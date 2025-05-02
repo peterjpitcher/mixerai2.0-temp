@@ -51,4 +51,12 @@ export function middleware(request: NextRequest) {
 
   return NextResponse.next();
   */
-} 
+}
+
+// Configure paths to exclude from middleware processing
+export const config = {
+  matcher: [
+    // Skip all internal paths (_next, static, etc)
+    '/((?!_next/|api/|static/|favicon.ico).*)',
+  ],
+}; 
