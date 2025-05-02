@@ -1,5 +1,4 @@
 {
-  "buildCommand": "mkdir -p .net && touch .net/routes-manifest.json && next build && cp -r .next/routes-manifest.json .net/",
   "headers": [
     {
       "source": "/(.*)",
