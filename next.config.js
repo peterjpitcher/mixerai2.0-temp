@@ -20,11 +20,7 @@ const nextConfig = {
     fetches: {
       fullUrl: true,
     },
-  },
-  // Use serverless target for Vercel
-  target: 'serverless',
-  // Don't use standalone output with serverless target
-  output: undefined
+  }
 };
 
 module.exports = nextConfig; 
