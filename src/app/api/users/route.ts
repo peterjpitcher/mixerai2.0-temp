@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { handleApiError } from '@/lib/api-utils';
 
 // Define the shape of user profiles returned from Supabase
 interface ProfileRecord {
@@ -21,6 +22,41 @@ interface ProfileRecord {
  */
 export async function GET() {
   try {
+    // During static site generation, return mock data
+    if (process.env.NEXT_PHASE === 'phase-production-build') {
+      console.log('Returning mock users during build');
+      return NextResponse.json({ 
+        success: true, 
+        isMockData: true,
+        users: [
+          {
+            id: '1',
+            full_name: 'Admin User',
+            email: 'admin@example.com',
+            avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin',
+            role: 'Admin',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            brand_permissions: [
+              { id: '1', brand_id: '1', role: 'admin' }
+            ]
+          },
+          {
+            id: '2',
+            full_name: 'Editor User',
+            email: 'editor@example.com',
+            avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=editor',
+            role: 'Editor',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            brand_permissions: [
+              { id: '2', brand_id: '1', role: 'editor' }
+            ]
+          }
+        ]
+      });
+    }
+    
     const supabase = createSupabaseAdminClient();
     
     // Get all user profiles with associated role information
@@ -70,10 +106,6 @@ export async function GET() {
       users: formattedUsers 
     });
   } catch (error) {
-    console.error('Error fetching users:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch users' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'Error fetching users');
   }
 } 

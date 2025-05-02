@@ -1,8 +1,44 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { handleApiError } from '@/lib/api-utils';
 
 export async function GET() {
   try {
+    // During static site generation, return mock data
+    if (process.env.NEXT_PHASE === 'phase-production-build') {
+      console.log('Returning mock brands during build');
+      return NextResponse.json({ 
+        success: true, 
+        isMockData: true,
+        brands: [
+          {
+            id: '1',
+            name: 'Sample Brand',
+            website_url: 'https://example.com',
+            country: 'United States',
+            language: 'English',
+            brand_identity: 'Modern and innovative',
+            tone_of_voice: 'Professional but friendly',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            content_count: 5
+          },
+          {
+            id: '2',
+            name: 'Another Brand',
+            website_url: 'https://another-example.com',
+            country: 'United Kingdom',
+            language: 'English',
+            brand_identity: 'Traditional and trusted',
+            tone_of_voice: 'Formal and authoritative',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            content_count: 3
+          }
+        ]
+      });
+    }
+    
     const supabase = createSupabaseAdminClient();
     
     // Get all brands
@@ -24,11 +60,7 @@ export async function GET() {
       brands: formattedBrands 
     });
   } catch (error) {
-    console.error('Error fetching brands:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch brands' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'Error fetching brands');
   }
 }
 
@@ -67,10 +99,6 @@ export async function POST(request: Request) {
       brand: data[0]
     });
   } catch (error) {
-    console.error('Error creating brand:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to create brand' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'Error creating brand');
   }
 } 

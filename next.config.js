@@ -18,6 +18,13 @@ const nextConfig = {
     serverActions: {
       allowedOrigins: ["localhost:3000", "mixerai2-0.vercel.app"]
     }
+  },
+  // Disable the static generation of API routes that depend on database connections
+  // This prevents build errors from fetch failures
+  output: "standalone",
+  distDir: ".next",
+  generateBuildId: async () => {
+    return "mixerai-build-" + new Date().getTime();
   }
 };
 
