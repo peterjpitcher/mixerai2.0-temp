@@ -23,40 +23,23 @@ const dashboardPaths = [
   '/account',
 ];
 
-// This function can be marked `async` if using `await` inside
+// This middleware adds security headers to all responses
 export function middleware(request: NextRequest) {
-  // DISABLED: Now using RootLayoutWrapper instead of route groups
-  return NextResponse.next();
+  // Get the response
+  const response = NextResponse.next();
   
-  /*
-  const { pathname } = request.nextUrl;
-
-  // Check if the current path should use the dashboard layout
-  const isDashboardPath = dashboardPaths.some(path => 
-    pathname === path || pathname.startsWith(`${path}/`)
-  );
-
-  // Skip API routes
-  if (pathname.startsWith('/api')) {
-    return NextResponse.next();
-  }
-
-  // If this is a dashboard path but not in the (dashboard) route group
-  if (isDashboardPath && !pathname.startsWith('/(dashboard)')) {
-    // Rewrite to the same path but with the (dashboard) layout
-    const url = request.nextUrl.clone();
-    url.pathname = `/(dashboard)${pathname}`;
-    return NextResponse.rewrite(url);
-  }
-
-  return NextResponse.next();
-  */
+  // Add security headers
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-XSS-Protection', '1; mode=block');
+  response.headers.set('Referrer-Policy', 'origin-when-cross-origin');
+  
+  return response;
 }
 
-// Configure paths to exclude from middleware processing
+// Configure paths to include in middleware processing
 export const config = {
   matcher: [
-    // Skip all internal paths (_next, static, etc)
-    '/((?!_next/|api/|static/|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 }; 

@@ -19,19 +19,13 @@ const nextConfig = {
       allowedOrigins: ["localhost:3000", "mixerai2-0.vercel.app"]
     }
   },
-  // Disable the static generation of API routes that depend on database connections
-  // This prevents build errors from fetch failures
-  output: "standalone",
-  distDir: ".next",
-  generateBuildId: async () => {
-    return "mixerai-build-" + new Date().getTime();
-  },
   // Fix for routes-manifest.json error in Vercel
   outputFileTracing: true,
   env: {
     // Make sure the NEXT_PHASE env var is set during build
     NEXT_PHASE: process.env.NEXT_PHASE || "phase-production-build"
-  }
+  },
+  poweredByHeader: false
 };
 
 module.exports = nextConfig; 
