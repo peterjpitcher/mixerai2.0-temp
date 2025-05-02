@@ -1,0 +1,92 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# MixerAI 2.0 Project Structure
+
+This rule documents the overall project structure and architecture for the MixerAI 2.0 application.
+
+## Project Overview
+
+MixerAI 2.0 is a Next.js application for generating AI content with Azure OpenAI for digital marketing. It allows users to create and manage content for different brands using customizable workflows.
+
+## Directory Structure Issue ⚠️
+
+The project currently has duplication issues in its directory structure:
+
+```
+MixerAI 2.0a/               # Root project directory
+├── src/                    # Duplicate src directory (should be consolidated)
+├── mixerai-2.0/            # Main application directory (correct location)
+│   ├── src/                # Main source code (correct location)
+│   ├── public/             # Static assets
+│   ├── migrations/         # Database migration scripts
+│   ├── scripts/            # Utility scripts
+│   └── .next/              # Next.js build output (generated)
+│   └── mixerai-2.0/        # Nested duplicate directory (should be removed)
+```
+
+### ⚠️ Important Note
+
+**Always use the `/mixerai-2.0` directory as the project root.** All commands should be run from this directory, not from the parent directory.
+
+```bash
+# Navigate to the correct directory
+cd mixerai-2.0
+
+# Then run commands
+npm run dev
+```
+
+See [FOLDER_STRUCTURE_FIX.md](mdc:FOLDER_STRUCTURE_FIX.md) for details on resolving the directory structure issues.
+
+## Correct Application Structure
+
+The application follows the Next.js App Router structure (from within the `mixerai-2.0` directory):
+
+- [src/app/](mdc:mixerai-2.0/src/app) - Main application routes
+  - [api/](mdc:mixerai-2.0/src/app/api) - API routes
+  - [auth/](mdc:mixerai-2.0/src/app/auth) - Authentication pages
+  - [dashboard/](mdc:mixerai-2.0/src/app/dashboard) - Dashboard pages
+
+## Key Components
+
+- [src/components/](mdc:mixerai-2.0/src/components) - UI components
+  - [ui/](mdc:mixerai-2.0/src/components/ui) - shadcn/ui components
+  - [content/](mdc:mixerai-2.0/src/components/content) - Content-related components
+  - [dashboard/](mdc:mixerai-2.0/src/components/dashboard) - Dashboard components
+  - [workflows/](mdc:mixerai-2.0/src/components/workflows) - Workflow components
+
+## Library Code
+
+- [src/lib/](mdc:mixerai-2.0/src/lib) - Shared libraries and utilities
+  - [db.ts](mdc:mixerai-2.0/src/lib/db.ts) - Direct PostgreSQL connection
+  - [auth/](mdc:mixerai-2.0/src/lib/auth) - Authentication utilities
+  - [azure/](mdc:mixerai-2.0/src/lib/azure) - Azure OpenAI integration
+
+## Running the Application
+
+To run the application (always from the `mixerai-2.0` directory):
+
+1. For local development with local PostgreSQL:
+   ```bash
+   cd mixerai-2.0
+   ./scripts/use-local-db.sh
+   ```
+
+2. For standard development (with Supabase):
+   ```bash
+   cd mixerai-2.0
+   npm run dev
+   ```
+
+## Documentation
+
+The project includes several documentation files:
+
+- [DOCUMENTATION.md](mdc:mixerai-2.0/DOCUMENTATION.md) - Main project documentation
+- [DATABASE_SETUP.md](mdc:mixerai-2.0/DATABASE_SETUP.md) - Database setup guide
+- [CLEAN_DATABASE.md](mdc:mixerai-2.0/CLEAN_DATABASE.md) - Guide for cleaning test data
+- [DATABASE_CONNECTION_ISSUES.md](mdc:mixerai-2.0/DATABASE_CONNECTION_ISSUES.md) - Troubleshooting guide
+- [FOLDER_STRUCTURE_FIX.md](mdc:FOLDER_STRUCTURE_FIX.md) - Guide to fixing directory structure

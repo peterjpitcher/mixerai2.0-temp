@@ -1,0 +1,74 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# MixerAI 2.0 Database Connections
+
+This rule documents the database connection architecture and setup for the MixerAI 2.0 project.
+
+## Database Connection Architecture
+
+The application can use two database connection methods:
+
+1. **Supabase Connection** (Default)
+   - Used for authentication and data storage in production/staging
+   - Connection is managed through the Supabase client libraries
+   - Configured via environment variables:
+     - `NEXT_PUBLIC_SUPABASE_URL`
+     - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+     - `SUPABASE_SERVICE_ROLE_KEY`
+
+2. **Direct PostgreSQL Connection** (Local Development)
+   - Implemented through the [src/lib/db.ts](mdc:mixerai-2.0/src/lib/db.ts) module
+   - Configured via environment variables:
+     - `POSTGRES_HOST`
+     - `POSTGRES_PORT`
+     - `POSTGRES_USER`
+     - `POSTGRES_PASSWORD`
+     - `POSTGRES_DB`
+
+## API Routes for Data Access
+
+The application uses Next.js API routes to manage data access:
+
+- [src/app/api/brands/route.ts](mdc:mixerai-2.0/src/app/api/brands/route.ts) - Fetch all brands
+- [src/app/api/content-types/route.ts](mdc:mixerai-2.0/src/app/api/content-types/route.ts) - Fetch all content types
+- [src/app/api/content/route.ts](mdc:mixerai-2.0/src/app/api/content/route.ts) - Fetch all content
+
+## Frontend Components
+
+Frontend components should fetch data from the API routes rather than using direct database connections:
+
+- [src/app/dashboard/brands/page.tsx](mdc:mixerai-2.0/src/app/dashboard/brands/page.tsx) - Brands listing page
+- [src/app/dashboard/content/page.tsx](mdc:mixerai-2.0/src/app/dashboard/content/page.tsx) - Content listing page
+
+## Local Development Setup
+
+For local development using PostgreSQL:
+
+1. Use Docker to run a PostgreSQL instance:
+   ```bash
+   docker-compose up -d
+   ```
+
+2. Run the application with local database configuration:
+   ```bash
+   cd mixerai-2.0
+   ./scripts/use-local-db.sh
+   ```
+
+## Utility Scripts
+
+The project includes several utility scripts for database management:
+
+- **use-local-db.sh**: Runs the app with local database configuration
+- **reset-database.sh**: Completely resets the database with a clean schema
+- **clean-database.sh**: Removes dummy data while preserving the schema
+- **add-test-user.sh**: Adds a test user for authentication
+- **create-sample-brands.sh**: Adds sample brands matching the UI
+
+## Documentation
+
+For more detailed information about database connections and issues, refer to:
+[DATABASE_CONNECTION_ISSUES.md](mdc:mixerai-2.0/DATABASE_CONNECTION_ISSUES.md)

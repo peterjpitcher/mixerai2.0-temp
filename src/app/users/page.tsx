@@ -1,0 +1,253 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { Button } from '@/components/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/card';
+import { Input } from '@/components/input';
+import { useToast } from '@/components/toast-provider';
+import { Badge } from '@/components/badge';
+
+interface User {
+  id: string;
+  full_name: string;
+  email?: string;
+  role?: string;
+  avatar_url?: string;
+  created_at?: string;
+}
+
+export default function UsersPage() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        const response = await fetch('/api/users');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch users');
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          setUsers(data.users);
+          setFilteredUsers(data.users);
+        } else {
+          throw new Error(data.error || 'Failed to fetch users');
+        }
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        setError((error as Error).message || 'Failed to load users');
+        toast({
+          title: 'Error',
+          description: 'Failed to load users. Please try again.',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchUsers();
+  }, [toast]);
+  
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredUsers(users);
+      return;
+    }
+    
+    const query = searchQuery.toLowerCase();
+    const filtered = users.filter(user => 
+      user.full_name.toLowerCase().includes(query) || 
+      (user.email && user.email.toLowerCase().includes(query)) ||
+      (user.role && user.role.toLowerCase().includes(query))
+    );
+    
+    setFilteredUsers(filtered);
+  }, [searchQuery, users]);
+  
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'Unknown';
+    
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    }).format(date);
+  };
+  
+  return (
+    <div className="flex flex-col">
+      {/* Full width header with background */}
+      <div className="w-full bg-background border-b px-6 py-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold tracking-tight">Users</h1>
+          <Button asChild>
+            <Link href="/users/invite">Invite User</Link>
+          </Button>
+        </div>
+      </div>
+      
+      <div className="space-y-8">
+        <div className="flex items-center justify-between">
+          <div className="max-w-sm w-full">
+            <Input 
+              placeholder="Search users..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Export
+            </Button>
+          </div>
+        </div>
+        
+        {isLoading ? (
+          <div className="py-10 flex justify-center items-center min-h-[300px]">
+            <div className="flex flex-col items-center">
+              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p className="text-muted-foreground">Loading users...</p>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="text-center py-12 px-4">
+            <div className="mx-auto w-24 h-24 rounded-full bg-destructive/10 flex items-center justify-center mb-6">
+              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-destructive">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Failed to load users</h3>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              {error}
+            </p>
+            <Button variant="outline" size="lg" onClick={() => window.location.reload()}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                <path d="M21 2v6h-6" />
+                <path d="M3 12a9 9 0 0 1 15-6.7l3-3.3" />
+                <path d="M3 22v-6h6" />
+                <path d="M21 12a9 9 0 0 1-15 6.7l-3 3.3" />
+              </svg>
+              Retry
+            </Button>
+          </div>
+        ) : users.length === 0 ? (
+          <div className="text-center py-12 px-4">
+            <div className="mx-auto w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold mb-2">No users found</h3>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              You haven't added any users to the system yet. Invite users to start collaborating.
+            </p>
+            <Button size="lg" asChild>
+              <Link href="/users/invite">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                  <path d="M5 12h14" />
+                  <path d="M12 5v14" />
+                </svg>
+                Invite First User
+              </Link>
+            </Button>
+          </div>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle>All Users ({filteredUsers.length})</CardTitle>
+              {searchQuery && (
+                <CardDescription>
+                  Showing results for "{searchQuery}"
+                </CardDescription>
+              )}
+            </CardHeader>
+            <CardContent>
+              {filteredUsers.length === 0 ? (
+                <div className="text-center py-6">
+                  <p className="text-muted-foreground">No users match your search criteria</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left pb-3 font-medium">Name</th>
+                        <th className="text-left pb-3 font-medium">Email</th>
+                        <th className="text-left pb-3 font-medium">Role</th>
+                        <th className="text-left pb-3 font-medium">Joined</th>
+                        <th className="text-left pb-3 font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredUsers.map(user => (
+                        <tr key={user.id} className="border-b hover:bg-muted/50">
+                          <td className="py-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full overflow-hidden">
+                                {user.avatar_url ? (
+                                  <img src={user.avatar_url} alt={user.full_name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="bg-primary/10 w-full h-full flex items-center justify-center text-primary font-bold">
+                                    {user.full_name.charAt(0)}
+                                  </div>
+                                )}
+                              </div>
+                              <span>{user.full_name}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 text-muted-foreground">{user.email}</td>
+                          <td className="py-3">
+                            {user.role === 'Admin' ? (
+                              <Badge variant="default" className="bg-blue-100 hover:bg-blue-100 text-blue-800 hover:text-blue-800">Admin</Badge>
+                            ) : user.role === 'Editor' ? (
+                              <Badge variant="default" className="bg-green-100 hover:bg-green-100 text-green-800 hover:text-green-800">Editor</Badge>
+                            ) : (
+                              <Badge variant="default" className="bg-gray-100 hover:bg-gray-100 text-gray-800 hover:text-gray-800">Viewer</Badge>
+                            )}
+                          </td>
+                          <td className="py-3 text-muted-foreground">
+                            {formatDate(user.created_at)}
+                          </td>
+                          <td className="py-3">
+                            <div className="flex gap-2">
+                              <Button variant="ghost" size="sm">Edit</Button>
+                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">Delete</Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+} 

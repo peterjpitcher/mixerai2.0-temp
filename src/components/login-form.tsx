@@ -1,0 +1,127 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/card";
+import { Input } from "@/components/input";
+import { Label } from "@/components/label";
+import { createSupabaseClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/toast-provider";
+
+export function LoginForm() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const supabase = createSupabaseClient();
+      
+      // Log client-side URL for debugging
+      console.log("Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+      
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.error("Authentication error:", error);
+        setError(error.message);
+        toast({
+          title: "Login failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        // Successfully logged in
+        toast({
+          title: "Success",
+          description: "You have been logged in",
+        });
+        router.push("/dashboard");
+        router.refresh();
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("An unexpected error occurred. Please try again.");
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-2xl font-bold text-center">Log in to your account</CardTitle>
+        <CardDescription className="text-center">
+          Enter your email and password to access your account
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-1">
+            <Label htmlFor="email">Email</Label>
+            <Input 
+              id="email" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@example.com" 
+              type="email" 
+              autoCapitalize="none" 
+              autoComplete="email" 
+              autoCorrect="off"
+              disabled={isLoading} 
+              required
+            />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <Link href="/auth/forgot-password" className="text-sm font-medium text-primary hover:underline">
+                Forgot password?
+              </Link>
+            </div>
+            <Input 
+              id="password" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password" 
+              autoComplete="current-password"
+              disabled={isLoading}
+              required
+            />
+          </div>
+          {error && (
+            <div className="text-sm text-red-500">{error}</div>
+          )}
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? "Logging in..." : "Log in"}
+          </Button>
+        </form>
+      </CardContent>
+      <CardFooter>
+        <div className="text-center w-full text-sm">
+          Don't have an account?{" "}
+          <Link href="/auth/register" className="font-medium text-primary hover:underline">
+            Sign up
+          </Link>
+        </div>
+      </CardFooter>
+    </Card>
+  );
+} 
