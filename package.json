@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "postbuild": "mkdir -p .vercel/output/static .vercel/output/functions/_next/data && cp -r .next/routes-manifest.json .vercel/routes-manifest.json || true",
+    "vercel-build": "next build",
+    "postbuild": "echo 'Build completed successfully'",
     "start": "next start",
     "lint": "next lint"
   },

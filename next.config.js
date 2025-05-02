@@ -19,12 +19,6 @@ const nextConfig = {
       allowedOrigins: ["localhost:3000", "mixerai2-0.vercel.app"]
     }
   },
-  // Fix for routes-manifest.json error in Vercel
-  outputFileTracing: true,
-  env: {
-    // Make sure the NEXT_PHASE env var is set during build
-    NEXT_PHASE: process.env.NEXT_PHASE || "phase-production-build"
-  },
   poweredByHeader: false
 };
 
