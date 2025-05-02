@@ -1,6 +1,36 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { handleApiError } from '@/lib/api-utils';
+import { handleApiError, isProduction } from '@/lib/api-utils';
+
+// Sample fallback data for production when DB connection fails
+const getFallbackBrands = () => {
+  return [
+    {
+      id: '1',
+      name: 'Sample Brand',
+      website_url: 'https://example.com',
+      country: 'United States',
+      language: 'English',
+      brand_identity: 'Modern and innovative',
+      tone_of_voice: 'Professional but friendly',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      content_count: 5
+    },
+    {
+      id: '2',
+      name: 'Another Brand',
+      website_url: 'https://another-example.com',
+      country: 'United Kingdom',
+      language: 'English',
+      brand_identity: 'Traditional and trusted',
+      tone_of_voice: 'Formal and authoritative',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      content_count: 3
+    }
+  ];
+};
 
 export async function GET() {
   try {
@@ -10,32 +40,7 @@ export async function GET() {
       return NextResponse.json({ 
         success: true, 
         isMockData: true,
-        brands: [
-          {
-            id: '1',
-            name: 'Sample Brand',
-            website_url: 'https://example.com',
-            country: 'United States',
-            language: 'English',
-            brand_identity: 'Modern and innovative',
-            tone_of_voice: 'Professional but friendly',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            content_count: 5
-          },
-          {
-            id: '2',
-            name: 'Another Brand',
-            website_url: 'https://another-example.com',
-            country: 'United Kingdom',
-            language: 'English',
-            brand_identity: 'Traditional and trusted',
-            tone_of_voice: 'Formal and authoritative',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            content_count: 3
-          }
-        ]
+        brands: getFallbackBrands()
       });
     }
     
@@ -59,7 +64,21 @@ export async function GET() {
       success: true, 
       brands: formattedBrands 
     });
-  } catch (error) {
+  } catch (error: any) {
+    // In production, if it's a serious database connection error, return fallback data
+    if (isProduction() && 
+       (error.code === 'ECONNREFUSED' || 
+        error.code === 'ConnectionError' || 
+        error.message?.includes('connection') ||
+        error.message?.includes('auth'))) {
+      console.error('Database connection error, using fallback brands data:', error);
+      return NextResponse.json({ 
+        success: true, 
+        isFallback: true,
+        brands: getFallbackBrands()
+      });
+    }
+    
     return handleApiError(error, 'Error fetching brands');
   }
 }

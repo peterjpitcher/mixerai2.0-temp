@@ -1,5 +1,5 @@
 {
-  "buildCommand": "next build && mkdir -p .net && cp -r .next/routes-manifest.json .net/",
+  "buildCommand": "mkdir -p .net && next build && cp -r .next/routes-manifest.json .net/",
   "outputDirectory": ".next",
   "headers": [
     {
@@ -16,6 +16,10 @@
         {
           "key": "X-XSS-Protection",
           "value": "1; mode=block"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
         }
       ]
     }

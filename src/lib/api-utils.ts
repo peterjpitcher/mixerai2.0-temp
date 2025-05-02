@@ -19,9 +19,16 @@ export const handleApiError = (
   message: string = 'An error occurred', 
   status: number = 500
 ) => {
-  // During static generation, we want to return a more gentle error
-  // This ensures the build can complete even if DB connections fail
-  console.error(`${message}:`, error);
+  // Log the full error in development, but a sanitized version in production
+  if (isProduction()) {
+    console.error(`API Error [${message}]:`, {
+      message: error.message || 'Unknown error',
+      code: error.code || 'UNKNOWN',
+      hint: error.hint || '',
+    });
+  } else {
+    console.error(`${message}:`, error);
+  }
   
   // During static site generation, we return an empty success
   // to prevent build errors with database connections
@@ -34,12 +41,28 @@ export const handleApiError = (
     });
   }
   
+  // If this is a database connection error in production, provide a more helpful response
+  if (isProduction() && 
+     (error.code === 'ECONNREFUSED' || 
+      error.code === 'ConnectionError' || 
+      error.message?.includes('connection') ||
+      error.message?.includes('auth'))) {
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Database connection error. Please try again later.',
+        isFallback: true,
+      },
+      { status: 503 } // Service Unavailable
+    );
+  }
+  
   // Otherwise return the actual error
   return NextResponse.json(
     { 
       success: false, 
       error: message,
-      details: error.message || error.toString(),
+      details: isProduction() ? 'See server logs for details' : (error.message || error.toString()),
       hint: error.hint || '',
       code: error.code || ''
     },

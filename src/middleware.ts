@@ -2,29 +2,15 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
- * NOTE: This middleware is currently DISABLED to avoid routing conflicts.
- * 
- * The application now uses a RootLayoutWrapper component in src/app/layout.tsx
- * to provide consistent navigation instead of relying on route groups.
- * 
- * All routes including '/users' and '/users/invite' now exist directly in
- * the src/app directory without using the (dashboard) route group.
- * 
- * For details, see docs/ROUTING_FIX.md
+ * This middleware adds security headers to all responses
+ * It's been simplified to avoid routing conflicts
  */
-
-// List of paths that should use the dashboard layout
-const dashboardPaths = [
-  '/',
-  '/brands',
-  '/content',
-  '/workflows',
-  '/users',
-  '/account',
-];
-
-// This middleware adds security headers to all responses
 export function middleware(request: NextRequest) {
+  // Skip API routes to prevent interference with their error handling
+  if (request.nextUrl.pathname.startsWith('/api/')) {
+    return NextResponse.next();
+  }
+  
   // Get the response
   const response = NextResponse.next();
   
@@ -40,6 +26,7 @@ export function middleware(request: NextRequest) {
 // Configure paths to include in middleware processing
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    // Apply to all routes except API, static assets, images, and favicon
+    '/((?!_next/static|_next/image|favicon.ico|api/).*)',
   ],
 }; 
