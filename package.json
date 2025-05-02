@@ -6,8 +6,6 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "vercel-build": "next build",
-    "postbuild": "echo 'Build completed successfully'",
     "start": "next start",
     "lint": "next lint"
   },

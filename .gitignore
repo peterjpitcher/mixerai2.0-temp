@@ -15,6 +15,7 @@
 # vercel
 .vercel
 !.vercel/build.sh
+!.net/
 
 # local env files
 .env*.local

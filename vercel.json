@@ -1,4 +1,6 @@
 {
+  "buildCommand": "next build && mkdir -p .net && cp -r .next/routes-manifest.json .net/",
+  "outputDirectory": ".next",
   "headers": [
     {
       "source": "/(.*)",
