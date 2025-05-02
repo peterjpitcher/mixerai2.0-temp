@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
+  "framework": "nextjs",
   "headers": [
     {
       "source": "/(.*)",
@@ -23,10 +23,5 @@
         }
       ]
     }
-  ],
-  "build": {
-    "env": {
-      "NEXT_PUBLIC_VERCEL_ENV": "production"
-    }
-  }
+  ]
 } 

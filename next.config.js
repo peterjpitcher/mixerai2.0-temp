@@ -20,7 +20,9 @@ const nextConfig = {
     fetches: {
       fullUrl: true,
     },
-  }
+  },
+  // Set output to be compatible with Vercel serverless functions
+  output: 'standalone',
 };
 
 module.exports = nextConfig; 

@@ -5,7 +5,7 @@
   "description": "MixerAI 2.0 - AI-powered content generation platform",
   "scripts": {
     "dev": "next dev",
-    "build": "next build && mkdir -p .net && cp .next/routes-manifest.json .net/",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
