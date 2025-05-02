@@ -5,8 +5,8 @@
   "description": "MixerAI 2.0 - AI-powered content generation platform",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "NODE_ENV=production node server.js",
+    "build": "next build && mkdir -p .net && cp .next/routes-manifest.json .net/",
+    "start": "next start",
     "lint": "next lint"
   },
   "keywords": ["wrapper"],
