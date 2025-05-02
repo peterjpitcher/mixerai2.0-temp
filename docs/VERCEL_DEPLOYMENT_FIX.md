@@ -1,83 +1,73 @@
 # Vercel Deployment Fix
 
-## Issues
+This document outlines the steps taken to fix the Vercel deployment issues with MixerAI 2.0.
 
-The deployment of MixerAI 2.0 to Vercel was experiencing two separate but related issues:
+## Problem
 
-1. **Missing routes-manifest.json**:
-   ```
-   The file '/vercel/path0/.net/routes-manifest.json' couldn't be found.
-   ```
+The application was stuck in maintenance mode showing only a static page with the message:
 
-2. **Missing styled-jsx dependency**:
-   ```
-   Cannot find module 'styled-jsx/style'
-   Require stack:
-   - /var/task/node_modules/next/dist/server/require-hook.js
-   - /var/task/node_modules/next/dist/server/next.js
-   - /var/task/server.js
-   ```
+```
+MixerAI 2.0
+Maintenance Mode
+API Services Available
+The application is currently in maintenance mode, but API services are available.
+```
 
-These errors were causing 500 errors for both API endpoints and page rendering.
+The root cause was that the Vercel configuration was set to use the custom server.js file in maintenance mode instead of deploying the proper Next.js application.
 
 ## Solution
 
-We implemented a two-part solution:
+The following changes were made to fix the deployment:
 
-### 1. Simplify the Server Implementation
+1. **Updated vercel.json**:
+   - Removed the `builds` section that pointed to server.js
+   - Removed the `routes` section that directed all traffic to server.js
+   - Added proper `headers` configuration
+   - Added `buildCommand` to use Next.js build
 
-Instead of using Next.js in a custom server, we created a lightweight standalone HTTP server:
+2. **Updated package.json**:
+   - Changed the `start` script from `NODE_ENV=production node server.js` to `next start`
+   - Modified the `build` script to ensure .net/routes-manifest.json is created
 
-- Removed the dependency on Next.js in the server.js file
-- Created direct handlers for API routes that return fallback data
-- Added a simple maintenance mode HTML page for non-API routes
-- This avoids the complications of trying to integrate Next.js with a custom server
+3. **Fixed routes-manifest.json issue**:
+   - Created a .net directory with a valid routes-manifest.json file
+   - Added a step in the build script to copy the Next.js generated routes-manifest.json to the .net directory
 
-### 2. Add Missing Dependencies
+## Deployment Instructions
 
-- Added `styled-jsx` package to dependencies in package.json:
-  ```json
-  "styled-jsx": "^5.1.2"
-  ```
+1. Push the changes to GitHub:
+   ```bash
+   git add vercel.json package.json .net/routes-manifest.json
+   git commit -m "Fix Vercel deployment to use Next.js instead of maintenance mode"
+   git push origin main
+   ```
 
-### 3. Configure Vercel Properly
+2. In the Vercel dashboard:
+   - Redeploy the application from the GitHub repository
+   - Ensure no environment variables are set to enable maintenance mode
+   - Verify that the build logs show the Next.js build process and not just the server.js deployment
 
-- Updated vercel.json to use the server.js directly:
-  ```json
-  {
-    "version": 2,
-    "builds": [
-      {
-        "src": "server.js",
-        "use": "@vercel/node"
-      }
-    ],
-    "routes": [
-      {
-        "src": "/(.*)",
-        "dest": "/server.js"
-      }
-    ]
-  }
-  ```
+## Reverting to Maintenance Mode
 
-## Current State
+If you need to put the site back in maintenance mode:
 
-The application is now deployed in a "maintenance mode" where:
-
-1. The API routes (/api/brands, /api/content, /api/content-types) work and return fallback data
-2. A maintenance page is shown for all other routes
-
-## Next Steps
-
-1. **Database Connection**: Once we have reliable API endpoints, investigate and fix the database connection issues:
-   - Check environment variables in the Vercel dashboard
-   - Verify Supabase access permissions
-   - Test database connectivity from Vercel's infrastructure
-
-2. **Full Application Restoration**: After database connectivity is fixed:
-   - Revert to the standard Next.js deployment approach
-   - Remove the custom server.js 
-   - Test all pages and routes 
-
-3. **Monitoring and Logging**: Implement better error monitoring and logging to catch similar issues in the future 
+1. Change the `start` script in package.json back to `NODE_ENV=production node server.js`
+2. Update vercel.json to use the server.js configuration:
+   ```json
+   {
+     "version": 2,
+     "builds": [
+       {
+         "src": "server.js",
+         "use": "@vercel/node"
+       }
+     ],
+     "routes": [
+       {
+         "src": "/(.*)",
+         "dest": "/server.js"
+       }
+     ]
+   }
+   ```
+3. Commit and push the changes to GitHub 
