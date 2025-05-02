@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MixerAI API Tester</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      line-height: 1.6;
+      color: #333;
+      background-color: #f9f9f9;
+    }
+    h1 {
+      color: #2563eb;
+      margin-top: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      margin: 20px 0;
+    }
+    button {
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+      font-size: 14px;
+    }
+    button:hover {
+      background-color: #1d4ed8;
+    }
+    pre {
+      background-color: #f0f0f0;
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-family: monospace;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .endpoint {
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #eaeaea;
+    }
+    .endpoint:last-child {
+      border-bottom: none;
+    }
+    .badge {
+      display: inline-block;
+      background: #ffedd5;
+      color: #c2410c;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>MixerAI API Tester</h1>
+  <span class="badge">Test API Endpoints</span>
+  
+  <div class="card">
+    <div class="endpoint">
+      <h2>Brands API</h2>
+      <button onclick="fetchApi('/api/brands')">Test Brands API</button>
+      <div id="brands-result"></div>
+    </div>
+    
+    <div class="endpoint">
+      <h2>Content API</h2>
+      <button onclick="fetchApi('/api/content')">Test Content API</button>
+      <div id="content-result"></div>
+    </div>
+    
+    <div class="endpoint">
+      <h2>Content Types API</h2>
+      <button onclick="fetchApi('/api/content-types')">Test Content Types API</button>
+      <div id="content-types-result"></div>
+    </div>
+  </div>
+
+  <script>
+    async function fetchApi(endpoint) {
+      const resultId = endpoint.split('/')[2].replace('-', '') + '-result';
+      const resultElement = document.getElementById(resultId);
+      
+      resultElement.innerHTML = '<p>Loading...</p>';
+      
+      try {
+        const response = await fetch(endpoint, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include' // Include cookies if needed
+        });
+        
+        const data = await response.json();
+        
+        resultElement.innerHTML = `
+          <h3>Status: ${response.status} ${response.ok ? 'OK' : 'Error'}</h3>
+          <pre>${JSON.stringify(data, null, 2)}</pre>
+        `;
+      } catch (error) {
+        resultElement.innerHTML = `
+          <h3>Error</h3>
+          <pre>${error.message}</pre>
+        `;
+      }
+    }
+  </script>
+</body>
+</html> 

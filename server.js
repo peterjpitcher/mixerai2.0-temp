@@ -1,5 +1,7 @@
 const { createServer } = require('http');
 const { parse } = require('url');
+const fs = require('fs');
+const path = require('path');
 
 // Create a simple server that handles requests directly
 const server = createServer((req, res) => {
@@ -11,6 +13,22 @@ const server = createServer((req, res) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+  
+  // Serve API tester HTML page
+  if (pathname === '/api-tester') {
+    try {
+      const htmlPath = path.join(__dirname, 'public', 'api-tester.html');
+      if (fs.existsSync(htmlPath)) {
+        const content = fs.readFileSync(htmlPath, 'utf8');
+        res.setHeader('Content-Type', 'text/html');
+        res.statusCode = 200;
+        res.end(content);
+        return;
+      }
+    } catch (error) {
+      console.error('Error serving API tester:', error);
+    }
+  }
   
   // Handle API routes directly with fallback data
   if (pathname.startsWith('/api/')) {
@@ -186,6 +204,7 @@ const server = createServer((req, res) => {
             <li>/api/content - Get all content</li>
             <li>/api/content-types - Get all content types</li>
           </ul>
+          <p><a href="/api-tester" style="color: #2563eb; text-decoration: none; font-weight: bold;">Use the API Tester</a></p>
         </div>
         <p>The full application will be back soon. Thank you for your patience.</p>
       </body>
