@@ -1,6 +1,4 @@
 {
-  "buildCommand": "npm run build && bash scripts/copy-routes-manifest.sh",
-  "ignoreCommand": "exit 1",
   "headers": [
     {
       "source": "/(.*)",
