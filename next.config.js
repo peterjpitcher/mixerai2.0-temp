@@ -14,14 +14,7 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   // Security settings
-  experimental: {
-    serverActions: {
-      allowedOrigins: ["localhost:3000", "mixerai2-0.vercel.app", "mixerai.orangejelly.co.uk"]
-    }
-  },
   poweredByHeader: false,
-  // Prevent output conflicts
-  output: "standalone",
   // Log more info in production builds
   logging: {
     fetches: {
