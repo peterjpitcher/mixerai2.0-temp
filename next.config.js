@@ -21,8 +21,7 @@ const nextConfig = {
       fullUrl: true,
     },
   },
-  // Set output to be compatible with Vercel serverless functions
-  output: 'standalone',
+  output: 'standalone'
 };
 
 module.exports = nextConfig; 

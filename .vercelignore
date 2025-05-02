@@ -1,6 +1,18 @@
-.git
-node_modules
-.next
+# Don't ignore our patches directory
+!.vercel/patches/
+
+# Ignore node_modules
+node_modules/
+
+# Ignore build output directories except necessary files
+.next/*
+!.next/routes-manifest.json
+
+# Ignore development files
+.git/
+.github/
+.vscode/
+
 .vercel
 scripts
 docs

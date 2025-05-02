@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "framework": "nextjs",
+  "buildCommand": "npm run build && bash .vercel/patches/copy-routes-manifest.sh",
+  "ignoreCommand": "exit 1",
   "headers": [
     {
       "source": "/(.*)",
