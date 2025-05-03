@@ -37,7 +37,7 @@ export async function GET() {
       return NextResponse.json({ 
         success: true, 
         isMockData: true,
-        contentTypes: getFallbackContentTypes()
+        data: getFallbackContentTypes()
       });
     }
     
@@ -56,7 +56,7 @@ export async function GET() {
     
     return NextResponse.json({ 
       success: true, 
-      contentTypes 
+      data: contentTypes 
     });
   } catch (error: any) {
     console.error('Error fetching content types:', error);
@@ -67,7 +67,7 @@ export async function GET() {
       return NextResponse.json({ 
         success: true, 
         isFallback: true,
-        contentTypes: getFallbackContentTypes()
+        data: getFallbackContentTypes()
       });
     }
     
