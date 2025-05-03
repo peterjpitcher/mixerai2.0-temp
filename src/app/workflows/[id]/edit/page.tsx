@@ -10,6 +10,7 @@ import { Textarea } from '@/components/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { Label } from '@/components/label';
 import { useToast } from '@/components/toast-provider';
+import { BrandIcon } from '@/components/brand-icon';
 
 interface Step {
   id: number;
@@ -30,6 +31,7 @@ interface WorkflowFormData {
 interface Brand {
   id: string;
   name: string;
+  brand_color?: string;
 }
 
 interface ContentType {
@@ -319,7 +321,10 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
                     <SelectContent>
                       {brands.map(brand => (
                         <SelectItem key={brand.id} value={brand.id}>
-                          {brand.name}
+                          <div className="flex items-center">
+                            <BrandIcon name={brand.name} color={brand.brand_color} size="sm" className="mr-2" />
+                            {brand.name}
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -12,10 +12,12 @@ import { Separator } from '@/components/separator';
 import { MarkdownDisplay } from './markdown-display';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/toast-provider';
+import { BrandIcon } from '@/components/brand-icon';
 
 interface Brand {
   id: string;
   name: string;
+  brand_color?: string;
 }
 
 interface ContentType {
@@ -220,9 +222,12 @@ export function ContentGeneratorForm() {
                   <SelectValue placeholder="Select brand" />
                 </SelectTrigger>
                 <SelectContent>
-                  {brands.map((brand) => (
+                  {brands.map(brand => (
                     <SelectItem key={brand.id} value={brand.id}>
-                      {brand.name}
+                      <div className="flex items-center">
+                        <BrandIcon name={brand.name} color={brand.brand_color} size="sm" className="mr-2" />
+                        {brand.name}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>

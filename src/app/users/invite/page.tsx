@@ -10,10 +10,12 @@ import { Label } from '@/components/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { useToast } from '@/components/toast-provider';
 import { Checkbox } from '@/components/checkbox';
+import { BrandIcon } from '@/components/brand-icon';
 
 interface Brand {
   id: string;
   name: string;
+  brand_color?: string;
 }
 
 export default function InviteUserPage() {
@@ -250,7 +252,10 @@ export default function InviteUserPage() {
                     <SelectContent>
                       {brands.map(brand => (
                         <SelectItem key={brand.id} value={brand.id}>
-                          {brand.name}
+                          <div className="flex items-center">
+                            <BrandIcon name={brand.name} color={brand.brand_color} size="sm" className="mr-2" />
+                            {brand.name}
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
