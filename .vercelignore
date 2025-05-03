@@ -1,19 +1,22 @@
 # Include build output directories
-!out/
 !.next/
+!.vercel/
+!vercel-build.js
 
 # Ignore node_modules
 node_modules/
-
-# Ignore custom server
-server.js
 
 # Ignore development files
 .git/
 .github/
 .vscode/
-.env*
+.env
+.env.local
+.env.development
 .DS_Store
+
+# Keep the following files
+!routes-manifest.json
 
 # Ignore docs, scripts, and other non-essential files
 README.md
