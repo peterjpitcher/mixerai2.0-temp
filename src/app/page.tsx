@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/card";
-import { AnalyticsOverview } from "@/components/dashboard/analytics-overview";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/tabs";
+import { Tabs, TabsContent } from "@/components/tabs";
 import { NotificationsButton } from "@/components/dashboard/notifications";
 
 // Define types for our data
@@ -32,6 +31,9 @@ interface ContentItem {
 interface WorkflowItem {
   id: string;
   name: string;
+  brand_name?: string;
+  content_type_name?: string;
+  steps_count?: number;
 }
 
 interface DashboardStats {
@@ -39,6 +41,13 @@ interface DashboardStats {
   userCount: number;
   contentCount: number;
   workflowCount: number;
+}
+
+interface ContentTypeDistribution {
+  name: string;
+  count: number;
+  percentage: number;
+  color: string;
 }
 
 export default function Dashboard() {
@@ -49,6 +58,7 @@ export default function Dashboard() {
     workflowCount: 0
   });
   const [recentContent, setRecentContent] = useState<ContentItem[]>([]);
+  const [contentTypeDistribution, setContentTypeDistribution] = useState<ContentTypeDistribution[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -63,20 +73,28 @@ export default function Dashboard() {
         // Fetch content
         const contentResponse = await fetch('/api/content');
         
-        if (!brandsResponse.ok || !contentResponse.ok) {
+        // Fetch users
+        const usersResponse = await fetch('/api/users');
+        
+        // Fetch workflows
+        const workflowsResponse = await fetch('/api/workflows');
+        
+        if (!brandsResponse.ok || !contentResponse.ok || !usersResponse.ok || !workflowsResponse.ok) {
           throw new Error("Failed to fetch dashboard data");
         }
         
         const brandsData = await brandsResponse.json();
         const contentData = await contentResponse.json();
+        const usersData = await usersResponse.json();
+        const workflowsData = await workflowsResponse.json();
         
-        if (brandsData.success && contentData.success) {
-          // Update stats
+        if (brandsData.success && contentData.success && usersData.success && workflowsData.success) {
+          // Update stats with live data
           setStats({
             brandCount: brandsData.brands.length,
-            userCount: 3, // Placeholder since we don't have users API yet
+            userCount: usersData.users.length,
             contentCount: contentData.content.length,
-            workflowCount: 5 // Placeholder since we don't have workflows API yet
+            workflowCount: workflowsData.workflows.length
           });
           
           // Set recent content (most recent 4 items)
@@ -86,6 +104,33 @@ export default function Dashboard() {
             .slice(0, 4);
           
           setRecentContent(sortedContent);
+          
+          // Calculate content type distribution
+          if (contentData.content.length > 0) {
+            const contentTypes: Record<string, number> = {};
+            
+            // Count contents by type
+            contentData.content.forEach((item: ContentItem) => {
+              if (item.content_type_name) {
+                contentTypes[item.content_type_name] = (contentTypes[item.content_type_name] || 0) + 1;
+              }
+            });
+            
+            // Convert to array with percentages
+            const totalCount = contentData.content.length;
+            const colors = ['bg-primary', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500'];
+            
+            const distribution = Object.entries(contentTypes)
+              .map(([name, count], index) => ({
+                name,
+                count,
+                percentage: Math.round((count / totalCount) * 100),
+                color: colors[index % colors.length]
+              }))
+              .sort((a, b) => b.count - a.count);
+            
+            setContentTypeDistribution(distribution);
+          }
         } else {
           throw new Error("Failed to fetch dashboard data");
         }
@@ -189,188 +234,160 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-1 mb-6">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {statsItems.map((stat) => (
-              <Card key={stat.name}>
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">{stat.name}</p>
-                      <p className="text-3xl font-bold">{stat.value}</p>
-                    </div>
-                    <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center text-primary">
-                      {stat.icon}
-                    </div>
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {statsItems.map((stat) => (
+            <Card key={stat.name}>
+              <CardContent className="p-6">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">{stat.name}</p>
+                    <p className="text-3xl font-bold">{stat.value}</p>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center text-primary">
+                    {stat.icon}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Content</CardTitle>
+            <CardDescription>Your latest content across all brands</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left pb-3 font-medium">Title</th>
+                    <th className="text-left pb-3 font-medium">Type</th>
+                    <th className="text-left pb-3 font-medium">Brand</th>
+                    <th className="text-left pb-3 font-medium">Status</th>
+                    <th className="text-left pb-3 font-medium">Date</th>
+                    <th className="text-left pb-3 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentContent.length > 0 ? (
+                    recentContent.map((content) => (
+                      <tr key={content.id} className="border-b">
+                        <td className="py-3">{content.title}</td>
+                        <td className="py-3">{content.content_type_name}</td>
+                        <td className="py-3">{content.brand_name}</td>
+                        <td className="py-3">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                            ${content.status === 'published' ? 'bg-green-100 text-green-800' : 
+                              content.status === 'draft' ? 'bg-gray-100 text-gray-800' : 
+                              content.status === 'pending_review' ? 'bg-yellow-100 text-yellow-800' : 
+                              'bg-blue-100 text-blue-800'}`}>
+                            {content.status.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="py-3">{formatDate(content.created_at)}</td>
+                        <td className="py-3">
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link href={`/content/${content.id}`}>View</Link>
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="py-6 text-center text-muted-foreground">
+                        No content found. Create your first content piece.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button variant="outline" asChild className="w-full">
+              <Link href="/content">View All Content</Link>
+            </Button>
+          </CardFooter>
+        </Card>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+              <CardDescription>Common tasks and actions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button variant="outline" className="w-full justify-start" asChild>
+                <Link href="/brands/new">
+                  <span className="flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                      <path d="M5 12h14" />
+                      <path d="M12 5v14" />
+                    </svg>
+                    Add New Brand
+                  </span>
+                </Link>
+              </Button>
+              <Button variant="outline" className="w-full justify-start" asChild>
+                <Link href="/users/invite">
+                  <span className="flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M19 8v6" />
+                      <path d="M16 11h6" />
+                    </svg>
+                    Invite User
+                  </span>
+                </Link>
+              </Button>
+              <Button variant="outline" className="w-full justify-start" asChild>
+                <Link href="/workflows/new">
+                  <span className="flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <path d="M12 18v-6" />
+                      <path d="M9 15h6" />
+                    </svg>
+                    Create New Workflow
+                  </span>
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Recent Content</CardTitle>
-              <CardDescription>Your latest content across all brands</CardDescription>
+              <CardTitle>Content Overview</CardTitle>
+              <CardDescription>Distribution by type</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left pb-3 font-medium">Title</th>
-                      <th className="text-left pb-3 font-medium">Type</th>
-                      <th className="text-left pb-3 font-medium">Brand</th>
-                      <th className="text-left pb-3 font-medium">Status</th>
-                      <th className="text-left pb-3 font-medium">Date</th>
-                      <th className="text-left pb-3 font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentContent.length > 0 ? (
-                      recentContent.map((content) => (
-                        <tr key={content.id} className="border-b">
-                          <td className="py-3">{content.title}</td>
-                          <td className="py-3">{content.content_type_name}</td>
-                          <td className="py-3">{content.brand_name}</td>
-                          <td className="py-3">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
-                              ${content.status === 'published' ? 'bg-green-100 text-green-800' : 
-                                content.status === 'draft' ? 'bg-gray-100 text-gray-800' : 
-                                content.status === 'pending_review' ? 'bg-yellow-100 text-yellow-800' : 
-                                'bg-blue-100 text-blue-800'}`}>
-                              {content.status.replace('_', ' ')}
-                            </span>
-                          </td>
-                          <td className="py-3">{formatDate(content.created_at)}</td>
-                          <td className="py-3">
-                            <Button variant="ghost" size="sm" asChild>
-                              <Link href={`/content/${content.id}`}>View</Link>
-                            </Button>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={6} className="py-6 text-center text-muted-foreground">
-                          No content found. Create your first content piece.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+            <CardContent className="p-6">
+              {contentTypeDistribution.length > 0 ? (
+                <div className="space-y-4">
+                  {contentTypeDistribution.map((type) => (
+                    <div key={type.name}>
+                      <div className="flex justify-between mb-1 text-sm">
+                        <span>{type.name}</span>
+                        <span>{type.percentage}%</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2">
+                        <div className={`${type.color} h-2 rounded-full`} style={{ width: `${type.percentage}%` }}></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-muted-foreground">
+                  No content data available yet
+                </div>
+              )}
             </CardContent>
-            <CardFooter>
-              <Button variant="outline" asChild className="w-full">
-                <Link href="/content">View All Content</Link>
-              </Button>
-            </CardFooter>
           </Card>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-                <CardDescription>Common tasks and actions</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start" asChild>
-                  <Link href="/brands/new">
-                    <span className="flex items-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                        <path d="M5 12h14" />
-                        <path d="M12 5v14" />
-                      </svg>
-                      Add New Brand
-                    </span>
-                  </Link>
-                </Button>
-                <Button variant="outline" className="w-full justify-start" asChild>
-                  <Link href="/users/invite">
-                    <span className="flex items-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                        <circle cx="9" cy="7" r="4" />
-                        <path d="M19 8v6" />
-                        <path d="M16 11h6" />
-                      </svg>
-                      Invite User
-                    </span>
-                  </Link>
-                </Button>
-                <Button variant="outline" className="w-full justify-start" asChild>
-                  <Link href="/workflows/new">
-                    <span className="flex items-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                        <polyline points="14 2 14 8 20 8" />
-                        <path d="M12 18v-6" />
-                        <path d="M9 15h6" />
-                      </svg>
-                      Create New Workflow
-                    </span>
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Content Overview</CardTitle>
-                <CardDescription>Distribution by type</CardDescription>
-              </CardHeader>
-              <CardContent className="p-6">
-                {recentContent.length > 0 ? (
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between mb-1 text-sm">
-                        <span>Articles</span>
-                        <span>45%</span>
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-2">
-                        <div className="bg-primary h-2 rounded-full" style={{ width: '45%' }}></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between mb-1 text-sm">
-                        <span>Retailer PDPs</span>
-                        <span>30%</span>
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-2">
-                        <div className="bg-blue-500 h-2 rounded-full" style={{ width: '30%' }}></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between mb-1 text-sm">
-                        <span>Owned PDPs</span>
-                        <span>25%</span>
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-2">
-                        <div className="bg-green-500 h-2 rounded-full" style={{ width: '25%' }}></div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-muted-foreground">
-                    No content data available yet
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
-      
-      <div className="text-center p-4 bg-amber-50 text-amber-800 rounded-md border border-amber-200">
-        <p className="text-sm">
-          <strong>Note:</strong> Some data shown is placeholder data. API endpoints for workflows and users will be implemented in a future update.
-        </p>
+        </div>
       </div>
     </div>
   );
