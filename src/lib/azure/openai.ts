@@ -124,4 +124,67 @@ export async function generateContent(
     console.error("Error generating content with Azure OpenAI:", error);
     throw new Error("Failed to generate content");
   }
+}
+
+// Generate brand identity details from URLs
+export async function generateBrandIdentityFromUrls(
+  brandName: string,
+  urls: string[]
+) {
+  const client = getAzureOpenAIClient();
+  const deploymentName = process.env.AZURE_OPENAI_DEPLOYMENT || "";
+  
+  if (!urls || urls.length === 0) {
+    throw new Error("At least one URL is required to generate brand identity");
+  }
+  
+  // Create a system prompt for brand identity generation
+  const systemPrompt = `You are an expert brand analyst who excels at analyzing websites and extracting key brand information. Your task is to analyze the content from these URLs for the brand "${brandName}" and generate a comprehensive brand identity profile.`;
+  
+  // Create the user prompt with the URLs
+  const userPrompt = `I need you to analyze these websites for the brand "${brandName}": 
+${urls.join('\n')}
+
+Based on the content of these websites, please generate the following:
+
+1. BRAND IDENTITY: A 2-3 paragraph description of the brand's identity, values, mission, and positioning in the market.
+
+2. TONE OF VOICE: A concise description of how the brand communicates, including 4-5 adjectives (e.g., professional, friendly, authoritative, casual) that best describe their communication style.
+
+3. CONTENT GUARDRAILS: A list of 3-5 specific guidelines that content creators should follow when creating content for this brand.
+
+4. CONTENT VETTING AGENCIES: Identify any relevant content vetting agencies or regulatory bodies that might be applicable to this brand based on its industry.
+
+Format your response in a JSON object with these keys: brandIdentity, toneOfVoice, guardrails, contentVettingAgencies.`;
+
+  try {
+    const response = await client.chat.completions.create({
+      model: deploymentName,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      max_tokens: 1500,
+      temperature: 0.7,
+      response_format: { type: "json_object" }
+    });
+    
+    const content = response.choices[0]?.message?.content || "{}";
+    
+    try {
+      const parsedContent = JSON.parse(content);
+      return {
+        brandIdentity: parsedContent.brandIdentity || "",
+        toneOfVoice: parsedContent.toneOfVoice || "",
+        guardrails: parsedContent.guardrails || "",
+        contentVettingAgencies: parsedContent.contentVettingAgencies || ""
+      };
+    } catch (parseError) {
+      console.error("Error parsing JSON from OpenAI response:", parseError);
+      throw new Error("Failed to parse brand identity generation results");
+    }
+  } catch (error) {
+    console.error("Error generating brand identity with Azure OpenAI:", error);
+    throw new Error("Failed to generate brand identity");
+  }
 } 
