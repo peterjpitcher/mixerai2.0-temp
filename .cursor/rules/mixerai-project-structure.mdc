@@ -5,88 +5,74 @@ alwaysApply: true
 ---
 # MixerAI 2.0 Project Structure
 
-This rule documents the overall project structure and architecture for the MixerAI 2.0 application.
+This document outlines the updated project structure and standards for the MixerAI 2.0 application, following best practices for a modern Next.js (App Router) codebase.
 
-## Project Overview
+## 🧠 Project Overview
 
-MixerAI 2.0 is a Next.js application for generating AI content with Azure OpenAI for digital marketing. It allows users to create and manage content for different brands using customizable workflows.
+MixerAI 2.0 is a Next.js application that uses Azure OpenAI to generate marketing content. Users can manage branded content through a flexible workflow interface powered by Supabase for backend services and PostgreSQL.
 
-## Directory Structure Issue ⚠️
+## 📁 Directory Structure
 
-The project currently has duplication issues in its directory structure:
+All development should be done from the root project folder:
 
-```
-MixerAI 2.0a/               # Root project directory
-├── src/                    # Duplicate src directory (should be consolidated)
-├── mixerai-2.0/            # Main application directory (correct location)
-│   ├── src/                # Main source code (correct location)
-│   ├── public/             # Static assets
-│   ├── migrations/         # Database migration scripts
-│   ├── scripts/            # Utility scripts
-│   └── .next/              # Next.js build output (generated)
-│   └── mixerai-2.0/        # Nested duplicate directory (should be removed)
-```
+MixerAI 2.0a/
 
-### ⚠️ Important Note
+Run all scripts and `npm` commands from this directory.
 
-**Always use the `/mixerai-2.0` directory as the project root.** All commands should be run from this directory, not from the parent directory.
+### ✅ Clean Folder Layout
 
+MixerAI 2.0a/
+├── docs/ # Markdown and shell script documentation
+├── migrations/ # SQL migration scripts
+├── public/ # Static assets (images, icons, etc.)
+├── scripts/ # Developer tools and database setup scripts
+├── src/ # Source code
+│ ├── app/ # App Router: routes and layouts
+│ │ ├── api/ # API route handlers
+│ │ ├── auth/ # Login, registration, etc.
+│ │ └── dashboard/ # Authenticated user interface
+│ ├── components/ # Reusable UI components
+│ │ ├── content/ # Content-specific UI (e.g. approval workflows)
+│ │ ├── dashboard/ # Dashboard widgets and panels
+│ │ └── [shared]/ # Shared components (buttons, modals, tables, etc.)
+│ ├── lib/ # Logic and service clients
+│ │ ├── auth/ # Authentication utilities
+│ │ ├── azure/ # Azure OpenAI integration
+│ │ ├── supabase/ # Supabase client instance
+│ │ └── db.ts # Direct PostgreSQL connection
+│ └── types/ # TypeScript types and interfaces
+├── .env, .env.local # Environment variables
+├── package.json # Project dependencies and scripts
+├── tsconfig.json # TypeScript configuration
+├── next.config.ts # Next.js configuration
+└── README.md # Project overview
+
+## 💡 Development Standards
+
+- Use the **App Router** (`src/app/`) pattern — pages, layouts, and nested routes live here.
+- Components should live in `src/components/`, either:
+  - **Flat** for shared UI (e.g. `button.tsx`, `toast.tsx`)
+  - Or **domain-specific** subfolders (e.g. `dashboard/`, `content/`)
+- Shared utilities live in `src/lib/`, structured by concern (`auth/`, `azure/`, etc.)
+- Do not reintroduce `ui/`, `mixerai-2.0/`, or duplicate `src/` folders.
+
+## ▶️ Running the App
+
+Run all commands from the **project root directory**.
+
+1. With a local PostgreSQL DB:
 ```bash
-# Navigate to the correct directory
-cd mixerai-2.0
-
-# Then run commands
+./scripts/use-local-db.sh
 npm run dev
-```
 
-See [FOLDER_STRUCTURE_FIX.md](mdc:FOLDER_STRUCTURE_FIX.md) for details on resolving the directory structure issues.
+2. With Supabase:
+npm run dev
 
-## Correct Application Structure
+📚 Documentation
+Located in /docs/:
+DOCUMENTATION.md – Full project overview
+DATABASE_SETUP.md – PostgreSQL & Supabase setup
+CLEAN_DATABASE.md – Test DB reset guide
+DATABASE_CONNECTION_ISSUES.md – Troubleshooting
+FOLDER_STRUCTURE_FIX.md – This document
 
-The application follows the Next.js App Router structure (from within the `mixerai-2.0` directory):
-
-- [src/app/](mdc:mixerai-2.0/src/app) - Main application routes
-  - [api/](mdc:mixerai-2.0/src/app/api) - API routes
-  - [auth/](mdc:mixerai-2.0/src/app/auth) - Authentication pages
-  - [dashboard/](mdc:mixerai-2.0/src/app/dashboard) - Dashboard pages
-
-## Key Components
-
-- [src/components/](mdc:mixerai-2.0/src/components) - UI components
-  - [ui/](mdc:mixerai-2.0/src/components/ui) - shadcn/ui components
-  - [content/](mdc:mixerai-2.0/src/components/content) - Content-related components
-  - [dashboard/](mdc:mixerai-2.0/src/components/dashboard) - Dashboard components
-  - [workflows/](mdc:mixerai-2.0/src/components/workflows) - Workflow components
-
-## Library Code
-
-- [src/lib/](mdc:mixerai-2.0/src/lib) - Shared libraries and utilities
-  - [db.ts](mdc:mixerai-2.0/src/lib/db.ts) - Direct PostgreSQL connection
-  - [auth/](mdc:mixerai-2.0/src/lib/auth) - Authentication utilities
-  - [azure/](mdc:mixerai-2.0/src/lib/azure) - Azure OpenAI integration
-
-## Running the Application
-
-To run the application (always from the `mixerai-2.0` directory):
-
-1. For local development with local PostgreSQL:
-   ```bash
-   cd mixerai-2.0
-   ./scripts/use-local-db.sh
-   ```
-
-2. For standard development (with Supabase):
-   ```bash
-   cd mixerai-2.0
-   npm run dev
-   ```
-
-## Documentation
-
-The project includes several documentation files:
-
-- [DOCUMENTATION.md](mdc:mixerai-2.0/DOCUMENTATION.md) - Main project documentation
-- [DATABASE_SETUP.md](mdc:mixerai-2.0/DATABASE_SETUP.md) - Database setup guide
-- [CLEAN_DATABASE.md](mdc:mixerai-2.0/CLEAN_DATABASE.md) - Guide for cleaning test data
-- [DATABASE_CONNECTION_ISSUES.md](mdc:mixerai-2.0/DATABASE_CONNECTION_ISSUES.md) - Troubleshooting guide
-- [FOLDER_STRUCTURE_FIX.md](mdc:FOLDER_STRUCTURE_FIX.md) - Guide to fixing directory structure
