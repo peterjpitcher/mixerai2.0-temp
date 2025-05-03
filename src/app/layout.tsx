@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/toast";
 import { ToastProvider } from "@/components/toast-provider";
 import RootLayoutWrapper from "@/components/layout/root-layout-wrapper";
+import Script from "next/script";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,6 +20,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <Script src="/api-fallback.js" strategy="beforeInteractive" />
+      </head>
       <body className={inter.className}>
         <ToastProvider>
           <RootLayoutWrapper>{children}</RootLayoutWrapper>

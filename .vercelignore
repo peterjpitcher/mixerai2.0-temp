@@ -1,23 +1,22 @@
-# Don't ignore Next.js build files
+# Include build output directories
+!out/
 !.next/
-
-# Don't ignore scripts directory for post-build scripts
-!scripts/
-
-# Ignore our custom server since we want to use the Next.js built-in server
-server.js
 
 # Ignore node_modules
 node_modules/
+
+# Ignore custom server
+server.js
 
 # Ignore development files
 .git/
 .github/
 .vscode/
-
-# Project documents and archives
-.vercel
-docs
-README.md
+.env*
 .DS_Store
+
+# Ignore docs, scripts, and other non-essential files
+README.md
+docs/
+scripts/
 *.log 

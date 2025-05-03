@@ -3,23 +3,25 @@ const nextConfig = {
   reactStrictMode: true,
   images: {
     domains: ['api.dicebear.com'],
+    unoptimized: true,
   },
-  // For better API routes error handling
+  // Skip type checking during build
   typescript: {
-    // Ignore TypeScript errors to fix build
     ignoreBuildErrors: true,
   },
+  // Skip ESLint during build
   eslint: {
-    // Ignore ESLint errors to fix build
     ignoreDuringBuilds: true,
   },
   // Security settings
   poweredByHeader: false,
-  // Log more info in production builds
-  logging: {
-    fetches: {
-      fullUrl: true,
-    },
+  // Build configuration for Vercel 
+  output: 'export',
+  // Disable output link display
+  distDir: '.next',
+  // Enable static export for API routes
+  experimental: {
+    outputFileTracingRoot: process.cwd(),
   }
 };
 
