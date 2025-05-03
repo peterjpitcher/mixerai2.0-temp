@@ -269,7 +269,7 @@ export default function NewBrandPage() {
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select a country" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="max-h-60 overflow-y-auto">
                           {COUNTRIES.map((country) => (
                             <SelectItem key={country.value} value={country.value}>
                               {country.label}
@@ -287,7 +287,7 @@ export default function NewBrandPage() {
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select a language" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="max-h-60 overflow-y-auto">
                           {LANGUAGES.map((language) => (
                             <SelectItem key={language.value} value={language.value}>
                               {language.label}
