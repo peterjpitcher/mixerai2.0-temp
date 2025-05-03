@@ -11,11 +11,10 @@ import { Textarea } from '@/components/textarea';
 import { useToast } from '@/components/toast-provider';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/select";
-import { COUNTRIES, LANGUAGES } from "@/lib/constants";
+import { COUNTRIES, LANGUAGES, getVettingAgenciesForCountry } from "@/lib/constants";
 import { AlertCircle, Loader2, Info } from "lucide-react";
 import { Checkbox } from "@/components/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/dialog";
-import { getVettingAgenciesForCountry } from '@/lib/azure/openai';
 
 interface BrandEditPageProps {
   params: {
