@@ -20,6 +20,7 @@ export interface Database {
           tone_of_voice: string | null
           guardrails: string | null
           content_vetting_agencies: string | null
+          brand_color: string | null
           created_at: string
           updated_at: string
         }
@@ -33,6 +34,7 @@ export interface Database {
           tone_of_voice?: string | null
           guardrails?: string | null
           content_vetting_agencies?: string | null
+          brand_color?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -46,6 +48,7 @@ export interface Database {
           tone_of_voice?: string | null
           guardrails?: string | null
           content_vetting_agencies?: string | null
+          brand_color?: string | null
           created_at?: string
           updated_at?: string
         }
