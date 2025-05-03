@@ -11,7 +11,8 @@ import { Textarea } from '@/components/textarea';
 import { useToast } from '@/components/toast-provider';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/select";
-import { COUNTRIES, LANGUAGES, getVettingAgenciesForCountry } from "@/lib/constants";
+import { COUNTRIES, LANGUAGES } from "@/lib/constants";
+import { getVettingAgenciesForCountry } from "@/lib/azure/openai";
 import { AlertCircle, Loader2, Info } from "lucide-react";
 import { Checkbox } from "@/components/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/dialog";
@@ -44,7 +45,8 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     brand_identity: '',
     tone_of_voice: '',
     guardrails: '',
-    content_vetting_agencies: ''
+    content_vetting_agencies: '',
+    brand_color: '#3498db' // Default blue color
   });
   
   // Fetch brand data
@@ -251,16 +253,93 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
           ...prev,
           brand_identity: result.data.brandIdentity,
           tone_of_voice: result.data.toneOfVoice,
-          guardrails: result.data.guardrails,
-          content_vetting_agencies: result.data.contentVettingAgencies
+          guardrails: typeof result.data.guardrails === 'string' 
+            ? result.data.guardrails 
+            : Array.isArray(result.data.guardrails)
+              ? result.data.guardrails.map((item: string) => `- ${item}`).join('\n')
+              : String(result.data.guardrails),
+          content_vetting_agencies: result.data.contentVettingAgencies,
+          brand_color: typeof result.data.brandColor === 'string' && result.data.brandColor.startsWith('#') 
+            ? result.data.brandColor 
+            : prev.brand_color // Keep existing color if no valid color is provided
         }));
 
-        // Reset selected agencies and update them based on new content_vetting_agencies
+        // Process the AI-generated vetting agencies
         if (result.data.contentVettingAgencies) {
-          const newAgencies = result.data.contentVettingAgencies.split(',').map((agency: string) => agency.trim());
-          setSelectedAgencies(newAgencies);
+          let agencyNames: string[] = [];
+          
+          // Parse generated agency information
+          let generatedAgencies: { name: string; description: string }[] = [];
+          
+          if (Array.isArray(result.data.contentVettingAgencies)) {
+            result.data.contentVettingAgencies.forEach((agency: any) => {
+              if (typeof agency === 'object' && agency.name) {
+                // Extract name and description from object
+                generatedAgencies.push({
+                  name: agency.name.trim(),
+                  description: agency.description || ''
+                });
+              } else if (typeof agency === 'string') {
+                // If it's just a string, use it as the name
+                generatedAgencies.push({
+                  name: agency.trim(),
+                  description: ''
+                });
+              }
+            });
+          } else if (typeof result.data.contentVettingAgencies === 'string') {
+            // If it's a comma-separated string, split it
+            const agencyStrings = result.data.contentVettingAgencies.split(',');
+            agencyStrings.forEach(agencyStr => {
+              generatedAgencies.push({
+                name: agencyStr.trim(),
+                description: ''
+              });
+            });
+          } else if (typeof result.data.contentVettingAgencies === 'object' && result.data.contentVettingAgencies !== null) {
+            // If it's an object but not an array
+            try {
+              Object.entries(result.data.contentVettingAgencies).forEach(([key, value]) => {
+                if (typeof value === 'object' && value !== null && 'name' in value) {
+                  generatedAgencies.push({
+                    name: (value as any).name.trim(),
+                    description: (value as any).description || ''
+                  });
+                } else {
+                  generatedAgencies.push({
+                    name: key.trim(),
+                    description: typeof value === 'string' ? value : ''
+                  });
+                }
+              });
+            } catch (e) {
+              console.log("Failed to parse complex agency object:", e);
+            }
+          }
+          
+          // Update default suggested agencies with the AI-generated ones if we have any
+          if (generatedAgencies.length > 0) {
+            // Replace predefined country agencies with the AI-generated ones
+            setVettingAgencies(generatedAgencies);
+          }
+          
+          // Extract just the names for selection
+          agencyNames = generatedAgencies.map(agency => agency.name);
+          
+          // Set all new agencies as selected by default
+          setSelectedAgencies(agencyNames);
+          
+          // Update the brand data with the comma-separated string of agencies
+          setBrand(prev => ({
+            ...prev,
+            content_vetting_agencies: agencyNames.join(', ')
+          }));
         } else {
           setSelectedAgencies([]);
+          setBrand(prev => ({
+            ...prev,
+            content_vetting_agencies: ''
+          }));
         }
 
         toast({
@@ -314,10 +393,30 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     try {
       setIsSubmitting(true);
       
+      // Make a copy of the brand data to ensure proper format for submission
+      const brandData = { ...brand };
+      
+      // Ensure guardrails are properly formatted if they're in array format
+      if (brandData.guardrails) {
+        // If it looks like a JSON array string
+        if (brandData.guardrails.startsWith('[') && brandData.guardrails.endsWith(']')) {
+          try {
+            const guardrailsArray = JSON.parse(brandData.guardrails);
+            if (Array.isArray(guardrailsArray)) {
+              brandData.guardrails = guardrailsArray.map(item => `- ${item}`).join('\n');
+              console.log("Converted guardrails from JSON array to bulleted list before submission");
+            }
+          } catch (e) {
+            // If parsing fails, keep as is
+            console.log("Failed to parse guardrails as JSON array in form submission");
+          }
+        }
+      }
+      
       const response = await fetch(`/api/brands/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(brand)
+        body: JSON.stringify(brandData)
       });
       
       const data = await response.json();
@@ -536,10 +635,18 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                     )}
                   </Button>
                   
-                  {brand.country && (
+                  {(brand.country || brand.language) && (
                     <div className="text-sm text-muted-foreground flex items-center mt-2">
                       <Info className="h-4 w-4 mr-1" />
-                      <span>Generation will be optimized for {COUNTRIES.find(c => c.value === brand.country)?.label || brand.country}</span>
+                      <span>
+                        {brand.country && brand.language ? (
+                          <>Generation will be optimized for {COUNTRIES.find(c => c.value === brand.country)?.label || brand.country} and content will be generated in {LANGUAGES.find(l => l.value === brand.language)?.label || brand.language}</>
+                        ) : brand.country ? (
+                          <>Generation will be optimized for {COUNTRIES.find(c => c.value === brand.country)?.label || brand.country}</>
+                        ) : (
+                          <>Content will be generated in {LANGUAGES.find(l => l.value === brand.language)?.label || brand.language}</>
+                        )}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -558,7 +665,21 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="brand_identity">Brand Identity</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="brand_identity">Brand Identity</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="color"
+                          id="brand_color"
+                          name="brand_color"
+                          value={brand.brand_color || '#3498db'}
+                          onChange={handleInputChange}
+                          className="w-8 h-8 p-1 rounded cursor-pointer"
+                          title="Click to change brand color"
+                        />
+                        <span className="text-xs text-muted-foreground">{brand.brand_color || '#3498db'}</span>
+                      </div>
+                    </div>
                     <Textarea
                       id="brand_identity"
                       name="brand_identity"
@@ -583,60 +704,73 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                   
                   <div className="space-y-2">
                     <Label htmlFor="guardrails">Content Guardrails</Label>
-                    <Textarea
-                      id="guardrails"
-                      name="guardrails"
-                      placeholder="Specify any content restrictions or guidelines to follow"
-                      rows={3}
-                      value={brand.guardrails}
-                      onChange={handleInputChange}
-                    />
+                    <div className="relative">
+                      <Textarea
+                        id="guardrails"
+                        name="guardrails"
+                        placeholder="Specify any content restrictions or guidelines as a bulleted list (- Item 1&#10;- Item 2)"
+                        rows={5}
+                        value={brand.guardrails}
+                        onChange={handleInputChange}
+                      />
+                      <div className="absolute bottom-2 right-2 text-xs text-muted-foreground">
+                        Enter as bulleted list
+                      </div>
+                    </div>
+                    {brand.guardrails && !brand.guardrails.includes('-') && (
+                      <div className="text-xs text-amber-600 flex items-center mt-1">
+                        <AlertCircle className="h-3 w-3 mr-1" />
+                        <span>For better readability, use bullet points (e.g., "- Guideline 1" on each line)</span>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="space-y-4">
                     <div>
-                      <Label htmlFor="content_vetting_agencies">Content Vetting Agencies</Label>
-                      <Input
-                        id="content_vetting_agencies"
+                      {/* Add hidden input to maintain the value */}
+                      <input 
+                        type="hidden"
                         name="content_vetting_agencies"
-                        placeholder="List any applicable content vetting agencies"
                         value={brand.content_vetting_agencies}
-                        onChange={handleInputChange}
                       />
-                    </div>
-                    
-                    {brand.country && vettingAgencies.length > 0 && (
-                      <div className="pt-2 border-t">
-                        <Label className="mb-3 block">
-                          Suggested Agencies for {COUNTRIES.find(c => c.value === brand.country)?.label || brand.country}
-                        </Label>
-                        <div className="space-y-3">
-                          {vettingAgencies.map((agency) => (
-                            <div key={agency.name} className="flex items-start space-x-2">
-                              <Checkbox 
-                                id={`agency-${agency.name}`}
-                                checked={selectedAgencies.includes(agency.name)}
-                                onCheckedChange={(checked) => {
-                                  handleAgencyCheckboxChange(checked as boolean, agency);
-                                }}
-                                className="mt-1"
-                              />
-                              <div className="grid gap-1.5 leading-none">
-                                <Label
-                                  htmlFor={`agency-${agency.name}`}
-                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                >
-                                  {agency.name}
-                                </Label>
-                                <p className="text-sm text-muted-foreground">
-                                  {agency.description}
-                                </p>
+                      
+                      {/* Default suggested agencies based on country */}
+                      {brand.country && vettingAgencies.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium mb-2">Suggested Agencies for {COUNTRIES.find(c => c.value === brand.country)?.label || brand.country}</p>
+                          <p className="text-xs text-muted-foreground mb-3">
+                            {selectedAgencies.length > 0 
+                              ? `Selected: ${selectedAgencies.length} ${selectedAgencies.length === 1 ? 'agency' : 'agencies'}`
+                              : 'Select agencies to include in content generation'}
+                          </p>
+                          <div className="space-y-3 max-h-80 overflow-y-auto border rounded-md p-3">
+                            {vettingAgencies.map((agency) => (
+                              <div key={agency.name} className="flex items-start space-x-2">
+                                <Checkbox 
+                                  id={`agency-${agency.name}`}
+                                  checked={selectedAgencies.includes(agency.name)}
+                                  onCheckedChange={(checked) => {
+                                    handleAgencyCheckboxChange(checked as boolean, agency);
+                                  }}
+                                  className="mt-1"
+                                />
+                                <div className="grid gap-1.5 leading-none">
+                                  <Label
+                                    htmlFor={`agency-${agency.name}`}
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                  >
+                                    {agency.name}
+                                  </Label>
+                                  <p className="text-sm text-muted-foreground">
+                                    {agency.description}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
