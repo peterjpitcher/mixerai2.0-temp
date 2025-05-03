@@ -1,7 +1,19 @@
+// Import the uuid package for generating unique identifiers for workflow invitations
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
 import { v4 as uuidv4 } from 'uuid';
+
+// Define types for the workflow invitation
+interface WorkflowInvitation {
+  workflow_id: string;
+  step_id: number;
+  email: string;
+  role: string;
+  invite_token: string;
+  expires_at: string;
+  status?: string;
+}
 
 // Sample fallback data for when DB connection fails
 const getFallbackWorkflows = () => {
@@ -208,7 +220,13 @@ export async function POST(request: Request) {
     
     // Process assignees - create invitations for each email if needed
     const steps = body.steps || [];
-    const invitations = [];
+    const invitationItems: {
+      step_id: number;
+      email: string;
+      role: string;
+      invite_token: string;
+      expires_at: string;
+    }[] = [];
     
     for (const step of steps) {
       if (step.assignees && Array.isArray(step.assignees)) {
@@ -225,12 +243,12 @@ export async function POST(request: Request) {
             assignee.id = existingUser.id;
           } else {
             // User doesn't exist, prepare an invitation
-            invitations.push({
-              workflow_step_id: step.id,
+            invitationItems.push({
+              step_id: step.id,
               email: assignee.email,
               role: step.role || 'editor',
               invite_token: uuidv4(),
-              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
+              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days from now
             });
           }
         }
@@ -265,23 +283,23 @@ export async function POST(request: Request) {
     // If there are new invitations, create them in the workflow_invitations table
     const workflowId = data[0].id;
     
-    if (invitations.length > 0) {
-      // Update the workflow_id in the invitations
-      const workflowInvitations = invitations.map(invitation => ({
-        ...invitation,
+    if (invitationItems.length > 0) {
+      // Create the workflow invitations with the workflow_id
+      const invitations: WorkflowInvitation[] = invitationItems.map(item => ({
+        ...item,
         workflow_id: workflowId
       }));
       
       // Insert the invitations
       const { error: invitationError } = await supabase
         .from('workflow_invitations')
-        .insert(workflowInvitations);
+        .insert(invitations);
       
       if (invitationError) {
         console.error('Error creating workflow invitations:', invitationError);
         // Don't fail the entire request if invitations fail
       } else {
-        console.log(`Created ${workflowInvitations.length} workflow invitations`);
+        console.log(`Created ${invitations.length} workflow invitations`);
         
         // TODO: Send invitation emails (this would be implemented separately)
       }

@@ -1,6 +1,18 @@
+// Import the uuid package for generating unique workflow invitation tokens
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
+
+// Define types for the workflow invitation
+interface WorkflowInvitation {
+  workflow_id: string;
+  step_id: number;
+  email: string;
+  role: string;
+  invite_token: string;
+  expires_at: string;
+  status?: string;
+}
 
 /**
  * GET endpoint to retrieve a specific workflow by ID
@@ -83,7 +95,7 @@ export async function PUT(
     
     // Process assignees - create invitations for each email if needed
     const steps = body.steps || [];
-    const invitations = [];
+    const invitations: WorkflowInvitation[] = [];
     
     for (const step of steps) {
       if (step.assignees && Array.isArray(step.assignees)) {
@@ -109,7 +121,7 @@ export async function PUT(
               email: assignee.email,
               role: step.role || 'editor',
               invite_token: uuidv4(),
-              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
+              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days from now
             });
           }
         }
