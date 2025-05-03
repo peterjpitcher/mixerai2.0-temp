@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "postbuild": "node scripts/vercel-postbuild.js",
-    "start": "node server.js",
+    "start": "next start",
     "lint": "next lint"
   },
   "keywords": [
