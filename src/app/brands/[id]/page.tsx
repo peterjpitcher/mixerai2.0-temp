@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/button";
@@ -16,62 +16,244 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [requiresCascade, setRequiresCascade] = useState(false);
+  const [contentCount, setContentCount] = useState(0);
+  const [workflowCount, setWorkflowCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [brand, setBrand] = useState<any>(null);
+  const [contents, setContents] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [workflows, setWorkflows] = useState<any[]>([]);
+  const [error, setError] = useState("");
 
-  // Placeholder data for brand details
-  const brand = {
-    id: params.id,
-    name: "TechGadgets",
-    website_url: "https://techgadgets.example.com",
-    country: "United States",
-    language: "English",
-    brand_identity: "TechGadgets is a forward-thinking technology company that aims to make high-quality gadgets accessible to everyone. We believe in innovation, sustainability, and user-friendly design.",
-    tone_of_voice: "Professional but approachable, tech-savvy but not condescending, enthusiastic about innovation.",
-    guardrails: "Avoid negative comparisons with competitors. Focus on benefits rather than features. Do not make unsubstantiated claims.",
-    content_vetting_agencies: "TechRating, ConsumerTech",
-    created_at: "2023-08-15",
-  };
+  // Fetch brand data
+  useEffect(() => {
+    const fetchBrandData = async () => {
+      try {
+        setIsLoading(true);
+        setError("");
+        
+        // Add a timestamp and unique identifier to prevent caching
+        const cacheBuster = `nocache=${Date.now()}-${Math.random()}`;
+        
+        // Fetch brand details with debug header
+        console.log(`🔍 Fetching brand details for ID: ${params.id} at ${new Date().toISOString()}`);
+        const brandResponse = await fetch(`/api/brands/${params.id}?${cacheBuster}`, {
+          headers: {
+            'x-request-source': 'brand-detail-page',
+            'Cache-Control': 'no-cache, no-store'
+          }
+        });
+        
+        // Log response status and headers for debugging
+        console.log(`🔄 Brand API response status: ${brandResponse.status}`);
+        // Convert headers to object safely
+        const responseHeaders: Record<string, string> = {};
+        brandResponse.headers.forEach((value, key) => {
+          responseHeaders[key] = value;
+        });
+        console.log(`🔄 Brand API response headers:`, responseHeaders);
+        
+        const brandData = await brandResponse.json();
+        
+        console.log("📊 Brand API response:", JSON.stringify(brandData, null, 2));
+        
+        if (brandData.isFallback) {
+          console.warn("⚠️ Using fallback brand data from API - this indicates a database connection issue");
+        }
+        
+        if (!brandData.success) {
+          throw new Error(brandData.error || "Failed to fetch brand data");
+        }
+        
+        setBrand(brandData.brand);
+        
+        // Fetch brand content from the API
+        try {
+          console.log(`🔍 Fetching content for brand ID: ${params.id}`);
+          const contentResponse = await fetch(`/api/content?brand_id=${params.id}&${cacheBuster}`, {
+            headers: {
+              'x-request-source': 'brand-detail-page',
+              'Cache-Control': 'no-cache, no-store'
+            }
+          });
+          
+          console.log(`🔄 Content API response status: ${contentResponse.status}`);
+          const contentData = await contentResponse.json();
+          
+          console.log("📊 Content API response:", JSON.stringify(contentData, null, 2));
+          
+          if (contentData.isFallback) {
+            console.warn("⚠️ Using fallback content data from API");
+          }
+          
+          if (contentData.success) {
+            setContents(contentData.content || []);
+          } else {
+            console.error("Failed to fetch content:", contentData.error);
+            setContents([]);
+          }
+        } catch (contentError) {
+          console.error("Error fetching content:", contentError);
+          // Fallback to empty array
+          setContents([]);
+        }
+        
+        // Fetch workflows associated with this brand
+        try {
+          console.log(`🔍 Fetching workflows for brand ID: ${params.id}`);
+          const workflowsResponse = await fetch(`/api/workflows?brand_id=${params.id}&${cacheBuster}`, {
+            headers: {
+              'x-request-source': 'brand-detail-page',
+              'Cache-Control': 'no-cache, no-store'
+            }
+          });
+          
+          console.log(`🔄 Workflows API response status: ${workflowsResponse.status}`);
+          const workflowsData = await workflowsResponse.json();
+          
+          console.log("📊 Workflows API response:", JSON.stringify(workflowsData, null, 2));
+          
+          if (workflowsData.isFallback) {
+            console.warn("⚠️ Using fallback workflows data from API");
+          }
+          
+          if (workflowsData.success) {
+            setWorkflows(workflowsData.workflows || []);
+          } else {
+            console.error("Failed to fetch workflows:", workflowsData.error);
+            // Fallback to empty array rather than dummy data
+            setWorkflows([]);
+          }
+        } catch (workflowError) {
+          console.error("Error fetching workflows:", workflowError);
+          // Fallback to empty array
+          setWorkflows([]);
+        }
+        
+        // Fetch users with access to this brand
+        try {
+          console.log(`🔍 Fetching users for brand ID: ${params.id}`);
+          const usersResponse = await fetch(`/api/users?brand_id=${params.id}&${cacheBuster}`, {
+            headers: {
+              'x-request-source': 'brand-detail-page',
+              'Cache-Control': 'no-cache, no-store'
+            }
+          });
+          
+          console.log(`🔄 Users API response status: ${usersResponse.status}`);
+          const usersData = await usersResponse.json();
+          
+          console.log("📊 Users API response:", JSON.stringify(usersData, null, 2));
+          
+          if (usersData.isFallback) {
+            console.warn("⚠️ Using fallback users data from API");
+          }
+          
+          if (usersData.success) {
+            setUsers(usersData.users || []);
+          } else {
+            console.error("Failed to fetch users:", usersData.error);
+            // Fallback to empty array rather than dummy data
+            setUsers([]);
+          }
+        } catch (userError) {
+          console.error("Error fetching users:", userError);
+          // Fallback to empty array
+          setUsers([]);
+        }
+        
+      } catch (error: any) {
+        console.error("🔴 Error in fetchBrandData:", error);
+        setError(error.message || "Failed to load brand data");
+        toast({
+          title: "Error",
+          description: error.message || "Failed to load brand data",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  // Placeholder data for content
-  const content = [
-    { id: 1, title: "10 Ways to Improve Product Visibility", type: "Article", status: "Published", date: "2023-10-15" },
-    { id: 2, title: "Smart Home Technology Guide", type: "Article", status: "Draft", date: "2023-10-10" },
-    { id: 3, title: "Wireless Earbuds Pro", type: "Retailer PDP", status: "Published", date: "2023-09-28" },
-    { id: 4, title: "4K Ultra HD Smart TV", type: "Owned PDP", status: "Pending Review", date: "2023-09-20" },
-  ];
+    fetchBrandData();
+  }, [params.id, toast]);
 
-  // Placeholder data for users
-  const users = [
-    { id: 1, name: "Alice Johnson", email: "alice@example.com", role: "Admin" },
-    { id: 2, name: "Bob Smith", email: "bob@example.com", role: "Editor" },
-    { id: 3, name: "Charlie Brown", email: "charlie@example.com", role: "Viewer" },
-  ];
-
-  // Placeholder data for workflows
-  const workflows = [
-    { id: 1, name: "Article Approval", contentType: "Article", steps: 3 },
-    { id: 2, name: "Retailer PDP Workflow", contentType: "Retailer PDP", steps: 2 },
-    { id: 3, name: "Owned PDP Workflow", contentType: "Owned PDP", steps: 4 },
-  ];
+  // Control the delete dialog based on requiresCascade state
+  useEffect(() => {
+    console.log("requiresCascade changed:", requiresCascade, 
+                "contentCount:", contentCount, 
+                "workflowCount:", workflowCount);
+                
+    // If requiresCascade is true, make sure the dialog shows up
+    if (requiresCascade && !showDeleteConfirm) {
+      console.log("Opening delete dialog due to cascade requirement");
+      setTimeout(() => {
+        setShowDeleteConfirm(true);
+      }, 100);
+    }
+  }, [requiresCascade, contentCount, workflowCount, showDeleteConfirm]);
 
   // Handle delete brand
-  const handleDeleteBrand = async () => {
+  const handleDeleteBrand = async (options?: { cascade?: boolean }) => {
+    console.log("handleDeleteBrand called with options:", options);
+    
+    // If dialog is already open with cascade required, but user didn't check cascade option,
+    // just return and let them check the box
+    if (requiresCascade && !options?.cascade) {
+      console.log("Cascade required but not selected, showing error toast");
+      toast({
+        title: "Cascade required",
+        description: "Please check the box to confirm deletion of all associated content and workflows.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       setIsDeleting(true);
+      
+      // Reset error state at the beginning of each attempt
       setDeleteError("");
-
-      const response = await fetch(`/api/brands/${brand.id}`, {
+      
+      const url = new URL(`/api/brands/${brand.id}`, window.location.origin);
+      if (options?.cascade) {
+        url.searchParams.append('deleteCascade', 'true');
+      }
+      
+      console.log("Sending DELETE request to:", url.toString());
+      
+      const response = await fetch(url.toString(), {
         method: 'DELETE',
       });
-
+      
       const data = await response.json();
-
+      console.log("DELETE response:", data);
+      
       if (data.success) {
+        // Success case
         toast({
           title: "Success",
           description: data.message || "Brand deleted successfully",
         });
         router.push('/brands');
+        return;
+      }
+      
+      // Handle error cases
+      if (data.requiresCascade) {
+        // This brand has associated content or workflows
+        setRequiresCascade(true);
+        setContentCount(data.contentCount || 0);
+        setWorkflowCount(data.workflowCount || 0);
+        
+        // No need to set showDeleteConfirm here, the useEffect will handle it
+        toast({
+          title: "Cascade Delete Required",
+          description: `This brand has associated items that must be deleted as well.`,
+        });
       } else {
+        // Other error
         setDeleteError(data.error || "Failed to delete brand");
         toast({
           title: "Error",
@@ -80,7 +262,8 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
         });
       }
     } catch (error: any) {
-      setDeleteError(error.message || "An error occurred");
+      console.error("Exception in handleDeleteBrand:", error);
+      setDeleteError(error.message || "An unexpected error occurred");
       toast({
         title: "Error",
         description: "An unexpected error occurred",
@@ -91,17 +274,43 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
     }
   };
 
+  // If loading, show loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-[50vh]">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <p>Loading brand details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If error or no brand data, show error state
+  if (error || !brand) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[50vh] space-y-4">
+        <div className="text-destructive text-xl">
+          {error || "Brand not found"}
+        </div>
+        <Button onClick={() => router.push('/brands')}>
+          Back to Brands
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">
-            {brand.name.charAt(0)}
+            {brand.name?.charAt(0) || '?'}
           </div>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">{brand.name}</h1>
             <p className="text-muted-foreground">
-              {brand.country}, {brand.language}
+              {brand.country || 'No country'}, {brand.language || 'No language'}
             </p>
           </div>
         </div>
@@ -117,7 +326,14 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
           </Button>
           <Button 
             variant="destructive" 
-            onClick={() => setShowDeleteConfirm(true)}
+            onClick={() => {
+              // Reset cascade state when initiating a new delete
+              setRequiresCascade(false);
+              setContentCount(0);
+              setWorkflowCount(0);
+              setDeleteError("");
+              setShowDeleteConfirm(true);
+            }}
             disabled={isDeleting}
           >
             <Trash2 className="mr-2 h-4 w-4" />
@@ -140,7 +356,10 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
         open={showDeleteConfirm}
-        onOpenChange={setShowDeleteConfirm}
+        onOpenChange={(isOpen) => {
+          console.log("Dialog open state changing to:", isOpen);
+          setShowDeleteConfirm(isOpen);
+        }}
         title="Delete Brand"
         description={
           deleteError ? (
@@ -151,24 +370,43 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
             <div>
               <p>Are you sure you want to delete the brand <strong>{brand.name}</strong>?</p>
               <p className="mt-2">This action cannot be undone and will delete all brand information.</p>
-              <p className="mt-2">Note: Brands with existing content cannot be deleted.</p>
+              {requiresCascade && (
+                <p className="mt-2 text-destructive">
+                  This brand has {contentCount} piece{contentCount === 1 ? '' : 's'} of content and {workflowCount} workflow{workflowCount === 1 ? '' : 's'} that will also be deleted if you check the box below.
+                </p>
+              )}
+              {/* Debug info */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mt-4 p-2 bg-slate-100 text-xs">
+                  <p>Debug info:</p>
+                  <p>showCascadeOption: {String(requiresCascade)}</p>
+                  <p>contentCount: {contentCount}</p>
+                  <p>workflowCount: {workflowCount}</p>
+                </div>
+              )}
             </div>
           )
         }
         verificationText={brand.name}
         verificationRequired={true}
-        onConfirm={handleDeleteBrand}
+        onConfirm={(options) => {
+          console.log("Confirming delete with options:", options);
+          handleDeleteBrand(options);
+        }}
         confirmText={isDeleting ? "Deleting..." : "Delete Brand"}
         cancelText="Cancel"
         variant="destructive"
+        showCascadeOption={requiresCascade}
+        cascadeDescription={`Also delete all content and workflows associated with ${brand.name}`}
       />
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="content">Content</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="workflows">Workflows</TabsTrigger>
+          <TabsTrigger value="debug">Debug</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="space-y-6 mt-6">
           <Card>
@@ -181,27 +419,35 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
             <CardContent className="space-y-4">
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground">Website URL</h3>
-                <p>{brand.website_url}</p>
+                <p>{brand.website_url || 'No website URL provided'}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground">Country</h3>
+                <p>{brand.country || 'No country specified'}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground">Language</h3>
+                <p>{brand.language || 'No language specified'}</p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground">Created on</h3>
-                <p>{brand.created_at}</p>
+                <p>{brand.created_at ? new Date(brand.created_at).toLocaleDateString() : 'Unknown'}</p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground">Brand Identity</h3>
-                <p>{brand.brand_identity}</p>
+                <p>{brand.brand_identity || 'No brand identity defined'}</p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground">Tone of Voice</h3>
-                <p>{brand.tone_of_voice}</p>
+                <p>{brand.tone_of_voice || 'No tone of voice defined'}</p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground">Content Guardrails</h3>
-                <p>{brand.guardrails}</p>
+                <p>{brand.guardrails || 'No content guardrails defined'}</p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground">Content Vetting Agencies</h3>
-                <p>{brand.content_vetting_agencies}</p>
+                <p>{brand.content_vetting_agencies || 'No content vetting agencies specified'}</p>
               </div>
             </CardContent>
           </Card>
@@ -212,7 +458,7 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
                 <CardTitle>Content</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">{content.length}</div>
+                <div className="text-3xl font-bold">{contents.length}</div>
                 <p className="text-sm text-muted-foreground">
                   Pieces of content created
                 </p>
@@ -296,27 +542,35 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
                     </tr>
                   </thead>
                   <tbody>
-                    {content.map((item) => (
-                      <tr key={item.id} className="border-b">
-                        <td className="py-3">{item.title}</td>
-                        <td className="py-3">{item.type}</td>
-                        <td className="py-3">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
-                            ${item.status === 'Published' ? 'bg-green-100 text-green-800' : 
-                              item.status === 'Draft' ? 'bg-gray-100 text-gray-800' : 
-                              item.status === 'Pending Review' ? 'bg-yellow-100 text-yellow-800' : 
-                              'bg-blue-100 text-blue-800'}`}>
-                            {item.status}
-                          </span>
-                        </td>
-                        <td className="py-3">{item.date}</td>
-                        <td className="py-3">
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/content/${item.id}`}>View</Link>
-                          </Button>
+                    {contents.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-6 text-center text-muted-foreground">
+                          No content has been created for this brand yet.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      contents.map((item) => (
+                        <tr key={item.id} className="border-b">
+                          <td className="py-3">{item.title}</td>
+                          <td className="py-3">{item.content_type_name || 'Unknown type'}</td>
+                          <td className="py-3">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                              ${item.status === 'published' ? 'bg-green-100 text-green-800' : 
+                                item.status === 'draft' ? 'bg-gray-100 text-gray-800' : 
+                                item.status === 'pending_review' ? 'bg-yellow-100 text-yellow-800' : 
+                                'bg-blue-100 text-blue-800'}`}>
+                              {item.status?.charAt(0).toUpperCase() + item.status?.slice(1).replace('_', ' ') || 'Unknown'}
+                            </span>
+                          </td>
+                          <td className="py-3">{new Date(item.created_at).toLocaleDateString()}</td>
+                          <td className="py-3">
+                            <Button variant="ghost" size="sm" asChild>
+                              <Link href={`/content/${item.id}`}>View</Link>
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -351,23 +605,42 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
                     </tr>
                   </thead>
                   <tbody>
-                    {users.map((user) => (
-                      <tr key={user.id} className="border-b">
-                        <td className="py-3">{user.name}</td>
-                        <td className="py-3">{user.email}</td>
-                        <td className="py-3">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
-                            ${user.role === 'Admin' ? 'bg-purple-100 text-purple-800' : 
-                              user.role === 'Editor' ? 'bg-blue-100 text-blue-800' : 
-                              'bg-gray-100 text-gray-800'}`}>
-                            {user.role}
-                          </span>
-                        </td>
-                        <td className="py-3">
-                          <Button variant="ghost" size="sm">Edit Role</Button>
+                    {users.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-6 text-center text-muted-foreground">
+                          No users have been assigned to this brand yet.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      users.map((user) => {
+                        // Find user's role for this specific brand
+                        const brandPermission = user.brand_permissions?.find(
+                          permission => permission.brand_id === brand.id
+                        );
+                        
+                        const userRole = brandPermission ? 
+                          (brandPermission.role.charAt(0).toUpperCase() + brandPermission.role.slice(1)) :
+                          user.role || 'Viewer';
+                        
+                        return (
+                          <tr key={user.id} className="border-b">
+                            <td className="py-3">{user.full_name}</td>
+                            <td className="py-3">{user.email}</td>
+                            <td className="py-3">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                                ${userRole === 'Admin' ? 'bg-purple-100 text-purple-800' : 
+                                  userRole === 'Editor' ? 'bg-blue-100 text-blue-800' : 
+                                  'bg-gray-100 text-gray-800'}`}>
+                                {userRole}
+                              </span>
+                            </td>
+                            <td className="py-3">
+                              <Button variant="ghost" size="sm">Edit Role</Button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -394,22 +667,32 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
                       <th className="text-left pb-3 font-medium">Name</th>
                       <th className="text-left pb-3 font-medium">Content Type</th>
                       <th className="text-left pb-3 font-medium">Steps</th>
+                      <th className="text-left pb-3 font-medium">Content Count</th>
                       <th className="text-left pb-3 font-medium">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {workflows.map((workflow) => (
-                      <tr key={workflow.id} className="border-b">
-                        <td className="py-3">{workflow.name}</td>
-                        <td className="py-3">{workflow.contentType}</td>
-                        <td className="py-3">{workflow.steps}</td>
-                        <td className="py-3">
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/workflows/${workflow.id}`}>View</Link>
-                          </Button>
+                    {workflows.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-6 text-center text-muted-foreground">
+                          No workflows have been created for this brand yet.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      workflows.map((workflow) => (
+                        <tr key={workflow.id} className="border-b">
+                          <td className="py-3">{workflow.name}</td>
+                          <td className="py-3">{workflow.content_type_name || 'Unknown type'}</td>
+                          <td className="py-3">{workflow.steps_count || 0}</td>
+                          <td className="py-3">{workflow.content_count || 0}</td>
+                          <td className="py-3">
+                            <Button variant="ghost" size="sm" asChild>
+                              <Link href={`/workflows/${workflow.id}`}>View</Link>
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -421,6 +704,101 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
                 </Link>
               </Button>
             </CardFooter>
+          </Card>
+        </TabsContent>
+
+        {/* New Debug Tab */}
+        <TabsContent value="debug" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>API Response Debug Information</CardTitle>
+              <CardDescription>
+                This tab shows detailed information about the API responses to help diagnose data issues
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Brand Data</h3>
+                <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-md overflow-x-auto">
+                  <p className="text-xs font-mono whitespace-pre-wrap">
+                    {JSON.stringify(brand, null, 2)}
+                  </p>
+                </div>
+                <p className="text-sm mt-2">
+                  <strong>isFallback:</strong> {brand?.isFallback ? 'Yes (showing dummy data)' : 'No (showing real data)'}
+                </p>
+                <p className="text-sm">
+                  <strong>Source:</strong> {brand?.source || 'Unknown'}
+                </p>
+              </div>
+              
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Content Data</h3>
+                <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-md overflow-x-auto">
+                  <p className="text-xs font-mono whitespace-pre-wrap">
+                    {JSON.stringify(contents, null, 2)}
+                  </p>
+                </div>
+                <p className="text-sm mt-2">
+                  <strong>Item Count:</strong> {contents?.length || 0}
+                </p>
+              </div>
+              
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Workflows Data</h3>
+                <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-md overflow-x-auto">
+                  <p className="text-xs font-mono whitespace-pre-wrap">
+                    {JSON.stringify(workflows, null, 2)}
+                  </p>
+                </div>
+                <p className="text-sm mt-2">
+                  <strong>Item Count:</strong> {workflows?.length || 0}
+                </p>
+              </div>
+              
+              <div>
+                <h3 className="text-lg font-semibold mb-2">System Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm"><strong>Page URL:</strong> {typeof window !== 'undefined' ? window.location.href : ''}</p>
+                    <p className="text-sm"><strong>Brand ID:</strong> {params.id}</p>
+                    <p className="text-sm"><strong>API Endpoint:</strong> /api/brands/{params.id}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm"><strong>Timestamp:</strong> {new Date().toISOString()}</p>
+                    <p className="text-sm"><strong>Network Status:</strong> {navigator?.onLine ? 'Online' : 'Offline'}</p>
+                    <p className="text-sm"><strong>Environment:</strong> {process.env.NODE_ENV}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Actions</h3>
+                <div className="flex gap-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const cacheBuster = `nocache=${Date.now()}-${Math.random()}`;
+                      window.location.href = `${window.location.pathname}?${cacheBuster}`;
+                    }}
+                  >
+                    Reload with Cache Buster
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      window.localStorage.clear();
+                      window.sessionStorage.clear();
+                      alert('Local storage and session storage cleared. Reloading page...');
+                      window.location.reload();
+                    }}
+                  >
+                    Clear Browser Storage
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
