@@ -102,6 +102,39 @@ As a fallback, we can use package overrides to specify a known compatible experi
 
 7. **Create a pull request** and verify deployment on Vercel preview
 
+## Implementation Notes
+
+After reviewing with senior developers, we implemented Option 1 with these additional recommendations:
+
+1. **Removed the explicit dependency**:
+   ```diff
+   - "react-server-dom-webpack": "^18.2.0",
+   ```
+
+2. **Enhanced the build process**:
+   - Updated build script with increased memory allocation:
+   ```json
+   "build": "NODE_OPTIONS=\"--max_old_space_size=4096\" next build",
+   ```
+
+3. **Full clean install process**:
+   ```bash
+   # Remove existing dependencies and lock file
+   rm -rf node_modules package-lock.json
+   
+   # Perform a clean install
+   npm ci
+   
+   # Build with increased memory
+   npm run build
+   ```
+
+4. **Alternative for direct RSC imports**:
+   If we ever need to directly import React Server Components APIs, we've documented the approach to use Next.js's compiled version:
+   ```bash
+   npm install react-server-dom-webpack@npm:next/dist/compiled/react-server-dom-webpack
+   ```
+
 ## Verification Process
 
 For each option, we'll verify success by:
