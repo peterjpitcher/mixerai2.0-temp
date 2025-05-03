@@ -3,7 +3,6 @@ const nextConfig = {
   reactStrictMode: true,
   images: {
     domains: ['api.dicebear.com'],
-    unoptimized: true,
   },
   // Skip type checking during build
   typescript: {
@@ -15,11 +14,7 @@ const nextConfig = {
   },
   // Security settings
   poweredByHeader: false,
-  // Build configuration for Vercel 
-  output: 'export',
-  // Disable output link display
-  distDir: '.next',
-  // Enable static export for API routes
+  // Ensure Next.js can find files for tracing
   experimental: {
     outputFileTracingRoot: process.cwd(),
   }
