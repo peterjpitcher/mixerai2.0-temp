@@ -63,7 +63,8 @@ if (maintenanceMode) {
               tone_of_voice: 'Professional but friendly',
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
-              content_count: 5
+              content_count: 5,
+              brand_color: '#3498db'
             },
             {
               id: '2',
@@ -75,7 +76,8 @@ if (maintenanceMode) {
               tone_of_voice: 'Formal and authoritative',
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
-              content_count: 3
+              content_count: 3,
+              brand_color: '#e74c3c'
             }
           ]
         }));
@@ -130,6 +132,7 @@ if (maintenanceMode) {
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
               brand_name: 'Sample Brand',
+              brand_color: '#3498db',
               content_type_name: 'Article',
               created_by_name: 'System'
             },
@@ -141,6 +144,7 @@ if (maintenanceMode) {
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
               brand_name: 'Another Brand',
+              brand_color: '#e74c3c',
               content_type_name: 'Retailer PDP',
               created_by_name: 'System'
             }

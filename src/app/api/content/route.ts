@@ -13,6 +13,7 @@ const getFallbackContent = () => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       brand_name: 'Sample Brand',
+      brand_color: '#3498db',
       content_type_name: 'Article',
       created_by_name: 'System'
     },
@@ -24,6 +25,7 @@ const getFallbackContent = () => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       brand_name: 'Another Brand',
+      brand_color: '#e74c3c',
       content_type_name: 'Retailer PDP',
       created_by_name: 'System'
     }
@@ -54,7 +56,7 @@ export async function GET(request: NextRequest) {
       .from('content')
       .select(`
         *,
-        brands:brand_id(name),
+        brands:brand_id(name, brand_color),
         content_types:content_type_id(name),
         profiles:created_by(full_name)
       `)
@@ -74,6 +76,7 @@ export async function GET(request: NextRequest) {
     const formattedContent = content.map(item => ({
       ...item,
       brand_name: item.brands?.name || null,
+      brand_color: item.brands?.brand_color || null,
       content_type_name: item.content_types?.name || null,
       created_by_name: item.profiles?.full_name || null
     }));
