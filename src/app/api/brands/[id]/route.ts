@@ -7,6 +7,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const requestHeaders = Object.fromEntries(request.headers.entries());
+  console.log(`🔍 API: GET /api/brands/${params.id} - Request headers:`, requestHeaders);
+  
   try {
     // Return mock data during static site generation
     if (isBuildPhase()) {
@@ -24,8 +27,15 @@ export async function GET(
           tone_of_voice: 'Professional yet friendly, with a focus on clarity and simplicity.',
           guardrails: 'Avoid technical jargon. Focus on benefits rather than features.',
           content_vetting_agencies: 'FDA, FTC, EPA',
+          brand_color: '#3498db',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
+        }
+      }, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-store',
+          'x-data-source': 'mock-build-phase'
         }
       });
     }
@@ -47,15 +57,37 @@ export async function GET(
     if (!brand) {
       return NextResponse.json(
         { success: false, error: 'Brand not found' },
-        { status: 404 }
+        { 
+          status: 404,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'no-store'
+          }
+        }
       );
     }
 
     console.log(`Successfully fetched brand: ${brand.name}`);
     
+    // Add metadata to help identify the response (using type assertion for extra properties)
+    (brand as any).source = 'database';
+    (brand as any).fetchedAt = new Date().toISOString();
+    
     return NextResponse.json({ 
       success: true, 
-      brand 
+      brand,
+      meta: {
+        source: 'database',
+        isFallback: false,
+        requestId: crypto.randomUUID(),
+        timestamp: new Date().toISOString()
+      }
+    }, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-store',
+        'x-data-source': 'database'
+      }
     });
   } catch (error: any) {
     console.error('Error fetching brand:', error);
@@ -76,8 +108,24 @@ export async function GET(
           tone_of_voice: 'Professional yet friendly.',
           guardrails: 'Avoid technical jargon.',
           content_vetting_agencies: 'FDA, FTC',
+          brand_color: '#e74c3c',
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          source: 'fallback',
+          fetchedAt: new Date().toISOString()
+        },
+        meta: {
+          source: 'fallback',
+          isFallback: true,
+          errorType: 'database_connection',
+          requestId: crypto.randomUUID(),
+          timestamp: new Date().toISOString()
+        }
+      }, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-store',
+          'x-data-source': 'fallback'
         }
       });
     }
@@ -112,7 +160,35 @@ export async function PUT(
     if (body.language !== undefined) updateData.language = body.language;
     if (body.brand_identity !== undefined) updateData.brand_identity = body.brand_identity;
     if (body.tone_of_voice !== undefined) updateData.tone_of_voice = body.tone_of_voice;
-    if (body.guardrails !== undefined) updateData.guardrails = body.guardrails;
+    if (body.brand_color !== undefined) updateData.brand_color = body.brand_color;
+    
+    // Handle guardrails specially to ensure proper format
+    if (body.guardrails !== undefined) {
+      // Handle case where guardrails might be a JSON array string or an actual array
+      let formattedGuardrails = body.guardrails;
+      
+      // If it's already an array (parsed from JSON)
+      if (Array.isArray(body.guardrails)) {
+        formattedGuardrails = body.guardrails.map(item => `- ${item}`).join('\n');
+      } 
+      // If it's a JSON string containing an array
+      else if (typeof body.guardrails === 'string' && 
+               body.guardrails.trim().startsWith('[') && 
+               body.guardrails.trim().endsWith(']')) {
+        try {
+          const guardrailsArray = JSON.parse(body.guardrails);
+          if (Array.isArray(guardrailsArray)) {
+            formattedGuardrails = guardrailsArray.map(item => `- ${item}`).join('\n');
+          }
+        } catch (e) {
+          // If parsing fails, use as is
+          console.log("Failed to parse guardrails as JSON array, using as-is");
+        }
+      }
+      
+      updateData.guardrails = formattedGuardrails;
+    }
+    
     if (body.content_vetting_agencies !== undefined) updateData.content_vetting_agencies = body.content_vetting_agencies;
     
     // Check if there's anything to update
