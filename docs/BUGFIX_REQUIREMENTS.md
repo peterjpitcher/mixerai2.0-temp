@@ -13,7 +13,8 @@ This document outlines the requirements for fixing various issues and implementi
 - Remove the "Overview" tab button from the TabsList since it's now the only tab.
 - Replace all placeholder data with live data from API endpoints:
   - Currently hardcoded: `userCount: 3` and `workflowCount: 5`
-  - Connect to appropriate API endpoints for accurate data
+  - Create or connect to appropriate API endpoints for accurate data
+  - Implement best-practice approach for counting workflows and users
 - Remove the note about placeholder data once all data is live.
 
 ## 2. Brands Page
@@ -25,8 +26,9 @@ This document outlines the requirements for fixing various issues and implementi
 ### Requirements:
 - Remove import and export buttons from the brands page.
 - Fix the routing for brand viewing and editing:
-  - Review code to determine the correct routes according to project standards
-  - Fix links to ensure they point to the correct routes (likely `/dashboard/brands/[id]` or similar)
+  - Review code to determine the correct routes according to application standards
+  - Follow the same URL structure pattern as the rest of the application
+  - Fix links to ensure they point to the correct routes
 
 ## 3. Brand Creation Page
 
@@ -44,6 +46,8 @@ This document outlines the requirements for fixing various issues and implementi
   - Add functionality to extract text from these URLs.
   - Use Azure OpenAI to generate brand identity, tone of voice, guardrails, and vetting agencies.
   - Display error messages if URLs can't be processed.
+  - Implement rate limiting to avoid OpenAI API rate limits.
+  - No preview of extracted content is needed before generation.
   - Use existing Azure OpenAI configuration:
     ```
     AZURE_OPENAI_API_KEY=91657ac1fc944910992d8c9da1d9c866
@@ -62,13 +66,11 @@ This document outlines the requirements for fixing various issues and implementi
 ### Requirements:
 - Remove the export button.
 - Change "Joined date" to "Last login date" using the `last_sign_in_at` field.
-- Add functionality to assign roles to users:
-  - Dropdown menu for role selection (admin, editor, viewer)
-  - Store this information properly in Supabase
-- Add functionality to assign users to brands:
-  - Multi-select component for brand assignment
-  - Allow different roles for different brands
-  - Connect to user_brand_permissions table in Supabase
+- User management clarifications:
+  - Only admin users can be added through the 'Invite User' functionality
+  - Regular users need to be set up by assigning them to a workflow stage
+  - No need to add brand assignment functionality on the users page
+  - User roles will be defined by workflow stage assignments
 
 ## 5. Workflows System
 
@@ -76,8 +78,15 @@ This document outlines the requirements for fixing various issues and implementi
 - Workflows are not connected to brands and content types.
 
 ### Requirements:
+- Review existing schema in migrations and create a migration for any missing tables/fields
 - Update workflow schema to include brand_id and content_type_id as required fields.
 - Implement workflow according to the detailed PRD specifications:
+- Workflow-specific requirements:
+  - Workflows are always unique to brands (not shareable across brands)
+  - Users should be assignable to workflow stages by email
+  - If the email belongs to an existing user, assign to their account
+  - If the email is new, invite them to the system
+  - Implement proper UI for workflow stage user assignment
 
 ### Workflow Core Components:
 - Workflow Definitions - Templates that define a sequence of stages
@@ -90,7 +99,7 @@ This document outlines the requirements for fixing various issues and implementi
 1. **Stage Configuration Interface**
    - Basic information (name, type, order)
    - Stage requirements (customizable checklist)
-   - Team assignment (user selection, role assignment)
+   - Team assignment (user selection by email)
    - Automation settings (auto-transition, notifications)
 
 2. **Workflow Dashboard**
@@ -123,7 +132,8 @@ This document outlines the requirements for fixing various issues and implementi
 ## Technical Implementation Notes
 
 1. **Database Structure**
-   - Ensure appropriate tables exist for workflows, stages, permissions
+   - Review existing tables for workflows, stages, permissions
+   - Create migration script for any missing tables/fields
    - Create proper relations between brands, content types, workflows
 
 2. **API Integration**
@@ -138,13 +148,14 @@ This document outlines the requirements for fixing various issues and implementi
 4. **Error Handling**
    - Implement specific error handling for workflow operations
    - Display user-friendly error messages
+   - Add rate limiting for OpenAI API calls
 
 ## Implementation Priority
 
 1. Fix dashboard page placeholder data and remove unnecessary tab
 2. Fix brand viewing/editing routes
 3. Enhance brand creation page with combo boxes and separate tab
-4. Update users page with role and brand assignment functionality
+4. Update users page to show last login date and remove export button
 5. Implement workflow system with brand and content type connections
 
 Each issue should be addressed independently to ensure clean commits and easier review. 
