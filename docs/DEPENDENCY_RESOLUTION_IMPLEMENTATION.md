@@ -6,8 +6,8 @@ This document details the implementation of our solution to fix the React Server
 
 1. **package.json**
    - Pinned Node.js to version 18.x for stability
-   - Added missing `react-server-dom-webpack` dependency at version 18.3.1
-   - Pinned React and React DOM to exact versions (18.3.1) to ensure compatibility
+   - Removed explicit `react-server-dom-webpack` dependency that was causing errors
+   - Pinned React and React DOM to exact versions (18.2.0) to ensure compatibility
    - Removed caret (^) from Next.js version to prevent minor version shifts
    - Updated build script to include cache cleaning step
 
@@ -24,8 +24,8 @@ This document details the implementation of our solution to fix the React Server
    - Added GitHub integration settings
 
 4. **vercel-build.js**
-   - Added environment verification step to check for RSC dependencies
-   - Implements runtime dependency checking and auto-repair
+   - Updated environment verification to check for modules without requiring specific versions
+   - Modified auto-repair to only reinstall React and React DOM at 18.2.0
    - Added memory allocation settings to prevent OOM errors
    - Updated framework version reference
 
@@ -44,10 +44,10 @@ This document details the implementation of our solution to fix the React Server
 
 ### 1. Dependency Management
 
-The core issue was missing or incompatible React Server Components dependencies. Our solution:
+The core issue was a missing `react-server-dom-webpack@18.3.1` dependency that doesn't exist in the npm registry. Our solution:
 
-- Explicitly includes `react-server-dom-webpack` at version 18.3.1
-- Ensures all React packages (`react`, `react-dom`, `react-server-dom-webpack`) are at the same exact version
+- Uses Next.js's built-in transitive dependency for react-server-dom-webpack instead of specifying an explicit version
+- Ensures React packages (`react`, `react-dom`) are at the stable 18.2.0 version
 - Uses `.npmrc` settings to prevent peer dependency conflicts
 
 ### 2. Build Process Improvements
@@ -62,8 +62,8 @@ To ensure clean builds without stale artifacts:
 
 The `vercel-build.js` script now:
 
-- Tests for the presence of required modules before building
-- Automatically attempts to fix missing or broken dependencies
+- Tests for the presence of required modules without requiring specific versions
+- Automatically reinstalls stable React packages when needed
 - Increases Node.js memory allocation to handle larger builds
 
 ### 4. Configuration Simplification
@@ -79,7 +79,7 @@ We simplified the Next.js configuration to:
 With these changes, the build process should:
 
 1. Start with a clean environment free of stale artifacts
-2. Properly resolve all React Server Components dependencies
+2. Use Next.js's built-in React Server Components dependencies
 3. Generate the correct serverless function files for Vercel
 4. Deploy successfully without the "Module not found" errors
 
@@ -96,7 +96,8 @@ After deployment:
 As Next.js and React evolve, keep in mind:
 
 1. React Server Components are still evolving and may change in future releases
-2. Keep React, React DOM, and React Server DOM Webpack versions in sync
-3. When upgrading Next.js, ensure all related packages are compatible
+2. Keep React and React DOM versions in sync
+3. Let Next.js manage its internal dependencies rather than explicitly specifying them
+4. When upgrading Next.js, ensure all related packages are compatible
 
 This implementation should resolve the current deployment issues and provide a more stable foundation for future development. 

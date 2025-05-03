@@ -23,10 +23,13 @@ try {
     const React = require('react');
     // The following line will throw an error if the module is missing
     try {
-      require('react-server-dom-webpack');
-      console.log('✅ react-server-dom-webpack is properly installed');
+      // Check if react-server-dom-webpack is available, but don't require a specific version
+      console.log('✅ Checking for react-server-dom-webpack in modules...');
+      if (require.resolve('react-server-dom-webpack')) {
+        console.log('✅ react-server-dom-webpack is available');
+      }
     } catch (error) {
-      console.error('❌ react-server-dom-webpack module missing or invalid', error.message);
+      console.error('❌ react-server-dom-webpack module missing:', error.message);
       process.exit(1);
     }
   `);
@@ -43,9 +46,9 @@ try {
   // Create .npmrc to help with peer dependencies
   fs.writeFileSync('.npmrc', 'legacy-peer-deps=true\nstrict-peer-dependencies=false\n');
   
-  // Force reinstall of critical packages
+  // Force reinstall of React packages (without specifying react-server-dom-webpack)
   try {
-    execSync('npm install react@18.3.1 react-dom@18.3.1 react-server-dom-webpack@18.3.1 --no-save', { stdio: 'inherit' });
+    execSync('npm install react@18.2.0 react-dom@18.2.0 --no-save', { stdio: 'inherit' });
     console.log('✅ Reinstalled React packages');
   } catch (installError) {
     console.error('❌ Failed to reinstall React packages:', installError.message);
