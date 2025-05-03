@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { handleApiError } from '@/lib/api-utils';
+import { handleApiError, isProduction } from '@/lib/api-utils';
 
 // GET a single brand by ID
 export async function GET(
@@ -8,6 +8,28 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    // Return mock data during static site generation
+    if (process.env.NEXT_PHASE === 'phase-production-build') {
+      console.log('Returning mock brand during build');
+      return NextResponse.json({ 
+        success: true, 
+        isMockData: true,
+        brand: {
+          id: params.id,
+          name: 'Demo Brand',
+          website_url: 'https://example.com',
+          country: 'United States',
+          language: 'English', 
+          brand_identity: 'A sample brand identity for demonstration purposes.',
+          tone_of_voice: 'Professional yet friendly, with a focus on clarity and simplicity.',
+          guardrails: 'Avoid technical jargon. Focus on benefits rather than features.',
+          content_vetting_agencies: 'FDA, FTC, EPA',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      });
+    }
+    
     const supabase = createSupabaseAdminClient();
     const { id } = params;
     
