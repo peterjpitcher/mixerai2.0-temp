@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
+import { v4 as uuidv4 } from 'uuid';
 
 // Sample fallback data for when DB connection fails
 const getFallbackWorkflows = () => {
@@ -13,9 +14,36 @@ const getFallbackWorkflows = () => {
       content_type_id: '1',
       content_type_name: 'Article',
       steps: [
-        { id: '1', name: 'Draft', approvers: [] },
-        { id: '2', name: 'Review', approvers: [] },
-        { id: '3', name: 'Publish', approvers: [] }
+        { 
+          id: 1, 
+          name: 'Draft', 
+          description: 'Initial draft creation',
+          role: 'editor',
+          approvalRequired: true,
+          assignees: [
+            { email: 'editor@example.com' }
+          ] 
+        },
+        { 
+          id: 2, 
+          name: 'Review', 
+          description: 'Content review by editorial team',
+          role: 'editor',
+          approvalRequired: true,
+          assignees: [
+            { email: 'reviewer@example.com' }
+          ] 
+        },
+        { 
+          id: 3, 
+          name: 'Publish', 
+          description: 'Final approval and publishing',
+          role: 'admin',
+          approvalRequired: true,
+          assignees: [
+            { email: 'admin@example.com' }
+          ] 
+        }
       ],
       steps_count: 3,
       content_count: 2,
@@ -30,8 +58,26 @@ const getFallbackWorkflows = () => {
       content_type_id: '2',
       content_type_name: 'Retailer PDP',
       steps: [
-        { id: '1', name: 'Draft', approvers: [] },
-        { id: '2', name: 'Publish', approvers: [] }
+        { 
+          id: 1, 
+          name: 'Draft', 
+          description: 'Initial product description',
+          role: 'editor',
+          approvalRequired: true,
+          assignees: [
+            { email: 'pdp@example.com' }
+          ]
+        },
+        { 
+          id: 2, 
+          name: 'Publish', 
+          description: 'Final approval',
+          role: 'admin',
+          approvalRequired: true,
+          assignees: [
+            { email: 'admin@example.com' }
+          ]
+        }
       ],
       steps_count: 2,
       content_count: 1,
@@ -105,7 +151,7 @@ export async function GET(request: NextRequest) {
       success: true, 
       workflows: formattedWorkflows 
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching workflows:', error);
     
     // Only use fallback for genuine database connection errors
@@ -160,6 +206,37 @@ export async function POST(request: Request) {
       );
     }
     
+    // Process assignees - create invitations for each email if needed
+    const steps = body.steps || [];
+    const invitations = [];
+    
+    for (const step of steps) {
+      if (step.assignees && Array.isArray(step.assignees)) {
+        for (const assignee of step.assignees) {
+          // Check if the user exists
+          const { data: existingUser } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('email', assignee.email)
+            .maybeSingle();
+            
+          if (existingUser) {
+            // User exists, set their ID in the assignee
+            assignee.id = existingUser.id;
+          } else {
+            // User doesn't exist, prepare an invitation
+            invitations.push({
+              workflow_step_id: step.id,
+              email: assignee.email,
+              role: step.role || 'editor',
+              invite_token: uuidv4(),
+              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
+            });
+          }
+        }
+      }
+    }
+    
     // Insert the new workflow
     const { data, error } = await supabase
       .from('workflows')
@@ -167,7 +244,7 @@ export async function POST(request: Request) {
         name: body.name,
         brand_id: body.brand_id,
         content_type_id: body.content_type_id,
-        steps: body.steps || []
+        steps: steps
       }])
       .select();
     
@@ -183,6 +260,31 @@ export async function POST(request: Request) {
         );
       }
       throw error;
+    }
+    
+    // If there are new invitations, create them in the workflow_invitations table
+    const workflowId = data[0].id;
+    
+    if (invitations.length > 0) {
+      // Update the workflow_id in the invitations
+      const workflowInvitations = invitations.map(invitation => ({
+        ...invitation,
+        workflow_id: workflowId
+      }));
+      
+      // Insert the invitations
+      const { error: invitationError } = await supabase
+        .from('workflow_invitations')
+        .insert(workflowInvitations);
+      
+      if (invitationError) {
+        console.error('Error creating workflow invitations:', invitationError);
+        // Don't fail the entire request if invitations fail
+      } else {
+        console.log(`Created ${workflowInvitations.length} workflow invitations`);
+        
+        // TODO: Send invitation emails (this would be implemented separately)
+      }
     }
     
     return NextResponse.json({ 

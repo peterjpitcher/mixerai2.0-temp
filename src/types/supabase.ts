@@ -265,6 +265,42 @@ export interface Database {
           }
         ]
       }
+      workflow_invitations: {
+        Row: {
+          id: string
+          workflow_id: string
+          step_id: number
+          email: string
+          role: string
+          invite_token: string
+          status: string
+          created_at: string
+          expires_at: string
+        }
+        Insert: {
+          id?: string
+          workflow_id: string
+          step_id: number
+          email: string
+          role: string
+          invite_token: string
+          status?: string
+          created_at?: string
+          expires_at: string
+        }
+        Update: {
+          id?: string
+          workflow_id?: string
+          step_id?: number
+          email?: string
+          role?: string
+          invite_token?: string
+          status?: string
+          created_at?: string
+          expires_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -30,24 +30,23 @@ interface WorkflowStepAssignee {
   id?: string;
 }
 
-interface Step {
+interface WorkflowStep {
   id: number;
   name: string;
   description: string;
   role: string;
-  approvalRequired?: boolean;
+  approvalRequired: boolean;
   assignees: WorkflowStepAssignee[];
 }
 
-interface WorkflowFormData {
-  id: string;
+interface FormData {
   name: string;
   brand_id: string;
   content_type_id: string;
-  steps: Step[];
+  steps: WorkflowStep[];
 }
 
-export default function WorkflowEditPage({ params }: { params: { id: string }}) {
+export default function CreateWorkflowPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -57,12 +56,20 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
   const [isSaving, setIsSaving] = useState(false);
   const [newAssigneeEmail, setNewAssigneeEmail] = useState<{[key: number]: string}>({});
   
-  const [formData, setFormData] = useState<WorkflowFormData>({
-    id: params.id,
+  const [formData, setFormData] = useState<FormData>({
     name: '',
     brand_id: '',
     content_type_id: '',
-    steps: []
+    steps: [
+      {
+        id: 1,
+        name: '',
+        description: '',
+        role: 'editor',
+        approvalRequired: true,
+        assignees: []
+      }
+    ]
   });
   
   useEffect(() => {
@@ -71,16 +78,11 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
         setIsLoading(true);
         setError(null);
         
-        // Fetch workflow, brands, and content types
-        const [workflowResponse, brandsResponse, contentTypesResponse] = await Promise.all([
-          fetch(`/api/workflows/${params.id}`),
+        // Fetch brands and content types
+        const [brandsResponse, contentTypesResponse] = await Promise.all([
           fetch('/api/brands'),
           fetch('/api/content-types')
         ]);
-        
-        if (!workflowResponse.ok) {
-          throw new Error('Failed to fetch workflow');
-        }
         
         if (!brandsResponse.ok) {
           throw new Error('Failed to fetch brands');
@@ -90,13 +92,8 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
           throw new Error('Failed to fetch content types');
         }
         
-        const workflowData = await workflowResponse.json();
         const brandsData = await brandsResponse.json();
         const contentTypesData = await contentTypesResponse.json();
-        
-        if (!workflowData.success) {
-          throw new Error(workflowData.error || 'Failed to fetch workflow');
-        }
         
         if (!brandsData.success) {
           throw new Error(brandsData.error || 'Failed to fetch brands');
@@ -109,27 +106,12 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
         // Set the data
         setBrands(brandsData.brands || []);
         setContentTypes(contentTypesData.data || []);
-        
-        // Format workflow data for form - ensure steps have assignees array
-        const workflow = workflowData.workflow;
-        const steps = workflow.steps?.map((step: any) => ({
-          ...step,
-          assignees: step.assignees || []
-        })) || [];
-        
-        setFormData({
-          id: workflow.id,
-          name: workflow.name,
-          brand_id: workflow.brand_id,
-          content_type_id: workflow.content_type_id,
-          steps: steps
-        });
       } catch (error) {
         console.error('Error loading data:', error);
         setError((error as Error).message || 'Failed to load data');
         toast({
           title: 'Error',
-          description: 'Failed to load workflow data. Please try again.',
+          description: 'Failed to load data. Please try again.',
           variant: 'destructive'
         });
       } finally {
@@ -138,7 +120,7 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
     };
     
     loadData();
-  }, [params.id, toast]);
+  }, [toast]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -212,7 +194,7 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
     }
     
     // Check if email already exists in this step
-    if (formData.steps[stepIndex].assignees?.some(a => a.email === email)) {
+    if (formData.steps[stepIndex].assignees.some(a => a.email === email)) {
       toast({
         title: 'Duplicate Email',
         description: 'This email is already assigned to this step',
@@ -223,7 +205,7 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
     
     // Add the assignee
     handleStepChange(stepIndex, 'assignees', [
-      ...(formData.steps[stepIndex].assignees || []),
+      ...formData.steps[stepIndex].assignees,
       { email }
     ]);
     
@@ -254,11 +236,22 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
       return;
     }
     
+    // Validate each step
+    const invalidSteps = formData.steps.filter(step => !step.name);
+    if (invalidSteps.length > 0) {
+      toast({
+        title: 'Validation Error',
+        description: 'All workflow steps must have a name',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     try {
       setIsSaving(true);
       
-      const response = await fetch(`/api/workflows/${params.id}`, {
-        method: 'PUT',
+      const response = await fetch('/api/workflows', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
@@ -270,18 +263,18 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
       if (data.success) {
         toast({
           title: 'Success',
-          description: 'Workflow updated successfully'
+          description: 'Workflow created successfully'
         });
         
-        router.push(`/workflows/${params.id}`);
+        router.push('/workflows');
       } else {
-        throw new Error(data.error || 'Failed to update workflow');
+        throw new Error(data.error || 'Failed to create workflow');
       }
     } catch (error) {
-      console.error('Error updating workflow:', error);
+      console.error('Error creating workflow:', error);
       toast({
         title: 'Error',
-        description: (error as Error).message || 'Failed to update workflow. Please try again.',
+        description: (error as Error).message || 'Failed to create workflow. Please try again.',
         variant: 'destructive'
       });
     } finally {
@@ -294,7 +287,7 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
       <div className="py-10 flex justify-center items-center min-h-[300px]">
         <div className="flex flex-col items-center">
           <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-muted-foreground">Loading workflow data...</p>
+          <p className="text-muted-foreground">Loading data...</p>
         </div>
       </div>
     );
@@ -310,18 +303,18 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
             <line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
         </div>
-        <h3 className="text-xl font-semibold mb-2">Error Loading Workflow</h3>
+        <h3 className="text-xl font-semibold mb-2">Error Loading Data</h3>
         <p className="text-muted-foreground mb-6 max-w-md mx-auto">
           {error}
         </p>
-        <Button variant="outline" size="lg" asChild>
-          <Link href="/workflows">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-              <path d="M19 12H5" />
-              <path d="M12 19l-7-7 7-7" />
-            </svg>
-            Back to Workflows
-          </Link>
+        <Button variant="outline" size="lg" onClick={() => window.location.reload()}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+            <path d="M21 2v6h-6" />
+            <path d="M3 12a9 9 0 0 1 15-6.7l3-3.3" />
+            <path d="M3 22v-6h6" />
+            <path d="M21 12a9 9 0 0 1-15 6.7l-3 3.3" />
+          </svg>
+          Retry
         </Button>
       </div>
     );
@@ -333,19 +326,19 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
       <div className="w-full bg-background border-b px-6 py-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Edit Workflow</h1>
-            <p className="text-muted-foreground">{formData.name}</p>
+            <h1 className="text-3xl font-bold tracking-tight">Create Workflow</h1>
+            <p className="text-muted-foreground">Create a new workflow for your content approval process.</p>
           </div>
           <div className="flex items-center gap-4">
             <Button variant="outline" asChild>
-              <Link href={`/workflows/${params.id}`}>Cancel</Link>
+              <Link href="/workflows">Cancel</Link>
             </Button>
             <Button 
               type="submit" 
               form="workflow-form" 
               disabled={isSaving}
             >
-              {isSaving ? 'Saving...' : 'Save Changes'}
+              {isSaving ? 'Creating...' : 'Create Workflow'}
             </Button>
           </div>
         </div>
@@ -358,7 +351,7 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
             <CardHeader>
               <CardTitle>Workflow Details</CardTitle>
               <CardDescription>
-                Update the basic information for this workflow.
+                Enter the basic information for this workflow.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -506,7 +499,7 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
                       </p>
                       
                       {/* Assignee list */}
-                      {step.assignees && step.assignees.length > 0 && (
+                      {step.assignees.length > 0 && (
                         <div className="mb-3 space-y-2">
                           {step.assignees.map((assignee, assigneeIndex) => (
                             <div key={assigneeIndex} className="flex items-center justify-between bg-secondary/20 rounded-md px-3 py-2">
@@ -572,10 +565,10 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
             
             <CardFooter className="border-t pt-6 flex justify-end gap-4">
               <Button variant="outline" asChild>
-                <Link href={`/workflows/${params.id}`}>Cancel</Link>
+                <Link href="/workflows">Cancel</Link>
               </Button>
               <Button type="submit" disabled={isSaving}>
-                {isSaving ? 'Saving...' : 'Save Changes'}
+                {isSaving ? 'Creating...' : 'Create Workflow'}
               </Button>
             </CardFooter>
           </Card>

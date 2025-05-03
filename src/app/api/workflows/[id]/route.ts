@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * GET endpoint to retrieve a specific workflow by ID
@@ -80,12 +81,47 @@ export async function PUT(
       );
     }
     
+    // Process assignees - create invitations for each email if needed
+    const steps = body.steps || [];
+    const invitations = [];
+    
+    for (const step of steps) {
+      if (step.assignees && Array.isArray(step.assignees)) {
+        for (const assignee of step.assignees) {
+          // Skip assignees that already have an ID
+          if (assignee.id) continue;
+          
+          // Check if the user exists
+          const { data: existingUser } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('email', assignee.email)
+            .maybeSingle();
+            
+          if (existingUser) {
+            // User exists, set their ID in the assignee
+            assignee.id = existingUser.id;
+          } else {
+            // User doesn't exist, prepare an invitation
+            invitations.push({
+              workflow_id: id,
+              step_id: step.id,
+              email: assignee.email,
+              role: step.role || 'editor',
+              invite_token: uuidv4(),
+              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
+            });
+          }
+        }
+      }
+    }
+    
     // Prepare update object with only valid fields
     const updateData: any = {};
     if (body.name !== undefined) updateData.name = body.name;
     if (body.brand_id !== undefined) updateData.brand_id = body.brand_id;
     if (body.content_type_id !== undefined) updateData.content_type_id = body.content_type_id;
-    if (body.steps !== undefined) updateData.steps = body.steps;
+    if (body.steps !== undefined) updateData.steps = steps;
     
     // Check if there's anything to update
     if (Object.keys(updateData).length === 0) {
@@ -122,6 +158,30 @@ export async function PUT(
         { success: false, error: 'Workflow not found' },
         { status: 404 }
       );
+    }
+    
+    // If there are new invitations, create them in the workflow_invitations table
+    if (invitations.length > 0) {
+      // Before creating new invitations, delete any existing ones that might be outdated
+      await supabase
+        .from('workflow_invitations')
+        .delete()
+        .eq('workflow_id', id)
+        .in('status', ['pending']);
+        
+      // Insert the new invitations
+      const { error: invitationError } = await supabase
+        .from('workflow_invitations')
+        .insert(invitations);
+      
+      if (invitationError) {
+        console.error('Error creating workflow invitations:', invitationError);
+        // Don't fail the entire request if invitations fail
+      } else {
+        console.log(`Created ${invitations.length} workflow invitations`);
+        
+        // TODO: Send invitation emails (this would be implemented separately)
+      }
     }
     
     return NextResponse.json({ 
@@ -166,6 +226,12 @@ export async function DELETE(
         { status: 409 }
       );
     }
+    
+    // Delete associated workflow invitations
+    await supabase
+      .from('workflow_invitations')
+      .delete()
+      .eq('workflow_id', id);
     
     // Delete the workflow
     const { error, count } = await supabase

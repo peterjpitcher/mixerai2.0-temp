@@ -71,7 +71,7 @@ This document outlines the requirements for fixing various issues and implementi
     - France: SNAM, DGCCRF, ARPP
   - Allow users to select multiple relevant agencies
 
-## 4. Users Page
+## 4. Users Page - COMPLETE
 
 ### Current Issues:
 - Cannot assign roles (admin, editor, viewer) to users.
@@ -87,7 +87,7 @@ This document outlines the requirements for fixing various issues and implementi
   - Brand assignment for users will be handled through the workflow system, not directly on the users page
   - User roles will be defined by workflow stage assignments
 
-## 5. Workflows System
+## 5. Workflows System - COMPLETE
 
 ### Current Issues:
 - Workflows are not connected to brands and content types.
