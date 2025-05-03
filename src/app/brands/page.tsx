@@ -6,6 +6,8 @@ import { Button } from "@/components/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/card";
 import { Input } from "@/components/input";
 import { useToast } from "@/components/toast-provider";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Trash2 } from "lucide-react";
 
 interface Brand {
   id: string;
@@ -19,39 +21,84 @@ export default function BrandsPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [brandToDelete, setBrandToDelete] = useState<Brand | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const { toast } = useToast();
 
-  useEffect(() => {
-    async function fetchBrands() {
-      try {
-        const response = await fetch('/api/brands');
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch brands');
-        }
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          setBrands(data.brands);
-        } else {
-          throw new Error(data.error || 'Failed to fetch brands');
-        }
-      } catch (error) {
-        console.error('Error fetching brands:', error);
-        setError((error as Error).message || 'Failed to load brands');
-        toast({
-          title: "Error",
-          description: "Failed to load brands. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
+  const fetchBrands = async () => {
+    try {
+      const response = await fetch('/api/brands');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch brands');
       }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setBrands(data.brands);
+      } else {
+        throw new Error(data.error || 'Failed to fetch brands');
+      }
+    } catch (error) {
+      console.error('Error fetching brands:', error);
+      setError((error as Error).message || 'Failed to load brands');
+      toast({
+        title: "Error",
+        description: "Failed to load brands. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
+  };
 
+  useEffect(() => {
     fetchBrands();
   }, [toast]);
+
+  // Handle delete brand
+  const handleDeleteBrand = async () => {
+    if (!brandToDelete) return;
+
+    try {
+      setIsDeleting(true);
+      setDeleteError("");
+
+      const response = await fetch(`/api/brands/${brandToDelete.id}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast({
+          title: "Success",
+          description: data.message || "Brand deleted successfully",
+        });
+        // Refresh the brands list
+        fetchBrands();
+      } else {
+        setDeleteError(data.error || "Failed to delete brand");
+        toast({
+          title: "Error",
+          description: data.error || "Failed to delete brand",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      setDeleteError(error.message || "An error occurred");
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Empty state component
   const EmptyState = () => (
@@ -72,7 +119,7 @@ export default function BrandsPage() {
         You haven't added any brands yet. Create your first brand to start managing content.
       </p>
       <Button size="lg" asChild>
-        <Link href="/dashboard/brands/new">
+        <Link href="/brands/new">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
             <path d="M5 12h14" />
             <path d="M12 5v14" />
@@ -114,7 +161,7 @@ export default function BrandsPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">Brands</h1>
         <Button asChild>
-          <Link href="/dashboard/brands/new">Add Brand</Link>
+          <Link href="/brands/new">Add Brand</Link>
         </Button>
       </div>
 
@@ -163,28 +210,70 @@ export default function BrandsPage() {
                 </div>
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-between">
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href={`/dashboard/brands/${brand.id}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                    View
-                  </Link>
-                </Button>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href={`/dashboard/brands/${brand.id}/edit`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                    </svg>
-                    Edit
-                  </Link>
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href={`/brands/${brand.id}`}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                      View
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href={`/brands/${brand.id}/edit`}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                      Edit
+                    </Link>
+                  </Button>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    setBrandToDelete(brand);
+                    setShowDeleteConfirm(true);
+                  }}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
                 </Button>
               </CardFooter>
             </Card>
           ))}
         </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {brandToDelete && (
+        <ConfirmDialog
+          open={showDeleteConfirm}
+          onOpenChange={setShowDeleteConfirm}
+          title="Delete Brand"
+          description={
+            deleteError ? (
+              <div className="text-destructive my-2">
+                {deleteError}
+              </div>
+            ) : (
+              <div>
+                <p>Are you sure you want to delete the brand <strong>{brandToDelete.name}</strong>?</p>
+                <p className="mt-2">This action cannot be undone and will delete all brand information.</p>
+                <p className="mt-2">Note: Brands with existing content cannot be deleted.</p>
+              </div>
+            )
+          }
+          verificationText={brandToDelete.name}
+          verificationRequired={true}
+          onConfirm={handleDeleteBrand}
+          confirmText={isDeleting ? "Deleting..." : "Delete Brand"}
+          cancelText="Cancel"
+          variant="destructive"
+        />
       )}
     </div>
   );

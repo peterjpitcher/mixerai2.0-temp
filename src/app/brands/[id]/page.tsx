@@ -1,11 +1,22 @@
 'use client';
 
+import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/tabs";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useToast } from "@/components/toast-provider";
+import { Trash2 } from "lucide-react";
 
 export default function BrandDetailPage({ params }: { params: { id: string } }) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
   // Placeholder data for brand details
   const brand = {
     id: params.id,
@@ -42,6 +53,44 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
     { id: 3, name: "Owned PDP Workflow", contentType: "Owned PDP", steps: 4 },
   ];
 
+  // Handle delete brand
+  const handleDeleteBrand = async () => {
+    try {
+      setIsDeleting(true);
+      setDeleteError("");
+
+      const response = await fetch(`/api/brands/${brand.id}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast({
+          title: "Success",
+          description: data.message || "Brand deleted successfully",
+        });
+        router.push('/brands');
+      } else {
+        setDeleteError(data.error || "Failed to delete brand");
+        toast({
+          title: "Error",
+          description: data.error || "Failed to delete brand",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      setDeleteError(error.message || "An error occurred");
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -66,6 +115,14 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
               Edit Brand
             </Link>
           </Button>
+          <Button 
+            variant="destructive" 
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={isDeleting}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </Button>
           <Button asChild>
             <Link href={`/content/new?brand=${brand.id}`}>
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
@@ -79,6 +136,32 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
           </Button>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete Brand"
+        description={
+          deleteError ? (
+            <div className="text-destructive my-2">
+              {deleteError}
+            </div>
+          ) : (
+            <div>
+              <p>Are you sure you want to delete the brand <strong>{brand.name}</strong>?</p>
+              <p className="mt-2">This action cannot be undone and will delete all brand information.</p>
+              <p className="mt-2">Note: Brands with existing content cannot be deleted.</p>
+            </div>
+          )
+        }
+        verificationText={brand.name}
+        verificationRequired={true}
+        onConfirm={handleDeleteBrand}
+        confirmText={isDeleting ? "Deleting..." : "Delete Brand"}
+        cancelText="Cancel"
+        variant="destructive"
+      />
 
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
