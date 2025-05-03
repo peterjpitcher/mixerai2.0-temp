@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/input';
 import { Label } from '@/components/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
-import { useToast } from '@/components/toast-provider';
+import { useToast } from '@/components/use-toast';
 import { Switch } from '@/components/switch';
 
 export default function AccountPage() {

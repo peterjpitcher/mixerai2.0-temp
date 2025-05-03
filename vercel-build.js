@@ -12,6 +12,27 @@ function ensureDirectoryExists(dirPath) {
 
 console.log('Verifying environment...');
 
+// Check for CSS-related dependencies
+try {
+  console.log('Checking for CSS-related dependencies...');
+  // Try to require these packages to see if they're installed
+  require.resolve('autoprefixer');
+  require.resolve('postcss');
+  require.resolve('tailwindcss');
+  console.log('✅ CSS dependencies found');
+} catch (error) {
+  console.error('❌ Missing CSS dependencies:', error.message);
+  console.log('Installing missing CSS dependencies...');
+  
+  try {
+    execSync('npm install --save-dev autoprefixer postcss tailwindcss', { stdio: 'inherit' });
+    console.log('✅ Installed CSS dependencies');
+  } catch (installError) {
+    console.error('❌ Failed to install CSS dependencies:', installError.message);
+    // Continue with build attempt despite install failure
+  }
+}
+
 // Check for React Server Components dependencies
 try {
   // Create a simple test file to verify module resolution
