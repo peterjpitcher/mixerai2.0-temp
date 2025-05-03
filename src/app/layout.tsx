@@ -26,9 +26,17 @@ export default function RootLayout({
         <Script id="api-fallback" strategy="beforeInteractive">
           {`
           // This script provides fallbacks for API routes if they fail to load
-          // It will only intercept API requests when the actual API endpoints fail
+          // It will only intercept API requests when the actual API endpoints fail with server errors
           window.addEventListener('DOMContentLoaded', function() {
             const originalFetch = window.fetch;
+            
+            // Enable or disable the fallback entirely
+            const fallbackEnabled = true;
+            if (!fallbackEnabled) return;
+            
+            // Track API failures for diagnostics
+            window.apiFailures = [];
+            
             window.fetch = async function(url, options) {
               // Only run this fallback logic for our own API routes
               if (typeof url === 'string' && url.startsWith('/api/')) {
@@ -36,13 +44,27 @@ export default function RootLayout({
                   // Try the original fetch first
                   const response = await originalFetch(url, options);
                   
-                  // If it succeeds, return it
-                  if (response.ok) {
+                  // Only use fallbacks for server errors (5xx) or specific 4xx errors
+                  // that might indicate API route isn't deployed properly
+                  const needsFallback = response.status >= 500 || 
+                                        response.status === 404 || 
+                                        response.status === 421;
+                  
+                  // If it succeeds or doesn't need fallback, return it
+                  if (response.ok || !needsFallback) {
                     return response;
                   }
                   
-                  // If we get here, the API route failed
-                  console.warn('API route failed, using fallback:', url);
+                  // If we get here, the API route failed with a server error
+                  console.warn(\`API route failed with status \${response.status}, using fallback:\`, url);
+                  
+                  // Track the failure for diagnostics
+                  window.apiFailures.push({
+                    url: url,
+                    status: response.status,
+                    timestamp: new Date().toISOString(),
+                    error: 'Server error'
+                  });
                   
                   // Provide fallback data based on the route
                   if (url.includes('/api/brands')) {
@@ -52,7 +74,7 @@ export default function RootLayout({
                       brands: [
                         {
                           id: '1',
-                          name: 'Sample Brand', 
+                          name: 'Sample Brand (Client Fallback)', 
                           website_url: 'https://example.com',
                           content_count: 2
                         }
@@ -81,19 +103,26 @@ export default function RootLayout({
                   return new Response(JSON.stringify({
                     success: true,
                     isFallback: true,
-                    message: 'Using fallback API data'
+                    message: 'Using client-side fallback API data'
                   }), {
                     status: 200,
                     headers: { 'Content-Type': 'application/json' }
                   });
                 } catch (error) {
-                  console.error('API request failed, using fallback', error);
+                  console.error('API request failed completely, using fallback', error);
+                  
+                  // Track the failure for diagnostics
+                  window.apiFailures.push({
+                    url: url,
+                    error: error.message || 'Network error',
+                    timestamp: new Date().toISOString()
+                  });
                   
                   // Return a generic error fallback
                   return new Response(JSON.stringify({
                     success: false,
                     isFallback: true,
-                    error: 'API service unavailable'
+                    error: 'API service unavailable (client fallback)'
                   }), {
                     status: 503,
                     headers: { 'Content-Type': 'application/json' }
@@ -103,6 +132,11 @@ export default function RootLayout({
               
               // For non-API requests, use the original fetch
               return originalFetch.apply(this, arguments);
+            };
+            
+            // Add a helper method to get fallback diagnostics
+            window.getAPIFailures = function() {
+              return window.apiFailures;
             };
           });
           `}

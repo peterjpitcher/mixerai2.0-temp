@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { handleApiError, isProduction } from '@/lib/api-utils';
+import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
 
-// Sample fallback data for production when DB connection fails
+// Sample fallback data for when DB connection fails
 const getFallbackBrands = () => {
   return [
     {
@@ -35,7 +35,7 @@ const getFallbackBrands = () => {
 export async function GET() {
   try {
     // During static site generation, return mock data
-    if (process.env.NEXT_PHASE === 'phase-production-build') {
+    if (isBuildPhase()) {
       console.log('Returning mock brands during build');
       return NextResponse.json({ 
         success: true, 
@@ -44,6 +44,7 @@ export async function GET() {
       });
     }
     
+    console.log('Attempting to fetch brands from database');
     const supabase = createSupabaseAdminClient();
     
     // Get all brands
@@ -60,17 +61,17 @@ export async function GET() {
       content_count: brand.content?.[0]?.count || 0
     }));
 
+    console.log(`Successfully fetched ${formattedBrands.length} brands`);
+    
     return NextResponse.json({ 
       success: true, 
       brands: formattedBrands 
     });
   } catch (error: any) {
-    // In production, if it's a serious database connection error, return fallback data
-    if (isProduction() && 
-       (error.code === 'ECONNREFUSED' || 
-        error.code === 'ConnectionError' || 
-        error.message?.includes('connection') ||
-        error.message?.includes('auth'))) {
+    console.error('Error fetching brands:', error);
+    
+    // Only use fallback for genuine database connection errors
+    if (isDatabaseConnectionError(error)) {
       console.error('Database connection error, using fallback brands data:', error);
       return NextResponse.json({ 
         success: true, 

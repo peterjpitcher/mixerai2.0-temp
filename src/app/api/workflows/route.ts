@@ -1,15 +1,70 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
+
+// Sample fallback data for when DB connection fails
+const getFallbackWorkflows = () => {
+  return [
+    {
+      id: '1',
+      name: 'Sample Content Workflow',
+      brand_id: '1',
+      brand_name: 'Sample Brand',
+      content_type_id: '1',
+      content_type_name: 'Article',
+      steps: [
+        { id: '1', name: 'Draft', approvers: [] },
+        { id: '2', name: 'Review', approvers: [] },
+        { id: '3', name: 'Publish', approvers: [] }
+      ],
+      steps_count: 3,
+      content_count: 2,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    },
+    {
+      id: '2',
+      name: 'Another Workflow',
+      brand_id: '2',
+      brand_name: 'Another Brand',
+      content_type_id: '2',
+      content_type_name: 'Retailer PDP',
+      steps: [
+        { id: '1', name: 'Draft', approvers: [] },
+        { id: '2', name: 'Publish', approvers: [] }
+      ],
+      steps_count: 2,
+      content_count: 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+  ];
+};
 
 /**
  * GET endpoint to retrieve all workflows with related data
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // During static site generation, return mock data
+    if (isBuildPhase()) {
+      console.log('Returning mock workflows during build');
+      return NextResponse.json({ 
+        success: true, 
+        isMockData: true,
+        workflows: getFallbackWorkflows()
+      });
+    }
+    
+    console.log('Attempting to fetch workflows from database');
     const supabase = createSupabaseAdminClient();
     
-    // Get all workflows with brand and content type information
-    const { data: workflows, error } = await supabase
+    // Parse URL to check for brand_id filter
+    const url = new URL(request.url);
+    const brandId = url.searchParams.get('brand_id');
+    
+    // Base query
+    let query = supabase
       .from('workflows')
       .select(`
         *,
@@ -18,6 +73,14 @@ export async function GET() {
         content:content(count)
       `)
       .order('created_at', { ascending: false });
+    
+    // Apply brand_id filter if specified
+    if (brandId) {
+      query = query.eq('brand_id', brandId);
+    }
+    
+    // Execute the query
+    const { data: workflows, error } = await query;
     
     if (error) throw error;
     
@@ -36,16 +99,26 @@ export async function GET() {
       updated_at: workflow.updated_at
     }));
 
+    console.log(`Successfully fetched ${formattedWorkflows.length} workflows`);
+    
     return NextResponse.json({ 
       success: true, 
       workflows: formattedWorkflows 
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching workflows:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch workflows' },
-      { status: 500 }
-    );
+    
+    // Only use fallback for genuine database connection errors
+    if (isDatabaseConnectionError(error)) {
+      console.error('Database connection error, using fallback workflows data:', error);
+      return NextResponse.json({ 
+        success: true, 
+        isFallback: true,
+        workflows: getFallbackWorkflows()
+      });
+    }
+    
+    return handleApiError(error, 'Error fetching workflows');
   }
 }
 
@@ -117,10 +190,6 @@ export async function POST(request: Request) {
       workflow: data[0]
     });
   } catch (error) {
-    console.error('Error creating workflow:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to create workflow' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'Error creating workflow');
   }
 } 

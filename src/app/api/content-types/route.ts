@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { handleApiError, isProduction } from '@/lib/api-utils';
+import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
 
-// Sample fallback data for production when DB connection fails
+// Sample fallback data for when DB connection fails
 const getFallbackContentTypes = () => {
   return [
     {
@@ -30,19 +30,9 @@ const getFallbackContentTypes = () => {
 };
 
 export async function GET() {
-  // Immediately return fallback data in production to prevent errors
-  if (isProduction()) {
-    console.log('Production environment detected - using fallback content types data');
-    return NextResponse.json({ 
-      success: true, 
-      isFallback: true,
-      contentTypes: getFallbackContentTypes()
-    });
-  }
-  
   try {
     // During static site generation, return mock data
-    if (process.env.NEXT_PHASE === 'phase-production-build') {
+    if (isBuildPhase()) {
       console.log('Returning mock content types during build');
       return NextResponse.json({ 
         success: true, 
@@ -51,6 +41,7 @@ export async function GET() {
       });
     }
     
+    console.log('Attempting to fetch content types from database');
     const supabase = createSupabaseAdminClient();
     
     // Get all content types
@@ -61,13 +52,17 @@ export async function GET() {
     
     if (error) throw error;
     
+    console.log(`Successfully fetched ${contentTypes.length} content types`);
+    
     return NextResponse.json({ 
       success: true, 
       contentTypes 
     });
   } catch (error: any) {
-    // In production, always return fallback data on error
-    if (isProduction()) {
+    console.error('Error fetching content types:', error);
+    
+    // Only use fallback for genuine database connection errors
+    if (isDatabaseConnectionError(error)) {
       console.error('Database connection error, using fallback content types data:', error);
       return NextResponse.json({ 
         success: true, 

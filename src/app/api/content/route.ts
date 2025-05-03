@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { handleApiError, isProduction } from '@/lib/api-utils';
+import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
 
-// Sample fallback data for production when DB connection fails
+// Sample fallback data for when DB connection fails
 const getFallbackContent = () => {
   return [
     {
@@ -30,20 +30,10 @@ const getFallbackContent = () => {
   ];
 };
 
-export async function GET() {
-  // Immediately return fallback data in production to prevent errors
-  if (isProduction()) {
-    console.log('Production environment detected - using fallback content data');
-    return NextResponse.json({ 
-      success: true, 
-      isFallback: true,
-      content: getFallbackContent()
-    });
-  }
-  
+export async function GET(request: NextRequest) {
   try {
     // During static site generation, return mock data
-    if (process.env.NEXT_PHASE === 'phase-production-build') {
+    if (isBuildPhase()) {
       console.log('Returning mock content during build');
       return NextResponse.json({ 
         success: true, 
@@ -52,10 +42,15 @@ export async function GET() {
       });
     }
     
+    console.log('Attempting to fetch content from database');
     const supabase = createSupabaseAdminClient();
     
-    // Get all content with related details
-    const { data: content, error } = await supabase
+    // Parse URL to check for brand_id filter
+    const url = new URL(request.url);
+    const brandId = url.searchParams.get('brand_id');
+    
+    // Base query
+    let query = supabase
       .from('content')
       .select(`
         *,
@@ -64,6 +59,14 @@ export async function GET() {
         profiles:created_by(full_name)
       `)
       .order('created_at', { ascending: false });
+    
+    // Apply brand_id filter if specified
+    if (brandId) {
+      query = query.eq('brand_id', brandId);
+    }
+    
+    // Execute the query
+    const { data: content, error } = await query;
     
     if (error) throw error;
     
@@ -75,13 +78,17 @@ export async function GET() {
       created_by_name: item.profiles?.full_name || null
     }));
 
+    console.log(`Successfully fetched ${formattedContent.length} content items`);
+    
     return NextResponse.json({ 
       success: true, 
       content: formattedContent 
     });
   } catch (error: any) {
-    // In production, if it's a serious database connection error, return fallback data
-    if (isProduction()) {
+    console.error('Error fetching content:', error);
+    
+    // Only use fallback data for genuine database connection errors, not automatically in production
+    if (isDatabaseConnectionError(error)) {
       console.error('Database connection error, using fallback content data:', error);
       return NextResponse.json({ 
         success: true, 
@@ -133,9 +140,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error creating content:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to create content' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'Failed to create content', 500);
   }
 } 

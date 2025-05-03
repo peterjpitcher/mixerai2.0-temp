@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { handleApiError, isProduction } from '@/lib/api-utils';
+import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
 
 // GET a single brand by ID
 export async function GET(
@@ -9,7 +9,7 @@ export async function GET(
 ) {
   try {
     // Return mock data during static site generation
-    if (process.env.NEXT_PHASE === 'phase-production-build') {
+    if (isBuildPhase()) {
       console.log('Returning mock brand during build');
       return NextResponse.json({ 
         success: true, 
@@ -30,6 +30,8 @@ export async function GET(
       });
     }
     
+    console.log(`Attempting to fetch brand with ID: ${params.id}`);
+    
     const supabase = createSupabaseAdminClient();
     const { id } = params;
     
@@ -49,11 +51,37 @@ export async function GET(
       );
     }
 
+    console.log(`Successfully fetched brand: ${brand.name}`);
+    
     return NextResponse.json({ 
       success: true, 
       brand 
     });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('Error fetching brand:', error);
+    
+    // Only use fallback for genuine database connection errors
+    if (isDatabaseConnectionError(error)) {
+      console.error('Database connection error, using fallback brand data:', error);
+      return NextResponse.json({ 
+        success: true, 
+        isFallback: true,
+        brand: {
+          id: params.id,
+          name: 'Fallback Brand (Connection Error)',
+          website_url: 'https://example.com',
+          country: 'United States',
+          language: 'English', 
+          brand_identity: 'Fallback brand data due to database connection issue.',
+          tone_of_voice: 'Professional yet friendly.',
+          guardrails: 'Avoid technical jargon.',
+          content_vetting_agencies: 'FDA, FTC',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      });
+    }
+    
     return handleApiError(error, 'Error fetching brand');
   }
 }
