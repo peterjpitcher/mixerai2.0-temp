@@ -3,8 +3,6 @@ const nextConfig = {
   reactStrictMode: true,
   images: {
     domains: ['api.dicebear.com'],
-    // Required for Vercel deployment with images
-    unoptimized: process.env.NODE_ENV === 'production',
   },
   // Skip type checking during build
   typescript: {
@@ -16,16 +14,11 @@ const nextConfig = {
   },
   // Security settings
   poweredByHeader: false,
-  // Vercel-specific settings
-  // No 'output' setting to ensure serverless functions are generated
-  // Configure tracing for serverless functions
+  // Basic experimental features needed for correct build
   experimental: {
-    serverComponentsExternalPackages: ['next'],
-    outputFileTracingRoot: process.cwd(),
+    // No additional experimental features
   },
-  // Allow serverless functions to be generated
-  // This is critical for Vercel deployment
-  swcMinify: true
+  // No custom webpack configuration that might interfere with module resolution
 };
 
 module.exports = nextConfig; 

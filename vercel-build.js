@@ -10,12 +10,55 @@ function ensureDirectoryExists(dirPath) {
   }
 }
 
+console.log('Verifying environment...');
+
+// Check for React Server Components dependencies
+try {
+  // Create a simple test file to verify module resolution
+  const testDir = path.join(process.cwd(), '.vercel-test');
+  ensureDirectoryExists(testDir);
+  
+  // Write a simple test file
+  fs.writeFileSync(path.join(testDir, 'test-rsc.js'), `
+    const React = require('react');
+    // The following line will throw an error if the module is missing
+    try {
+      require('react-server-dom-webpack');
+      console.log('✅ react-server-dom-webpack is properly installed');
+    } catch (error) {
+      console.error('❌ react-server-dom-webpack module missing or invalid', error.message);
+      process.exit(1);
+    }
+  `);
+  
+  // Execute the test file
+  execSync('node .vercel-test/test-rsc.js', { stdio: 'inherit' });
+  
+  // Clean up test directory
+  fs.rmSync(testDir, { recursive: true, force: true });
+} catch (error) {
+  console.error('Environment verification failed:', error.message);
+  console.log('Attempting to fix dependency issues...');
+  
+  // Create .npmrc to help with peer dependencies
+  fs.writeFileSync('.npmrc', 'legacy-peer-deps=true\nstrict-peer-dependencies=false\n');
+  
+  // Force reinstall of critical packages
+  try {
+    execSync('npm install react@18.3.1 react-dom@18.3.1 react-server-dom-webpack@18.3.1 --no-save', { stdio: 'inherit' });
+    console.log('✅ Reinstalled React packages');
+  } catch (installError) {
+    console.error('❌ Failed to reinstall React packages:', installError.message);
+    // Continue with build attempt despite reinstall failure
+  }
+}
+
 try {
   console.log('Starting Vercel build process...');
   
-  // Run the standard Next.js build
+  // Run the standard Next.js build with environment variables to skip telemetry
   console.log('Running Next.js build...');
-  execSync('next build', { stdio: 'inherit' });
+  execSync('NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS="--max_old_space_size=4096" next build', { stdio: 'inherit' });
   
   // Check if .next directory was created
   if (!fs.existsSync('.next')) {
@@ -45,7 +88,7 @@ try {
     ],
     // Tell Vercel this is a Next.js function
     framework: {
-      version: require('./package.json').dependencies.next.replace('^', '')
+      version: require('./package.json').dependencies.next
     }
   };
   

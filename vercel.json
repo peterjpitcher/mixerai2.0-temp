@@ -3,7 +3,7 @@
   "framework": "nextjs",
   "buildCommand": null,
   "devCommand": null,
-  "installCommand": null,
+  "installCommand": "npm install --no-save",
   "outputDirectory": null,
   "headers": [
     {
@@ -27,5 +27,13 @@
         }
       ]
     }
-  ]
+  ],
+  "env": {
+    "VERCEL_FORCE_NO_BUILD_CACHE": "1",
+    "NEXT_TELEMETRY_DISABLED": "1"
+  },
+  "github": {
+    "enabled": true,
+    "silent": false
+  }
 } 
