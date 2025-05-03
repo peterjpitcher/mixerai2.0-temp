@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/toast";
 import { ToastProvider } from "@/components/toast-provider";
+import { ThemeProvider } from "@/components/theme-provider";
 import RootLayoutWrapper from "@/components/layout/root-layout-wrapper";
 import Script from "next/script";
 
@@ -19,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* API fallback script for ensuring functionality if API routes don't deploy correctly */}
         <Script id="api-fallback" strategy="beforeInteractive">
@@ -108,10 +109,17 @@ export default function RootLayout({
         </Script>
       </head>
       <body className={inter.className}>
-        <ToastProvider>
-          <RootLayoutWrapper>{children}</RootLayoutWrapper>
-          <Toaster />
-        </ToastProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <ToastProvider>
+            <RootLayoutWrapper>{children}</RootLayoutWrapper>
+            <Toaster />
+          </ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
