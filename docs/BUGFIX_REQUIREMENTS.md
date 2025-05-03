@@ -2,7 +2,7 @@
 
 This document outlines the requirements for fixing various issues and implementing enhancements in the MixerAI 2.0 application.
 
-## 1. Dashboard Page (Root)
+## 1. Dashboard Page (Root) - COMPLETE
 
 ### Current Issues:
 - Note stating "Some data shown is placeholder data. API endpoints for workflows and users will be implemented in a future update."
@@ -17,7 +17,7 @@ This document outlines the requirements for fixing various issues and implementi
   - Implement best-practice approach for counting workflows and users
 - Remove the note about placeholder data once all data is live.
 
-## 2. Brands Page
+## 2. Brands Page - COMPLETE
 
 ### Current Issues:
 - Import and export buttons are unnecessary.
@@ -30,12 +30,14 @@ This document outlines the requirements for fixing various issues and implementi
   - Follow the same URL structure pattern as the rest of the application
   - Fix links to ensure they point to the correct routes
 
-## 3. Brand Creation Page
+## 3. Brand Creation Page - COMPLETE
 
 ### Current Issues:
 - Country and language fields are not user-friendly.
 - Brand identity, tone of voice, guardrails, and vetting agencies need to be moved to a separate tab.
 - No functionality for automatically generating these fields from URLs.
+- Brand identity generation is too generic and doesn't incorporate country/language context.
+- Content vetting agencies aren't provided as selectable options specific to the brand's country.
 
 ### Requirements:
 - Update country and language fields to combo boxes with standard ISO options.
@@ -54,12 +56,25 @@ This document outlines the requirements for fixing various issues and implementi
     AZURE_OPENAI_ENDPOINT=https://owned-ai-dev.openai.azure.com
     AZURE_OPENAI_DEPLOYMENT=gpt-4o
     ```
+- Enhanced brand identity generation:
+  - Use the country and language selected for the brand when generating identity.
+  - Ensure the AI properly scrapes and analyzes content from the provided URLs.
+  - Add confirmation dialog if user attempts to regenerate when fields already have values.
+- Content vetting agencies implementation:
+  - Generate a list of relevant vetting agencies specific to the selected country.
+  - Present agencies as selectable options (checkboxes) that the user can choose from.
+  - Order agencies by priority/relevance to the brand.
+  - Provide brief explanation for why each agency is important for the brand.
+  - Examples of agencies by country:
+    - US: FDA, USDA, CDC, FTC, EPA
+    - UK: FSA, DEFRA, UHSA, ASA, EA
+    - France: SNAM, DGCCRF, ARPP
+  - Allow users to select multiple relevant agencies
 
 ## 4. Users Page
 
 ### Current Issues:
 - Cannot assign roles (admin, editor, viewer) to users.
-- No way to assign users to specific brands.
 - "Joined date" should be "Last login date".
 - Export button is unnecessary.
 
@@ -69,7 +84,7 @@ This document outlines the requirements for fixing various issues and implementi
 - User management clarifications:
   - Only admin users can be added through the 'Invite User' functionality
   - Regular users need to be set up by assigning them to a workflow stage
-  - No need to add brand assignment functionality on the users page
+  - Brand assignment for users will be handled through the workflow system, not directly on the users page
   - User roles will be defined by workflow stage assignments
 
 ## 5. Workflows System
