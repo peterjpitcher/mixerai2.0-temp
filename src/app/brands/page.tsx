@@ -72,7 +72,7 @@ export default function BrandsPage() {
         You haven't added any brands yet. Create your first brand to start managing content.
       </p>
       <Button size="lg" asChild>
-        <Link href="/brands/new">
+        <Link href="/dashboard/brands/new">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
             <path d="M5 12h14" />
             <path d="M12 5v14" />
@@ -114,34 +114,15 @@ export default function BrandsPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">Brands</h1>
         <Button asChild>
-          <Link href="/brands/new">Add Brand</Link>
+          <Link href="/dashboard/brands/new">Add Brand</Link>
         </Button>
       </div>
 
-      {/* Always show search and export buttons, even when empty */}
+      {/* Search input for brands */}
       {brands.length > 0 && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center">
           <div className="max-w-sm">
             <Input placeholder="Search brands..." />
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                <rect width="8" height="4" x="4" y="8" rx="1" />
-                <path d="M4 16v1a2 2 0 0 0 2 2h2" />
-                <path d="M16 4h1a2 2 0 0 1 2 2v2" />
-                <path d="M16 20h1a2 2 0 0 0 2-2v-2" />
-                <path d="M8 4H7a2 2 0 0 0-2 2v2" />
-                <rect width="8" height="4" x="12" y="12" rx="1" />
-              </svg>
-              Export
-            </Button>
-            <Button variant="outline" size="sm">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                <path d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-              </svg>
-              Import
-            </Button>
           </div>
         </div>
       )}
@@ -183,7 +164,7 @@ export default function BrandsPage() {
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-between">
                 <Button variant="ghost" size="sm" asChild>
-                  <Link href={`/brands/${brand.id}`}>
+                  <Link href={`/dashboard/brands/${brand.id}`}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
                       <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
                       <circle cx="12" cy="12" r="3" />
@@ -192,7 +173,7 @@ export default function BrandsPage() {
                   </Link>
                 </Button>
                 <Button variant="ghost" size="sm" asChild>
-                  <Link href={`/brands/${brand.id}/edit`}>
+                  <Link href={`/dashboard/brands/${brand.id}/edit`}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
                       <path d="M12 20h9" />
                       <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
