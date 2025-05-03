@@ -136,7 +136,8 @@ export async function POST(request: Request) {
         tone_of_voice: body.tone_of_voice || null,
         guardrails: formattedGuardrails,
         content_vetting_agencies: body.content_vetting_agencies || null,
-        brand_color: body.brand_color || '#3498db'
+        brand_color: body.brand_color || '#3498db',
+        approved_content_types: body.approved_content_types || null
       }])
       .select();
     

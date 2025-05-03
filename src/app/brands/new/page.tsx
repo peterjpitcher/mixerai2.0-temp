@@ -27,6 +27,13 @@ interface BrandFormData {
   guardrails: string;
   content_vetting_agencies: string;
   brand_color: string;
+  approved_content_types: string[];
+}
+
+interface ContentType {
+  id: string;
+  name: string;
+  description?: string;
 }
 
 export default function NewBrandPage() {
@@ -40,6 +47,8 @@ export default function NewBrandPage() {
   const [usedFallback, setUsedFallback] = useState(false);
   const [showOverwriteDialog, setShowOverwriteDialog] = useState(false);
   const [selectedAgencies, setSelectedAgencies] = useState<string[]>([]);
+  const [contentTypes, setContentTypes] = useState<ContentType[]>([]);
+  const [loadingContentTypes, setLoadingContentTypes] = useState(false);
   const [formData, setFormData] = useState<BrandFormData>({
     name: '',
     website_url: '',
@@ -49,12 +58,62 @@ export default function NewBrandPage() {
     tone_of_voice: '',
     guardrails: '',
     content_vetting_agencies: '',
-    brand_color: '#3498db' // Default blue color
+    brand_color: '#3498db', // Default blue color
+    approved_content_types: []
   });
 
   // Get vetting agencies based on selected country
   const [vettingAgencies, setVettingAgencies] = useState<any[]>([]);
   
+  // Fetch content types on page load
+  useEffect(() => {
+    const fetchContentTypes = async () => {
+      try {
+        setLoadingContentTypes(true);
+        const response = await fetch('/api/content-types');
+        const data = await response.json();
+        
+        if (data.success) {
+          setContentTypes(data.data || []);
+        } else {
+          console.error('Failed to fetch content types:', data.error);
+          toast({
+            title: 'Warning',
+            description: 'Failed to load content types. Some features may be limited.',
+            variant: 'destructive',
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching content types:', error);
+      } finally {
+        setLoadingContentTypes(false);
+      }
+    };
+    
+    fetchContentTypes();
+  }, [toast]);
+  
+  // Handle approved content types selection
+  const handleContentTypeChange = (contentTypeId: string) => {
+    setFormData(prev => {
+      const currentTypes = [...prev.approved_content_types];
+      const index = currentTypes.indexOf(contentTypeId);
+      
+      if (index >= 0) {
+        // Remove if already selected
+        currentTypes.splice(index, 1);
+      } else {
+        // Add if not selected
+        currentTypes.push(contentTypeId);
+      }
+      
+      return {
+        ...prev,
+        approved_content_types: currentTypes
+      };
+    });
+  };
+
   // Update vetting agencies when country changes
   useEffect(() => {
     if (formData.country) {
@@ -521,6 +580,51 @@ export default function NewBrandPage() {
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Approved Content Types</Label>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Select which types of content can be created for this brand
+                      </p>
+                      {loadingContentTypes ? (
+                        <div className="flex items-center space-x-2 py-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-sm text-muted-foreground">Loading content types...</span>
+                        </div>
+                      ) : contentTypes.length === 0 ? (
+                        <div className="flex items-center space-x-2 py-2">
+                          <AlertCircle className="h-4 w-4" />
+                          <span className="text-sm text-muted-foreground">No content types found</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {contentTypes.map((contentType) => (
+                            <div key={contentType.id} className="flex items-center space-x-2">
+                              <Checkbox 
+                                id={`content-type-${contentType.id}`}
+                                checked={formData.approved_content_types.includes(contentType.id)}
+                                onCheckedChange={(checked) => 
+                                  handleContentTypeChange(contentType.id)
+                                }
+                              />
+                              <Label 
+                                htmlFor={`content-type-${contentType.id}`}
+                                className="text-sm font-normal cursor-pointer"
+                              >
+                                {contentType.name}
+                                {contentType.description && (
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    {contentType.description}
+                                  </span>
+                                )}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

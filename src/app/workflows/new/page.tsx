@@ -18,6 +18,7 @@ interface Brand {
   id: string;
   name: string;
   brand_color?: string;
+  approved_content_types?: string[];
 }
 
 interface ContentType {
@@ -51,6 +52,7 @@ export default function CreateWorkflowPage() {
   const { toast } = useToast();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [contentTypes, setContentTypes] = useState<ContentType[]>([]);
+  const [filteredContentTypes, setFilteredContentTypes] = useState<ContentType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -105,7 +107,9 @@ export default function CreateWorkflowPage() {
         
         // Set the data
         setBrands(brandsData.brands || []);
-        setContentTypes(contentTypesData.data || []);
+        const allContentTypes = contentTypesData.data || [];
+        setContentTypes(allContentTypes);
+        setFilteredContentTypes(allContentTypes);
       } catch (error) {
         console.error('Error loading data:', error);
         setError((error as Error).message || 'Failed to load data');
@@ -121,6 +125,36 @@ export default function CreateWorkflowPage() {
     
     loadData();
   }, [toast]);
+  
+  // Filter content types when brand changes
+  useEffect(() => {
+    if (formData.brand_id && brands.length > 0) {
+      const selectedBrand = brands.find(brand => brand.id === formData.brand_id);
+      
+      if (selectedBrand && selectedBrand.approved_content_types && Array.isArray(selectedBrand.approved_content_types) && selectedBrand.approved_content_types.length > 0) {
+        // Filter content types to only show those approved for this brand
+        const filteredTypes = contentTypes.filter(contentType => 
+          selectedBrand.approved_content_types?.includes(contentType.id)
+        );
+        
+        setFilteredContentTypes(filteredTypes);
+        
+        // If the currently selected content type is not in the filtered list, reset it
+        if (formData.content_type_id && !filteredTypes.some(ct => ct.id === formData.content_type_id)) {
+          setFormData(prev => ({
+            ...prev,
+            content_type_id: ''
+          }));
+        }
+      } else {
+        // If no approved content types specified, show all
+        setFilteredContentTypes(contentTypes);
+      }
+    } else {
+      // If no brand selected, show all content types
+      setFilteredContentTypes(contentTypes);
+    }
+  }, [formData.brand_id, brands, contentTypes]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -400,7 +434,7 @@ export default function CreateWorkflowPage() {
                       <SelectValue placeholder="Select a content type" />
                     </SelectTrigger>
                     <SelectContent>
-                      {contentTypes.map(contentType => (
+                      {filteredContentTypes.map(contentType => (
                         <SelectItem key={contentType.id} value={contentType.id}>
                           {contentType.name}
                         </SelectItem>

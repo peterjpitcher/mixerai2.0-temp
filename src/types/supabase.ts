@@ -21,6 +21,7 @@ export interface Database {
           guardrails: string | null
           content_vetting_agencies: string | null
           brand_color: string | null
+          approved_content_types: Json | null
           created_at: string
           updated_at: string
         }
@@ -35,6 +36,7 @@ export interface Database {
           guardrails?: string | null
           content_vetting_agencies?: string | null
           brand_color?: string | null
+          approved_content_types?: Json | null
           created_at?: string
           updated_at?: string
         }
@@ -49,6 +51,7 @@ export interface Database {
           guardrails?: string | null
           content_vetting_agencies?: string | null
           brand_color?: string | null
+          approved_content_types?: Json | null
           created_at?: string
           updated_at?: string
         }

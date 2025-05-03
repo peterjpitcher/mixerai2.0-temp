@@ -161,6 +161,7 @@ export async function PUT(
     if (body.brand_identity !== undefined) updateData.brand_identity = body.brand_identity;
     if (body.tone_of_voice !== undefined) updateData.tone_of_voice = body.tone_of_voice;
     if (body.brand_color !== undefined) updateData.brand_color = body.brand_color;
+    if (body.approved_content_types !== undefined) updateData.approved_content_types = body.approved_content_types;
     
     // Handle guardrails specially to ensure proper format
     if (body.guardrails !== undefined) {

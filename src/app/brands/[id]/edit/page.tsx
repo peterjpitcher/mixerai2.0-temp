@@ -46,8 +46,13 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     tone_of_voice: '',
     guardrails: '',
     content_vetting_agencies: '',
-    brand_color: '#3498db' // Default blue color
+    brand_color: '#3498db', // Default blue color
+    approved_content_types: [] as string[]
   });
+  
+  // Add contentTypes state
+  const [contentTypes, setContentTypes] = useState<Array<{id: string, name: string, description?: string}>>([]);
+  const [loadingContentTypes, setLoadingContentTypes] = useState(false);
   
   // Fetch brand data
   useEffect(() => {
@@ -61,7 +66,24 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         }
         
         if (data.success && data.brand) {
-          setBrand(data.brand);
+          // Convert approved_content_types from JSON to array if needed
+          let approvedTypes: string[] = [];
+          if (data.brand.approved_content_types) {
+            if (typeof data.brand.approved_content_types === 'string') {
+              try {
+                approvedTypes = JSON.parse(data.brand.approved_content_types);
+              } catch (e) {
+                console.error('Failed to parse approved_content_types:', e);
+              }
+            } else if (Array.isArray(data.brand.approved_content_types)) {
+              approvedTypes = data.brand.approved_content_types;
+            }
+          }
+          
+          setBrand({
+            ...data.brand,
+            approved_content_types: approvedTypes
+          });
           
           // Initialize selected agencies from content_vetting_agencies
           if (data.brand.content_vetting_agencies) {
@@ -90,6 +112,50 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     
     fetchBrand();
   }, [id, toast]);
+  
+  // Fetch content types
+  useEffect(() => {
+    const fetchContentTypes = async () => {
+      try {
+        setLoadingContentTypes(true);
+        const response = await fetch('/api/content-types');
+        const data = await response.json();
+        
+        if (data.success) {
+          setContentTypes(data.data || []);
+        } else {
+          console.error('Failed to fetch content types:', data.error);
+        }
+      } catch (error) {
+        console.error('Error fetching content types:', error);
+      } finally {
+        setLoadingContentTypes(false);
+      }
+    };
+    
+    fetchContentTypes();
+  }, []);
+  
+  // Handle approved content types selection
+  const handleContentTypeChange = (contentTypeId: string) => {
+    setBrand(prev => {
+      const currentTypes = [...prev.approved_content_types];
+      const index = currentTypes.indexOf(contentTypeId);
+      
+      if (index >= 0) {
+        // Remove if already selected
+        currentTypes.splice(index, 1);
+      } else {
+        // Add if not selected
+        currentTypes.push(contentTypeId);
+      }
+      
+      return {
+        ...prev,
+        approved_content_types: currentTypes
+      };
+    });
+  };
   
   // Update vetting agencies when country changes
   useEffect(() => {
@@ -565,6 +631,51 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label>Approved Content Types</Label>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Select which types of content can be created for this brand
+                  </p>
+                  {loadingContentTypes ? (
+                    <div className="flex items-center space-x-2 py-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm text-muted-foreground">Loading content types...</span>
+                    </div>
+                  ) : contentTypes.length === 0 ? (
+                    <div className="flex items-center space-x-2 py-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <span className="text-sm text-muted-foreground">No content types found</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {contentTypes.map((contentType) => (
+                        <div key={contentType.id} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`content-type-${contentType.id}`}
+                            checked={brand.approved_content_types.includes(contentType.id)}
+                            onCheckedChange={(checked) => 
+                              handleContentTypeChange(contentType.id)
+                            }
+                          />
+                          <Label 
+                            htmlFor={`content-type-${contentType.id}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {contentType.name}
+                            {contentType.description && (
+                              <span className="text-xs text-muted-foreground ml-2">
+                                {contentType.description}
+                              </span>
+                            )}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
