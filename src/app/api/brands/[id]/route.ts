@@ -36,14 +36,83 @@ export async function GET(
   }
 }
 
-// DELETE a brand by ID
-export async function DELETE(
+// PUT endpoint to update a brand
+export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const supabase = createSupabaseAdminClient();
     const { id } = params;
+    const body = await request.json();
+    
+    // Validate required fields
+    if (!body.name || body.name.trim() === '') {
+      return NextResponse.json(
+        { success: false, error: 'Brand name is required' },
+        { status: 400 }
+      );
+    }
+    
+    // Prepare update object with only valid fields
+    const updateData: any = {};
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.website_url !== undefined) updateData.website_url = body.website_url;
+    if (body.country !== undefined) updateData.country = body.country;
+    if (body.language !== undefined) updateData.language = body.language;
+    if (body.brand_identity !== undefined) updateData.brand_identity = body.brand_identity;
+    if (body.tone_of_voice !== undefined) updateData.tone_of_voice = body.tone_of_voice;
+    if (body.guardrails !== undefined) updateData.guardrails = body.guardrails;
+    if (body.content_vetting_agencies !== undefined) updateData.content_vetting_agencies = body.content_vetting_agencies;
+    
+    // Check if there's anything to update
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'No valid fields to update' },
+        { status: 400 }
+      );
+    }
+    
+    // Update the brand
+    const { data, error } = await supabase
+      .from('brands')
+      .update(updateData)
+      .eq('id', id)
+      .select();
+    
+    if (error) throw error;
+    
+    // Check if any rows were affected
+    if (!data || data.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Brand not found' },
+        { status: 404 }
+      );
+    }
+    
+    return NextResponse.json({ 
+      success: true, 
+      brand: data[0] 
+    });
+  } catch (error) {
+    return handleApiError(error, 'Error updating brand');
+  }
+}
+
+// DELETE a brand by ID
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  console.log("DELETE brand API called for ID:", params.id);
+  try {
+    const supabase = createSupabaseAdminClient();
+    const { id } = params;
+    
+    // Parse the URL to get the query parameters
+    const url = new URL(request.url);
+    const deleteCascade = url.searchParams.get('deleteCascade') === 'true';
+    console.log("deleteCascade parameter:", deleteCascade);
     
     // First check if the brand exists
     const { data: brand, error: fetchError } = await supabase
@@ -55,6 +124,7 @@ export async function DELETE(
     if (fetchError) throw fetchError;
     
     if (!brand) {
+      console.log("Brand not found:", id);
       return NextResponse.json(
         { success: false, error: 'Brand not found' },
         { status: 404 }
@@ -69,17 +139,73 @@ export async function DELETE(
     
     if (countError) throw countError;
     
-    if (contentCount && contentCount > 0) {
+    // Check if there's any workflows associated with this brand
+    const { count: workflowCount, error: workflowCountError } = await supabase
+      .from('workflows')
+      .select('id', { count: 'exact', head: true })
+      .eq('brand_id', id);
+    
+    if (workflowCountError) throw workflowCountError;
+    
+    const contentCountValue = contentCount || 0;
+    const workflowCountValue = workflowCount || 0;
+    
+    console.log("Associated content count:", contentCountValue);
+    console.log("Associated workflow count:", workflowCountValue);
+    
+    // If cascade delete is not specified, and there's associated content or workflows, return an error
+    if (!deleteCascade && (contentCountValue > 0 || workflowCountValue > 0)) {
+      console.log("Cascade delete required but not specified");
       return NextResponse.json(
         { 
           success: false, 
-          error: `Cannot delete brand. It has ${contentCount} piece${contentCount === 1 ? '' : 's'} of content associated with it.` 
+          error: `Cannot delete brand. It has ${contentCountValue} piece${contentCountValue === 1 ? '' : 's'} of content and ${workflowCountValue} workflow${workflowCountValue === 1 ? '' : 's'} associated with it.`,
+          contentCount: contentCountValue,
+          workflowCount: workflowCountValue,
+          requiresCascade: true
         },
         { status: 400 }
       );
     }
     
-    // Proceed with deletion
+    // If cascade delete is specified, first delete all associated content and workflows
+    if (deleteCascade) {
+      // For cascade delete, we'll do it manually since RPC may not be set up
+      // First delete all content
+      if (contentCountValue > 0) {
+        const { error: contentDeleteError } = await supabase
+          .from('content')
+          .delete()
+          .eq('brand_id', id);
+        
+        if (contentDeleteError) throw contentDeleteError;
+      }
+      
+      // Then delete all workflows
+      if (workflowCountValue > 0) {
+        const { error: workflowDeleteError } = await supabase
+          .from('workflows')
+          .delete()
+          .eq('brand_id', id);
+        
+        if (workflowDeleteError) throw workflowDeleteError;
+      }
+      
+      // Finally delete the brand
+      const { error: deleteError } = await supabase
+        .from('brands')
+        .delete()
+        .eq('id', id);
+      
+      if (deleteError) throw deleteError;
+      
+      return NextResponse.json({ 
+        success: true, 
+        message: `Brand "${brand.name}" and all associated content and workflows have been deleted successfully` 
+      });
+    }
+    
+    // If we're here, then there's no associated content or workflows, so just delete the brand
     const { error: deleteError } = await supabase
       .from('brands')
       .delete()
