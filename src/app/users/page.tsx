@@ -15,6 +15,7 @@ interface User {
   role?: string;
   avatar_url?: string;
   created_at?: string;
+  last_sign_in_at?: string;
 }
 
 export default function UsersPage() {

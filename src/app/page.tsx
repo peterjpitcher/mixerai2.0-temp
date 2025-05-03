@@ -190,9 +190,8 @@ export default function Dashboard() {
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-6">
+        <TabsList className="grid w-full grid-cols-1 mb-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview" className="space-y-6">
@@ -365,10 +364,6 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-        
-        <TabsContent value="analytics">
-          <AnalyticsOverview />
         </TabsContent>
       </Tabs>
       

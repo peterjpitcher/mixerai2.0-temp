@@ -59,8 +59,13 @@ export async function GET() {
     
     const supabase = createSupabaseAdminClient();
     
+    // First, get all users from auth.users table
+    const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+    
+    if (authError) throw authError;
+    
     // Get all user profiles with associated role information
-    const { data: users, error } = await supabase
+    const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select(`
         *,
@@ -72,14 +77,17 @@ export async function GET() {
       `)
       .order('created_at', { ascending: false });
     
-    if (error) throw error;
+    if (profilesError) throw profilesError;
     
-    // Process users to determine their highest role
-    const formattedUsers = (users as ProfileRecord[]).map(user => {
+    // Merge auth users with profiles where available
+    const mergedUsers = authUsers.users.map(authUser => {
+      // Find matching profile
+      const profile = (profiles as ProfileRecord[]).find(p => p.id === authUser.id);
+      
       // Get the highest role (admin > editor > viewer)
       let highestRole = 'viewer';
-      if (user.user_brand_permissions) {
-        for (const permission of user.user_brand_permissions) {
+      if (profile?.user_brand_permissions) {
+        for (const permission of profile.user_brand_permissions) {
           if (permission.role === 'admin') {
             highestRole = 'admin';
             break;
@@ -90,20 +98,20 @@ export async function GET() {
       }
       
       return {
-        id: user.id,
-        full_name: user.full_name || 'Unnamed User',
-        email: user.email || undefined,
-        avatar_url: user.avatar_url,
+        id: authUser.id,
+        full_name: profile?.full_name || authUser.user_metadata?.full_name || 'Unnamed User',
+        email: authUser.email,
+        avatar_url: profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUser.id}`,
         role: highestRole.charAt(0).toUpperCase() + highestRole.slice(1), // Capitalize role
-        created_at: user.created_at,
-        updated_at: user.updated_at,
-        brand_permissions: user.user_brand_permissions || []
+        created_at: authUser.created_at,
+        last_sign_in_at: authUser.last_sign_in_at,
+        brand_permissions: profile?.user_brand_permissions || []
       };
     });
 
     return NextResponse.json({ 
       success: true, 
-      users: formattedUsers 
+      users: mergedUsers 
     });
   } catch (error) {
     return handleApiError(error, 'Error fetching users');
