@@ -16,8 +16,6 @@ const nextConfig = {
   poweredByHeader: false,
   // Disable custom build process in Vercel
   skipTrailingSlashRedirect: true,
-  // Disable auto-installed React version
-  unstable_useDeploymentId: false,
   // Ensure module resolution works correctly
   transpilePackages: [],
 };
