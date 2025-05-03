@@ -16,6 +16,7 @@ export default function RootLayoutWrapper({
   const skipLayoutPaths = [
     '/auth',
     '/api',
+    '/dashboard', // Skip layout for dashboard routes which have their own layout
   ];
 
   // Check if the current path should skip the dashboard layout
@@ -134,6 +135,17 @@ export default function RootLayoutWrapper({
                 <line x1="10" x2="8" y1="9" y2="9" />
               </svg>
               <span>Content</span>
+            </Link>
+            <Link 
+              href="/todo-app" 
+              className={`flex items-center space-x-2 p-2 rounded-md ${isActive('/todo-app') ? 'bg-muted' : 'hover:bg-muted'}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                <line x1="9" y1="9" x2="15" y2="9" />
+                <line x1="9" y1="15" x2="13" y2="15" />
+              </svg>
+              <span>Todo App</span>
             </Link>
           </nav>
         </aside>
