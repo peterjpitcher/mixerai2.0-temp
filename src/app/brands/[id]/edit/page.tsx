@@ -92,8 +92,13 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   // Update vetting agencies when country changes
   useEffect(() => {
     if (brand.country) {
-      const agencies = getVettingAgenciesForCountry(brand.country);
-      setVettingAgencies(agencies);
+      try {
+        const agencies = getVettingAgenciesForCountry(brand.country);
+        setVettingAgencies(agencies || []);
+      } catch (error) {
+        console.error("Error loading vetting agencies:", error);
+        setVettingAgencies([]);
+      }
     } else {
       setVettingAgencies([]);
     }
