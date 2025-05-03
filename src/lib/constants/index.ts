@@ -36,5 +36,7 @@ export const LANGUAGES = [
   { value: 'pl', label: 'Polish' },
 ].sort((a, b) => a.label.localeCompare(b.label));
 
-// Export vetting agencies from their dedicated file
-export * from './vetting-agencies'; 
+// Import and re-export from vetting-agencies.ts
+import { VETTING_AGENCIES, getVettingAgenciesForCountry, type VettingAgency } from './vetting-agencies';
+export { VETTING_AGENCIES, getVettingAgenciesForCountry };
+export type { VettingAgency }; 
