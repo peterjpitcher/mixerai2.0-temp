@@ -191,3 +191,90 @@ Potential future improvements include:
 - Implementing retry logic for transient Azure OpenAI API errors
 - Adding more detailed validation for environment variables at startup
 - Enhancing the AI-generated content with additional examples and references 
+
+## Workflow User Assignment
+
+The MixerAI 2.0 application now supports assigning users to workflow stages during the workflow creation and editing process.
+
+### Key Features
+
+- **User Assignment by Email**: Users can be assigned to workflow stages by email addresses
+- **Existing Users Recognition**: If an email belongs to an existing user, they are automatically assigned
+- **User Invitation**: If an email doesn't match an existing user, an invitation is created
+- **Role-Based Access**: Each workflow stage has an associated role (editor, admin, etc.)
+- **Multiple Assignees**: Each workflow stage can have multiple assignees
+
+### Technical Implementation
+
+#### Database Schema
+
+The workflow schema uses a JSONB column to store steps with assignees:
+
+```json
+{
+  "steps": [
+    {
+      "id": 1,
+      "name": "Draft Review",
+      "description": "Initial review by the content author",
+      "role": "editor",
+      "approvalRequired": true,
+      "assignees": [
+        {"email": "user1@example.com", "id": "user-uuid-if-exists"},
+        {"email": "user2@example.com", "id": "user-uuid-if-exists"}
+      ]
+    }
+  ]
+}
+```
+
+A separate `workflow_invitations` table tracks invitations for users not yet in the system:
+
+```sql
+CREATE TABLE workflow_invitations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workflow_id UUID REFERENCES workflows(id) ON DELETE CASCADE,
+  step_id INTEGER NOT NULL,
+  email TEXT NOT NULL,
+  role TEXT NOT NULL,
+  invite_token TEXT NOT NULL UNIQUE,
+  status TEXT DEFAULT 'pending', -- 'pending', 'accepted', 'declined'
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  UNIQUE(workflow_id, step_id, email)
+);
+```
+
+#### User Interface
+
+The workflow creation and editing pages include:
+
+- Input field for entering assignee emails
+- List of current assignees with removal option
+- Email validation to ensure correct format
+- Prevention of duplicate email assignments
+
+#### API Implementation
+
+The API handles:
+1. Checking if an assignee email belongs to an existing user
+2. Creating invitations for new users
+3. Tracking assignee status in the workflow steps
+4. Managing invitation lifecycle (pending, accepted, declined)
+
+### Usage
+
+1. Create or edit a workflow
+2. Add steps as needed
+3. For each step, enter email addresses to assign users
+4. Save the workflow
+5. Users will either:
+   - See their assignments directly (if already in the system)
+   - Receive an invitation email (if not yet a user)
+
+### Future Enhancements
+
+- Email notification system integration
+- User invitation acceptance flow
+- Assignment history tracking
+- Reassignment capabilities 
