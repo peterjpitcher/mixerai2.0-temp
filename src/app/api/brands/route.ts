@@ -15,7 +15,8 @@ const getFallbackBrands = () => {
       tone_of_voice: 'Professional but friendly',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      content_count: 5
+      content_count: 5,
+      brand_color: '#3498db'
     },
     {
       id: '2',
@@ -27,7 +28,8 @@ const getFallbackBrands = () => {
       tone_of_voice: 'Formal and authoritative',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      content_count: 3
+      content_count: 3,
+      brand_color: '#e74c3c'
     }
   ];
 };
@@ -97,6 +99,31 @@ export async function POST(request: Request) {
       );
     }
     
+    // Format guardrails to ensure proper display
+    let formattedGuardrails = body.guardrails || null;
+    
+    // Handle case where guardrails might be in array format
+    if (formattedGuardrails) {
+      // If it's already an array (parsed from JSON)
+      if (Array.isArray(formattedGuardrails)) {
+        formattedGuardrails = formattedGuardrails.map(item => `- ${item}`).join('\n');
+      } 
+      // If it's a JSON string containing an array
+      else if (typeof formattedGuardrails === 'string' && 
+              formattedGuardrails.trim().startsWith('[') && 
+              formattedGuardrails.trim().endsWith(']')) {
+        try {
+          const guardrailsArray = JSON.parse(formattedGuardrails);
+          if (Array.isArray(guardrailsArray)) {
+            formattedGuardrails = guardrailsArray.map(item => `- ${item}`).join('\n');
+          }
+        } catch (e) {
+          // If parsing fails, use as is
+          console.log("Failed to parse guardrails as JSON array in POST, using as-is");
+        }
+      }
+    }
+    
     // Insert the new brand
     const { data, error } = await supabase
       .from('brands')
@@ -107,8 +134,9 @@ export async function POST(request: Request) {
         language: body.language || null,
         brand_identity: body.brand_identity || null,
         tone_of_voice: body.tone_of_voice || null,
-        guardrails: body.guardrails || null,
-        content_vetting_agencies: body.content_vetting_agencies || null
+        guardrails: formattedGuardrails,
+        content_vetting_agencies: body.content_vetting_agencies || null,
+        brand_color: body.brand_color || '#3498db'
       }])
       .select();
     
