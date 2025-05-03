@@ -6,6 +6,8 @@ import { Button } from "@/components/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/card";
 import { Input } from "@/components/input";
 import { useToast } from "@/components/toast-provider";
+import { BrandIcon } from "@/components/brand-icon";
+import { COUNTRIES, LANGUAGES } from "@/lib/constants";
 
 interface Brand {
   id: string;
@@ -13,6 +15,7 @@ interface Brand {
   country: string;
   language: string;
   content_count: number;
+  brand_color?: string;
 }
 
 export default function BrandsPage() {
@@ -165,20 +168,27 @@ export default function BrandsPage() {
                 <div className="flex justify-between items-start">
                   <div>
                     <CardTitle className="text-xl">{brand.name}</CardTitle>
-                    <CardDescription>{brand.country}, {brand.language}</CardDescription>
+                    <CardDescription>
+                      {COUNTRIES.find(c => c.value === brand.country)?.label || brand.country}, 
+                      {LANGUAGES.find(l => l.value === brand.language)?.label || brand.language}
+                    </CardDescription>
                   </div>
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
-                    {brand.name.charAt(0)}
-                  </div>
+                  <BrandIcon 
+                    name={brand.name} 
+                    color={brand.brand_color} 
+                    size="md"
+                  />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex justify-between text-sm text-muted-foreground mb-3">
-                  <span>Content pieces</span>
-                  <span className="font-medium">{brand.content_count}</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <div className="bg-primary h-2 rounded-full" style={{ width: `${Math.min(Number(brand.content_count) * 5, 100)}%` }}></div>
+                <div className="w-full bg-muted rounded-full h-2 mt-2">
+                  <div 
+                    className="h-2 rounded-full" 
+                    style={{ 
+                      width: `${Math.min(Number(brand.content_count) * 5, 100)}%`,
+                      backgroundColor: brand.brand_color || '#3498db'
+                    }}
+                  ></div>
                 </div>
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-between">
