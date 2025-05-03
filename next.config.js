@@ -14,11 +14,12 @@ const nextConfig = {
   },
   // Security settings
   poweredByHeader: false,
-  // Basic experimental features needed for correct build
-  experimental: {
-    // No additional experimental features
-  },
-  // No custom webpack configuration that might interfere with module resolution
+  // Disable custom build process in Vercel
+  skipTrailingSlashRedirect: true,
+  // Disable auto-installed React version
+  unstable_useDeploymentId: false,
+  // Ensure module resolution works correctly
+  transpilePackages: [],
 };
 
 module.exports = nextConfig; 

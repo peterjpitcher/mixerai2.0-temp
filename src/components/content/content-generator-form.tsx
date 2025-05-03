@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/separator';
 import { MarkdownDisplay } from './markdown-display';
 import { useRouter } from 'next/navigation';
-import { useToast } from '@/components/use-toast';
+import { useToast } from '@/components/toast-provider';
 
 interface Brand {
   id: string;
