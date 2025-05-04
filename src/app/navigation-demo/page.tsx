@@ -27,11 +27,11 @@ export default function NavigationDemoPage() {
                 <div className="border rounded-md p-4 bg-neutral-50">
                   <h2 className="text-xl font-semibold mb-3 text-primary">Top Navigation</h2>
                   <p className="text-neutral-600 mb-3">
-                    The top navigation uses <code className="bg-neutral-100 px-2 py-1 rounded text-primary">bg-top-nav</code> class,
-                    which is configured to use our primary blue (<code className="bg-neutral-100 px-2 py-1 rounded text-primary">#0066CC</code>).
+                    The top navigation uses <code className="bg-neutral-100 px-2 py-1 rounded text-primary">bg-primary</code> class,
+                    which is set to our exact blue color (<code className="bg-neutral-100 px-2 py-1 rounded text-primary">#0066CC</code>).
                   </p>
                   <ul className="list-disc pl-6 space-y-1 text-neutral-700 text-sm">
-                    <li>Primary blue background</li>
+                    <li>Primary blue background (#0066CC)</li>
                     <li>White text for optimal readability</li>
                     <li>Active state highlighting</li>
                     <li>Responsive design with mobile menu</li>

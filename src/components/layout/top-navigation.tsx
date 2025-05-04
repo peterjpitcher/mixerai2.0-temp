@@ -14,7 +14,7 @@ export function TopNavigation() {
   const pathname = usePathname();
   
   return (
-    <header className="bg-top-nav text-white h-16 flex items-center px-6 sticky top-0 z-50 shadow-md">
+    <header className="bg-primary text-white h-16 flex items-center px-6 sticky top-0 z-50 shadow-md">
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-4">
           {/* Mobile menu button */}
