@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-// Create OpenAI client
+// Simplified Azure OpenAI client configuration
 const openai = new OpenAI({
   apiKey: process.env.AZURE_OPENAI_API_KEY,
-  baseURL: `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT}`,
+  baseURL: process.env.AZURE_OPENAI_ENDPOINT,
   defaultQuery: { 'api-version': '2023-05-15' },
-  defaultHeaders: { 'api-key': process.env.AZURE_OPENAI_API_KEY }
 });
 
 export async function POST(request: NextRequest) {
@@ -27,6 +26,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Missing required parameters' },
         { status: 400 }
+      );
+    }
+    
+    // Validate environment variables
+    if (!process.env.AZURE_OPENAI_API_KEY || 
+        !process.env.AZURE_OPENAI_ENDPOINT || 
+        !process.env.AZURE_OPENAI_DEPLOYMENT) {
+      console.error('Missing required environment variables for Azure OpenAI');
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Azure OpenAI configuration is incomplete. Please set all required environment variables.' 
+        },
+        { status: 500 }
       );
     }
     
@@ -88,30 +101,65 @@ Improve clarity, professionalism, and conciseness while preserving the original 
     console.log('Calling OpenAI with prompt:', prompt);
     console.log('System message:', systemMessage);
     
-    // Call OpenAI API
-    const response = await openai.chat.completions.create({
-      messages: [
-        { role: "system", content: systemMessage },
-        { role: "user", content: prompt }
-      ],
-      model: 'gpt-4o',
-      max_tokens: 100,
-      temperature: 0.7
-    });
-    
-    // Extract the generated description
-    const description = response.choices[0]?.message?.content?.trim() || '';
-    
-    console.log('Generated description:', description);
-    
-    const result = {
-      success: true,
-      description
-    };
-    
-    console.log('Sending response:', result);
-    
-    return NextResponse.json(result);
+    try {
+      // Call OpenAI API using the proper format for Azure OpenAI
+      const response = await fetch(
+        `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2023-05-15`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'api-key': process.env.AZURE_OPENAI_API_KEY || ''
+          },
+          body: JSON.stringify({
+            messages: [
+              { role: "system", content: systemMessage },
+              { role: "user", content: prompt }
+            ],
+            max_tokens: 100,
+            temperature: 0.7
+          }),
+          cache: 'no-store' // Add no-cache to prevent caching
+        }
+      );
+      
+      if (!response.ok) {
+        console.error('Azure OpenAI API error:', response.status, await response.text());
+        throw new Error(`Azure OpenAI API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Extract the generated description from Azure OpenAI response
+      let description = data.choices?.[0]?.message?.content?.trim() || '';
+      
+      // Remove any quotes that might be wrapping the description
+      description = description.replace(/^["']|["']$/g, '');
+      
+      console.log('Generated description:', description);
+      
+      const result = {
+        success: true,
+        description
+      };
+      
+      console.log('Sending response:', result);
+      
+      return NextResponse.json(result, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'Surrogate-Control': 'no-store'
+        }
+      });
+    } catch (aiError) {
+      console.error('OpenAI API error:', aiError);
+      return NextResponse.json(
+        { success: false, error: 'Error calling OpenAI API. Please check your API configuration.' },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error('Error generating description:', error);
     

@@ -12,7 +12,8 @@ import { Label } from '@/components/label';
 import { Checkbox } from '@/components/checkbox';
 import { useToast } from '@/components/toast-provider';
 import { BrandIcon } from '@/components/brand-icon';
-import { PlusIcon, Trash2Icon, XIcon } from 'lucide-react';
+import { PlusIcon, Trash2Icon, XIcon, ChevronUpIcon, ChevronDownIcon, Users } from 'lucide-react';
+import { Badge } from '@/components/badge';
 
 interface Brand {
   id: string;
@@ -46,6 +47,14 @@ interface FormData {
   content_type_id: string;
   steps: WorkflowStep[];
 }
+
+// Role descriptions for display
+const roleDescriptions = {
+  editor: "General content editor responsible for content quality",
+  legal: "Legal reviewer who ensures content compliance with regulations",
+  brand: "Brand reviewer who ensures content aligns with brand standards",
+  seo: "SEO specialist who optimizes content for search engines"
+};
 
 export default function CreateWorkflowPage() {
   const router = useRouter();
@@ -258,6 +267,48 @@ export default function CreateWorkflowPage() {
     );
   };
   
+  const moveStepUp = (index: number) => {
+    if (index === 0) return; // Can't move first step up
+    
+    setFormData(prev => {
+      const updatedSteps = [...prev.steps];
+      
+      // Swap the step with the one above it
+      [updatedSteps[index], updatedSteps[index - 1]] = [updatedSteps[index - 1], updatedSteps[index]];
+      
+      return {
+        ...prev,
+        steps: updatedSteps
+      };
+    });
+    
+    toast({
+      title: 'Step Moved',
+      description: 'The step has been moved up'
+    });
+  };
+  
+  const moveStepDown = (index: number) => {
+    setFormData(prev => {
+      if (index === prev.steps.length - 1) return prev; // Can't move last step down
+      
+      const updatedSteps = [...prev.steps];
+      
+      // Swap the step with the one below it
+      [updatedSteps[index], updatedSteps[index + 1]] = [updatedSteps[index + 1], updatedSteps[index]];
+      
+      return {
+        ...prev,
+        steps: updatedSteps
+      };
+    });
+    
+    toast({
+      title: 'Step Moved',
+      description: 'The step has been moved down'
+    });
+  };
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -453,97 +504,241 @@ export default function CreateWorkflowPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {formData.steps.map((step, index) => (
-                <div key={index} className="border rounded-lg p-4 relative">
+                <div key={index} className="border border-border rounded-md p-6 relative bg-card mb-6 shadow-sm">
+                  {/* Step number and reordering */}
+                  <div className="absolute left-4 top-4 flex flex-col items-center">
+                    <div className="flex items-center justify-center bg-muted rounded-full h-8 w-8 font-semibold text-muted-foreground mb-2">
+                      {index + 1}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <Button
+                        type="button" 
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => moveStepUp(index)}
+                        disabled={index === 0}
+                      >
+                        <ChevronUpIcon className="h-4 w-4" />
+                        <span className="sr-only">Move up</span>
+                      </Button>
+                      <Button
+                        type="button" 
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => moveStepDown(index)}
+                        disabled={index === formData.steps.length - 1}
+                      >
+                        <ChevronDownIcon className="h-4 w-4" />
+                        <span className="sr-only">Move down</span>
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {/* Delete step button */}
                   <div className="absolute top-4 right-4">
                     <Button
                       type="button"
                       variant="ghost"
-                      size="sm"
+                      size="icon"
                       onClick={() => removeStep(index)}
-                      className="h-8 w-8 p-0"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      disabled={formData.steps.length <= 1}
                     >
                       <Trash2Icon className="h-4 w-4" />
                       <span className="sr-only">Remove step</span>
                     </Button>
                   </div>
                   
-                  <div className="grid grid-cols-1 gap-4 pb-4">
-                    <div className="space-y-2">
-                      <Label htmlFor={`step-${index}-name`}>Step Name</Label>
+                  <div className="pl-12 pr-4 mt-3">
+                    {/* Rest of the step fields */}
+                    <div className="mb-6">
+                      <Label htmlFor={`step-${index}-name`} className="text-base font-medium mb-2 block">
+                        Step Name
+                      </Label>
                       <Input
                         id={`step-${index}-name`}
                         value={step.name}
                         onChange={(e) => handleStepChange(index, 'name', e.target.value)}
                         placeholder="e.g., Draft Review"
+                        className="border-input"
                         required
                       />
                     </div>
                     
-                    <div className="space-y-2">
-                      <Label htmlFor={`step-${index}-description`}>Description</Label>
+                    <div className="mb-6">
+                      <Label htmlFor={`step-${index}-description`} className="text-base font-medium mb-2 block">
+                        Description
+                      </Label>
                       <Textarea
                         id={`step-${index}-description`}
                         value={step.description}
                         onChange={(e) => handleStepChange(index, 'description', e.target.value)}
                         placeholder="Describe what happens in this step"
+                        className="min-h-24 border-input"
                       />
                     </div>
                     
                     <div className="space-y-2">
                       <Label htmlFor={`step-${index}-role`}>Required Role</Label>
-                      <Select
-                        value={step.role}
-                        onValueChange={(value) => handleStepChange(index, 'role', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="editor">Editor</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="legal">Legal</SelectItem>
-                          <SelectItem value="brand">Brand</SelectItem>
-                          <SelectItem value="seo">SEO</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div 
+                          className={`border rounded-md p-3 cursor-pointer transition-colors ${
+                            step.role === 'editor' ? 'bg-primary/10 border-primary' : 'bg-card hover:bg-accent'
+                          }`}
+                          onClick={() => handleStepChange(index, 'role', 'editor')}
+                        >
+                          <div className="flex items-start gap-2">
+                            <Checkbox 
+                              id={`step-${index}-role-editor`}
+                              checked={step.role === 'editor'}
+                              onCheckedChange={() => handleStepChange(index, 'role', 'editor')}
+                              className="mt-0.5"
+                            />
+                            <div>
+                              <Label 
+                                htmlFor={`step-${index}-role-editor`}
+                                className="font-medium cursor-pointer"
+                              >
+                                Editor
+                              </Label>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {roleDescriptions.editor}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div 
+                          className={`border rounded-md p-3 cursor-pointer transition-colors ${
+                            step.role === 'legal' ? 'bg-primary/10 border-primary' : 'bg-card hover:bg-accent'
+                          }`}
+                          onClick={() => handleStepChange(index, 'role', 'legal')}
+                        >
+                          <div className="flex items-start gap-2">
+                            <Checkbox 
+                              id={`step-${index}-role-legal`}
+                              checked={step.role === 'legal'}
+                              onCheckedChange={() => handleStepChange(index, 'role', 'legal')}
+                              className="mt-0.5"
+                            />
+                            <div>
+                              <Label 
+                                htmlFor={`step-${index}-role-legal`}
+                                className="font-medium cursor-pointer"
+                              >
+                                Legal
+                              </Label>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {roleDescriptions.legal}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div 
+                          className={`border rounded-md p-3 cursor-pointer transition-colors ${
+                            step.role === 'brand' ? 'bg-primary/10 border-primary' : 'bg-card hover:bg-accent'
+                          }`}
+                          onClick={() => handleStepChange(index, 'role', 'brand')}
+                        >
+                          <div className="flex items-start gap-2">
+                            <Checkbox 
+                              id={`step-${index}-role-brand`}
+                              checked={step.role === 'brand'}
+                              onCheckedChange={() => handleStepChange(index, 'role', 'brand')}
+                              className="mt-0.5"
+                            />
+                            <div>
+                              <Label 
+                                htmlFor={`step-${index}-role-brand`}
+                                className="font-medium cursor-pointer"
+                              >
+                                Brand
+                              </Label>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {roleDescriptions.brand}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div 
+                          className={`border rounded-md p-3 cursor-pointer transition-colors ${
+                            step.role === 'seo' ? 'bg-primary/10 border-primary' : 'bg-card hover:bg-accent'
+                          }`}
+                          onClick={() => handleStepChange(index, 'role', 'seo')}
+                        >
+                          <div className="flex items-start gap-2">
+                            <Checkbox 
+                              id={`step-${index}-role-seo`}
+                              checked={step.role === 'seo'}
+                              onCheckedChange={() => handleStepChange(index, 'role', 'seo')}
+                              className="mt-0.5"
+                            />
+                            <div>
+                              <Label 
+                                htmlFor={`step-${index}-role-seo`}
+                                className="font-medium cursor-pointer"
+                              >
+                                SEO
+                              </Label>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {roleDescriptions.seo}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                     
                     <div className="flex items-center space-x-2 pt-2">
                       <Checkbox
-                        id={`step-${index}-approval`}
-                        checked={step.approvalRequired}
+                        id={`step-${index}-optional`}
+                        checked={!step.approvalRequired}
                         onCheckedChange={(checked) => 
-                          handleStepChange(index, 'approvalRequired', checked)
+                          handleStepChange(index, 'approvalRequired', !checked)
                         }
                       />
                       <Label 
-                        htmlFor={`step-${index}-approval`}
-                        className="text-sm font-normal cursor-pointer"
+                        htmlFor={`step-${index}-optional`}
+                        className="font-medium cursor-pointer"
                       >
-                        Require approval to proceed to next step
+                        Optional step
                       </Label>
                     </div>
-                  </div>
-                  
-                  <div className="border-t pt-4">
-                    <div className="space-y-2">
-                      <Label>Assign Users</Label>
-                      <p className="text-sm text-muted-foreground mb-2">
+                    <p className="text-sm text-muted-foreground mt-1 ml-6">
+                      When selected, content can skip this step and proceed to the next non-optional step.
+                    </p>
+                    
+                    {/* Assignees section */}
+                    <div className="border-t border-border pt-4 mt-4">
+                      <div className="flex items-center mb-3">
+                        <Users className="h-4 w-4 text-muted-foreground mr-2" />
+                        <Label className="text-base font-medium">Assign Users</Label>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-4">
                         Assign users to this workflow step by email. If they don't have an account yet, they'll be invited.
                       </p>
                       
                       {/* Assignee list */}
-                      {step.assignees.length > 0 && (
-                        <div className="mb-3 space-y-2">
+                      {step.assignees && step.assignees.length > 0 && (
+                        <div className="mb-4 space-y-2">
                           {step.assignees.map((assignee, assigneeIndex) => (
-                            <div key={assigneeIndex} className="flex items-center justify-between bg-secondary/20 rounded-md px-3 py-2">
-                              <span>{assignee.email}</span>
+                            <div 
+                              key={assigneeIndex} 
+                              className="flex items-center justify-between bg-accent/50 rounded-md px-3 py-2"
+                            >
+                              <Badge variant="secondary" className="font-normal text-foreground">
+                                {assignee.email}
+                              </Badge>
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => removeAssignee(index, assigneeIndex)}
-                                className="h-6 w-6 p-0"
+                                className="h-6 w-6 p-0 hover:bg-background/80 hover:text-destructive"
                               >
                                 <XIcon className="h-4 w-4" />
                                 <span className="sr-only">Remove assignee</span>
@@ -554,7 +749,7 @@ export default function CreateWorkflowPage() {
                       )}
                       
                       {/* Add assignee input */}
-                      <div className="flex space-x-2">
+                      <div className="flex gap-2">
                         <Input
                           placeholder="Enter email address"
                           value={newAssigneeEmail[index] || ''}
@@ -574,8 +769,9 @@ export default function CreateWorkflowPage() {
                         />
                         <Button
                           type="button"
-                          size="sm"
+                          size="default"
                           onClick={() => addAssignee(index)}
+                          className="shrink-0"
                         >
                           <PlusIcon className="h-4 w-4 mr-1" />
                           Add

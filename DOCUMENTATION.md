@@ -258,3 +258,115 @@ The API handles:
 - User invitation acceptance flow
 - Assignment history tracking
 - Reassignment capabilities 
+
+## Workflow Management Enhancements
+
+The workflow management in MixerAI 2.0 has been enhanced with several usability improvements:
+
+### Key Features
+
+#### Improved Role Selection
+- **Role Checkboxes with Descriptions**: Replaced dropdown menu with visual checkbox cards
+- **Role Context**: Each role now displays a description of its responsibilities
+- **Visual Clarity**: Selected roles are highlighted with a border and background color
+
+#### Step Reordering
+- **Up/Down Controls**: Added buttons to move steps up or down in the workflow
+- **Step Numbering**: Clear visual indicators of step order with numbered badges
+- **Drag Handles**: Intuitive controls for adjusting workflow sequence
+
+#### Optional Steps
+- **Clearer Terminology**: Changed "Require approval" to "Optional step" for better clarity
+- **Enhanced Description**: Added explanation of what optional steps mean in the workflow
+- **Toggle Interface**: Simple checkbox toggle with descriptive label
+
+#### Assignee Management
+- **Improved Styling**: Assignee emails now use badges for better visibility
+- **Easier Removal**: One-click removal of assignees from workflow steps
+- **Simplified Addition**: Enter key support for quickly adding multiple assignees
+
+#### Auto-generate Description
+- **Brand Context Awareness**: Descriptions now consider brand language and geography
+- **Improved Error Handling**: Better feedback when description generation fails
+- **Optimized State Updates**: Prevents UI refreshes that could cause user position loss
+
+### Technical Improvements
+
+#### Azure OpenAI Integration
+- **Fixed Client Configuration**: Proper endpoint construction for Azure OpenAI
+- **Error Handling**: Detailed error information for troubleshooting
+- **API Versioning**: Updated to use the latest API version for better compatibility
+
+#### User Interface Enhancements
+- **Consistent Styling**: Harmonized UI elements across new and edit workflow pages
+- **Improved Layout**: Better spacing and visual hierarchy for workflow steps
+- **Responsive Design**: Layout adjustments for different screen sizes
+
+### Usage
+
+1. Create or edit a workflow
+2. Use the step reordering buttons to arrange workflow steps in the desired sequence
+3. Select the appropriate role for each step using the descriptive checkbox cards
+4. Toggle "Optional step" for steps that can be skipped in certain cases
+5. Use the "Auto-generate" button to quickly create professional step descriptions
+6. Add assignees by email to each step in the workflow
+7. Remove assignees with a single click if needed
+
+The enhanced workflow management provides a more intuitive, user-friendly interface that makes creating and managing complex content workflows simpler and more efficient. 
+
+## Azure OpenAI Integration Fixes
+
+The workflow description auto-generation feature has been enhanced with improved Azure OpenAI integration:
+
+### Key Improvements
+
+- **Simplified API Configuration**: Removed complex client setup in favor of direct fetch calls to Azure OpenAI
+- **Comprehensive Error Handling**: Added detailed error handling with informative error messages
+- **Diagnostic Tools**: Created testing endpoints and scripts to validate Azure OpenAI configuration
+- **Troubleshooting Guide**: Added detailed documentation for common Azure OpenAI issues
+
+### Implementation Changes
+
+1. **Azure OpenAI Client Configuration**:
+   - Updated the Azure OpenAI client to use the correct API endpoint format
+   - Fixed authentication header setup
+   - Added environment variable validation
+
+2. **Frontend Error Handling**:
+   - Added pre-flight checks to verify Azure OpenAI configuration
+   - Improved error message display
+   - Added detailed logging for troubleshooting
+
+3. **Testing and Diagnostics**:
+   - Created `/api/test-azure-openai` endpoint for quick configuration testing
+   - Added `scripts/test-azure-openai.js` for command-line testing
+   - Enhanced error reporting with specific troubleshooting steps
+
+### Technical Considerations
+
+When using the Azure OpenAI API, these points are critical:
+
+1. The endpoint URL format must be: `https://your-resource-name.openai.azure.com`
+2. Authentication requires the `api-key` header (not `Authorization`)
+3. API calls need to specify the deployment name in the URL path
+4. The API version (`2023-05-15`) must be included as a query parameter
+
+For detailed troubleshooting information, refer to the [Azure OpenAI Troubleshooting Guide](docs/AZURE_OPENAI_TROUBLESHOOTING.md). 
+
+## Recent Fixes
+
+### Auto-Generate Description Fix
+
+We resolved an issue where generated descriptions from Azure OpenAI weren't being displayed in the workflow editor. The issue was related to browser extensions interfering with React's state updates. We implemented a multi-layered approach to ensure the description is updated even when state updates fail:
+
+1. Direct DOM manipulation as a fallback
+2. Multiple React state update approaches
+3. Synthetic event dispatching to ensure change detection
+
+For more details, see [Auto-Generate Description Fix](docs/AUTO_GENERATE_DESCRIPTION_FIX.md).
+
+### Azure OpenAI Integration Improvements
+
+We strengthened the Azure OpenAI integration with better error checking and TypeScript typing in the test endpoint. The test endpoint now provides more detailed diagnostic information when checking the Azure OpenAI configuration.
+
+For troubleshooting Azure OpenAI issues, refer to [Azure OpenAI Troubleshooting Guide](docs/AZURE_OPENAI_TROUBLESHOOTING.md). 

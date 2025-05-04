@@ -12,7 +12,12 @@ import { Label } from '@/components/label';
 import { Checkbox } from '@/components/checkbox';
 import { useToast } from '@/components/toast-provider';
 import { BrandIcon } from '@/components/brand-icon';
-import { PlusIcon, Trash2Icon, XIcon, Wand2Icon } from 'lucide-react';
+import { 
+  PlusIcon, TrashIcon, XIcon, Wand2Icon, 
+  ChevronUpIcon, ChevronDownIcon, GripVerticalIcon, Users
+} from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/tooltip';
+import { Badge } from '@/components/badge';
 
 interface Brand {
   id: string;
@@ -40,6 +45,7 @@ interface Step {
   role: string;
   approvalRequired?: boolean;
   assignees: WorkflowStepAssignee[];
+  order?: number;
 }
 
 interface WorkflowFormData {
@@ -49,6 +55,14 @@ interface WorkflowFormData {
   content_type_id: string;
   steps: Step[];
 }
+
+// Role descriptions for display
+const roleDescriptions = {
+  editor: "General content editor responsible for content quality",
+  legal: "Legal reviewer who ensures content compliance with regulations",
+  brand: "Brand reviewer who ensures content aligns with brand standards",
+  seo: "SEO specialist who optimizes content for search engines"
+};
 
 export default function WorkflowEditPage({ params }: { params: { id: string }}) {
   const router = useRouter();
@@ -61,6 +75,7 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
   const [isSaving, setIsSaving] = useState(false);
   const [newAssigneeEmail, setNewAssigneeEmail] = useState<{[key: number]: string}>({});
   const [isGeneratingDescription, setIsGeneratingDescription] = useState<{[key: number]: boolean}>({});
+  const [dataLoaded, setDataLoaded] = useState(false);
   
   const [formData, setFormData] = useState<WorkflowFormData>({
     id: params.id,
@@ -72,15 +87,18 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
   
   useEffect(() => {
     const loadData = async () => {
+      // Skip loading if data is already loaded
+      if (dataLoaded) return;
+      
       try {
         setIsLoading(true);
         setError(null);
         
         // Fetch workflow, brands, and content types
         const [workflowResponse, brandsResponse, contentTypesResponse] = await Promise.all([
-          fetch(`/api/workflows/${params.id}`),
-          fetch('/api/brands'),
-          fetch('/api/content-types')
+          fetch(`/api/workflows/${params.id}`, { cache: 'no-store' }),
+          fetch('/api/brands', { cache: 'no-store' }),
+          fetch('/api/content-types', { cache: 'no-store' })
         ]);
         
         if (!workflowResponse.ok) {
@@ -153,11 +171,12 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
         });
       } finally {
         setIsLoading(false);
+        setDataLoaded(true);
       }
     };
     
     loadData();
-  }, [params.id, toast]);
+  }, [params.id, toast, dataLoaded]);
   
   // Filter content types when brand changes
   useEffect(() => {
@@ -290,6 +309,48 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
       'assignees', 
       formData.steps[stepIndex].assignees.filter((_, i) => i !== assigneeIndex)
     );
+  };
+  
+  const moveStepUp = (index: number) => {
+    if (index === 0) return; // Can't move first step up
+    
+    setFormData(prev => {
+      const updatedSteps = [...prev.steps];
+      
+      // Swap the step with the one above it
+      [updatedSteps[index], updatedSteps[index - 1]] = [updatedSteps[index - 1], updatedSteps[index]];
+      
+      return {
+        ...prev,
+        steps: updatedSteps
+      };
+    });
+    
+    toast({
+      title: 'Step Moved',
+      description: 'The step has been moved up'
+    });
+  };
+  
+  const moveStepDown = (index: number) => {
+    setFormData(prev => {
+      if (index === prev.steps.length - 1) return prev; // Can't move last step down
+      
+      const updatedSteps = [...prev.steps];
+      
+      // Swap the step with the one below it
+      [updatedSteps[index], updatedSteps[index + 1]] = [updatedSteps[index + 1], updatedSteps[index]];
+      
+      return {
+        ...prev,
+        steps: updatedSteps
+      };
+    });
+    
+    toast({
+      title: 'Step Moved',
+      description: 'The step has been moved down'
+    });
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -476,294 +537,493 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
             </CardHeader>
             <CardContent className="space-y-4">
               {formData.steps.map((step, index) => (
-                <div key={index} className="border rounded-lg p-4 relative">
+                <div key={index} className="border border-border rounded-md p-6 relative bg-card mb-6 shadow-sm">
+                  {/* Step number and reordering */}
+                  <div className="absolute left-4 top-4 flex flex-col items-center">
+                    <div className="flex items-center justify-center bg-muted rounded-full h-8 w-8 font-semibold text-muted-foreground mb-2">
+                      {index + 1}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <Button
+                        type="button" 
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => moveStepUp(index)}
+                        disabled={index === 0}
+                      >
+                        <ChevronUpIcon className="h-4 w-4" />
+                        <span className="sr-only">Move up</span>
+                      </Button>
+                      <Button
+                        type="button" 
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => moveStepDown(index)}
+                        disabled={index === formData.steps.length - 1}
+                      >
+                        <ChevronDownIcon className="h-4 w-4" />
+                        <span className="sr-only">Move down</span>
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {/* Delete step button */}
                   <div className="absolute top-4 right-4">
                     <Button
                       type="button"
                       variant="ghost"
-                      size="sm"
+                      size="icon"
                       onClick={() => removeStep(index)}
-                      className="h-8 w-8 p-0"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
                     >
-                      <Trash2Icon className="h-4 w-4" />
+                      <TrashIcon className="h-4 w-4" />
                       <span className="sr-only">Remove step</span>
                     </Button>
                   </div>
                   
-                  <div className="grid grid-cols-1 gap-4 pb-4">
-                    <div className="space-y-2">
-                      <Label htmlFor={`step-${index}-name`}>Step Name</Label>
+                  <div className="pl-12 pr-4 mt-3">
+                    {/* Step name */}
+                    <div className="mb-6">
+                      <Label htmlFor={`step-${index}-name`} className="text-base font-medium mb-2 block">
+                        Step Name
+                      </Label>
                       <Input
                         id={`step-${index}-name`}
                         value={step.name}
                         onChange={(e) => handleStepChange(index, 'name', e.target.value)}
                         placeholder="e.g., Draft Review"
+                        className="border-input"
                         required
                       />
                     </div>
                     
-                    <div className="space-y-2">
-                      <Label htmlFor={`step-${index}-description`}>Description</Label>
-                      <div className="relative">
-                        {/* For debugging - show the current description from state */}
-                        <div className="text-xs text-muted-foreground mb-1">
-                          <strong>Current description in state:</strong> {step.description ? `"${step.description}"` : 'None'}
-                        </div>
-                        <Textarea
-                          id={`step-${index}-description`}
-                          value={step.description}
-                          onChange={(e) => handleStepChange(index, 'description', e.target.value)}
-                          placeholder="Describe what happens in this step"
-                          className="min-h-24"
-                        />
-                        <div className="absolute top-1 right-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 py-1 text-xs"
-                            disabled={isGeneratingDescription[index]}
-                            onClick={async (e) => {
-                              // Prevent default behavior
-                              e.preventDefault();
-                              e.stopPropagation();
-                              
-                              if (isGeneratingDescription[index]) return;
-                              
-                              try {
-                                // Mark this step as loading
-                                setIsGeneratingDescription(prev => ({
-                                  ...prev,
-                                  [index]: true
-                                }));
-                                
-                                // Get step data
-                                const step = formData.steps[index];
-                                if (!step.name) {
-                                  toast({
-                                    title: 'Missing Step Name',
-                                    description: 'Please provide a name for this step before generating a description.',
-                                    variant: 'destructive'
-                                  });
-                                  return;
-                                }
-                                
-                                // Get other steps for context
-                                const otherSteps = formData.steps.filter((_, i) => i !== index);
-                                console.log('Generating description for step:', step.name);
-                                
-                                // Get brand info for language/country context
-                                const selectedBrand = brands.find(brand => brand.id === formData.brand_id);
-                                const brandContext = selectedBrand 
-                                  ? { 
-                                      name: selectedBrand.name,
-                                      language: selectedBrand.language || 'English',
-                                      country: selectedBrand.country || 'Global'
-                                    }
-                                  : undefined;
-                                
-                                // Call the API
-                                const response = await fetch('/api/workflows/generate-description', {
-                                  method: 'POST',
-                                  headers: {
-                                    'Content-Type': 'application/json'
-                                  },
-                                  body: JSON.stringify({
-                                    type: 'generate',
-                                    stepName: step.name,
-                                    otherSteps: otherSteps.map(s => ({ name: s.name, description: s.description })),
-                                    brandContext
-                                  })
-                                });
-                                
-                                const data = await response.json();
-                                console.log('API response:', data);
-                                
-                                if (data.success && data.description) {
-                                  console.log('Generated description:', data.description);
+                    {/* Step description */}
+                    <div className="mb-6">
+                      <Label htmlFor={`step-${index}-description`} className="text-base font-medium mb-2 block">
+                        Description
+                      </Label>
+                      <Textarea
+                        id={`step-${index}-description`}
+                        value={step.description}
+                        onChange={(e) => handleStepChange(index, 'description', e.target.value)}
+                        placeholder="Describe what happens in this step"
+                        className="min-h-24 border-input w-full mb-2"
+                        data-stepindex={index}
+                      />
+                      <div className="flex justify-end">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-3 py-1 text-xs"
+                                disabled={isGeneratingDescription[index]}
+                                onClick={async (e) => {
+                                  // Prevent default behavior
+                                  e.preventDefault();
+                                  e.stopPropagation();
                                   
-                                  // First, create a direct DOM update to ensure the textarea displays the content
-                                  const textarea = document.getElementById(`step-${index}-description`) as HTMLTextAreaElement;
-                                  if (textarea) {
-                                    textarea.value = data.description;
-                                  }
+                                  if (isGeneratingDescription[index]) return;
                                   
-                                  // Then update the React state
-                                  setFormData(prevFormData => {
-                                    console.log('Previous form data:', JSON.stringify(prevFormData.steps[index].description));
+                                  try {
+                                    // Mark this step as loading
+                                    setIsGeneratingDescription(prev => ({
+                                      ...prev,
+                                      [index]: true
+                                    }));
                                     
-                                    // Create a new steps array with the updated description
-                                    const updatedSteps = prevFormData.steps.map((s, i) => {
-                                      if (i === index) {
-                                        return {
-                                          ...s,
-                                          description: data.description
-                                        };
-                                      }
-                                      return s;
+                                    // Get step data
+                                    const step = formData.steps[index];
+                                    if (!step.name) {
+                                      toast({
+                                        title: 'Missing Step Name',
+                                        description: 'Please provide a name for this step before generating a description.',
+                                        variant: 'destructive'
+                                      });
+                                      setIsGeneratingDescription(prev => ({
+                                        ...prev,
+                                        [index]: false
+                                      }));
+                                      return;
+                                    }
+                                    
+                                    // First, check if Azure OpenAI is configured properly
+                                    const testResponse = await fetch('/api/test-azure-openai', {
+                                      // Add cache: 'no-store' to prevent caching which might cause refreshes
+                                      cache: 'no-store',
+                                      // Add next.js specific cache options
+                                      next: { revalidate: 0 }
                                     });
                                     
-                                    console.log('New description being set:', data.description);
-                                    console.log('Updated form data:', JSON.stringify(updatedSteps[index].description));
+                                    if (!testResponse.ok) {
+                                      const testData = await testResponse.json();
+                                      console.error('Azure OpenAI configuration error:', testData);
+                                      toast({
+                                        title: 'Azure OpenAI Configuration Error',
+                                        description: testData.error || 'Azure OpenAI is not properly configured. Please check your environment variables.',
+                                        variant: 'destructive'
+                                      });
+                                      setIsGeneratingDescription(prev => ({
+                                        ...prev,
+                                        [index]: false
+                                      }));
+                                      return;
+                                    }
                                     
-                                    return {
-                                      ...prevFormData,
-                                      steps: updatedSteps
-                                    };
-                                  });
-                                  
-                                  toast({
-                                    title: 'Description Generated',
-                                    description: 'Step description has been auto-generated.'
-                                  });
-                                } else {
-                                  throw new Error(data.error || 'Failed to generate description');
-                                }
-                              } catch (error) {
-                                console.error('Error generating description:', error);
-                                toast({
-                                  title: 'Error',
-                                  description: 'Failed to generate description. Please try again.',
-                                  variant: 'destructive'
-                                });
-                              } finally {
-                                setIsGeneratingDescription(prev => ({
-                                  ...prev,
-                                  [index]: false
-                                }));
-                              }
-                            }}
-                          >
-                            {isGeneratingDescription[index] ? (
-                              <div className="h-3 w-3 border-2 border-primary border-t-transparent rounded-full animate-spin mr-1" />
-                            ) : (
-                              <Wand2Icon className="h-3.5 w-3.5 mr-1" />
-                            )}
-                            Auto-generate
-                          </Button>
+                                    // Get other steps for context
+                                    const otherSteps = formData.steps.filter((_, i) => i !== index);
+                                    console.log('Generating description for step:', step.name);
+                                    
+                                    // Get brand info for language/country context
+                                    const selectedBrand = brands.find(brand => brand.id === formData.brand_id);
+                                    const brandContext = selectedBrand 
+                                      ? { 
+                                          name: selectedBrand.name,
+                                          language: selectedBrand.language || 'English',
+                                          country: selectedBrand.country || 'Global'
+                                        }
+                                      : undefined;
+                                    
+                                    // Call the API
+                                    try {
+                                      const response = await fetch('/api/workflows/generate-description', {
+                                        method: 'POST',
+                                        headers: {
+                                          'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify({
+                                          type: 'generate',
+                                          stepName: step.name,
+                                          otherSteps: otherSteps.map(s => ({ name: s.name, description: s.description })),
+                                          brandContext
+                                        }),
+                                        // Prevent caching to avoid refreshes
+                                        cache: 'no-store',
+                                        // Add next.js specific cache options
+                                        next: { revalidate: 0 }
+                                      });
+                                      
+                                      const responseText = await response.text();
+                                      let data;
+                                      
+                                      try {
+                                        data = JSON.parse(responseText);
+                                      } catch (parseError) {
+                                        console.error('Error parsing API response:', responseText);
+                                        throw new Error(`Invalid API response: ${responseText.substring(0, 100)}...`);
+                                      }
+                                      
+                                      if (!response.ok) {
+                                        console.error('Error response from API:', response.status, data);
+                                        throw new Error(`API error: ${response.status} ${data?.error || 'Unknown error'}`);
+                                      }
+                                      
+                                      console.log('API response:', data);
+                                      
+                                      if (data.success && data.description) {
+                                        // Clean the description by removing any wrapping quotes
+                                        const cleanDescription = data.description.replace(/^["']|["']$/g, '');
+                                        console.log('Generated description (cleaned):', cleanDescription);
+                                        
+                                        // Update the textarea directly first, before React state updates
+                                        try {
+                                          // Update main textarea
+                                          const textarea = document.getElementById(`step-${index}-description`) as HTMLTextAreaElement;
+                                          if (textarea) {
+                                            textarea.value = cleanDescription;
+                                            console.log('Updated main textarea directly');
+                                          }
+                                        } catch (domError) {
+                                          console.error('Error updating DOM directly:', domError);
+                                        }
+                                        
+                                        // Update the React state - use functional update to ensure we have latest state
+                                        setFormData(prevFormData => {
+                                          const updatedSteps = prevFormData.steps.map((s, i) => {
+                                            if (i === index) {
+                                              return {
+                                                ...s,
+                                                description: cleanDescription
+                                              };
+                                            }
+                                            return s;
+                                          });
+                                          
+                                          return {
+                                            ...prevFormData,
+                                            steps: updatedSteps
+                                          };
+                                        });
+                                        
+                                        // Method 2: Use handleStepChange as a backup approach
+                                        setTimeout(() => {
+                                          try {
+                                            handleStepChange(index, 'description', cleanDescription);
+                                            console.log('Updated description using handleStepChange fallback');
+                                          } catch (stateError) {
+                                            console.error('Error in handleStepChange fallback:', stateError);
+                                          }
+                                        }, 50);
+                                        
+                                        toast({
+                                          title: 'Description Generated',
+                                          description: 'Step description has been auto-generated.'
+                                        });
+                                      } else {
+                                        throw new Error(data.error || 'Failed to generate description');
+                                      }
+                                    } catch (apiError) {
+                                      console.error('API call error:', apiError);
+                                      toast({
+                                        title: 'API Error',
+                                        description: apiError instanceof Error 
+                                          ? apiError.message 
+                                          : 'Failed to generate description. API communication error.',
+                                        variant: 'destructive'
+                                      });
+                                    }
+                                  } catch (error) {
+                                    console.error('Error generating description:', error);
+                                    toast({
+                                      title: 'Error',
+                                      description: error instanceof Error 
+                                        ? error.message 
+                                        : 'Failed to generate description. Please try again.',
+                                      variant: 'destructive'
+                                    });
+                                  } finally {
+                                    setIsGeneratingDescription(prev => ({
+                                      ...prev,
+                                      [index]: false
+                                    }));
+                                  }
+                                }}
+                              >
+                                {isGeneratingDescription[index] ? (
+                                  <div className="h-3 w-3 border-2 border-primary border-t-transparent rounded-full animate-spin mr-1" />
+                                ) : (
+                                  <Wand2Icon className="h-3.5 w-3.5 mr-1" />
+                                )}
+                                Auto-generate
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs">Generate a description for this step</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </div>
+                    
+                    {/* Role selection */}
+                    <div className="mb-6">
+                      <Label className="text-base font-medium block mb-3">Required Role</Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div 
+                          className={`border rounded-md p-3 cursor-pointer transition-colors ${
+                            step.role === 'editor' ? 'bg-primary/10 border-primary' : 'bg-card hover:bg-accent'
+                          }`}
+                          onClick={() => handleStepChange(index, 'role', 'editor')}
+                        >
+                          <div className="flex items-start gap-2">
+                            <Checkbox 
+                              id={`step-${index}-role-editor`}
+                              checked={step.role === 'editor'}
+                              onCheckedChange={() => handleStepChange(index, 'role', 'editor')}
+                              className="mt-0.5"
+                            />
+                            <div>
+                              <Label 
+                                htmlFor={`step-${index}-role-editor`}
+                                className="font-medium cursor-pointer"
+                              >
+                                Editor
+                              </Label>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {roleDescriptions.editor}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div 
+                          className={`border rounded-md p-3 cursor-pointer transition-colors ${
+                            step.role === 'legal' ? 'bg-primary/10 border-primary' : 'bg-card hover:bg-accent'
+                          }`}
+                          onClick={() => handleStepChange(index, 'role', 'legal')}
+                        >
+                          <div className="flex items-start gap-2">
+                            <Checkbox 
+                              id={`step-${index}-role-legal`}
+                              checked={step.role === 'legal'}
+                              onCheckedChange={() => handleStepChange(index, 'role', 'legal')}
+                              className="mt-0.5"
+                            />
+                            <div>
+                              <Label 
+                                htmlFor={`step-${index}-role-legal`}
+                                className="font-medium cursor-pointer"
+                              >
+                                Legal
+                              </Label>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {roleDescriptions.legal}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div 
+                          className={`border rounded-md p-3 cursor-pointer transition-colors ${
+                            step.role === 'brand' ? 'bg-primary/10 border-primary' : 'bg-card hover:bg-accent'
+                          }`}
+                          onClick={() => handleStepChange(index, 'role', 'brand')}
+                        >
+                          <div className="flex items-start gap-2">
+                            <Checkbox 
+                              id={`step-${index}-role-brand`}
+                              checked={step.role === 'brand'}
+                              onCheckedChange={() => handleStepChange(index, 'role', 'brand')}
+                              className="mt-0.5"
+                            />
+                            <div>
+                              <Label 
+                                htmlFor={`step-${index}-role-brand`}
+                                className="font-medium cursor-pointer"
+                              >
+                                Brand
+                              </Label>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {roleDescriptions.brand}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div 
+                          className={`border rounded-md p-3 cursor-pointer transition-colors ${
+                            step.role === 'seo' ? 'bg-primary/10 border-primary' : 'bg-card hover:bg-accent'
+                          }`}
+                          onClick={() => handleStepChange(index, 'role', 'seo')}
+                        >
+                          <div className="flex items-start gap-2">
+                            <Checkbox 
+                              id={`step-${index}-role-seo`}
+                              checked={step.role === 'seo'}
+                              onCheckedChange={() => handleStepChange(index, 'role', 'seo')}
+                              className="mt-0.5"
+                            />
+                            <div>
+                              <Label 
+                                htmlFor={`step-${index}-role-seo`}
+                                className="font-medium cursor-pointer"
+                              >
+                                SEO
+                              </Label>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {roleDescriptions.seo}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
                     
-                    <div className="space-y-2">
-                      <Label htmlFor={`step-${index}-role`}>Required Role</Label>
-                      <Select
-                        value={step.role}
-                        onValueChange={(value) => handleStepChange(index, 'role', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="editor">Editor</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="legal">Legal</SelectItem>
-                          <SelectItem value="brand">Brand</SelectItem>
-                          <SelectItem value="seo">SEO</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    {/* Optional Step checkbox */}
+                    <div className="mb-6">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`step-${index}-optional`}
+                          checked={step.approvalRequired === false}
+                          onCheckedChange={(checked) => 
+                            handleStepChange(index, 'approvalRequired', checked !== true)
+                          }
+                        />
+                        <Label 
+                          htmlFor={`step-${index}-optional`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          Optional Step
+                        </Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1 ml-6">
+                        If enabled, this step will be optional and can be skipped in the workflow.
+                      </p>
                     </div>
                     
-                    <div className="flex items-center space-x-2 pt-2">
-                      <Checkbox
-                        id={`step-${index}-approval`}
-                        checked={step.approvalRequired}
-                        onCheckedChange={(checked) => 
-                          handleStepChange(index, 'approvalRequired', checked)
-                        }
-                      />
-                      <Label 
-                        htmlFor={`step-${index}-approval`}
-                        className="text-sm font-normal cursor-pointer"
-                      >
-                        Require approval to proceed to next step
-                      </Label>
-                    </div>
-                  </div>
-                  
-                  <div className="border-t pt-4">
-                    <div className="space-y-2">
-                      <Label>Assign Users</Label>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        Assign users to this workflow step by email. If they don't have an account yet, they'll be invited.
-                      </p>
-                      
-                      {/* Assignee list */}
-                      {step.assignees && step.assignees.length > 0 && (
-                        <div className="mb-3 space-y-2">
-                          {step.assignees.map((assignee, assigneeIndex) => (
-                            <div key={assigneeIndex} className="flex items-center justify-between bg-secondary/20 rounded-md px-3 py-2">
-                              <span>{assignee.email}</span>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeAssignee(index, assigneeIndex)}
-                                className="h-6 w-6 p-0"
-                              >
-                                <XIcon className="h-4 w-4" />
-                                <span className="sr-only">Remove assignee</span>
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      
-                      {/* Add assignee input */}
-                      <div className="flex space-x-2">
-                        <Input
-                          placeholder="Enter email address"
-                          value={newAssigneeEmail[index] || ''}
-                          onChange={(e) => 
-                            setNewAssigneeEmail(prev => ({
-                              ...prev,
+                    {/* Assignees */}
+                    <div className="mb-6">
+                      <Label className="text-base font-medium mb-2 block">Assignees</Label>
+                      <div className="border rounded-md p-4">
+                        {step.assignees && step.assignees.length > 0 ? (
+                          <div className="space-y-2 mb-4">
+                            {step.assignees.map((assignee, assigneeIndex) => (
+                              <div key={assigneeIndex} className="flex items-center justify-between bg-accent/50 px-3 py-2 rounded-md">
+                                <div className="flex items-center gap-2">
+                                  <Users className="h-4 w-4 text-muted-foreground" />
+                                  <span>{assignee.email}</span>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeAssignee(index, assigneeIndex)}
+                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                                >
+                                  <XIcon className="h-4 w-4" />
+                                  <span className="sr-only">Remove assignee</span>
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-4 text-muted-foreground text-sm mb-4">
+                            No assignees yet. Add users to this step below.
+                          </div>
+                        )}
+                        
+                        <div className="flex gap-2">
+                          <Input
+                            value={newAssigneeEmail[index] || ''}
+                            onChange={(e) => setNewAssigneeEmail({
+                              ...newAssigneeEmail,
                               [index]: e.target.value
-                            }))
-                          }
-                          className="flex-1"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              addAssignee(index);
-                            }
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => addAssignee(index)}
-                        >
-                          <PlusIcon className="h-4 w-4 mr-1" />
-                          Add
-                        </Button>
+                            })}
+                            placeholder="Enter email address"
+                            className="flex-1"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                addAssignee(index);
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => addAssignee(index)}
+                          >
+                            <PlusIcon className="h-4 w-4 mr-1" />
+                            Add
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Assignees will be notified when content reaches this step
+                        </p>
                       </div>
                     </div>
                   </div>
                 </div>
               ))}
-              
-              <Button
-                type="button"
-                variant="outline"
-                onClick={addStep}
-                className="w-full"
-              >
-                <PlusIcon className="h-4 w-4 mr-2" />
-                Add Step
-              </Button>
             </CardContent>
-            
-            <CardFooter className="border-t pt-6 flex justify-end gap-4">
-              <Button variant="outline" asChild>
-                <Link href={`/workflows/${params.id}`}>Cancel</Link>
-              </Button>
-              <Button type="submit" disabled={isSaving}>
-                {isSaving ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </CardFooter>
           </Card>
         </form>
       </div>
     </div>
   );
-} 
+}
