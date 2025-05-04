@@ -12,10 +12,11 @@ import { useToast } from '@/components/toast-provider';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/select";
 import { COUNTRIES, LANGUAGES } from "@/lib/constants";
-import { getVettingAgenciesForCountry } from "@/lib/azure/openai";
+import { VETTING_AGENCIES_BY_COUNTRY } from "@/lib/azure/openai";
 import { AlertCircle, Loader2, Info } from "lucide-react";
 import { Checkbox } from "@/components/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/dialog";
+import { ConfirmDialog } from '@/components/confirm-dialog';
 
 interface BrandEditPageProps {
   params: {
@@ -161,8 +162,8 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   useEffect(() => {
     if (brand.country) {
       try {
-        const agencies = getVettingAgenciesForCountry(brand.country);
-        setVettingAgencies(agencies || []);
+        const agencies = VETTING_AGENCIES_BY_COUNTRY[brand.country] || [];
+        setVettingAgencies(agencies);
       } catch (error) {
         console.error("Error loading vetting agencies:", error);
         setVettingAgencies([]);
@@ -294,24 +295,27 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       console.log("Attempting to generate brand identity from:", urls);
       console.log("Using country:", brand.country, "and language:", brand.language);
       
-      // Add debug information to help diagnose issues
-      const requestData = {
+      const apiUrl = "/api/brands/identity";
+      console.log("POST request to", apiUrl, "with data:", {
         brandName: brand.name,
         urls,
         countryCode: brand.country,
-        languageCode: brand.language
-      };
-      
-      console.log("POST request to /api/brands/identity with data:", JSON.stringify(requestData));
-      
-      const response = await fetch('/api/brands/identity', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
+        languageCode: brand.language,
       });
-
+      
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          brandName: brand.name,
+          urls,
+          countryCode: brand.country,
+          languageCode: brand.language,
+        }),
+      });
+      
       console.log("Response status:", response.status);
       // Log response headers more safely 
       const responseHeaders: Record<string, string> = {};
@@ -321,110 +325,27 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       console.log("Response headers:", responseHeaders);
       
       const result = await response.json();
-      console.log("Response data:", JSON.stringify(result, null, 2));
-
-      if (!response.ok) {
-        throw new Error(result.error || `Server error: ${response.status}`);
-      }
-
-      if (result.success) {
-        // Update the brand data with the generated identity
+      console.log("Response data:", result);
+      
+      if (result.success && result.data) {
+        const newBrandIdentity = result.data.brandIdentity;
         setBrand(prev => ({
           ...prev,
-          brand_identity: result.data.brandIdentity,
-          tone_of_voice: result.data.toneOfVoice,
-          guardrails: typeof result.data.guardrails === 'string' 
-            ? result.data.guardrails 
-            : Array.isArray(result.data.guardrails)
-              ? result.data.guardrails.map((item: string) => `- ${item}`).join('\n')
-              : String(result.data.guardrails),
-          content_vetting_agencies: result.data.contentVettingAgencies,
-          brand_summary: result.data.brandIdentity 
-            ? result.data.brandIdentity.slice(0, 250) + (result.data.brandIdentity.length > 250 ? '...' : '') 
-            : '',
-          brand_color: typeof result.data.brandColor === 'string' && result.data.brandColor.startsWith('#') 
-            ? result.data.brandColor 
-            : prev.brand_color // Keep existing color if no valid color is provided
+          brand_identity: newBrandIdentity,
         }));
-
-        // Process the AI-generated vetting agencies
-        if (result.data.contentVettingAgencies) {
-          let agencyNames: string[] = [];
-          
-          // Parse generated agency information
-          let generatedAgencies: { name: string; description: string }[] = [];
-          
-          if (Array.isArray(result.data.contentVettingAgencies)) {
-            result.data.contentVettingAgencies.forEach((agency: any) => {
-              if (typeof agency === 'object' && agency.name) {
-                // Extract name and description from object
-                generatedAgencies.push({
-                  name: agency.name.trim(),
-                  description: agency.description || ''
-                });
-              } else if (typeof agency === 'string') {
-                // If it's just a string, use it as the name
-                generatedAgencies.push({
-                  name: agency.trim(),
-                  description: ''
-                });
-              }
-            });
-          } else if (typeof result.data.contentVettingAgencies === 'string') {
-            // If it's a comma-separated string, split it
-            const agencyStrings = result.data.contentVettingAgencies.split(',');
-            agencyStrings.forEach(agencyStr => {
-              generatedAgencies.push({
-                name: agencyStr.trim(),
-                description: ''
-              });
-            });
-          } else if (typeof result.data.contentVettingAgencies === 'object' && result.data.contentVettingAgencies !== null) {
-            // If it's an object but not an array
-            try {
-              Object.entries(result.data.contentVettingAgencies).forEach(([key, value]) => {
-                if (typeof value === 'object' && value !== null && 'name' in value) {
-                  generatedAgencies.push({
-                    name: (value as any).name.trim(),
-                    description: (value as any).description || ''
-                  });
-                } else {
-                  generatedAgencies.push({
-                    name: key.trim(),
-                    description: typeof value === 'string' ? value : ''
-                  });
-                }
-              });
-            } catch (e) {
-              console.log("Failed to parse complex agency object:", e);
-            }
-          }
-          
-          // Update default suggested agencies with the AI-generated ones if we have any
-          if (generatedAgencies.length > 0) {
-            // Replace predefined country agencies with the AI-generated ones
-            setVettingAgencies(generatedAgencies);
-          }
-          
-          // Extract just the names for selection
-          agencyNames = generatedAgencies.map(agency => agency.name);
-          
-          // Set all new agencies as selected by default
-          setSelectedAgencies(agencyNames);
-          
-          // Update the brand data with the comma-separated string of agencies
+        
+        // If vetting agencies were provided, update them
+        if (result.data.vettingAgencies && result.data.vettingAgencies.length > 0) {
+          const agencies = result.data.vettingAgencies
+            .map((agency: {name: string, description: string}) => `${agency.name}: ${agency.description}`)
+            .join('\n');
           setBrand(prev => ({
             ...prev,
-            content_vetting_agencies: agencyNames.join(', ')
-          }));
-        } else {
-          setSelectedAgencies([]);
-          setBrand(prev => ({
-            ...prev,
-            content_vetting_agencies: ''
+            content_vetting_agencies: agencies,
           }));
         }
-
+        
+        // Show success notification
         toast({
           title: "Success",
           description: "Brand identity generated successfully",
@@ -432,31 +353,24 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       } else {
         throw new Error(result.error || "Failed to generate brand identity");
       }
-    } catch (error: any) {
-      console.error('Error generating brand identity:', error);
+    } catch (error) {
+      console.error("Error generating brand identity:", error);
       
-      // Clear error message about AI service being unavailable
-      setUsedFallback(false);
-      
-      // Format user-friendly error message
-      let errorMessage = error.message || "An unknown error occurred";
-      
-      // Look for specific API errors to provide better guidance
-      if (errorMessage.includes('not found') || errorMessage.includes('deployment')) {
-        errorMessage = "The AI model deployment was not found. Please check your Azure OpenAI configuration.";
-      } else if (errorMessage.includes('authentication') || errorMessage.includes('API key')) {
-        errorMessage = "Authentication with the AI service failed. Please check your Azure OpenAI API key.";
-      } else if (errorMessage.includes('forbidden') || errorMessage.includes('permissions')) {
-        errorMessage = "The request to the AI service was forbidden. Please check your API permissions.";
-      } else if (errorMessage.includes('connect') || errorMessage.includes('endpoint')) {
-        errorMessage = "Could not connect to the AI service. Please check your Azure OpenAI endpoint configuration.";
+      // Set fallback brand identity based on available information
+      if (brand.country && brand.country in VETTING_AGENCIES_BY_COUNTRY) {
+        const agencies = VETTING_AGENCIES_BY_COUNTRY[brand.country]
+          .map(agency => `${agency.name}: ${agency.description}`)
+          .join('\n');
+        setBrand(prev => ({
+          ...prev,
+          content_vetting_agencies: agencies,
+        }));
+        setUsedFallback(true);
       }
       
-      setUrlsError(errorMessage);
-      
       toast({
-        title: "AI Service Error",
-        description: errorMessage,
+        title: "Error",
+        description: "Failed to generate brand identity. Using fallback data.",
         variant: "destructive",
       });
     } finally {
