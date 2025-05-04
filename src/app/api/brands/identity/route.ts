@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateBrandIdentityFromUrls, getVettingAgenciesForCountry } from '@/lib/azure/openai';
+import { generateBrandIdentityFromUrls } from '@/lib/azure/openai';
 
 // Simple in-memory rate limiting
 const rateLimit = new Map<string, { count: number, timestamp: number }>();
@@ -72,16 +72,15 @@ export async function POST(req: NextRequest) {
     }
     
     // Get brand identity
-    const brandIdentity = await generateBrandIdentityFromUrls(brandName, validUrls);
-    
-    // Get content vetting agencies if country code is provided
-    const vettingAgencies = countryCode ? getVettingAgenciesForCountry(countryCode) : [];
+    const result = await generateBrandIdentityFromUrls(brandName, validUrls);
     
     return NextResponse.json({
       success: true,
       data: {
-        brandIdentity,
-        vettingAgencies
+        brandIdentity: result.brandIdentity,
+        toneOfVoice: result.toneOfVoice,
+        guardrails: result.guardrails,
+        vettingAgencies: result.suggestedAgencies
       }
     });
   } catch (error) {

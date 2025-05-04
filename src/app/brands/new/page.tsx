@@ -245,6 +245,7 @@ export default function NewBrandPage() {
     setIsGenerating(true);
     setUrlsError("");
     setUsedFallback(false);
+    setSelectedAgencies([]);
 
     try {
       console.log("Attempting to generate brand identity from:", urls);
@@ -269,101 +270,40 @@ export default function NewBrandPage() {
         throw new Error(result.error || `Server error: ${response.status}`);
       }
 
-      if (result.success) {
-        // Update the form data with the generated identity
+      if (result.success && result.data) {
+        // Update the brand with all the generated information
         setFormData(prev => ({
           ...prev,
-          brand_identity: result.data.brandIdentity,
-          tone_of_voice: result.data.toneOfVoice,
-          guardrails: typeof result.data.guardrails === 'string' 
-            ? result.data.guardrails 
-            : Array.isArray(result.data.guardrails)
-              ? result.data.guardrails.map((item: string) => `- ${item}`).join('\n')
-              : String(result.data.guardrails),
-          content_vetting_agencies: typeof result.data.contentVettingAgencies === 'string'
-            ? result.data.contentVettingAgencies
-            : String(result.data.contentVettingAgencies),
-          brand_color: typeof result.data.brandColor === 'string' && result.data.brandColor.startsWith('#') 
-            ? result.data.brandColor 
-            : '#3498db' // Default to blue if no valid color is provided
+          brand_identity: result.data.brandIdentity || "",
+          tone_of_voice: result.data.toneOfVoice || "",
+          guardrails: result.data.guardrails || "",
         }));
-
-        // Process the AI-generated vetting agencies
-        if (result.data.contentVettingAgencies) {
-          let agencyNames: string[] = [];
-          
-          // Parse generated agency information
-          let generatedAgencies: { name: string; description: string }[] = [];
-          
-          if (Array.isArray(result.data.contentVettingAgencies)) {
-            result.data.contentVettingAgencies.forEach((agency: any) => {
-              if (typeof agency === 'object' && agency.name) {
-                // Extract name and description from object
-                generatedAgencies.push({
-                  name: agency.name.trim(),
-                  description: agency.description || ''
-                });
-              } else if (typeof agency === 'string') {
-                // If it's just a string, use it as the name
-                generatedAgencies.push({
-                  name: agency.trim(),
-                  description: ''
-                });
-              }
-            });
-          } else if (typeof result.data.contentVettingAgencies === 'string') {
-            // If it's a comma-separated string, split it
-            const agencyStrings = result.data.contentVettingAgencies.split(',');
-            agencyStrings.forEach(agencyStr => {
-              generatedAgencies.push({
-                name: agencyStr.trim(),
-                description: ''
-              });
-            });
-          } else if (typeof result.data.contentVettingAgencies === 'object' && result.data.contentVettingAgencies !== null) {
-            // If it's an object but not an array
-            try {
-              Object.entries(result.data.contentVettingAgencies).forEach(([key, value]) => {
-                if (typeof value === 'object' && value !== null && 'name' in value) {
-                  generatedAgencies.push({
-                    name: (value as any).name.trim(),
-                    description: (value as any).description || ''
-                  });
-                } else {
-                  generatedAgencies.push({
-                    name: key.trim(),
-                    description: typeof value === 'string' ? value : ''
-                  });
-                }
-              });
-            } catch (e) {
-              console.log("Failed to parse complex agency object:", e);
-            }
-          }
-          
-          // Update default suggested agencies with the AI-generated ones if we have any
-          if (generatedAgencies.length > 0) {
-            // Replace predefined country agencies with the AI-generated ones
-            setVettingAgencies(generatedAgencies);
-          }
-          
-          // Extract just the names for selection
-          agencyNames = generatedAgencies.map(agency => agency.name);
-          
-          // Set all new agencies as selected by default
-          setSelectedAgencies(agencyNames);
-          
-          // Update the form data with the comma-separated string of agencies
-          setFormData(prev => ({
-            ...prev,
-            content_vetting_agencies: agencyNames.join(', ')
+        
+        // Handle vetting agencies if provided
+        if (result.data.vettingAgencies && result.data.vettingAgencies.length > 0) {
+          // Update vetting agencies list
+          const customAgencies = result.data.vettingAgencies.map((agency: any) => ({
+            name: agency.name,
+            description: agency.description,
+            priority: agency.priority || "medium"
           }));
-        } else {
-          setSelectedAgencies([]);
-          setFormData(prev => ({
-            ...prev,
-            content_vetting_agencies: ''
-          }));
+          
+          setVettingAgencies(customAgencies);
+          
+          // Select only high priority agencies by default
+          const highPriorityAgencies = customAgencies
+            .filter((agency: any) => agency.priority === "high")
+            .map((agency: any) => agency.name);
+          
+          setSelectedAgencies(highPriorityAgencies);
+          
+          // Update the form's content_vetting_agencies field
+          if (highPriorityAgencies.length > 0) {
+            setFormData(prev => ({
+              ...prev,
+              content_vetting_agencies: highPriorityAgencies.join(', ')
+            }));
+          }
         }
 
         toast({

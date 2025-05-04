@@ -171,12 +171,17 @@ export async function generateContent(
  * Generates brand identity from a list of URLs
  * @param brandName The name of the brand
  * @param urls Array of URLs to analyze for brand identity
- * @returns A generated brand identity description
+ * @returns An object with brand identity, tone of voice, guardrails and recommended agencies
  */
 export async function generateBrandIdentityFromUrls(
   brandName: string,
   urls: string[]
-): Promise<string> {
+): Promise<{
+  brandIdentity: string;
+  toneOfVoice: string;
+  guardrails: string;
+  suggestedAgencies: Array<{name: string, description: string, priority: 'high' | 'medium' | 'low'}>;
+}> {
   try {
     console.log(`Generating brand identity for ${brandName} from ${urls.length} URLs`);
     
@@ -194,13 +199,17 @@ export async function generateBrandIdentityFromUrls(
     Please analyze the following URLs related to the brand "${brandName}":
     ${urls.map(url => `- ${url}`).join('\n')}
     
-    Based on these URLs, generate a comprehensive brand identity that includes:
-    1. Brand personality and values
-    2. Target audience
-    3. Key messaging themes
-    4. Tone of voice recommendations
+    Based on these URLs, generate a comprehensive brand identity profile with the following components:
     
-    Provide a well-structured and detailed response that captures the essence of the brand based on the information available from these URLs.
+    1. BRAND IDENTITY: A detailed description of the brand's personality, values, target audience, and key messaging themes. This should be in plain text paragraphs, not markdown.
+    
+    2. TONE OF VOICE: A description of how the brand communicates - the style, language, and approach it uses. This should be a concise paragraph.
+    
+    3. CONTENT GUARDRAILS: Provide 5 specific guidelines that content creators should follow when creating content for this brand. Format these as a bulleted list.
+    
+    4. SUGGESTED VETTING AGENCIES: Based on the industry and country (if known), recommend 3-5 regulatory or vetting agencies that might be relevant to this brand, with a brief description of each. Also assign each a priority level (high, medium, or low) based on how critical compliance with this agency is for the brand.
+    
+    Format your response as a JSON object with these keys: brandIdentity, toneOfVoice, guardrails (as an array of strings), and suggestedAgencies (as an array of objects with name, description, and priority fields).
     `;
     
     // Make the API call
@@ -211,11 +220,31 @@ export async function generateBrandIdentityFromUrls(
         { role: "user", content: prompt }
       ],
       temperature: 0.7,
-      max_tokens: 1000
+      max_tokens: 1000,
+      response_format: { type: "json_object" }
     });
     
-    const response = completion.choices[0]?.message?.content || "";
-    return response;
+    const responseContent = completion.choices[0]?.message?.content || "{}";
+    let parsedResponse;
+    
+    try {
+      parsedResponse = JSON.parse(responseContent);
+      
+      // Ensure guardrails are formatted properly
+      if (Array.isArray(parsedResponse.guardrails)) {
+        parsedResponse.guardrails = parsedResponse.guardrails.map((item: string) => `- ${item}`).join('\n');
+      }
+      
+      return {
+        brandIdentity: parsedResponse.brandIdentity || "",
+        toneOfVoice: parsedResponse.toneOfVoice || "",
+        guardrails: parsedResponse.guardrails || "",
+        suggestedAgencies: parsedResponse.suggestedAgencies || []
+      };
+    } catch (error) {
+      console.error("Failed to parse API response:", error);
+      return generateFallbackBrandIdentity(brandName, urls);
+    }
   } catch (error) {
     console.error("Error generating brand identity:", error);
     // When an error occurs, fall back to the template generation
@@ -226,11 +255,17 @@ export async function generateBrandIdentityFromUrls(
 
 /**
  * Generates a fallback brand identity when Azure OpenAI is not available
+ * @returns An object with brand identity, tone of voice, guardrails and vetting agencies
  */
-function generateFallbackBrandIdentity(brandName: string, urls: string[]): string {
+function generateFallbackBrandIdentity(brandName: string, urls: string[]): {
+  brandIdentity: string;
+  toneOfVoice: string;
+  guardrails: string;
+  suggestedAgencies: Array<{name: string, description: string, priority: 'high' | 'medium' | 'low'}>;
+} {
   // Extract potential industry/category from URLs
   let industry = "general";
-  if (urls.some(url => url.includes("food") || url.includes("recipe") || url.includes("cook"))) {
+  if (urls.some(url => url.includes("food") || url.includes("recipe") || url.includes("cook") || url.includes("baking"))) {
     industry = "food";
   } else if (urls.some(url => url.includes("tech") || url.includes("software") || url.includes("digital"))) {
     industry = "technology";
@@ -240,98 +275,125 @@ function generateFallbackBrandIdentity(brandName: string, urls: string[]): strin
     industry = "health";
   }
   
-  const templates: Record<string, string> = {
-    food: `
-      # ${brandName} Brand Identity
+  // Brand identity templates as plain text, not Markdown
+  const templates: Record<string, {
+    identity: string;
+    tone: string;
+    guardrails: string[];
+    agencies: Array<{name: string, description: string, priority: 'high' | 'medium' | 'low'}>;
+  }> = {
+    food: {
+      identity: `${brandName} projects a warm, inviting, and trustworthy personality. The brand values quality ingredients, culinary tradition, and creating memorable food experiences. It emphasizes authenticity, care, and attention to detail in all its offerings.\n\nPrimary audience includes home cooks of all skill levels, food enthusiasts, and families looking for reliable, delicious recipes and food products. Secondary audiences include culinary professionals seeking inspiration and quality ingredients.\n\nKey messaging themes include quality ingredients lead to exceptional results, making cooking accessible and enjoyable for everyone, bringing people together through food, and balancing tradition with modern culinary innovation.`,
       
-      ## Brand Personality and Values
-      ${brandName} projects a warm, inviting, and trustworthy personality. The brand values quality ingredients, culinary tradition, and creating memorable food experiences. It emphasizes authenticity, care, and attention to detail in all its offerings.
+      tone: `Warm, encouraging, and knowledgeable. The tone should be conversational and friendly, but also authoritative on food topics. Use descriptive, sensory language when discussing food, and maintain a helpful, guiding approach when providing instructions or advice.`,
       
-      ## Target Audience
-      Primary audience includes home cooks of all skill levels, food enthusiasts, and families looking for reliable, delicious recipes and food products. Secondary audiences include culinary professionals seeking inspiration and quality ingredients.
+      guardrails: [
+        "Always prioritize food safety - never suggest undercooked ingredients that could cause illness",
+        "Respect dietary restrictions and allergies with clear labeling and alternatives",
+        "Ensure recipes are tested and accurate, with clear measurements and instructions",
+        "Avoid negative language about food choices or eating habits",
+        "Never make unsubstantiated health claims about recipes or ingredients"
+      ],
       
-      ## Key Messaging Themes
-      - Quality ingredients lead to exceptional results
-      - Making cooking accessible and enjoyable for everyone
-      - Bringing people together through food
-      - Balancing tradition with modern culinary innovation
+      agencies: [
+        { name: "FSA", description: "Food Standards Agency - Responsible for food safety and food hygiene across the UK", priority: "high" },
+        { name: "ASA", description: "Advertising Standards Authority - Regulates advertising across all media in the UK", priority: "high" },
+        { name: "DEFRA", description: "Department for Environment, Food and Rural Affairs - Oversees food production standards", priority: "medium" },
+        { name: "BRC", description: "British Retail Consortium - Sets standards for food safety and quality", priority: "low" }
+      ]
+    },
+    
+    technology: {
+      identity: `${brandName} embodies innovation, reliability, and forward-thinking vision. The brand values cutting-edge technology, user-centered design, and creating solutions that meaningfully improve people's lives and work.\n\nTarget audience includes tech enthusiasts, early adopters, business professionals seeking efficiency through technology, and everyday consumers looking for intuitive digital solutions. The audience appreciates both functionality and aesthetic design.\n\nKey messaging themes focus on simplifying complexity through smart design, empowering users through technology, continuous innovation and improvement, and security and reliability in a digital world.`,
       
-      ## Tone of Voice Recommendations
-      ${brandName} should communicate in a warm, encouraging, and knowledgeable voice. The tone should be conversational and friendly, but also authoritative on food topics. Use descriptive, sensory language when discussing food, and maintain a helpful, guiding approach when providing instructions or advice.
-    `,
-    technology: `
-      # ${brandName} Brand Identity
+      tone: `Clear, confident, and knowledgeable. The tone should balance technical expertise with accessibility, avoiding unnecessary jargon. Maintain an optimistic outlook about technological possibilities while being honest about capabilities and limitations.`,
       
-      ## Brand Personality and Values
-      ${brandName} embodies innovation, reliability, and forward-thinking vision. The brand values cutting-edge technology, user-centered design, and creating solutions that meaningfully improve people's lives and work.
+      guardrails: [
+        "Never overpromise on security or privacy features",
+        "Maintain transparency about data collection and usage",
+        "Avoid technical language that excludes non-expert users",
+        "Don't make specific performance claims without evidence",
+        "Be inclusive in all language and visual representations"
+      ],
       
-      ## Target Audience
-      Tech enthusiasts, early adopters, business professionals seeking efficiency through technology, and everyday consumers looking for intuitive digital solutions. The audience appreciates both functionality and aesthetic design.
+      agencies: [
+        { name: "ICO", description: "Information Commissioner's Office - UK's independent authority set up to uphold information rights", priority: "high" },
+        { name: "ASA", description: "Advertising Standards Authority - Regulates advertising across all media in the UK", priority: "high" },
+        { name: "CMA", description: "Competition and Markets Authority - Promotes competition and prevents anti-competitive activities", priority: "medium" },
+        { name: "BSI", description: "British Standards Institution - Provides technical standards for products and services", priority: "low" }
+      ]
+    },
+    
+    fashion: {
+      identity: `${brandName} represents elegance, creativity, and contemporary style. The brand values quality craftsmanship, sustainable practices, and enabling personal expression through fashion.\n\nTarget audience includes style-conscious individuals who appreciate quality and design. They seek fashion that reflects their personal identity and values, and are willing to invest in pieces that will last.\n\nKey messaging themes emphasize quality and craftsmanship in every detail, fashion as personal expression, timeless style with modern sensibility, and responsible production and consumption.`,
       
-      ## Key Messaging Themes
-      - Simplifying complexity through smart design
-      - Empowering users through technology
-      - Continuous innovation and improvement
-      - Security and reliability in a digital world
+      tone: `Sophisticated, inspiring, and confident. The tone should be aspirational yet accessible, using rich, descriptive language when discussing products. Balance trend awareness with an emphasis on enduring style.`,
       
-      ## Tone of Voice Recommendations
-      ${brandName} should communicate in a clear, confident, and knowledgeable voice. The tone should balance technical expertise with accessibility, avoiding unnecessary jargon. Maintain an optimistic outlook about technological possibilities while being honest about capabilities and limitations.
-    `,
-    fashion: `
-      # ${brandName} Brand Identity
+      guardrails: [
+        "Ensure all claims about sustainability are specific and verifiable",
+        "Maintain diversity and inclusivity in all marketing materials",
+        "Avoid language that promotes unhealthy body image",
+        "Be transparent about manufacturing processes and materials",
+        "Don't make claims about competitors' products or practices"
+      ],
       
-      ## Brand Personality and Values
-      ${brandName} represents elegance, creativity, and contemporary style. The brand values quality craftsmanship, sustainable practices, and enabling personal expression through fashion.
+      agencies: [
+        { name: "ASA", description: "Advertising Standards Authority - Regulates advertising across all media in the UK", priority: "high" },
+        { name: "CMA", description: "Competition and Markets Authority - Promotes competition and prevents anti-competitive activities", priority: "medium" },
+        { name: "Trading Standards", description: "Enforces consumer protection legislation and ensures product safety", priority: "medium" },
+        { name: "BRC", description: "British Retail Consortium - Sets standards for retailers", priority: "low" }
+      ]
+    },
+    
+    health: {
+      identity: `${brandName} embodies vitality, balance, and holistic wellbeing. The brand values scientific understanding, natural approaches to health, and empowering individuals to take control of their wellness journey.\n\nTarget audience includes health-conscious individuals seeking to improve or maintain their wellbeing, fitness enthusiasts, and those looking for natural solutions to health concerns. The audience spans multiple age groups but shares a proactive approach to health.\n\nKey messaging themes promote a balanced approach to health and wellness, evidence-based natural solutions, preventative care and lasting vitality, and personal empowerment through health knowledge.`,
       
-      ## Target Audience
-      Style-conscious individuals who appreciate quality and design. They seek fashion that reflects their personal identity and values, and are willing to invest in pieces that will last.
+      tone: `Nurturing, knowledgeable, and encouraging. The tone should be informative without being clinical, and motivational without being pushy. Use clear, straightforward language when discussing health concepts, and maintain an empathetic approach to wellness challenges.`,
       
-      ## Key Messaging Themes
-      - Quality and craftsmanship in every detail
-      - Fashion as personal expression
-      - Timeless style with modern sensibility
-      - Responsible production and consumption
+      guardrails: [
+        "Never make specific medical claims without scientific evidence",
+        "Avoid promising specific results or outcomes from products or practices",
+        "Be inclusive of different body types, abilities and health journeys",
+        "Use qualified experts for health-related content",
+        "Always include appropriate disclaimers for health content"
+      ],
       
-      ## Tone of Voice Recommendations
-      ${brandName} should communicate in a sophisticated, inspiring, and confident voice. The tone should be aspirational yet accessible, using rich, descriptive language when discussing products. Balance trend awareness with an emphasis on enduring style.
-    `,
-    health: `
-      # ${brandName} Brand Identity
+      agencies: [
+        { name: "MHRA", description: "Medicines and Healthcare products Regulatory Agency - Regulates medicines, medical devices, and blood components", priority: "high" },
+        { name: "ASA", description: "Advertising Standards Authority - Regulates advertising across all media in the UK", priority: "high" },
+        { name: "NICE", description: "National Institute for Health and Care Excellence - Provides national guidance and advice to improve health and social care", priority: "medium" },
+        { name: "Trading Standards", description: "Enforces consumer protection legislation and ensures product safety", priority: "low" }
+      ]
+    },
+    
+    general: {
+      identity: `${brandName} projects a professional, reliable, and customer-focused personality. The brand values quality, innovation, and creating exceptional experiences for its customers. It emphasizes integrity, excellence, and adaptability in an evolving marketplace.\n\nPrimary audience includes discerning consumers who value quality and service. They appreciate attention to detail and are willing to invest in products or services that deliver consistent value and reliability.\n\nKey messaging themes include unwavering commitment to quality, innovation driven by customer needs, building lasting relationships, and delivering on promises consistently.`,
       
-      ## Brand Personality and Values
-      ${brandName} embodies vitality, balance, and holistic wellbeing. The brand values scientific understanding, natural approaches to health, and empowering individuals to take control of their wellness journey.
+      tone: `Clear, confident, and approachable. The tone should be professional without being impersonal, and authoritative without being condescending. Maintain a balance between showcasing expertise and being accessible to a wide audience.`,
       
-      ## Target Audience
-      Health-conscious individuals seeking to improve or maintain their wellbeing, fitness enthusiasts, and those looking for natural solutions to health concerns. The audience spans multiple age groups but shares a proactive approach to health.
+      guardrails: [
+        "Maintain transparency in all communications and practices",
+        "Avoid making unsubstantiated claims about products or services",
+        "Use inclusive language that respects diversity",
+        "Don't disparage competitors or alternative solutions",
+        "Ensure all claims are accurate and can be verified"
+      ],
       
-      ## Key Messaging Themes
-      - Balanced approach to health and wellness
-      - Evidence-based natural solutions
-      - Preventative care and lasting vitality
-      - Personal empowerment through health knowledge
-      
-      ## Tone of Voice Recommendations
-      ${brandName} should communicate in a nurturing, knowledgeable, and encouraging voice. The tone should be informative without being clinical, and motivational without being pushy. Use clear, straightforward language when discussing health concepts, and maintain an empathetic approach to wellness challenges.
-    `,
-    general: `
-      # ${brandName} Brand Identity
-      
-      ## Brand Personality and Values
-      ${brandName} projects a professional, reliable, and customer-focused personality. The brand values quality, innovation, and creating exceptional experiences for its customers. It emphasizes integrity, excellence, and adaptability in an evolving marketplace.
-      
-      ## Target Audience
-      Primary audience includes discerning consumers who value quality and service. They appreciate attention to detail and are willing to invest in products or services that deliver consistent value and reliability.
-      
-      ## Key Messaging Themes
-      - Unwavering commitment to quality
-      - Innovation driven by customer needs
-      - Building lasting relationships
-      - Delivering on promises consistently
-      
-      ## Tone of Voice Recommendations
-      ${brandName} should communicate in a clear, confident, and approachable voice. The tone should be professional without being impersonal, and authoritative without being condescending. Maintain a balance between showcasing expertise and being accessible to a wide audience.
-    `,
+      agencies: [
+        { name: "ASA", description: "Advertising Standards Authority - Regulates advertising across all media in the UK", priority: "high" },
+        { name: "CMA", description: "Competition and Markets Authority - Promotes competition and prevents anti-competitive activities", priority: "medium" },
+        { name: "Trading Standards", description: "Enforces consumer protection legislation and ensures product safety", priority: "medium" },
+        { name: "ICO", description: "Information Commissioner's Office - UK's independent authority set up to uphold information rights", priority: "low" }
+      ]
+    }
   };
   
-  return templates[industry];
+  const templateData = templates[industry];
+  
+  return {
+    brandIdentity: templateData.identity,
+    toneOfVoice: templateData.tone,
+    guardrails: templateData.guardrails.map(item => `- ${item}`).join('\n'),
+    suggestedAgencies: templateData.agencies
+  };
 } 

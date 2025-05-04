@@ -290,6 +290,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     setIsGenerating(true);
     setUrlsError("");
     setUsedFallback(false);
+    setSelectedAgencies([]);
 
     try {
       console.log("Attempting to generate brand identity from:", urls);
@@ -328,21 +329,39 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       console.log("Response data:", result);
       
       if (result.success && result.data) {
-        const newBrandIdentity = result.data.brandIdentity;
+        // Update the brand with all the generated information
         setBrand(prev => ({
           ...prev,
-          brand_identity: newBrandIdentity,
+          brand_identity: result.data.brandIdentity || "",
+          tone_of_voice: result.data.toneOfVoice || "",
+          guardrails: result.data.guardrails || "",
         }));
         
-        // If vetting agencies were provided, update them
+        // Handle vetting agencies if provided
         if (result.data.vettingAgencies && result.data.vettingAgencies.length > 0) {
-          const agencies = result.data.vettingAgencies
-            .map((agency: {name: string, description: string}) => `${agency.name}: ${agency.description}`)
-            .join('\n');
-          setBrand(prev => ({
-            ...prev,
-            content_vetting_agencies: agencies,
+          // Update vetting agencies list
+          const customAgencies = result.data.vettingAgencies.map((agency: any) => ({
+            name: agency.name,
+            description: agency.description,
+            priority: agency.priority || "medium"
           }));
+          
+          setVettingAgencies(customAgencies);
+          
+          // Select only high priority agencies by default
+          const highPriorityAgencies = customAgencies
+            .filter((agency: any) => agency.priority === "high")
+            .map((agency: any) => agency.name);
+          
+          setSelectedAgencies(highPriorityAgencies);
+          
+          // Update the brand's content_vetting_agencies field
+          if (highPriorityAgencies.length > 0) {
+            setBrand(prev => ({
+              ...prev,
+              content_vetting_agencies: highPriorityAgencies.join(', ')
+            }));
+          }
         }
         
         // Show success notification
