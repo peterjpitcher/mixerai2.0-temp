@@ -15,7 +15,7 @@ import { COUNTRIES, LANGUAGES } from "@/lib/constants";
 import { AlertCircle, Loader2, Info } from "lucide-react";
 import { Checkbox } from "@/components/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/dialog";
-import { getVettingAgenciesForCountry } from '@/lib/azure/openai';
+import { VETTING_AGENCIES_BY_COUNTRY } from '@/lib/azure/openai';
 
 interface BrandFormData {
   name: string;
@@ -117,7 +117,7 @@ export default function NewBrandPage() {
   // Update vetting agencies when country changes
   useEffect(() => {
     if (formData.country) {
-      const agencies = getVettingAgenciesForCountry(formData.country);
+      const agencies = VETTING_AGENCIES_BY_COUNTRY[formData.country] || [];
       setVettingAgencies(agencies);
     } else {
       setVettingAgencies([]);

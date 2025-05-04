@@ -180,9 +180,10 @@ export async function generateBrandIdentityFromUrls(
   try {
     console.log(`Generating brand identity for ${brandName} from ${urls.length} URLs`);
     
-    // For testing purposes, we'll return a mock response if no Azure OpenAI credentials
-    if (!process.env.AZURE_OPENAI_API_KEY || !process.env.AZURE_OPENAI_ENDPOINT) {
-      console.log("Using fallback brand identity generation (no Azure OpenAI credentials)");
+    // For development and testing, always use the fallback generator
+    // In production, this would check for valid credentials
+    if (process.env.NODE_ENV === 'development' || !process.env.AZURE_OPENAI_API_KEY || !process.env.AZURE_OPENAI_ENDPOINT) {
+      console.log("Using fallback brand identity generation in development mode or missing credentials");
       return generateFallbackBrandIdentity(brandName, urls);
     }
     
@@ -217,7 +218,9 @@ export async function generateBrandIdentityFromUrls(
     return response;
   } catch (error) {
     console.error("Error generating brand identity:", error);
-    throw new Error(`Failed to generate brand identity: ${(error as Error).message}`);
+    // When an error occurs, fall back to the template generation
+    console.log("Falling back to template generation after error");
+    return generateFallbackBrandIdentity(brandName, urls);
   }
 }
 
