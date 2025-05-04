@@ -12,13 +12,15 @@ import { Label } from '@/components/label';
 import { Checkbox } from '@/components/checkbox';
 import { useToast } from '@/components/toast-provider';
 import { BrandIcon } from '@/components/brand-icon';
-import { PlusIcon, Trash2Icon, XIcon } from 'lucide-react';
+import { PlusIcon, Trash2Icon, XIcon, Wand2Icon } from 'lucide-react';
 
 interface Brand {
   id: string;
   name: string;
   brand_color?: string;
   approved_content_types?: string[];
+  language?: string;
+  country?: string;
 }
 
 interface ContentType {
@@ -58,6 +60,7 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [newAssigneeEmail, setNewAssigneeEmail] = useState<{[key: number]: string}>({});
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState<{[key: number]: boolean}>({});
   
   const [formData, setFormData] = useState<WorkflowFormData>({
     id: params.id,
@@ -204,17 +207,16 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
   };
   
   const handleStepChange = (index: number, field: string, value: any) => {
-    setFormData(prev => {
-      const updatedSteps = [...prev.steps];
-      updatedSteps[index] = {
-        ...updatedSteps[index],
-        [field]: value
-      };
-      return {
-        ...prev,
-        steps: updatedSteps
-      };
-    });
+    const updatedSteps = [...formData.steps];
+    updatedSteps[index] = {
+      ...updatedSteps[index],
+      [field]: value
+    };
+    
+    setFormData(prevState => ({
+      ...prevState,
+      steps: updatedSteps
+    }));
   };
   
   const addStep = () => {
@@ -502,12 +504,145 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
                     
                     <div className="space-y-2">
                       <Label htmlFor={`step-${index}-description`}>Description</Label>
-                      <Textarea
-                        id={`step-${index}-description`}
-                        value={step.description}
-                        onChange={(e) => handleStepChange(index, 'description', e.target.value)}
-                        placeholder="Describe what happens in this step"
-                      />
+                      <div className="relative">
+                        {/* For debugging - show the current description from state */}
+                        <div className="text-xs text-muted-foreground mb-1">
+                          <strong>Current description in state:</strong> {step.description ? `"${step.description}"` : 'None'}
+                        </div>
+                        <Textarea
+                          id={`step-${index}-description`}
+                          value={step.description}
+                          onChange={(e) => handleStepChange(index, 'description', e.target.value)}
+                          placeholder="Describe what happens in this step"
+                          className="min-h-24"
+                        />
+                        <div className="absolute top-1 right-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 py-1 text-xs"
+                            disabled={isGeneratingDescription[index]}
+                            onClick={async (e) => {
+                              // Prevent default behavior
+                              e.preventDefault();
+                              e.stopPropagation();
+                              
+                              if (isGeneratingDescription[index]) return;
+                              
+                              try {
+                                // Mark this step as loading
+                                setIsGeneratingDescription(prev => ({
+                                  ...prev,
+                                  [index]: true
+                                }));
+                                
+                                // Get step data
+                                const step = formData.steps[index];
+                                if (!step.name) {
+                                  toast({
+                                    title: 'Missing Step Name',
+                                    description: 'Please provide a name for this step before generating a description.',
+                                    variant: 'destructive'
+                                  });
+                                  return;
+                                }
+                                
+                                // Get other steps for context
+                                const otherSteps = formData.steps.filter((_, i) => i !== index);
+                                console.log('Generating description for step:', step.name);
+                                
+                                // Get brand info for language/country context
+                                const selectedBrand = brands.find(brand => brand.id === formData.brand_id);
+                                const brandContext = selectedBrand 
+                                  ? { 
+                                      name: selectedBrand.name,
+                                      language: selectedBrand.language || 'English',
+                                      country: selectedBrand.country || 'Global'
+                                    }
+                                  : undefined;
+                                
+                                // Call the API
+                                const response = await fetch('/api/workflows/generate-description', {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json'
+                                  },
+                                  body: JSON.stringify({
+                                    type: 'generate',
+                                    stepName: step.name,
+                                    otherSteps: otherSteps.map(s => ({ name: s.name, description: s.description })),
+                                    brandContext
+                                  })
+                                });
+                                
+                                const data = await response.json();
+                                console.log('API response:', data);
+                                
+                                if (data.success && data.description) {
+                                  console.log('Generated description:', data.description);
+                                  
+                                  // First, create a direct DOM update to ensure the textarea displays the content
+                                  const textarea = document.getElementById(`step-${index}-description`) as HTMLTextAreaElement;
+                                  if (textarea) {
+                                    textarea.value = data.description;
+                                  }
+                                  
+                                  // Then update the React state
+                                  setFormData(prevFormData => {
+                                    console.log('Previous form data:', JSON.stringify(prevFormData.steps[index].description));
+                                    
+                                    // Create a new steps array with the updated description
+                                    const updatedSteps = prevFormData.steps.map((s, i) => {
+                                      if (i === index) {
+                                        return {
+                                          ...s,
+                                          description: data.description
+                                        };
+                                      }
+                                      return s;
+                                    });
+                                    
+                                    console.log('New description being set:', data.description);
+                                    console.log('Updated form data:', JSON.stringify(updatedSteps[index].description));
+                                    
+                                    return {
+                                      ...prevFormData,
+                                      steps: updatedSteps
+                                    };
+                                  });
+                                  
+                                  toast({
+                                    title: 'Description Generated',
+                                    description: 'Step description has been auto-generated.'
+                                  });
+                                } else {
+                                  throw new Error(data.error || 'Failed to generate description');
+                                }
+                              } catch (error) {
+                                console.error('Error generating description:', error);
+                                toast({
+                                  title: 'Error',
+                                  description: 'Failed to generate description. Please try again.',
+                                  variant: 'destructive'
+                                });
+                              } finally {
+                                setIsGeneratingDescription(prev => ({
+                                  ...prev,
+                                  [index]: false
+                                }));
+                              }
+                            }}
+                          >
+                            {isGeneratingDescription[index] ? (
+                              <div className="h-3 w-3 border-2 border-primary border-t-transparent rounded-full animate-spin mr-1" />
+                            ) : (
+                              <Wand2Icon className="h-3.5 w-3.5 mr-1" />
+                            )}
+                            Auto-generate
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                     
                     <div className="space-y-2">
