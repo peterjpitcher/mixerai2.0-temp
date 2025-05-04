@@ -13,6 +13,11 @@ interface Step {
   description: string;
   role: string;
   approvalRequired?: boolean;
+  assignees?: Array<{
+    id?: string;
+    email: string;
+    name?: string;
+  }>;
 }
 
 interface WorkflowDetail {
@@ -225,6 +230,39 @@ export default function WorkflowDetailsPage({ params }: { params: { id: string }
                           )}
                         </div>
                         <p className="text-muted-foreground mb-4">{step.description}</p>
+                        
+                        {/* Show assignees */}
+                        {step.assignees && step.assignees.length > 0 && (
+                          <div className="mb-4">
+                            <h4 className="text-sm font-medium mb-2">Assignees:</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {step.assignees.map((assignee, i) => (
+                                <div key={i} className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted">
+                                  {assignee.id ? (
+                                    // User exists in system
+                                    <span className="flex items-center gap-1">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500">
+                                        <path d="M20 6 9 17l-5-5" />
+                                      </svg>
+                                      {assignee.name || assignee.email}
+                                    </span>
+                                  ) : (
+                                    // User is invited but not signed up
+                                    <span className="flex items-center gap-1">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500">
+                                        <path d="M21.2 8.4c.5.38.8.97.8 1.6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2h3.8a2 2 0 0 0 1.4-.6L12 4l2.8 3.4a2 2 0 0 0 1.4.6H20a2 2 0 0 1 1.2.4Z" />
+                                        <path d="m21.3 14.7-9 6.6a1 1 0 0 1-1.2 0l-8.8-6.7" />
+                                      </svg>
+                                      {assignee.email}
+                                      <span className="text-amber-500">(Invited)</span>
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
                         {index < workflow.steps.length - 1 && (
                           <div className="w-full border-t border-dashed my-4"></div>
                         )}

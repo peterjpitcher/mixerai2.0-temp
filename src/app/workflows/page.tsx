@@ -6,46 +6,74 @@ import { Button } from '@/components/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/card';
 import { Input } from '@/components/input';
 import { useToast } from '@/components/toast-provider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
+import { BrandIcon } from '@/components/brand-icon';
 
 interface Workflow {
   id: string;
   name: string;
+  brand_id: string;
   brand_name: string;
+  brand_color?: string;
   content_type_name: string;
+  steps: Array<{
+    id: number;
+    name: string;
+    description: string;
+    role: string;
+  }>;
   steps_count: number;
+}
+
+interface Brand {
+  id: string;
+  name: string;
+  color?: string;
 }
 
 export default function WorkflowsPage() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [selectedBrandId, setSelectedBrandId] = useState<string>('all');
+  const [filteredWorkflows, setFilteredWorkflows] = useState<Workflow[]>([]);
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Fetch all workflows and brands
   useEffect(() => {
-    const fetchWorkflows = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true);
         setError(null);
         
-        const response = await fetch('/api/workflows');
+        // Fetch workflows
+        const workflowsResponse = await fetch('/api/workflows');
         
-        if (!response.ok) {
-          throw new Error('Failed to fetch workflows');
+        // Fetch brands for the filter
+        const brandsResponse = await fetch('/api/brands');
+        
+        if (!workflowsResponse.ok || !brandsResponse.ok) {
+          throw new Error('Failed to fetch data');
         }
         
-        const data = await response.json();
+        const workflowsData = await workflowsResponse.json();
+        const brandsData = await brandsResponse.json();
         
-        if (data.success) {
-          setWorkflows(data.workflows);
+        if (workflowsData.success && brandsData.success) {
+          setWorkflows(workflowsData.workflows);
+          setFilteredWorkflows(workflowsData.workflows);
+          setBrands(brandsData.brands);
         } else {
-          throw new Error(data.error || 'Failed to fetch workflows');
+          throw new Error('Failed to fetch data');
         }
       } catch (error) {
-        console.error('Error fetching workflows:', error);
-        setError((error as Error).message || 'Failed to load workflows');
+        console.error('Error fetching data:', error);
+        setError((error as Error).message || 'Failed to load data');
         toast({
           title: 'Error',
-          description: 'Failed to load workflows. Please try again.',
+          description: 'Failed to load data. Please try again.',
           variant: 'destructive'
         });
       } finally {
@@ -53,8 +81,38 @@ export default function WorkflowsPage() {
       }
     };
     
-    fetchWorkflows();
+    fetchData();
   }, [toast]);
+  
+  // Apply filters when brand selection or search changes
+  useEffect(() => {
+    let result = [...workflows];
+    
+    // Apply brand filter
+    if (selectedBrandId && selectedBrandId !== 'all') {
+      result = result.filter(workflow => workflow.brand_id === selectedBrandId);
+    }
+    
+    // Apply search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(workflow => 
+        workflow.name.toLowerCase().includes(term) || 
+        workflow.brand_name.toLowerCase().includes(term) ||
+        workflow.content_type_name.toLowerCase().includes(term)
+      );
+    }
+    
+    setFilteredWorkflows(result);
+  }, [workflows, selectedBrandId, searchTerm]);
+  
+  const handleBrandChange = (brandId: string) => {
+    setSelectedBrandId(brandId);
+  };
+  
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
   
   return (
     <div className="space-y-8">
@@ -65,9 +123,31 @@ export default function WorkflowsPage() {
         </Button>
       </div>
       
-      <div className="flex items-center justify-between">
-        <div className="max-w-sm">
-          <Input placeholder="Search workflows..." />
+      <div className="flex items-center justify-between gap-4 flex-col sm:flex-row">
+        <div className="w-full sm:max-w-xs">
+          <Input 
+            placeholder="Search workflows..." 
+            value={searchTerm}
+            onChange={handleSearchChange}
+          />
+        </div>
+        <div className="w-full sm:max-w-xs">
+          <Select value={selectedBrandId} onValueChange={handleBrandChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by brand" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Brands</SelectItem>
+              {brands.map(brand => (
+                <SelectItem key={brand.id} value={brand.id}>
+                  <div className="flex items-center gap-2">
+                    <BrandIcon name={brand.name} color={brand.color} size="sm" />
+                    <span>{brand.name}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
       
@@ -101,7 +181,7 @@ export default function WorkflowsPage() {
             Retry
           </Button>
         </div>
-      ) : workflows.length === 0 ? (
+      ) : filteredWorkflows.length === 0 ? (
         <div className="text-center py-12 px-4">
           <div className="mx-auto w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-6">
             <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
@@ -113,26 +193,46 @@ export default function WorkflowsPage() {
               <rect width="8" height="8" x="14" y="14" rx="2" />
             </svg>
           </div>
-          <h3 className="text-xl font-semibold mb-2">No workflows found</h3>
+          <h3 className="text-xl font-semibold mb-2">
+            {selectedBrandId || searchTerm ? 'No matching workflows found' : 'No workflows found'}
+          </h3>
           <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            You haven't created any content approval workflows yet. Create your first workflow to streamline content creation.
+            {selectedBrandId || searchTerm 
+              ? 'Try adjusting your filters to see more results.'
+              : 'You haven\'t created any content approval workflows yet. Create your first workflow to streamline content creation.'}
           </p>
-          <Button size="lg" asChild>
-            <Link href="/workflows/new">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                <path d="M5 12h14" />
-                <path d="M12 5v14" />
-              </svg>
-              Create First Workflow
-            </Link>
-          </Button>
+          {!selectedBrandId || selectedBrandId === 'all' ? (
+            <Button size="lg" asChild>
+              <Link href="/workflows/new">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                  <path d="M5 12h14" />
+                  <path d="M12 5v14" />
+                </svg>
+                Create First Workflow
+              </Link>
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => {
+              setSelectedBrandId('all');
+              setSearchTerm('');
+            }}>
+              Clear Filters
+            </Button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {workflows.map((workflow) => (
+          {filteredWorkflows.map((workflow) => (
             <Card key={workflow.id}>
               <CardHeader className="pb-3">
-                <CardTitle className="text-xl">{workflow.name}</CardTitle>
+                <div className="flex items-center gap-3 mb-2">
+                  <BrandIcon 
+                    name={workflow.brand_name} 
+                    color={workflow.brand_color} 
+                    size="sm" 
+                  />
+                  <CardTitle className="text-xl">{workflow.name}</CardTitle>
+                </div>
                 <CardDescription>
                   {workflow.brand_name} - {workflow.content_type_name}
                 </CardDescription>
@@ -143,14 +243,25 @@ export default function WorkflowsPage() {
                   <span className="font-medium">{workflow.steps_count}</span>
                 </div>
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {Array.from({ length: workflow.steps_count }).map((_, i) => (
-                    <div 
-                      key={i} 
-                      className="h-8 flex items-center justify-center rounded-md bg-primary/10 text-primary text-xs px-3"
-                    >
-                      Step {i + 1}
-                    </div>
-                  ))}
+                  {workflow.steps && workflow.steps.length > 0 ? (
+                    workflow.steps.map((step) => (
+                      <div 
+                        key={step.id} 
+                        className="h-8 flex items-center justify-center rounded-md bg-primary/10 text-primary text-xs px-3"
+                      >
+                        {step.name}
+                      </div>
+                    ))
+                  ) : (
+                    Array.from({ length: workflow.steps_count }).map((_, i) => (
+                      <div 
+                        key={i} 
+                        className="h-8 flex items-center justify-center rounded-md bg-primary/10 text-primary text-xs px-3"
+                      >
+                        Step {i + 1}
+                      </div>
+                    ))
+                  )}
                 </div>
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-between">

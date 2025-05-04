@@ -17,15 +17,6 @@
   - Role information from user_brand_permissions
   - Fallback avatar generation for users without profile images
 
-### 3. Enhanced Todo Example
-- Added feature-rich Todo component at `/todo-app` (moved from `/examples/todo-example`)
-- Implemented persistent storage using localStorage
-- Added due dates with calendar selection
-- Added priority levels for tasks
-- Implemented sorting and filtering functionality
-- Created comprehensive documentation at `/docs/TODO_APP_DOCUMENTATION.md`
-- Added redirects to maintain backward compatibility
-
 ## Implementation Details
 
 ### API Route Update
@@ -53,17 +44,8 @@ The `/api/users` route now:
 }
 ```
 
-### Todo Component Features
-- Task management (add, complete, delete)
-- Priority levels (low, medium, high)
-- Due date calendar integration
-- LocalStorage persistence
-- Auto-sorting by completion, priority, and due date
-- Responsive design for all devices
-
 ### Routing Structure Issues Fix
 - Fixed route conflicts between the `/dashboard/*` routes and the `/(dashboard)/*` route group
-- Moved the Todo example out of nested layouts to prevent layout duplication
 - Implemented proper redirects to maintain backward compatibility 
 
 ## Benefits
@@ -71,13 +53,11 @@ The `/api/users` route now:
 - Simplified dashboard UI focuses on the most important content
 - More complete user information for better user management
 - Consistent user experience between local and production environments
-- Example Todo component showcases application features and UI components
 - Fixed routing structure prevents duplicate layouts and navigation elements
 
 ## Requirements
 - Requires SUPABASE_SERVICE_ROLE_KEY to be set in environment variables
 - Needs the auth.admin.listUsers permission for the service role
-- Todo example requires the date-fns package for date formatting 
 
 # MixerAI 2.0 Documentation
 

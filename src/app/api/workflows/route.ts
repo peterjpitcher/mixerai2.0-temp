@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
       .from('workflows')
       .select(`
         *,
-        brands:brand_id(name),
+        brands:brand_id(name, brand_color),
         content_types:content_type_id(name),
         content:content(count)
       `)
@@ -148,6 +148,7 @@ export async function GET(request: NextRequest) {
       name: workflow.name,
       brand_id: workflow.brand_id,
       brand_name: workflow.brands?.name || null,
+      brand_color: workflow.brands?.brand_color || null,
       content_type_id: workflow.content_type_id,
       content_type_name: workflow.content_types?.name || null,
       steps: workflow.steps,

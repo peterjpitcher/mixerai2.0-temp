@@ -14,6 +14,23 @@ interface WorkflowInvitation {
   status?: string;
 }
 
+// Define types for workflow steps and assignees
+interface WorkflowAssignee {
+  id?: string;
+  email: string;
+  name?: string;
+  invitation_status?: string;
+}
+
+interface WorkflowStep {
+  id: number;
+  name: string;
+  description: string;
+  role: string;
+  approvalRequired?: boolean;
+  assignees?: WorkflowAssignee[];
+}
+
 /**
  * GET endpoint to retrieve a specific workflow by ID
  */
@@ -30,7 +47,7 @@ export async function GET(
       .from('workflows')
       .select(`
         *,
-        brands:brand_id(name),
+        brands:brand_id(name, brand_color),
         content_types:content_type_id(name)
       `)
       .eq('id', id)
@@ -46,12 +63,63 @@ export async function GET(
       throw error;
     }
     
+    // If there are assignees in any step, fetch their user information
+    if (workflow.steps && Array.isArray(workflow.steps)) {
+      const userIds = new Set<string>();
+      
+      // Collect all user IDs from assignees
+      for (const step of workflow.steps as WorkflowStep[]) {
+        if (step.assignees && Array.isArray(step.assignees)) {
+          for (const assignee of step.assignees) {
+            if (assignee.id) {
+              userIds.add(assignee.id);
+            }
+          }
+        }
+      }
+      
+      // If there are user IDs, fetch the corresponding user information
+      if (userIds.size > 0) {
+        const { data: users, error: usersError } = await supabase
+          .from('profiles')
+          .select('id, full_name, email');
+        
+        if (usersError) {
+          console.error('Error fetching user information:', usersError);
+        } else if (users) {
+          // Filter users to only include those in our userIds set
+          const filteredUsers = users.filter(user => userIds.has(user.id));
+          
+          // Create a map of user information by ID
+          const userMap = new Map(filteredUsers.map(user => [user.id, user]));
+          
+          // Update assignees with user information
+          for (const step of workflow.steps as WorkflowStep[]) {
+            if (step.assignees && Array.isArray(step.assignees)) {
+              step.assignees = step.assignees.map(assignee => {
+                if (assignee.id && userMap.has(assignee.id)) {
+                  const user = userMap.get(assignee.id)!;
+                  return {
+                    ...assignee,
+                    name: user.full_name,
+                    email: user.email || assignee.email
+                  };
+                }
+                return assignee;
+              });
+            }
+          }
+        }
+      }
+    }
+    
     // Format the response
     const formattedWorkflow = {
       id: workflow.id,
       name: workflow.name,
       brand_id: workflow.brand_id,
       brand_name: workflow.brands?.name || null,
+      brand_color: workflow.brands?.brand_color || null,
       content_type_id: workflow.content_type_id,
       content_type_name: workflow.content_types?.name || null,
       steps: workflow.steps,

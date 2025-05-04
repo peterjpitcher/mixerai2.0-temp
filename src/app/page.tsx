@@ -228,9 +228,6 @@ export default function Dashboard() {
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/todo-app">Todo App</Link>
-          </Button>
           <Button asChild>
             <Link href="/content/new">Create Content</Link>
           </Button>
