@@ -187,4 +187,41 @@ Format your response in a JSON object with these keys: brandIdentity, toneOfVoic
     console.error("Error generating brand identity with Azure OpenAI:", error);
     throw new Error("Failed to generate brand identity");
   }
+}
+
+/**
+ * Returns a list of content vetting agencies relevant for a given country
+ */
+export function getVettingAgenciesForCountry(countryCode: string): Array<{name: string, description: string}> {
+  const agencies: Record<string, Array<{name: string, description: string}>> = {
+    "US": [
+      { name: "FDA", description: "Food and Drug Administration - Regulates food, drugs, cosmetics, and medical devices" },
+      { name: "FTC", description: "Federal Trade Commission - Enforces consumer protection and antitrust laws" },
+      { name: "NAD", description: "National Advertising Division - Self-regulatory body that monitors advertising for truthfulness" },
+      { name: "EPA", description: "Environmental Protection Agency - Regulates environmental claims" }
+    ],
+    "GB": [
+      { name: "ASA", description: "Advertising Standards Authority - Regulates advertising in the UK" },
+      { name: "MHRA", description: "Medicines and Healthcare products Regulatory Agency - Regulates medicines and medical devices" },
+      { name: "CAP", description: "Committee of Advertising Practice - Sets advertising standards in the UK" }
+    ],
+    "CA": [
+      { name: "Health Canada", description: "Regulates health products, food, and consumer goods" },
+      { name: "Ad Standards", description: "Canada's advertising self-regulatory body" },
+      { name: "CFIA", description: "Canadian Food Inspection Agency - Regulates food claims" }
+    ],
+    "AU": [
+      { name: "TGA", description: "Therapeutic Goods Administration - Regulates therapeutic goods including medicines and medical devices" },
+      { name: "ACCC", description: "Australian Competition and Consumer Commission - Enforces consumer protection laws" },
+      { name: "Ad Standards", description: "Australia's advertising self-regulatory body" }
+    ],
+    "EU": [
+      { name: "EFSA", description: "European Food Safety Authority - Provides scientific advice on food-related risks" },
+      { name: "EMA", description: "European Medicines Agency - Evaluates medicinal products" },
+      { name: "EASA", description: "European Advertising Standards Alliance - Coordinates advertising self-regulation" }
+    ]
+  };
+  
+  // Return appropriate agencies or empty array if none found
+  return agencies[countryCode] || [];
 } 

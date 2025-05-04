@@ -163,6 +163,17 @@ export async function PUT(
     if (body.brand_color !== undefined) updateData.brand_color = body.brand_color;
     if (body.approved_content_types !== undefined) updateData.approved_content_types = body.approved_content_types;
     
+    // Handle brand_summary field
+    if (body.brand_summary !== undefined) {
+      updateData.brand_summary = body.brand_summary;
+    } else if (body.brand_identity !== undefined && (body.brand_identity !== "")) {
+      // Generate summary from brand_identity if it's updated and summary isn't provided
+      updateData.brand_summary = body.brand_identity.slice(0, 250);
+      if (body.brand_identity.length > 250) {
+        updateData.brand_summary += '...';
+      }
+    }
+    
     // Handle guardrails specially to ensure proper format
     if (body.guardrails !== undefined) {
       // Handle case where guardrails might be a JSON array string or an actual array

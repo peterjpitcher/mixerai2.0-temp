@@ -13,6 +13,7 @@ const getFallbackBrands = () => {
       language: 'English',
       brand_identity: 'Modern and innovative',
       tone_of_voice: 'Professional but friendly',
+      brand_summary: 'Modern and innovative brand with a professional but friendly tone.',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       content_count: 5,
@@ -26,6 +27,7 @@ const getFallbackBrands = () => {
       language: 'English',
       brand_identity: 'Traditional and trusted',
       tone_of_voice: 'Formal and authoritative',
+      brand_summary: 'Traditional and trusted brand with a formal and authoritative tone.',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       content_count: 3,
@@ -124,6 +126,16 @@ export async function POST(request: Request) {
       }
     }
     
+    // Generate brand_summary from identity if provided
+    let brandSummary = body.brand_summary || null;
+    if (!brandSummary && body.brand_identity) {
+      // Get first 250 characters from brand_identity
+      brandSummary = body.brand_identity.slice(0, 250);
+      if (body.brand_identity.length > 250) {
+        brandSummary += '...';
+      }
+    }
+    
     // Insert the new brand
     const { data, error } = await supabase
       .from('brands')
@@ -137,6 +149,7 @@ export async function POST(request: Request) {
         guardrails: formattedGuardrails,
         content_vetting_agencies: body.content_vetting_agencies || null,
         brand_color: body.brand_color || '#3498db',
+        brand_summary: brandSummary,
         approved_content_types: body.approved_content_types || null
       }])
       .select();

@@ -357,56 +357,37 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
       <ConfirmDialog
         open={showDeleteConfirm}
         onOpenChange={(isOpen) => {
-          console.log("Dialog open state changing to:", isOpen);
           setShowDeleteConfirm(isOpen);
         }}
         title="Delete Brand"
         description={
-          deleteError ? (
-            <div className="text-destructive my-2">
-              {deleteError}
+          requiresCascade ? (
+            <div className="space-y-2">
+              <p>
+                This brand has {contentCount} content items and {workflowCount} workflows associated with it.
+              </p>
+              <p>
+                <strong className="text-destructive">Warning:</strong> Deleting this brand will also delete all associated content and workflows.
+              </p>
             </div>
           ) : (
-            <div>
-              <p>Are you sure you want to delete the brand <strong>{brand.name}</strong>?</p>
-              <p className="mt-2">This action cannot be undone and will delete all brand information.</p>
-              {requiresCascade && (
-                <p className="mt-2 text-destructive">
-                  This brand has {contentCount} piece{contentCount === 1 ? '' : 's'} of content and {workflowCount} workflow{workflowCount === 1 ? '' : 's'} that will also be deleted if you check the box below.
-                </p>
-              )}
-              {/* Debug info */}
-              {process.env.NODE_ENV === 'development' && (
-                <div className="mt-4 p-2 bg-slate-100 text-xs">
-                  <p>Debug info:</p>
-                  <p>showCascadeOption: {String(requiresCascade)}</p>
-                  <p>contentCount: {contentCount}</p>
-                  <p>workflowCount: {workflowCount}</p>
-                </div>
-              )}
-            </div>
+            <p>Are you sure you want to delete this brand? This action cannot be undone.</p>
           )
         }
-        verificationText={brand.name}
+        verificationText={brand?.name}
         verificationRequired={true}
-        onConfirm={(options) => {
-          console.log("Confirming delete with options:", options);
-          handleDeleteBrand(options);
-        }}
+        onConfirm={() => handleDeleteBrand({ cascade: requiresCascade })}
         confirmText={isDeleting ? "Deleting..." : "Delete Brand"}
         cancelText="Cancel"
         variant="destructive"
-        showCascadeOption={requiresCascade}
-        cascadeDescription={`Also delete all content and workflows associated with ${brand.name}`}
       />
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="content">Content</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="workflows">Workflows</TabsTrigger>
-          <TabsTrigger value="debug">Debug</TabsTrigger>
+          <TabsTrigger value="team">Team</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="space-y-6 mt-6">
           <Card>
@@ -488,7 +469,7 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
               <CardFooter className="border-t pt-4">
                 <Button variant="ghost" size="sm" className="w-full" asChild>
                   <Link href="#" onClick={() => {
-                    const usersTab = document.querySelector('[value="users"]') as HTMLElement;
+                    const usersTab = document.querySelector('[value="team"]') as HTMLElement;
                     if (usersTab) usersTab.click();
                   }}>
                     Manage Users
@@ -585,7 +566,63 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
           </Card>
         </TabsContent>
 
-        <TabsContent value="users" className="mt-6">
+        <TabsContent value="workflows" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Workflows</CardTitle>
+              <CardDescription>
+                Content approval workflows for this brand
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left pb-3 font-medium">Name</th>
+                      <th className="text-left pb-3 font-medium">Content Type</th>
+                      <th className="text-left pb-3 font-medium">Steps</th>
+                      <th className="text-left pb-3 font-medium">Content Count</th>
+                      <th className="text-left pb-3 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {workflows.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-6 text-center text-muted-foreground">
+                          No workflows have been created for this brand yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      workflows.map((workflow) => (
+                        <tr key={workflow.id} className="border-b">
+                          <td className="py-3">{workflow.name}</td>
+                          <td className="py-3">{workflow.content_type_name || 'Unknown type'}</td>
+                          <td className="py-3">{workflow.steps_count || 0}</td>
+                          <td className="py-3">{workflow.content_count || 0}</td>
+                          <td className="py-3">
+                            <Button variant="ghost" size="sm" asChild>
+                              <Link href={`/workflows/${workflow.id}`}>View</Link>
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+            <CardFooter className="border-t pt-6">
+              <Button asChild>
+                <Link href={`/workflows/new?brand=${brand.id}`}>
+                  Create New Workflow
+                </Link>
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="team" className="mt-6">
           <Card>
             <CardHeader>
               <CardTitle>Users</CardTitle>
@@ -648,157 +685,6 @@ export default function BrandDetailPage({ params }: { params: { id: string } }) 
             <CardFooter className="border-t pt-6">
               <Button>Add User to Brand</Button>
             </CardFooter>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="workflows" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Workflows</CardTitle>
-              <CardDescription>
-                Content approval workflows for this brand
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left pb-3 font-medium">Name</th>
-                      <th className="text-left pb-3 font-medium">Content Type</th>
-                      <th className="text-left pb-3 font-medium">Steps</th>
-                      <th className="text-left pb-3 font-medium">Content Count</th>
-                      <th className="text-left pb-3 font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {workflows.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="py-6 text-center text-muted-foreground">
-                          No workflows have been created for this brand yet.
-                        </td>
-                      </tr>
-                    ) : (
-                      workflows.map((workflow) => (
-                        <tr key={workflow.id} className="border-b">
-                          <td className="py-3">{workflow.name}</td>
-                          <td className="py-3">{workflow.content_type_name || 'Unknown type'}</td>
-                          <td className="py-3">{workflow.steps_count || 0}</td>
-                          <td className="py-3">{workflow.content_count || 0}</td>
-                          <td className="py-3">
-                            <Button variant="ghost" size="sm" asChild>
-                              <Link href={`/workflows/${workflow.id}`}>View</Link>
-                            </Button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-            <CardFooter className="border-t pt-6">
-              <Button asChild>
-                <Link href={`/workflows/new?brand=${brand.id}`}>
-                  Create New Workflow
-                </Link>
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-
-        {/* New Debug Tab */}
-        <TabsContent value="debug" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>API Response Debug Information</CardTitle>
-              <CardDescription>
-                This tab shows detailed information about the API responses to help diagnose data issues
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Brand Data</h3>
-                <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-md overflow-x-auto">
-                  <p className="text-xs font-mono whitespace-pre-wrap">
-                    {JSON.stringify(brand, null, 2)}
-                  </p>
-                </div>
-                <p className="text-sm mt-2">
-                  <strong>isFallback:</strong> {brand?.isFallback ? 'Yes (showing dummy data)' : 'No (showing real data)'}
-                </p>
-                <p className="text-sm">
-                  <strong>Source:</strong> {brand?.source || 'Unknown'}
-                </p>
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Content Data</h3>
-                <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-md overflow-x-auto">
-                  <p className="text-xs font-mono whitespace-pre-wrap">
-                    {JSON.stringify(contents, null, 2)}
-                  </p>
-                </div>
-                <p className="text-sm mt-2">
-                  <strong>Item Count:</strong> {contents?.length || 0}
-                </p>
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Workflows Data</h3>
-                <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-md overflow-x-auto">
-                  <p className="text-xs font-mono whitespace-pre-wrap">
-                    {JSON.stringify(workflows, null, 2)}
-                  </p>
-                </div>
-                <p className="text-sm mt-2">
-                  <strong>Item Count:</strong> {workflows?.length || 0}
-                </p>
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-semibold mb-2">System Information</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm"><strong>Page URL:</strong> {typeof window !== 'undefined' ? window.location.href : ''}</p>
-                    <p className="text-sm"><strong>Brand ID:</strong> {params.id}</p>
-                    <p className="text-sm"><strong>API Endpoint:</strong> /api/brands/{params.id}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm"><strong>Timestamp:</strong> {new Date().toISOString()}</p>
-                    <p className="text-sm"><strong>Network Status:</strong> {navigator?.onLine ? 'Online' : 'Offline'}</p>
-                    <p className="text-sm"><strong>Environment:</strong> {process.env.NODE_ENV}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Actions</h3>
-                <div className="flex gap-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      const cacheBuster = `nocache=${Date.now()}-${Math.random()}`;
-                      window.location.href = `${window.location.pathname}?${cacheBuster}`;
-                    }}
-                  >
-                    Reload with Cache Buster
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      window.localStorage.clear();
-                      window.sessionStorage.clear();
-                      alert('Local storage and session storage cleared. Reloading page...');
-                      window.location.reload();
-                    }}
-                  >
-                    Clear Browser Storage
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>

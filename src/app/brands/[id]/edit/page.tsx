@@ -294,20 +294,34 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       console.log("Attempting to generate brand identity from:", urls);
       console.log("Using country:", brand.country, "and language:", brand.language);
       
+      // Add debug information to help diagnose issues
+      const requestData = {
+        brandName: brand.name,
+        urls,
+        countryCode: brand.country,
+        languageCode: brand.language
+      };
+      
+      console.log("POST request to /api/brands/identity with data:", JSON.stringify(requestData));
+      
       const response = await fetch('/api/brands/identity', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          brandName: brand.name,
-          urls,
-          countryCode: brand.country,
-          languageCode: brand.language
-        }),
+        body: JSON.stringify(requestData),
       });
 
+      console.log("Response status:", response.status);
+      // Log response headers more safely 
+      const responseHeaders: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        responseHeaders[key] = value;
+      });
+      console.log("Response headers:", responseHeaders);
+      
       const result = await response.json();
+      console.log("Response data:", JSON.stringify(result, null, 2));
 
       if (!response.ok) {
         throw new Error(result.error || `Server error: ${response.status}`);
@@ -325,6 +339,9 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
               ? result.data.guardrails.map((item: string) => `- ${item}`).join('\n')
               : String(result.data.guardrails),
           content_vetting_agencies: result.data.contentVettingAgencies,
+          brand_summary: result.data.brandIdentity 
+            ? result.data.brandIdentity.slice(0, 250) + (result.data.brandIdentity.length > 250 ? '...' : '') 
+            : '',
           brand_color: typeof result.data.brandColor === 'string' && result.data.brandColor.startsWith('#') 
             ? result.data.brandColor 
             : prev.brand_color // Keep existing color if no valid color is provided

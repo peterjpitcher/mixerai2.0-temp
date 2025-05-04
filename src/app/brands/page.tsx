@@ -18,6 +18,7 @@ interface Brand {
   language: string;
   content_count: number;
   brand_color?: string;
+  brand_summary?: string;
 }
 
 export default function BrandsPage() {
@@ -209,15 +210,11 @@ export default function BrandsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="w-full bg-muted rounded-full h-2 mt-2">
-                  <div 
-                    className="h-2 rounded-full" 
-                    style={{ 
-                      width: `${Math.min(Number(brand.content_count) * 5, 100)}%`,
-                      backgroundColor: brand.brand_color || '#3498db'
-                    }}
-                  ></div>
-                </div>
+                {brand.brand_summary ? (
+                  <p className="text-sm text-muted-foreground line-clamp-3">{brand.brand_summary}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">No brand summary available</p>
+                )}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-between">
                 <div className="flex gap-2">
