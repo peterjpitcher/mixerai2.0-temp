@@ -25,13 +25,12 @@ export default function NavigationDemoPage() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
                 <div className="border rounded-md p-4 bg-neutral-50">
-                  <h2 className="text-xl font-semibold mb-3 text-primary">Top Navigation</h2>
+                  <h2 className="text-xl font-semibold mb-3" style={{ color: '#13599f' }}>Top Navigation</h2>
                   <p className="text-neutral-600 mb-3">
-                    The top navigation uses <code className="bg-neutral-100 px-2 py-1 rounded text-primary">bg-primary</code> class,
-                    which is set to our exact blue color (<code className="bg-neutral-100 px-2 py-1 rounded text-primary">#0066CC</code>).
+                    The top navigation now uses the specific blue color <code className="bg-neutral-100 px-2 py-1 rounded" style={{ color: '#13599f' }}>#13599f</code> via inline styling.
                   </p>
                   <ul className="list-disc pl-6 space-y-1 text-neutral-700 text-sm">
-                    <li>Primary blue background (#0066CC)</li>
+                    <li>Exact blue color (#13599f)</li>
                     <li>White text for optimal readability</li>
                     <li>Active state highlighting</li>
                     <li>Responsive design with mobile menu</li>
@@ -67,6 +66,24 @@ export default function NavigationDemoPage() {
                   <li>Status badges for urgent items</li>
                   <li>Icons that need emphasis</li>
                 </ul>
+              </div>
+              
+              <div className="mt-8 p-4 rounded-md border" style={{ backgroundColor: 'rgba(19, 89, 159, 0.05)' }}>
+                <h2 className="text-lg font-semibold mb-2" style={{ color: '#13599f' }}>Color Reference</h2>
+                <div className="flex gap-4 flex-wrap">
+                  <div className="rounded p-3 flex items-center gap-2" style={{ backgroundColor: '#13599f', color: 'white' }}>
+                    <span>Header Blue</span>
+                    <code className="bg-white/20 px-1 py-0.5 rounded text-white text-xs">#13599f</code>
+                  </div>
+                  <div className="rounded p-3 flex items-center gap-2 bg-primary text-white">
+                    <span>Primary Blue</span>
+                    <code className="bg-white/20 px-1 py-0.5 rounded text-white text-xs">#0066CC</code>
+                  </div>
+                  <div className="rounded p-3 flex items-center gap-2 bg-accent text-white">
+                    <span>Accent Red</span>
+                    <code className="bg-white/20 px-1 py-0.5 rounded text-white text-xs">#CC3333</code>
+                  </div>
+                </div>
               </div>
               
               <div className="mt-6 text-sm text-neutral-500">

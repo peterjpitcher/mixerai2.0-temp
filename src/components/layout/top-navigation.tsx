@@ -8,17 +8,17 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/avatar';
 import { cn } from '@/lib/utils';
 
 /**
- * Top navigation component that uses the primary blue color
+ * Top navigation component that uses the specified blue color #13599f
  */
 export function TopNavigation() {
   const pathname = usePathname();
   
   return (
-    <header className="bg-primary text-white h-16 flex items-center px-6 sticky top-0 z-50 shadow-md">
+    <header className="text-white h-16 flex items-center px-6 sticky top-0 z-50 shadow-md" style={{ backgroundColor: '#13599f' }}>
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-4">
           {/* Mobile menu button */}
-          <Button variant="ghost" className="lg:hidden p-0 text-white hover:bg-primary-dark">
+          <Button variant="ghost" className="lg:hidden p-0 text-white hover:bg-opacity-80" style={{ backgroundColor: 'transparent' }}>
             <Menu className="h-6 w-6" />
             <span className="sr-only">Open menu</span>
           </Button>
@@ -55,7 +55,7 @@ export function TopNavigation() {
         
         <div className="flex items-center gap-4">
           {/* Notifications */}
-          <Button variant="ghost" className="p-2 text-white hover:bg-primary-dark rounded-full">
+          <Button variant="ghost" className="p-2 text-white hover:bg-opacity-80 rounded-full" style={{ backgroundColor: 'transparent' }}>
             <Bell className="h-5 w-5" />
             <span className="sr-only">Notifications</span>
           </Button>
