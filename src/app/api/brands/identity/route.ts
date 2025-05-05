@@ -122,9 +122,16 @@ function generateFallbackBrandIdentity(name: string, industry = 'general', count
       guardrails: `- Never make unsubstantiated health claims\n- Always prioritize food safety in messaging\n- Be transparent about ingredients and nutritional information\n- Respect dietary restrictions and cultural food practices\n- Avoid negative language about food choices`,
       brandColor: "#E57373", // Soft red
       agencies: [
-        { name: "Food Standards Agency", description: "Ensures food safety and standards", priority: "high" },
-        { name: "Advertising Standards Authority", description: "Regulates food advertising claims", priority: "high" },
-        { name: "Trading Standards", description: "Enforces food labeling regulations", priority: "medium" }
+        { name: "Food Standards Agency", description: `Ensures food safety and standards in ${countryName}`, priority: "high" },
+        { name: "Advertising Standards Authority", description: `Regulates food advertising claims in ${countryName}`, priority: "high" },
+        { name: "Trading Standards", description: `Enforces food labeling regulations in ${countryName}`, priority: "medium" },
+        { name: "Department of Health", description: `Provides public health guidance in ${countryName}`, priority: "medium" },
+        { name: "Environmental Health Department", description: `Local authority responsible for food hygiene standards in ${countryName}`, priority: "high" },
+        { name: "Nutrition Advisory Board", description: `Provides guidance on nutritional claims in ${countryName}`, priority: "medium" },
+        { name: "Consumer Protection Agency", description: `Protects consumer rights in ${countryName}`, priority: "medium" },
+        { name: "Food Allergy Association", description: `Provides guidance on allergen labeling in ${countryName}`, priority: "high" },
+        { name: "Organic Certification Body", description: `Certifies organic food products in ${countryName}`, priority: "low" },
+        { name: "Sustainability Standards Board", description: `Sets standards for sustainability claims in ${countryName}`, priority: "low" }
       ]
     },
     technology: {
@@ -133,9 +140,16 @@ function generateFallbackBrandIdentity(name: string, industry = 'general', count
       guardrails: `- Never over-promise on capabilities or features\n- Be transparent about data usage and privacy practices\n- Avoid technical language that excludes non-expert users\n- Don't make unsupported claims about competitors\n- Ensure all security claims are accurate and verifiable`,
       brandColor: "#2196F3", // Blue
       agencies: [
-        { name: "Information Commissioner's Office", description: "Data protection and privacy regulation", priority: "high" },
-        { name: "Advertising Standards Authority", description: "Regulates advertising claims", priority: "medium" },
-        { name: "Trading Standards", description: "Consumer protection for tech products", priority: "medium" }
+        { name: "Information Commissioner's Office", description: `Data protection and privacy regulation in ${countryName}`, priority: "high" },
+        { name: "Advertising Standards Authority", description: `Regulates advertising claims in ${countryName}`, priority: "medium" },
+        { name: "Trading Standards", description: `Consumer protection for tech products in ${countryName}`, priority: "medium" },
+        { name: "Communications Regulatory Authority", description: `Regulates telecommunications and internet services in ${countryName}`, priority: "high" },
+        { name: "Competition and Markets Authority", description: `Promotes fair competition in ${countryName}`, priority: "medium" },
+        { name: "Office of Digital Oversight", description: `Monitors digital platforms in ${countryName}`, priority: "medium" },
+        { name: "National Cybersecurity Centre", description: `Provides security guidance for technology in ${countryName}`, priority: "high" },
+        { name: "Financial Conduct Authority", description: `Regulates financial technology services in ${countryName}`, priority: "medium" },
+        { name: "Consumer Electronics Safety Board", description: `Ensures safety of consumer electronics in ${countryName}`, priority: "low" },
+        { name: "Technology Standards Institution", description: `Sets technical standards in ${countryName}`, priority: "low" }
       ]
     },
     general: {
@@ -144,9 +158,16 @@ function generateFallbackBrandIdentity(name: string, industry = 'general', count
       guardrails: `- Maintain transparency in all communications\n- Avoid making exaggerated or unsubstantiated claims\n- Use inclusive language that respects diversity\n- Don't disparage competitors\n- Ensure all claims are accurate and can be verified`,
       brandColor: "#607D8B", // Blue grey
       agencies: [
-        { name: "Advertising Standards Authority", description: "Regulates advertising across all media", priority: "high" },
-        { name: "Trading Standards", description: "Enforces consumer protection regulations", priority: "medium" },
-        { name: "Competition and Markets Authority", description: "Promotes competition and prevents anti-competitive activities", priority: "medium" }
+        { name: "Advertising Standards Authority", description: `Regulates advertising across all media in ${countryName}`, priority: "high" },
+        { name: "Trading Standards", description: `Enforces consumer protection regulations in ${countryName}`, priority: "medium" },
+        { name: "Competition and Markets Authority", description: `Promotes competition in ${countryName}`, priority: "medium" },
+        { name: "Data Protection Authority", description: `Enforces data protection laws in ${countryName}`, priority: "high" },
+        { name: "Consumer Rights Association", description: `Protects consumer rights in ${countryName}`, priority: "medium" },
+        { name: "Industry Regulatory Board", description: `Sets standards for industry practices in ${countryName}`, priority: "medium" },
+        { name: "Quality Assurance Institute", description: `Certifies product and service quality in ${countryName}`, priority: "low" },
+        { name: "Fair Trading Commission", description: `Ensures fair business practices in ${countryName}`, priority: "medium" },
+        { name: "Environmental Standards Agency", description: `Regulates environmental claims in ${countryName}`, priority: "low" },
+        { name: "Standards and Compliance Board", description: `Monitors compliance with regulations in ${countryName}`, priority: "medium" }
       ]
     }
   };
@@ -310,19 +331,19 @@ ${contents.map((content, i) => `URL ${i+1}: ${validUrls[i]}\n${content.substring
 
 The brand operates in ${countryName} and communicates in ${language}.
 
-IMPORTANT: Generate ALL content in the "${language}" language. The entire response must be written in this language.
+IMPORTANT: Generate ALL content in the "${language}" language. The entire response must be written in this language, appropriate for the market in ${countryName}.
 
 Please provide the following elements:
 
-1. BRAND IDENTITY: A detailed paragraph describing the brand's personality, values, and mission. (100-150 words)
+1. BRAND IDENTITY: A detailed paragraph describing the brand's personality, values, and mission as they would be perceived in ${countryName}. (100-150 words)
 
-2. TONE OF VOICE: A description of how the brand communicates - formal/casual, technical/accessible, etc. (50-75 words)
+2. TONE OF VOICE: A description of how the brand communicates in ${language} - formal/casual, technical/accessible, etc. Consider cultural norms and communication styles in ${countryName}. (50-75 words)
 
-3. CONTENT GUARDRAILS: 5 specific guidelines that content creators must follow when creating content for this brand. Format as bullet points.
+3. CONTENT GUARDRAILS: 5 specific guidelines that content creators must follow when creating content for this brand in ${countryName}. Format as bullet points.
 
-4. SUGGESTED AGENCIES: 3-5 regulatory bodies or vetting agencies relevant to this brand in ${countryName}. For each agency, include their name, a brief description, and priority level (high/medium/low).
+4. SUGGESTED AGENCIES: 10 regulatory bodies or vetting agencies relevant to this brand in ${countryName}. Include a mix of general and industry-specific organizations. For each agency, include their name, a brief description, and priority level (high/medium/low).
 
-5. BRAND COLOR: Suggest a primary brand color in hex format (e.g., #FF5733).
+5. BRAND COLOR: Suggest a primary brand color in hex format (e.g., #FF5733) that would resonate well with consumers in ${countryName}.
 
 Format your response as a structured JSON object with these keys: brandIdentity, toneOfVoice, guardrails, suggestedAgencies (as an array of objects with name, description, and priority), and brandColor.`;
     
