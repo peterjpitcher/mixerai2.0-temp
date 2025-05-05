@@ -12,16 +12,19 @@ import { useToast } from "@/components/toast-provider";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/select";
 import { COUNTRIES, LANGUAGES } from "@/lib/constants";
-import { AlertCircle, Loader2, Info, ArrowLeft } from "lucide-react";
+import { AlertCircle, Loader2, Info, ArrowLeft, Check, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/dialog";
 import { VETTING_AGENCIES_BY_COUNTRY } from '@/lib/azure/openai';
 import { Badge } from "@/components/badge";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import TwoColumnLayout from "@/components/layout/two-column-layout";
 
 interface BrandFormData {
   name: string;
   website_url: string;
+  website_urls?: string;
   country: string;
   language: string;
   brand_identity: string;
@@ -30,6 +33,7 @@ interface BrandFormData {
   content_vetting_agencies: string;
   brand_color: string;
   approved_content_types: string[];
+  user_added_agencies?: string;
 }
 
 interface ContentType {
@@ -66,6 +70,13 @@ export default function NewBrandPage() {
 
   // Get vetting agencies based on selected country
   const [vettingAgencies, setVettingAgencies] = useState<any[]>([]);
+  
+  // State for custom agency dialog
+  const [showAddAgencyDialog, setShowAddAgencyDialog] = useState(false);
+  const [customAgencyName, setCustomAgencyName] = useState('');
+  const [customAgencyDescription, setCustomAgencyDescription] = useState('');
+  const [customAgencyPriority, setCustomAgencyPriority] = useState('medium');
+  const [userAddedAgencies, setUserAddedAgencies] = useState<any[]>([]);
   
   // Fetch content types on page load
   useEffect(() => {
@@ -181,6 +192,49 @@ export default function NewBrandPage() {
       a.name === agency.name ? { ...a, priority } : a
     );
     setVettingAgencies(updatedAgencies);
+  };
+
+  // Handle adding custom agency
+  const handleAddCustomAgency = () => {
+    if (!customAgencyName.trim()) return;
+    
+    const newAgency = {
+      name: customAgencyName.trim(),
+      description: customAgencyDescription.trim(),
+      priority: customAgencyPriority
+    };
+    
+    setUserAddedAgencies(prev => [...prev, newAgency]);
+    setSelectedAgencies(prev => [...prev, newAgency.name]);
+    
+    // Update content_vetting_agencies field
+    setFormData(prev => ({
+      ...prev,
+      content_vetting_agencies: [...selectedAgencies, newAgency.name].join(', ')
+    }));
+    
+    // Reset form
+    setCustomAgencyName('');
+    setCustomAgencyDescription('');
+    setCustomAgencyPriority('medium');
+    setShowAddAgencyDialog(false);
+  };
+
+  // Handle removing custom agency
+  const handleRemoveCustomAgency = (index: number) => {
+    const agencyToRemove = userAddedAgencies[index];
+    
+    setUserAddedAgencies(prev => prev.filter((_, i) => i !== index));
+    setSelectedAgencies(prev => prev.filter(name => name !== agencyToRemove.name));
+    
+    // Update content_vetting_agencies field
+    setFormData(prev => {
+      const updatedAgencies = selectedAgencies.filter(name => name !== agencyToRemove.name);
+      return {
+        ...prev,
+        content_vetting_agencies: updatedAgencies.join(', ')
+      };
+    });
   };
 
   // Validate URLs
@@ -459,6 +513,14 @@ export default function NewBrandPage() {
             console.log("Failed to parse guardrails as JSON array in form submission");
           }
         }
+      }
+      
+      // Add website URLs and user-added agencies
+      submissionData.website_urls = urlsInput.trim();
+      
+      // Store user-added agencies as JSON if we have any
+      if (userAddedAgencies.length > 0) {
+        submissionData.user_added_agencies = JSON.stringify(userAddedAgencies);
       }
       
       const response = await fetch('/api/brands', {
@@ -862,18 +924,26 @@ export default function NewBrandPage() {
                     <div>
                       <div className="flex justify-between items-center">
                         <Label>Content Vetting Agencies</Label>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setShowAddAgencyDialog(true)}
+                          className="h-8 text-xs"
+                        >
+                          Add Custom Agency
+                        </Button>
                       </div>
                       <p className="text-xs text-muted-foreground mb-4">
                         These are official bodies that generated content should be vetted against to ensure it's true, accurate, 
                         and safe. Agencies are specific to the brand's country of operation and are prioritised by importance.
                       </p>
                       
-                      {vettingAgencies.length === 0 ? (
+                      {vettingAgencies.length === 0 && userAddedAgencies.length === 0 ? (
                         <div className="text-sm text-muted-foreground p-4 border rounded-md">
                           {formData.country ? (
-                            <>No suggested agencies available for {COUNTRIES.find(c => c.value === formData.country)?.label}. Please select a different country.</>
+                            <>No suggested agencies available for {COUNTRIES.find(c => c.value === formData.country)?.label}. Please select a different country or add a custom agency.</>
                           ) : (
-                            <>Select a country to see suggested vetting agencies.</>
+                            <>Select a country to see suggested vetting agencies or add custom agencies.</>
                           )}
                         </div>
                       ) : (
@@ -886,7 +956,7 @@ export default function NewBrandPage() {
                           <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
                             {vettingAgencies.map((agency, index) => (
                               <div 
-                                key={index} 
+                                key={`standard-${index}`} 
                                 className="flex items-start space-x-2 p-2 rounded-md border hover:bg-muted/50"
                               >
                                 <Checkbox 
@@ -933,6 +1003,66 @@ export default function NewBrandPage() {
                                 </Select>
                               </div>
                             ))}
+                            
+                            {/* User-added agencies */}
+                            {userAddedAgencies.map((agency, index) => (
+                              <div 
+                                key={`custom-${index}`}
+                                className="flex items-start space-x-2 p-2 rounded-md border bg-muted/20 hover:bg-muted/50"
+                              >
+                                <Checkbox 
+                                  checked={selectedAgencies.includes(agency.name)}
+                                  onCheckedChange={(checked) => 
+                                    handleAgencyCheckboxChange(!!checked, agency)
+                                  }
+                                />
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium">{agency.name}</span>
+                                    <Badge variant="secondary" className="text-xs">Custom</Badge>
+                                    {agency.priority === 'high' ? (
+                                      <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">High</Badge>
+                                    ) : agency.priority === 'medium' ? (
+                                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Medium</Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Low</Badge>
+                                    )}
+                                  </div>
+                                  {agency.description && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {agency.description}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex space-x-1">
+                                  <Select 
+                                    value={agency.priority}
+                                    onValueChange={(value) => {
+                                      setUserAddedAgencies(prev => 
+                                        prev.map((a, i) => i === index ? {...a, priority: value} : a)
+                                      );
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-7 w-24">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="high">High</SelectItem>
+                                      <SelectItem value="medium">Medium</SelectItem>
+                                      <SelectItem value="low">Low</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleRemoveCustomAgency(index)}
+                                    className="h-7 w-7"
+                                  >
+                                    <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}
@@ -959,6 +1089,66 @@ export default function NewBrandPage() {
               </Button>
             </CardFooter>
           </Card>
+          
+          {/* Custom Agency Dialog */}
+          <Dialog open={showAddAgencyDialog} onOpenChange={setShowAddAgencyDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Custom Agency</DialogTitle>
+                <DialogDescription>
+                  Add a custom content vetting agency that's specific to your brand's needs.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="custom-agency-name">Agency Name <span className="text-destructive">*</span></Label>
+                  <Input
+                    id="custom-agency-name"
+                    value={customAgencyName}
+                    onChange={(e) => setCustomAgencyName(e.target.value)}
+                    placeholder="e.g. Food Safety Authority"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="custom-agency-description">Description</Label>
+                  <Textarea
+                    id="custom-agency-description"
+                    value={customAgencyDescription}
+                    onChange={(e) => setCustomAgencyDescription(e.target.value)}
+                    placeholder="Describe the agency's role and relevance to your brand"
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="custom-agency-priority">Priority</Label>
+                  <Select
+                    value={customAgencyPriority}
+                    onValueChange={setCustomAgencyPriority}
+                  >
+                    <SelectTrigger id="custom-agency-priority">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAddAgencyDialog(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleAddCustomAgency}
+                  disabled={!customAgencyName.trim()}
+                >
+                  Add Agency
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
       </Tabs>
     </div>
