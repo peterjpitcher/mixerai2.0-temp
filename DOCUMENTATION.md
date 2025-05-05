@@ -776,3 +776,23 @@ The system supports all languages available in the LANGUAGES constant, including
 - And many more
 
 The language selection is directly tied to the brand's language setting in the basic details tab.
+
+## UI Consistency Between Brand Pages
+
+We've ensured consistency between the brand creation and editing experiences:
+
+### Standardized Layout
+- Both `/brands/new` and `/brands/[id]/edit` pages now share identical layouts
+- The same two-tab interface (Basic Details and Brand Identity)
+- Consistent two-column layout in the Brand Identity tab
+
+### Custom Agency Support
+- Both pages now support adding, editing, and removing custom regulatory agencies
+- Custom agencies include name, description, and priority settings
+- Visual distinction between standard and custom agencies
+
+### Error Handling Improvements
+- Consistent handling of different response formats from the API
+- Better fallback content generation with appropriate user notifications
+- Clear validation messages for URL inputs
+- Type-safe handling of guardrails content (array vs string)

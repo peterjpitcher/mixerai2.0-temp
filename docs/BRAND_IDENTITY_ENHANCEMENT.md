@@ -39,6 +39,16 @@ Ensured consistent UI between brand creation and brand editing:
 - Consistent agency selection interface
 - Visual indication of fallback content generation
 
+### 4. Custom Agency Support
+
+Both the new and edit brand pages now support custom agencies:
+
+- Users can add their own custom vetting agencies
+- Custom agencies include name, description, and priority level
+- Custom agencies are visually distinguished from standard agencies
+- Custom agencies are stored in the database as JSON in a dedicated field
+- Support for removing custom agencies
+
 ## Technical Implementation
 
 ### API Endpoint
