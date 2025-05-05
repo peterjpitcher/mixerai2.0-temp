@@ -329,40 +329,51 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       console.log("Response data:", result);
       
       if (result.success && result.data) {
-        // Update the brand with all the generated information
-        setBrand(prev => ({
-          ...prev,
+        console.log("Brand identity generation successful. Raw data:", result.data);
+        console.log("Brand color received:", result.data.brandColor);
+        console.log("Vetting agencies received:", result.data.vettingAgencies);
+        
+        // First update brand state with all basic fields
+        const updatedBrand = {
+          ...brand,
           brand_identity: result.data.brandIdentity || "",
           tone_of_voice: result.data.toneOfVoice || "",
           guardrails: result.data.guardrails || "",
-        }));
+          brand_color: result.data.brandColor || "#3498db" // Set brand color with fallback
+        };
         
         // Handle vetting agencies if provided
-        if (result.data.vettingAgencies && result.data.vettingAgencies.length > 0) {
-          // Update vetting agencies list
+        if (result.data.vettingAgencies && Array.isArray(result.data.vettingAgencies) && result.data.vettingAgencies.length > 0) {
+          // Process all vetting agencies for display
           const customAgencies = result.data.vettingAgencies.map((agency: any) => ({
             name: agency.name,
             description: agency.description,
             priority: agency.priority || "medium"
           }));
           
+          console.log("Processed vetting agencies:", customAgencies);
           setVettingAgencies(customAgencies);
           
-          // Select only high priority agencies by default
+          // Select high priority agencies
           const highPriorityAgencies = customAgencies
             .filter((agency: any) => agency.priority === "high")
             .map((agency: any) => agency.name);
           
+          console.log("Selected high priority agencies:", highPriorityAgencies);
+          
+          // Update selectedAgencies state
           setSelectedAgencies(highPriorityAgencies);
           
-          // Update the brand's content_vetting_agencies field
+          // Update the brand's content_vetting_agencies field with the agency names
           if (highPriorityAgencies.length > 0) {
-            setBrand(prev => ({
-              ...prev,
-              content_vetting_agencies: highPriorityAgencies.join(', ')
-            }));
+            updatedBrand.content_vetting_agencies = highPriorityAgencies.join(', ');
+            console.log("Set content_vetting_agencies to:", updatedBrand.content_vetting_agencies);
           }
         }
+        
+        // Do a single state update with all changes at once
+        console.log("Final updated brand state:", updatedBrand);
+        setBrand(updatedBrand);
         
         // Show success notification
         toast({
@@ -749,6 +760,53 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                       value={brand.brand_identity}
                       onChange={handleInputChange}
                     />
+                  </div>
+                  
+                  {/* Debug area */}
+                  <div className="p-2 my-2 bg-gray-100 rounded-md border border-gray-200 text-xs">
+                    <p><strong>Debug Info:</strong></p>
+                    <p>Brand Color: {brand.brand_color || 'Not set'}</p>
+                    <p>Selected Agencies: {selectedAgencies.length > 0 ? selectedAgencies.join(', ') : 'None selected'}</p>
+                    <p>Agencies String: {brand.content_vetting_agencies || 'Empty'}</p>
+                    <p>Vetting Agencies Count: {vettingAgencies.length}</p>
+                    <p>Country: {brand.country || 'Not set'}</p>
+                    <div className="mt-1 flex gap-2 flex-wrap">
+                      <button 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          console.log('Current brand state:', brand);
+                          console.log('Selected agencies:', selectedAgencies);
+                          console.log('Vetting agencies:', vettingAgencies);
+                        }}
+                        className="text-blue-600 underline"
+                      >
+                        Log State to Console
+                      </button>
+                      <a 
+                        href="/test-brand-identity" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-green-600 underline"
+                      >
+                        Open Test Tool
+                      </a>
+                      <a 
+                        href="/api/test-brand-identity" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-purple-600 underline"
+                      >
+                        Check API Mapping
+                      </a>
+                      <a 
+                        href="https://github.com/peterjpitcher/mixerai2.0/blob/main/docs/BRAND_IDENTITY_UI_FIX.md" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-orange-600 underline"
+                      >
+                        Read Documentation
+                      </a>
+                    </div>
                   </div>
                   
                   <div className="space-y-2">

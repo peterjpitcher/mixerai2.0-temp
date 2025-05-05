@@ -87,4 +87,29 @@ Workflows define how content is created and approved for each brand and content 
 
 ## License
 
-This project is licensed under the MIT License 
+This project is licensed under the MIT License
+
+## OpenAI Testing Tools
+
+MixerAI 2.0 includes a comprehensive set of tools for testing and debugging the Azure OpenAI integration.
+
+### Testing Page
+
+Access the testing tools at `/openai-test` in your running application. The testing page includes:
+
+- Brand identity generation testing
+- Content generation testing
+- Direct API testing
+- Environment configuration display
+- System status monitoring
+
+### Features
+
+- Detect whether content is truly AI-generated or using templates
+- Test various API endpoints directly
+- View detailed error information and response times
+- Configure and test with different parameters
+
+### Documentation
+
+For detailed information on using the OpenAI testing tools, see [OPENAI_TESTING_TOOLS.md](docs/OPENAI_TESTING_TOOLS.md) in the docs directory. 

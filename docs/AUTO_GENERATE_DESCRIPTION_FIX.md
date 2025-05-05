@@ -129,3 +129,62 @@ If the fix doesn't resolve all issues, users can:
 ## Related Improvements
 
 We also fixed TypeScript errors in the `/api/test-azure-openai` endpoint to ensure proper type safety for the API testing function. 
+
+# Brand Identity Generation Fix
+
+## Issue Summary
+
+When using the "Generate Brand Identity" button on the brand edit page, the system was installing boilerplate content rather than generating unique content with AI. The specific issues were:
+
+1. The system couldn't connect to Azure OpenAI service due to a non-existent deployment name
+2. Debug logging was insufficient to diagnose the exact problem
+3. There was no explicit fallback mode that could be enabled for testing
+
+## Investigation Findings
+
+After investigating the issue, we found:
+
+1. The environment variables were correctly set in `.env`, but the deployment name "gpt-4o" doesn't exist in the Azure OpenAI resource
+2. The fallback generation was being triggered, but the issue wasn't clearly logged
+3. The code was configured to require additional debug information
+
+## Solution Implemented
+
+1. Added comprehensive logging to `src/lib/azure/openai.ts` to better diagnose connection issues
+2. Improved error handling throughout the AI generation pipeline
+3. Added a special `USE_LOCAL_GENERATION=true` mode that can be enabled for testing
+4. Created a test API endpoint at `/api/env-check` to verify environment variables
+5. Created a diagnostic script at `scripts/test-azure-openai.js` to test the Azure OpenAI connection
+6. Created a utility script `scripts/force-local-generation.js` to enable/disable local generation mode
+
+## Using the Solution
+
+### For Testing with Local Generation
+
+To test brand identity generation with local templates:
+
+```bash
+node scripts/force-local-generation.js enable
+# Restart your Next.js server
+```
+
+This will ensure the system uses the local generation templates regardless of Azure OpenAI configuration.
+
+### For Production with Azure OpenAI
+
+To use Azure OpenAI for generation:
+
+1. Verify available deployments in your Azure OpenAI resource
+2. Update the `.env` file with the correct deployment name:
+   ```
+   AZURE_OPENAI_DEPLOYMENT=your-actual-deployment-name
+   ```
+3. Disable local generation mode:
+   ```bash
+   node scripts/force-local-generation.js disable
+   ```
+4. Restart your Next.js server
+
+## Documentation
+
+See [AZURE_OPENAI_TROUBLESHOOTING.md](./AZURE_OPENAI_TROUBLESHOOTING.md) for comprehensive troubleshooting guidance related to Azure OpenAI integration. 

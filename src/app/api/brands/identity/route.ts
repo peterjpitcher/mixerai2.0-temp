@@ -74,19 +74,45 @@ export async function POST(req: NextRequest) {
     // Get brand identity
     const result = await generateBrandIdentityFromUrls(brandName, validUrls);
     
+    // Validate the result to ensure all fields are present
+    if (!result.brandIdentity) console.warn("Warning: Brand identity is missing or empty");
+    if (!result.toneOfVoice) console.warn("Warning: Tone of voice is missing or empty");
+    if (!result.guardrails) console.warn("Warning: Guardrails are missing or empty");
+    if (!result.brandColor) console.warn("Warning: Brand color is missing or empty");
+    
+    if (!result.suggestedAgencies || !Array.isArray(result.suggestedAgencies)) {
+      console.warn("Warning: Suggested agencies are missing or not an array");
+    } else if (result.suggestedAgencies.length === 0) {
+      console.warn("Warning: Suggested agencies array is empty");
+    }
+    
+    // Log the full response for debugging
+    console.log("Final brand identity result:", {
+      brandIdentity: result.brandIdentity?.substring(0, 50) + "...",
+      toneOfVoice: result.toneOfVoice?.substring(0, 50) + "...",
+      guardrails: result.guardrails?.substring(0, 50) + "...",
+      suggestedAgenciesCount: result.suggestedAgencies?.length || 0,
+      brandColor: result.brandColor
+    });
+    
     return NextResponse.json({
       success: true,
       data: {
-        brandIdentity: result.brandIdentity,
-        toneOfVoice: result.toneOfVoice,
-        guardrails: result.guardrails,
-        vettingAgencies: result.suggestedAgencies
+        brandIdentity: result.brandIdentity || "",
+        toneOfVoice: result.toneOfVoice || "",
+        guardrails: result.guardrails || "",
+        vettingAgencies: result.suggestedAgencies || [],
+        brandColor: result.brandColor || "#3498db" // Provide a default color if missing
       }
     });
-  } catch (error) {
-    console.error("Error in brand identity API:", error);
+  } catch (error: any) {
+    console.error('Error generating brand identity:', error);
     return NextResponse.json(
-      { success: false, error: "Failed to generate brand identity" },
+      { 
+        success: false, 
+        error: 'Failed to generate brand identity',
+        message: error.message || 'Unknown error occurred'
+      },
       { status: 500 }
     );
   }

@@ -28,6 +28,40 @@ The application can use two database connection methods:
      - `POSTGRES_PASSWORD`
      - `POSTGRES_DB`
 
+## External Service Integration
+
+### Azure OpenAI Integration
+
+The application uses Azure OpenAI for AI-powered features:
+
+1. **Configuration**
+   - Primary connection uses Azure OpenAI service
+     - `AZURE_OPENAI_API_KEY`
+     - `AZURE_OPENAI_ENDPOINT`
+     - `AZURE_OPENAI_DEPLOYMENT_NAME`
+   - Fallback to standard OpenAI API when Azure not available
+     - `OPENAI_API_KEY`
+     - `OPENAI_MODEL_NAME`
+
+2. **Client Initialization**
+   - Client setup in [src/lib/azure/openai.ts](mdc:mixerai-2.0/src/lib/azure/openai.ts)
+   - Automatically detects and uses available credentials
+   - Falls back to templates when no credentials available
+
+3. **Error Handling**
+   - All API calls should use try/catch blocks
+   - Template-based fallback generation should be used when API fails
+   - Clearly indicate to users when fallback content is used
+   - Log errors for debugging purposes
+
+4. **Rate Limiting**
+   - API routes implement basic in-memory rate limiting
+   - Provides user-friendly messages when limits are exceeded
+
+5. **Testing**
+   - `scripts/test-azure-openai.js` can be used to verify connectivity
+   - Environment variable `FORCE_OPENAI_FALLBACK=true` to test fallback paths
+
 ## API Routes for Data Access
 
 The application uses Next.js API routes to manage data access:

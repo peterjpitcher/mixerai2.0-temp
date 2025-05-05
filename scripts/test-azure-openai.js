@@ -1,84 +1,80 @@
-// Test Azure OpenAI connection directly
+// Simple script to test Azure OpenAI connection
 require('dotenv').config();
-
-// Use native fetch if available (Node.js 18+), otherwise use node-fetch
-let fetch;
-if (typeof global.fetch === 'function') {
-  fetch = global.fetch;
-} else {
-  fetch = require('node-fetch');
-}
+const { OpenAI } = require('openai');
 
 async function testAzureOpenAI() {
-  console.log('Testing Azure OpenAI connection...');
+  console.log('=== Azure OpenAI Connection Test ===');
+  console.log('Environment variables:');
+  console.log('- NODE_ENV:', process.env.NODE_ENV || 'undefined');
+  console.log('- AZURE_OPENAI_API_KEY exists:', !!process.env.AZURE_OPENAI_API_KEY);
+  console.log('- AZURE_OPENAI_API_KEY length:', process.env.AZURE_OPENAI_API_KEY?.length);
+  console.log('- AZURE_OPENAI_ENDPOINT exists:', !!process.env.AZURE_OPENAI_ENDPOINT);
+  console.log('- AZURE_OPENAI_ENDPOINT value:', process.env.AZURE_OPENAI_ENDPOINT);
+  console.log('- AZURE_OPENAI_DEPLOYMENT:', process.env.AZURE_OPENAI_DEPLOYMENT || 'Not set (will use gpt-4o)');
   
-  // Check for required environment variables
-  const apiKey = process.env.AZURE_OPENAI_API_KEY;
-  const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
-  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT;
-  
-  console.log('\nEnvironment Configuration:');
-  console.log(`API Key: ${apiKey ? '✓ Set' : '✗ Missing'}`);
-  console.log(`Endpoint: ${endpoint ? '✓ Set' : '✗ Missing'} (${endpoint || 'undefined'})`);
-  console.log(`Deployment: ${deployment ? '✓ Set' : '✗ Missing'} (${deployment || 'undefined'})`);
-  
-  if (!apiKey || !endpoint || !deployment) {
-    console.error('\n❌ Error: Missing required environment variables');
-    console.log('Make sure AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, and AZURE_OPENAI_DEPLOYMENT are set in your .env file');
-    process.exit(1);
+  if (!process.env.AZURE_OPENAI_API_KEY || !process.env.AZURE_OPENAI_ENDPOINT) {
+    console.error('\nMissing required environment variables. Please check your .env file.');
+    return;
   }
   
+  console.log('\nTrying to initialize OpenAI client...');
+  let client;
+  
   try {
-    // Construct the Azure OpenAI endpoint URL
-    const apiUrl = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=2023-05-15`;
-    console.log(`\nAPI URL: ${apiUrl}`);
+    client = new OpenAI({
+      apiKey: process.env.AZURE_OPENAI_API_KEY,
+      baseURL: `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments`,
+      defaultQuery: { "api-version": "2023-09-01-preview" },
+      defaultHeaders: { "api-key": process.env.AZURE_OPENAI_API_KEY }
+    });
+    console.log('Client initialized successfully.');
+  } catch (initError) {
+    console.error('\nFailed to initialize OpenAI client:', initError.message);
+    return;
+  }
+  
+  console.log('\nTrying to make a simple API call...');
+  
+  try {
+    const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o";
+    console.log(`Using deployment: ${deployment}`);
     
-    // Make a request to Azure OpenAI
-    console.log('\nSending test request to Azure OpenAI...');
-    
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': apiKey
-      },
-      body: JSON.stringify({
-        messages: [
-          { role: "system", content: "You are a helpful assistant." },
-          { role: "user", content: "Say hello world" }
-        ],
-        max_tokens: 50,
-        temperature: 0.7
-      })
+    const completion = await client.chat.completions.create({
+      model: deployment,
+      messages: [
+        { role: "system", content: "You are a helpful assistant." },
+        { role: "user", content: "Say hello world in JSON format" }
+      ]
     });
     
-    // Check response status
-    console.log(`Response status: ${response.status} ${response.statusText}`);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`\n❌ Error: Azure OpenAI API returned ${response.status}`);
-      console.error('Response:', errorText);
-      process.exit(1);
-    }
-    
-    // Parse response
-    const data = await response.json();
-    console.log('\nResponse data:');
-    console.log(JSON.stringify(data, null, 2));
-    
-    const generatedText = data.choices?.[0]?.message?.content;
-    
-    if (generatedText) {
-      console.log(`\n✅ Success! Generated text: "${generatedText}"`);
-    } else {
-      console.log('\n⚠️ Warning: No generated text in the response');
-    }
-    
+    console.log("\nAPI call result:", completion.choices[0]?.message?.content);
+    console.log("\nConnection test successful! The Azure OpenAI service is working properly.");
   } catch (error) {
-    console.error('\n❌ Error connecting to Azure OpenAI:');
-    console.error(error);
-    process.exit(1);
+    console.error(`\nError testing Azure OpenAI connection:\n${error.message}`);
+    
+    // Try with a fallback deployment name if the issue is about deployment not existing
+    if (error.message && error.message.includes("API deployment for this resource does not exist")) {
+      console.log("\nTrying with fallback deployment 'gpt-35-turbo'...");
+      
+      try {
+        const fallbackCompletion = await client.chat.completions.create({
+          model: "gpt-35-turbo",
+          messages: [
+            { role: "system", content: "You are a helpful assistant." },
+            { role: "user", content: "Say hello world in JSON format" }
+          ]
+        });
+        
+        console.log("\nFallback API call result:", fallbackCompletion.choices[0]?.message?.content);
+        console.log("\nConnection test with fallback deployment successful!");
+        console.log("\nImportant: Please update AZURE_OPENAI_DEPLOYMENT in your .env file to 'gpt-35-turbo' to avoid this error in the future.");
+      } catch (fallbackError) {
+        console.error(`\nFallback model also failed: ${fallbackError.message}`);
+        console.log("\nConnection test failed. Please verify your Azure OpenAI resource has available deployments.");
+      }
+    } else {
+      console.log("\nConnection test failed. Please fix the configuration and try again.");
+    }
   }
 }
 

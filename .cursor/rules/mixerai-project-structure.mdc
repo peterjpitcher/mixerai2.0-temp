@@ -56,6 +56,28 @@ MixerAI 2.0a/
 - Shared utilities live in `src/lib/`, structured by concern (`auth/`, `azure/`, etc.)
 - Do not reintroduce `ui/`, `mixerai-2.0/`, or duplicate `src/` folders.
 
+## 🛡️ Error Prevention Practices
+
+- **Null/Undefined Checks**: Always validate data before using string methods or object properties
+  - Use optional chaining (`?.`) for nested object access
+  - Check if strings exist before calling methods like `.trim()`, `.includes()`, etc.
+  - Example: `if (value && typeof value === 'string' && value.trim() !== '')`
+
+- **Fallback Values**: Provide sensible defaults when data might be missing
+  - Use nullish coalescing operator (`??`) or OR operator (`||`) with defaults
+  - Example: `const color = data.brandColor || "#3498db"` // Default blue
+
+- **Defensive UI Components**: Design components that can handle missing data gracefully
+  - Include loading states for async operations
+  - Show appropriate feedback when data is unavailable
+  - Use placeholders and fallback content when needed
+
+- **Type Guards**: Use TypeScript type guards to ensure type safety
+  - Example: `if (Array.isArray(data.items)) { /* safe to use array methods */ }`
+  - Consider using `instanceof` for Error objects: `if (error instanceof Error)`
+
+These practices help maintain application stability even when facing unexpected data or API failures.
+
 ## ▶️ Running the App
 
 Run all commands from the **project root directory**.

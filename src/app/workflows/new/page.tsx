@@ -12,14 +12,17 @@ import { Label } from '@/components/label';
 import { Checkbox } from '@/components/checkbox';
 import { useToast } from '@/components/toast-provider';
 import { BrandIcon } from '@/components/brand-icon';
-import { PlusIcon, Trash2Icon, XIcon, ChevronUpIcon, ChevronDownIcon, Users } from 'lucide-react';
+import { PlusIcon, Trash2Icon, XIcon, ChevronUpIcon, ChevronDownIcon, Users, Wand2Icon } from 'lucide-react';
 import { Badge } from '@/components/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/tooltip';
 
 interface Brand {
   id: string;
   name: string;
   brand_color?: string;
   approved_content_types?: string[];
+  language?: string;
+  country?: string;
 }
 
 interface ContentType {
@@ -53,7 +56,8 @@ const roleDescriptions = {
   editor: "General content editor responsible for content quality",
   legal: "Legal reviewer who ensures content compliance with regulations",
   brand: "Brand reviewer who ensures content aligns with brand standards",
-  seo: "SEO specialist who optimizes content for search engines"
+  seo: "SEO specialist who optimizes content for search engines",
+  culinary: "Culinary expert who reviews food content for safety and correctness"
 };
 
 export default function CreateWorkflowPage() {
@@ -66,6 +70,7 @@ export default function CreateWorkflowPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [newAssigneeEmail, setNewAssigneeEmail] = useState<{[key: number]: string}>({});
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState<{[key: number]: boolean}>({});
   
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -568,9 +573,186 @@ export default function CreateWorkflowPage() {
                     </div>
                     
                     <div className="mb-6">
-                      <Label htmlFor={`step-${index}-description`} className="text-base font-medium mb-2 block">
-                        Description
-                      </Label>
+                      <div className="flex justify-between items-center mb-2">
+                        <Label htmlFor={`step-${index}-description`} className="text-base font-medium">
+                          Description
+                        </Label>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs"
+                                disabled={isGeneratingDescription[index] || !step.name || !formData.brand_id}
+                                onClick={async () => {
+                                  try {
+                                    if (!step.name) {
+                                      toast({
+                                        title: 'Step Name Required',
+                                        description: 'Please enter a name for this step first.',
+                                        variant: 'destructive'
+                                      });
+                                      return;
+                                    }
+                                    
+                                    if (!formData.brand_id) {
+                                      toast({
+                                        title: 'Brand Selection Required',
+                                        description: 'Please select a brand first to generate an appropriate description.',
+                                        variant: 'destructive'
+                                      });
+                                      return;
+                                    }
+                                    
+                                    // Set loading state
+                                    setIsGeneratingDescription(prev => ({
+                                      ...prev,
+                                      [index]: true
+                                    }));
+                                    
+                                    // First, check if Azure OpenAI is configured properly
+                                    const testResponse = await fetch('/api/test-azure-openai', {
+                                      // Add cache: 'no-store' to prevent caching which might cause refreshes
+                                      cache: 'no-store',
+                                      // Add next.js specific cache options
+                                      next: { revalidate: 0 }
+                                    });
+                                    
+                                    if (!testResponse.ok) {
+                                      const testData = await testResponse.json();
+                                      console.error('Azure OpenAI configuration error:', testData);
+                                      toast({
+                                        title: 'Azure OpenAI Configuration Error',
+                                        description: testData.error || 'Azure OpenAI is not properly configured. Please check your environment variables.',
+                                        variant: 'destructive'
+                                      });
+                                      setIsGeneratingDescription(prev => ({
+                                        ...prev,
+                                        [index]: false
+                                      }));
+                                      return;
+                                    }
+                                    
+                                    // Get other steps for context
+                                    const otherSteps = formData.steps.filter((_, i) => i !== index);
+                                    console.log('Generating description for step:', step.name);
+                                    
+                                    // Get brand info for language/country context
+                                    const selectedBrand = brands.find(brand => brand.id === formData.brand_id);
+                                    const brandContext = selectedBrand 
+                                      ? { 
+                                          name: selectedBrand.name,
+                                          language: selectedBrand.language || 'English',
+                                          country: selectedBrand.country || 'Global'
+                                        }
+                                      : undefined;
+                                    
+                                    // Call the API
+                                    try {
+                                      const response = await fetch('/api/workflows/generate-description', {
+                                        method: 'POST',
+                                        headers: {
+                                          'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify({
+                                          type: 'generate',
+                                          stepName: step.name,
+                                          otherSteps: otherSteps.map(s => ({ name: s.name, description: s.description })),
+                                          brandContext
+                                        }),
+                                        // Prevent caching to avoid refreshes
+                                        cache: 'no-store',
+                                        // Add next.js specific cache options
+                                        next: { revalidate: 0 }
+                                      });
+                                      
+                                      const responseText = await response.text();
+                                      let data;
+                                      
+                                      try {
+                                        data = JSON.parse(responseText);
+                                      } catch (parseError) {
+                                        console.error('Error parsing API response:', responseText);
+                                        throw new Error(`Invalid API response: ${responseText.substring(0, 100)}...`);
+                                      }
+                                      
+                                      if (!response.ok) {
+                                        console.error('Error response from API:', response.status, data);
+                                        throw new Error(`API error: ${response.status} ${data?.error || 'Unknown error'}`);
+                                      }
+                                      
+                                      console.log('API response:', data);
+                                      
+                                      if (data.success && data.description) {
+                                        // Clean the description by removing any wrapping quotes
+                                        const cleanDescription = data.description.replace(/^["']|["']$/g, '');
+                                        console.log('Generated description (cleaned):', cleanDescription);
+                                        
+                                        // Update the textarea directly first, before React state updates
+                                        try {
+                                          // Update main textarea
+                                          const textarea = document.getElementById(`step-${index}-description`) as HTMLTextAreaElement;
+                                          if (textarea) {
+                                            textarea.value = cleanDescription;
+                                            console.log('Updated main textarea directly');
+                                          }
+                                        } catch (domError) {
+                                          console.error('Error updating DOM directly:', domError);
+                                        }
+                                        
+                                        // Update the React state
+                                        handleStepChange(index, 'description', cleanDescription);
+                                        
+                                        toast({
+                                          title: 'Description Generated',
+                                          description: 'Step description has been auto-generated.'
+                                        });
+                                      } else {
+                                        throw new Error(data.error || 'Failed to generate description');
+                                      }
+                                    } catch (apiError) {
+                                      console.error('API call error:', apiError);
+                                      toast({
+                                        title: 'API Error',
+                                        description: apiError instanceof Error 
+                                          ? apiError.message 
+                                          : 'Failed to generate description. API communication error.',
+                                        variant: 'destructive'
+                                      });
+                                    }
+                                  } catch (error) {
+                                    console.error('Error generating description:', error);
+                                    toast({
+                                      title: 'Error',
+                                      description: error instanceof Error 
+                                        ? error.message 
+                                        : 'Failed to generate description. Please try again.',
+                                      variant: 'destructive'
+                                    });
+                                  } finally {
+                                    setIsGeneratingDescription(prev => ({
+                                      ...prev,
+                                      [index]: false
+                                    }));
+                                  }
+                                }}
+                              >
+                                {isGeneratingDescription[index] ? (
+                                  <div className="h-3 w-3 border-2 border-primary border-t-transparent rounded-full animate-spin mr-1" />
+                                ) : (
+                                  <Wand2Icon className="h-3.5 w-3.5 mr-1" />
+                                )}
+                                Auto-generate
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs">Generate a description for this step</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
                       <Textarea
                         id={`step-${index}-description`}
                         value={step.description}
@@ -686,6 +868,33 @@ export default function CreateWorkflowPage() {
                               </Label>
                               <p className="text-sm text-muted-foreground mt-1">
                                 {roleDescriptions.seo}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div 
+                          className={`border rounded-md p-3 cursor-pointer transition-colors ${
+                            step.role === 'culinary' ? 'bg-primary/10 border-primary' : 'bg-card hover:bg-accent'
+                          }`}
+                          onClick={() => handleStepChange(index, 'role', 'culinary')}
+                        >
+                          <div className="flex items-start gap-2">
+                            <Checkbox 
+                              id={`step-${index}-role-culinary`}
+                              checked={step.role === 'culinary'}
+                              onCheckedChange={() => handleStepChange(index, 'role', 'culinary')}
+                              className="mt-0.5"
+                            />
+                            <div>
+                              <Label 
+                                htmlFor={`step-${index}-role-culinary`}
+                                className="font-medium cursor-pointer"
+                              >
+                                Culinary
+                              </Label>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {roleDescriptions.culinary}
                               </p>
                             </div>
                           </div>

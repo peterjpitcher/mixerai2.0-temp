@@ -61,4 +61,21 @@ export async function GET() {
       diagnostics
     }, { status: 500 });
   }
+}
+
+export async function GET_ENV_VARS() {
+  const envVars = {
+    NODE_ENV: process.env.NODE_ENV,
+    AZURE_OPENAI_API_KEY_EXISTS: !!process.env.AZURE_OPENAI_API_KEY,
+    AZURE_OPENAI_API_KEY_FIRST_CHARS: process.env.AZURE_OPENAI_API_KEY ? process.env.AZURE_OPENAI_API_KEY.substring(0, 5) + '...' : null,
+    AZURE_OPENAI_ENDPOINT_EXISTS: !!process.env.AZURE_OPENAI_ENDPOINT,
+    AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT,
+    AZURE_OPENAI_DEPLOYMENT: process.env.AZURE_OPENAI_DEPLOYMENT || "Not set, will use default"
+  };
+
+  return NextResponse.json({ 
+    success: true, 
+    message: "Environment variable check", 
+    data: envVars 
+  });
 } 

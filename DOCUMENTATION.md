@@ -63,36 +63,11 @@ The `/api/users` route now:
 
 ## Azure OpenAI Integration
 
-The application integrates with Azure OpenAI to generate brand identity content and other marketing materials. The integration has been improved with the following enhancements:
+The MixerAI 2.0 application uses Azure OpenAI to generate brand identities, content, and other AI-powered features. The integration is managed through the `src/lib/azure/openai.ts` module.
 
-### Fixed Azure OpenAI Client Configuration
+### Required Environment Variables
 
-- Properly formats the Azure OpenAI endpoint URL to ensure it doesn't have trailing slashes
-- Uses the correct `model` parameter (not `deployment_id`) for API calls
-- Correctly constructs the API path for Azure OpenAI using the deployment name
-- Enhanced error handling with specific error messages for common issues
-
-### Testing and Diagnostics
-
-- Enhanced `/api/test-openai` endpoint for diagnosing Azure OpenAI connection issues
-- Improved error messages that provide specific troubleshooting guidance
-- Added detailed logging for Azure OpenAI API calls
-
-### Error Handling Improvements
-
-- Removed fallback generation to prevent using incorrect AI-generated content
-- Added specific error messages for different types of API failures
-- Created a troubleshooting guide at `docs/AZURE_OPENAI_TROUBLESHOOTING.md`
-
-### User Interface Enhancements
-
-- Brand creation and edit pages now display meaningful error messages
-- Added confirmation before overwriting existing brand identity data
-- Improved country-specific vetting agencies selection with checkboxes
-
-## Environment Configuration
-
-The application requires the following environment variables for Azure OpenAI:
+For Azure OpenAI integration to work correctly, you need to set up the following environment variables:
 
 ```
 AZURE_OPENAI_API_KEY=your_api_key
@@ -100,7 +75,19 @@ AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com
 AZURE_OPENAI_DEPLOYMENT=your_deployment_name
 ```
 
-All three variables must be set for the AI features to work properly. A diagnostic endpoint is available at `/api/test-openai` to verify your configuration.
+### Debugging and Troubleshooting
+
+If you encounter issues with the Azure OpenAI integration, you can use the following tools and resources:
+
+1. **Test Script**: Run `node scripts/test-azure-openai.js` to test your Azure OpenAI credentials directly.
+2. **Test API Endpoint**: Visit `http://localhost:3001/api/test-azure-openai` to test the integration through the API.
+3. **Documentation**: 
+   - `docs/AZURE_OPENAI_TROUBLESHOOTING.md` - Detailed troubleshooting guide
+   - `docs/AUTO_GENERATE_DESCRIPTION_FIX.md` - Fix for the brand identity generation issue
+
+### Fallback Content Generation
+
+When Azure OpenAI is not available or when an error occurs during API calls, the system falls back to using predefined templates based on industry detection from URLs. This ensures that the application can continue functioning even in the absence of a working AI connection.
 
 ## Brand Management
 
@@ -370,3 +357,24 @@ For more details, see [Auto-Generate Description Fix](docs/AUTO_GENERATE_DESCRIP
 We strengthened the Azure OpenAI integration with better error checking and TypeScript typing in the test endpoint. The test endpoint now provides more detailed diagnostic information when checking the Azure OpenAI configuration.
 
 For troubleshooting Azure OpenAI issues, refer to [Azure OpenAI Troubleshooting Guide](docs/AZURE_OPENAI_TROUBLESHOOTING.md). 
+
+## Testing and Debugging Tools
+
+### OpenAI Testing Tools
+
+MixerAI 2.0 includes a dedicated page for testing and debugging the Azure OpenAI integration at `/openai-test`. This page provides various tools to help developers:
+
+- Test brand identity generation
+- Test content generation
+- Test Azure OpenAI connectivity
+- View environment configuration
+- Detect whether content is truly AI-generated or uses fallback templates
+
+These tools are essential for diagnosing issues with AI content generation and verifying that Azure OpenAI is properly configured and working. For detailed information on using these tools, see [OPENAI_TESTING_TOOLS.md](docs/OPENAI_TESTING_TOOLS.md).
+
+Key features:
+- AI versus template detection through heuristic analysis
+- Timing information for performance monitoring
+- Raw API response inspection
+- Direct API testing for any endpoint
+- Environment configuration display 

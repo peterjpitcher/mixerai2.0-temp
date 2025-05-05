@@ -1,86 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server';
+import OpenAI from 'openai';
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    // Check for required environment variables
-    const apiKey = process.env.AZURE_OPENAI_API_KEY;
-    const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
-    const deployment = process.env.AZURE_OPENAI_DEPLOYMENT;
-    
-    const missingVars: string[] = [];
-    if (!apiKey) missingVars.push('AZURE_OPENAI_API_KEY');
-    if (!endpoint) missingVars.push('AZURE_OPENAI_ENDPOINT');
-    if (!deployment) missingVars.push('AZURE_OPENAI_DEPLOYMENT');
-    
-    if (missingVars.length > 0) {
+    const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
+    const azureApiKey = process.env.AZURE_OPENAI_API_KEY;
+    const azureDeployment = process.env.AZURE_OPENAI_DEPLOYMENT;
+    const azureApiVersion = process.env.AZURE_OPENAI_API_VERSION || '2023-05-15';
+
+    if (!azureEndpoint || !azureApiKey || !azureDeployment) {
       return NextResponse.json({
         success: false,
-        error: `Missing required environment variables: ${missingVars.join(', ')}`,
-        config: {
-          apiKey: apiKey ? '✓ Set' : '✗ Missing',
-          endpoint: endpoint ? '✓ Set' : '✗ Missing',
-          deployment: deployment ? '✓ Set' : '✗ Missing'
+        error: 'Azure OpenAI configuration is incomplete',
+        missingConfig: {
+          endpoint: !azureEndpoint,
+          apiKey: !azureApiKey,
+          deployment: !azureDeployment
         }
-      }, { status: 500 });
+      }, { status: 400 });
     }
+
+    // Configure Azure OpenAI
+    const openai = new OpenAI({
+      apiKey: azureApiKey,
+      baseURL: `${azureEndpoint}/openai/deployments/${azureDeployment}`,
+      defaultQuery: { 'api-version': azureApiVersion },
+      defaultHeaders: { 'api-key': azureApiKey }
+    });
+
+    // Send a simple ping with a minimal prompt
+    const startTime = Date.now();
     
-    // Make a simple request to test connectivity
-    const apiUrl = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=2023-05-15`;
-    
-    console.log('Testing Azure OpenAI connection with URL:', apiUrl);
-    
-    // Ensure apiKey is defined for the headers
-    if (!apiKey) {
-      throw new Error('API key is undefined');
-    }
-    
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': apiKey
-      },
-      body: JSON.stringify({
-        messages: [
-          { role: "system", content: "You are a helpful assistant." },
-          { role: "user", content: "Say hello world" }
-        ],
-        max_tokens: 50,
-        temperature: 0.7
-      })
+    const response = await openai.chat.completions.create({
+      model: azureDeployment,
+      messages: [
+        { role: 'system', content: 'You are a helpful assistant.' },
+        { role: 'user', content: 'Say hello world!' }
+      ],
+      max_tokens: 10,
+      temperature: 0.1,
     });
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Azure OpenAI API error:', response.status, errorText);
-      
-      return NextResponse.json({
-        success: false,
-        error: `Azure OpenAI API returned ${response.status}`,
-        details: errorText,
-        requestUrl: apiUrl
-      }, { status: response.status });
-    }
-    
-    const data = await response.json();
-    
+    const endTime = Date.now();
+    const responseTime = endTime - startTime;
+
     return NextResponse.json({
       success: true,
-      message: "Successfully connected to Azure OpenAI API",
-      response: data.choices[0]?.message?.content || "No content returned",
-      config: {
-        endpoint,
-        deployment,
-        apiVersion: '2023-05-15'
-      }
+      message: 'Azure OpenAI API is working correctly',
+      responseTime: `${responseTime}ms`,
+      modelUsed: response.model,
+      modelResponse: response.choices[0]?.message?.content,
+      tokenUsage: response.usage,
+      deploymentName: azureDeployment,
+      apiVersion: azureApiVersion
     });
-  } catch (error) {
-    console.error('Error testing Azure OpenAI connection:', error);
+    
+  } catch (error: any) {
+    console.error('Azure OpenAI test error:', error);
     
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
+      error: `Azure OpenAI test failed: ${error.message}`,
+      errorDetails: error.response?.data || null
     }, { status: 500 });
   }
 } 

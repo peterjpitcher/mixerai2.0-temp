@@ -5,9 +5,17 @@ export const getAzureOpenAIClient = () => {
   const apiKey = process.env.AZURE_OPENAI_API_KEY;
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
   
-  if (!apiKey || !endpoint) {
-    throw new Error("Azure OpenAI API credentials are missing");
+  if (!apiKey) {
+    console.error("Azure OpenAI API key is missing");
+    throw new Error("Azure OpenAI API key is missing");
   }
+  
+  if (!endpoint) {
+    console.error("Azure OpenAI endpoint is missing");
+    throw new Error("Azure OpenAI endpoint is missing");
+  }
+  
+  console.log(`Initializing Azure OpenAI client with endpoint: ${endpoint}`);
   
   return new OpenAI({
     apiKey: apiKey,
@@ -181,72 +189,158 @@ export async function generateBrandIdentityFromUrls(
   toneOfVoice: string;
   guardrails: string;
   suggestedAgencies: Array<{name: string, description: string, priority: 'high' | 'medium' | 'low'}>;
+  brandColor: string;
 }> {
   try {
     console.log(`Generating brand identity for ${brandName} from ${urls.length} URLs`);
     
-    // For development and testing, always use the fallback generator
-    // In production, this would check for valid credentials
-    if (process.env.NODE_ENV === 'development' || !process.env.AZURE_OPENAI_API_KEY || !process.env.AZURE_OPENAI_ENDPOINT) {
-      console.log("Using fallback brand identity generation in development mode or missing credentials");
+    // Debug environment variables
+    console.log("Environment check:");
+    console.log("- NODE_ENV:", process.env.NODE_ENV);
+    console.log("- AZURE_OPENAI_API_KEY exists:", !!process.env.AZURE_OPENAI_API_KEY);
+    console.log("- AZURE_OPENAI_ENDPOINT exists:", !!process.env.AZURE_OPENAI_ENDPOINT);
+    console.log("- AZURE_OPENAI_DEPLOYMENT:", process.env.AZURE_OPENAI_DEPLOYMENT);
+    console.log("- USE_LOCAL_GENERATION:", process.env.USE_LOCAL_GENERATION || 'false');
+    
+    // Check if local generation is forced via env var
+    if (process.env.USE_LOCAL_GENERATION === 'true') {
+      console.log("Using fallback brand identity generation due to USE_LOCAL_GENERATION=true");
       return generateFallbackBrandIdentity(brandName, urls);
     }
     
-    const client = getAzureOpenAIClient();
-    
-    // Prepare the prompt
-    const prompt = `
-    Please analyze the following URLs related to the brand "${brandName}":
-    ${urls.map(url => `- ${url}`).join('\n')}
-    
-    Based on these URLs, generate a comprehensive brand identity profile with the following components:
-    
-    1. BRAND IDENTITY: A detailed description of the brand's personality, values, target audience, and key messaging themes. This should be in plain text paragraphs, not markdown.
-    
-    2. TONE OF VOICE: A description of how the brand communicates - the style, language, and approach it uses. This should be a concise paragraph.
-    
-    3. CONTENT GUARDRAILS: Provide 5 specific guidelines that content creators should follow when creating content for this brand. Format these as a bulleted list.
-    
-    4. SUGGESTED VETTING AGENCIES: Based on the industry and country (if known), recommend 3-5 regulatory or vetting agencies that might be relevant to this brand, with a brief description of each. Also assign each a priority level (high, medium, or low) based on how critical compliance with this agency is for the brand.
-    
-    Format your response as a JSON object with these keys: brandIdentity, toneOfVoice, guardrails (as an array of strings), and suggestedAgencies (as an array of objects with name, description, and priority fields).
-    `;
-    
-    // Make the API call
-    const completion = await client.chat.completions.create({
-      model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME || "gpt-35-turbo",
-      messages: [
-        { role: "system", content: "You are a brand strategy expert that helps analyze and create detailed brand identities." },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.7,
-      max_tokens: 1000,
-      response_format: { type: "json_object" }
-    });
-    
-    const responseContent = completion.choices[0]?.message?.content || "{}";
-    let parsedResponse;
+    // Only use fallback if credentials are missing
+    if (!process.env.AZURE_OPENAI_API_KEY || !process.env.AZURE_OPENAI_ENDPOINT) {
+      console.log("Using fallback brand identity generation due to missing credentials");
+      return generateFallbackBrandIdentity(brandName, urls);
+    }
     
     try {
-      parsedResponse = JSON.parse(responseContent);
+      console.log("Attempting to initialize Azure OpenAI client");
+      const client = getAzureOpenAIClient();
+      console.log("Successfully initialized Azure OpenAI client");
       
-      // Ensure guardrails are formatted properly
-      if (Array.isArray(parsedResponse.guardrails)) {
-        parsedResponse.guardrails = parsedResponse.guardrails.map((item: string) => `- ${item}`).join('\n');
+      // Prepare the prompt
+      const prompt = `
+      Please analyze the following URLs related to the brand "${brandName}":
+      ${urls.map(url => `- ${url}`).join('\n')}
+      
+      Based on these URLs, generate a comprehensive brand identity profile with the following components:
+      
+      1. BRAND IDENTITY: A detailed description of the brand's personality, values, target audience, and key messaging themes. This should be in plain text paragraphs, not markdown.
+      
+      2. TONE OF VOICE: A description of how the brand communicates - the style, language, and approach it uses. This should be a concise paragraph.
+      
+      3. CONTENT GUARDRAILS: Provide 5 specific guidelines that content creators should follow when creating content for this brand. Format these as a bulleted list.
+      
+      4. SUGGESTED VETTING AGENCIES: Based on the industry and country (if known), recommend 3-5 regulatory or vetting agencies that might be relevant to this brand, with a brief description of each. Also assign each a priority level (high, medium, or low) based on how critical compliance with this agency is for the brand.
+      
+      5. BRAND COLOR: Suggest a primary brand color that would best represent this brand's identity and values. Provide the color in hex format (e.g., #FF5733).
+      
+      Format your response as a JSON object with these keys: brandIdentity, toneOfVoice, guardrails (as an array of strings), suggestedAgencies (as an array of objects with name, description, and priority fields), and brandColor (as a hex color code).
+      `;
+      
+      // Make the API call
+      console.log("Sending request to Azure OpenAI API");
+      const deploymentName = process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-35-turbo";
+      console.log(`Using deployment: ${deploymentName}`);
+      
+      try {
+        const completion = await client.chat.completions.create({
+          model: deploymentName,
+          messages: [
+            { role: "system", content: "You are a brand strategy expert that helps analyze and create detailed brand identities." },
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.7,
+          max_tokens: 1000,
+          response_format: { type: "json_object" }
+        });
+        
+        console.log("Received response from Azure OpenAI API");
+        const responseContent = completion.choices[0]?.message?.content || "{}";
+        console.log("Raw API response:", responseContent.substring(0, 100) + "...");
+        
+        let parsedResponse;
+        
+        try {
+          parsedResponse = JSON.parse(responseContent);
+          
+          // Ensure guardrails are formatted properly
+          if (Array.isArray(parsedResponse.guardrails)) {
+            parsedResponse.guardrails = parsedResponse.guardrails.map((item: string) => `- ${item}`).join('\n');
+          }
+          
+          console.log("Successfully parsed response and formatted guardrails");
+          return {
+            brandIdentity: parsedResponse.brandIdentity || "",
+            toneOfVoice: parsedResponse.toneOfVoice || "",
+            guardrails: parsedResponse.guardrails || "",
+            suggestedAgencies: parsedResponse.suggestedAgencies || [],
+            brandColor: parsedResponse.brandColor || ""
+          };
+        } catch (error) {
+          console.error("Failed to parse API response:", error);
+          console.log("Raw response that failed to parse:", responseContent);
+          return generateFallbackBrandIdentity(brandName, urls);
+        }
+      } catch (openAIError: any) {
+        console.error("Error calling Azure OpenAI API:", openAIError.message);
+        
+        // If the deployment doesn't exist, try with a different model
+        if (openAIError.message && openAIError.message.includes("API deployment for this resource does not exist")) {
+          console.log("Deployment not found, trying fallback deployment 'gpt-35-turbo'");
+          try {
+            const fallbackCompletion = await client.chat.completions.create({
+              model: "gpt-35-turbo",  // Use a common fallback model name
+              messages: [
+                { role: "system", content: "You are a brand strategy expert that helps analyze and create detailed brand identities." },
+                { role: "user", content: prompt }
+              ],
+              temperature: 0.7,
+              max_tokens: 1000,
+              response_format: { type: "json_object" }
+            });
+            
+            console.log("Received response from fallback Azure OpenAI model");
+            const fallbackResponseContent = fallbackCompletion.choices[0]?.message?.content || "{}";
+            console.log("Raw fallback API response:", fallbackResponseContent.substring(0, 100) + "...");
+            
+            try {
+              const parsedResponse = JSON.parse(fallbackResponseContent);
+              
+              // Ensure guardrails are formatted properly
+              if (Array.isArray(parsedResponse.guardrails)) {
+                parsedResponse.guardrails = parsedResponse.guardrails.map((item: string) => `- ${item}`).join('\n');
+              }
+              
+              console.log("Successfully parsed response from fallback model");
+              return {
+                brandIdentity: parsedResponse.brandIdentity || "",
+                toneOfVoice: parsedResponse.toneOfVoice || "",
+                guardrails: parsedResponse.guardrails || "",
+                suggestedAgencies: parsedResponse.suggestedAgencies || [],
+                brandColor: parsedResponse.brandColor || ""
+              };
+            } catch (parseError) {
+              console.error("Failed to parse fallback API response:", parseError);
+              return generateFallbackBrandIdentity(brandName, urls);
+            }
+          } catch (fallbackError: any) {
+            console.error("Fallback model also failed:", fallbackError.message);
+            return generateFallbackBrandIdentity(brandName, urls);
+          }
+        } else {
+          // For other errors, fall back to template generation
+          return generateFallbackBrandIdentity(brandName, urls);
+        }
       }
-      
-      return {
-        brandIdentity: parsedResponse.brandIdentity || "",
-        toneOfVoice: parsedResponse.toneOfVoice || "",
-        guardrails: parsedResponse.guardrails || "",
-        suggestedAgencies: parsedResponse.suggestedAgencies || []
-      };
-    } catch (error) {
-      console.error("Failed to parse API response:", error);
+    } catch (apiError) {
+      console.error("Azure OpenAI API call failed:", apiError);
+      console.log("Falling back to template generation after API error");
       return generateFallbackBrandIdentity(brandName, urls);
     }
   } catch (error) {
-    console.error("Error generating brand identity:", error);
+    console.error("Error in generateBrandIdentityFromUrls:", error);
     // When an error occurs, fall back to the template generation
     console.log("Falling back to template generation after error");
     return generateFallbackBrandIdentity(brandName, urls);
@@ -262,7 +356,10 @@ function generateFallbackBrandIdentity(brandName: string, urls: string[]): {
   toneOfVoice: string;
   guardrails: string;
   suggestedAgencies: Array<{name: string, description: string, priority: 'high' | 'medium' | 'low'}>;
+  brandColor: string;
 } {
+  console.log("⚠️ Using fallback brand identity generation for:", brandName);
+  
   // Extract potential industry/category from URLs
   let industry = "general";
   if (urls.some(url => url.includes("food") || url.includes("recipe") || url.includes("cook") || url.includes("baking"))) {
@@ -275,12 +372,15 @@ function generateFallbackBrandIdentity(brandName: string, urls: string[]): {
     industry = "health";
   }
   
+  console.log("Detected industry for fallback content:", industry);
+  
   // Brand identity templates as plain text, not Markdown
   const templates: Record<string, {
     identity: string;
     tone: string;
     guardrails: string[];
     agencies: Array<{name: string, description: string, priority: 'high' | 'medium' | 'low'}>;
+    color: string;
   }> = {
     food: {
       identity: `${brandName} projects a warm, inviting, and trustworthy personality. The brand values quality ingredients, culinary tradition, and creating memorable food experiences. It emphasizes authenticity, care, and attention to detail in all its offerings.\n\nPrimary audience includes home cooks of all skill levels, food enthusiasts, and families looking for reliable, delicious recipes and food products. Secondary audiences include culinary professionals seeking inspiration and quality ingredients.\n\nKey messaging themes include quality ingredients lead to exceptional results, making cooking accessible and enjoyable for everyone, bringing people together through food, and balancing tradition with modern culinary innovation.`,
@@ -300,7 +400,8 @@ function generateFallbackBrandIdentity(brandName: string, urls: string[]): {
         { name: "ASA", description: "Advertising Standards Authority - Regulates advertising across all media in the UK", priority: "high" },
         { name: "DEFRA", description: "Department for Environment, Food and Rural Affairs - Oversees food production standards", priority: "medium" },
         { name: "BRC", description: "British Retail Consortium - Sets standards for food safety and quality", priority: "low" }
-      ]
+      ],
+      color: "#E57373" // Soft red color for food
     },
     
     technology: {
@@ -321,7 +422,8 @@ function generateFallbackBrandIdentity(brandName: string, urls: string[]): {
         { name: "ASA", description: "Advertising Standards Authority - Regulates advertising across all media in the UK", priority: "high" },
         { name: "CMA", description: "Competition and Markets Authority - Promotes competition and prevents anti-competitive activities", priority: "medium" },
         { name: "BSI", description: "British Standards Institution - Provides technical standards for products and services", priority: "low" }
-      ]
+      ],
+      color: "#2196F3" // Blue for technology
     },
     
     fashion: {
@@ -342,7 +444,8 @@ function generateFallbackBrandIdentity(brandName: string, urls: string[]): {
         { name: "CMA", description: "Competition and Markets Authority - Promotes competition and prevents anti-competitive activities", priority: "medium" },
         { name: "Trading Standards", description: "Enforces consumer protection legislation and ensures product safety", priority: "medium" },
         { name: "BRC", description: "British Retail Consortium - Sets standards for retailers", priority: "low" }
-      ]
+      ],
+      color: "#9C27B0" // Purple for fashion
     },
     
     health: {
@@ -363,7 +466,8 @@ function generateFallbackBrandIdentity(brandName: string, urls: string[]): {
         { name: "ASA", description: "Advertising Standards Authority - Regulates advertising across all media in the UK", priority: "high" },
         { name: "NICE", description: "National Institute for Health and Care Excellence - Provides national guidance and advice to improve health and social care", priority: "medium" },
         { name: "Trading Standards", description: "Enforces consumer protection legislation and ensures product safety", priority: "low" }
-      ]
+      ],
+      color: "#4CAF50" // Green for health
     },
     
     general: {
@@ -384,16 +488,33 @@ function generateFallbackBrandIdentity(brandName: string, urls: string[]): {
         { name: "CMA", description: "Competition and Markets Authority - Promotes competition and prevents anti-competitive activities", priority: "medium" },
         { name: "Trading Standards", description: "Enforces consumer protection legislation and ensures product safety", priority: "medium" },
         { name: "ICO", description: "Information Commissioner's Office - UK's independent authority set up to uphold information rights", priority: "low" }
-      ]
+      ],
+      color: "#607D8B" // Blue grey for general
     }
   };
   
   const templateData = templates[industry];
   
-  return {
+  // Format the response to ensure it has all required fields in the correct format
+  const result = {
     brandIdentity: templateData.identity,
     toneOfVoice: templateData.tone,
     guardrails: templateData.guardrails.map(item => `- ${item}`).join('\n'),
-    suggestedAgencies: templateData.agencies
+    suggestedAgencies: templateData.agencies.map(agency => ({
+      name: agency.name,
+      description: agency.description,
+      priority: agency.priority as 'high' | 'medium' | 'low'
+    })),
+    brandColor: templateData.color
   };
+  
+  console.log("Generated fallback brand identity with values:", {
+    brandIdentityLength: result.brandIdentity.length,
+    toneOfVoiceLength: result.toneOfVoice.length, 
+    guardrailsLength: result.guardrails.length,
+    agenciesCount: result.suggestedAgencies.length,
+    brandColor: result.brandColor
+  });
+  
+  return result;
 } 

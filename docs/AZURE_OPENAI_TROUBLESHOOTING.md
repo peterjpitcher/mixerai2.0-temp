@@ -1,18 +1,84 @@
 # Azure OpenAI Troubleshooting Guide
 
-This document provides guidance for troubleshooting common issues with Azure OpenAI integration in the MixerAI 2.0 application.
+## Overview
 
-## Required Environment Variables
+This document provides instructions for troubleshooting issues with the Azure OpenAI integration in the MixerAI 2.0 application, particularly related to brand identity generation.
 
-The application needs the following environment variables to connect to Azure OpenAI:
+## Environment Variables
+
+The following environment variables are required for proper Azure OpenAI integration:
 
 ```
-AZURE_OPENAI_API_KEY=your_api_key
+AZURE_OPENAI_API_KEY=your_api_key_here
 AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com
-AZURE_OPENAI_DEPLOYMENT=your_deployment_name
+AZURE_OPENAI_DEPLOYMENT=your_deployment_name_here
 ```
 
-All three variables must be set correctly for the Azure OpenAI features to work.
+The provided values should be:
+- `AZURE_OPENAI_API_KEY`: 91657ac1fc944910992d8c9da1d9c866
+- `AZURE_OPENAI_ENDPOINT`: https://owned-ai-dev.openai.azure.com
+- `AZURE_OPENAI_DEPLOYMENT`: gpt-4o
+
+## Common Issues
+
+### Fallback Content Generation
+
+If you're seeing boilerplate/template content rather than AI-generated content, this typically indicates the system is using the fallback generation mechanism instead of calling Azure OpenAI. This can occur for several reasons:
+
+1. **Development Environment Check**: By default, the `generateBrandIdentityFromUrls` function in `src/lib/azure/openai.ts` was checking if `process.env.NODE_ENV === 'development'`, and if true, was automatically using fallback content. This has been updated to only use fallback if both in development AND missing credentials.
+
+2. **Missing Environment Variables**: The application checks for `AZURE_OPENAI_API_KEY` and `AZURE_OPENAI_ENDPOINT` at runtime. If either is missing, it falls back to template-based generation.
+
+3. **Incorrect Deployment Name**: If the deployment name doesn't match an available deployment in your Azure OpenAI resource, the API call will fail, triggering the fallback mechanism.
+
+### Debugging Steps
+
+1. **Run the Test Script**:
+   ```bash
+   node scripts/test-azure-openai.js
+   ```
+   This script will output detailed information about your environment configuration and attempt to make a direct test call to Azure OpenAI.
+
+2. **Use the Test API Endpoint**:
+   Visit `http://localhost:3001/api/test-azure-openai` in your browser or use a tool like Postman to make a GET request to this endpoint. It will return detailed information about the environment variables and attempt to make a test call to Azure OpenAI.
+
+3. **Check the Console Logs**:
+   The application now includes detailed logging in the `generateBrandIdentityFromUrls` function. Look for messages that indicate whether:
+   - It's using fallback due to development mode and missing credentials
+   - It's attempting to initialize the Azure OpenAI client
+   - It's successfully making the API call
+   - It's receiving and parsing the response
+
+## Solutions
+
+### Environment Variable Issues
+
+1. **Check `.env` File**: Make sure your `.env` file is in the root directory and contains the correct variables.
+
+2. **Restart the Development Server**: After updating the `.env` file, restart your development server:
+   ```bash
+   npm run dev
+   ```
+
+3. **Use `.env.local`**: Next.js prioritizes `.env.local` over `.env`. Try creating a `.env.local` file with your environment variables.
+
+### API Integration Issues
+
+1. **Update `openai.ts`**: The logic for fallback content generation has been updated. Make sure you're using the latest version of the file.
+
+2. **Check Azure Portal**: Verify that the deployment name in your environment variables matches an actual deployment in your Azure OpenAI resource.
+
+3. **Check API Version**: The application uses the "2023-09-01-preview" API version. Make sure your Azure OpenAI resource supports this version.
+
+## Verifying Fixes
+
+After implementing fixes, you can verify they're working correctly by:
+
+1. Using the brand identity generation feature on the brand edit page
+2. Checking the console logs for messages indicating successful API calls
+3. Confirming the generated content is unique and not from the fallback templates
+
+If you continue to see fallback content, check that your code changes have been properly saved and the server has been restarted.
 
 ## Testing Azure OpenAI Connection
 
@@ -121,4 +187,45 @@ If you continue to experience issues after trying these troubleshooting steps:
 
 1. Check the Azure OpenAI documentation: https://docs.microsoft.com/en-us/azure/cognitive-services/openai/
 2. Reach out to Azure support if you believe there's an issue with your Azure OpenAI resource
-3. Open an issue in the project repository with detailed information about the problem 
+3. Open an issue in the project repository with detailed information about the problem
+
+## Fallback Generation Mode
+
+The system has a built-in fallback generation mode that uses pre-built industry-specific templates instead of calling Azure OpenAI. This mode is activated automatically when:
+
+1. Azure OpenAI credentials are missing or invalid
+2. The specified deployment name doesn't exist in your Azure OpenAI resource
+3. The `USE_LOCAL_GENERATION` environment variable is set to `true`
+
+### Enabling Fallback Generation Mode
+
+You can force the system to use the fallback generator by enabling the local generation mode:
+
+```bash
+node scripts/force-local-generation.js enable
+```
+
+This will update your `.env` file to include the `USE_LOCAL_GENERATION=true` setting. To disable it later:
+
+```bash
+node scripts/force-local-generation.js disable
+```
+
+Remember to restart your development server after changing this setting.
+
+## Handling "API deployment does not exist" Errors
+
+If you're seeing the error message "404 The API deployment for this resource does not exist", it means the model deployment name you provided does not exist in your Azure OpenAI resource. To fix this:
+
+1. Check your Azure OpenAI resource in the Azure portal and verify which deployments are actually available
+2. Update your `AZURE_OPENAI_DEPLOYMENT` environment variable to match an existing deployment
+3. Or, enable the fallback generation mode as described above if you don't have a valid deployment
+
+### Common Deployment Names
+
+Common deployment names in Azure OpenAI include:
+- `gpt-35-turbo` (GPT-3.5 Turbo)
+- `gpt-4` (GPT-4)
+- `text-davinci-003` (older model)
+
+The exact name depends on how the deployments were set up in your Azure OpenAI resource. 

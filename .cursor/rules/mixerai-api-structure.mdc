@@ -119,3 +119,28 @@ return NextResponse.json(
   { status: 500 }
 );
 ```
+
+## Error Handling and Fallback Strategies
+
+### Brand Identity Generation
+
+The brand identity generation feature relies on Azure OpenAI. When AI generation fails, the application follows these principles:
+
+1. **Fallback Generation**:
+   - In `src/lib/azure/openai.ts`, the `generateBrandIdentityFromUrls` function should fall back to template-based content when OpenAI API calls fail
+   - The `generateFallbackBrandIdentity` function provides industry-specific templates using URL-based detection
+
+2. **Default Data Provision**:
+   - API route (`src/app/api/brands/identity/route.ts`) always ensures complete data is returned
+   - Even in error cases, default values should be provided for all required fields:
+     - Brand identity
+     - Tone of voice
+     - Content guardrails
+     - Suggested agencies
+     - Brand color
+
+3. **UI Handling**:
+   - In brand edit pages (`src/app/brands/[id]/edit/page.tsx` and `src/app/brands/new/page.tsx`), the `executeGenerateBrandIdentity` function should display a toast notification but continue with fallback data
+   - Set `usedFallback` state to true to inform users that default content is being used
+
+This approach ensures users always have usable content, even when API services are unavailable.

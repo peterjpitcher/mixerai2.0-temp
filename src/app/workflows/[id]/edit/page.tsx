@@ -61,7 +61,8 @@ const roleDescriptions = {
   editor: "General content editor responsible for content quality",
   legal: "Legal reviewer who ensures content compliance with regulations",
   brand: "Brand reviewer who ensures content aligns with brand standards",
-  seo: "SEO specialist who optimizes content for search engines"
+  seo: "SEO specialist who optimizes content for search engines",
+  culinary: "Culinary expert who reviews food content for safety and correctness"
 };
 
 export default function WorkflowEditPage({ params }: { params: { id: string }}) {
@@ -926,6 +927,33 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
                               </Label>
                               <p className="text-sm text-muted-foreground mt-1">
                                 {roleDescriptions.seo}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div 
+                          className={`border rounded-md p-3 cursor-pointer transition-colors ${
+                            step.role === 'culinary' ? 'bg-primary/10 border-primary' : 'bg-card hover:bg-accent'
+                          }`}
+                          onClick={() => handleStepChange(index, 'role', 'culinary')}
+                        >
+                          <div className="flex items-start gap-2">
+                            <Checkbox 
+                              id={`step-${index}-role-culinary`}
+                              checked={step.role === 'culinary'}
+                              onCheckedChange={() => handleStepChange(index, 'role', 'culinary')}
+                              className="mt-0.5"
+                            />
+                            <div>
+                              <Label 
+                                htmlFor={`step-${index}-role-culinary`}
+                                className="font-medium cursor-pointer"
+                              >
+                                Culinary
+                              </Label>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {roleDescriptions.culinary}
                               </p>
                             </div>
                           </div>
