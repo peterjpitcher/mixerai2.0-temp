@@ -8,6 +8,17 @@ import { Input } from "@/components/input";
 import { useToast } from "@/components/toast-provider";
 import { BrandIcon } from "@/components/brand-icon";
 import { COUNTRIES, LANGUAGES } from "@/lib/constants";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/alert-dialog";
+import { Trash2 } from "lucide-react";
 
 interface Brand {
   id: string;
@@ -23,6 +34,12 @@ export default function BrandsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const [brandToDelete, setBrandToDelete] = useState<Brand | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [requiresCascade, setRequiresCascade] = useState(false);
+  const [contentCount, setContentCount] = useState(0);
+  const [workflowCount, setWorkflowCount] = useState(0);
 
   useEffect(() => {
     async function fetchBrands() {
@@ -56,58 +73,86 @@ export default function BrandsPage() {
     fetchBrands();
   }, [toast]);
 
-  // Empty state component
-  const EmptyState = () => (
-    <div className="text-center py-12 px-4">
-      <div className="mx-auto w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
-          <path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25" />
-          <line x1="8" y1="16" x2="8.01" y2="16" />
-          <line x1="8" y1="20" x2="8.01" y2="20" />
-          <line x1="12" y1="18" x2="12.01" y2="18" />
-          <line x1="12" y1="22" x2="12.01" y2="22" />
-          <line x1="16" y1="16" x2="16.01" y2="16" />
-          <line x1="16" y1="20" x2="16.01" y2="20" />
-        </svg>
-      </div>
-      <h3 className="text-xl font-semibold mb-2">No brands found</h3>
-      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-        You haven't added any brands yet. Create your first brand to start managing content.
-      </p>
-      <Button size="lg" asChild>
-        <Link href="/brands/new">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-            <path d="M5 12h14" />
-            <path d="M12 5v14" />
-          </svg>
-          Add Your First Brand
-        </Link>
-      </Button>
-    </div>
-  );
+  const handleDeleteBrand = async (cascade: boolean = false) => {
+    if (!brandToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      const url = new URL(`/api/brands/${brandToDelete.id}`, window.location.origin);
+      if (cascade) {
+        url.searchParams.append('deleteCascade', 'true');
+      }
+      
+      const response = await fetch(url.toString(), {
+        method: 'DELETE',
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        toast({
+          title: "Success",
+          description: data.message || "Brand deleted successfully",
+        });
+        // Remove the brand from the state
+        setBrands(prevBrands => prevBrands.filter(b => b.id !== brandToDelete.id));
+        setShowDeleteDialog(false);
+        setBrandToDelete(null);
+        setRequiresCascade(false);
+      } else if (data.requiresCascade) {
+        setRequiresCascade(true);
+        setContentCount(data.contentCount || 0);
+        setWorkflowCount(data.workflowCount || 0);
+      } else {
+        toast({
+          title: "Error",
+          description: data.error || "Failed to delete brand",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting brand:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Error state component
   const ErrorState = () => (
-    <div className="text-center py-12 px-4">
-      <div className="mx-auto w-24 h-24 rounded-full bg-destructive/10 flex items-center justify-center mb-6">
-        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-destructive">
-          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-          <line x1="12" y1="9" x2="12" y2="13" />
-          <line x1="12" y1="17" x2="12.01" y2="17" />
+    <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
+      <div className="mb-4 text-red-500">
+        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
       </div>
-      <h3 className="text-xl font-semibold mb-2">Failed to load brands</h3>
-      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-        {error || "An error occurred while loading your brands. Please try again."}
-      </p>
-      <Button variant="outline" size="lg" onClick={() => window.location.reload()}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-          <path d="M21 2v6h-6" />
-          <path d="M3 12a9 9 0 0 1 15-6.7l3-3.3" />
-          <path d="M3 22v-6h6" />
-          <path d="M21 12a9 9 0 0 1-15 6.7l-3 3.3" />
+      <h3 className="text-xl font-bold mb-2">Failed to load brands</h3>
+      <p className="text-muted-foreground mb-4 text-center max-w-md">{error}</p>
+      <Button onClick={() => window.location.reload()}>Try Again</Button>
+    </div>
+  );
+
+  // Empty state component
+  const EmptyState = () => (
+    <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
+      <div className="mb-4 text-muted-foreground">
+        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+          <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
         </svg>
-        Retry
+      </div>
+      <h3 className="text-xl font-bold mb-2">No brands yet</h3>
+      <p className="text-muted-foreground mb-4 text-center max-w-md">
+        Get started by creating your first brand to manage content for.
+      </p>
+      <Button asChild>
+        <Link href="/brands/new">Add Your First Brand</Link>
       </Button>
     </div>
   );
@@ -192,29 +237,81 @@ export default function BrandsPage() {
                 </div>
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-between">
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href={`/brands/${brand.id}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                    View
-                  </Link>
-                </Button>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href={`/brands/${brand.id}/edit`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                    </svg>
-                    Edit
-                  </Link>
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href={`/brands/${brand.id}`}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                      View
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href={`/brands/${brand.id}/edit`}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                      Edit
+                    </Link>
+                  </Button>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => {
+                    setBrandToDelete(brand);
+                    setShowDeleteDialog(true);
+                    setRequiresCascade(false);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
                 </Button>
               </CardFooter>
             </Card>
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {requiresCascade
+                ? "Delete brand and associated items?" 
+                : "Are you sure you want to delete this brand?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {requiresCascade 
+                ? `This will delete the brand "${brandToDelete?.name}" along with ${contentCount} content item${contentCount !== 1 ? 's' : ''} and ${workflowCount} workflow${workflowCount !== 1 ? 's' : ''}.`
+                : `This action will permanently delete the brand "${brandToDelete?.name}" and cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            {requiresCascade ? (
+              <AlertDialogAction
+                onClick={() => handleDeleteBrand(true)}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? "Deleting..." : "Delete All"}
+              </AlertDialogAction>
+            ) : (
+              <AlertDialogAction
+                onClick={() => handleDeleteBrand()}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 } 
