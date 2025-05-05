@@ -8,6 +8,7 @@ import { Input } from '@/components/input';
 import { useToast } from '@/components/toast-provider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { BrandIcon } from '@/components/brand-icon';
+import { Plus, Search, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Workflow {
   id: string;
@@ -31,11 +32,22 @@ interface Brand {
   color?: string;
 }
 
+interface GroupedWorkflows {
+  [key: string]: {
+    brand_id: string;
+    brand_name: string;
+    brand_color?: string;
+    workflows: Workflow[];
+    isOpen: boolean;
+  }
+}
+
 export default function WorkflowsPage() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [selectedBrandId, setSelectedBrandId] = useState<string>('all');
   const [filteredWorkflows, setFilteredWorkflows] = useState<Workflow[]>([]);
+  const [groupedWorkflows, setGroupedWorkflows] = useState<GroupedWorkflows>({});
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +96,7 @@ export default function WorkflowsPage() {
     fetchData();
   }, [toast]);
   
-  // Apply filters when brand selection or search changes
+  // Apply filters and group workflows by brand
   useEffect(() => {
     let result = [...workflows];
     
@@ -104,6 +116,35 @@ export default function WorkflowsPage() {
     }
     
     setFilteredWorkflows(result);
+    
+    // Group workflows by brand
+    const grouped: GroupedWorkflows = {};
+    result.forEach((workflow) => {
+      const brandId = workflow.brand_id;
+      const brandName = workflow.brand_name || 'Unknown';
+      
+      if (!grouped[brandId]) {
+        grouped[brandId] = {
+          brand_id: brandId,
+          brand_name: brandName,
+          brand_color: workflow.brand_color,
+          workflows: [],
+          isOpen: true
+        };
+      }
+      
+      grouped[brandId].workflows.push(workflow);
+    });
+    
+    // Sort brands alphabetically
+    const sortedGrouped: GroupedWorkflows = {};
+    Object.keys(grouped).sort((a, b) => {
+      return grouped[a].brand_name.localeCompare(grouped[b].brand_name);
+    }).forEach(key => {
+      sortedGrouped[key] = grouped[key];
+    });
+    
+    setGroupedWorkflows(sortedGrouped);
   }, [workflows, selectedBrandId, searchTerm]);
   
   const handleBrandChange = (brandId: string) => {
@@ -114,19 +155,33 @@ export default function WorkflowsPage() {
     setSearchTerm(e.target.value);
   };
   
+  const toggleBrandGroup = (brandId: string) => {
+    setGroupedWorkflows(prev => ({
+      ...prev,
+      [brandId]: {
+        ...prev[brandId],
+        isOpen: !prev[brandId].isOpen
+      }
+    }));
+  };
+  
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">Workflows</h1>
         <Button asChild>
-          <Link href="/workflows/new">Create Workflow</Link>
+          <Link href="/workflows/new">
+            <Plus className="mr-2 h-4 w-4" /> Create Workflow
+          </Link>
         </Button>
       </div>
       
       <div className="flex items-center justify-between gap-4 flex-col sm:flex-row">
-        <div className="w-full sm:max-w-xs">
+        <div className="w-full sm:max-w-xs relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
             placeholder="Search workflows..." 
+            className="pl-10"
             value={searchTerm}
             onChange={handleSearchChange}
           />
@@ -181,7 +236,7 @@ export default function WorkflowsPage() {
             Retry
           </Button>
         </div>
-      ) : filteredWorkflows.length === 0 ? (
+      ) : Object.keys(groupedWorkflows).length === 0 ? (
         <div className="text-center py-12 px-4">
           <div className="mx-auto w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-6">
             <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
@@ -221,70 +276,83 @@ export default function WorkflowsPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredWorkflows.map((workflow) => (
-            <Card key={workflow.id}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-3 mb-2">
-                  <BrandIcon 
-                    name={workflow.brand_name} 
-                    color={workflow.brand_color} 
-                    size="sm" 
-                  />
-                  <CardTitle className="text-xl">{workflow.name}</CardTitle>
+        <div className="space-y-6">
+          {Object.values(groupedWorkflows).map((group) => (
+            <div key={group.brand_id} className="border rounded-lg overflow-hidden">
+              <div 
+                className="bg-muted p-4 flex justify-between items-center cursor-pointer"
+                onClick={() => toggleBrandGroup(group.brand_id)}
+              >
+                <h2 className="text-xl font-semibold flex items-center gap-3">
+                  <BrandIcon name={group.brand_name} color={group.brand_color} size="sm" />
+                  {group.brand_name} 
+                  <span className="ml-2 text-sm text-muted-foreground">({group.workflows.length})</span>
+                </h2>
+                {group.isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+              </div>
+              
+              {group.isOpen && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                  {group.workflows.map((workflow) => (
+                    <Card key={workflow.id}>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-xl">{workflow.name}</CardTitle>
+                        <CardDescription>
+                          {workflow.content_type_name}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex justify-between text-sm text-muted-foreground mb-3">
+                          <span>Steps</span>
+                          <span className="font-medium">{workflow.steps_count}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {workflow.steps && workflow.steps.length > 0 ? (
+                            workflow.steps.map((step) => (
+                              <div 
+                                key={step.id} 
+                                className="h-8 flex items-center justify-center rounded-md bg-primary/10 text-primary text-xs px-3"
+                              >
+                                {step.name}
+                              </div>
+                            ))
+                          ) : (
+                            Array.from({ length: workflow.steps_count }).map((_, i) => (
+                              <div 
+                                key={i} 
+                                className="h-8 flex items-center justify-center rounded-md bg-primary/10 text-primary text-xs px-3"
+                              >
+                                Step {i + 1}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </CardContent>
+                      <CardFooter className="border-t pt-4 flex justify-between">
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/workflows/${workflow.id}`}>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                            View
+                          </Link>
+                        </Button>
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/workflows/${workflow.id}/edit`}>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                              <path d="M12 20h9" />
+                              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                            </svg>
+                            Edit
+                          </Link>
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ))}
                 </div>
-                <CardDescription>
-                  {workflow.brand_name} - {workflow.content_type_name}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-between text-sm text-muted-foreground mb-3">
-                  <span>Steps</span>
-                  <span className="font-medium">{workflow.steps_count}</span>
-                </div>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {workflow.steps && workflow.steps.length > 0 ? (
-                    workflow.steps.map((step) => (
-                      <div 
-                        key={step.id} 
-                        className="h-8 flex items-center justify-center rounded-md bg-primary/10 text-primary text-xs px-3"
-                      >
-                        {step.name}
-                      </div>
-                    ))
-                  ) : (
-                    Array.from({ length: workflow.steps_count }).map((_, i) => (
-                      <div 
-                        key={i} 
-                        className="h-8 flex items-center justify-center rounded-md bg-primary/10 text-primary text-xs px-3"
-                      >
-                        Step {i + 1}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-              <CardFooter className="border-t pt-4 flex justify-between">
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href={`/workflows/${workflow.id}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                    View
-                  </Link>
-                </Button>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href={`/workflows/${workflow.id}/edit`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                    </svg>
-                    Edit
-                  </Link>
-                </Button>
-              </CardFooter>
-            </Card>
+              )}
+            </div>
           ))}
         </div>
       )}
