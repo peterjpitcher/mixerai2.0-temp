@@ -41,6 +41,12 @@ interface ContentType {
   description?: string;
 }
 
+interface VettingAgency {
+  name: string;
+  description?: string;
+  priority: string;
+}
+
 export default function NewBrandPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -66,8 +72,10 @@ export default function NewBrandPage() {
     approved_content_types: []
   });
 
-  // Get vetting agencies based on selected country
-  const [vettingAgencies, setVettingAgencies] = useState<any[]>([]);
+  // Update this to store vetting agencies as objects
+  const [vettingAgencies, setVettingAgencies] = useState<VettingAgency[]>([]);
+  // Add state for selected agencies
+  const [selectedAgencies, setSelectedAgencies] = useState<string[]>([]);
   
   // State for custom agency dialog
   const [showAddAgencyDialog, setShowAddAgencyDialog] = useState(false);
@@ -191,6 +199,26 @@ export default function NewBrandPage() {
         ...prev,
         content_vetting_agencies: updatedAgencies.join(', ')
       };
+    });
+  };
+
+  // Handle vetting agency selection
+  const handleAgencySelection = (agencyName: string) => {
+    setSelectedAgencies(prev => {
+      const isSelected = prev.includes(agencyName);
+      
+      // Remove if already selected, add if not
+      const updated = isSelected 
+        ? prev.filter(name => name !== agencyName)
+        : [...prev, agencyName];
+      
+      // Update the content_vetting_agencies field
+      setFormData(prevForm => ({
+        ...prevForm,
+        content_vetting_agencies: updated.join(', ')
+      }));
+      
+      return updated;
     });
   };
 
@@ -330,13 +358,6 @@ export default function NewBrandPage() {
         const now = new Date();
         const timeString = now.toLocaleTimeString();
         
-        // Ensure vettingAgencies exists or use fallback
-        const vettingAgenciesData = data.data.suggestedAgencies || data.data.vettingAgencies || [];
-        console.log('Vetting agencies data:', vettingAgenciesData);
-        
-        // Debug the full data object
-        console.log('Full API response data:', JSON.stringify(data.data, null, 2));
-        
         // Process the guardrails - handle both array and string formats
         let guardrailsContent = '';
         if (Array.isArray(data.data.guardrails)) {
@@ -348,13 +369,31 @@ export default function NewBrandPage() {
           guardrailsContent = '- No guardrails provided';
         }
         
-        // Set brand with generated content
+        // Process vetting agencies
+        const vettingAgenciesData = data.data.suggestedAgencies || data.data.vettingAgencies || [];
+        console.log('Vetting agencies data:', vettingAgenciesData);
+        
+        // Format agencies as objects with name, description, and priority
+        const formattedAgencies = vettingAgenciesData.map((agency: any) => ({
+          name: agency.name || '',
+          description: agency.description || '',
+          priority: agency.priority || 'medium'
+        }));
+        
+        // Set vetting agencies
+        setVettingAgencies(formattedAgencies);
+        
+        // Select all agencies by default
+        const agencyNames = formattedAgencies.map((a: VettingAgency) => a.name);
+        setSelectedAgencies(agencyNames);
+        
+        // Update the brand data
         const updatedFormData = {
           ...formData,
           brand_identity: data.data.brandIdentity || '',
           tone_of_voice: data.data.toneOfVoice || '',
           guardrails: guardrailsContent,
-          content_vetting_agencies: vettingAgenciesData.length > 0 ? vettingAgenciesData.map(a => a.name).join(', ') : '',
+          content_vetting_agencies: agencyNames.join(', '),
           brand_color: data.data.brandColor || '#3498db'
         };
         
@@ -380,16 +419,6 @@ export default function NewBrandPage() {
           agencies: vettingAgenciesData.length > 0 ? `${vettingAgenciesData.length} agencies` : 'none',
           color: data.data.brandColor || '#3498db'
         });
-        
-        // Update selected agencies
-        if (vettingAgenciesData.length > 0) {
-          const agencyNames = vettingAgenciesData.map(a => a.name);
-          console.log('Setting selected agencies:', agencyNames);
-          setVettingAgencies(vettingAgenciesData);
-        }
-        
-        // Update usedFallback state
-        setUsedFallback(data.data.usedFallback || false);
         
         // Show toast based on whether fallback was used
         if (data.data.usedFallback) {
@@ -598,7 +627,7 @@ export default function NewBrandPage() {
                       <SelectTrigger id="country">
                         <SelectValue placeholder="Select country" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-h-[300px] overflow-y-auto">
                         {COUNTRIES.map((country) => (
                           <SelectItem key={country.value} value={country.value}>
                             {country.label}
@@ -617,7 +646,7 @@ export default function NewBrandPage() {
                       <SelectTrigger id="language">
                         <SelectValue placeholder="Select language" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-h-[300px] overflow-y-auto">
                         {LANGUAGES.map((language) => (
                           <SelectItem key={language.value} value={language.value}>
                             {language.label}
@@ -635,72 +664,6 @@ export default function NewBrandPage() {
               </Button>
               <Button type="button" onClick={() => setCurrentTab("brand-identity")}>
                 Next: Brand Identity
-              </Button>
-            </CardFooter>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle>Approved Content Types</CardTitle>
-                <Badge variant="outline" className="text-xs font-normal">
-                  AI Taskforce Managed
-                </Badge>
-              </div>
-              <CardDescription>
-                Select which types of content can be created for this brand. Any changes to these content types must be approved by the AI taskforce. Please work with Peter Pitcher if changes are needed.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loadingContentTypes ? (
-                <div className="flex items-center space-x-2 py-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm text-muted-foreground">Loading content types...</span>
-                </div>
-              ) : contentTypes.length === 0 ? (
-                <div className="flex items-center space-x-2 py-2">
-                  <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm text-muted-foreground">No content types found</span>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {contentTypes.map((contentType) => (
-                    <div 
-                      key={contentType.id}
-                      className={cn(
-                        "relative flex flex-col h-full rounded-md border p-4 hover:shadow-sm transition-shadow cursor-pointer",
-                        formData.approved_content_types.includes(contentType.id) 
-                          ? "bg-primary/10 border-primary/50" 
-                          : "bg-card"
-                      )}
-                      onClick={() => handleContentTypeChange(contentType.id)}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="font-medium text-sm">{contentType.name}</h4>
-                        <Checkbox 
-                          checked={formData.approved_content_types.includes(contentType.id)}
-                          onCheckedChange={() => handleContentTypeChange(contentType.id)}
-                          className="h-4 w-4"
-                        />
-                      </div>
-                      {contentType.description && (
-                        <p className="text-xs text-muted-foreground">
-                          {contentType.description}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-            <CardFooter className="flex justify-end border-t pt-6">
-              <Button 
-                form="brand-form" 
-                type="button" 
-                onClick={handleSubmit}
-                disabled={!isFormValid || isSubmitting}
-              >
-                {isSubmitting ? 'Creating...' : 'Create Brand'}
               </Button>
             </CardFooter>
           </Card>
@@ -823,17 +786,65 @@ export default function NewBrandPage() {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="content_vetting_agencies">Content Vetting Agencies</Label>
-                    <Textarea
+                    <Label>Content Vetting Agencies</Label>
+                    <div className="border rounded-md p-2">
+                      {vettingAgencies.length > 0 ? (
+                        <div className="space-y-2">
+                          {vettingAgencies.map((agency, index) => (
+                            <div 
+                              key={index}
+                              className="flex items-start space-x-3 p-2 border rounded-md hover:bg-accent/50 transition-colors"
+                            >
+                              <Checkbox 
+                                id={`agency-${index}`}
+                                checked={selectedAgencies.includes(agency.name)}
+                                onCheckedChange={() => handleAgencySelection(agency.name)}
+                                className="mt-1"
+                              />
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2">
+                                  <label 
+                                    htmlFor={`agency-${index}`}
+                                    className="font-medium cursor-pointer"
+                                  >
+                                    {agency.name}
+                                  </label>
+                                  <Badge variant={
+                                    agency.priority === 'high' ? 'destructive' : 
+                                    agency.priority === 'medium' ? 'default' : 
+                                    'outline'
+                                  }>
+                                    {agency.priority.charAt(0).toUpperCase() + agency.priority.slice(1)}
+                                  </Badge>
+                                </div>
+                                {agency.description && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {agency.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-4 text-muted-foreground">
+                          <p>No vetting agencies added yet</p>
+                          <p className="text-xs mt-1">Use the Generate button to auto-suggest agencies</p>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      These are regulatory bodies and agencies that content should comply with.
+                    </p>
+                    
+                    {/* Hidden textarea to maintain form data */}
+                    <textarea
                       id="content_vetting_agencies"
+                      name="content_vetting_agencies"
                       value={formData.content_vetting_agencies}
                       onChange={handleChange}
-                      placeholder="Content vetting agencies will be auto-generated when you generate brand identity or can be entered manually here..."
-                      className="min-h-[150px]"
+                      className="hidden"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Agencies that content should comply with. These will be auto-generated when you use the Generate button.
-                    </p>
                   </div>
                 </div>
               </div>
