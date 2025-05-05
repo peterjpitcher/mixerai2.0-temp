@@ -9,26 +9,49 @@ const MAX_REQUESTS = 5; // 5 requests per minute
 
 // Simplified OpenAI client - will try to use Azure OpenAI first
 const getOpenAIClient = () => {
-  // Use Azure OpenAI if available
-  if (process.env.AZURE_OPENAI_API_KEY && process.env.AZURE_OPENAI_ENDPOINT) {
-    console.log('Using Azure OpenAI client');
-    return new OpenAI({
-      apiKey: process.env.AZURE_OPENAI_API_KEY,
-      baseURL: process.env.AZURE_OPENAI_ENDPOINT,
-      defaultQuery: { 'api-version': '2023-05-15' },
-    });
+  try {
+    console.log('OpenAI client initialization:');
+    console.log(`- AZURE_OPENAI_API_KEY exists: ${!!process.env.AZURE_OPENAI_API_KEY}`);
+    console.log(`- AZURE_OPENAI_ENDPOINT exists: ${!!process.env.AZURE_OPENAI_ENDPOINT}`);
+    console.log(`- AZURE_OPENAI_DEPLOYMENT exists: ${!!process.env.AZURE_OPENAI_DEPLOYMENT}`);
+    console.log(`- OPENAI_API_KEY exists: ${!!process.env.OPENAI_API_KEY}`);
+    
+    // Use Azure OpenAI if available
+    if (process.env.AZURE_OPENAI_API_KEY && process.env.AZURE_OPENAI_ENDPOINT) {
+      console.log(`Using Azure OpenAI client with endpoint: ${process.env.AZURE_OPENAI_ENDPOINT}`);
+      
+      try {
+        const client = new OpenAI({
+          apiKey: process.env.AZURE_OPENAI_API_KEY,
+          baseURL: process.env.AZURE_OPENAI_ENDPOINT,
+          defaultQuery: { 'api-version': '2023-05-15' },
+        });
+        console.log('Successfully initialized Azure OpenAI client');
+        return client;
+      } catch (error) {
+        console.error('Error initializing Azure OpenAI client:', error);
+      }
+    }
+    
+    // Fallback to OpenAI
+    if (process.env.OPENAI_API_KEY) {
+      console.log('Using standard OpenAI client');
+      try {
+        const client = new OpenAI({
+          apiKey: process.env.OPENAI_API_KEY,
+        });
+        console.log('Successfully initialized standard OpenAI client');
+        return client;
+      } catch (error) {
+        console.error('Error initializing standard OpenAI client:', error);
+      }
+    }
+  } catch (error) {
+    console.error('Unexpected error during OpenAI client initialization:', error);
   }
   
-  // Fallback to OpenAI
-  if (process.env.OPENAI_API_KEY) {
-    console.log('Using standard OpenAI client');
-    return new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-  }
-  
-  // No credentials available
-  console.warn('No OpenAI credentials available, will use fallback generation');
+  // No credentials available or initialization failed
+  console.warn('No OpenAI credentials available or initialization failed, will use fallback generation');
   return null;
 };
 
@@ -148,15 +171,38 @@ export async function POST(req: NextRequest) {
   const isBuildTime = process.env.NODE_ENV === 'production' && 
                      typeof window === 'undefined' &&
                      (process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview' || 
-                      process.env.VERCEL_ENV === 'preview');
+                      process.env.VERCEL_ENV === 'preview') &&
+                     process.env.IGNORE_BUILD_TIME_CHECK !== 'true';
   
   if (isBuildTime) {
     console.log('Detected build-time environment, returning mock data');
-    return NextResponse.json({
-      success: true,
-      data: generateFallbackBrandIdentity('Example Brand')
-    });
+    try {
+      // Try to extract the brand name from the request body
+      const body = await req.json();
+      const brandName = body.name || body.brandName || 'Example Brand';
+      const country = body.country || 'GB';
+      
+      console.log(`Generating fallback brand identity for ${brandName} in build-time environment`);
+      return NextResponse.json({
+        success: true,
+        data: generateFallbackBrandIdentity(brandName, 'general', country)
+      });
+    } catch (error) {
+      console.error('Error extracting brand details during build time:', error);
+      return NextResponse.json({
+        success: true,
+        data: generateFallbackBrandIdentity('Example Brand')
+      });
+    }
   }
+  
+  // Additional logging to help diagnose environment variables
+  console.log('Environment check:');
+  console.log(`- NODE_ENV: ${process.env.NODE_ENV}`);
+  console.log(`- VERCEL_ENV: ${process.env.VERCEL_ENV}`);
+  console.log(`- NEXT_PUBLIC_VERCEL_ENV: ${process.env.NEXT_PUBLIC_VERCEL_ENV}`);
+  console.log(`- IGNORE_BUILD_TIME_CHECK: ${process.env.IGNORE_BUILD_TIME_CHECK}`);
+  console.log(`- Running in build-time mode: ${isBuildTime}`);
   
   // Apply rate limiting
   const ip = req.headers.get('x-forwarded-for') || 'unknown';
