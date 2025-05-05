@@ -65,6 +65,26 @@ function isValidUrl(url: string): boolean {
   }
 }
 
+// Get language name from language code
+function getLanguageName(languageCode: string): string {
+  const languageMap: Record<string, string> = {
+    'en-GB': 'British English',
+    'en-US': 'American English',
+    'fr-FR': 'French',
+    'de-DE': 'German',
+    'es-ES': 'Spanish',
+    'it-IT': 'Italian',
+    'nl-NL': 'Dutch',
+    'pt-PT': 'Portuguese',
+    'ja-JP': 'Japanese',
+    'zh-CN': 'Chinese (Simplified)',
+    'ar-SA': 'Arabic',
+    'ru-RU': 'Russian'
+  };
+  
+  return languageMap[languageCode] || languageCode;
+}
+
 // Function to extract website content from a URL
 async function scrapeWebsiteContent(url: string): Promise<string> {
   try {
@@ -107,12 +127,17 @@ async function scrapeWebsiteContent(url: string): Promise<string> {
 }
 
 // Template-based fallback generation
-function generateFallbackBrandIdentity(name: string, industry = 'general', country = 'GB') {
-  console.log(`Using fallback generation for: ${name}, industry: ${industry}, country: ${country}`);
+function generateFallbackBrandIdentity(name: string, industry = 'general', country = 'GB', language = 'en-GB') {
+  console.log(`Using fallback generation for: ${name}, industry: ${industry}, country: ${country}, language: ${language}`);
   
   // Get country label
   const countryObj = COUNTRIES.find(c => c.value === country);
   const countryName = countryObj ? countryObj.label : country;
+  const languageName = getLanguageName(language);
+  
+  // Use language-specific templates if available
+  // For demo purposes, we'll stick with English but note the language consideration
+  console.log(`Note: Using English templates for fallback, but would ideally use ${languageName} templates`);
   
   // Default templates by industry
   const templates: Record<string, any> = {
@@ -310,7 +335,7 @@ export async function POST(req: NextRequest) {
       
       return NextResponse.json({
         success: true,
-        data: generateFallbackBrandIdentity(name, industry, country)
+        data: generateFallbackBrandIdentity(name, industry, country, language)
       });
     }
     
@@ -322,22 +347,27 @@ export async function POST(req: NextRequest) {
     // Prepare prompt for OpenAI
     const countryInfo = COUNTRIES.find(c => c.value === country);
     const countryName = countryInfo ? countryInfo.label : country;
+    const languageName = getLanguageName(language);
     
-    const systemMessage = `You are an expert brand analyst who creates comprehensive brand identity profiles. Your analysis is clear, professional, and tailored to the specific brand and region.`;
+    const systemMessage = `You are an expert brand analyst who creates comprehensive brand identity profiles. 
+Your analysis is clear, professional, and tailored to the specific brand and region.
+CRITICAL: Your entire response MUST be in the language specified by the user (${languageName}).
+Do not include any content in English unless the specified language is English.`;
     
     const userMessage = `Create a comprehensive brand identity profile for "${name}" based on the following website content:
     
 ${contents.map((content, i) => `URL ${i+1}: ${validUrls[i]}\n${content.substring(0, 500)}...\n`).join('\n')}
 
-The brand operates in ${countryName} and communicates in ${language}.
+The brand operates in ${countryName} and communicates in ${languageName}.
 
-IMPORTANT: Generate ALL content in the "${language}" language. The entire response must be written in this language, appropriate for the market in ${countryName}.
+IMPORTANT: Generate ALL content in ${languageName}. The entire response must be written in this language, appropriate for the market in ${countryName}. 
+DO NOT use English for any part of your response unless the requested language is English.
 
 Please provide the following elements:
 
 1. BRAND IDENTITY: A detailed paragraph describing the brand's personality, values, and mission as they would be perceived in ${countryName}. (100-150 words)
 
-2. TONE OF VOICE: A description of how the brand communicates in ${language} - formal/casual, technical/accessible, etc. Consider cultural norms and communication styles in ${countryName}. (50-75 words)
+2. TONE OF VOICE: A description of how the brand communicates in ${languageName} - formal/casual, technical/accessible, etc. Consider cultural norms and communication styles in ${countryName}. (50-75 words)
 
 3. CONTENT GUARDRAILS: 5 specific guidelines that content creators must follow when creating content for this brand in ${countryName}. Format as bullet points.
 
@@ -345,7 +375,8 @@ Please provide the following elements:
 
 5. BRAND COLOR: Suggest a primary brand color in hex format (e.g., #FF5733) that would resonate well with consumers in ${countryName}.
 
-Format your response as a structured JSON object with these keys: brandIdentity, toneOfVoice, guardrails, suggestedAgencies (as an array of objects with name, description, and priority), and brandColor.`;
+Format your response as a structured JSON object with these keys: brandIdentity, toneOfVoice, guardrails, suggestedAgencies (as an array of objects with name, description, and priority), and brandColor.
+Remember that ALL text fields must be written in ${languageName}, not English.`;
     
     try {
       // Use direct fetch to handle both Azure and standard OpenAI
@@ -451,7 +482,7 @@ Format your response as a structured JSON object with these keys: brandIdentity,
       
       return NextResponse.json({
         success: true,
-        data: generateFallbackBrandIdentity(name, industry, country)
+        data: generateFallbackBrandIdentity(name, industry, country, language)
       });
     }
     

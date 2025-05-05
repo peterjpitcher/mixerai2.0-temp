@@ -893,33 +893,60 @@ export default function NewBrandPage() {
                   <span className="text-sm text-muted-foreground">No content types found</span>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {contentTypes.map((contentType) => (
-                    <div 
-                      key={contentType.id}
-                      className={cn(
-                        "relative flex flex-col h-full rounded-md border p-4 hover:shadow-sm transition-shadow cursor-pointer",
-                        formData.approved_content_types.includes(contentType.id) 
-                          ? "bg-primary/10 border-primary/50" 
-                          : "bg-card"
-                      )}
-                      onClick={() => handleContentTypeChange(contentType.id)}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="font-medium text-sm">{contentType.name}</h4>
-                        <Checkbox 
-                          checked={formData.approved_content_types.includes(contentType.id)}
-                          onCheckedChange={() => handleContentTypeChange(contentType.id)}
-                          className="h-4 w-4"
-                        />
-                      </div>
-                      {contentType.description && (
-                        <p className="text-xs text-muted-foreground">
-                          {contentType.description}
-                        </p>
-                      )}
-                    </div>
-                  ))}
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Each content type has specific characteristics and benefits. Select those that align with this brand's marketing strategy.
+                  </p>
+                  <div className="rounded-md border">
+                    <table className="w-full">
+                      <thead className="bg-muted/50">
+                        <tr className="text-left">
+                          <th className="p-3 font-medium text-sm">Content Type</th>
+                          <th className="p-3 font-medium text-sm">Description</th>
+                          <th className="p-3 font-medium text-sm">Benefits</th>
+                          <th className="p-3 font-medium text-sm">Select</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {contentTypes.map((contentType) => {
+                          // Generate benefits based on content type name if no description 
+                          // is available (this would ideally come from your database)
+                          const typeBenefits = getContentTypeBenefits(contentType.name);
+                          
+                          return (
+                            <tr 
+                              key={contentType.id}
+                              className={cn(
+                                "hover:bg-muted/30 transition-colors",
+                                formData.approved_content_types.includes(contentType.id) && "bg-primary/5"
+                              )}
+                            >
+                              <td className="p-3">
+                                <span className="font-medium">{contentType.name}</span>
+                              </td>
+                              <td className="p-3 text-sm">
+                                {contentType.description || "Specialized content format for audience engagement"}
+                              </td>
+                              <td className="p-3 text-sm">
+                                <ul className="list-disc pl-5 space-y-1">
+                                  {typeBenefits.map((benefit, idx) => (
+                                    <li key={idx}>{benefit}</li>
+                                  ))}
+                                </ul>
+                              </td>
+                              <td className="p-3 text-center">
+                                <Checkbox 
+                                  checked={formData.approved_content_types.includes(contentType.id)}
+                                  onCheckedChange={() => handleContentTypeChange(contentType.id)}
+                                  className="h-5 w-5"
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -943,4 +970,72 @@ export default function NewBrandPage() {
       </Tabs>
     </div>
   );
-} 
+}
+
+// Helper function to generate benefits based on content type
+const getContentTypeBenefits = (contentTypeName: string): string[] => {
+  const benefits: Record<string, string[]> = {
+    "Blog Post": [
+      "Improves SEO rankings",
+      "Establishes thought leadership",
+      "Drives organic traffic"
+    ],
+    "Social Media Post": [
+      "Increases brand awareness",
+      "Engages community directly",
+      "Provides shareable content"
+    ],
+    "Email Newsletter": [
+      "Nurtures existing customers",
+      "Delivers personalized content",
+      "Highest ROI for marketing channels"
+    ],
+    "Product Description": [
+      "Drives purchase decisions",
+      "Communicates value proposition",
+      "Reduces return rates through clear expectations"
+    ],
+    "Press Release": [
+      "Builds media relationships",
+      "Creates brand credibility",
+      "Ensures consistent messaging across outlets"
+    ],
+    "Landing Page": [
+      "Optimizes conversion rates", 
+      "Targets specific audience segments",
+      "Supports campaign objectives"
+    ],
+    "White Paper": [
+      "Demonstrates expertise",
+      "Generates quality leads",
+      "Supports complex purchase decisions"
+    ],
+    "Case Study": [
+      "Provides social proof",
+      "Illustrates real-world value",
+      "Supports sales conversations"
+    ],
+    "Infographic": [
+      "Simplifies complex information",
+      "Highly shareable content format",
+      "Appeals to visual learners"
+    ],
+    "Video Script": [
+      "Engages audiences effectively",
+      "Increases message retention",
+      "Performs well on social platforms"
+    ]
+  };
+
+  // Return specific benefits if we have them
+  if (benefits[contentTypeName]) {
+    return benefits[contentTypeName];
+  }
+
+  // Fallback generic benefits
+  return [
+    "Enhances brand communication",
+    "Connects with target audience",
+    "Supports marketing objectives"
+  ];
+}; 
