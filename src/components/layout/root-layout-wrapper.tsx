@@ -200,26 +200,11 @@ export default function RootLayoutWrapper({
       
       {/* Footer */}
       <footer className="border-t py-6 bg-muted/40">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-2 mb-4 md:mb-0">
-              <div className="w-8 h-8 rounded-full bg-[#13599f] flex items-center justify-center text-white font-bold text-sm">M</div>
-              <span className="text-sm font-medium">MixerAI 2.0 © {new Date().getFullYear()}</span>
-            </div>
-            <div className="flex flex-wrap justify-center space-x-4 text-sm text-muted-foreground">
-              <Link href="/release-notes" className="hover:text-foreground hover:underline">
-                Release Notes
-              </Link>
-              <Link href="/privacy-policy" className="hover:text-foreground hover:underline">
-                Privacy Policy
-              </Link>
-              <Link href="/terms" className="hover:text-foreground hover:underline">
-                Terms of Service
-              </Link>
-              <Link href="https://github.com/peterjpitcher/mixerai2.0" className="hover:text-foreground hover:underline">
-                GitHub
-              </Link>
-            </div>
+        <div className="w-full px-4">
+          <div className="flex justify-center">
+            <Link href="/release-notes" className="hover:text-foreground hover:underline text-sm text-muted-foreground">
+              Release Notes
+            </Link>
           </div>
         </div>
       </footer>
