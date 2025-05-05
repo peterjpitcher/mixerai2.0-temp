@@ -12,10 +12,12 @@ import { useToast } from "@/components/toast-provider";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/select";
 import { COUNTRIES, LANGUAGES } from "@/lib/constants";
-import { AlertCircle, Loader2, Info } from "lucide-react";
+import { AlertCircle, Loader2, Info, ArrowLeft } from "lucide-react";
 import { Checkbox } from "@/components/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/dialog";
 import { VETTING_AGENCIES_BY_COUNTRY } from '@/lib/azure/openai';
+import { Badge } from "@/components/badge";
+import { cn } from "@/lib/utils";
 
 interface BrandFormData {
   name: string;
@@ -173,6 +175,14 @@ export default function NewBrandPage() {
     }, 0);
   };
 
+  // Handle agency priority change
+  const handleAgencyPriorityChange = (agency: any, priority: string) => {
+    const updatedAgencies = vettingAgencies.map(a => 
+      a.name === agency.name ? { ...a, priority } : a
+    );
+    setVettingAgencies(updatedAgencies);
+  };
+
   // Validate URLs
   const validateUrls = (urls: string[]): boolean => {
     let isValid = true;
@@ -231,7 +241,7 @@ export default function NewBrandPage() {
       return;
     }
 
-    const urls = urlsInput.split('\n').filter(url => url.trim() !== '');
+    const urls = urlsInput.split('\n').map(url => url.trim()).filter(url => url.length > 0);
     
     if (urls.length === 0) {
       setUrlsError("Please enter at least one URL");
@@ -248,82 +258,161 @@ export default function NewBrandPage() {
     setSelectedAgencies([]);
 
     try {
-      console.log("Attempting to generate brand identity from:", urls);
-      console.log("Using country:", formData.country, "and language:", formData.language);
+      console.log('==== Executing Brand Identity Generation ====');
+      console.log('Brand name:', formData.name);
+      console.log('URLs:', urls);
+      console.log('Country:', formData.country);
+      console.log('Language:', formData.language);
+      
+      // Important: Use the exact parameter names expected by the API
+      const requestBody = {
+        name: formData.name,
+        urls: urls,
+        country: formData.country || 'GB',
+        language: formData.language || 'en-GB'
+      };
+      
+      console.log('Calling API with parameters:', requestBody);
       
       const response = await fetch('/api/brands/identity', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          brandName: formData.name,
-          urls,
-          countryCode: formData.country,
-          languageCode: formData.language
-        }),
+        body: JSON.stringify(requestBody),
+        // Prevent caching
+        cache: 'no-store',
+        // Add next.js specific cache options
+        next: { revalidate: 0 }
       });
 
-      const result = await response.json();
-
+      console.log('Response status:', response.status, response.ok ? 'OK' : 'Failed');
+      
       if (!response.ok) {
-        throw new Error(result.error || `Server error: ${response.status}`);
-      }
-
-      if (result.success && result.data) {
-        // Update the brand with all the generated information
-        setFormData(prev => ({
-          ...prev,
-          brand_identity: result.data.brandIdentity || "",
-          tone_of_voice: result.data.toneOfVoice || "",
-          guardrails: result.data.guardrails || "",
-        }));
-        
-        // Handle vetting agencies if provided
-        if (result.data.vettingAgencies && result.data.vettingAgencies.length > 0) {
-          // Update vetting agencies list
-          const customAgencies = result.data.vettingAgencies.map((agency: any) => ({
-            name: agency.name,
-            description: agency.description,
-            priority: agency.priority || "medium"
-          }));
-          
-          setVettingAgencies(customAgencies);
-          
-          // Select only high priority agencies by default
-          const highPriorityAgencies = customAgencies
-            .filter((agency: any) => agency.priority === "high")
-            .map((agency: any) => agency.name);
-          
-          setSelectedAgencies(highPriorityAgencies);
-          
-          // Update the form's content_vetting_agencies field
-          if (highPriorityAgencies.length > 0) {
-            setFormData(prev => ({
-              ...prev,
-              content_vetting_agencies: highPriorityAgencies.join(', ')
-            }));
-          }
+        const errorText = await response.text();
+        console.error('API error response:', errorText);
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.error || 'Failed to generate brand identity');
+        } catch (parseError) {
+          throw new Error(`Failed to generate brand identity: ${response.status} ${response.statusText}`);
         }
-
-        toast({
-          title: "Success",
-          description: "Brand identity generated successfully",
-        });
-      } else {
-        throw new Error(result.error || "Failed to generate brand identity");
       }
-    } catch (error: any) {
+      
+      // Try to get the response as text first to help with debugging
+      const responseText = await response.text();
+      console.log('Raw response:', responseText.substring(0, 100) + '...');
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log('Parsed response success:', data.success);
+        console.log('Used fallback generation:', data.data?.usedFallback);
+      } catch (parseError) {
+        console.error('Error parsing API response:', parseError);
+        throw new Error('Invalid response format from API');
+      }
+      
+      if (data.success && data.data) {
+        console.log('Brand identity generated successfully');
+        
+        // Get current time for toast notification
+        const now = new Date();
+        const timeString = now.toLocaleTimeString();
+        
+        // Ensure vettingAgencies exists or use fallback
+        const vettingAgenciesData = data.data.suggestedAgencies || data.data.vettingAgencies || [];
+        console.log('Vetting agencies data:', vettingAgenciesData);
+        
+        // Debug the full data object
+        console.log('Full API response data:', JSON.stringify(data.data, null, 2));
+        
+        // Process the guardrails - handle both array and string formats
+        let guardrailsContent = '';
+        if (Array.isArray(data.data.guardrails)) {
+          // Convert array to bulleted list format
+          guardrailsContent = data.data.guardrails.map(item => `- ${item}`).join('\n');
+        } else if (typeof data.data.guardrails === 'string') {
+          guardrailsContent = data.data.guardrails;
+        } else {
+          guardrailsContent = '- No guardrails provided';
+        }
+        
+        // Set brand with generated content
+        const updatedFormData = {
+          ...formData,
+          brand_identity: data.data.brandIdentity || '',
+          tone_of_voice: data.data.toneOfVoice || '',
+          guardrails: guardrailsContent,
+          content_vetting_agencies: vettingAgenciesData.length > 0 ? vettingAgenciesData.map(a => a.name).join(', ') : '',
+          brand_color: data.data.brandColor || '#3498db'
+        };
+        
+        // Debug the updated brand object before setting state
+        console.log('About to update brand with:', {
+          brandIdentityLength: updatedFormData.brand_identity.length,
+          toneOfVoiceLength: updatedFormData.tone_of_voice.length,
+          guardrailsLength: updatedFormData.guardrails.length,
+          agencies: updatedFormData.content_vetting_agencies,
+          color: updatedFormData.brand_color
+        });
+        
+        // Update the state
+        setFormData(updatedFormData);
+        
+        // Additional debugging - Ensure we handle guardrails correctly whether it's an array or string
+        console.log('Setting brand state with:', {
+          brandIdentity: data.data.brandIdentity ? data.data.brandIdentity.substring(0, 30) + '...' : 'undefined',
+          toneOfVoice: data.data.toneOfVoice ? data.data.toneOfVoice.substring(0, 30) + '...' : 'undefined',
+          guardrails: Array.isArray(data.data.guardrails) 
+            ? `${data.data.guardrails.length} rules` 
+            : (typeof data.data.guardrails === 'string' ? data.data.guardrails.substring(0, 30) + '...' : 'undefined'),
+          agencies: vettingAgenciesData.length > 0 ? `${vettingAgenciesData.length} agencies` : 'none',
+          color: data.data.brandColor || '#3498db'
+        });
+        
+        // Update selected agencies
+        if (vettingAgenciesData.length > 0) {
+          const agencyNames = vettingAgenciesData.map(a => a.name);
+          console.log('Setting selected agencies:', agencyNames);
+          setSelectedAgencies(agencyNames);
+          
+          // Important: Update the vettingAgencies state with the agencies from the API
+          console.log('Updating vetting agencies from API response');
+          setVettingAgencies(vettingAgenciesData);
+        }
+        
+        // Update usedFallback state
+        setUsedFallback(data.data.usedFallback || false);
+        
+        // Show toast based on whether fallback was used
+        if (data.data.usedFallback) {
+          toast({
+            title: 'Brand Identity Generated (Fallback)',
+            description: `Generated at ${timeString} using template-based fallback.`,
+            variant: 'default'
+          });
+        } else {
+          toast({
+            title: 'Brand Identity Generated',
+            description: `Generated at ${timeString} using Azure OpenAI.`,
+            variant: 'default'
+          });
+        }
+        
+        // Switch to the "Brand Identity" tab
+        console.log('Switching to brand-identity tab');
+        setCurrentTab("brand-identity");
+      } else {
+        console.error('API returned error or missing data:', data);
+        throw new Error(data.error || 'Failed to generate brand identity');
+      }
+    } catch (error) {
       console.error('Error generating brand identity:', error);
-      
-      // Don't use fallback content; instead clearly inform the user of the error
-      setUsedFallback(false);
-      setUrlsError(error.message || "Failed to generate brand identity. Please try again later.");
-      
       toast({
-        title: "AI Service Error",
-        description: error.message || "The AI service is currently unavailable. Please try again later.",
-        variant: "destructive",
+        title: 'Generation Error',
+        description: error instanceof Error ? error.message : 'Failed to generate brand identity',
+        variant: 'destructive'
       });
     } finally {
       setIsGenerating(false);
@@ -408,15 +497,13 @@ export default function NewBrandPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Add New Brand</h1>
-          <p className="text-muted-foreground">
-            Create a new brand to generate content for
-          </p>
-        </div>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold tracking-tight">Add New Brand</h1>
         <Button variant="outline" asChild>
-          <Link href="/brands">Cancel</Link>
+          <Link href="/brands">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Brands
+          </Link>
         </Button>
       </div>
 
@@ -448,149 +535,158 @@ export default function NewBrandPage() {
       >
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="basic-details">Basic Details</TabsTrigger>
-          <TabsTrigger value="brand-identity">Brand Identity AI</TabsTrigger>
+          <TabsTrigger value="brand-identity">Brand Identity</TabsTrigger>
         </TabsList>
 
         <TabsContent value="basic-details" className="space-y-4 mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Brand Information</CardTitle>
+              <CardTitle>Brand Details</CardTitle>
               <CardDescription>
-                Enter the basic details about the brand
+                Enter the basic information about the brand
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="name">Brand Name <span className="text-destructive">*</span></Label>
+                  </div>
+                  <Input
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    placeholder="Enter brand name"
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="website_url">Website URL</Label>
+                  <Input
+                    id="website_url"
+                    name="website_url"
+                    value={formData.website_url}
+                    onChange={handleChange}
+                    placeholder="https://example.com"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="country">Country</Label>
+                    <Select
+                      value={formData.country}
+                      onValueChange={(value) => handleSelectChange('country', value)}
+                    >
+                      <SelectTrigger id="country">
+                        <SelectValue placeholder="Select country" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COUNTRIES.map((country) => (
+                          <SelectItem key={country.value} value={country.value}>
+                            {country.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="language">Language</Label>
+                    <Select
+                      value={formData.language}
+                      onValueChange={(value) => handleSelectChange('language', value)}
+                    >
+                      <SelectTrigger id="language">
+                        <SelectValue placeholder="Select language" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LANGUAGES.map((language) => (
+                          <SelectItem key={language.value} value={language.value}>
+                            {language.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between border-t pt-6">
+              <Button type="button" variant="outline" disabled>
+                Back
+              </Button>
+              <Button type="button" onClick={() => setCurrentTab("brand-identity")}>
+                Next: Brand Identity
+              </Button>
+            </CardFooter>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>Approved Content Types</CardTitle>
+                <Badge variant="outline" className="text-xs font-normal">
+                  AI Taskforce Managed
+                </Badge>
+              </div>
+              <CardDescription>
+                Select which types of content can be created for this brand. Any changes to these content types must be approved by the AI taskforce. Please work with Peter Pitcher if changes are needed.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form className="space-y-6" id="brand-form">
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="name">Brand Name <span className="text-destructive">*</span></Label>
-                    <Input 
-                      id="name" 
-                      placeholder="Enter brand name" 
-                      value={formData.name}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="website_url">Website URL</Label>
-                    <Input 
-                      id="website_url" 
-                      type="url" 
-                      placeholder="https://example.com" 
-                      value={formData.website_url}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="country">Country</Label>
-                      <Select 
-                        value={formData.country} 
-                        onValueChange={(value) => handleSelectChange('country', value)}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select a country" />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-60 overflow-y-auto">
-                          {COUNTRIES.map((country) => (
-                            <SelectItem key={country.value} value={country.value}>
-                              {country.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="language">Language</Label>
-                      <Select 
-                        value={formData.language} 
-                        onValueChange={(value) => handleSelectChange('language', value)}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select a language" />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-60 overflow-y-auto">
-                          {LANGUAGES.map((language) => (
-                            <SelectItem key={language.value} value={language.value}>
-                              {language.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <Label>Approved Content Types</Label>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        Select which types of content can be created for this brand
-                      </p>
-                      {loadingContentTypes ? (
-                        <div className="flex items-center space-x-2 py-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="text-sm text-muted-foreground">Loading content types...</span>
-                        </div>
-                      ) : contentTypes.length === 0 ? (
-                        <div className="flex items-center space-x-2 py-2">
-                          <AlertCircle className="h-4 w-4" />
-                          <span className="text-sm text-muted-foreground">No content types found</span>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {contentTypes.map((contentType) => (
-                            <div key={contentType.id} className="flex items-center space-x-2">
-                              <Checkbox 
-                                id={`content-type-${contentType.id}`}
-                                checked={formData.approved_content_types.includes(contentType.id)}
-                                onCheckedChange={(checked) => 
-                                  handleContentTypeChange(contentType.id)
-                                }
-                              />
-                              <Label 
-                                htmlFor={`content-type-${contentType.id}`}
-                                className="text-sm font-normal cursor-pointer"
-                              >
-                                {contentType.name}
-                                {contentType.description && (
-                                  <span className="text-xs text-muted-foreground ml-2">
-                                    {contentType.description}
-                                  </span>
-                                )}
-                              </Label>
-                            </div>
-                          ))}
-                        </div>
+              {loadingContentTypes ? (
+                <div className="flex items-center space-x-2 py-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm text-muted-foreground">Loading content types...</span>
+                </div>
+              ) : contentTypes.length === 0 ? (
+                <div className="flex items-center space-x-2 py-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="text-sm text-muted-foreground">No content types found</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {contentTypes.map((contentType) => (
+                    <div 
+                      key={contentType.id}
+                      className={cn(
+                        "relative flex flex-col h-full rounded-md border p-4 hover:shadow-sm transition-shadow cursor-pointer",
+                        formData.approved_content_types.includes(contentType.id) 
+                          ? "bg-primary/10 border-primary/50" 
+                          : "bg-card"
+                      )}
+                      onClick={() => handleContentTypeChange(contentType.id)}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <h4 className="font-medium text-sm">{contentType.name}</h4>
+                        <Checkbox 
+                          checked={formData.approved_content_types.includes(contentType.id)}
+                          onCheckedChange={() => handleContentTypeChange(contentType.id)}
+                          className="h-4 w-4"
+                        />
+                      </div>
+                      {contentType.description && (
+                        <p className="text-xs text-muted-foreground">
+                          {contentType.description}
+                        </p>
                       )}
                     </div>
-                  </div>
+                  ))}
                 </div>
-              </form>
+              )}
             </CardContent>
-            <CardFooter className="flex justify-between border-t pt-6">
-              <Button variant="outline" asChild>
-                <Link href="/brands">Cancel</Link>
+            <CardFooter className="flex justify-end border-t pt-6">
+              <Button 
+                form="brand-form" 
+                type="button" 
+                onClick={handleSubmit}
+                disabled={!isFormValid || isSubmitting}
+              >
+                {isSubmitting ? 'Creating...' : 'Create Brand'}
               </Button>
-              <div className="flex gap-2">
-                <Button 
-                  type="button" 
-                  variant="outline"
-                  onClick={() => setCurrentTab("brand-identity")}
-                >
-                  Next: Brand Identity
-                </Button>
-                <Button 
-                  form="brand-form" 
-                  type="button" 
-                  onClick={handleSubmit}
-                  disabled={!isFormValid || isSubmitting}
-                >
-                  {isSubmitting ? 'Creating...' : 'Create Brand'}
-                </Button>
-              </div>
             </CardFooter>
           </Card>
         </TabsContent>
@@ -600,7 +696,7 @@ export default function NewBrandPage() {
             <CardHeader>
               <CardTitle>Brand Identity Generation</CardTitle>
               <CardDescription>
-                Generate brand identity using AI from website URLs or enter manually
+                Generate brand identity using AI from website URLs or edit manually
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -608,6 +704,10 @@ export default function NewBrandPage() {
                 <div className="space-y-4 pb-6 border-b">
                   <div className="space-y-2">
                     <Label htmlFor="urls-input">Website URLs (one per line)</Label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      These URLs will be used to analyse your brand's online presence and generate appropriate brand identity content.
+                      The URLs you enter will be saved for future reference.
+                    </p>
                     <Textarea
                       id="urls-input"
                       placeholder="https://example.com&#10;https://blog.example.com"
@@ -652,128 +752,185 @@ export default function NewBrandPage() {
                       </span>
                     </div>
                   )}
+                  
+                  {usedFallback && (
+                    <div className="flex items-start text-sm text-amber-600 bg-amber-50 p-4 rounded-md border border-amber-200 my-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 mt-0.5 flex-shrink-0">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                      </svg>
+                      <div>
+                        <p className="font-medium">Generated using industry templates</p>
+                        <p className="mt-1">We've used our industry templates for this brand identity. The information is based on your brand name, country, and industry type. You can edit any field to customize it further.</p>
+                        <button 
+                          onClick={() => executeGenerateBrandIdentity()}
+                          disabled={isGenerating}
+                          className="mt-2 text-xs bg-amber-100 hover:bg-amber-200 text-amber-800 font-medium py-1 px-2 rounded transition-colors inline-flex items-center"
+                        >
+                          {isGenerating ? (
+                            <>
+                              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-amber-800" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Generating...
+                            </>
+                          ) : (
+                            <>Try again</>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {usedFallback && (
-                  <div className="p-4 mb-4 border border-yellow-200 bg-yellow-50 rounded-md text-yellow-700 flex items-start">
-                    <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium">AI service unavailable</p>
-                      <p className="text-sm">Our AI service couldn't generate brand identity content. Please try again later or enter content manually.</p>
-                    </div>
-                  </div>
-                )}
-                
-                {urlsError && (
-                  <div className="p-4 mb-4 border border-red-200 bg-red-50 rounded-md text-red-700 flex items-start">
-                    <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium">Error</p>
-                      <p className="text-sm">{urlsError}</p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="brand_identity">Brand Identity</Label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="color"
-                          id="brand_color"
-                          name="brand_color"
-                          value={formData.brand_color}
-                          onChange={handleChange}
-                          className="w-8 h-8 p-1 rounded cursor-pointer"
-                          title="Click to change brand color"
-                        />
-                        <span className="text-xs text-muted-foreground">{formData.brand_color}</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left Column: Brand Identity, TOV, Guardrails */}
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="brand_identity">Brand Identity</Label>
+                        <div className="flex items-center gap-2 border rounded-md p-1 hover:bg-muted/50 cursor-pointer">
+                          <div className="text-xs mr-1">Brand Color:</div>
+                          <Input
+                            type="color"
+                            id="brand_color"
+                            name="brand_color"
+                            value={formData.brand_color || '#3498db'}
+                            onChange={handleChange}
+                            className="w-8 h-8 p-1 rounded cursor-pointer"
+                            title="Click to change brand colour"
+                          />
+                          <span className="text-xs font-mono">{formData.brand_color}</span>
+                        </div>
                       </div>
-                    </div>
-                    <Textarea
-                      id="brand_identity"
-                      placeholder="Describe the brand's identity, values, and mission"
-                      rows={3}
-                      value={formData.brand_identity}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="tone_of_voice">Tone of Voice</Label>
-                    <Textarea
-                      id="tone_of_voice"
-                      placeholder="Describe the brand's tone of voice (formal, casual, friendly, professional, etc.)"
-                      rows={3}
-                      value={formData.tone_of_voice}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="guardrails">Content Guardrails</Label>
-                    <div className="relative">
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Describes who the brand is, what it stands for, why it exists, and its consumer purpose. 
+                        This is used to ensure all generated content aligns with the brand's core identity.
+                      </p>
                       <Textarea
-                        id="guardrails"
-                        placeholder="Specify any content restrictions or guidelines as a bulleted list (- Item 1&#10;- Item 2)"
-                        rows={5}
-                        value={formData.guardrails}
+                        id="brand_identity"
+                        name="brand_identity"
+                        placeholder="Describe the brand's identity, values, and mission"
+                        rows={4}
+                        value={formData.brand_identity}
                         onChange={handleChange}
                       />
-                      <div className="absolute bottom-2 right-2 text-xs text-muted-foreground">
-                        Enter as bulleted list
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="tone_of_voice">Tone of Voice</Label>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Defines how the brand sounds, speaks, and the kind of language it uses. 
+                        This guides the style and tone of all generated content to maintain a consistent brand voice.
+                      </p>
+                      <Textarea
+                        id="tone_of_voice"
+                        name="tone_of_voice"
+                        placeholder="Describe the brand's tone of voice (formal, casual, friendly, professional, etc.)"
+                        rows={4}
+                        value={formData.tone_of_voice}
+                        onChange={handleChange}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="guardrails">Content Guardrails</Label>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Defines what the brand should NOT do. These protect the brand from creating content that 
+                        may damage consumer perception or brand reputation.
+                      </p>
+                      <div className="relative">
+                        <Textarea
+                          id="guardrails"
+                          name="guardrails"
+                          placeholder="Specify any content restrictions or guidelines as a bulleted list (- Item 1&#10;- Item 2)"
+                          rows={5}
+                          value={formData.guardrails}
+                          onChange={handleChange}
+                        />
+                        <div className="absolute bottom-2 right-2 text-xs text-muted-foreground">
+                          Enter as bulleted list
+                        </div>
                       </div>
                     </div>
-                    {formData.guardrails && !formData.guardrails.includes('-') && (
-                      <div className="text-xs text-amber-600 flex items-center mt-1">
-                        <AlertCircle className="h-3 w-3 mr-1" />
-                        <span>For better readability, use bullet points (e.g., "- Guideline 1" on each line)</span>
-                      </div>
-                    )}
                   </div>
                   
-                  <div className="space-y-4">
+                  {/* Right Column: Agencies/Bodies */}
+                  <div className="space-y-6">
                     <div>
-                      {/* Hidden input to store selected agencies */}
-                      <input 
-                        type="hidden" 
-                        id="content_vetting_agencies"
-                        name="content_vetting_agencies"
-                        value={formData.content_vetting_agencies}
-                      />
+                      <div className="flex justify-between items-center">
+                        <Label>Content Vetting Agencies</Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        These are official bodies that generated content should be vetted against to ensure it's true, accurate, 
+                        and safe. Agencies are specific to the brand's country of operation and are prioritised by importance.
+                      </p>
                       
-                      {/* Suggested agencies based on country */}
-                      {formData.country && vettingAgencies.length > 0 && (
-                        <div>
-                          <p className="text-sm font-medium mb-2">Suggested Agencies for {COUNTRIES.find(c => c.value === formData.country)?.label || formData.country}</p>
-                          <p className="text-xs text-muted-foreground mb-3">
-                            {selectedAgencies.length > 0 
-                              ? `Selected: ${selectedAgencies.length} ${selectedAgencies.length === 1 ? 'agency' : 'agencies'}`
-                              : 'Select agencies to include in content generation'}
-                          </p>
-                          <div className="space-y-3 max-h-80 overflow-y-auto border rounded-md p-3">
-                            {vettingAgencies.map((agency) => (
-                              <div key={agency.name} className="flex items-start space-x-2">
+                      {vettingAgencies.length === 0 ? (
+                        <div className="text-sm text-muted-foreground p-4 border rounded-md">
+                          {formData.country ? (
+                            <>No suggested agencies available for {COUNTRIES.find(c => c.value === formData.country)?.label}. Please select a different country.</>
+                          ) : (
+                            <>Select a country to see suggested vetting agencies.</>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">High Priority</Badge>
+                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Medium Priority</Badge>
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Low Priority</Badge>
+                          </div>
+                          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
+                            {vettingAgencies.map((agency, index) => (
+                              <div 
+                                key={index} 
+                                className="flex items-start space-x-2 p-2 rounded-md border hover:bg-muted/50"
+                              >
                                 <Checkbox 
-                                  id={`agency-${agency.name}`}
+                                  id={`agency-${index}`}
                                   checked={selectedAgencies.includes(agency.name)}
-                                  onCheckedChange={(checked) => {
-                                    handleAgencyCheckboxChange(checked as boolean, agency);
-                                  }}
-                                  className="mt-1"
+                                  onCheckedChange={(checked) => 
+                                    handleAgencyCheckboxChange(!!checked, agency)
+                                  }
                                 />
-                                <div className="grid gap-1.5 leading-none">
-                                  <Label
-                                    htmlFor={`agency-${agency.name}`}
-                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                <div className="flex-1">
+                                  <Label 
+                                    htmlFor={`agency-${index}`}
+                                    className="text-sm font-medium leading-none cursor-pointer"
                                   >
-                                    {agency.name}
+                                    <div className="flex items-center gap-2">
+                                      {agency.name}
+                                      {agency.priority === 'high' ? (
+                                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">High</Badge>
+                                      ) : agency.priority === 'medium' ? (
+                                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Medium</Badge>
+                                      ) : (
+                                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Low</Badge>
+                                      )}
+                                    </div>
                                   </Label>
-                                  <p className="text-sm text-muted-foreground">
-                                    {agency.description}
-                                  </p>
+                                  {agency.description && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {agency.description}
+                                    </p>
+                                  )}
                                 </div>
+                                <Select 
+                                  defaultValue={agency.priority}
+                                  onValueChange={(value) => handleAgencyPriorityChange(agency, value)}
+                                >
+                                  <SelectTrigger className="h-7 w-24">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="high">High</SelectItem>
+                                    <SelectItem value="medium">Medium</SelectItem>
+                                    <SelectItem value="low">Low</SelectItem>
+                                  </SelectContent>
+                                </Select>
                               </div>
                             ))}
                           </div>
