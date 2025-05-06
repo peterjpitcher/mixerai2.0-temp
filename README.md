@@ -42,12 +42,15 @@ For more detailed information, see the following documentation:
 - [Content Generation](./docs/CONTENT_GENERATION.md)
 - [Navigation Updates](./docs/NAVIGATION_UPDATES.md)
 - [Database Setup](./docs/DATABASE_SETUP.md)
+- [User Management](./docs/USER_MANAGEMENT.md)
 
 ## Recent Updates
 
 - **Navigation System**: Moved from nested `/dashboard/*` routes to root-level URLs for simpler navigation
 - **Content Generation**: Added AI-powered content generation with Azure OpenAI
 - **API Improvements**: Enhanced API routes with proper error handling and consistent response formats
+- **User Management**: Improved user invitation system with required job title field
+- **Database Migrations**: Added migrations to handle job_title field in profiles table
 
 ## Core Features
 
@@ -77,6 +80,14 @@ Users can access multiple brands with different permission levels:
 - Admin: Full access to all features
 - Editor: Can create and edit content
 - Viewer: Can only view content
+
+The user management system features:
+- User invitation via email
+- Profile management with required fields (including job title)
+- Role-based permissions
+- Brand-specific access control
+
+For detailed documentation on user management, see [docs/USER_MANAGEMENT.md](docs/USER_MANAGEMENT.md).
 
 ### Workflow Management
 

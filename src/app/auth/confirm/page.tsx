@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { Input } from '@/components/input';
@@ -10,7 +10,7 @@ import { Label } from '@/components/label';
 import { Alert } from '@/components/alert';
 import { Spinner } from '@/components/spinner';
 
-export default function ConfirmPage() {
+function ConfirmContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams?.get('token') || '';
@@ -277,5 +277,14 @@ export default function ConfirmPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+// Main component with suspense boundary
+export default function ConfirmPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><Spinner size="lg" /></div>}>
+      <ConfirmContent />
+    </Suspense>
   );
 } 
