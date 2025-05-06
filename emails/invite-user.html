@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You've Been Invited to MixerAI 2.0</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #333;
+      margin: 0;
+      padding: 0;
+      background-color: #f9fafb;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    .email-card {
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+    }
+    .header {
+      background-color: #13599f;
+      color: white;
+      padding: 24px;
+      text-align: center;
+    }
+    .logo {
+      font-size: 24px;
+      font-weight: bold;
+      margin: 0;
+    }
+    .content {
+      padding: 32px 24px;
+      line-height: 1.6;
+    }
+    .accept-button {
+      display: block;
+      background-color: #13599f;
+      color: white;
+      text-decoration: none;
+      padding: 12px 24px;
+      margin: 32px auto;
+      border-radius: 4px;
+      font-weight: 600;
+      text-align: center;
+      width: 200px;
+      transition: background-color 0.2s;
+    }
+    .accept-button:hover {
+      background-color: #0e4a89;
+    }
+    .footer {
+      text-align: center;
+      color: #6b7280;
+      font-size: 14px;
+      padding: 24px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .help-text {
+      margin-top: 32px;
+      font-size: 14px;
+      color: #6b7280;
+    }
+    .link {
+      color: #13599f;
+      text-decoration: underline;
+    }
+    .role-badge {
+      display: inline-block;
+      background-color: #e5eefb;
+      color: #13599f;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      margin-top: 8px;
+    }
+    .feature-list {
+      margin: 20px 0;
+      padding-left: 20px;
+    }
+    .feature-list li {
+      margin-bottom: 8px;
+    }
+    .contact-info {
+      background-color: #f0f7ff;
+      border-radius: 4px;
+      padding: 12px 16px;
+      margin: 24px 0 16px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="email-card">
+      <div class="header">
+        <div class="logo">MixerAI 2.0</div>
+      </div>
+      <div class="content">
+        <h2>You've Been Invited</h2>
+        <p>You have been invited to join <strong>MixerAI 2.0</strong>, General Mills' intelligent content creation platform that helps marketing teams create on-brand content at scale.</p>
+        
+        <p>Your role: <span class="role-badge">{{ .UserMetadata.role }}</span></p>
+        
+        <p>MixerAI 2.0 allows you to:</p>
+        <ul class="feature-list">
+          <li>Generate brand-compliant marketing content</li>
+          <li>Streamline approval workflows</li>
+          <li>Maintain consistency across campaigns</li>
+        </ul>
+        
+        <p>Click the button below to accept the invitation and create your account:</p>
+        
+        <a href="{{ .SiteURL }}/auth/confirm?token={{ .TokenHash }}&type=invite&redirect_to={{ .SiteURL }}" class="accept-button">Accept Invitation</a>
+        
+        <div class="contact-info">
+          <p><strong>Need help?</strong> Contact Peter Pitcher via Microsoft Teams or email at <a href="mailto:peter.pitcher@generalmills.com" class="link">peter.pitcher@generalmills.com</a>.</p>
+        </div>
+        
+        <p class="help-text">
+          If you did not expect to receive an invitation to MixerAI 2.0, you can safely ignore this email.
+          <br><br>
+          For security, this invitation will expire in 7 days.
+        </p>
+      </div>
+      <div class="footer">
+        <p>© 2023 MixerAI 2.0 | General Mills</p>
+        <p>
+          <a href="{{ .SiteURL }}/terms" class="link">Terms of Service</a> &nbsp;•&nbsp; 
+          <a href="{{ .SiteURL }}/privacy-policy" class="link">Privacy Policy</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html> 

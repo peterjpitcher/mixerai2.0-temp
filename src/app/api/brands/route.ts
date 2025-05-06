@@ -165,6 +165,76 @@ export const POST = withAuth(async (req: NextRequest, user) => {
     
     if (error) throw error;
     
+    // Set brand admin permissions (if provided)
+    if (body.brand_admin_ids && Array.isArray(body.brand_admin_ids) && body.brand_admin_ids.length > 0 && data?.[0]?.id) {
+      const brandId = data[0].id;
+      
+      // Process each brand admin ID
+      for (const brandAdminId of body.brand_admin_ids) {
+        // Create admin permission record for each brand admin
+        const { error: permissionError } = await supabase
+          .from('user_brand_permissions')
+          .upsert({
+            user_id: brandAdminId,
+            brand_id: brandId,
+            role: 'admin'
+          });
+        
+        if (permissionError) {
+          console.error(`Error setting brand admin permission for ${brandAdminId}:`, permissionError);
+          // Don't throw here, as the brand has been successfully created
+        }
+      }
+      
+      // Also add a permission for the creating user if not already included
+      if (!body.brand_admin_ids.includes(user.id)) {
+        const { error: creatorPermissionError } = await supabase
+          .from('user_brand_permissions')
+          .upsert({
+            user_id: user.id,
+            brand_id: brandId,
+            role: 'admin' // Give admin rights to creator as well
+          });
+        
+        if (creatorPermissionError) {
+          console.error('Error setting creator permission:', creatorPermissionError);
+        }
+      }
+    } 
+    // Backwards compatibility for single brand_admin_id
+    else if (body.brand_admin_id && data?.[0]?.id) {
+      const brandId = data[0].id;
+      const brandAdminId = body.brand_admin_id;
+      
+      // Create admin permission record for the brand admin
+      const { error: permissionError } = await supabase
+        .from('user_brand_permissions')
+        .upsert({
+          user_id: brandAdminId,
+          brand_id: brandId,
+          role: 'admin'
+        });
+      
+      if (permissionError) {
+        console.error('Error setting brand admin permission:', permissionError);
+      }
+      
+      // Also add a permission for the creating user (if different from admin)
+      if (user.id !== brandAdminId) {
+        const { error: creatorPermissionError } = await supabase
+          .from('user_brand_permissions')
+          .upsert({
+            user_id: user.id,
+            brand_id: brandId,
+            role: 'admin' // Give admin rights to creator as well
+          });
+        
+        if (creatorPermissionError) {
+          console.error('Error setting creator permission:', creatorPermissionError);
+        }
+      }
+    }
+    
     return NextResponse.json({ 
       success: true, 
       brand: data[0]

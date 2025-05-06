@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/card';
@@ -16,15 +16,87 @@ interface User {
   full_name: string;
   email?: string;
   job_title?: string;
+  company?: string;
   role?: string;
   avatar_url?: string;
   created_at?: string;
   last_sign_in_at?: string;
+  brand_permissions?: {
+    id: string;
+    brand_id: string;
+    role: 'admin' | 'editor' | 'viewer';
+  }[];
 }
+
+interface Brand {
+  id: string;
+  name: string;
+  brand_color?: string;
+}
+
+interface Workflow {
+  id: string;
+  name: string;
+  brand_id: string;
+  brand_name: string;
+  brand_color?: string;
+  steps: WorkflowStep[];
+}
+
+interface WorkflowStep {
+  id: number;
+  name: string;
+  role: string;
+  assignees: {
+    id?: string;
+    email: string;
+  }[];
+}
+
+interface GroupedUsers {
+  admins: User[];
+  byBrand: {
+    [brandId: string]: {
+      brandName: string;
+      brandColor?: string;
+      users: User[];
+    }
+  };
+  noBrands: User[];
+}
+
+// Add a function to generate random pastel colors for user avatars
+const getInitialsAndColor = (name: string) => {
+  // Create a hash of the user's name for consistent color
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  // Generate pastel colors (lighter, softer colors)
+  const hue = hash % 360;
+  const saturation = 60 + (hash % 20); // 60-80%
+  const lightness = 65 + (hash % 15);  // 65-80%
+  
+  const color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+  const textColor = `hsl(${hue}, ${saturation}%, 25%)`; // Darker text for contrast
+  
+  // Get up to two initials from the name
+  const initials = name
+    .split(' ')
+    .slice(0, 2)
+    .map(part => part.charAt(0).toUpperCase())
+    .join('');
+  
+  return { initials, backgroundColor: color, textColor };
+};
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+  const [groupedUsers, setGroupedUsers] = useState<GroupedUsers>({ admins: [], byBrand: {}, noBrands: [] });
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,6 +109,7 @@ export default function UsersPage() {
   const [editForm, setEditForm] = useState({
     full_name: '',
     job_title: '',
+    company: '',
     role: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -74,8 +147,139 @@ export default function UsersPage() {
       }
     };
     
+    const fetchBrands = async () => {
+      try {
+        const response = await fetch('/api/brands');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch brands');
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          setBrands(data.brands);
+        } else {
+          throw new Error(data.error || 'Failed to fetch brands');
+        }
+      } catch (error) {
+        console.error('Error fetching brands:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load brands. Brand grouping may be affected.',
+          variant: 'destructive'
+        });
+      }
+    };
+    
+    const fetchWorkflows = async () => {
+      try {
+        const response = await fetch('/api/workflows');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch workflows');
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          setWorkflows(data.workflows);
+        } else {
+          throw new Error(data.error || 'Failed to fetch workflows');
+        }
+      } catch (error) {
+        console.error('Error fetching workflows:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load workflow data. User grouping may be affected.',
+          variant: 'destructive'
+        });
+      }
+    };
+    
     fetchUsers();
+    fetchBrands();
+    fetchWorkflows();
   }, [toast]);
+  
+  // Group users by role and workflow brand assignments
+  useEffect(() => {
+    const getGroupedUsers = (usersList: User[]): GroupedUsers => {
+      const result: GroupedUsers = {
+        admins: [],
+        byBrand: {},
+        noBrands: []
+      };
+      
+      // First, identify admins
+      usersList.forEach(user => {
+        if (user.role === 'Admin') {
+          result.admins.push(user);
+        }
+      });
+      
+      // Map users to brands via workflow assignments
+      const userBrandMap = new Map<string, Set<string>>();
+      
+      // Process workflows to find user assignments to brands
+      workflows.forEach(workflow => {
+        if (!workflow.steps) return;
+        
+        workflow.steps.forEach(step => {
+          if (!step.assignees) return;
+          
+          step.assignees.forEach(assignee => {
+            if (!assignee.id) return; // Skip assignees without an ID
+            
+            // Add brand to this user's set of brands
+            if (!userBrandMap.has(assignee.id)) {
+              userBrandMap.set(assignee.id, new Set());
+            }
+            userBrandMap.get(assignee.id)?.add(workflow.brand_id);
+          });
+        });
+      });
+      
+      // Now assign users to their brand groups
+      usersList.forEach(user => {
+        // Skip admins as they're already added
+        if (user.role === 'Admin') return;
+        
+        const userBrands = userBrandMap.get(user.id);
+        
+        if (userBrands && userBrands.size > 0) {
+          // This user is assigned to at least one brand through workflows
+          userBrands.forEach(brandId => {
+            const brand = brands.find(b => b.id === brandId);
+            
+            if (!brand) return;
+            
+            if (!result.byBrand[brandId]) {
+              result.byBrand[brandId] = {
+                brandName: brand.name,
+                brandColor: brand.brand_color,
+                users: []
+              };
+            }
+            
+            // Check if user is already in this brand group
+            if (!result.byBrand[brandId].users.some(u => u.id === user.id)) {
+              result.byBrand[brandId].users.push(user);
+            }
+          });
+        } else {
+          // User not assigned to any brand through workflows
+          result.noBrands.push(user);
+        }
+      });
+      
+      return result;
+    };
+    
+    if (filteredUsers.length > 0 && workflows.length > 0 && brands.length > 0) {
+      setGroupedUsers(getGroupedUsers(filteredUsers));
+    }
+  }, [filteredUsers, workflows, brands]);
   
   useEffect(() => {
     if (searchQuery.trim() === '') {
@@ -87,7 +291,8 @@ export default function UsersPage() {
     const filtered = users.filter(user => 
       user.full_name.toLowerCase().includes(query) || 
       (user.email && user.email.toLowerCase().includes(query)) ||
-      (user.role && user.role.toLowerCase().includes(query))
+      (user.role && user.role.toLowerCase().includes(query)) ||
+      (user.company && user.company.toLowerCase().includes(query))
     );
     
     setFilteredUsers(filtered);
@@ -109,6 +314,7 @@ export default function UsersPage() {
     setEditForm({
       full_name: user.full_name || '',
       job_title: user.job_title || '',
+      company: user.company || '',
       role: (user.role?.toLowerCase() || 'viewer') as 'admin' | 'editor' | 'viewer'
     });
     setIsEditDialogOpen(true);
@@ -135,6 +341,7 @@ export default function UsersPage() {
         body: JSON.stringify({
           full_name: editForm.full_name,
           job_title: editForm.job_title,
+          company: editForm.company,
           role: editForm.role
         })
       });
@@ -149,6 +356,7 @@ export default function UsersPage() {
                 ...u, 
                 full_name: editForm.full_name,
                 job_title: editForm.job_title,
+                company: editForm.company,
                 role: editForm.role.charAt(0).toUpperCase() + editForm.role.slice(1)
               } 
             : u
@@ -161,6 +369,7 @@ export default function UsersPage() {
                 ...u, 
                 full_name: editForm.full_name,
                 job_title: editForm.job_title,
+                company: editForm.company,
                 role: editForm.role.charAt(0).toUpperCase() + editForm.role.slice(1)
               } 
             : u
@@ -225,6 +434,51 @@ export default function UsersPage() {
     }
   };
 
+  // Render user table row
+  const renderUserRow = (user: User) => (
+    <tr key={user.id} className="border-b hover:bg-muted/50">
+      <td className="py-3">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center">
+            {(() => {
+              const { initials, backgroundColor, textColor } = getInitialsAndColor(user.full_name);
+              return (
+                <div 
+                  className="w-full h-full flex items-center justify-center font-medium"
+                  style={{ backgroundColor, color: textColor }}
+                >
+                  {initials}
+                </div>
+              );
+            })()}
+          </div>
+          <span>{user.full_name}</span>
+        </div>
+      </td>
+      <td className="py-3 text-muted-foreground">{user.email}</td>
+      <td className="py-3 text-muted-foreground">{user.job_title || '—'}</td>
+      <td className="py-3 text-muted-foreground">{user.company || '—'}</td>
+      <td className="py-3">
+        {user.role === 'Admin' ? (
+          <Badge variant="default" className="bg-blue-100 hover:bg-blue-100 text-blue-800 hover:text-blue-800">Admin</Badge>
+        ) : user.role === 'Editor' ? (
+          <Badge variant="default" className="bg-green-100 hover:bg-green-100 text-green-800 hover:text-green-800">Editor</Badge>
+        ) : (
+          <Badge variant="default" className="bg-gray-100 hover:bg-gray-100 text-gray-800 hover:text-gray-800">Viewer</Badge>
+        )}
+      </td>
+      <td className="py-3 text-muted-foreground">
+        {formatDate(user.last_sign_in_at)}
+      </td>
+      <td className="py-3">
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={() => handleEditClick(user)}>Edit</Button>
+          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(user)}>Delete</Button>
+        </div>
+      </td>
+    </tr>
+  );
+
   return (
     <div className="flex flex-col">
       {/* Full width header with background */}
@@ -237,7 +491,7 @@ export default function UsersPage() {
         </div>
       </div>
       
-      <div className="space-y-8">
+      <div className="container py-8 max-w-7xl mx-auto space-y-8">
         <div className="flex items-center justify-between">
           <div className="max-w-sm w-full">
             <Input 
@@ -324,49 +578,61 @@ export default function UsersPage() {
                       <tr className="border-b">
                         <th className="text-left pb-3 font-medium">Name</th>
                         <th className="text-left pb-3 font-medium">Email</th>
+                        <th className="text-left pb-3 font-medium">Job Title</th>
+                        <th className="text-left pb-3 font-medium">Company</th>
                         <th className="text-left pb-3 font-medium">Role</th>
                         <th className="text-left pb-3 font-medium">Last Login</th>
                         <th className="text-left pb-3 font-medium">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredUsers.map(user => (
-                        <tr key={user.id} className="border-b hover:bg-muted/50">
-                          <td className="py-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full overflow-hidden">
-                                {user.avatar_url ? (
-                                  <img src={user.avatar_url} alt={user.full_name} className="w-full h-full object-cover" />
-                                ) : (
-                                  <div className="bg-primary/10 w-full h-full flex items-center justify-center text-primary font-bold">
-                                    {user.full_name.charAt(0)}
-                                  </div>
-                                )}
-                              </div>
-                              <span>{user.full_name}</span>
-                            </div>
-                          </td>
-                          <td className="py-3 text-muted-foreground">{user.email}</td>
-                          <td className="py-3">
-                            {user.role === 'Admin' ? (
-                              <Badge variant="default" className="bg-blue-100 hover:bg-blue-100 text-blue-800 hover:text-blue-800">Admin</Badge>
-                            ) : user.role === 'Editor' ? (
-                              <Badge variant="default" className="bg-green-100 hover:bg-green-100 text-green-800 hover:text-green-800">Editor</Badge>
-                            ) : (
-                              <Badge variant="default" className="bg-gray-100 hover:bg-gray-100 text-gray-800 hover:text-gray-800">Viewer</Badge>
-                            )}
-                          </td>
-                          <td className="py-3 text-muted-foreground">
-                            {formatDate(user.last_sign_in_at)}
-                          </td>
-                          <td className="py-3">
-                            <div className="flex gap-2">
-                              <Button variant="ghost" size="sm" onClick={() => handleEditClick(user)}>Edit</Button>
-                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(user)}>Delete</Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                      {/* Admin Users Section */}
+                      {groupedUsers.admins.length > 0 && (
+                        <>
+                          <tr className="bg-muted/30">
+                            <td colSpan={7} className="py-2 px-3 font-medium">
+                              Administrators ({groupedUsers.admins.length})
+                            </td>
+                          </tr>
+                          {groupedUsers.admins.map(renderUserRow)}
+                        </>
+                      )}
+                      
+                      {/* Users By Brand Section */}
+                      {Object.entries(groupedUsers.byBrand).map(([brandId, brandGroup]) => {
+                        if (brandGroup.users.length === 0) return null;
+                        
+                        return (
+                          <React.Fragment key={brandId}>
+                            <tr className="bg-muted/30">
+                              <td colSpan={7} className="py-2 px-3 font-medium">
+                                <div className="flex items-center gap-2">
+                                  {brandGroup.brandColor && (
+                                    <div 
+                                      className="w-3 h-3 rounded-full" 
+                                      style={{ backgroundColor: brandGroup.brandColor }}
+                                    ></div>
+                                  )}
+                                  <span>{brandGroup.brandName} ({brandGroup.users.length})</span>
+                                </div>
+                              </td>
+                            </tr>
+                            {brandGroup.users.map(renderUserRow)}
+                          </React.Fragment>
+                        );
+                      })}
+                      
+                      {/* Users Without Brand Assignments */}
+                      {groupedUsers.noBrands.length > 0 && groupedUsers.noBrands.some(user => user.role !== 'Admin') && (
+                        <>
+                          <tr className="bg-muted/30">
+                            <td colSpan={7} className="py-2 px-3 font-medium">
+                              Users Without Brand Assignments ({groupedUsers.noBrands.filter(u => u.role !== 'Admin').length})
+                            </td>
+                          </tr>
+                          {groupedUsers.noBrands.filter(user => user.role !== 'Admin').map(renderUserRow)}
+                        </>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -378,58 +644,75 @@ export default function UsersPage() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
-            <DialogDescription>Make changes to the user's information</DialogDescription>
+            <DialogDescription>Update user information and role</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="full_name" className="text-right">
-                Full Name
-              </Label>
-              <Input
-                id="full_name"
-                value={editForm.full_name}
-                onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                className="col-span-3"
-              />
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            handleEditSubmit(e);
+          }}>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="full_name">Full Name</Label>
+                <Input
+                  id="full_name"
+                  value={editForm.full_name}
+                  onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                  placeholder="Full name"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="company">Company</Label>
+                <Input
+                  id="company"
+                  value={editForm.company}
+                  onChange={(e) => setEditForm({ ...editForm, company: e.target.value })}
+                  placeholder="Company name"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="job_title">Job Title</Label>
+                <Input
+                  id="job_title"
+                  value={editForm.job_title}
+                  onChange={(e) => setEditForm({ ...editForm, job_title: e.target.value })}
+                  placeholder="Job title"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="role">Role</Label>
+                <Select
+                  value={editForm.role}
+                  onValueChange={(value) => setEditForm({ ...editForm, role: value as 'admin' | 'editor' | 'viewer' })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="editor">Editor</SelectItem>
+                    <SelectItem value="viewer">Viewer</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Admin: Full access to all features | Editor: Can create and edit content | Viewer: Read-only access
+                </p>
+              </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="job_title" className="text-right">
-                Job Title
-              </Label>
-              <Input
-                id="job_title"
-                value={editForm.job_title}
-                onChange={(e) => setEditForm({ ...editForm, job_title: e.target.value })}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="role" className="text-right">
-                Role
-              </Label>
-              <Select
-                value={editForm.role}
-                onValueChange={(value) => setEditForm({ ...editForm, role: value as 'admin' | 'editor' | 'viewer' })}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="editor">Editor</SelectItem>
-                  <SelectItem value="viewer">Viewer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="submit" onClick={handleEditSubmit}>
-              {isSubmitting ? 'Updating...' : 'Update'}
-            </Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

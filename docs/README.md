@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MixerAI 2.0 Documentation
 
-## Getting Started
+## Overview
 
-First, run the development server:
+This folder contains documentation for the MixerAI 2.0 application. We have consolidated most documentation into a single comprehensive file:
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+[CONSOLIDATED_DOCUMENTATION.md](./CONSOLIDATED_DOCUMENTATION.md) - Complete project documentation
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Email Templates
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The `/email-templates` folder contains HTML templates used for system emails:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- [confirmation.html](./email-templates/confirm-signup.html) - Account confirmation email
+- [invitation.html](./email-templates/invitation.html) - User invitation email
+- [magic-link.html](./email-templates/magic-link.html) - Magic link authentication email
+- [reset-password.html](./email-templates/reset-password.html) - Password reset email
 
-## Learn More
+## Scripts
 
-To learn more about Next.js, take a look at the following resources:
+The following shell scripts are available for development and maintenance:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [setup-local-db.sh](./setup-local-db.sh) - Set up a local database for development
+- [update-supabase-config.sh](./update-supabase-config.sh) - Update Supabase configuration
+- [fix-package-json.sh](./fix-package-json.sh) - Fix package.json issues
+- [run-mixerai.sh](./run-mixerai.sh) - Run the MixerAI application
+- [fix-folder-structure.sh](./fix-folder-structure.sh) - Fix folder structure issues
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Legacy Documentation
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Note: Most documentation has been consolidated, but specialized documentation may still exist in individual files. Please refer to the consolidated documentation first.

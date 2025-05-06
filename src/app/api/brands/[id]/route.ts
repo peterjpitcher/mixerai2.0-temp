@@ -203,6 +203,49 @@ export async function PUT(
     
     if (body.content_vetting_agencies !== undefined) updateData.content_vetting_agencies = body.content_vetting_agencies;
     
+    // If updated fields include brand_admin_id, update permissions
+    if (body.brand_admin_id) {
+      const brandAdminId = body.brand_admin_id;
+      
+      // Check if this brand admin already has admin permissions
+      const { data: existingPermission, error: permCheckError } = await supabase
+        .from('user_brand_permissions')
+        .select('id, role')
+        .eq('user_id', brandAdminId)
+        .eq('brand_id', id)
+        .maybeSingle();
+      
+      if (permCheckError) {
+        console.error('Error checking existing brand admin permission:', permCheckError);
+      } else {
+        // If exists but not admin, update to admin role
+        if (existingPermission && existingPermission.role !== 'admin') {
+          const { error: updatePermError } = await supabase
+            .from('user_brand_permissions')
+            .update({ role: 'admin' })
+            .eq('id', existingPermission.id);
+          
+          if (updatePermError) {
+            console.error('Error updating brand admin permission:', updatePermError);
+          }
+        } 
+        // If doesn't exist, create new admin permission
+        else if (!existingPermission) {
+          const { error: createPermError } = await supabase
+            .from('user_brand_permissions')
+            .insert({
+              user_id: brandAdminId,
+              brand_id: id,
+              role: 'admin'
+            });
+          
+          if (createPermError) {
+            console.error('Error creating brand admin permission:', createPermError);
+          }
+        }
+      }
+    }
+    
     // Check if there's anything to update
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(

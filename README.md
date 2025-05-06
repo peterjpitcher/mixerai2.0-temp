@@ -36,13 +36,11 @@ MixerAI 2.0 is an application that creates AI-generated content with Azure OpenA
 
 ## Documentation
 
-For more detailed information, see the following documentation:
+For comprehensive documentation, see:
 
-- [Main Documentation](./docs/DOCUMENTATION.md)
-- [Content Generation](./docs/CONTENT_GENERATION.md)
-- [Navigation Updates](./docs/NAVIGATION_UPDATES.md)
-- [Database Setup](./docs/DATABASE_SETUP.md)
-- [User Management](./docs/USER_MANAGEMENT.md)
+- [Consolidated Documentation](./docs/CONSOLIDATED_DOCUMENTATION.md)
+
+The project's documentation has been consolidated into a single comprehensive file for easier reference. Legacy and specialized documentation is available in the `/docs/archive` folder.
 
 ## Recent Updates
 
@@ -50,7 +48,8 @@ For more detailed information, see the following documentation:
 - **Content Generation**: Added AI-powered content generation with Azure OpenAI
 - **API Improvements**: Enhanced API routes with proper error handling and consistent response formats
 - **User Management**: Improved user invitation system with required job title field
-- **Database Migrations**: Added migrations to handle job_title field in profiles table
+- **Database Migrations**: Consolidated all migrations into a single file for easier deployment
+- **Documentation**: Consolidated documentation into a single comprehensive file
 
 ## Core Features
 
@@ -64,7 +63,7 @@ MixerAI 2.0 leverages Azure OpenAI to generate high-quality marketing content. T
 - Save generated content to the database
 - Integrate with approval workflows
 
-For detailed documentation on the content generation feature, see [docs/CONTENT_GENERATION.md](docs/CONTENT_GENERATION.md).
+For detailed documentation on content generation, see the [Consolidated Documentation](docs/CONSOLIDATED_DOCUMENTATION.md#content-generation).
 
 ### Brands Management
 
@@ -87,7 +86,7 @@ The user management system features:
 - Role-based permissions
 - Brand-specific access control
 
-For detailed documentation on user management, see [docs/USER_MANAGEMENT.md](docs/USER_MANAGEMENT.md).
+For detailed documentation on user management, see the [Consolidated Documentation](docs/CONSOLIDATED_DOCUMENTATION.md#user-management-with-rbac).
 
 ### Workflow Management
 
@@ -121,6 +120,4 @@ Access the testing tools at `/openai-test` in your running application. The test
 - View detailed error information and response times
 - Configure and test with different parameters
 
-### Documentation
-
-For detailed information on using the OpenAI testing tools, see [OPENAI_TESTING_TOOLS.md](docs/OPENAI_TESTING_TOOLS.md) in the docs directory. 
+For detailed information on using the OpenAI testing tools, see the [Consolidated Documentation](docs/CONSOLIDATED_DOCUMENTATION.md#azure-openai-integration) or the archived documentation in the docs directory. 

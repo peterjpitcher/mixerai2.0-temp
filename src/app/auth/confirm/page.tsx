@@ -20,6 +20,7 @@ function ConfirmContent() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [jobTitle, setJobTitle] = useState('');
+  const [company, setCompany] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -29,6 +30,26 @@ function ConfirmContent() {
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
   );
+  
+  // Extract company name from email domain
+  const extractCompanyFromEmail = (email: string) => {
+    try {
+      const domain = email.split('@')[1];
+      if (!domain) return '';
+      
+      // Remove common TLDs and extract the main domain name
+      const mainDomain = domain.split('.')[0];
+      
+      // Capitalize the first letter of each word
+      return mainDomain
+        .split(/[-_]/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    } catch (error) {
+      console.error('Error extracting company from email:', error);
+      return '';
+    }
+  };
   
   useEffect(() => {
     // Verify the token is present
@@ -56,6 +77,13 @@ function ConfirmContent() {
           if (data.user.user_metadata?.job_title) {
             setJobTitle(data.user.user_metadata.job_title);
           }
+          
+          // Pre-fill company from metadata if available, or extract from email
+          if (data.user.user_metadata?.company) {
+            setCompany(data.user.user_metadata.company);
+          } else if (data.user.email) {
+            setCompany(extractCompanyFromEmail(data.user.email));
+          }
         }
       } catch (err) {
         console.error('Error getting invitation details:', err);
@@ -73,7 +101,7 @@ function ConfirmContent() {
     try {
       // Debug logging
       console.log('Confirming invitation with token:', token);
-      console.log('Form data:', { fullName, jobTitle, passwordLength: password.length });
+      console.log('Form data:', { fullName, jobTitle, company, passwordLength: password.length });
       
       if (type === 'invite' && !password) {
         throw new Error('Please set a password to complete your registration');
@@ -85,6 +113,10 @@ function ConfirmContent() {
       
       if (type === 'invite' && !jobTitle.trim()) {
         throw new Error('Job title is required');
+      }
+      
+      if (type === 'invite' && !company.trim()) {
+        throw new Error('Company is required');
       }
       
       // For invited users, they need to set a password
@@ -104,19 +136,21 @@ function ConfirmContent() {
             password: password,
             data: {
               full_name: fullName.trim(),
-              job_title: jobTitle.trim()
+              job_title: jobTitle.trim(),
+              company: company.trim()
             }
           });
           
           if (updateUserError) throw updateUserError;
           
-          // Update the user's profile with additional information
+          // Update the user's profile with additional information without job_description
           const { error: profileError } = await supabase
             .from('profiles')
             .upsert({
               id: data.user.id,
               full_name: fullName.trim(),
               job_title: jobTitle.trim(),
+              company: company.trim(),
               updated_at: new Date().toISOString()
             });
           
@@ -136,6 +170,75 @@ function ConfirmContent() {
           
           if (permissionError) {
             console.error('Error updating permissions:', permissionError);
+          }
+          
+          // Update workflow invitations status to accepted and link to user ID
+          if (data?.user?.email) {
+            const userEmail = data.user.email;
+            const userId = data.user.id;
+            
+            const { error: workflowInviteError } = await supabase
+              .from('workflow_invitations')
+              .update({ status: 'accepted' })
+              .eq('email', userEmail)
+              .eq('status', 'pending');
+            
+            if (workflowInviteError) {
+              console.error('Error updating workflow invitations:', workflowInviteError);
+            } else {
+              console.log('Workflow invitations updated successfully');
+            }
+            
+            // Update the assignees in workflow steps to include proper name instead of just email
+            try {
+              // Get all workflows that have this user's email in steps
+              const { data: workflows, error: workflowsError } = await supabase
+                .from('workflows')
+                .select('id, steps');
+              
+              if (workflowsError) {
+                console.error('Error fetching workflows:', workflowsError);
+              } else if (workflows) {
+                // For each workflow, check if any steps have assignees with this email
+                for (const workflow of workflows) {
+                  if (workflow.steps && Array.isArray(workflow.steps)) {
+                    let updated = false;
+                    const updatedSteps = workflow.steps.map((step: any) => {
+                      if (step.assignees && Array.isArray(step.assignees)) {
+                        step.assignees = step.assignees.map((assignee: any) => {
+                          if (assignee.email === userEmail) {
+                            updated = true;
+                            return {
+                              ...assignee,
+                              id: userId,
+                              name: fullName.trim()
+                            };
+                          }
+                          return assignee;
+                        });
+                      }
+                      return step;
+                    });
+                    
+                    // If any steps were updated, save the workflow
+                    if (updated) {
+                      const { error: updateError } = await supabase
+                        .from('workflows')
+                        .update({ steps: updatedSteps })
+                        .eq('id', workflow.id);
+                      
+                      if (updateError) {
+                        console.error(`Error updating workflow ${workflow.id}:`, updateError);
+                      } else {
+                        console.log(`Updated workflow ${workflow.id} with user's name`);
+                      }
+                    }
+                  }
+                }
+              }
+            } catch (workflowUpdateError) {
+              console.error('Error updating workflow assignees:', workflowUpdateError);
+            }
           }
         }
       } else {
@@ -238,6 +341,17 @@ function ConfirmContent() {
                         value={jobTitle}
                         onChange={(e) => setJobTitle(e.target.value)}
                         placeholder="Your job title"
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <Label htmlFor="company">Company <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="company"
+                        value={company}
+                        onChange={(e) => setCompany(e.target.value)}
+                        placeholder="Your company"
                         required
                       />
                     </div>

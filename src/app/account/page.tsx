@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
 import { Input } from '@/components/input';
@@ -8,16 +8,23 @@ import { Label } from '@/components/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import { useToast } from '@/components/toast-provider';
 import { Switch } from '@/components/switch';
+import { createBrowserClient } from '@supabase/ssr';
 
 export default function AccountPage() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  );
 
   const [profileData, setProfileData] = useState({
-    fullName: 'John Doe',
-    email: 'john.doe@example.com',
-    company: 'Acme Inc.',
-    jobTitle: 'Marketing Manager',
+    fullName: '',
+    email: '',
+    company: '',
+    jobTitle: '',
   });
 
   const [notificationSettings, setNotificationSettings] = useState({
@@ -27,6 +34,55 @@ export default function AccountPage() {
     taskReminders: false,
     marketingEmails: false,
   });
+  
+  // Load user data
+  useEffect(() => {
+    async function loadUserData() {
+      try {
+        setIsLoading(true);
+        
+        // Get user session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+          // Get profile data
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (profile) {
+            setProfileData({
+              fullName: profile.full_name || session.user.user_metadata?.full_name || '',
+              email: session.user.email || '',
+              company: profile.company || session.user.user_metadata?.company || '',
+              jobTitle: profile.job_title || session.user.user_metadata?.job_title || '',
+            });
+          } else {
+            // If no profile, use user metadata from auth
+            setProfileData({
+              fullName: session.user.user_metadata?.full_name || '',
+              email: session.user.email || '',
+              company: session.user.user_metadata?.company || '',
+              jobTitle: session.user.user_metadata?.job_title || '',
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error loading user data:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load user profile data',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    
+    loadUserData();
+  }, [supabase, toast]);
 
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -48,8 +104,34 @@ export default function AccountPage() {
     setIsSubmitting(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Get current user
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+      
+      // Update profile
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({
+          id: session.user.id,
+          full_name: profileData.fullName,
+          company: profileData.company,
+          job_title: profileData.jobTitle,
+          updated_at: new Date().toISOString()
+        });
+      
+      if (error) throw error;
+      
+      // Also update user metadata
+      await supabase.auth.updateUser({
+        data: {
+          full_name: profileData.fullName,
+          job_title: profileData.jobTitle,
+          company: profileData.company
+        }
+      });
       
       toast({
         title: 'Profile updated',
@@ -96,8 +178,12 @@ export default function AccountPage() {
     setIsSubmitting(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Update password
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+      
+      if (error) throw error;
       
       toast({
         title: 'Password updated',
@@ -123,8 +209,21 @@ export default function AccountPage() {
     setIsSubmitting(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Get current user
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+      
+      // Update user metadata with notification preferences
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          notification_preferences: notificationSettings
+        }
+      });
+      
+      if (error) throw error;
       
       toast({
         title: 'Notification settings updated',
@@ -141,6 +240,19 @@ export default function AccountPage() {
       setIsSubmitting(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Account Settings</h1>
+          <p className="text-muted-foreground">
+            Loading your profile...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -170,7 +282,7 @@ export default function AccountPage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center space-x-4">
                   <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-2xl">
-                    {profileData.fullName.split(' ').map(name => name[0]).join('')}
+                    {profileData.fullName ? profileData.fullName.split(' ').map(name => name[0]).join('') : '?'}
                   </div>
                   <div>
                     <Button variant="outline" type="button">
@@ -195,7 +307,9 @@ export default function AccountPage() {
                       type="email" 
                       value={profileData.email}
                       onChange={handleProfileChange}
+                      disabled
                     />
+                    <p className="text-xs text-muted-foreground">Email cannot be changed</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="company">Company</Label>
@@ -215,7 +329,7 @@ export default function AccountPage() {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="border-t pt-6">
+              <CardFooter className="pt-6">
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? 'Saving...' : 'Save Changes'}
                 </Button>
@@ -260,7 +374,7 @@ export default function AccountPage() {
                   </ul>
                 </div>
               </CardContent>
-              <CardFooter className="border-t pt-6">
+              <CardFooter className="pt-6">
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? 'Updating...' : 'Update Password'}
                 </Button>
@@ -345,7 +459,7 @@ export default function AccountPage() {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="border-t pt-6">
+              <CardFooter className="pt-6">
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? 'Saving...' : 'Save Preferences'}
                 </Button>
@@ -354,12 +468,6 @@ export default function AccountPage() {
           </Card>
         </TabsContent>
       </Tabs>
-      
-      <div className="text-center p-4 bg-amber-50 text-amber-800 rounded-md border border-amber-200">
-        <p className="text-sm">
-          <strong>Note:</strong> This page currently uses mock data. User account API endpoints will be implemented in a future update.
-        </p>
-      </div>
     </div>
   );
 } 

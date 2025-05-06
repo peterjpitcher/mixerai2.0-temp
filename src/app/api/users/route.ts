@@ -20,6 +20,8 @@ interface ProfileRecord {
     brand_id: string;
     role: 'admin' | 'editor' | 'viewer';
   }[];
+  job_title?: string;
+  company?: string;
 }
 
 /**
@@ -89,24 +91,52 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       // Find matching profile
       const profile = (profiles as ProfileRecord[]).find(p => p.id === authUser.id);
       
+      // Debug user permissions
+      console.log(`Processing user: ${authUser.email}`);
+      if (profile?.user_brand_permissions) {
+        console.log(`User: ${authUser.email}, Permissions:`, JSON.stringify(profile.user_brand_permissions));
+      } else {
+        console.log(`User: ${authUser.email}, No permissions found`);
+      }
+      
       // Get the highest role (admin > editor > viewer)
       let highestRole = 'viewer';
-      if (profile?.user_brand_permissions) {
+      if (profile?.user_brand_permissions && Array.isArray(profile.user_brand_permissions) && profile.user_brand_permissions.length > 0) {
         for (const permission of profile.user_brand_permissions) {
-          if (permission.role === 'admin') {
+          if (permission && permission.role === 'admin') {
             highestRole = 'admin';
+            console.log(`User: ${authUser.email}, Found admin role, setting highest role to admin`);
             break;
-          } else if (permission.role === 'editor' && highestRole !== 'admin') {
+          } else if (permission && permission.role === 'editor' && highestRole !== 'admin') {
             highestRole = 'editor';
+            console.log(`User: ${authUser.email}, Found editor role, setting highest role to editor`);
           }
         }
       }
+      
+      // Check if role might be coming from metadata as fallback
+      if (highestRole === 'viewer' && authUser.user_metadata?.role) {
+        const metadataRole = typeof authUser.user_metadata.role === 'string' ? 
+          authUser.user_metadata.role.toLowerCase() : '';
+        
+        if (metadataRole === 'admin') {
+          highestRole = 'admin';
+          console.log(`User: ${authUser.email}, Found admin role in metadata, using that instead`);
+        } else if (metadataRole === 'editor') {
+          highestRole = 'editor';
+          console.log(`User: ${authUser.email}, Found editor role in metadata, using that instead`);
+        }
+      }
+      
+      console.log(`User: ${authUser.email}, Final role: ${highestRole}`);
       
       return {
         id: authUser.id,
         full_name: profile?.full_name || authUser.user_metadata?.full_name || 'Unnamed User',
         email: authUser.email,
         avatar_url: profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUser.id}`,
+        job_title: profile?.job_title || authUser.user_metadata?.job_title || '',
+        company: profile?.company || authUser.user_metadata?.company || '',
         role: highestRole.charAt(0).toUpperCase() + highestRole.slice(1), // Capitalize role
         created_at: authUser.created_at,
         last_sign_in_at: authUser.last_sign_in_at,

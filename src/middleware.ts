@@ -47,12 +47,14 @@ export async function middleware(request: NextRequest) {
 
     // Handle authentication for protected routes
     if (request.nextUrl.pathname.startsWith('/dashboard') || 
-        request.nextUrl.pathname.startsWith('/api/')) {
+        request.nextUrl.pathname.startsWith('/api/') ||
+        request.nextUrl.pathname.startsWith('/account')) {
       try {
         const { data } = await supabase.auth.getSession();
         if (!data.session) {
-          // Redirect to login for dashboard routes
-          if (request.nextUrl.pathname.startsWith('/dashboard')) {
+          // Redirect to login for dashboard or account routes
+          if (request.nextUrl.pathname.startsWith('/dashboard') ||
+              request.nextUrl.pathname.startsWith('/account')) {
             const redirectUrl = new URL('/auth/login', baseUrl);
             redirectUrl.searchParams.set('from', request.nextUrl.pathname);
             return NextResponse.redirect(redirectUrl);

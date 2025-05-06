@@ -15,6 +15,7 @@ import { BrandIcon } from '@/components/brand-icon';
 import { PlusIcon, Trash2Icon, XIcon, ChevronUpIcon, ChevronDownIcon, Users, Wand2Icon } from 'lucide-react';
 import { Badge } from '@/components/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/tooltip';
+import { UserSelect } from '@/components/user-select';
 
 interface Brand {
   id: string;
@@ -986,34 +987,52 @@ export default function CreateWorkflowPage() {
                       )}
                       
                       {/* Add assignee input */}
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Enter email address"
-                          value={newAssigneeEmail[index] || ''}
-                          onChange={(e) => 
-                            setNewAssigneeEmail(prev => ({
-                              ...prev,
-                              [index]: e.target.value
-                            }))
-                          }
-                          className="flex-1"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              addAssignee(index);
+                      <UserSelect
+                        onSelect={(user) => {
+                          // If it's a new email address
+                          if (!user.id) {
+                            // Check if already added
+                            if (step.assignees.some(a => a.email === user.email)) {
+                              toast({
+                                title: 'Duplicate Email',
+                                description: 'This email is already assigned to this step',
+                                variant: 'destructive'
+                              });
+                              return;
                             }
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          size="default"
-                          onClick={() => addAssignee(index)}
-                          className="shrink-0"
-                        >
-                          <PlusIcon className="h-4 w-4 mr-1" />
-                          Add
-                        </Button>
-                      </div>
+
+                            // Add the assignee with just email
+                            handleStepChange(index, 'assignees', [
+                              ...step.assignees,
+                              { email: user.email }
+                            ]);
+                          } else {
+                            // It's an existing user
+                            // Check if already added
+                            if (step.assignees.some(a => a.id === user.id || a.email === user.email)) {
+                              toast({
+                                title: 'User Already Assigned',
+                                description: 'This user is already assigned to this step',
+                                variant: 'destructive'
+                              });
+                              return;
+                            }
+
+                            // Add the assignee with ID and email
+                            handleStepChange(index, 'assignees', [
+                              ...step.assignees,
+                              { email: user.email, id: user.id }
+                            ]);
+                          }
+
+                          toast({
+                            title: 'User Assigned',
+                            description: `${user.email} has been assigned to this step`
+                          });
+                        }}
+                        placeholder="Search users or enter email to invite"
+                        className="w-full"
+                      />
                     </div>
                   </div>
                 </div>

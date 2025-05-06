@@ -8,6 +8,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
 import { v4 as uuidv4 } from 'uuid';
 import { withAuth } from '@/lib/auth/api-auth';
+import { verifyEmailTemplates } from '@/lib/auth/email-templates';
 
 // Define types for the workflow invitation
 interface WorkflowInvitation {
@@ -234,6 +235,8 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       expires_at: string;
     }[] = [];
     
+    const pendingInvites: string[] = []; // Track emails that need invites
+    
     for (const step of steps) {
       if (step.assignees && Array.isArray(step.assignees)) {
         for (const assignee of step.assignees) {
@@ -256,6 +259,11 @@ export const POST = withAuth(async (request: NextRequest, user) => {
               invite_token: uuidv4(),
               expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days expiry
             });
+            
+            // Add to pending invites if not already added
+            if (!pendingInvites.includes(assignee.email)) {
+              pendingInvites.push(assignee.email);
+            }
           }
         }
       }
@@ -291,6 +299,50 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       if (invitationError) {
         console.error('Error creating workflow invitations:', invitationError);
         // We'll continue even if there's an error with invitations
+      }
+      
+      // Send email invitations to users who don't exist yet
+      if (pendingInvites.length > 0) {
+        try {
+          // Verify email templates
+          await verifyEmailTemplates();
+          
+          // Send invites
+          for (const email of pendingInvites) {
+            // Find the highest role for this user across all steps
+            let highestRole = 'viewer';
+            for (const item of invitationItems) {
+              if (item.email === email) {
+                if (item.role === 'admin') {
+                  highestRole = 'admin';
+                  break;
+                } else if (item.role === 'editor' && highestRole !== 'admin') {
+                  highestRole = 'editor';
+                }
+              }
+            }
+            
+            // Send the invitation
+            const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
+              data: {
+                full_name: '',
+                role: highestRole,
+                invited_by: user.id, // Track who sent the invitation
+                invited_from_workflow: workflow.id
+              }
+            });
+            
+            if (inviteError) {
+              console.error(`Error inviting user ${email}:`, inviteError);
+              // Continue with other invites
+            } else {
+              console.log(`Successfully invited user ${email} with role ${highestRole}`);
+            }
+          }
+        } catch (inviteError) {
+          console.error('Error sending user invitations:', inviteError);
+          // Continue with the workflow creation
+        }
       }
     }
     

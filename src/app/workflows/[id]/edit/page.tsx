@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/tooltip';
 import { Badge } from '@/components/badge';
+import { UserSelect } from '@/components/user-select';
 
 interface Brand {
   id: string;
@@ -228,16 +229,23 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
   };
   
   const handleStepChange = (index: number, field: string, value: any) => {
-    const updatedSteps = [...formData.steps];
-    updatedSteps[index] = {
-      ...updatedSteps[index],
-      [field]: value
-    };
-    
-    setFormData(prevState => ({
-      ...prevState,
-      steps: updatedSteps
-    }));
+    setFormData(prev => {
+      const updatedSteps = [...prev.steps];
+      updatedSteps[index] = {
+        ...updatedSteps[index],
+        [field]: value
+      };
+      
+      // If field is 'role', ensure it's lowercase
+      if (field === 'role' && typeof value === 'string') {
+        updatedSteps[index].role = value.toLowerCase();
+      }
+      
+      return {
+        ...prev,
+        steps: updatedSteps
+      };
+    });
   };
   
   const addStep = () => {
@@ -1011,67 +1019,89 @@ export default function WorkflowEditPage({ params }: { params: { id: string }}) 
                       </p>
                     </div>
                     
-                    {/* Assignees */}
-                    <div className="mb-6">
-                      <Label className="text-base font-medium mb-2 block">Assignees</Label>
-                      <div className="border rounded-md p-4">
-                        {step.assignees && step.assignees.length > 0 ? (
-                          <div className="space-y-2 mb-4">
-                            {step.assignees.map((assignee, assigneeIndex) => (
-                              <div key={assigneeIndex} className="flex items-center justify-between bg-accent/50 px-3 py-2 rounded-md">
-                                <div className="flex items-center gap-2">
-                                  <Users className="h-4 w-4 text-muted-foreground" />
-                                  <span>{assignee.email}</span>
-                                </div>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeAssignee(index, assigneeIndex)}
-                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                                >
-                                  <XIcon className="h-4 w-4" />
-                                  <span className="sr-only">Remove assignee</span>
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center py-4 text-muted-foreground text-sm mb-4">
-                            No assignees yet. Add users to this step below.
-                          </div>
-                        )}
-                        
-                        <div className="flex gap-2">
-                          <Input
-                            value={newAssigneeEmail[index] || ''}
-                            onChange={(e) => setNewAssigneeEmail({
-                              ...newAssigneeEmail,
-                              [index]: e.target.value
-                            })}
-                            placeholder="Enter email address"
-                            className="flex-1"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                addAssignee(index);
-                              }
-                            }}
-                          />
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => addAssignee(index)}
-                          >
-                            <PlusIcon className="h-4 w-4 mr-1" />
-                            Add
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Assignees will be notified when content reaches this step
-                        </p>
+                    {/* Assignees section */}
+                    <div className="border-t border-border pt-4 mt-4">
+                      <div className="flex items-center mb-3">
+                        <Users className="h-4 w-4 text-muted-foreground mr-2" />
+                        <Label className="text-base font-medium">Assign Users</Label>
                       </div>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Assign users to this workflow step by email. If they don't have an account yet, they'll be invited.
+                      </p>
+                      
+                      {/* Assignee list */}
+                      {step.assignees && step.assignees.length > 0 && (
+                        <div className="mb-4 space-y-2">
+                          {step.assignees.map((assignee, assigneeIndex) => (
+                            <div 
+                              key={assigneeIndex} 
+                              className="flex items-center justify-between bg-accent/50 rounded-md px-3 py-2"
+                            >
+                              <Badge variant="secondary" className="font-normal text-foreground">
+                                {assignee.email}
+                              </Badge>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeAssignee(index, assigneeIndex)}
+                                className="h-6 w-6 p-0 hover:bg-background/80 hover:text-destructive"
+                              >
+                                <XIcon className="h-4 w-4" />
+                                <span className="sr-only">Remove assignee</span>
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Add assignee input */}
+                      <UserSelect
+                        onSelect={(user) => {
+                          // If it's a new email address
+                          if (!user.id) {
+                            // Check if already added
+                            if (step.assignees.some(a => a.email === user.email)) {
+                              toast({
+                                title: 'Duplicate Email',
+                                description: 'This email is already assigned to this step',
+                                variant: 'destructive'
+                              });
+                              return;
+                            }
+
+                            // Add the assignee with just email
+                            handleStepChange(index, 'assignees', [
+                              ...step.assignees,
+                              { email: user.email }
+                            ]);
+                          } else {
+                            // It's an existing user
+                            // Check if already added
+                            if (step.assignees.some(a => a.id === user.id || a.email === user.email)) {
+                              toast({
+                                title: 'User Already Assigned',
+                                description: 'This user is already assigned to this step',
+                                variant: 'destructive'
+                              });
+                              return;
+                            }
+
+                            // Add the assignee with ID and email
+                            handleStepChange(index, 'assignees', [
+                              ...step.assignees,
+                              { email: user.email, id: user.id }
+                            ]);
+                          }
+
+                          toast({
+                            title: 'User Assigned',
+                            description: `${user.email} has been assigned to this step`
+                          });
+                        }}
+                        placeholder="Search users or enter email to invite"
+                        className="w-full"
+                      />
                     </div>
                   </div>
                 </div>

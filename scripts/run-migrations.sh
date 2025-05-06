@@ -85,8 +85,8 @@ if ! psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "postgres" -lqt | cut -d 
   psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "postgres" -c "CREATE DATABASE $DB_NAME;"
 fi
 
-# Run the squashed migration
+# Run the consolidated migration
 echo "Running migrations..."
-run_sql_file "migrations/squashed_migrations.sql"
+run_sql_file "migrations/consolidated_migrations.sql"
 
 echo "Migrations completed successfully!" 
