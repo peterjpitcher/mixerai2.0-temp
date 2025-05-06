@@ -1,4 +1,8 @@
 import { NextResponse } from 'next/server';
+
+// Force dynamic rendering for this route
+export const dynamic = "force-dynamic";
+
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';

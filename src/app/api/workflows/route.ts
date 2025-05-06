@@ -1,5 +1,9 @@
 // Import the uuid package for generating unique identifiers for workflow invitations
 import { NextRequest, NextResponse } from 'next/server';
+
+// Force dynamic rendering for this route
+export const dynamic = "force-dynamic";
+
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
 import { v4 as uuidv4 } from 'uuid';

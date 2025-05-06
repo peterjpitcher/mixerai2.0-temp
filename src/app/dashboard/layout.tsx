@@ -105,6 +105,12 @@ export default function DashboardLayout({
 
         {/* Main content */}
         <main className="flex-1 p-6 overflow-auto">
+          {/* Dynamic import for DomainVerification to avoid build errors */}
+          {process.env.NODE_ENV === 'development' && (
+            <div id="domain-verification-container" className="mb-4">
+              {/* This will be populated client-side */}
+            </div>
+          )}
           {children}
         </main>
       </div>

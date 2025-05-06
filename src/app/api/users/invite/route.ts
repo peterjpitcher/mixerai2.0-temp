@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { withAuth } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
+import { verifyEmailTemplates } from '@/lib/auth/email-templates';
 
 /**
  * POST endpoint to invite a new user
@@ -11,6 +12,9 @@ export const POST = withAuth(async (request: NextRequest, user) => {
   try {
     const supabase = createSupabaseAdminClient();
     const body = await request.json();
+    
+    // Verify email templates in development mode
+    await verifyEmailTemplates();
     
     // Validate required fields
     if (!body.email) {

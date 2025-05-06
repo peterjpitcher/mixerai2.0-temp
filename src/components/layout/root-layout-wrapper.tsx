@@ -10,7 +10,7 @@ export default function RootLayoutWrapper({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const pathname = usePathname();
+  const pathname = usePathname() || '';
 
   // Skip layout for specific paths
   const skipLayoutPaths = [
@@ -201,7 +201,7 @@ export default function RootLayoutWrapper({
       {/* Footer */}
       <footer className="border-t py-6 bg-muted/40">
         <div className="w-full px-4">
-          <div className="flex justify-center">
+          <div className="flex justify-end">
             <Link href="/release-notes" className="hover:text-foreground hover:underline text-sm text-muted-foreground">
               Release Notes
             </Link>

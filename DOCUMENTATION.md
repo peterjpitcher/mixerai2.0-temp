@@ -872,3 +872,51 @@ Following our authentication strategy, we've completed the following tasks:
    - Test session refresh functionality
 
 By implementing cookie-based authentication with Supabase and applying Row-Level Security at the database level, we've significantly improved the security posture of the application while maintaining a good user experience.
+
+## Domain Configuration
+
+The MixerAI 2.0 application is configured to run on the production domain `mixerai.orangejely.co.uk`. We've created detailed documentation for setting up and configuring the application with this domain:
+
+- See [`docs/domain-configuration.md`](docs/domain-configuration.md) for complete setup instructions
+
+Key configuration areas include:
+- Supabase authentication settings
+- Email templates for user invitations
+- Environment variables
+- DNS and SSL configuration
+
+When deploying to the production domain, ensure all authentication settings and invitation email templates are updated to reference the correct domain.
+
+## Build and Deployment Optimizations
+
+We've implemented several optimizations to ensure smooth building and deployment:
+
+### Dynamic API Routes
+
+API routes that use authentication require `cookies` and can't be rendered statically. We've added the `dynamic = "force-dynamic"` flag to these routes:
+
+```typescript
+// Force dynamic rendering for this route
+export const dynamic = "force-dynamic";
+```
+
+A utility script is available to automatically add this flag to all API routes:
+```bash
+./scripts/update-api-routes.sh
+```
+
+### Configuration Cleanup
+
+- Removed deprecated `experimental.serverActions` from next.config.js since this is now the default in Next.js 14+
+- Added proper component imports to fix TypeScript errors
+- Ensured all dependencies are correctly installed (e.g., class-variance-authority)
+
+### Domain Configuration Testing
+
+For the production domain (`mixerai.orangejely.co.uk`), we've added:
+
+- A warning component that displays in development mode when not configured
+- Client-side verification in the dashboard layout
+- Email template verification in the user invitation API
+
+The domain configuration system avoids hardcoded values by using environment variables throughout the application.

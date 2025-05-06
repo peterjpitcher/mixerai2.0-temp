@@ -20,6 +20,9 @@ export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   
+  // Get base URL for redirects, using configured domain if available
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+  
   if (supabaseUrl && supabaseAnonKey) {
     const cookieStore = cookies();
     
@@ -50,7 +53,7 @@ export async function middleware(request: NextRequest) {
         if (!data.session) {
           // Redirect to login for dashboard routes
           if (request.nextUrl.pathname.startsWith('/dashboard')) {
-            const redirectUrl = new URL('/auth/login', request.url);
+            const redirectUrl = new URL('/auth/login', baseUrl);
             redirectUrl.searchParams.set('from', request.nextUrl.pathname);
             return NextResponse.redirect(redirectUrl);
           }

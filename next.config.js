@@ -10,10 +10,6 @@ const nextConfig = {
       'placeholder.com'
     ],
   },
-  // Define which API routes should be dynamic (non-static)
-  experimental: {
-    serverActions: true,
-  },
   // Skip type checking during build
   typescript: {
     ignoreBuildErrors: true,
