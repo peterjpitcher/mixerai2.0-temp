@@ -62,6 +62,8 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     const { data, error } = await supabase.auth.admin.inviteUserByEmail(body.email, {
       data: {
         full_name: body.full_name || '',
+        job_title: body.job_title || '',
+        company: body.company || '',
         role: body.role.toLowerCase(),
         invited_by: user.id // Track who sent the invitation
       }

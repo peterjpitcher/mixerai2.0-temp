@@ -920,3 +920,29 @@ For the production domain (`mixerai.orangejely.co.uk`), we've added:
 - Email template verification in the user invitation API
 
 The domain configuration system avoids hardcoded values by using environment variables throughout the application.
+
+# User Profile Fields
+
+The user profile contains the following fields:
+
+| Field Name | Description | Required | Location |
+|------------|-------------|----------|----------|
+| id | Unique identifier | Yes | auth.users, profiles |
+| email | User's email address | Yes | auth.users, profiles |
+| full_name | User's full name | Yes | auth.users (metadata), profiles |
+| job_title | User's job title or role | Yes | auth.users (metadata), profiles |
+| job_description | Description of user's job | No | auth.users (metadata), profiles |
+| company | User's company or organization | Yes | auth.users (metadata), profiles |
+| avatar_url | URL to user's profile picture | No | profiles |
+| role | System role (admin, editor, viewer) | Yes | user_brand_permissions |
+| created_at | Account creation timestamp | Yes | auth.users, profiles |
+
+# Company Field
+
+The company field has been added to the user profile to track organizational information. This field is:
+
+- Displayed in the users management table
+- Required during user signup/invitation acceptance
+- Automatically pre-filled with the domain name from the user's email address (without TLD)
+- Editable by admins through the user edit interface
+- Stored in both the user metadata and profiles table

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/toast-provider';
 import { Checkbox } from '@/components/checkbox';
 import { BrandIcon } from '@/components/brand-icon';
+import { Textarea } from '@/components/textarea';
 
 interface Brand {
   id: string;
@@ -27,8 +28,10 @@ export default function InviteUserPage() {
   const [formData, setFormData] = useState({
     email: '',
     full_name: '',
-    role: '',
-    brand_id: ''
+    job_title: '',
+    company: '',
+    role: 'viewer',
+    brand_id: '',
   });
   const [emailValid, setEmailValid] = useState(true);
 
@@ -87,29 +90,21 @@ export default function InviteUserPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate form data
     if (!formData.email) {
       toast({
-        title: 'Validation Error',
-        description: 'Email is required',
+        title: 'Error',
+        description: 'Email address is required',
         variant: 'destructive'
       });
       return;
     }
     
-    if (!emailValid) {
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
       toast({
-        title: 'Validation Error',
+        title: 'Invalid Email',
         description: 'Please enter a valid email address',
-        variant: 'destructive'
-      });
-      return;
-    }
-    
-    if (!formData.role) {
-      toast({
-        title: 'Validation Error',
-        description: 'Role is required',
         variant: 'destructive'
       });
       return;
@@ -217,6 +212,29 @@ export default function InviteUserPage() {
                   name="full_name"
                   placeholder="John Doe"
                   value={formData.full_name}
+                  onChange={handleInputChange}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="company">Company<span className="text-red-500">*</span></Label>
+                <Input
+                  id="company"
+                  name="company"
+                  placeholder="Company Name"
+                  value={formData.company}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="job_title">Job Title</Label>
+                <Input
+                  id="job_title"
+                  name="job_title"
+                  placeholder="e.g. Marketing Manager"
+                  value={formData.job_title}
                   onChange={handleInputChange}
                 />
               </div>

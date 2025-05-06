@@ -23,7 +23,6 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 interface BrandFormData {
   name: string;
   website_url: string;
-  website_urls?: string;
   country: string;
   language: string;
   brand_identity: string;
@@ -33,6 +32,7 @@ interface BrandFormData {
   brand_color: string;
   approved_content_types: string[];
   user_added_agencies?: string;
+  brand_admin_ids: string[];
 }
 
 interface ContentType {
@@ -53,12 +53,12 @@ export default function NewBrandPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentTab, setCurrentTab] = useState("basic-details");
-  const [urlsInput, setUrlsInput] = useState("");
-  const [urlsError, setUrlsError] = useState("");
   const [usedFallback, setUsedFallback] = useState(false);
   const [showOverwriteDialog, setShowOverwriteDialog] = useState(false);
   const [contentTypes, setContentTypes] = useState<ContentType[]>([]);
   const [loadingContentTypes, setLoadingContentTypes] = useState(false);
+  const [users, setUsers] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [formData, setFormData] = useState<BrandFormData>({
     name: '',
     website_url: '',
@@ -69,7 +69,8 @@ export default function NewBrandPage() {
     guardrails: '',
     content_vetting_agencies: '',
     brand_color: '#3498db', // Default blue color
-    approved_content_types: []
+    approved_content_types: [],
+    brand_admin_ids: []
   });
 
   // Update this to store vetting agencies as objects
@@ -83,6 +84,74 @@ export default function NewBrandPage() {
   const [customAgencyDescription, setCustomAgencyDescription] = useState('');
   const [customAgencyPriority, setCustomAgencyPriority] = useState('medium');
   const [userAddedAgencies, setUserAddedAgencies] = useState<any[]>([]);
+  
+  // State for filtering users in the brand admins dropdown
+  const [adminSearchTerm, setAdminSearchTerm] = useState('');
+  const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
+  
+  // Add new state for detecting emails
+  const [isValidEmail, setIsValidEmail] = useState(false);
+  
+  // Add function to validate email
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+  
+  // Add function to send invitation to new user
+  const sendInvitation = async (email: string) => {
+    try {
+      const response = await fetch('/api/users/invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          role: 'editor', // Default role for brand admins
+          company: 'Added via brand admin',
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to invite user');
+      }
+      
+      // Add the user with a temporary ID until they register
+      const tempUserId = `temp-${Date.now()}`;
+      setFormData(prev => ({
+        ...prev,
+        brand_admin_ids: [...prev.brand_admin_ids, tempUserId]
+      }));
+      
+      // Add a temporary user object to the users array
+      setUsers(prev => [...prev, {
+        id: tempUserId,
+        full_name: email,
+        email: email,
+        role: 'Editor',
+        pending: true
+      }]);
+      
+      toast({
+        title: 'Invitation Sent',
+        description: `Invitation sent to ${email}. They will be added as a brand admin once they register.`,
+      });
+      
+      // Clear the search term
+      setAdminSearchTerm('');
+      setIsValidEmail(false);
+    } catch (error) {
+      console.error('Error inviting user:', error);
+      toast({
+        title: 'Invitation Failed',
+        description: error instanceof Error ? error.message : 'Failed to invite user',
+        variant: 'destructive',
+      });
+    }
+  };
   
   // Fetch content types on page load
   useEffect(() => {
@@ -111,6 +180,52 @@ export default function NewBrandPage() {
     
     fetchContentTypes();
   }, [toast]);
+  
+  // Fetch users for brand admin selection
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoadingUsers(true);
+        const response = await fetch('/api/users');
+        const data = await response.json();
+        
+        if (data.success) {
+          setUsers(data.users || []);
+        } else {
+          console.error('Failed to fetch users:', data.error);
+        }
+      } catch (error) {
+        console.error('Error fetching users:', error);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+    
+    fetchUsers();
+  }, []);
+  
+  // Update filtered users when users list changes or search term changes
+  useEffect(() => {
+    if (users.length) {
+      // Check if the search term is a valid email that doesn't exist in users
+      const isEmail = validateEmail(adminSearchTerm);
+      const emailExists = isEmail && users.some(user => user.email?.toLowerCase() === adminSearchTerm.toLowerCase());
+      setIsValidEmail(isEmail && !emailExists);
+      
+      const filtered = users
+        .filter(user => user.role === 'Admin' || user.role === 'Editor')
+        .filter(user => !formData.brand_admin_ids.includes(user.id))
+        .filter(user => {
+          if (!adminSearchTerm) return true;
+          const term = adminSearchTerm.toLowerCase();
+          return (
+            user.full_name.toLowerCase().includes(term) ||
+            (user.email && user.email.toLowerCase().includes(term))
+          );
+        });
+      setFilteredUsers(filtered);
+    }
+  }, [users, adminSearchTerm, formData.brand_admin_ids]);
   
   // Handle approved content types selection
   const handleContentTypeChange = (contentTypeId: string) => {
@@ -222,29 +337,6 @@ export default function NewBrandPage() {
     });
   };
 
-  // Validate URLs
-  const validateUrls = (urls: string[]): boolean => {
-    let isValid = true;
-    const invalidUrls: string[] = [];
-
-    urls.forEach(url => {
-      try {
-        new URL(url);
-      } catch (e) {
-        isValid = false;
-        invalidUrls.push(url);
-      }
-    });
-
-    if (!isValid) {
-      setUrlsError(`Invalid URLs: ${invalidUrls.join(', ')}`);
-    } else {
-      setUrlsError("");
-    }
-
-    return isValid;
-  };
-
   // Check if we need to show the overwrite confirmation dialog
   const checkOverwriteBrandIdentity = () => {
     // If any of the identity fields are filled, show confirmation dialog
@@ -280,32 +372,41 @@ export default function NewBrandPage() {
       return;
     }
 
-    const urls = urlsInput.split('\n').map(url => url.trim()).filter(url => url.length > 0);
-    
-    if (urls.length === 0) {
-      setUrlsError("Please enter at least one URL");
+    if (!formData.website_url.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Website URL is required",
+        variant: "destructive",
+      });
       return;
     }
 
-    if (!validateUrls(urls)) {
+    // Validate URL
+    try {
+      new URL(formData.website_url);
+    } catch (e) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid URL",
+        variant: "destructive",
+      });
       return;
     }
 
     setIsGenerating(true);
-    setUrlsError("");
     setUsedFallback(false);
 
     try {
       console.log('==== Executing Brand Identity Generation ====');
       console.log('Brand name:', formData.name);
-      console.log('URLs:', urls);
+      console.log('URL:', formData.website_url);
       console.log('Country:', formData.country);
       console.log('Language:', formData.language);
       
       // Important: Use the exact parameter names expected by the API
       const requestBody = {
         name: formData.name,
-        urls: urls,
+        urls: [formData.website_url],
         country: formData.country || 'GB',
         language: formData.language || 'en-GB'
       };
@@ -463,72 +564,67 @@ export default function NewBrandPage() {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.name) {
-      toast({
-        title: "Validation Error",
-        description: "Brand name is required",
-        variant: "destructive",
-      });
-      return;
-    }
+    setIsSubmitting(true);
     
     try {
-      setIsSubmitting(true);
-      
-      // Make a copy of the form data to ensure proper format for submission
-      const submissionData = { ...formData };
-      
-      // Ensure guardrails are properly formatted if they're in array format
-      if (submissionData.guardrails) {
-        // If it looks like a JSON array string
-        if (submissionData.guardrails.startsWith('[') && submissionData.guardrails.endsWith(']')) {
-          try {
-            const guardrailsArray = JSON.parse(submissionData.guardrails);
-            if (Array.isArray(guardrailsArray)) {
-              submissionData.guardrails = guardrailsArray.map(item => `- ${item}`).join('\n');
-              console.log("Converted guardrails from JSON array to bulleted list before submission");
-            }
-          } catch (e) {
-            // If parsing fails, keep as is
-            console.log("Failed to parse guardrails as JSON array in form submission");
-          }
-        }
+      // Validate required fields
+      if (!formData.name.trim()) {
+        throw new Error('Brand name is required');
       }
       
-      // Add website URLs and user-added agencies
-      submissionData.website_urls = urlsInput.trim();
-      
-      // Store user-added agencies as JSON if we have any
-      if (userAddedAgencies.length > 0) {
-        submissionData.user_added_agencies = JSON.stringify(userAddedAgencies);
+      if (!formData.website_url.trim()) {
+        throw new Error('Website URL is required');
       }
+
+      // Validate URL
+      try {
+        new URL(formData.website_url);
+      } catch (e) {
+        throw new Error('Please enter a valid URL');
+      }
+      
+      // Validate at least one brand admin is selected
+      if (formData.brand_admin_ids.length === 0) {
+        throw new Error('At least one brand admin must be selected');
+      }
+      
+      // Create the request body
+      const requestBody = {
+        ...formData,
+        brand_admin_ids: formData.brand_admin_ids,
+        approved_content_types: formData.approved_content_types,
+        user_added_agencies: JSON.stringify(userAddedAgencies)
+      };
+      
+      console.log('Submitting brand with:', requestBody);
       
       const response = await fetch('/api/brands', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(submissionData),
+        body: JSON.stringify(requestBody),
       });
       
       const data = await response.json();
       
-      if (data.success) {
-        toast({
-          title: "Success",
-          description: "Brand created successfully",
-        });
-        router.push('/brands');
-      } else {
+      if (!response.ok) {
         throw new Error(data.error || 'Failed to create brand');
       }
+      
+      toast({
+        title: 'Success!',
+        description: 'Brand created successfully',
+      });
+      
+      // Redirect to the brand page
+      router.push(`/dashboard/brands/${data.brand.id}`);
     } catch (error) {
       console.error('Error creating brand:', error);
       toast({
-        title: "Error",
-        description: "Failed to create brand. Please try again.",
-        variant: "destructive",
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to create brand',
+        variant: 'destructive',
       });
     } finally {
       setIsSubmitting(false);
@@ -582,7 +678,7 @@ export default function NewBrandPage() {
           <TabsTrigger value="content-types">Content Types</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="basic-details" className="space-y-4 mt-6">
+        <TabsContent value="basic-details" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Brand Details</CardTitle>
@@ -590,79 +686,160 @@ export default function NewBrandPage() {
                 Enter the basic information about the brand
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4">
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="name">Brand Name <span className="text-destructive">*</span></Label>
-                  </div>
+                  <Label htmlFor="name">Brand Name <span className="text-red-500">*</span></Label>
                   <Input
                     id="name"
-                    name="name"
+                    placeholder="Enter brand name"
                     value={formData.name}
                     onChange={handleChange}
-                    placeholder="Enter brand name"
-                    required
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="brand_admin_ids">Brand Admins <span className="text-red-500">*</span></Label>
+                  <div className="relative">
+                    <Input
+                      id="admin-search"
+                      placeholder="Search for users..."
+                      value={adminSearchTerm}
+                      onChange={(e) => setAdminSearchTerm(e.target.value)}
+                      className="mb-1"
+                    />
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {formData.brand_admin_ids.map(adminId => {
+                        const admin = users.find(u => u.id === adminId);
+                        return admin ? (
+                          <Badge key={adminId} variant="secondary" className="flex items-center gap-1">
+                            {admin.full_name}
+                            <button 
+                              type="button" 
+                              onClick={() => {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  brand_admin_ids: prev.brand_admin_ids.filter(id => id !== adminId)
+                                }));
+                              }}
+                              className="ml-1 rounded-full hover:bg-muted p-0.5"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              <span className="sr-only">Remove</span>
+                            </button>
+                          </Badge>
+                        ) : null;
+                      })}
+                    </div>
+                    <div className="max-h-[200px] overflow-y-auto border rounded-md p-2">
+                      {loadingUsers ? (
+                        <div className="flex items-center justify-center p-2">
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          <span>Loading users...</span>
+                        </div>
+                      ) : isValidEmail ? (
+                        <div 
+                          className="flex items-center justify-between p-2 hover:bg-muted cursor-pointer rounded-sm bg-primary/5"
+                          onClick={() => sendInvitation(adminSearchTerm)}
+                        >
+                          <div>
+                            <div className="font-medium">Invite new user</div>
+                            <div className="text-xs text-muted-foreground">{adminSearchTerm}</div>
+                          </div>
+                          <Button variant="default" size="sm" type="button">Invite</Button>
+                        </div>
+                      ) : filteredUsers.length > 0 ? (
+                        filteredUsers.map(user => (
+                          <div 
+                            key={user.id} 
+                            className="flex items-center justify-between p-2 hover:bg-muted cursor-pointer rounded-sm"
+                            onClick={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                brand_admin_ids: [...prev.brand_admin_ids, user.id]
+                              }));
+                              setAdminSearchTerm(''); // Clear search after selection
+                            }}
+                          >
+                            <div>
+                              <div className="font-medium">{user.full_name}</div>
+                              <div className="text-xs text-muted-foreground">{user.email}</div>
+                            </div>
+                            <Button variant="ghost" size="sm" type="button">Add</Button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center p-2 text-muted-foreground text-sm">
+                          {adminSearchTerm ? 'No users found. Enter a valid email to invite.' : 'Type to search users or enter an email to invite'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Brand admins are the primary points of contact who own this brand
+                  </p>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="website_url">Website URL</Label>
+                <Input
+                  id="website_url"
+                  placeholder="https://example.com"
+                  value={formData.website_url}
+                  onChange={handleChange}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enter the primary website URL for this brand
+                </p>
+              </div>
+              
+              {/* Country and Language selection */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="country">Country</Label>
+                  <Select 
+                    value={formData.country}
+                    onValueChange={(value) => handleSelectChange('country', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COUNTRIES.map(country => (
+                        <SelectItem key={country.value} value={country.value}>
+                          {country.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="website_url">Website URL</Label>
-                  <Input
-                    id="website_url"
-                    name="website_url"
-                    value={formData.website_url}
-                    onChange={handleChange}
-                    placeholder="https://example.com"
-                  />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="country">Country</Label>
-                    <Select
-                      value={formData.country}
-                      onValueChange={(value) => handleSelectChange('country', value)}
-                    >
-                      <SelectTrigger id="country">
-                        <SelectValue placeholder="Select country" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[300px] overflow-y-auto">
-                        {COUNTRIES.map((country) => (
-                          <SelectItem key={country.value} value={country.value}>
-                            {country.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="language">Language</Label>
-                    <Select
-                      value={formData.language}
-                      onValueChange={(value) => handleSelectChange('language', value)}
-                    >
-                      <SelectTrigger id="language">
-                        <SelectValue placeholder="Select language" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[300px] overflow-y-auto">
-                        {LANGUAGES.map((language) => (
-                          <SelectItem key={language.value} value={language.value}>
-                            {language.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <Label htmlFor="language">Language</Label>
+                  <Select
+                    value={formData.language}
+                    onValueChange={(value) => handleSelectChange('language', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LANGUAGES.map(language => (
+                        <SelectItem key={language.value} value={language.value}>
+                          {language.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </CardContent>
             <CardFooter className="flex justify-between border-t pt-6">
-              <Button type="button" variant="outline" disabled>
-                Back
-              </Button>
-              <Button type="button" onClick={() => setCurrentTab("brand-identity")}>
+              <div></div> {/* Empty div for alignment */}
+              <Button 
+                type="button" 
+                onClick={() => setCurrentTab("brand-identity")}
+              >
                 Next: Brand Identity
               </Button>
             </CardFooter>
@@ -679,41 +856,34 @@ export default function NewBrandPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex-1">
-                    <Label htmlFor="urls-input">Website URLs</Label>
-                    <div className="flex gap-2 mt-1.5">
-                      <Input
-                        id="urls-input"
-                        placeholder="Enter one or more URLs, separated by commas"
-                        value={urlsInput}
-                        onChange={(e) => {
-                          setUrlsInput(e.target.value);
-                          setUrlsError("");
-                        }}
-                      />
-                      <Button 
-                        onClick={generateBrandIdentity} 
-                        disabled={isGenerating}
-                        className="whitespace-nowrap"
-                      >
-                        {isGenerating ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Generating...
-                          </>
-                        ) : (
-                          <>Generate</>
-                        )}
-                      </Button>
-                    </div>
-                    {urlsError && (
-                      <p className="text-destructive text-sm mt-1">{urlsError}</p>
-                    )}
-                    <p className="text-muted-foreground text-xs mt-1">
-                      Enter the website URLs to automatically generate brand identity and tone of voice
-                    </p>
+                <div className="space-y-2 pb-6 border-b">
+                  <Label htmlFor="website-identity-url">Generate Brand Identity</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="website-identity-url"
+                      placeholder="Enter website URL"
+                      value={formData.website_url}
+                      onChange={(e) => setFormData(prev => ({ ...prev, website_url: e.target.value }))}
+                      className="font-mono text-sm"
+                    />
+                    <Button 
+                      onClick={generateBrandIdentity} 
+                      disabled={isGenerating || !formData.website_url.trim()}
+                      className="whitespace-nowrap"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>Generate Identity</>
+                      )}
+                    </Button>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    The website URL will be analyzed to generate brand identity content
+                  </p>
                 </div>
               </div>
               
