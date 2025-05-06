@@ -52,19 +52,21 @@ BEGIN
   
   IF function_exists THEN
     -- Update the function to include job_title
+    EXECUTE '
     CREATE OR REPLACE FUNCTION public.create_profile_for_user()
-    RETURNS TRIGGER AS $$
+    RETURNS TRIGGER AS $func$
     BEGIN
       INSERT INTO public.profiles (id, full_name, email, job_title)
       VALUES (
         NEW.id, 
-        COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
+        COALESCE(NEW.raw_user_meta_data->>''full_name'', ''''),
         NEW.email,
-        COALESCE(NEW.raw_user_meta_data->>'job_title', '')
+        COALESCE(NEW.raw_user_meta_data->>''job_title'', '''')
       );
       RETURN NEW;
     END;
-    $$ LANGUAGE plpgsql SECURITY DEFINER;
+    $func$ LANGUAGE plpgsql SECURITY DEFINER;
+    ';
     
     RAISE NOTICE 'Updated create_profile_for_user function to include job_title';
   ELSE

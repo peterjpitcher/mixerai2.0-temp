@@ -38,7 +38,7 @@ if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
 fi
 
 # Check if the migration file exists
-MIGRATION_FILE="migrations/add_job_title_to_profiles.sql"
+MIGRATION_FILE="migrations/add_job_title_to_profiles_v2.sql"
 if [ ! -f "$MIGRATION_FILE" ]; then
   echo -e "${RED}Error: Migration file not found at $MIGRATION_FILE${NC}"
   exit 1
