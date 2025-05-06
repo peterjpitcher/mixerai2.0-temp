@@ -7,11 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/input';
 import { useToast } from '@/components/toast-provider';
 import { Badge } from '@/components/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/dialog';
+import { Label } from '@/components/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 
 interface User {
   id: string;
   full_name: string;
   email?: string;
+  job_title?: string;
   role?: string;
   avatar_url?: string;
   created_at?: string;
@@ -25,6 +29,17 @@ export default function UsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
+  
+  // Add state for edit and delete dialogs
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [editForm, setEditForm] = useState({
+    full_name: '',
+    job_title: '',
+    role: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -89,6 +104,127 @@ export default function UsersPage() {
     }).format(date);
   };
   
+  const handleEditClick = (user: User) => {
+    setSelectedUser(user);
+    setEditForm({
+      full_name: user.full_name || '',
+      job_title: user.job_title || '',
+      role: (user.role?.toLowerCase() || 'viewer') as 'admin' | 'editor' | 'viewer'
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDeleteClick = (user: User) => {
+    setSelectedUser(user);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedUser) return;
+    
+    try {
+      setIsSubmitting(true);
+      
+      const response = await fetch(`/api/users/${selectedUser.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          full_name: editForm.full_name,
+          job_title: editForm.job_title,
+          role: editForm.role
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Update the user in the local state
+        setUsers(users.map(u => 
+          u.id === selectedUser.id 
+            ? { 
+                ...u, 
+                full_name: editForm.full_name,
+                job_title: editForm.job_title,
+                role: editForm.role.charAt(0).toUpperCase() + editForm.role.slice(1)
+              } 
+            : u
+        ));
+        
+        // Update filtered users too
+        setFilteredUsers(filteredUsers.map(u => 
+          u.id === selectedUser.id 
+            ? { 
+                ...u, 
+                full_name: editForm.full_name,
+                job_title: editForm.job_title,
+                role: editForm.role.charAt(0).toUpperCase() + editForm.role.slice(1)
+              } 
+            : u
+        ));
+        
+        toast({
+          title: 'Success',
+          description: 'User updated successfully'
+        });
+        
+        setIsEditDialogOpen(false);
+      } else {
+        throw new Error(data.error || 'Failed to update user');
+      }
+    } catch (error) {
+      console.error('Error updating user:', error);
+      toast({
+        title: 'Error',
+        description: (error as Error).message || 'Failed to update user. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedUser) return;
+    
+    try {
+      setIsSubmitting(true);
+      
+      const response = await fetch(`/api/users/${selectedUser.id}`, {
+        method: 'DELETE'
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Remove the user from the local state
+        setUsers(users.filter(u => u.id !== selectedUser.id));
+        setFilteredUsers(filteredUsers.filter(u => u.id !== selectedUser.id));
+        
+        toast({
+          title: 'Success',
+          description: 'User deleted successfully'
+        });
+        
+        setIsDeleteDialogOpen(false);
+      } else {
+        throw new Error(data.error || 'Failed to delete user');
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: 'Error',
+        description: (error as Error).message || 'Failed to delete user. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="flex flex-col">
       {/* Full width header with background */}
@@ -225,8 +361,8 @@ export default function UsersPage() {
                           </td>
                           <td className="py-3">
                             <div className="flex gap-2">
-                              <Button variant="ghost" size="sm">Edit</Button>
-                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">Delete</Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleEditClick(user)}>Edit</Button>
+                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(user)}>Delete</Button>
                             </div>
                           </td>
                         </tr>
@@ -239,6 +375,78 @@ export default function UsersPage() {
           </Card>
         )}
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>Make changes to the user's information</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="full_name" className="text-right">
+                Full Name
+              </Label>
+              <Input
+                id="full_name"
+                value={editForm.full_name}
+                onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="job_title" className="text-right">
+                Job Title
+              </Label>
+              <Input
+                id="job_title"
+                value={editForm.job_title}
+                onChange={(e) => setEditForm({ ...editForm, job_title: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="role" className="text-right">
+                Role
+              </Label>
+              <Select
+                value={editForm.role}
+                onValueChange={(value) => setEditForm({ ...editForm, role: value as 'admin' | 'editor' | 'viewer' })}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="editor">Editor</SelectItem>
+                  <SelectItem value="viewer">Viewer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="submit" onClick={handleEditSubmit}>
+              {isSubmitting ? 'Updating...' : 'Update'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Are you sure you want to delete this user?</DialogTitle>
+            <DialogDescription>This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="submit" onClick={handleDeleteConfirm}>
+              {isSubmitting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 
