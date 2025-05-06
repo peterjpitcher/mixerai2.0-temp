@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
+import { withAuth } from '@/lib/auth/api-auth';
+import { NextRequest } from 'next/server';
 
 // Sample fallback data for when DB connection fails
 const getFallbackContentTypes = () => {
@@ -29,7 +31,7 @@ const getFallbackContentTypes = () => {
   ];
 };
 
-export async function GET() {
+export const GET = withAuth(async (req: NextRequest, user) => {
   try {
     // During static site generation, return mock data
     if (isBuildPhase()) {
@@ -73,4 +75,4 @@ export async function GET() {
     
     return handleApiError(error, 'Error fetching content types');
   }
-} 
+}); 

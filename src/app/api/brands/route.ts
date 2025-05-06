@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
+import { withAuth } from '@/lib/auth/api-auth';
+import { NextRequest } from 'next/server';
 
 // Sample fallback data for when DB connection fails
 const getFallbackBrands = () => {
@@ -36,7 +38,8 @@ const getFallbackBrands = () => {
   ];
 };
 
-export async function GET() {
+// Authenticated GET handler for brands
+export const GET = withAuth(async (req: NextRequest, user) => {
   try {
     // During static site generation, return mock data
     if (isBuildPhase()) {
@@ -86,12 +89,13 @@ export async function GET() {
     
     return handleApiError(error, 'Error fetching brands');
   }
-}
+});
 
-export async function POST(request: Request) {
+// Authenticated POST handler for creating brands
+export const POST = withAuth(async (req: NextRequest, user) => {
   try {
     const supabase = createSupabaseAdminClient();
-    const body = await request.json();
+    const body = await req.json();
     
     // Validate required fields
     if (!body.name) {
@@ -136,7 +140,7 @@ export async function POST(request: Request) {
       }
     }
     
-    // Insert the new brand
+    // Insert the new brand with the user ID as created_by
     const { data, error } = await supabase
       .from('brands')
       .insert([{
@@ -150,7 +154,8 @@ export async function POST(request: Request) {
         content_vetting_agencies: body.content_vetting_agencies || null,
         brand_color: body.brand_color || '#3498db',
         brand_summary: brandSummary,
-        approved_content_types: body.approved_content_types || null
+        approved_content_types: body.approved_content_types || null,
+        created_by: user.id // Add the authenticated user ID
       }])
       .select();
     
@@ -163,4 +168,4 @@ export async function POST(request: Request) {
   } catch (error) {
     return handleApiError(error, 'Error creating brand');
   }
-} 
+}); 

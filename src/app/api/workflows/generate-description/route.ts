@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 
 // Simplified Azure OpenAI client configuration
 const openai = new OpenAI({
@@ -8,7 +9,7 @@ const openai = new OpenAI({
   defaultQuery: { 'api-version': '2023-05-15' },
 });
 
-export async function POST(request: NextRequest) {
+export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
   try {
     const body = await request.json();
     const { type, stepName, existingDescription, otherSteps, brandContext } = body;
@@ -18,7 +19,8 @@ export async function POST(request: NextRequest) {
       stepName,
       existingDescription: existingDescription ? 'exists' : 'none',
       otherSteps: otherSteps ? `${otherSteps.length} steps` : 'none',
-      brandContext: brandContext ? JSON.stringify(brandContext) : 'none'
+      brandContext: brandContext ? JSON.stringify(brandContext) : 'none',
+      userId: user.id // Log the user ID for audit
     });
     
     if (!type || !stepName) {
@@ -140,7 +142,8 @@ Improve clarity, professionalism, and conciseness while preserving the original 
       
       const result = {
         success: true,
-        description
+        description,
+        userId: user.id
       };
       
       console.log('Sending response:', result);
@@ -177,4 +180,4 @@ Improve clarity, professionalism, and conciseness while preserving the original 
       { status: 500 }
     );
   }
-} 
+}); 

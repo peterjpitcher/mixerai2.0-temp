@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { withAuth } from '@/lib/auth/api-auth';
+import { handleApiError } from '@/lib/api-utils';
 
 /**
  * POST endpoint to invite a new user
+ * Only users with admin role can invite others
  */
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest, user) => {
   try {
     const supabase = createSupabaseAdminClient();
     const body = await request.json();
@@ -32,11 +35,31 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Check if the current user has admin permissions
+    const { data: userPermissions, error: permissionCheckError } = await supabase
+      .from('user_brand_permissions')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin');
+    
+    if (permissionCheckError) {
+      throw permissionCheckError;
+    }
+    
+    // If the user has no admin role, reject the invitation request
+    if (!userPermissions || userPermissions.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Only administrators can invite users' },
+        { status: 403 }
+      );
+    }
+    
     // Send the invitation via Supabase Auth
     const { data, error } = await supabase.auth.admin.inviteUserByEmail(body.email, {
       data: {
         full_name: body.full_name || '',
-        role: body.role.toLowerCase()
+        role: body.role.toLowerCase(),
+        invited_by: user.id // Track who sent the invitation
       }
     });
     
@@ -60,7 +83,8 @@ export async function POST(request: NextRequest) {
           {
             user_id: data.user.id,
             brand_id: body.brand_id,
-            role: body.role.toLowerCase()
+            role: body.role.toLowerCase(),
+            assigned_by: user.id // Track who assigned the permission
           }
         ]);
       
@@ -77,6 +101,9 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // Log the successful invitation
+    console.log(`User ${user.id} invited ${body.email} with role ${body.role}`);
+    
     return NextResponse.json({ 
       success: true, 
       message: 'Invitation sent successfully',
@@ -84,9 +111,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error inviting user:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to invite user' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'Failed to invite user');
   }
-} 
+}); 

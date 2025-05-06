@@ -1,8 +1,18 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   reactStrictMode: true,
   images: {
-    domains: ['api.dicebear.com'],
+    domains: [
+      'api.dicebear.com',
+      'images.unsplash.com',
+      'placehold.co',
+      'placeholder.com'
+    ],
+  },
+  // Define which API routes should be dynamic (non-static)
+  experimental: {
+    serverActions: true,
   },
   // Skip type checking during build
   typescript: {

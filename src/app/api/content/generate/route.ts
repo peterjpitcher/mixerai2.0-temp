@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateContent } from '@/lib/azure/openai';
+import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 
 interface ContentGenerationRequest {
   contentType: "article" | "retailer_pdp" | "owned_pdp";
@@ -18,7 +19,7 @@ interface ContentGenerationRequest {
   };
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
   try {
     const data: ContentGenerationRequest = await request.json();
     
@@ -52,13 +53,20 @@ export async function POST(request: NextRequest) {
       data.input
     );
     
-    return NextResponse.json(generatedContent);
+    return NextResponse.json({
+      success: true,
+      userId: user.id, // Include user ID for monitoring purposes
+      ...generatedContent
+    });
   } catch (error) {
     console.error('Error generating content:', error);
     
     return NextResponse.json(
-      { error: 'Failed to generate content' },
+      { 
+        success: false,
+        error: 'Failed to generate content' 
+      },
       { status: 500 }
     );
   }
-} 
+}); 

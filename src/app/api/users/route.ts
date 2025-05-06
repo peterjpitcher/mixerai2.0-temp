@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { handleApiError } from '@/lib/api-utils';
+import { handleApiError, isBuildPhase } from '@/lib/api-utils';
+import { withAuth } from '@/lib/auth/api-auth';
 
 // Define the shape of user profiles returned from Supabase
 interface ProfileRecord {
@@ -20,10 +21,10 @@ interface ProfileRecord {
 /**
  * GET endpoint to retrieve all users with profile information
  */
-export async function GET() {
+export const GET = withAuth(async (req: NextRequest, user) => {
   try {
     // During static site generation, return mock data
-    if (process.env.NEXT_PHASE === 'phase-production-build') {
+    if (isBuildPhase()) {
       console.log('Returning mock users during build');
       return NextResponse.json({ 
         success: true, 
@@ -105,7 +106,8 @@ export async function GET() {
         role: highestRole.charAt(0).toUpperCase() + highestRole.slice(1), // Capitalize role
         created_at: authUser.created_at,
         last_sign_in_at: authUser.last_sign_in_at,
-        brand_permissions: profile?.user_brand_permissions || []
+        brand_permissions: profile?.user_brand_permissions || [],
+        is_current_user: authUser.id === user.id // Flag to identify the current user
       };
     });
 
@@ -116,4 +118,4 @@ export async function GET() {
   } catch (error) {
     return handleApiError(error, 'Error fetching users');
   }
-} 
+}); 

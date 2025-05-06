@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
+import { withAuth } from '@/lib/auth/api-auth';
 
 // Sample fallback data for when DB connection fails
 const getFallbackContent = () => {
@@ -32,7 +33,7 @@ const getFallbackContent = () => {
   ];
 };
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest, user) => {
   try {
     // During static site generation, return mock data
     if (isBuildPhase()) {
@@ -102,9 +103,9 @@ export async function GET(request: NextRequest) {
     
     return handleApiError(error, 'Failed to fetch content');
   }
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest, user) => {
   try {
     const data = await request.json();
     
@@ -124,7 +125,7 @@ export async function POST(request: NextRequest) {
       .insert({
         brand_id: data.brand_id,
         content_type_id: data.content_type_id,
-        created_by: data.created_by,
+        created_by: user.id, // Use the authenticated user's ID
         title: data.title,
         body: data.body,
         meta_title: data.meta_title,
@@ -145,4 +146,4 @@ export async function POST(request: NextRequest) {
     console.error('Error creating content:', error);
     return handleApiError(error, 'Failed to create content', 500);
   }
-} 
+}); 

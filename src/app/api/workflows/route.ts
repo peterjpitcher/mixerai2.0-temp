@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
 import { v4 as uuidv4 } from 'uuid';
+import { withAuth } from '@/lib/auth/api-auth';
 
 // Define types for the workflow invitation
 interface WorkflowInvitation {
@@ -102,7 +103,7 @@ const getFallbackWorkflows = () => {
 /**
  * GET endpoint to retrieve all workflows with related data
  */
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest, user) => {
   try {
     // During static site generation, return mock data
     if (isBuildPhase()) {
@@ -179,12 +180,12 @@ export async function GET(request: NextRequest) {
     
     return handleApiError(error, 'Error fetching workflows');
   }
-}
+});
 
 /**
  * POST endpoint to create a new workflow
  */
-export async function POST(request: Request) {
+export const POST = withAuth(async (request: NextRequest, user) => {
   try {
     const supabase = createSupabaseAdminClient();
     const body = await request.json();
@@ -249,68 +250,75 @@ export async function POST(request: Request) {
               email: assignee.email,
               role: step.role || 'editor',
               invite_token: uuidv4(),
-              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days from now
+              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days expiry
             });
           }
         }
       }
     }
     
-    // Insert the new workflow
-    const { data, error } = await supabase
+    // Insert the new workflow with the current user as created_by
+    const { data: workflow, error } = await supabase
       .from('workflows')
-      .insert([{
+      .insert({
         name: body.name,
         brand_id: body.brand_id,
         content_type_id: body.content_type_id,
-        steps: steps
-      }])
-      .select();
+        steps: steps,
+        created_by: user.id // Set the authenticated user as the creator
+      })
+      .select()
+      .single();
     
-    if (error) {
-      // Check for unique constraint violation
-      if (error.code === '23505') {
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: 'A workflow for this brand and content type already exists' 
-          },
-          { status: 409 }
-        );
-      }
-      throw error;
-    }
+    if (error) throw error;
     
-    // If there are new invitations, create them in the workflow_invitations table
-    const workflowId = data[0].id;
-    
-    if (invitationItems.length > 0) {
-      // Create the workflow invitations with the workflow_id
-      const invitations: WorkflowInvitation[] = invitationItems.map(item => ({
+    // If we have workflow invitations to create, insert them
+    if (invitationItems.length > 0 && workflow) {
+      const workflowInvitations: WorkflowInvitation[] = invitationItems.map(item => ({
+        workflow_id: workflow.id,
         ...item,
-        workflow_id: workflowId
+        status: 'pending'
       }));
       
-      // Insert the invitations
       const { error: invitationError } = await supabase
         .from('workflow_invitations')
-        .insert(invitations);
+        .insert(workflowInvitations);
       
       if (invitationError) {
         console.error('Error creating workflow invitations:', invitationError);
-        // Don't fail the entire request if invitations fail
-      } else {
-        console.log(`Created ${invitations.length} workflow invitations`);
-        
-        // TODO: Send invitation emails (this would be implemented separately)
+        // We'll continue even if there's an error with invitations
       }
     }
     
-    return NextResponse.json({ 
-      success: true, 
-      workflow: data[0]
+    // Fetch brand and content type data to include in response
+    const { data: brand } = await supabase
+      .from('brands')
+      .select('name, brand_color')
+      .eq('id', body.brand_id)
+      .single();
+    
+    const { data: contentType } = await supabase
+      .from('content_types')
+      .select('name')
+      .eq('id', body.content_type_id)
+      .single();
+    
+    // Format the workflow response
+    const formattedWorkflow = {
+      ...workflow,
+      brand_name: brand?.name || null,
+      brand_color: brand?.brand_color || null,
+      content_type_name: contentType?.name || null,
+      steps_count: Array.isArray(workflow.steps) ? workflow.steps.length : 0,
+      content_count: 0
+    };
+    
+    return NextResponse.json({
+      success: true,
+      workflow: formattedWorkflow
     });
   } catch (error) {
+    console.error('Error creating workflow:', error);
     return handleApiError(error, 'Error creating workflow');
   }
-} 
+}); 
