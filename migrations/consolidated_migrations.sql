@@ -38,12 +38,12 @@ COMMENT ON COLUMN brands.company IS 'Company or organization that owns the brand
 COMMENT ON COLUMN brands.approved_content_types IS 'List of content type IDs approved for this brand';
 
 CREATE TABLE IF NOT EXISTS profiles (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY REFERENCES auth.users(id),
   full_name TEXT,
   avatar_url TEXT,
+  email TEXT,
   job_title TEXT,
   job_description TEXT,
-  email TEXT,
   company TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 COMMENT ON COLUMN profiles.job_title IS 'User''s job title or role within their organization';
 COMMENT ON COLUMN profiles.job_description IS 'Detailed description of the user''s job responsibilities';
 COMMENT ON COLUMN profiles.company IS 'Company or organization where the user is employed';
+COMMENT ON COLUMN profiles.email IS 'Email address of the user, used for workflows and notifications';
 
 CREATE TABLE IF NOT EXISTS user_brand_permissions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

@@ -1,0 +1,582 @@
+'use client';
+
+import * as React from 'react';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/button';
+import { Input } from '@/components/input';
+import { Textarea } from '@/components/textarea';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
+import { Label } from '@/components/label';
+import { Switch } from '@/components/switch';
+import { Badge } from '@/components/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
+import { toast } from 'sonner';
+import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2 } from 'lucide-react';
+
+export default function NewWorkflowPage() {
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [brands, setBrands] = useState<any[]>([]);
+  const [newAssigneeEmail, setNewAssigneeEmail] = useState('');
+  const [workflow, setWorkflow] = useState<any>({
+    name: '',
+    description: '',
+    brand: null,
+    status: 'draft',
+    steps: [
+      {
+        id: 'step1',
+        name: 'Content Review',
+        description: 'Review content for accuracy and quality',
+        role: 'editor',
+        approvalRequired: true,
+        assignees: []
+      }
+    ]
+  });
+  
+  useEffect(() => {
+    // Mock API call - in a real implementation, we would fetch from Supabase
+    const fetchBrands = async () => {
+      setIsLoading(true);
+      
+      try {
+        // Simulate API call delay
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Mock data
+        const brandsData = [
+          { id: '1', name: 'Demo Brand', color: '#3B82F6' },
+          { id: '2', name: 'Another Brand', color: '#10B981' },
+          { id: '3', name: 'Test Brand', color: '#F59E0B' }
+        ];
+        
+        setBrands(brandsData);
+        
+        // Set default brand if available
+        if (brandsData.length > 0) {
+          setWorkflow(prev => ({
+            ...prev,
+            brand: brandsData[0]
+          }));
+        }
+      } catch (error) {
+        console.error('Error fetching brands:', error);
+        toast.error('Failed to load brands. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchBrands();
+  }, []);
+
+  const handleUpdateWorkflowDetails = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setWorkflow((prev: any) => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleUpdateWorkflowStatus = (value: string) => {
+    setWorkflow((prev: any) => ({
+      ...prev,
+      status: value
+    }));
+  };
+
+  const handleUpdateBrand = (value: string) => {
+    const selectedBrand = brands.find((brand: any) => brand.id === value);
+    if (selectedBrand) {
+      setWorkflow((prev: any) => ({
+        ...prev,
+        brand: selectedBrand
+      }));
+    }
+  };
+
+  const handleUpdateStepName = (index: number, value: string) => {
+    setWorkflow((prev: any) => {
+      const updatedSteps = [...prev.steps];
+      updatedSteps[index] = {
+        ...updatedSteps[index],
+        name: value
+      };
+      return {
+        ...prev,
+        steps: updatedSteps
+      };
+    });
+  };
+
+  const handleUpdateStepDescription = (index: number, value: string) => {
+    setWorkflow((prev: any) => {
+      const updatedSteps = [...prev.steps];
+      updatedSteps[index] = {
+        ...updatedSteps[index],
+        description: value
+      };
+      return {
+        ...prev,
+        steps: updatedSteps
+      };
+    });
+  };
+
+  const handleUpdateStepRole = (index: number, value: string) => {
+    setWorkflow((prev: any) => {
+      const updatedSteps = [...prev.steps];
+      updatedSteps[index] = {
+        ...updatedSteps[index],
+        role: value
+      };
+      return {
+        ...prev,
+        steps: updatedSteps
+      };
+    });
+  };
+
+  const handleUpdateStepApprovalRequired = (index: number, value: boolean) => {
+    setWorkflow((prev: any) => {
+      const updatedSteps = [...prev.steps];
+      updatedSteps[index] = {
+        ...updatedSteps[index],
+        approvalRequired: value
+      };
+      return {
+        ...prev,
+        steps: updatedSteps
+      };
+    });
+  };
+
+  const handleAddAssignee = (stepIndex: number) => {
+    if (!newAssigneeEmail || !newAssigneeEmail.includes('@')) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    // Check if assignee already exists in this step
+    const stepAssignees = workflow.steps[stepIndex].assignees;
+    const exists = stepAssignees.some((a: any) => a.email === newAssigneeEmail);
+    
+    if (exists) {
+      toast.error('This assignee is already added to this step');
+      return;
+    }
+
+    setWorkflow((prev: any) => {
+      const updatedSteps = [...prev.steps];
+      updatedSteps[stepIndex] = {
+        ...updatedSteps[stepIndex],
+        assignees: [
+          ...updatedSteps[stepIndex].assignees,
+          {
+            id: `temp-${Date.now()}`,
+            email: newAssigneeEmail
+          }
+        ]
+      };
+      return {
+        ...prev,
+        steps: updatedSteps
+      };
+    });
+
+    setNewAssigneeEmail('');
+  };
+
+  const handleRemoveAssignee = (stepIndex: number, assigneeId: string) => {
+    setWorkflow((prev: any) => {
+      const updatedSteps = [...prev.steps];
+      updatedSteps[stepIndex] = {
+        ...updatedSteps[stepIndex],
+        assignees: updatedSteps[stepIndex].assignees.filter(
+          (a: any) => a.id !== assigneeId
+        )
+      };
+      return {
+        ...prev,
+        steps: updatedSteps
+      };
+    });
+  };
+
+  const handleMoveStepUp = (index: number) => {
+    if (index === 0) return;
+    
+    setWorkflow((prev: any) => {
+      const updatedSteps = [...prev.steps];
+      const temp = updatedSteps[index];
+      updatedSteps[index] = updatedSteps[index - 1];
+      updatedSteps[index - 1] = temp;
+      
+      return {
+        ...prev,
+        steps: updatedSteps
+      };
+    });
+  };
+
+  const handleMoveStepDown = (index: number) => {
+    if (index === workflow.steps.length - 1) return;
+    
+    setWorkflow((prev: any) => {
+      const updatedSteps = [...prev.steps];
+      const temp = updatedSteps[index];
+      updatedSteps[index] = updatedSteps[index + 1];
+      updatedSteps[index + 1] = temp;
+      
+      return {
+        ...prev,
+        steps: updatedSteps
+      };
+    });
+  };
+
+  const handleAddStep = () => {
+    setWorkflow((prev: any) => {
+      const newStep = {
+        id: `step${prev.steps.length + 1}`,
+        name: `Step ${prev.steps.length + 1}`,
+        description: '',
+        role: 'editor',
+        approvalRequired: true,
+        assignees: []
+      };
+      
+      return {
+        ...prev,
+        steps: [...prev.steps, newStep]
+      };
+    });
+  };
+
+  const handleRemoveStep = (index: number) => {
+    if (workflow.steps.length <= 1) {
+      toast.error('Workflow must have at least one step');
+      return;
+    }
+    
+    setWorkflow((prev: any) => {
+      const updatedSteps = prev.steps.filter((_: any, i: number) => i !== index);
+      return {
+        ...prev,
+        steps: updatedSteps
+      };
+    });
+  };
+
+  const validateWorkflow = () => {
+    if (!workflow.name.trim()) {
+      toast.error('Please enter a workflow name');
+      return false;
+    }
+
+    if (!workflow.brand) {
+      toast.error('Please select a brand');
+      return false;
+    }
+
+    // Check if all steps have names
+    const invalidSteps = workflow.steps.filter((step: any) => !step.name.trim());
+    if (invalidSteps.length > 0) {
+      toast.error('All steps must have a name');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleCreateWorkflow = async () => {
+    if (!validateWorkflow()) {
+      return;
+    }
+
+    setIsSaving(true);
+    
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      toast.success('Workflow created successfully');
+      router.push('/dashboard/workflows');
+    } catch (error) {
+      console.error('Error creating workflow:', error);
+      toast.error('Failed to create workflow. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[300px]">
+        <div className="animate-spin rounded-full border-2 border-current border-t-transparent h-6 w-6"></div>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold tracking-tight">Create New Workflow</h1>
+        <div className="flex space-x-2">
+          <Button variant="outline" asChild>
+            <Link href="/dashboard/workflows">Cancel</Link>
+          </Button>
+          <Button onClick={handleCreateWorkflow} disabled={isSaving || brands.length === 0}>
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              'Create Workflow'
+            )}
+          </Button>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-1 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Workflow Details</CardTitle>
+            <CardDescription>Basic information about the workflow</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Workflow Name <span className="text-red-500">*</span></Label>
+                <Input
+                  id="name"
+                  name="name"
+                  value={workflow.name}
+                  onChange={handleUpdateWorkflowDetails}
+                  placeholder="Enter workflow name"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select defaultValue={workflow.status} onValueChange={handleUpdateWorkflowStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="brand">Brand <span className="text-red-500">*</span></Label>
+              <Select 
+                defaultValue={workflow.brand?.id} 
+                onValueChange={handleUpdateBrand}
+                disabled={brands.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={brands.length > 0 ? "Select brand" : "No brands available"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {brands.map((brand: any) => (
+                    <SelectItem key={brand.id} value={brand.id}>
+                      <div className="flex items-center">
+                        <div 
+                          className="w-3 h-3 rounded-full mr-2" 
+                          style={{ backgroundColor: brand.color }}
+                        />
+                        {brand.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {brands.length === 0 && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  No brands available. Please create a brand first.
+                </p>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                name="description"
+                value={workflow.description}
+                onChange={handleUpdateWorkflowDetails}
+                placeholder="Enter workflow description"
+                rows={3}
+              />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Workflow Steps</CardTitle>
+                <CardDescription>Define the steps in your workflow</CardDescription>
+              </div>
+              <Button onClick={handleAddStep} size="sm">
+                <Plus className="h-4 w-4 mr-1" />
+                Add Step
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {workflow.steps.map((step: any, index: number) => (
+                <div key={step.id} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                      <span className="flex items-center justify-center w-6 h-6 bg-primary text-white rounded-full text-xs font-medium mr-3">
+                        {index + 1}
+                      </span>
+                      <h3 className="font-medium">Step {index + 1}</h3>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleMoveStepUp(index)}
+                        disabled={index === 0}
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleMoveStepDown(index)}
+                        disabled={index === workflow.steps.length - 1}
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveStep(index)}
+                        className="text-destructive hover:text-destructive/90"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor={`step-name-${index}`}>Step Name <span className="text-red-500">*</span></Label>
+                        <Input
+                          id={`step-name-${index}`}
+                          value={step.name}
+                          onChange={(e) => handleUpdateStepName(index, e.target.value)}
+                          placeholder="Enter step name"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor={`step-role-${index}`}>Role</Label>
+                        <Select 
+                          defaultValue={step.role} 
+                          onValueChange={(value) => handleUpdateStepRole(index, value)}
+                        >
+                          <SelectTrigger id={`step-role-${index}`}>
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="editor">Editor</SelectItem>
+                            <SelectItem value="seo">SEO Specialist</SelectItem>
+                            <SelectItem value="viewer">Viewer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor={`step-description-${index}`}>Description</Label>
+                      <Textarea
+                        id={`step-description-${index}`}
+                        value={step.description}
+                        onChange={(e) => handleUpdateStepDescription(index, e.target.value)}
+                        placeholder="Enter step description"
+                        rows={2}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id={`step-approval-${index}`}
+                        checked={step.approvalRequired}
+                        onCheckedChange={(value) => handleUpdateStepApprovalRequired(index, value)}
+                      />
+                      <Label htmlFor={`step-approval-${index}`}>
+                        Require approval for this step
+                      </Label>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor={`step-assignees-${index}`}>Assignees</Label>
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          id={`step-assignees-${index}`}
+                          placeholder="Enter email address"
+                          value={newAssigneeEmail}
+                          onChange={(e) => setNewAssigneeEmail(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddAssignee(index);
+                            }
+                          }}
+                        />
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleAddAssignee(index)}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {step.assignees.map((assignee: any) => (
+                          <Badge key={assignee.id} variant="outline" className="text-xs flex items-center">
+                            {assignee.email}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveAssignee(index, assignee.id)}
+                              className="ml-1 text-muted-foreground hover:text-destructive"
+                            >
+                              <XCircle className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+          <CardFooter>
+            <p className="text-sm text-muted-foreground">
+              <span className="text-red-500">*</span> Indicates required fields
+            </p>
+          </CardFooter>
+        </Card>
+      </div>
+    </div>
+  );
+} 

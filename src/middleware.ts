@@ -83,6 +83,14 @@ export async function middleware(request: NextRequest) {
   
   const { pathname } = request.nextUrl;
   
+  // ===================================================================
+  // Route Redirection Logic
+  // Part of the June 2024 Route Cleanup project (see docs/ROUTE_CLEANUP_COMPLETION.md)
+  // This middleware works with next.config.js redirects to ensure a 
+  // single source of truth for all routes by redirecting top-level routes
+  // to their /dashboard equivalents.
+  // ===================================================================
+  
   // Normalize path to handle path traversal attempts
   const normalizedPath = pathname.replace(/\/\.\.\//g, '/');
   

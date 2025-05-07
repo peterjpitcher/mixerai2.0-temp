@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
+// Force dynamic rendering for this route
+export const dynamic = "force-dynamic";
 
 // Define types for the workflow invitation
 interface WorkflowInvitation {
@@ -81,17 +83,15 @@ export async function GET(
       // If there are user IDs, fetch the corresponding user information
       if (userIds.size > 0) {
         const { data: users, error: usersError } = await supabase
-          .from('profiles')
-          .select('id, full_name, email');
+          .from('profiles_view')
+          .select('id, full_name, email')
+          .in('id', Array.from(userIds));
         
         if (usersError) {
           console.error('Error fetching user information:', usersError);
         } else if (users) {
-          // Filter users to only include those in our userIds set
-          const filteredUsers = users.filter(user => userIds.has(user.id));
-          
           // Create a map of user information by ID
-          const userMap = new Map(filteredUsers.map(user => [user.id, user]));
+          const userMap = new Map(users.map(user => [user.id, user]));
           
           // Update assignees with user information
           for (const step of workflow.steps as WorkflowStep[]) {
@@ -172,13 +172,15 @@ export async function PUT(
           if (assignee.id) continue;
           
           // Check if the user exists
-          const { data: existingUser } = await supabase
-            .from('profiles')
+          const { data: existingUser, error: userError } = await supabase
+            .from('profiles_view')
             .select('id')
             .eq('email', assignee.email)
             .maybeSingle();
-            
-          if (existingUser) {
+          
+          if (userError) {
+            console.error('Error checking user by email:', userError);
+          } else if (existingUser) {
             // User exists, set their ID in the assignee
             assignee.id = existingUser.id;
           } else {

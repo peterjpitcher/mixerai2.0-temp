@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withRouteAuth } from '@/lib/auth/route-handlers';
+// Force dynamic rendering for this route
+export const dynamic = "force-dynamic";
 
 interface Params {
   params: { id: string }
@@ -168,8 +170,8 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: any, context
       
       if (permissionsError) throw permissionsError;
       
-      // Update all brand permissions to the new role
-      if (existingPermissions && existingPermissions.length > 0) {
+      // Update all brand permissions to the new role if no specific brand_permissions provided
+      if (!body.brand_permissions && existingPermissions && existingPermissions.length > 0) {
         const permissionUpdates = existingPermissions.map(permission => ({
           id: permission.id,
           user_id: permission.user_id,
@@ -182,6 +184,56 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: any, context
           .upsert(permissionUpdates);
         
         if (permUpdateError) throw permUpdateError;
+      }
+    }
+    
+    // Handle brand permissions if provided
+    if (body.brand_permissions && Array.isArray(body.brand_permissions)) {
+      // Get existing brand permissions for comparison
+      const { data: existingPermissions, error: permissionsError } = await supabase
+        .from('user_brand_permissions')
+        .select('id, brand_id, role')
+        .eq('user_id', params.id);
+      
+      if (permissionsError) throw permissionsError;
+      
+      // Create a map of existing permissions by brand_id for easier lookup
+      const existingPermissionsMap = new Map();
+      (existingPermissions || []).forEach(permission => {
+        existingPermissionsMap.set(permission.brand_id, permission);
+      });
+      
+      // Prepare permissions to update or insert
+      const permissionsToUpsert = body.brand_permissions.map(permission => ({
+        id: permission.id || existingPermissionsMap.get(permission.brand_id)?.id,
+        user_id: params.id,
+        brand_id: permission.brand_id,
+        role: permission.role
+      }));
+      
+      // Identify permissions to delete (brands that are in existing but not in the update)
+      const brandIdsToKeep = new Set(body.brand_permissions.map(p => p.brand_id));
+      const permissionIdsToDelete = (existingPermissions || [])
+        .filter(p => !brandIdsToKeep.has(p.brand_id))
+        .map(p => p.id);
+      
+      // Update or insert brand permissions
+      if (permissionsToUpsert.length > 0) {
+        const { error: upsertError } = await supabase
+          .from('user_brand_permissions')
+          .upsert(permissionsToUpsert);
+        
+        if (upsertError) throw upsertError;
+      }
+      
+      // Delete removed brand permissions
+      if (permissionIdsToDelete.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('user_brand_permissions')
+          .delete()
+          .in('id', permissionIdsToDelete);
+        
+        if (deleteError) throw deleteError;
       }
     }
     
@@ -260,7 +312,7 @@ export const DELETE = withRouteAuth(async (request: NextRequest, user: any, cont
         // Get brand admin's details
         const { data: adminUser, error: adminUserError } = await supabase
           .from('profiles')
-          .select('id, full_name, email')
+          .select('id, full_name')
           .eq('id', brandAdminId)
           .single();
         
@@ -269,6 +321,16 @@ export const DELETE = withRouteAuth(async (request: NextRequest, user: any, cont
           continue;
         }
         
+        // Get admin's email from auth.users
+        const { data: adminAuthUser, error: adminAuthError } = await supabase.auth.admin.getUserById(brandAdminId);
+        
+        if (adminAuthError || !adminAuthUser || !adminAuthUser.user) {
+          console.error(`Error fetching admin auth user ${brandAdminId}:`, adminAuthError);
+          continue;
+        }
+        
+        const adminEmail = adminAuthUser.user.email;
+
         // Process workflows steps and reassign as needed
         const updatedSteps = workflow.steps.map((step: any) => {
           if (step.assignees && Array.isArray(step.assignees)) {
@@ -290,14 +352,14 @@ export const DELETE = withRouteAuth(async (request: NextRequest, user: any, cont
               // Check if the brand admin is already assigned
               const adminAlreadyAssigned = filteredAssignees.some((assignee: any) => 
                 assignee.id === brandAdminId || 
-                (assignee.email && assignee.email === adminUser?.email)
+                (assignee.email && assignee.email === adminEmail)
               );
               
               // Add the brand admin if not already assigned
               if (!adminAlreadyAssigned) {
                 filteredAssignees.push({
                   id: brandAdminId,
-                  email: adminUser?.email || '',
+                  email: adminEmail || '',
                   name: adminUser?.full_name || 'Brand Admin',
                   reassigned_from_deleted_user: params.id
                 });

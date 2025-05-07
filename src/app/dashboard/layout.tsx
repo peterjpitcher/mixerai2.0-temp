@@ -45,7 +45,7 @@ export default function DashboardLayout({
     <div className="flex min-h-screen flex-col">
       {/* Header */}
       <header className="border-b" style={{ backgroundColor: '#13599f' }}>
-        <div className="max-w-[1440px] mx-auto px-4 py-4 flex items-center justify-between text-white">
+        <div className="w-full mx-auto px-4 py-4 flex items-center justify-between text-white">
           <div className="flex items-center space-x-2">
             <Link href="/dashboard" className="flex items-center space-x-2">
               <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-[#13599f] font-bold text-xl">M</div>
