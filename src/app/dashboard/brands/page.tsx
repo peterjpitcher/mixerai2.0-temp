@@ -40,6 +40,7 @@ export default function BrandsPage() {
   const [requiresCascade, setRequiresCascade] = useState(false);
   const [contentCount, setContentCount] = useState(0);
   const [workflowCount, setWorkflowCount] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     async function fetchBrands() {
@@ -122,6 +123,49 @@ export default function BrandsPage() {
     }
   };
 
+  // Group brands by country
+  const groupBrandsByCountry = (brands: Brand[]) => {
+    const groupedBrands: Record<string, { countryName: string, brands: Brand[] }> = {};
+    
+    brands.forEach(brand => {
+      if (!brand.country) {
+        // Handle brands with no country
+        if (!groupedBrands['unknown']) {
+          groupedBrands['unknown'] = {
+            countryName: 'Unknown',
+            brands: []
+          };
+        }
+        groupedBrands['unknown'].brands.push(brand);
+        return;
+      }
+      
+      if (!groupedBrands[brand.country]) {
+        const countryName = COUNTRIES.find(c => c.value === brand.country)?.label || brand.country;
+        groupedBrands[brand.country] = {
+          countryName,
+          brands: []
+        };
+      }
+      
+      groupedBrands[brand.country].brands.push(brand);
+    });
+    
+    // Sort by country name
+    return Object.entries(groupedBrands)
+      .sort((a, b) => a[1].countryName.localeCompare(b[1].countryName));
+  };
+  
+  // Filter brands based on search term
+  const filteredBrands = brands.filter(brand => 
+    brand.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (COUNTRIES.find(c => c.value === brand.country)?.label || brand.country)
+      .toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
+  // Group brands by country after filtering
+  const groupedBrands = groupBrandsByCountry(filteredBrands);
+
   // Error state component
   const ErrorState = () => (
     <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
@@ -169,8 +213,12 @@ export default function BrandsPage() {
       {/* Always show search and export buttons, even when empty */}
       {brands.length > 0 && (
         <div className="flex items-center justify-between">
-          <div className="max-w-sm">
-            <Input placeholder="Search brands..." />
+          <div className="max-w-sm w-full">
+            <Input 
+              placeholder="Search brands..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm">
@@ -205,72 +253,96 @@ export default function BrandsPage() {
         <ErrorState />
       ) : brands.length === 0 ? (
         <EmptyState />
+      ) : filteredBrands.length === 0 ? (
+        <div className="flex flex-col items-center justify-center min-h-[200px] py-8">
+          <h3 className="text-xl font-bold mb-2">No brands found</h3>
+          <p className="text-muted-foreground mb-4">No brands match your search criteria.</p>
+          <Button variant="outline" onClick={() => setSearchTerm("")}>
+            Clear Search
+          </Button>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {brands.map((brand) => (
-            <Card key={brand.id}>
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-xl">{brand.name}</CardTitle>
-                    <CardDescription>
-                      {COUNTRIES.find(c => c.value === brand.country)?.label || brand.country}, 
-                      {LANGUAGES.find(l => l.value === brand.language)?.label || brand.language}
-                    </CardDescription>
-                  </div>
-                  <BrandIcon 
-                    name={brand.name} 
-                    color={brand.brand_color} 
-                    size="md"
-                  />
+        <div className="space-y-10">
+          {groupedBrands.map(([countryCode, { countryName, brands }]) => (
+            <div key={countryCode} className="space-y-4">
+              <div className="flex items-center">
+                <h2 className="text-xl font-semibold">{countryName}</h2>
+                <div className="ml-3 px-2 py-1 bg-muted rounded-full text-xs font-medium">
+                  {brands.length} brand{brands.length !== 1 ? 's' : ''}
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="w-full bg-muted rounded-full h-2 mt-2">
-                  <div 
-                    className="h-2 rounded-full" 
-                    style={{ 
-                      width: `${Math.min(Number(brand.content_count) * 5, 100)}%`,
-                      backgroundColor: brand.brand_color || '#3498db'
-                    }}
-                  ></div>
-                </div>
-              </CardContent>
-              <CardFooter className="border-t pt-4 flex justify-between">
-                <div className="flex gap-2">
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href={`/brands/${brand.id}`}>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                        <circle cx="12" cy="12" r="3" />
-                      </svg>
-                      View
-                    </Link>
-                  </Button>
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href={`/brands/${brand.id}/edit`}>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                        <path d="M12 20h9" />
-                        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                      </svg>
-                      Edit
-                    </Link>
-                  </Button>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => {
-                    setBrandToDelete(brand);
-                    setShowDeleteDialog(true);
-                    setRequiresCascade(false);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </Button>
-              </CardFooter>
-            </Card>
+                <div className="h-px flex-1 bg-border ml-4"></div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {brands.map((brand) => (
+                  <Card key={brand.id}>
+                    <CardHeader className="pb-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-xl">{brand.name}</CardTitle>
+                          <CardDescription>
+                            {LANGUAGES.find(l => l.value === brand.language)?.label || brand.language}
+                          </CardDescription>
+                        </div>
+                        <BrandIcon 
+                          name={brand.name} 
+                          color={brand.brand_color} 
+                          size="md"
+                        />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="w-full bg-muted rounded-full h-2 mt-2">
+                        <div 
+                          className="h-2 rounded-full" 
+                          style={{ 
+                            width: `${Math.min(Number(brand.content_count) * 5, 100)}%`,
+                            backgroundColor: brand.brand_color || '#3498db'
+                          }}
+                        ></div>
+                      </div>
+                      <div className="mt-2 text-sm text-muted-foreground">
+                        {brand.content_count} content item{brand.content_count !== 1 ? 's' : ''}
+                      </div>
+                    </CardContent>
+                    <CardFooter className="border-t pt-4 flex justify-between">
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/dashboard/brands/${brand.id}`}>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                            View
+                          </Link>
+                        </Button>
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/dashboard/brands/${brand.id}/edit`}>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                              <path d="M12 20h9" />
+                              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                            </svg>
+                            Edit
+                          </Link>
+                        </Button>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => {
+                          setBrandToDelete(brand);
+                          setShowDeleteDialog(true);
+                          setRequiresCascade(false);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}

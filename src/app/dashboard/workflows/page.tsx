@@ -31,58 +31,26 @@ export default function WorkflowsPage() {
   const [groupedWorkflows, setGroupedWorkflows] = useState<GroupedWorkflows>({});
   const { toast } = useToast();
 
-  // This is a placeholder since we don't have a workflows API yet
   useEffect(() => {
-    const loadDummyWorkflows = async () => {
+    const fetchWorkflows = async () => {
       try {
         setIsLoading(true);
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Mock workflows data
-        const mockWorkflows: Workflow[] = [
-          {
-            id: '1',
-            name: 'Standard Article Workflow',
-            brand_name: 'TechGadgets',
-            content_type_name: 'Article',
-            steps_count: 3
-          },
-          {
-            id: '2',
-            name: 'Premium Product Description',
-            brand_name: 'WearTech',
-            content_type_name: 'Owned PDP',
-            steps_count: 4
-          },
-          {
-            id: '3',
-            name: 'Retailer Quick Approval',
-            brand_name: 'NutriHealth',
-            content_type_name: 'Retailer PDP',
-            steps_count: 2
-          },
-          {
-            id: '4',
-            name: 'Standard Blog Post',
-            brand_name: 'TechGadgets',
-            content_type_name: 'Blog Post',
-            steps_count: 3
-          },
-          {
-            id: '5',
-            name: 'Social Media Posts',
-            brand_name: 'NutriHealth',
-            content_type_name: 'Social Media',
-            steps_count: 2
-          }
-        ];
+        // Fetch real data from the API
+        const response = await fetch('/api/workflows');
+        const data = await response.json();
         
-        setWorkflows(mockWorkflows);
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to fetch workflows');
+        }
+        
+        const workflowsData = data.workflows || [];
+        
+        setWorkflows(workflowsData);
         
         // Group workflows by brand name
         const grouped: GroupedWorkflows = {};
-        mockWorkflows.forEach((workflow) => {
+        workflowsData.forEach((workflow: any) => {
           const brandName = workflow.brand_name || 'Unknown';
           
           if (!grouped[brandName]) {
@@ -117,7 +85,7 @@ export default function WorkflowsPage() {
       }
     };
     
-    loadDummyWorkflows();
+    fetchWorkflows();
   }, [toast]);
   
   const filteredWorkflows = searchTerm.trim() === '' 
@@ -154,7 +122,7 @@ export default function WorkflowsPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">Workflows</h1>
         <Button asChild>
-          <Link href="/workflows/new">
+          <Link href="/dashboard/workflows/new">
             <Plus className="mr-2 h-4 w-4" /> Create Workflow
           </Link>
         </Button>
@@ -195,7 +163,7 @@ export default function WorkflowsPage() {
           </p>
           {!searchTerm && (
             <Button size="lg" asChild>
-              <Link href="/workflows/new">
+              <Link href="/dashboard/workflows/new">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
                   <path d="M5 12h14" />
                   <path d="M12 5v14" />
@@ -247,20 +215,12 @@ export default function WorkflowsPage() {
                       </CardContent>
                       <CardFooter className="border-t pt-4 flex justify-between">
                         <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/workflows/${workflow.id}`}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                              <circle cx="12" cy="12" r="3" />
-                            </svg>
+                          <Link href={`/dashboard/workflows/${workflow.id}`}>
                             View
                           </Link>
                         </Button>
                         <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/workflows/${workflow.id}/edit`}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                              <path d="M12 20h9" />
-                              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                            </svg>
+                          <Link href={`/dashboard/workflows/${workflow.id}/edit`}>
                             Edit
                           </Link>
                         </Button>
@@ -273,12 +233,6 @@ export default function WorkflowsPage() {
           ))}
         </div>
       )}
-      
-      <div className="text-center p-4 bg-amber-50 text-amber-800 rounded-md border border-amber-200">
-        <p className="text-sm">
-          <strong>Note:</strong> This page currently shows mock data. Workflow API endpoints will be implemented in a future update.
-        </p>
-      </div>
     </div>
   );
 } 
