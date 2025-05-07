@@ -25,6 +25,18 @@ export const getAzureOpenAIClient = () => {
   });
 };
 
+// Get the model name from environment variables without fallbacks
+export function getModelName(): string {
+  const configuredModel = process.env.AZURE_OPENAI_DEPLOYMENT || "";
+  
+  if (!configuredModel) {
+    console.warn("Azure OpenAI deployment name is not configured");
+    throw new Error("Azure OpenAI deployment name is not configured");
+  }
+  
+  return configuredModel;
+}
+
 // Content vetting agencies by country
 export const VETTING_AGENCIES_BY_COUNTRY: Record<string, Array<{name: string, description: string}>> = {
   "US": [
@@ -66,7 +78,9 @@ export function getVettingAgenciesForCountry(countryCode: string): Array<{name: 
   return VETTING_AGENCIES_BY_COUNTRY[countryCode] || [];
 }
 
-// Generate content based on a content type
+/**
+ * Generate content based on a content type
+ */
 export async function generateContent(
   contentType: "article" | "retailer_pdp" | "owned_pdp", 
   brand: {
@@ -83,8 +97,9 @@ export async function generateContent(
     additionalInstructions?: string;
   }
 ) {
+  console.log(`Generating ${contentType} content for brand: ${brand.name}`);
+  
   const client = getAzureOpenAIClient();
-  const deploymentName = process.env.AZURE_OPENAI_DEPLOYMENT || "";
   
   // Build the prompt based on content type and brand information
   let systemPrompt = `You are an expert content creator for the brand "${brand.name}".`;
@@ -132,9 +147,10 @@ export async function generateContent(
   
   userPrompt += ` Format the content in markdown. For articles, include appropriate section headers. Always include a compelling meta title and meta description at the end in the format: META TITLE: [title] META DESCRIPTION: [description].`;
   
+  // Make the API call directly with error handling
   try {
     const response = await client.chat.completions.create({
-      model: deploymentName,
+      model: getModelName(),
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
@@ -171,15 +187,12 @@ export async function generateContent(
     };
   } catch (error) {
     console.error("Error generating content with Azure OpenAI:", error);
-    throw new Error("Failed to generate content");
+    throw new Error(`Failed to generate content: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 /**
  * Generates brand identity from a list of URLs
- * @param brandName The name of the brand
- * @param urls Array of URLs to analyze for brand identity
- * @returns An object with brand identity, tone of voice, guardrails and recommended agencies
  */
 export async function generateBrandIdentityFromUrls(
   brandName: string,
@@ -191,330 +204,446 @@ export async function generateBrandIdentityFromUrls(
   suggestedAgencies: Array<{name: string, description: string, priority: 'high' | 'medium' | 'low'}>;
   brandColor: string;
 }> {
+  console.log(`Generating brand identity for ${brandName} from ${urls.length} URLs`);
+  
+  // Debug environment variables
+  console.log("Environment check:");
+  console.log("- NODE_ENV:", process.env.NODE_ENV);
+  console.log("- AZURE_OPENAI_API_KEY exists:", !!process.env.AZURE_OPENAI_API_KEY);
+  console.log("- AZURE_OPENAI_ENDPOINT exists:", !!process.env.AZURE_OPENAI_ENDPOINT);
+  console.log("- AZURE_OPENAI_DEPLOYMENT:", process.env.AZURE_OPENAI_DEPLOYMENT);
+  
+  const client = getAzureOpenAIClient();
+  const deploymentName = getModelName();
+  
+  // Prepare the prompt
+  const prompt = `
+  Please analyze the following URLs related to the brand "${brandName}":
+  ${urls.map(url => `- ${url}`).join('\n')}
+  
+  Based on these URLs, generate a comprehensive brand identity profile with the following components:
+  
+  1. BRAND IDENTITY: A detailed description of the brand's personality, values, target audience, and key messaging themes. This should be in plain text paragraphs, not markdown.
+  
+  2. TONE OF VOICE: A description of how the brand communicates - the style, language, and approach it uses. This should be a concise paragraph.
+  
+  3. CONTENT GUARDRAILS: Provide 5 specific guidelines that content creators should follow when creating content for this brand. Format these as a bulleted list.
+  
+  4. SUGGESTED VETTING AGENCIES: Based on the industry and country (if known), recommend 3-5 regulatory or vetting agencies that might be relevant to this brand, with a brief description of each. Also assign each a priority level (high, medium, or low) based on how critical compliance with this agency is for the brand.
+  
+  5. BRAND COLOR: Suggest a primary brand color that would best represent this brand's identity and values. Provide the color in hex format (e.g., #FF5733).
+  
+  Format your response as a JSON object with these keys: brandIdentity, toneOfVoice, guardrails (as an array of strings), suggestedAgencies (as an array of objects with name, description, and priority fields), and brandColor (as a hex color code).
+  `;
+  
+  // Make the API call
   try {
-    console.log(`Generating brand identity for ${brandName} from ${urls.length} URLs`);
+    console.log("Sending request to Azure OpenAI API");
+    console.log(`Using deployment: ${deploymentName}`);
     
-    // Debug environment variables
-    console.log("Environment check:");
-    console.log("- NODE_ENV:", process.env.NODE_ENV);
-    console.log("- AZURE_OPENAI_API_KEY exists:", !!process.env.AZURE_OPENAI_API_KEY);
-    console.log("- AZURE_OPENAI_ENDPOINT exists:", !!process.env.AZURE_OPENAI_ENDPOINT);
-    console.log("- AZURE_OPENAI_DEPLOYMENT:", process.env.AZURE_OPENAI_DEPLOYMENT);
-    console.log("- USE_LOCAL_GENERATION:", process.env.USE_LOCAL_GENERATION || 'false');
+    const completion = await client.chat.completions.create({
+      model: deploymentName,
+      messages: [
+        { role: "system", content: "You are a brand strategy expert that helps analyze and create detailed brand identities." },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 1000,
+      response_format: { type: "json_object" }
+    });
     
-    // Check if local generation is forced via env var
-    if (process.env.USE_LOCAL_GENERATION === 'true') {
-      console.log("Using fallback brand identity generation due to USE_LOCAL_GENERATION=true");
-      return generateFallbackBrandIdentity(brandName, urls);
+    console.log("Received response from Azure OpenAI API");
+    const responseContent = completion.choices[0]?.message?.content || "{}";
+    console.log("Raw API response:", responseContent.substring(0, 100) + "...");
+    
+    const parsedResponse = JSON.parse(responseContent);
+    
+    // Ensure guardrails are formatted properly
+    if (Array.isArray(parsedResponse.guardrails)) {
+      parsedResponse.guardrails = parsedResponse.guardrails.map((item: string) => `- ${item}`).join('\n');
     }
     
-    // Only use fallback if credentials are missing
-    if (!process.env.AZURE_OPENAI_API_KEY || !process.env.AZURE_OPENAI_ENDPOINT) {
-      console.log("Using fallback brand identity generation due to missing credentials");
-      return generateFallbackBrandIdentity(brandName, urls);
-    }
-    
-    try {
-      console.log("Attempting to initialize Azure OpenAI client");
-      const client = getAzureOpenAIClient();
-      console.log("Successfully initialized Azure OpenAI client");
-      
-      // Prepare the prompt
-      const prompt = `
-      Please analyze the following URLs related to the brand "${brandName}":
-      ${urls.map(url => `- ${url}`).join('\n')}
-      
-      Based on these URLs, generate a comprehensive brand identity profile with the following components:
-      
-      1. BRAND IDENTITY: A detailed description of the brand's personality, values, target audience, and key messaging themes. This should be in plain text paragraphs, not markdown.
-      
-      2. TONE OF VOICE: A description of how the brand communicates - the style, language, and approach it uses. This should be a concise paragraph.
-      
-      3. CONTENT GUARDRAILS: Provide 5 specific guidelines that content creators should follow when creating content for this brand. Format these as a bulleted list.
-      
-      4. SUGGESTED VETTING AGENCIES: Based on the industry and country (if known), recommend 3-5 regulatory or vetting agencies that might be relevant to this brand, with a brief description of each. Also assign each a priority level (high, medium, or low) based on how critical compliance with this agency is for the brand.
-      
-      5. BRAND COLOR: Suggest a primary brand color that would best represent this brand's identity and values. Provide the color in hex format (e.g., #FF5733).
-      
-      Format your response as a JSON object with these keys: brandIdentity, toneOfVoice, guardrails (as an array of strings), suggestedAgencies (as an array of objects with name, description, and priority fields), and brandColor (as a hex color code).
-      `;
-      
-      // Make the API call
-      console.log("Sending request to Azure OpenAI API");
-      const deploymentName = process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-35-turbo";
-      console.log(`Using deployment: ${deploymentName}`);
-      
-      try {
-        const completion = await client.chat.completions.create({
-          model: deploymentName,
-          messages: [
-            { role: "system", content: "You are a brand strategy expert that helps analyze and create detailed brand identities." },
-            { role: "user", content: prompt }
-          ],
-          temperature: 0.7,
-          max_tokens: 1000,
-          response_format: { type: "json_object" }
-        });
-        
-        console.log("Received response from Azure OpenAI API");
-        const responseContent = completion.choices[0]?.message?.content || "{}";
-        console.log("Raw API response:", responseContent.substring(0, 100) + "...");
-        
-        let parsedResponse;
-        
-        try {
-          parsedResponse = JSON.parse(responseContent);
-          
-          // Ensure guardrails are formatted properly
-          if (Array.isArray(parsedResponse.guardrails)) {
-            parsedResponse.guardrails = parsedResponse.guardrails.map((item: string) => `- ${item}`).join('\n');
-          }
-          
-          console.log("Successfully parsed response and formatted guardrails");
-          return {
-            brandIdentity: parsedResponse.brandIdentity || "",
-            toneOfVoice: parsedResponse.toneOfVoice || "",
-            guardrails: parsedResponse.guardrails || "",
-            suggestedAgencies: parsedResponse.suggestedAgencies || [],
-            brandColor: parsedResponse.brandColor || ""
-          };
-        } catch (error) {
-          console.error("Failed to parse API response:", error);
-          console.log("Raw response that failed to parse:", responseContent);
-          return generateFallbackBrandIdentity(brandName, urls);
-        }
-      } catch (openAIError: any) {
-        console.error("Error calling Azure OpenAI API:", openAIError.message);
-        
-        // If the deployment doesn't exist, try with a different model
-        if (openAIError.message && openAIError.message.includes("API deployment for this resource does not exist")) {
-          console.log("Deployment not found, trying fallback deployment 'gpt-35-turbo'");
-          try {
-            const fallbackCompletion = await client.chat.completions.create({
-              model: "gpt-35-turbo",  // Use a common fallback model name
-              messages: [
-                { role: "system", content: "You are a brand strategy expert that helps analyze and create detailed brand identities." },
-                { role: "user", content: prompt }
-              ],
-              temperature: 0.7,
-              max_tokens: 1000,
-              response_format: { type: "json_object" }
-            });
-            
-            console.log("Received response from fallback Azure OpenAI model");
-            const fallbackResponseContent = fallbackCompletion.choices[0]?.message?.content || "{}";
-            console.log("Raw fallback API response:", fallbackResponseContent.substring(0, 100) + "...");
-            
-            try {
-              const parsedResponse = JSON.parse(fallbackResponseContent);
-              
-              // Ensure guardrails are formatted properly
-              if (Array.isArray(parsedResponse.guardrails)) {
-                parsedResponse.guardrails = parsedResponse.guardrails.map((item: string) => `- ${item}`).join('\n');
-              }
-              
-              console.log("Successfully parsed response from fallback model");
-              return {
-                brandIdentity: parsedResponse.brandIdentity || "",
-                toneOfVoice: parsedResponse.toneOfVoice || "",
-                guardrails: parsedResponse.guardrails || "",
-                suggestedAgencies: parsedResponse.suggestedAgencies || [],
-                brandColor: parsedResponse.brandColor || ""
-              };
-            } catch (parseError) {
-              console.error("Failed to parse fallback API response:", parseError);
-              return generateFallbackBrandIdentity(brandName, urls);
-            }
-          } catch (fallbackError: any) {
-            console.error("Fallback model also failed:", fallbackError.message);
-            return generateFallbackBrandIdentity(brandName, urls);
-          }
-        } else {
-          // For other errors, fall back to template generation
-          return generateFallbackBrandIdentity(brandName, urls);
-        }
-      }
-    } catch (apiError) {
-      console.error("Azure OpenAI API call failed:", apiError);
-      console.log("Falling back to template generation after API error");
-      return generateFallbackBrandIdentity(brandName, urls);
-    }
+    console.log("Successfully parsed response and formatted guardrails");
+    return {
+      brandIdentity: parsedResponse.brandIdentity || "",
+      toneOfVoice: parsedResponse.toneOfVoice || "",
+      guardrails: parsedResponse.guardrails || "",
+      suggestedAgencies: parsedResponse.suggestedAgencies || [],
+      brandColor: parsedResponse.brandColor || ""
+    };
   } catch (error) {
-    console.error("Error in generateBrandIdentityFromUrls:", error);
-    // When an error occurs, fall back to the template generation
-    console.log("Falling back to template generation after error");
-    return generateFallbackBrandIdentity(brandName, urls);
+    console.error("Error generating brand identity with Azure OpenAI:", error);
+    throw new Error(`Failed to generate brand identity: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 /**
- * Generates a fallback brand identity when Azure OpenAI is not available
- * @returns An object with brand identity, tone of voice, guardrails and vetting agencies
+ * Generates SEO-optimized meta title and description from a URL
  */
-function generateFallbackBrandIdentity(brandName: string, urls: string[]): {
-  brandIdentity: string;
-  toneOfVoice: string;
-  guardrails: string;
-  suggestedAgencies: Array<{name: string, description: string, priority: 'high' | 'medium' | 'low'}>;
-  brandColor: string;
-} {
-  console.log("⚠️ Using fallback brand identity generation for:", brandName);
+export async function generateMetadata(
+  url: string,
+  brandLanguage: string = 'en',
+  brandCountry: string = 'US',
+  brandContext?: {
+    brandIdentity?: string;
+    toneOfVoice?: string;
+    guardrails?: string;
+    pageContent?: string;
+  }
+): Promise<{
+  metaTitle: string;
+  metaDescription: string;
+}> {
+  console.log(`Generating metadata for ${url}`);
   
-  // Extract potential industry/category from URLs
-  let industry = "general";
-  if (urls.some(url => url.includes("food") || url.includes("recipe") || url.includes("cook") || url.includes("baking"))) {
-    industry = "food";
-  } else if (urls.some(url => url.includes("tech") || url.includes("software") || url.includes("digital"))) {
-    industry = "technology";
-  } else if (urls.some(url => url.includes("fashion") || url.includes("cloth") || url.includes("wear"))) {
-    industry = "fashion";
-  } else if (urls.some(url => url.includes("health") || url.includes("wellness") || url.includes("fitness"))) {
-    industry = "health";
+  const client = getAzureOpenAIClient();
+  
+  // Prepare the prompt
+  let systemPrompt = `You are an expert SEO specialist who creates compelling, optimized metadata for webpages.
+  You're analyzing content in ${brandLanguage} for users in ${brandCountry}.
+  
+  You MUST follow these strict requirements:
+  1. Meta title MUST be EXACTLY between 50-60 characters
+  2. Meta description MUST be EXACTLY between 150-160 characters
+  
+  Focus on clarity, keywords, and attracting clicks while accurately representing the page content.`;
+  
+  // Add brand context if available
+  if (brandContext?.brandIdentity) {
+    systemPrompt += `\n\nBrand identity: ${brandContext.brandIdentity}`;
   }
   
-  console.log("Detected industry for fallback content:", industry);
+  if (brandContext?.toneOfVoice) {
+    systemPrompt += `\n\nTone of voice: ${brandContext.toneOfVoice}`;
+  }
   
-  // Brand identity templates as plain text, not Markdown
-  const templates: Record<string, {
-    identity: string;
-    tone: string;
-    guardrails: string[];
-    agencies: Array<{name: string, description: string, priority: 'high' | 'medium' | 'low'}>;
-    color: string;
-  }> = {
-    food: {
-      identity: `${brandName} projects a warm, inviting, and trustworthy personality. The brand values quality ingredients, culinary tradition, and creating memorable food experiences. It emphasizes authenticity, care, and attention to detail in all its offerings.\n\nPrimary audience includes home cooks of all skill levels, food enthusiasts, and families looking for reliable, delicious recipes and food products. Secondary audiences include culinary professionals seeking inspiration and quality ingredients.\n\nKey messaging themes include quality ingredients lead to exceptional results, making cooking accessible and enjoyable for everyone, bringing people together through food, and balancing tradition with modern culinary innovation.`,
-      
-      tone: `Warm, encouraging, and knowledgeable. The tone should be conversational and friendly, but also authoritative on food topics. Use descriptive, sensory language when discussing food, and maintain a helpful, guiding approach when providing instructions or advice.`,
-      
-      guardrails: [
-        "Always prioritize food safety - never suggest undercooked ingredients that could cause illness",
-        "Respect dietary restrictions and allergies with clear labeling and alternatives",
-        "Ensure recipes are tested and accurate, with clear measurements and instructions",
-        "Avoid negative language about food choices or eating habits",
-        "Never make unsubstantiated health claims about recipes or ingredients"
-      ],
-      
-      agencies: [
-        { name: "FSA", description: "Food Standards Agency - Responsible for food safety and food hygiene across the UK", priority: "high" },
-        { name: "ASA", description: "Advertising Standards Authority - Regulates advertising across all media in the UK", priority: "high" },
-        { name: "DEFRA", description: "Department for Environment, Food and Rural Affairs - Oversees food production standards", priority: "medium" },
-        { name: "BRC", description: "British Retail Consortium - Sets standards for food safety and quality", priority: "low" }
-      ],
-      color: "#E57373" // Soft red color for food
-    },
+  if (brandContext?.guardrails) {
+    systemPrompt += `\n\nContent guardrails: ${brandContext.guardrails}`;
+  }
+  
+  let userPrompt = `Generate SEO-optimized meta title and description for this URL: ${url}`;
+  
+  // Add page content if available
+  if (brandContext?.pageContent) {
+    // Extract more meaningful content for better metadata generation
+    const content = brandContext.pageContent;
+    const truncatedContent = content.length > 3000 
+      ? content.slice(0, 3000) + "..."
+      : content;
     
-    technology: {
-      identity: `${brandName} embodies innovation, reliability, and forward-thinking vision. The brand values cutting-edge technology, user-centered design, and creating solutions that meaningfully improve people's lives and work.\n\nTarget audience includes tech enthusiasts, early adopters, business professionals seeking efficiency through technology, and everyday consumers looking for intuitive digital solutions. The audience appreciates both functionality and aesthetic design.\n\nKey messaging themes focus on simplifying complexity through smart design, empowering users through technology, continuous innovation and improvement, and security and reliability in a digital world.`,
-      
-      tone: `Clear, confident, and knowledgeable. The tone should balance technical expertise with accessibility, avoiding unnecessary jargon. Maintain an optimistic outlook about technological possibilities while being honest about capabilities and limitations.`,
-      
-      guardrails: [
-        "Never overpromise on security or privacy features",
-        "Maintain transparency about data collection and usage",
-        "Avoid technical language that excludes non-expert users",
-        "Don't make specific performance claims without evidence",
-        "Be inclusive in all language and visual representations"
-      ],
-      
-      agencies: [
-        { name: "ICO", description: "Information Commissioner's Office - UK's independent authority set up to uphold information rights", priority: "high" },
-        { name: "ASA", description: "Advertising Standards Authority - Regulates advertising across all media in the UK", priority: "high" },
-        { name: "CMA", description: "Competition and Markets Authority - Promotes competition and prevents anti-competitive activities", priority: "medium" },
-        { name: "BSI", description: "British Standards Institution - Provides technical standards for products and services", priority: "low" }
-      ],
-      color: "#2196F3" // Blue for technology
-    },
+    userPrompt += `\n\nHere is the content from the webpage that should be used as the primary source for metadata generation:\n${truncatedContent}
     
-    fashion: {
-      identity: `${brandName} represents elegance, creativity, and contemporary style. The brand values quality craftsmanship, sustainable practices, and enabling personal expression through fashion.\n\nTarget audience includes style-conscious individuals who appreciate quality and design. They seek fashion that reflects their personal identity and values, and are willing to invest in pieces that will last.\n\nKey messaging themes emphasize quality and craftsmanship in every detail, fashion as personal expression, timeless style with modern sensibility, and responsible production and consumption.`,
-      
-      tone: `Sophisticated, inspiring, and confident. The tone should be aspirational yet accessible, using rich, descriptive language when discussing products. Balance trend awareness with an emphasis on enduring style.`,
-      
-      guardrails: [
-        "Ensure all claims about sustainability are specific and verifiable",
-        "Maintain diversity and inclusivity in all marketing materials",
-        "Avoid language that promotes unhealthy body image",
-        "Be transparent about manufacturing processes and materials",
-        "Don't make claims about competitors' products or practices"
-      ],
-      
-      agencies: [
-        { name: "ASA", description: "Advertising Standards Authority - Regulates advertising across all media in the UK", priority: "high" },
-        { name: "CMA", description: "Competition and Markets Authority - Promotes competition and prevents anti-competitive activities", priority: "medium" },
-        { name: "Trading Standards", description: "Enforces consumer protection legislation and ensures product safety", priority: "medium" },
-        { name: "BRC", description: "British Retail Consortium - Sets standards for retailers", priority: "low" }
-      ],
-      color: "#9C27B0" // Purple for fashion
-    },
+    Important:
+    - Base your metadata primarily on this content. 
+    - The meta title should accurately represent the page content and NOT include the brand or website name.
+    - META TITLE MUST be EXACTLY 50-60 characters.
+    - META DESCRIPTION MUST be EXACTLY 150-160 characters.`;
+  } else {
+    userPrompt += `\n\nNote: No page content was available for analysis. Please create metadata based on the URL structure. 
     
-    health: {
-      identity: `${brandName} embodies vitality, balance, and holistic wellbeing. The brand values scientific understanding, natural approaches to health, and empowering individuals to take control of their wellness journey.\n\nTarget audience includes health-conscious individuals seeking to improve or maintain their wellbeing, fitness enthusiasts, and those looking for natural solutions to health concerns. The audience spans multiple age groups but shares a proactive approach to health.\n\nKey messaging themes promote a balanced approach to health and wellness, evidence-based natural solutions, preventative care and lasting vitality, and personal empowerment through health knowledge.`,
-      
-      tone: `Nurturing, knowledgeable, and encouraging. The tone should be informative without being clinical, and motivational without being pushy. Use clear, straightforward language when discussing health concepts, and maintain an empathetic approach to wellness challenges.`,
-      
-      guardrails: [
-        "Never make specific medical claims without scientific evidence",
-        "Avoid promising specific results or outcomes from products or practices",
-        "Be inclusive of different body types, abilities and health journeys",
-        "Use qualified experts for health-related content",
-        "Always include appropriate disclaimers for health content"
+    Important:
+    - The meta title should NOT include the brand or website name.
+    - META TITLE MUST be EXACTLY 50-60 characters.
+    - META DESCRIPTION MUST be EXACTLY 150-160 characters.`;
+  }
+  
+  userPrompt += `\n\nCreate:
+  1. A compelling meta title (MUST be EXACTLY 50-60 characters)
+  2. An informative meta description (MUST be EXACTLY 150-160 characters)
+  
+  Format as JSON with metaTitle and metaDescription keys.`;
+  
+  try {
+    // Make the API call
+    const response = await client.chat.completions.create({
+      model: getModelName(),
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
       ],
-      
-      agencies: [
-        { name: "MHRA", description: "Medicines and Healthcare products Regulatory Agency - Regulates medicines, medical devices, and blood components", priority: "high" },
-        { name: "ASA", description: "Advertising Standards Authority - Regulates advertising across all media in the UK", priority: "high" },
-        { name: "NICE", description: "National Institute for Health and Care Excellence - Provides national guidance and advice to improve health and social care", priority: "medium" },
-        { name: "Trading Standards", description: "Enforces consumer protection legislation and ensures product safety", priority: "low" }
-      ],
-      color: "#4CAF50" // Green for health
-    },
+      response_format: { type: "json_object" },
+      max_tokens: 500,
+      temperature: 0.7
+    });
     
-    general: {
-      identity: `${brandName} projects a professional, reliable, and customer-focused personality. The brand values quality, innovation, and creating exceptional experiences for its customers. It emphasizes integrity, excellence, and adaptability in an evolving marketplace.\n\nPrimary audience includes discerning consumers who value quality and service. They appreciate attention to detail and are willing to invest in products or services that deliver consistent value and reliability.\n\nKey messaging themes include unwavering commitment to quality, innovation driven by customer needs, building lasting relationships, and delivering on promises consistently.`,
-      
-      tone: `Clear, confident, and approachable. The tone should be professional without being impersonal, and authoritative without being condescending. Maintain a balance between showcasing expertise and being accessible to a wide audience.`,
-      
-      guardrails: [
-        "Maintain transparency in all communications and practices",
-        "Avoid making unsubstantiated claims about products or services",
-        "Use inclusive language that respects diversity",
-        "Don't disparage competitors or alternative solutions",
-        "Ensure all claims are accurate and can be verified"
+    const content = response.choices[0]?.message?.content || "{}";
+    
+    const parsedResponse = JSON.parse(content);
+    return {
+      metaTitle: parsedResponse.metaTitle || "",
+      metaDescription: parsedResponse.metaDescription || ""
+    };
+  } catch (error) {
+    console.error("Error generating metadata with Azure OpenAI:", error);
+    throw new Error(`Failed to generate metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Generates SEO-optimized meta title and description from content directly
+ */
+export async function generateMetadataFromContent(
+  contentTitle: string,
+  contentBody: string,
+  brandLanguage: string = 'en',
+  brandCountry: string = 'US',
+  brandContext?: {
+    brandIdentity?: string;
+    toneOfVoice?: string;
+    guardrails?: string;
+  }
+): Promise<{
+  metaTitle: string;
+  metaDescription: string;
+  keywords: string[];
+}> {
+  console.log(`Generating metadata for content: ${contentTitle}`);
+  
+  const client = getAzureOpenAIClient();
+  
+  // Prepare the prompt
+  let systemPrompt = `You are an expert SEO specialist who creates compelling, optimized metadata for content.
+  You're analyzing content in ${brandLanguage} for users in ${brandCountry}.
+  
+  You MUST follow these strict requirements:
+  1. Meta title MUST be EXACTLY between 50-60 characters
+  2. Meta description MUST be EXACTLY between 150-160 characters
+  3. Generate 5-8 relevant keywords or keyword phrases based on the content
+  
+  Focus on clarity, SEO optimization, and attracting clicks while accurately representing the content.`;
+  
+  // Add brand context if available
+  if (brandContext?.brandIdentity) {
+    systemPrompt += `\n\nBrand identity: ${brandContext.brandIdentity}`;
+  }
+  
+  if (brandContext?.toneOfVoice) {
+    systemPrompt += `\n\nTone of voice: ${brandContext.toneOfVoice}`;
+  }
+  
+  if (brandContext?.guardrails) {
+    systemPrompt += `\n\nContent guardrails: ${brandContext.guardrails}`;
+  }
+  
+  // Truncate content body if too long
+  const truncatedBody = contentBody.length > 3000 
+    ? contentBody.slice(0, 3000) + "..."
+    : contentBody;
+  
+  const userPrompt = `Generate SEO-optimized meta title, description, and keywords for this content:
+  
+  Title: ${contentTitle}
+  
+  Content:
+  ${truncatedBody}
+  
+  Important:
+  - Base your metadata on the content provided
+  - The meta title should accurately represent the content and NOT include the brand or website name
+  - META TITLE MUST be EXACTLY 50-60 characters
+  - META DESCRIPTION MUST be EXACTLY 150-160 characters
+  - Generate 5-8 relevant keywords or keyword phrases based on the content
+  
+  Format as JSON with metaTitle, metaDescription, and keywords keys (keywords should be an array of strings).`;
+  
+  try {
+    // Make the API call
+    const response = await client.chat.completions.create({
+      model: getModelName(),
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
       ],
-      
-      agencies: [
-        { name: "ASA", description: "Advertising Standards Authority - Regulates advertising across all media in the UK", priority: "high" },
-        { name: "CMA", description: "Competition and Markets Authority - Promotes competition and prevents anti-competitive activities", priority: "medium" },
-        { name: "Trading Standards", description: "Enforces consumer protection legislation and ensures product safety", priority: "medium" },
-        { name: "ICO", description: "Information Commissioner's Office - UK's independent authority set up to uphold information rights", priority: "low" }
+      response_format: { type: "json_object" },
+      max_tokens: 500,
+      temperature: 0.7
+    });
+    
+    const content = response.choices[0]?.message?.content || "{}";
+    
+    const parsedResponse = JSON.parse(content);
+    return {
+      metaTitle: parsedResponse.metaTitle || "",
+      metaDescription: parsedResponse.metaDescription || "",
+      keywords: Array.isArray(parsedResponse.keywords) ? parsedResponse.keywords : []
+    };
+  } catch (error) {
+    console.error("Error generating metadata with Azure OpenAI:", error);
+    throw new Error(`Failed to generate metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Generates accessible alt text for an image
+ */
+export async function generateAltText(
+  imageUrl: string,
+  brandLanguage: string = 'en',
+  brandCountry: string = 'US',
+  brandContext?: {
+    brandIdentity?: string;
+    toneOfVoice?: string;
+    guardrails?: string;
+  }
+): Promise<{
+  altText: string;
+}> {
+  console.log(`Generating alt text for ${imageUrl}`);
+  
+  const client = getAzureOpenAIClient();
+  
+  // Prepare the prompt with best practices
+  let systemPrompt = `You are an accessibility expert who creates clear and descriptive alt text for images.
+  You're writing alt text in ${brandLanguage} for users in ${brandCountry}.
+  
+  Follow these best practices for creating alt text:
+  
+  ✅ DO:
+  - Be descriptive and specific about essential image details
+  - Keep it concise (under 125 characters)
+  - Describe function if the image is a functional element
+  - Include important text visible in the image
+  - Consider the image's context on the page
+  - Use keywords thoughtfully if they naturally fit
+  
+  ❌ AVOID:
+  - Starting with "Image of..." or "Picture of..."
+  - Overly vague descriptions
+  - Keyword stuffing
+  - Long descriptions (use adjacent text for complex images)
+  - Decorative image descriptions (for purely decorative images)
+  
+  Create alt text that clearly communicates what a user would miss if they couldn't see the image.`;
+  
+  // Add brand context if available
+  if (brandContext?.brandIdentity) {
+    systemPrompt += `\n\nBrand identity: ${brandContext.brandIdentity}`;
+  }
+  
+  if (brandContext?.toneOfVoice) {
+    systemPrompt += `\n\nTone of voice: ${brandContext.toneOfVoice}`;
+  }
+  
+  if (brandContext?.guardrails) {
+    systemPrompt += `\n\nContent guardrails: ${brandContext.guardrails}`;
+  }
+  
+  const userPrompt = `Generate accessible alt text for this image: ${imageUrl}
+  
+  Examples of good alt text:
+  - "Woman holding a protest sign reading 'Equality for All' during a march in central London"
+  - "Mountain range at sunset with orange-pink sky reflected in a still lake"
+  - "Chef demonstrating how to knead bread dough on a flour-dusted countertop"
+  
+  Bad examples to avoid:
+  - "Image of a nice scenery" (too vague)
+  - "Picture showing a person at an event" (starts with 'picture' and is vague)
+  - "Beautiful product photo of our newest spring collection item perfect for your wardrobe essential must-have fashion trend 2023" (keyword stuffed)
+  
+  Keep it under 125 characters and focus on the most important visual details. If there's text in the image, include it.
+  
+  Format your response as JSON with an altText key.`;
+  
+  try {
+    // Make the API call without any fallbacks
+    const response = await client.chat.completions.create({
+      model: getModelName(),
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
       ],
-      color: "#607D8B" // Blue grey for general
-    }
+      response_format: { type: "json_object" },
+      max_tokens: 300,
+      temperature: 0.7
+    });
+    
+    const content = response.choices[0]?.message?.content || "{}";
+    
+    const parsedResponse = JSON.parse(content);
+    return {
+      altText: parsedResponse.altText || ""
+    };
+  } catch (error) {
+    console.error("Error generating alt text with Azure OpenAI:", error);
+    throw new Error(`Failed to generate alt text: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Trans-creates content from one language to another
+ */
+export async function transCreateContent(
+  content: string,
+  sourceLanguage: string = 'en',
+  targetLanguage: string = 'es',
+  targetCountry: string = 'ES'
+): Promise<{
+  transCreatedContent: string;
+}> {
+  console.log(`Trans-creating content from ${sourceLanguage} to ${targetLanguage} for ${targetCountry}`);
+  
+  const client = getAzureOpenAIClient();
+  
+  // Language map with common names to help with prompting
+  const languageNames: Record<string, string> = {
+    'en': 'English',
+    'es': 'Spanish',
+    'fr': 'French',
+    'de': 'German',
+    'it': 'Italian',
+    'pt': 'Portuguese',
+    'ru': 'Russian',
+    'zh': 'Chinese',
+    'ja': 'Japanese',
+    'ko': 'Korean'
   };
   
-  const templateData = templates[industry];
+  const sourceLangName = languageNames[sourceLanguage] || sourceLanguage;
+  const targetLangName = languageNames[targetLanguage] || targetLanguage;
   
-  // Format the response to ensure it has all required fields in the correct format
-  const result = {
-    brandIdentity: templateData.identity,
-    toneOfVoice: templateData.tone,
-    guardrails: templateData.guardrails.map(item => `- ${item}`).join('\n'),
-    suggestedAgencies: templateData.agencies.map(agency => ({
-      name: agency.name,
-      description: agency.description,
-      priority: agency.priority as 'high' | 'medium' | 'low'
-    })),
-    brandColor: templateData.color
-  };
+  // Prepare the prompt
+  const systemPrompt = `You are an expert localisation specialist who trans-creates content from ${sourceLangName} to ${targetLangName} for audiences in ${targetCountry}.
+  Trans-creation means adapting content culturally and linguistically, not just translating it.
+  Consider cultural nuances, idioms, expressions, and preferences of the target audience.
+  Maintain the original meaning, tone, and intent while making it feel natural to native ${targetLangName} speakers.
   
-  console.log("Generated fallback brand identity with values:", {
-    brandIdentityLength: result.brandIdentity.length,
-    toneOfVoiceLength: result.toneOfVoice.length, 
-    guardrailsLength: result.guardrails.length,
-    agenciesCount: result.suggestedAgencies.length,
-    brandColor: result.brandColor
-  });
+  For Spanish content specifically:
+  - Adapt idioms and expressions to Spanish equivalents
+  - Consider cultural references relevant to Spanish-speaking audiences
+  - Use language that feels natural and authentic to native speakers
+  - Adapt humor appropriately for the culture
+  - Pay attention to formal vs. informal tone based on context`;
   
-  return result;
+  const userPrompt = `Trans-create the following content from ${sourceLangName} to ${targetLangName} for audiences in ${targetCountry}:
+  
+  "${content}"
+  
+  Don't just translate literally - adapt the content to feel authentic and natural to ${targetLangName} native speakers in ${targetCountry}.
+  Adjust cultural references, idioms, humor, and examples as needed while preserving the main message.
+  
+  Format your response as JSON with a transCreatedContent key containing ONLY the translated content.`;
+  
+  try {
+    // Make the API call
+    const response = await client.chat.completions.create({
+      model: getModelName(),
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 1500,
+      temperature: 0.7
+    });
+    
+    const responseContent = response.choices[0]?.message?.content || "{}";
+    
+    const parsedResponse = JSON.parse(responseContent);
+    return {
+      transCreatedContent: parsedResponse.transCreatedContent || ""
+    };
+  } catch (error) {
+    console.error("Error trans-creating content with Azure OpenAI:", error);
+    throw new Error(`Failed to trans-create content: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 } 
