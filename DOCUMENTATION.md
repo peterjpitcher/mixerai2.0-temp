@@ -1201,3 +1201,37 @@ The application's main navigation is built around the dashboard structure. The p
 3. **Breadcrumb Navigation** - Located at the top of each page, showing the current location in the navigation hierarchy
 
 For more details on the navigation structure, see `src/components/layout/Navigation.tsx`.
+
+## 🛠️ Technical Tools
+
+MixerAI 2.0 includes several technical tools to enhance content creation workflows:
+
+### Metadata Generator
+- **Purpose**: Generates SEO-optimised meta titles and descriptions from webpage URLs
+- **Features**:
+  - Scrapes webpage content and analyzes it with Azure OpenAI
+  - Creates language-specific and country-specific metadata
+  - Follows SEO best practices for title and description length
+  - Easy copy-to-clipboard functionality
+- **API**: `POST /api/tools/metadata-generator`
+- **UI**: `/dashboard/tools/metadata-generator`
+
+### Alt Text Generator
+- **Purpose**: Creates accessible alt text for images to improve accessibility and SEO
+- **Features**:
+  - Analyzes image content using Azure OpenAI's image understanding
+  - Generates concise, descriptive alt text following accessibility best practices
+  - Supports multiple languages based on brand settings
+  - Image preview and copy-to-clipboard functionality
+- **API**: `POST /api/tools/alt-text-generator`
+- **UI**: `/dashboard/tools/alt-text-generator`
+
+### Content Trans-Creator
+- **Purpose**: Trans-creates content across languages and cultures (beyond simple translation)
+- **Features**:
+  - Adapts content to be culturally relevant, not just linguistically accurate
+  - Preserves original meaning while making it natural to native speakers
+  - Supports multiple language and country combinations
+  - Maintains tone and brand voice across languages
+- **API**: `POST /api/tools/content-transcreator`
+- **UI**: `/dashboard/tools/content-transcreator`

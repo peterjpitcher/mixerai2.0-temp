@@ -28,3 +28,8 @@ The following shell scripts are available for development and maintenance:
 ## Legacy Documentation
 
 Note: Most documentation has been consolidated, but specialized documentation may still exist in individual files. Please refer to the consolidated documentation first.
+
+## OpenAI Integration Documentation
+
+- [Azure OpenAI Integration](./AZURE_OPENAI_INTEGRATION.md) - Comprehensive guide to the Azure OpenAI integration in MixerAI 2.0a
+- [Removing Fallback Generation](./REMOVE_FALLBACK_GENERATION.md) - Guide for removing fallback content generation logic

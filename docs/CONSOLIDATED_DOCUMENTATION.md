@@ -271,112 +271,69 @@ The application uses Supabase Auth for authentication with the following setup:
 - UI indicators for fallback content usage
 - Rate limiting with friendly messages
 
+## AI Integration
+
+### Azure OpenAI Configuration
+
+MixerAI 2.0 uses Azure OpenAI for all AI-powered content generation. The system is configured via environment variables:
+
+```
+AZURE_OPENAI_API_KEY=your_azure_openai_api_key
+AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com
+AZURE_OPENAI_DEPLOYMENT=deployment_name
+```
+
+The OpenAI client is initialized in `/src/lib/azure/openai.ts` and all API calls are made server-side to protect API credentials.
+
+### Content Generation Features
+
+MixerAI 2.0 includes several AI-powered tools:
+
+1. **Content Generation**
+   - Articles, Product Descriptions, and other marketing content
+   - Incorporates brand voice, guidelines, and context
+
+2. **Brand Identity Generation**
+   - Creates brand identity from website URLs
+   - Includes tone of voice, guardrails, and agency recommendations
+   
+3. **Metadata Generator**
+   - SEO-optimized meta titles (50-60 characters) and descriptions (150-160 characters)
+   - Incorporates brand context for consistent messaging
+
+4. **Alt Text Generator**
+   - Accessible image descriptions for web content
+   - Follows accessibility best practices (no "image of...", concise descriptions)
+   - Limited to 125 characters for optimal screen reader experience
+
+5. **Content Trans-Creator**
+   - Adapts content between languages with cultural sensitivity
+   - Goes beyond direct translation to localize for target markets
+
+### Brand Context Integration
+
+Each AI request includes comprehensive brand information:
+
+- **Brand Language & Country**: For localization and cultural relevance
+- **Brand Identity**: Core brand personality and values
+- **Tone of Voice**: Specific communication style guidance
+- **Guardrails**: Content limitations and requirements
+- **Vetting Agency Alignment**: Content validated against country-specific regulatory agencies
+
+### Error Handling
+
+When Azure OpenAI API calls fail:
+
+1. Errors are logged to the console with detailed information
+2. Specific error messages are returned to the client
+3. UI displays appropriate error notifications
+4. No fallback content is generated - errors are transparently reported
+
+For more detailed information on the Azure OpenAI integration, refer to:
+- [Azure OpenAI Integration](./AZURE_OPENAI_INTEGRATION.md)
+- [Removing Fallback Generation](./REMOVE_FALLBACK_GENERATION.md)
+
 ## Local Development Setup
 
 ### Using Docker for PostgreSQL
-```bash
-docker-compose up -d
 ```
-
-### Environment Variables Setup
-Create a `.env` file in the project root with:
-```
-# Database Connection
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-POSTGRES_DB=mixerai
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-
-# Supabase Connection (for auth and production)
-NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
-
-# Azure OpenAI Configuration
-AZURE_OPENAI_API_KEY=your-azure-openai-api-key
-AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com/
-AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment-name
-AZURE_OPENAI_API_VERSION=2023-05-15
-
-# Application Settings
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-NODE_ENV=development
-```
-
-### Running the App
-
-1. With a local PostgreSQL DB:
-```bash
-./scripts/use-local-db.sh
-npm run dev
-```
-
-2. With Supabase:
-```bash
-npm run dev
-```
-
-## Project Structure
-
-```
-MixerAI 2.0a/
-├── docs/ # Markdown and shell script documentation
-├── migrations/ # SQL migration scripts
-├── public/ # Static assets (images, icons, etc.)
-├── scripts/ # Developer tools and database setup scripts
-├── src/ # Source code
-│ ├── app/ # App Router: routes and layouts
-│ │ ├── api/ # API route handlers
-│ │ ├── auth/ # Login, registration, etc.
-│ │ └── dashboard/ # Authenticated user interface
-│ ├── components/ # Reusable UI components
-│ │ ├── content/ # Content-specific UI (e.g. approval workflows)
-│ │ ├── dashboard/ # Dashboard widgets and panels
-│ │ └── [shared]/ # Shared components (buttons, modals, tables, etc.)
-│ ├── lib/ # Logic and service clients
-│ │ ├── auth/ # Authentication utilities
-│ │ ├── azure/ # Azure OpenAI integration
-│ │ ├── supabase/ # Supabase client instance
-│ │ └── db.ts # Direct PostgreSQL connection
-│ └── types/ # TypeScript types and interfaces
-├── .env, .env.local # Environment variables
-├── package.json # Project dependencies and scripts
-└── next.config.ts # Next.js configuration
-```
-
-## User Invitation System
-
-The application uses a simplified invitation system:
-
-1. **Process Flow**:
-   - Admin users can invite new users with specific roles
-   - Invited users receive an email with a sign-up link
-   - Upon registration, users get pre-assigned permissions
-
-2. **Implementation**:
-   - Uses Supabase's email invitation system
-   - Tracks invitation attempts for troubleshooting
-   - Pre-assigns brand permissions based on invitation context
-
-3. **Database Tables**:
-   - `profiles` - User profile information
-   - `user_brand_permissions` - User access to specific brands
-   - `invitation_logs` - Tracking of invitation attempts
-
-## Email Templates
-
-The application uses custom HTML email templates for:
-- User invitations
-- Password reset
-- Magic link authentication
-- Account confirmation
-
-Templates are located in `/docs/email-templates/` and can be customized for branding.
-
-## Error Prevention Best Practices
-
-- **Null/Undefined Checks**: Always validate data before using
-- **Fallback Values**: Provide sensible defaults when data might be missing
-- **Defensive UI Components**: Handle missing data gracefully with loading states
-- **Type Guards**: Use TypeScript type guards to ensure type safety 
