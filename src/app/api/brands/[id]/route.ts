@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
+// Force dynamic rendering for this route
+export const dynamic = "force-dynamic";
 
 // GET a single brand by ID
 export async function GET(
@@ -30,7 +32,9 @@ export async function GET(
           brand_color: '#3498db',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        }
+        },
+        contentCount: 5,
+        workflowCount: 2
       }, {
         headers: {
           'Access-Control-Allow-Origin': '*',
@@ -67,6 +71,26 @@ export async function GET(
       );
     }
 
+    // Get content count for this brand
+    const { count: contentCount, error: contentError } = await supabase
+      .from('content')
+      .select('id', { count: 'exact', head: true })
+      .eq('brand_id', id);
+      
+    if (contentError) {
+      console.error('Error fetching content count:', contentError);
+    }
+    
+    // Get workflow count for this brand
+    const { count: workflowCount, error: workflowError } = await supabase
+      .from('workflows')
+      .select('id', { count: 'exact', head: true })
+      .eq('brand_id', id);
+      
+    if (workflowError) {
+      console.error('Error fetching workflow count:', workflowError);
+    }
+
     console.log(`Successfully fetched brand: ${brand.name}`);
     
     // Add metadata to help identify the response (using type assertion for extra properties)
@@ -76,6 +100,8 @@ export async function GET(
     return NextResponse.json({ 
       success: true, 
       brand,
+      contentCount: contentCount || 0,
+      workflowCount: workflowCount || 0,
       meta: {
         source: 'database',
         isFallback: false,
@@ -114,6 +140,8 @@ export async function GET(
           source: 'fallback',
           fetchedAt: new Date().toISOString()
         },
+        contentCount: 0,
+        workflowCount: 0,
         meta: {
           source: 'fallback',
           isFallback: true,

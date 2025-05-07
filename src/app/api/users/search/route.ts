@@ -3,6 +3,9 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 
+// Force dynamic rendering for this route
+export const dynamic = "force-dynamic";
+
 // Define the extended profile type that includes job_title
 interface ExtendedProfile {
   id: string;

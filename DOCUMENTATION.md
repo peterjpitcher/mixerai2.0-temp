@@ -17,6 +17,29 @@
   - Role information from user_brand_permissions
   - Fallback avatar generation for users without profile images
 
+### 3. Missing Pages Documentation
+- Created comprehensive documentation for pages that have been removed or relocated
+- Developed detailed implementation guides for recreating high-priority pages
+- Established a tracking system for monitoring implementation progress
+- Identified dependencies and blockers for the implementation process
+- Documentation available in the `/docs/missing-pages/` directory:
+  - `README.md` - Overview and plan for missing pages
+  - `implementation-guide.md` - Detailed implementation instructions
+  - `tracking.md` - Progress tracking document
+
+### 4. Missing Workflow Pages Implementation
+- Implemented all workflow-related missing pages:
+  - `/dashboard/workflows/[id]/page.tsx` - Workflow detail view
+  - `/dashboard/workflows/[id]/edit/page.tsx` - Workflow edit page 
+  - `/dashboard/workflows/new/page.tsx` - Workflow creation page
+- Added comprehensive UI components for workflow management:
+  - Step reordering functionality
+  - Role and approval management
+  - Assignee email management
+  - Workflow validation
+- Implementation currently uses mock data, with planned API integration
+- Updated tracking documentation to reflect progress
+
 ## Implementation Details
 
 ### API Route Update
@@ -54,6 +77,7 @@ The `/api/users` route now:
 - More complete user information for better user management
 - Consistent user experience between local and production environments
 - Fixed routing structure prevents duplicate layouts and navigation elements
+- Restored workflow management functionality with improved UI
 
 ## Requirements
 - Requires SUPABASE_SERVICE_ROLE_KEY to be set in environment variables
@@ -62,6 +86,57 @@ The `/api/users` route now:
 # MixerAI 2.0 Documentation
 
 ## Recent Updates
+
+### API Route Optimization
+
+We've improved the build process with proper route configuration:
+
+1. **Dynamic Route Handling**
+   - Added the `dynamic = "force-dynamic"` directive to all API routes using authentication
+   - Fixed build warnings related to cookie usage in static routes
+   - Created an automated script (`scripts/fix-dynamic-routes.sh`) to ensure all API routes are properly configured
+
+2. **Build Performance**
+   - Improved build times by correctly marking routes as dynamic or static
+   - Fixed issues with cookies and authentication in static exports
+   - Reduced the number of build warnings and errors
+
+3. **Authentication Consistency**
+   - Ensured all authenticated API routes properly mark themselves as dynamic
+   - Maintained consistent behavior between development and production
+   - Improved error handling for authentication failures
+
+### Brand Page Fixes
+
+We've fixed and enhanced the brand detail and edit pages to provide comprehensive brand management functionality:
+
+1. **Fixed Broken Redirects**
+   - Resolved issues where the brand detail page was incorrectly redirecting to a non-existent route (`/brands/[id]`)
+   - Fixed the brand edit page that was incorrectly redirecting to a non-existent route (`/brands/[id]/edit`)
+   - Implemented proper brand pages at `/dashboard/brands/[id]` and `/dashboard/brands/[id]/edit`
+
+2. **Enhanced Brand Detail UI**
+   - Created a tabbed interface with Overview, Brand Identity, Content, and Workflows sections
+   - Added brand statistics including content count and workflow count
+   - Implemented proper loading, error, and not-found states
+   - Responsive design that works on all device sizes
+
+3. **Comprehensive Brand Edit Interface**
+   - Implemented a complete brand editing experience with Basic Details and Brand Identity tabs
+   - Added brand identity generation functionality with AI support
+   - Created a side panel with brand preview and recommendations
+   - Added proper form validation and error handling
+
+4. **API Enhancements**
+   - Updated the GET `/api/brands/[id]` endpoint to include content and workflow counts
+   - Improved brand identity generation with country and language support
+   - Added better error handling and fallback data for unreliable connections
+   - Improved performance with optimized database queries
+
+5. **Navigation Integration**
+   - Added proper links between view, edit and list pages
+   - Consistent with overall application navigation structure
+   - Intuitive user flow for brand management
 
 ### Unified Navigation System
 
@@ -1080,3 +1155,49 @@ Detailed documentation about the implementation can be found in:
 - [Duplicate Pages Removal Plan](./docs/DUPLICATE_PAGES_REMOVAL_PLAN.md)
 - [Route Cleanup Executive Summary](./docs/ROUTE_CLEANUP_EXECUTIVE_SUMMARY.md)
 - [Route Redirect Test Plan](./docs/ROUTE_REDIRECT_TEST_PLAN.md)
+
+## Application Route Structure
+
+MixerAI 2.0 uses a simplified route structure where all authenticated content is accessible through the `/dashboard` route prefix. All other top-level routes (like `/brands`, `/workflows`, `/content`, and `/users`) are automatically redirected to their `/dashboard` equivalents.
+
+### Main Route Groups
+
+1. **Authentication Routes**
+   - `/auth/login` - User login
+   - `/auth/register` - New user registration
+
+2. **Dashboard Routes**
+   - `/dashboard/brands` - Brand management
+   - `/dashboard/workflows` - Workflow management
+   - `/dashboard/content` - Content management (redirects to `/dashboard/content/article`)
+   - `/dashboard/users` - User management
+
+3. **API Routes**
+   - `/api/brands` - Brand data endpoints
+   - `/api/workflows` - Workflow endpoints
+   - `/api/content` - Content management endpoints
+   - `/api/users` - User management endpoints
+
+4. **Account Management**
+   - `/account` - User account settings
+
+### Redirect Handling
+
+For backward compatibility, all non-dashboard routes automatically redirect to their dashboard equivalents:
+
+- `/brands/*` → `/dashboard/brands/*`
+- `/workflows/*` → `/dashboard/workflows/*`
+- `/content/*` → `/dashboard/content/*`
+- `/users/*` → `/dashboard/users/*`
+
+All redirects maintain query parameters and are configured as permanent (301) redirects.
+
+## Navigation
+
+The application's main navigation is built around the dashboard structure. The primary navigation components are:
+
+1. **Sidebar Navigation** - Located on the left side of the dashboard, providing access to all main sections
+2. **User Menu** - Located in the top-right corner, providing access to account settings and logout
+3. **Breadcrumb Navigation** - Located at the top of each page, showing the current location in the navigation hierarchy
+
+For more details on the navigation structure, see `src/components/layout/Navigation.tsx`.
