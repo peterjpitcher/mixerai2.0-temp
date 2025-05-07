@@ -14,7 +14,11 @@ import {
   ShoppingBag,
   Store,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Wrench,
+  Code,
+  Image,
+  Globe
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
@@ -46,7 +50,8 @@ export function UnifiedNavigation() {
   
   // Track expanded state for collapsible sections
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    content: true // Content section expanded by default
+    content: true, // Content section expanded by default
+    tools: true    // Tools section expanded by default
   });
 
   // Automatically expand sections based on current path
@@ -55,6 +60,10 @@ export function UnifiedNavigation() {
     
     if (pathname.includes('/content') && !expandedSections.content) {
       newExpandedState.content = true;
+    }
+    
+    if (pathname.includes('/tools') && !expandedSections.tools) {
+      newExpandedState.tools = true;
     }
     
     setExpandedSections(newExpandedState);
@@ -112,6 +121,33 @@ export function UnifiedNavigation() {
           label: 'Retailer PDP',
           icon: <Store className="h-4 w-4" />,
           segment: 'retailerpdp'
+        }
+      ]
+    },
+    // New Tools section with submenu
+    {
+      label: 'Tools',
+      icon: <Wrench className="h-5 w-5" />,
+      segment: 'tools',
+      defaultOpen: true,
+      items: [
+        {
+          href: '/dashboard/tools/metadata-generator',
+          label: 'Metadata Generator',
+          icon: <Code className="h-4 w-4" />,
+          segment: 'metadata-generator'
+        },
+        {
+          href: '/dashboard/tools/alt-text-generator',
+          label: 'Alt Text Generator',
+          icon: <Image className="h-4 w-4" />,
+          segment: 'alt-text-generator'
+        },
+        {
+          href: '/dashboard/tools/content-transcreator',
+          label: 'Content Trans-Creator',
+          icon: <Globe className="h-4 w-4" />,
+          segment: 'content-transcreator'
         }
       ]
     },

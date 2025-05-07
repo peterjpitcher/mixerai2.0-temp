@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/toast-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import RootLayoutWrapper from "@/components/layout/root-layout-wrapper";
 import Script from "next/script";
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -152,6 +153,7 @@ export default function RootLayout({
           <ToastProvider>
             <RootLayoutWrapper>{children}</RootLayoutWrapper>
             <Toaster />
+            <SonnerToaster />
           </ToastProvider>
         </ThemeProvider>
       </body>
