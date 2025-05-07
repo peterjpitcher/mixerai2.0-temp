@@ -1,59 +1,156 @@
-'use client';
+import { Button } from "@/components/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/card";
+import Link from "next/link";
+import { BookOpen, Building2, GitBranch, Users } from "lucide-react";
+import { requireAuth } from '@/lib/auth/server';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+export const metadata = {
+  title: 'Dashboard | MixerAI',
+  description: 'MixerAI dashboard home',
+};
 
-// Domain verification component for dashboard
-function DomainCheck() {
-  useEffect(() => {
-    const productionDomain = 'mixerai.orangejely.co.uk';
-    const isDev = process.env.NODE_ENV === 'development';
-    
-    if (isDev) {
-      const container = document.getElementById('domain-verification-container');
-      if (!container) return;
-      
-      const hostname = window.location.hostname;
-      const isConfigured = hostname === productionDomain || 
-                          process.env.NEXT_PUBLIC_APP_URL?.includes(productionDomain);
-      
-      if (!isConfigured) {
-        container.innerHTML = `
-          <div class="p-4 rounded-lg border border-yellow-500/50 text-yellow-700 bg-yellow-50 relative">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-4 top-4">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-              <line x1="12" y1="9" x2="12" y2="13"></line>
-              <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>
-            <div class="pl-7">
-              <h5 class="mb-1 font-medium leading-none tracking-tight">Domain Configuration Warning</h5>
-              <div class="text-sm">
-                The application is not configured to use the production domain <strong>${productionDomain}</strong>.<br>
-                Run <code class="bg-muted px-1 rounded">./scripts/update-domain-config.sh</code> to configure the application.
-              </div>
-            </div>
-          </div>
-        `;
-      }
-    }
-  }, []);
-  
-  return null;
-}
-
-export default function DashboardRedirect() {
-  const router = useRouter();
-  
-  useEffect(() => {
-    router.replace('/');
-  }, [router]);
+export default async function DashboardPage() {
+  await requireAuth();
   
   return (
-    <div className="flex justify-center items-center h-screen">
-      <div className="text-center p-4">
-        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-muted-foreground">Redirecting to new dashboard location...</p>
+    <div className="container mx-auto py-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground">
+          Welcome to MixerAI. Manage your content, brands, workflows, and users.
+        </p>
       </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Content Card */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-medium">
+              Content
+            </CardTitle>
+            <BookOpen className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Create and manage different types of marketing content
+              </p>
+              <div className="flex flex-col space-y-2">
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/dashboard/content/article">Articles</Link>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/dashboard/content/ownedpdp">Owned PDP</Link>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/dashboard/content/retailerpdp">Retailer PDP</Link>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* Brands Card */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-medium">
+              Brands
+            </CardTitle>
+            <Building2 className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Manage your brands and their identity
+              </p>
+              <div className="flex flex-col space-y-2">
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/dashboard/brands">View All Brands</Link>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/dashboard/brands/new">Create New Brand</Link>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* Workflows Card */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-medium">
+              Workflows
+            </CardTitle>
+            <GitBranch className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Create and manage content approval workflows
+              </p>
+              <div className="flex flex-col space-y-2">
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/dashboard/workflows">View All Workflows</Link>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/dashboard/workflows/templates">Templates</Link>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* Users Card */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-medium">
+              Users
+            </CardTitle>
+            <Users className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Manage users and their permissions
+              </p>
+              <div className="flex flex-col space-y-2">
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/dashboard/users">View All Users</Link>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/dashboard/users/invite">Invite User</Link>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Actions</CardTitle>
+          <CardDescription>
+            Get started with these common tasks
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild>
+              <Link href="/dashboard/content/new">Create New Content</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/brands/new">Add New Brand</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/users/invite">Invite Team Member</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/workflows/new">Create Workflow</Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 } 

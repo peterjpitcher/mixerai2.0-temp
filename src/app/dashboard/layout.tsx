@@ -3,13 +3,44 @@
 import Link from "next/link";
 import { Button } from "@/components/button";
 import { NotificationCenter } from "@/components/dashboard/notification-center";
-import { SideNavigationV2 } from "@/components/layout/side-navigation-v2";
+import { UnifiedNavigation } from "@/components/layout/unified-navigation";
+import { useRouter } from "next/navigation";
+import { createBrowserClient } from "@supabase/ssr";
+import { useToast } from "@/components/toast-provider";
 
 export default function DashboardLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  );
+  
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        throw error;
+      }
+      toast({
+        title: "Signed out",
+        description: "You have been successfully signed out."
+      });
+      router.push('/auth/login');
+    } catch (error) {
+      console.error("Error signing out:", error);
+      toast({
+        title: "Error",
+        description: "There was a problem signing out. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col">
       {/* Header */}
@@ -23,18 +54,11 @@ export default function DashboardLayout({
           </div>
           <div className="flex items-center space-x-4">
             <NotificationCenter />
-            <Button variant="ghost" asChild className="text-white hover:bg-[#13599f]/80">
-              <Link href="/account">
-                <span className="flex items-center space-x-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
-                  <span>Account</span>
-                </span>
-              </Link>
-            </Button>
-            <Button variant="ghost" className="text-white hover:bg-[#13599f]/80">
+            <Button 
+              variant="ghost" 
+              className="text-white hover:bg-[#13599f]/80"
+              onClick={handleSignOut}
+            >
               <span className="flex items-center space-x-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -49,8 +73,8 @@ export default function DashboardLayout({
       </header>
 
       <div className="flex flex-1">
-        {/* Use the new SideNavigationV2 component */}
-        <SideNavigationV2 />
+        {/* Replace SideNavigationV2 with UnifiedNavigation */}
+        <UnifiedNavigation />
 
         {/* Main content */}
         <main className="flex-1 p-6 overflow-auto">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
 import { Input } from '@/components/input';
@@ -8,16 +8,24 @@ import { Label } from '@/components/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import { useToast } from '@/components/toast-provider';
 import { Switch } from '@/components/switch';
+import { createBrowserClient } from '@supabase/ssr';
+import { Spinner } from '@/components/spinner';
 
 export default function AccountPage() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  );
 
   const [profileData, setProfileData] = useState({
-    fullName: 'John Doe',
-    email: 'john.doe@example.com',
-    company: 'Acme Inc.',
-    jobTitle: 'Marketing Manager',
+    fullName: '',
+    email: '',
+    company: '',
+    jobTitle: '',
   });
 
   const [notificationSettings, setNotificationSettings] = useState({
@@ -27,6 +35,66 @@ export default function AccountPage() {
     taskReminders: false,
     marketingEmails: false,
   });
+
+  // Fetch user data on component mount
+  useEffect(() => {
+    async function fetchUserData() {
+      try {
+        // Get current user session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) throw sessionError;
+        
+        if (!session) {
+          // User not logged in, redirect to login
+          window.location.href = '/auth/login';
+          return;
+        }
+        
+        const userId = session.user.id;
+        
+        // Fetch user profile data
+        const { data: userData, error: userError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+        
+        if (userError && userError.code !== 'PGRST116') {
+          // PGRST116 is "no rows returned" - not an error if the profile doesn't exist yet
+          throw userError;
+        }
+        
+        // Get auth user metadata (might contain additional info)
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError) throw authError;
+        
+        // Combine data from both sources
+        setProfileData({
+          fullName: userData?.full_name || authUser?.user_metadata?.full_name || '',
+          email: authUser?.email || '',
+          company: userData?.company || authUser?.user_metadata?.company || '',
+          jobTitle: userData?.job_title || authUser?.user_metadata?.job_title || '',
+        });
+        
+        // Notification settings might be stored in the database
+        // This example just keeps the default mock settings for now
+        
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        toast({
+          title: 'Error loading profile',
+          description: 'Failed to load your profile data. Please try again later.',
+          variant: 'destructive'
+        });
+        setIsLoading(false);
+      }
+    }
+    
+    fetchUserData();
+  }, [supabase, toast]);
 
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -48,8 +116,39 @@ export default function AccountPage() {
     setIsSubmitting(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Get current session to get user ID
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+      
+      const userId = session.user.id;
+      
+      // Update both the profile table and user metadata
+      const updates = {
+        id: userId,
+        full_name: profileData.fullName,
+        company: profileData.company,
+        job_title: profileData.jobTitle,
+        updated_at: new Date().toISOString()
+      };
+      
+      // Update profile in profiles table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert(updates)
+        .eq('id', userId);
+      
+      if (profileError) throw profileError;
+      
+      // Update user metadata in auth.users (doesn't update email)
+      const { error: metadataError } = await supabase.auth.updateUser({
+        data: {
+          full_name: profileData.fullName,
+          company: profileData.company,
+          job_title: profileData.jobTitle
+        }
+      });
+      
+      if (metadataError) throw metadataError;
       
       toast({
         title: 'Profile updated',
@@ -96,8 +195,12 @@ export default function AccountPage() {
     setIsSubmitting(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Use Supabase Auth to update password
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+      
+      if (error) throw error;
       
       toast({
         title: 'Password updated',
@@ -123,8 +226,16 @@ export default function AccountPage() {
     setIsSubmitting(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Get current session to get user ID
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+      
+      const userId = session.user.id;
+      
+      // Store notification preferences in the database
+      // Note: You would need to create a new table for this
+      // For now, just simulate an API call
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       toast({
         title: 'Notification settings updated',
@@ -141,6 +252,17 @@ export default function AccountPage() {
       setIsSubmitting(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <Spinner size="lg" className="mb-4" />
+          <p className="text-muted-foreground">Loading profile data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -170,7 +292,7 @@ export default function AccountPage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center space-x-4">
                   <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-2xl">
-                    {profileData.fullName.split(' ').map(name => name[0]).join('')}
+                    {profileData.fullName ? profileData.fullName.split(' ').map(name => name[0]).join('') : '?'}
                   </div>
                   <div>
                     <Button variant="outline" type="button">
@@ -194,8 +316,11 @@ export default function AccountPage() {
                       id="email" 
                       type="email" 
                       value={profileData.email}
-                      onChange={handleProfileChange}
+                      disabled
+                      readOnly
+                      title="Email cannot be changed"
                     />
+                    <p className="text-xs text-muted-foreground mt-1">Email address cannot be changed</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="company">Company</Label>
@@ -249,16 +374,6 @@ export default function AccountPage() {
                     <Input id="confirm-password" name="confirm-password" type="password" />
                   </div>
                 </div>
-                
-                <div className="text-sm text-muted-foreground">
-                  <p>Password requirements:</p>
-                  <ul className="list-disc list-inside">
-                    <li>Minimum 8 characters</li>
-                    <li>At least one uppercase letter</li>
-                    <li>At least one number</li>
-                    <li>At least one special character</li>
-                  </ul>
-                </div>
               </CardContent>
               <CardFooter className="border-t pt-6">
                 <Button type="submit" disabled={isSubmitting}>
@@ -273,76 +388,80 @@ export default function AccountPage() {
           <Card>
             <form onSubmit={handleNotificationSubmit}>
               <CardHeader>
-                <CardTitle>Notification Settings</CardTitle>
+                <CardTitle>Notification Preferences</CardTitle>
                 <CardDescription>
-                  Configure how and when you receive notifications
+                  Configure how you receive notifications and updates
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="emailNotifications">Email Notifications</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Receive notifications via email
-                      </p>
-                    </div>
-                    <Switch 
-                      id="emailNotifications" 
-                      checked={notificationSettings.emailNotifications}
-                      onCheckedChange={(checked) => handleNotificationChange('emailNotifications', checked)}
-                    />
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="emailNotifications">Email Notifications</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive email notifications for important updates
+                    </p>
                   </div>
-                  
-                  <div className="border-t pt-4">
-                    <h3 className="text-sm font-medium mb-3">Notification Types</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="contentUpdates">Content Updates</Label>
-                        <Switch 
-                          id="contentUpdates" 
-                          checked={notificationSettings.contentUpdates}
-                          onCheckedChange={(checked) => handleNotificationChange('contentUpdates', checked)}
-                          disabled={!notificationSettings.emailNotifications}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="newComments">New Comments</Label>
-                        <Switch 
-                          id="newComments" 
-                          checked={notificationSettings.newComments}
-                          onCheckedChange={(checked) => handleNotificationChange('newComments', checked)}
-                          disabled={!notificationSettings.emailNotifications}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="taskReminders">Task Reminders</Label>
-                        <Switch 
-                          id="taskReminders" 
-                          checked={notificationSettings.taskReminders}
-                          onCheckedChange={(checked) => handleNotificationChange('taskReminders', checked)}
-                          disabled={!notificationSettings.emailNotifications}
-                        />
-                      </div>
-                    </div>
+                  <Switch
+                    id="emailNotifications"
+                    checked={notificationSettings.emailNotifications}
+                    onCheckedChange={(checked) => handleNotificationChange('emailNotifications', checked)}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="contentUpdates">Content Updates</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Get notified when content is updated or published
+                    </p>
                   </div>
-                  
-                  <div className="border-t pt-4">
-                    <h3 className="text-sm font-medium mb-3">Marketing</h3>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="marketingEmails">Marketing Emails</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Receive updates about new features and promotions
-                        </p>
-                      </div>
-                      <Switch 
-                        id="marketingEmails" 
-                        checked={notificationSettings.marketingEmails}
-                        onCheckedChange={(checked) => handleNotificationChange('marketingEmails', checked)}
-                      />
-                    </div>
+                  <Switch
+                    id="contentUpdates"
+                    checked={notificationSettings.contentUpdates}
+                    onCheckedChange={(checked) => handleNotificationChange('contentUpdates', checked)}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="newComments">New Comments</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive notifications for new comments on your content
+                    </p>
                   </div>
+                  <Switch
+                    id="newComments"
+                    checked={notificationSettings.newComments}
+                    onCheckedChange={(checked) => handleNotificationChange('newComments', checked)}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="taskReminders">Task Reminders</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Get reminded about upcoming tasks and deadlines
+                    </p>
+                  </div>
+                  <Switch
+                    id="taskReminders"
+                    checked={notificationSettings.taskReminders}
+                    onCheckedChange={(checked) => handleNotificationChange('taskReminders', checked)}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="marketingEmails">Marketing Emails</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive occasional marketing emails and promotions
+                    </p>
+                  </div>
+                  <Switch
+                    id="marketingEmails"
+                    checked={notificationSettings.marketingEmails}
+                    onCheckedChange={(checked) => handleNotificationChange('marketingEmails', checked)}
+                  />
                 </div>
               </CardContent>
               <CardFooter className="border-t pt-6">
@@ -354,12 +473,6 @@ export default function AccountPage() {
           </Card>
         </TabsContent>
       </Tabs>
-      
-      <div className="text-center p-4 bg-amber-50 text-amber-800 rounded-md border border-amber-200">
-        <p className="text-sm">
-          <strong>Note:</strong> This page currently uses mock data. User account API endpoints will be implemented in a future update.
-        </p>
-      </div>
     </div>
   );
 } 
