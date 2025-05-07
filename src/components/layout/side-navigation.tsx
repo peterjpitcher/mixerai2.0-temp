@@ -57,17 +57,17 @@ export function SideNavigation() {
       icon: <BookOpen className="h-5 w-5" />,
       items: [
         {
-          href: '/content/article',
+          href: '/dashboard/content/article',
           label: 'Articles',
           icon: <FileText className="h-4 w-4" />
         },
         {
-          href: '/content/ownedpdp',
+          href: '/dashboard/content/ownedpdp',
           label: 'Owned PDP',
           icon: <ShoppingBag className="h-4 w-4" />
         },
         {
-          href: '/content/retailerpdp',
+          href: '/dashboard/content/retailerpdp',
           label: 'Retailer PDP',
           icon: <Store className="h-4 w-4" />
         }

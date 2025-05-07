@@ -1,11 +1,13 @@
-import { ContentGeneratorForm } from '@/components/content/content-generator-form';
+'use client';
 
-export const metadata = {
-  title: 'Create New Content | MixerAI',
-  description: 'Generate new AI content for your brands',
-};
+import { ContentGeneratorForm } from '@/components/content/content-generator-form';
+import { useSearchParams } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function NewContentPage() {
+  const searchParams = useSearchParams();
+  const contentType = searchParams?.get('type');
+  
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -17,7 +19,7 @@ export default function NewContentPage() {
         </div>
       </div>
       
-      <ContentGeneratorForm />
+      <ContentGeneratorForm preselectedContentType={contentType || undefined} />
     </div>
   );
 } 
