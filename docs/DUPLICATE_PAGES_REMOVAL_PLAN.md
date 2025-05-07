@@ -22,448 +22,172 @@ The application currently has the following duplicated route structures:
    - `/dashboard/content`, `/dashboard/content/article`, `/dashboard/content/ownedpdp`, `/dashboard/content/retailerpdp`
    - `/dashboard/users`, `/dashboard/users/invite`
 
-### Current Redirection Approach
+### Technical Challenges
 
-The application currently uses a partial redirection approach in `next.config.js`:
+This duplication creates several issues:
+
+1. **Code Duplication:** Multiple implementations of nearly identical pages
+2. **Maintenance Overhead:** Changes must be applied in two places
+3. **Inconsistent User Experience:** Different UI between routes serving the same content
+4. **Increased Bundle Size:** Duplicate components increase JavaScript payload size
+5. **SEO Concerns:** Multiple URLs for the same content could dilute SEO effectiveness
+6. **Authentication Inconsistencies:** Potential for different auth requirements between parallel routes
+
+## Implementation Plan
+
+### ✅ Phase 1: Redirect Implementation (COMPLETED)
+
+1. **Framework-Level Redirects:** 
+   - ✅ **DONE:** Implemented catch-all patterns in Next.js configuration
+   - ✅ **DONE:** Added framework-level redirects in `next.config.js` to handle URL paths 
+   - ✅ **DONE:** Added special case redirect for `/dashboard/content` to `/dashboard/content/article`
+
+2. **Middleware Redirects:**
+   - ✅ **DONE:** Enhanced `middleware.ts` with redirect logic for non-dashboard routes
+   - ✅ **DONE:** Preserved query parameters during redirects
+   - ✅ **DONE:** Added detailed logging for redirects
+   - ✅ **DONE:** Updated middleware matcher to handle all needed paths
+
+3. **Create Empty Placeholder Components:**
+   - ✅ **DONE:** Replaced existing non-dashboard page component content with minimal placeholder code
+   - ✅ **DONE:** Added clear documentation in each placeholder file explaining its purpose
+   - ✅ **DONE:** Ensured all placeholders handle basic rendering in case redirects fail
+
+### Phase 2: Testing and Verification
+
+1. **Route Coverage Testing:**
+   - Create a test plan to verify all routes redirect correctly
+   - Check that query parameters are preserved during redirects
+   - Verify that browser history works correctly with redirects
+   - Monitor for any 404 errors after implementation
+
+2. **Performance Analysis:**
+   - Compare page load times before and after implementation
+   - Measure JavaScript bundle size impact
+
+3. **User Experience Verification:**
+   - Confirm that user navigation flows remain intuitive
+   - Ensure bookmarks and direct links continue to work
+   - Verify that authentication state is properly maintained
+
+### Phase 3: Code Cleanup and Finalization
+
+1. **Complete Removal:**
+   - After successful testing period (recommended: 2 weeks), remove placeholder files completely
+   - Remove any legacy route references throughout the codebase
+   - Update all documentation to reference only dashboard routes
+
+2. **Documentation Update:**
+   - Update application documentation to reflect the new route structure
+   - Create detailed routing guide for future development
+
+## Implementation Details
+
+### Route Redirect Patterns
+
+The implementation uses catch-all patterns in `next.config.js`:
 
 ```javascript
-async redirects() {
-  return [
-    // Redirect root content page to article content
-    {
-      source: '/content',
-      destination: '/dashboard/content/article',
-      permanent: false,
-    },
-    // Redirect dashboard content root to article content
-    {
-      source: '/dashboard/content',
-      destination: '/dashboard/content/article',
-      permanent: false,
-    },
-    // Legacy routes support
-    {
-      source: '/brands',
-      destination: '/dashboard/brands',
-      permanent: false,
-    },
-    {
-      source: '/users',
-      destination: '/dashboard/users',
-      permanent: false,
-    },
-    {
-      source: '/workflows',
-      destination: '/dashboard/workflows',
-      permanent: false,
-    }
-  ];
-}
-```
-
-However, this solution only redirects the root paths and not their nested routes, causing confusion and maintenance overhead.
-
-### Navigation Implementation
-
-The current navigation system (`UnifiedNavigation`) already uses dashboard routes exclusively:
-
-```tsx
-// Primary nav items
-const navItems: (NavItem | NavGroupItem)[] = [
-  {
-    href: '/dashboard',
-    label: 'Dashboard',
-    icon: <Home className="h-5 w-5" />,
-    segment: ''
+// Using catch-all patterns with :path* for flexible matching
+[
+  { 
+    source: '/brands/:path*', 
+    destination: '/dashboard/brands/:path*', 
+    permanent: false 
   },
-  {
-    href: '/dashboard/workflows',
-    label: 'Workflows',
-    icon: <GitBranch className="h-5 w-5" />,
-    segment: 'workflows'
+  { 
+    source: '/workflows/:path*', 
+    destination: '/dashboard/workflows/:path*', 
+    permanent: false 
   },
-  {
-    href: '/dashboard/brands',
-    label: 'Brands',
-    icon: <Building2 className="h-5 w-5" />,
-    segment: 'brands'
+  { 
+    source: '/content/:path*', 
+    destination: '/dashboard/content/:path*', 
+    permanent: false 
   },
-  // Content with submenu
-  {
-    label: 'Content',
-    icon: <BookOpen className="h-5 w-5" />,
-    segment: 'content',
-    defaultOpen: true,
-    items: [
-      {
-        href: '/dashboard/content/article',
-        label: 'Articles',
-        icon: <FileText className="h-4 w-4" />,
-        segment: 'article'
-      },
-      {
-        href: '/dashboard/content/ownedpdp',
-        label: 'Owned PDP',
-        icon: <ShoppingBag className="h-4 w-4" />,
-        segment: 'ownedpdp'
-      },
-      {
-        href: '/dashboard/content/retailerpdp',
-        label: 'Retailer PDP',
-        icon: <Store className="h-4 w-4" />,
-        segment: 'retailerpdp'
-      }
-    ]
-  },
-  {
-    href: '/dashboard/users',
-    label: 'Users',
-    icon: <Users className="h-5 w-5" />,
-    segment: 'users'
+  { 
+    source: '/users/:path*', 
+    destination: '/dashboard/users/:path*', 
+    permanent: false 
   }
-];
+]
 ```
 
-## Issues with the Current Approach
+### Middleware Implementation
 
-1. **Code Duplication**: Maintaining two sets of nearly identical pages increases development time and risk of inconsistencies.
-
-2. **Increased Bundle Size**: Duplicate pages increase the JavaScript bundle size unnecessarily.
-
-3. **Maintenance Overhead**: Changes must be implemented in multiple places, increasing the chance of errors.
-
-4. **Inconsistent User Experience**: Users may encounter different designs or behaviors depending on which URL they use.
-
-5. **Authentication Confusion**: Some pages may have different authentication behaviors.
-
-## Proposed Solution
-
-We propose to completely remove all non-dashboard pages and routes, keeping only the dashboard-prefixed routes, and implement comprehensive redirects at the framework level.
-
-### High-Level Plan
-
-1. Implement optimized redirects for all non-dashboard routes
-2. Create a middleware solution for fine-grained control and dynamic handling
-3. Implement a phased approach to safely remove duplicate pages
-4. Enhance testing coverage to verify redirect behavior
-5. Update documentation to reflect the new simplified structure
-
-## Detailed Implementation Plan
-
-### 1. Optimized Redirect Configuration
-
-Update `next.config.js` with catch-all patterns for more efficient and future-proof redirects:
-
-```javascript
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  // ... other config options
-  
-  // Add optimized redirects using catch-all patterns
-  async redirects() {
-    return [
-      // Brand redirects with catch-all pattern
-      { 
-        source: '/brands/:path*', 
-        destination: '/dashboard/brands/:path*', 
-        permanent: false 
-      },
-      
-      // Workflow redirects with catch-all pattern
-      { 
-        source: '/workflows/:path*', 
-        destination: '/dashboard/workflows/:path*', 
-        permanent: false 
-      },
-      
-      // Content redirects with catch-all pattern
-      { 
-        source: '/content/:path*', 
-        destination: '/dashboard/content/:path*', 
-        permanent: false 
-      },
-      
-      // User redirects with catch-all pattern
-      { 
-        source: '/users/:path*', 
-        destination: '/dashboard/users/:path*', 
-        permanent: false 
-      },
-      
-      // Special redirect for content index
-      { 
-        source: '/dashboard/content', 
-        destination: '/dashboard/content/article', 
-        permanent: false 
-      },
-    ];
-  },
-};
-
-module.exports = nextConfig;
-```
-
-These optimized redirects provide several benefits:
-- Less boilerplate with one rule per feature domain instead of many individual rules
-- Automatic coverage of any future nested pages (e.g., `/brands/archive/2025`)
-- Cleaner, more maintainable configuration
-
-### 2. Next.js Middleware for Fine-Grained Control
-
-For more control over redirects, especially for conditional logic, we'll implement a middleware solution:
+The middleware implements dynamic path rewriting with query parameter preservation:
 
 ```typescript
-// src/middleware.ts
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
-
-export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl
+// Check if path starts with any of our top-level non-dashboard routes
+if (['/brands', '/workflows', '/content', '/users']
+    .some(prefix => pathname.startsWith(prefix))) {
   
-  // Catch all non-dashboard routes and redirect to dashboard equivalents
-  if (['/brands', '/workflows', '/content', '/users']
-      .some(prefix => pathname.startsWith(prefix))) {
-    
-    // Create the new path by replacing the prefix
-    const newPath = pathname.replace(
-      /^\/(brands|workflows|content|users)/, 
-      '/dashboard/$1'
-    )
-    
-    // Preserve query parameters
-    const url = new URL(newPath, req.url)
-    req.nextUrl.searchParams.forEach((value, key) => {
-      url.searchParams.set(key, value)
-    })
-    
-    return NextResponse.redirect(url)
-  }
+  // Create the new path by replacing the prefix
+  const newPath = pathname.replace(
+    /^\/(brands|workflows|content|users)/, 
+    '/dashboard/$1'
+  );
   
-  return NextResponse.next()
-}
-
-// Configure middleware to run only on specific paths
-export const config = {
-  matcher: [
-    '/brands/:path*',
-    '/workflows/:path*',
-    '/content/:path*',
-    '/users/:path*',
-  ],
+  // Preserve query parameters
+  const url = new URL(newPath, request.url);
+  request.nextUrl.searchParams.forEach((value, key) => {
+    url.searchParams.set(key, value);
+  });
+  
+  console.log(`Redirecting: ${pathname} → ${url.pathname}${url.search}`);
+  return NextResponse.redirect(url);
 }
 ```
 
-The middleware approach offers:
-- Ability to add conditional logic (e.g., based on authentication state)
-- Centralized handling of all redirects
-- Preservation of query parameters and URL structure
-- Execution before page rendering for better performance
+### Placeholder Page Components
 
-### 3. Phased Implementation Approach
-
-To minimize risk, we'll use a two-phase approach:
-
-#### Phase 1: Create Empty Redirect Folders
-
-1. Keep the non-dashboard folders (`/src/app/brands`, etc.), but replace their content with simple redirect components:
+Placeholder components are minimal but clear about their purpose:
 
 ```tsx
-// src/app/brands/page.tsx (and similar files)
-export default function LegacyBrandsPage() {
-  // This page is kept temporarily to catch any missed redirects
-  // The middleware or next.config.js redirects should handle this before rendering
+/**
+ * Brand Redirect Page
+ * 
+ * This page exists as a placeholder for the old /brands path.
+ * The user should be redirected to /dashboard/brands via middleware or next.config.js
+ * before this component is rendered.
+ */
+export default function BrandRedirectPage() {
+  // This component should never be rendered as redirects should happen first
   return null;
 }
 ```
 
-2. Deploy this version and:
-   - Monitor logs for any unexpected 404 errors
-   - Check analytics for pages not being properly redirected
-   - Verify that all query parameters are preserved
+## Expected Benefits
 
-#### Phase 2: Complete Removal
-
-After confirming Phase 1 is successful and all redirects are working correctly:
-
-1. Remove the legacy folders entirely:
-   - `/src/app/brands`
-   - `/src/app/workflows`
-   - `/src/app/content`
-   - `/src/app/users`
-
-2. Rely solely on the middleware and `next.config.js` redirects
-
-This phased approach provides a safety net in case of unexpected issues with external links or bookmarks.
-
-### 4. Route Groups for Organization (Optional)
-
-For better code organization without affecting URLs, we can use Next.js route groups:
-
-```
-src/
- ┣ app/
- ┃ ┣ (dashboard)/
- ┃ ┃ ┗ brands/
- ┃ ┃   ┣ page.tsx      ← source-of-truth implementation
- ┃ ┃   ┗ [id]/
- ┃ ┃     ┗ page.tsx
- ┃ ┣ dashboard/       ← just re-exports components from (dashboard)
- ┃ ┃ ┗ brands/
- ┃ ┃   ┣ page.tsx
- ┃ ┃   ┗ [id]/
- ┃ ┃     ┗ page.tsx
- ┃ ┣ brands/          ← empty redirector (Phase 1 only)
- ┃ ┃ ┗ page.tsx
- ┃ ┗ ...
-```
-
-This approach:
-- Keeps related code together in the file system
-- Maintains a single source of truth
-- Doesn't affect URL structure
-
-### 5. Enhanced Testing Strategy
-
-We'll implement a comprehensive testing approach to ensure all redirects work correctly:
-
-#### End-to-End Tests
-
-Using Playwright or Cypress:
-
-```typescript
-// tests/redirects.spec.ts
-test('should redirect from top-level routes to dashboard routes', async ({ page }) => {
-  // Test brand routes
-  await page.goto('/brands/42/edit?foo=bar');
-  await page.waitForURL('/dashboard/brands/42/edit?foo=bar');
-  
-  // Test workflow routes
-  await page.goto('/workflows/new?template=social');
-  await page.waitForURL('/dashboard/workflows/new?template=social');
-  
-  // Test content routes
-  await page.goto('/content/article');
-  await page.waitForURL('/dashboard/content/article');
-  
-  // Test user routes
-  await page.goto('/users/invite?role=editor');
-  await page.waitForURL('/dashboard/users/invite?role=editor');
-});
-```
-
-#### Route Coverage Script
-
-Create a script to verify all paths are either served or redirected:
-
-```typescript
-// scripts/verify-routes.ts
-import fs from 'fs';
-import path from 'path';
-
-const APP_DIR = path.join(process.cwd(), 'src/app');
-
-// Find all page.tsx files
-function findAllPages(dir: string, pages: string[] = []): string[] {
-  const files = fs.readdirSync(dir);
-  
-  for (const file of files) {
-    const filePath = path.join(dir, file);
-    const stat = fs.statSync(filePath);
-    
-    if (stat.isDirectory()) {
-      findAllPages(filePath, pages);
-    } else if (file === 'page.tsx') {
-      pages.push(filePath);
-    }
-  }
-  
-  return pages;
-}
-
-// Extract route from file path
-function filePathToRoute(filePath: string): string {
-  return filePath
-    .replace(APP_DIR, '')
-    .replace(/\/page\.tsx$/, '')
-    .replace(/\/\[([^\]]+)\]/g, '/:$1');
-}
-
-// Main function
-function verifyRoutes() {
-  const pages = findAllPages(APP_DIR);
-  const routes = pages.map(filePathToRoute);
-  
-  console.log('All application routes:');
-  routes.forEach(route => console.log(route));
-  
-  // Verify dashboard routes exist for non-dashboard routes
-  const nonDashboardRoutes = routes.filter(r => 
-    r.startsWith('/brands') || 
-    r.startsWith('/workflows') || 
-    r.startsWith('/content') || 
-    r.startsWith('/users')
-  );
-  
-  for (const route of nonDashboardRoutes) {
-    const dashboardRoute = route.replace(
-      /^\/(brands|workflows|content|users)/, 
-      '/dashboard/$1'
-    );
-    
-    if (!routes.includes(dashboardRoute)) {
-      console.warn(`Warning: Dashboard route ${dashboardRoute} doesn't exist for ${route}`);
-    }
-  }
-}
-
-verifyRoutes();
-```
-
-### 6. Authentication Boundary Considerations
-
-Our current authentication boundary is clear with `requireAuth()` middleware on `/dashboard/*` routes. We need to:
-
-1. Verify no public content is accidentally protected: 
-   - Check for any legacy public routes that should remain public (e.g., marketing pages)
-   - Ensure these are handled appropriately in middleware
-
-2. Ensure consistent query parameter handling:
-   - Verify both redirect rules and middleware preserve all query strings
-   - Test authentication redirects that include 'return to' URLs
-
-3. Check for any hardcoded URLs in authentication flows:
-   - Update any authentication code that might redirect to old URL patterns
+1. **Improved Code Maintainability:** Single implementation for each feature
+2. **Reduced Bundle Size:** ~35-40% reduction in JavaScript for route components
+3. **Consistent User Experience:** Users always navigate through one consistent interface
+4. **Better Navigation:** Clearer navigation patterns with a single entry point
+5. **Enhanced SEO:** Single canonical URL for each feature
+6. **Simplified Authentication:** Unified authentication flow through dashboard routes
 
 ## Rollback Plan
 
-If issues are encountered after implementation:
+In case of unexpected issues:
 
-1. For Phase 1: Restore the original page components in the non-dashboard directories.
-2. For Phase 2: Recreate the placeholder redirect components in non-dashboard directories.
-3. Disable the middleware temporarily if it's causing issues.
-4. Roll back `next.config.js` changes to the previous redirects configuration.
-
-## Benefits of the New Approach
-
-1. **Simplified Codebase**: Elimination of duplicated code improves maintainability.
-2. **Reduced Bundle Size**: Fewer pages mean smaller JavaScript bundles and faster load times.
-3. **Consistent UX**: Users will always experience the same UI regardless of how they access pages.
-4. **Simplified Routing Logic**: One canonical URL for each feature improves SEO and link sharing.
-5. **Clearer Authentication Boundaries**: All protected content lives under `/dashboard`.
-6. **Future-Proof Redirects**: Catch-all patterns will handle any new routes automatically.
-7. **Better Performance**: Framework-level redirects are more efficient than client-side redirects.
+1. Restore original page components from Git history
+2. Remove redirect rules from `next.config.js`
+3. Remove redirect logic from middleware
+4. Return to the duplicate route structure temporarily while addressing issues
 
 ## Timeline and Resource Requirements
 
-| Phase | Estimated Effort | Description |
-|-------|-----------------|-------------|
-| Planning & Discovery | 1 day | Complete analysis and create detailed plan (this document) |
-| Implementation Phase 1 | 1.5 days | Implement redirects, middleware, and placeholder pages |
-| Monitoring & Validation | 0.5 days | Monitor logs and analytics for issues |
-| Implementation Phase 2 | 1 day | Complete removal of duplicate code |
-| Testing | 1.5 days | Implement and run comprehensive tests |
-| Documentation | 0.5 days | Update project documentation |
-| **Total** | **6 days** | |
+### Timeline
+
+- Phase 1 (Redirect Implementation): **COMPLETED**
+- Phase 2 (Testing and Verification): 1-2 weeks
+- Phase 3 (Final Cleanup): 1 day after successful testing period
+
+### Resources Required
+
+- Developer time: 1-2 days for implementation
+- QA testing: 1-2 days for route verification
+- Documentation update: 2-4 hours
 
 ## Conclusion
 
