@@ -9,7 +9,10 @@ import {
   Building2,
   Users,
   Settings,
-  HelpCircle
+  HelpCircle,
+  FileText,
+  ShoppingBag,
+  Store
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -19,13 +22,20 @@ interface NavItem {
   icon: React.ReactNode;
 }
 
+interface NavGroupItem {
+  label: string;
+  icon: React.ReactNode;
+  items: NavItem[];
+}
+
 /**
  * Side navigation component that uses the light blue shade
  */
 export function SideNavigation() {
   const pathname = usePathname();
   
-  const navItems: NavItem[] = [
+  // Regular nav items without submenus
+  const navItems: (NavItem | NavGroupItem)[] = [
     {
       href: '/dashboard',
       label: 'Dashboard',
@@ -41,10 +51,27 @@ export function SideNavigation() {
       label: 'Brands',
       icon: <Building2 className="h-5 w-5" />
     },
+    // Content with submenu - always visible
     {
-      href: '/content',
       label: 'Content',
-      icon: <BookOpen className="h-5 w-5" />
+      icon: <BookOpen className="h-5 w-5" />,
+      items: [
+        {
+          href: '/content/article',
+          label: 'Articles',
+          icon: <FileText className="h-4 w-4" />
+        },
+        {
+          href: '/content/ownedpdp',
+          label: 'Owned PDP',
+          icon: <ShoppingBag className="h-4 w-4" />
+        },
+        {
+          href: '/content/retailerpdp',
+          label: 'Retailer PDP',
+          icon: <Store className="h-4 w-4" />
+        }
+      ]
     },
     {
       href: '/users',
@@ -70,20 +97,49 @@ export function SideNavigation() {
     <nav className="bg-side-nav w-64 p-4 h-[calc(100vh-4rem)] overflow-y-auto border-r border-border sticky top-16 hidden lg:block">
       <div className="space-y-8">
         <div className="space-y-1">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                pathname?.startsWith(item.href)
-                  ? 'bg-primary text-white'
-                  : 'text-neutral-700 hover:text-primary hover:bg-primary-50'
-              )}
-            >
-              {item.icon}
-              {item.label}
-            </Link>
+          {navItems.map((item, index) => (
+            'items' in item ? (
+              <div key={index} className="space-y-1">
+                {/* Group header */}
+                <div className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-neutral-700">
+                  {item.icon}
+                  {item.label}
+                </div>
+                
+                {/* Group items - indented */}
+                <div className="pl-6 space-y-1">
+                  {item.items.map((subItem) => (
+                    <Link
+                      key={subItem.href}
+                      href={subItem.href}
+                      className={cn(
+                        'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors',
+                        pathname?.startsWith(subItem.href)
+                          ? 'bg-primary text-white'
+                          : 'text-neutral-700 hover:text-primary hover:bg-primary-50'
+                      )}
+                    >
+                      {subItem.icon}
+                      {subItem.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                  pathname?.startsWith(item.href)
+                    ? 'bg-primary text-white'
+                    : 'text-neutral-700 hover:text-primary hover:bg-primary-50'
+                )}
+              >
+                {item.icon}
+                {item.label}
+              </Link>
+            )
           ))}
         </div>
         

@@ -25,7 +25,11 @@ interface ContentType {
   name: string;
 }
 
-export function ContentGeneratorForm() {
+interface ContentGeneratorFormProps {
+  preselectedContentType?: string | null;
+}
+
+export function ContentGeneratorForm({ preselectedContentType }: ContentGeneratorFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -50,24 +54,41 @@ export function ContentGeneratorForm() {
         const brandsResponse = await fetch('/api/brands');
         const brandsData = await brandsResponse.json();
         
-        if (brandsData.success) {
+        if (brandsData.success && Array.isArray(brandsData.brands)) {
           setBrands(brandsData.brands);
+        } else {
+          setBrands([]);
         }
         
         // Fetch content types
         const contentTypesResponse = await fetch('/api/content-types');
         const contentTypesData = await contentTypesResponse.json();
         
-        if (contentTypesData.success) {
+        if (contentTypesData.success && Array.isArray(contentTypesData.contentTypes)) {
           setContentTypes(contentTypesData.contentTypes);
+          
+          // Set preselected content type if provided and valid
+          if (preselectedContentType && Array.isArray(contentTypesData.contentTypes)) {
+            const matchedType = contentTypesData.contentTypes.find(
+              ct => ct.name.toLowerCase() === preselectedContentType.toLowerCase()
+            );
+            
+            if (matchedType) {
+              setSelectedContentType(matchedType.name);
+            }
+          }
+        } else {
+          setContentTypes([]);
         }
       } catch (error) {
         console.error('Error fetching form data:', error);
+        setBrands([]);
+        setContentTypes([]);
       }
     };
     
     fetchData();
-  }, []);
+  }, [preselectedContentType]);
   
   useEffect(() => {
     // Use the topic as the initial title when content is generated
@@ -222,7 +243,7 @@ export function ContentGeneratorForm() {
                   <SelectValue placeholder="Select brand" />
                 </SelectTrigger>
                 <SelectContent>
-                  {brands.map(brand => (
+                  {Array.isArray(brands) && brands.map(brand => (
                     <SelectItem key={brand.id} value={brand.id}>
                       <div className="flex items-center">
                         <BrandIcon name={brand.name} color={brand.brand_color} size="sm" className="mr-2" />
@@ -244,7 +265,7 @@ export function ContentGeneratorForm() {
                   <SelectValue placeholder="Select content type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {contentTypes.map((type) => (
+                  {Array.isArray(contentTypes) && contentTypes.map((type) => (
                     <SelectItem key={type.id} value={type.name}>
                       {type.name}
                     </SelectItem>
