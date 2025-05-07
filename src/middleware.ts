@@ -81,6 +81,28 @@ export async function middleware(request: NextRequest) {
     }
   }
   
+  const { pathname } = request.nextUrl;
+  
+  // Check if path starts with any of our top-level non-dashboard routes
+  if (['/brands', '/workflows', '/content', '/users']
+      .some(prefix => pathname.startsWith(prefix))) {
+    
+    // Create the new path by replacing the prefix
+    const newPath = pathname.replace(
+      /^\/(brands|workflows|content|users)/, 
+      '/dashboard/$1'
+    );
+    
+    // Preserve query parameters
+    const url = new URL(newPath, request.url);
+    request.nextUrl.searchParams.forEach((value, key) => {
+      url.searchParams.set(key, value);
+    });
+    
+    console.log(`Redirecting: ${pathname} → ${url.pathname}${url.search}`);
+    return NextResponse.redirect(url);
+  }
+  
   return response;
 }
 
@@ -95,5 +117,9 @@ export const config = {
      * 4. all root files inside /public (e.g. /favicon.ico)
      */
     '/((?!api/env-check|api/test-connection|api/brands/identity|_next/static|_next/image|public|favicon.ico).*)',
+    '/brands/:path*',
+    '/workflows/:path*',
+    '/content/:path*',
+    '/users/:path*',
   ],
 }; 

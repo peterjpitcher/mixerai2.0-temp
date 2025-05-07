@@ -28,32 +28,32 @@ const nextConfig = {
   // Add framework-level redirects
   async redirects() {
     return [
-      // Redirect root content page to article content
-      {
-        source: '/content',
-        destination: '/dashboard/content/article',
-        permanent: false,
+      // Catch-all redirects for top-level routes
+      { 
+        source: '/brands/:path*', 
+        destination: '/dashboard/brands/:path*', 
+        permanent: false 
       },
-      // Redirect dashboard content root to article content
+      { 
+        source: '/workflows/:path*', 
+        destination: '/dashboard/workflows/:path*', 
+        permanent: false 
+      },
+      { 
+        source: '/content/:path*', 
+        destination: '/dashboard/content/:path*', 
+        permanent: false 
+      },
+      { 
+        source: '/users/:path*', 
+        destination: '/dashboard/users/:path*', 
+        permanent: false 
+      },
+      
+      // Special case: Redirect dashboard content root to article content
       {
         source: '/dashboard/content',
         destination: '/dashboard/content/article',
-        permanent: false,
-      },
-      // Legacy routes support
-      {
-        source: '/brands',
-        destination: '/dashboard/brands',
-        permanent: false,
-      },
-      {
-        source: '/users',
-        destination: '/dashboard/users',
-        permanent: false,
-      },
-      {
-        source: '/workflows',
-        destination: '/dashboard/workflows',
         permanent: false,
       }
     ];
