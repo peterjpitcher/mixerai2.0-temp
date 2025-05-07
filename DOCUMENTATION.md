@@ -975,3 +975,54 @@ The company field has been added to the user profile to track organizational inf
 - Automatically pre-filled with the domain name from the user's email address (without TLD)
 - Editable by admins through the user edit interface
 - Stored in both the user metadata and profiles table
+
+## Route Cleanup (2024-06-XX)
+
+### Problem
+The application had duplicate routes with nearly identical implementations: top-level routes (`/brands`, `/workflows`, etc.) and dashboard routes (`/dashboard/brands`, `/dashboard/workflows`, etc.). This caused code duplication, maintenance challenges, and inconsistent user experiences.
+
+### Solution Implemented
+We simplified the application architecture by:
+1. Implementing comprehensive framework-level redirects using catch-all patterns in `next.config.js`
+2. Creating middleware-based redirects for fine-grained control in `middleware.ts`
+3. Replacing the content of non-dashboard pages with minimal placeholder components
+4. Ensuring all navigation links point only to dashboard routes
+
+### Technical Details
+- **Catch-all Redirects**: Used pattern matching with `:path*` to handle any nested routes
+  ```javascript
+  // next.config.js
+  { 
+    source: '/brands/:path*', 
+    destination: '/dashboard/brands/:path*', 
+    permanent: false 
+  }
+  ```
+
+- **Middleware Redirects**: Added middleware logic to handle edge cases and preserve query parameters
+  ```typescript
+  // middleware.ts
+  if (['/brands', '/workflows', '/content', '/users']
+      .some(prefix => pathname.startsWith(prefix))) {
+    const newPath = pathname.replace(
+      /^\/(brands|workflows|content|users)/, 
+      '/dashboard/$1'
+    );
+    // ...handle redirect with query params
+  }
+  ```
+
+- **Placeholder Components**: Implemented empty component versions of the top-level routes to enable Phase 1 of the migration without breaking existing links
+
+### Benefits Achieved
+- Eliminated code duplication across 14+ routes
+- Reduced JavaScript bundle size
+- Improved application maintainability with a single source of truth
+- Simplified navigation patterns for users
+- Created a clean separation between public and authenticated routes
+
+### Documentation
+For more detailed information about the implementation, see:
+- [Route Cleanup Executive Summary](./docs/ROUTE_CLEANUP_EXECUTIVE_SUMMARY.md)
+- [Duplicate Pages Removal Plan](./docs/DUPLICATE_PAGES_REMOVAL_PLAN.md)
+- [Technical Analysis of Route Duplication](./docs/DUPLICATE_ROUTES_TECHNICAL_ANALYSIS.md)
