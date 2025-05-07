@@ -83,12 +83,26 @@ export async function middleware(request: NextRequest) {
   
   const { pathname } = request.nextUrl;
   
+  // Normalize path to handle path traversal attempts
+  const normalizedPath = pathname.replace(/\/\.\.\//g, '/');
+  
+  // Special case for /content root
+  if (pathname === '/content') {
+    const url = new URL('/dashboard/content/article', request.url);
+    // Preserve query parameters
+    request.nextUrl.searchParams.forEach((value, key) => {
+      url.searchParams.set(key, value);
+    });
+    console.log(`Redirecting content root: ${pathname} → ${url.pathname}${url.search}`);
+    return NextResponse.redirect(url);
+  }
+  
   // Check if path starts with any of our top-level non-dashboard routes
   if (['/brands', '/workflows', '/content', '/users']
-      .some(prefix => pathname.startsWith(prefix))) {
+      .some(prefix => normalizedPath.startsWith(prefix))) {
     
     // Create the new path by replacing the prefix
-    const newPath = pathname.replace(
+    const newPath = normalizedPath.replace(
       /^\/(brands|workflows|content|users)/, 
       '/dashboard/$1'
     );

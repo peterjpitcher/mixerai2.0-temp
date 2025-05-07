@@ -28,6 +28,35 @@ const nextConfig = {
   // Add framework-level redirects
   async redirects() {
     return [
+      // Special case: Direct /content to /dashboard/content/article (put this first for higher priority)
+      {
+        source: '/content',
+        destination: '/dashboard/content/article',
+        permanent: false,
+      },
+      
+      // Special case: Handle path traversal attempts
+      {
+        source: '/brands/../:path*',
+        destination: '/dashboard/:path*',
+        permanent: false,
+      },
+      {
+        source: '/workflows/../:path*',
+        destination: '/dashboard/:path*',
+        permanent: false,
+      },
+      {
+        source: '/content/../:path*',
+        destination: '/dashboard/:path*',
+        permanent: false,
+      },
+      {
+        source: '/users/../:path*',
+        destination: '/dashboard/:path*',
+        permanent: false,
+      },
+      
       // Catch-all redirects for top-level routes
       { 
         source: '/brands/:path*', 
