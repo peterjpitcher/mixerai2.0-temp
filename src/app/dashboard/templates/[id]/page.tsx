@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/button';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { TemplateForm } from '@/components/template/template-form';
-import { useToast } from '@/components/use-toast';
+import { useToast } from '@/components/toast-provider';
 import { Loader2, ChevronLeft } from 'lucide-react';
 
 // Default templates data for system templates

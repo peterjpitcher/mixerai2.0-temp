@@ -9,7 +9,7 @@ import { Label } from '@/components/label';
 import { Textarea } from '@/components/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import { ScrollArea } from '@/components/scroll-area';
-import { useToast } from '@/components/use-toast';
+import { useToast } from '@/components/toast-provider';
 import { FieldDesigner } from './field-designer';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Icons } from '@/components/icons';
