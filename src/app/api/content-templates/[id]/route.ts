@@ -7,14 +7,19 @@ import { withAuth } from '@/lib/auth/api-auth';
 export const dynamic = "force-dynamic";
 
 /**
- * GET: Fetch a specific content template by ID
+ * Direct GET handler without auth to test route params
  */
-export const GET = withAuth(async (request: NextRequest, user, context) => {
+export async function GET(
+  request: NextRequest,
+  context: { params: { id: string } }
+) {
   try {
-    const { params } = context || {};
-    const id = params?.id;
+    console.log('Direct API Route - GET template - Context:', context);
+    const id = context.params.id;
+    console.log('Direct API Route - Template ID from params:', id);
     
     if (!id) {
+      console.error('Direct API Route - Missing template ID in params');
       return NextResponse.json(
         { success: false, error: 'Template ID is required' },
         { status: 400 }
@@ -30,8 +35,12 @@ export const GET = withAuth(async (request: NextRequest, user, context) => {
       .eq('id', id)
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error('Direct API Route - Supabase error fetching template:', error);
+      throw error;
+    }
     
+    console.log('Direct API Route - Successfully fetched template:', template?.id);
     return NextResponse.json({ 
       success: true, 
       template 
@@ -40,18 +49,25 @@ export const GET = withAuth(async (request: NextRequest, user, context) => {
     console.error('Error fetching content template:', error);
     return handleApiError(error, 'Failed to fetch content template');
   }
-});
+}
 
 /**
  * PUT: Update a specific content template
  */
-export const PUT = withAuth(async (request: NextRequest, user, context) => {
+export const PUT = withAuth(async (
+  request: NextRequest,
+  user: any,
+  context: { params: { id: string } }
+) => {
   try {
-    const { params } = context || {};
-    const id = params?.id;
+    console.log('API Route - PUT template - Context:', context);
+    const id = context.params.id;
+    console.log('API Route - Template ID from params:', id);
+    
     const data = await request.json();
     
     if (!id) {
+      console.error('API Route - Missing template ID in params');
       return NextResponse.json(
         { success: false, error: 'Template ID is required' },
         { status: 400 }
@@ -104,12 +120,18 @@ export const PUT = withAuth(async (request: NextRequest, user, context) => {
 /**
  * DELETE: Remove a content template
  */
-export const DELETE = withAuth(async (request: NextRequest, user, context) => {
+export const DELETE = withAuth(async (
+  request: NextRequest,
+  user: any,
+  context: { params: { id: string } }
+) => {
   try {
-    const { params } = context || {};
-    const id = params?.id;
+    console.log('API Route - DELETE template - Context:', context);
+    const id = context.params.id;
+    console.log('API Route - Template ID from params:', id);
     
     if (!id) {
+      console.error('API Route - Missing template ID in params');
       return NextResponse.json(
         { success: false, error: 'Template ID is required' },
         { status: 400 }

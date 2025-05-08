@@ -41,6 +41,11 @@ export default function TemplatesPage() {
         if (data.success && Array.isArray(data.templates)) {
           // Just use the templates from the database
           setTemplates(data.templates);
+          
+          // Log template IDs for debugging
+          data.templates.forEach((template: Template) => {
+            console.log(`Template: ${template.name}, ID: ${template.id}`);
+          });
         } else {
           console.error('Failed to get templates:', data.error || 'Unknown error');
           setTemplates([]);

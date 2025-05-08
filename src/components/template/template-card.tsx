@@ -7,7 +7,7 @@ import { Button } from '@/components/button';
 import { Badge } from '@/components/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/alert-dialog';
-import { useToast } from '@/components/use-toast';
+import { useToast } from '@/components/toast-provider';
 
 interface TemplateCardProps {
   id: string;
@@ -94,7 +94,7 @@ export function TemplateCard({ id, name, description, inputFieldCount, outputFie
                   <Link href={`/dashboard/templates/${id}`}>View</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href={`/dashboard/templates/${id}/edit`}>Edit</Link>
+                  <Link href={`/dashboard/templates/${id}`}>Edit</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href={`/dashboard/content/new?template=${id}`}>Create Content</Link>

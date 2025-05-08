@@ -147,12 +147,18 @@ export default function TemplateEditPage() {
   const [template, setTemplate] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Add debugging logs
+  console.log('Template Edit Page - Params:', params);
+  console.log('Template Edit Page - ID:', id);
+
   useEffect(() => {
     const fetchTemplate = async () => {
+      console.log('Starting to fetch template with ID:', id);
       setLoading(true);
 
       // Check if this is a default template
       if (id === 'article-template' || id === 'product-template') {
+        console.log('Using default template:', id);
         setTemplate(defaultTemplates[id as keyof typeof defaultTemplates]);
         setLoading(false);
         return;
@@ -160,17 +166,22 @@ export default function TemplateEditPage() {
 
       // Otherwise, try to fetch from the API
       try {
+        console.log('Fetching template from API for ID:', id);
         const response = await fetch(`/api/content-templates/${id}`);
         const data = await response.json();
+        console.log('API response:', data);
 
         if (data.success) {
+          console.log('Successfully fetched template:', data.template);
           setTemplate(data.template);
         } else {
+          console.error('Error from API:', data.error);
           toast({
             title: 'Error',
             description: data.error || 'Failed to load template',
             variant: 'destructive',
           });
+          console.log('Redirecting to templates page due to API error');
           router.push('/dashboard/templates');
         }
       } catch (error) {
@@ -180,13 +191,25 @@ export default function TemplateEditPage() {
           description: 'Failed to load template',
           variant: 'destructive',
         });
+        console.log('Redirecting to templates page due to fetch error');
         router.push('/dashboard/templates');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchTemplate();
+    if (id) {
+      console.log('Template ID is available, fetching template');
+      fetchTemplate();
+    } else {
+      console.error('No template ID provided');
+      toast({
+        title: 'Error',
+        description: 'Template ID is required',
+        variant: 'destructive',
+      });
+      router.push('/dashboard/templates');
+    }
   }, [id, router, toast]);
 
   if (loading) {
@@ -215,6 +238,11 @@ export default function TemplateEditPage() {
       />
       
       {template && <TemplateForm initialData={template} />}
+      {!template && (
+        <div className="p-4 border border-red-300 bg-red-50 rounded-md">
+          <p>Error: Template data could not be loaded</p>
+        </div>
+      )}
     </div>
   );
 } 

@@ -9,9 +9,9 @@ import { Database } from '@/types/supabase';
  * @returns A new handler function that first checks authentication
  */
 export function withAuth<T>(
-  handler: (req: NextRequest, user: any) => Promise<Response>
+  handler: (req: NextRequest, user: any, context?: any) => Promise<Response>
 ) {
-  return async (req: NextRequest) => {
+  return async (req: NextRequest, context?: any) => {
     try {
       const cookieStore = cookies();
       
@@ -55,7 +55,7 @@ export function withAuth<T>(
       }
       
       // Authentication successful, call the handler with the authenticated user
-      return handler(req, user);
+      return handler(req, user, context);
     } catch (error) {
       console.error('API authentication error:', error);
       
@@ -84,9 +84,9 @@ export function withAuth<T>(
  * @returns A new handler function with auth checks and monitoring
  */
 export function withAuthAndMonitoring<T>(
-  handler: (req: NextRequest, user: any) => Promise<Response>
+  handler: (req: NextRequest, user: any, context?: any) => Promise<Response>
 ) {
-  return async (req: NextRequest) => {
+  return async (req: NextRequest, context?: any) => {
     const startTime = Date.now();
     const path = req.nextUrl.pathname;
     
@@ -136,7 +136,7 @@ export function withAuthAndMonitoring<T>(
       }
       
       // Authentication successful, call the handler
-      const response = await handler(req, user);
+      const response = await handler(req, user, context);
       
       // Log request completion time
       const duration = Date.now() - startTime;
