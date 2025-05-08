@@ -172,65 +172,74 @@ export default function ContentTransCreatorPage() {
                 </p>
               </div>
               
-              <div className="grid grid-cols-1 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="sourceLanguage">Source Language</Label>
-                  <Select
-                    value={sourceLanguage}
-                    onValueChange={setSourceLanguage}
-                    disabled={isLoading}
-                  >
-                    <SelectTrigger id="sourceLanguage">
-                      <SelectValue placeholder="Select source language" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {languageOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="targetLanguage">Target Language</Label>
-                  <Select
-                    value={targetLanguage}
-                    onValueChange={setTargetLanguage}
-                    disabled={isLoading}
-                  >
-                    <SelectTrigger id="targetLanguage">
-                      <SelectValue placeholder="Select target language" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {languageOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="targetCountry">Target Country</Label>
-                  <Select
-                    value={targetCountry}
-                    onValueChange={setTargetCountry}
-                    disabled={isLoading}
-                  >
-                    <SelectTrigger id="targetCountry">
-                      <SelectValue placeholder="Select target country" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {countryOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <div className="space-y-2">
+                <Label>Language Settings</Label>
+                <div className="flex flex-wrap gap-3">
+                  <div className="flex-1 min-w-[150px]">
+                    <div className="border rounded-md p-2">
+                      <p className="text-xs font-medium text-muted-foreground mb-1">FROM</p>
+                      <Select
+                        value={sourceLanguage}
+                        onValueChange={setSourceLanguage}
+                        disabled={isLoading}
+                      >
+                        <SelectTrigger id="sourceLanguage" className="border-0 p-0 h-8 shadow-none">
+                          <SelectValue placeholder="Select source language" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {languageOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 min-w-[150px]">
+                    <div className="border rounded-md p-2">
+                      <p className="text-xs font-medium text-muted-foreground mb-1">TO</p>
+                      <Select
+                        value={targetLanguage}
+                        onValueChange={setTargetLanguage}
+                        disabled={isLoading}
+                      >
+                        <SelectTrigger id="targetLanguage" className="border-0 p-0 h-8 shadow-none">
+                          <SelectValue placeholder="Select language" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {languageOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 min-w-[150px]">
+                    <div className="border rounded-md p-2">
+                      <p className="text-xs font-medium text-muted-foreground mb-1">LOCALE</p>
+                      <Select
+                        value={targetCountry}
+                        onValueChange={setTargetCountry}
+                        disabled={isLoading}
+                      >
+                        <SelectTrigger id="targetCountry" className="border-0 p-0 h-8 shadow-none">
+                          <SelectValue placeholder="Select country" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {countryOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
               </div>
               
