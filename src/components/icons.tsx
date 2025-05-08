@@ -1,9 +1,11 @@
 'use client';
 
+import * as React from "react";
 import {
   AlertTriangle,
   ArrowRight,
   Check,
+  CheckCircle,
   ChevronLeft,
   ChevronRight,
   Command,
@@ -34,6 +36,8 @@ import {
 
 export type Icon = typeof LucideIcon;
 
+export type IconProps = React.HTMLAttributes<SVGElement>;
+
 export const Icons = {
   logo: Command,
   close: X,
@@ -50,6 +54,8 @@ export const Icons = {
   sun: SunMedium,
   warning: AlertTriangle,
   check: Check,
+  checkCircle: CheckCircle,
+  copy: Copy,
   file: File,
   fileText: FileText,
   plus: Plus,
@@ -57,9 +63,5 @@ export const Icons = {
   moreVertical: MoreVertical,
   image: Image,
   twitter: Twitter,
-  pizza: Pizza,
-  page: File,
-  copy: Copy,
-  clipboardCheck: ClipboardCheck,
-  logOut: LogOut,
+  logout: LogOut,
 }; 
