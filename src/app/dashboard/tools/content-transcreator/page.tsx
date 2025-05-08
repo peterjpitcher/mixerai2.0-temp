@@ -178,11 +178,11 @@ export default function ContentTransCreatorPage() {
         Transform content across languages and cultures with our AI-powered trans-creation tool.
       </p>
       <div className="bg-slate-50 p-4 rounded-md mb-8">
-        <p className="text-sm text-slate-700 mb-2">
+        <p className="text-sm text-muted-foreground mb-2">
           <strong>Why trans-creation matters:</strong> Unlike direct translation, trans-creation preserves 
           the intent, emotion, and impact of your original content while adapting it for cultural nuances. 
         </p>
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-muted-foreground">
           This ensures your message resonates authentically with native speakers, maintaining brand voice 
           while avoiding cultural missteps and translation awkwardness.
         </p>
