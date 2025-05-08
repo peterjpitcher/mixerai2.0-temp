@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Button } from '@/components/button';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { TemplateForm } from '@/components/template/template-form';
-import { Icons } from '@/components/icons';
+import { ChevronLeft } from 'lucide-react';
 import { DebugComponent } from './debug';
 
 export const metadata: Metadata = {
@@ -21,7 +21,7 @@ export default function NewTemplatePage() {
         actions={
           <Link href="/dashboard/templates">
             <Button variant="outline">
-              <Icons.chevronLeft className="mr-2 h-4 w-4" />
+              <ChevronLeft className="mr-2 h-4 w-4" />
               Back to Templates
             </Button>
           </Link>

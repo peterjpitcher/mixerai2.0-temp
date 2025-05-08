@@ -15,7 +15,7 @@ export const getAzureOpenAIClient = () => {
     throw new Error("Azure OpenAI endpoint is missing");
   }
   
-  // Get deployment name but don't append it to baseURL
+  // Get deployment name
   const deploymentName = getModelName();
   
   console.log(`Initializing Azure OpenAI client with:
@@ -25,9 +25,10 @@ export const getAzureOpenAIClient = () => {
   `);
   
   // Create the OpenAI client with Azure configuration
+  // The baseURL needs to include /openai/deployments for Azure OpenAI
   return new OpenAI({
     apiKey: apiKey,
-    baseURL: endpoint,
+    baseURL: `${endpoint}/openai/deployments`,
     defaultQuery: { 
       "api-version": "2023-12-01-preview"
     },

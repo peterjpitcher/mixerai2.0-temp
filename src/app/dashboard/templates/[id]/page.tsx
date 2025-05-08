@@ -6,8 +6,8 @@ import Link from 'next/link';
 import { Button } from '@/components/button';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { TemplateForm } from '@/components/template/template-form';
-import { Icons } from '@/components/icons';
 import { useToast } from '@/components/use-toast';
+import { Loader2, ChevronLeft } from 'lucide-react';
 
 // Default templates data for system templates
 const defaultTemplates = {
@@ -193,7 +193,7 @@ export default function TemplateEditPage() {
     return (
       <div className="container mx-auto px-4 py-6 space-y-8">
         <div className="flex items-center justify-center h-64">
-          <Icons.spinner className="h-8 w-8 animate-spin" />
+          <Loader2 className="h-8 w-8 animate-spin" />
         </div>
       </div>
     );
@@ -207,7 +207,7 @@ export default function TemplateEditPage() {
         actions={
           <Link href="/dashboard/templates">
             <Button variant="outline">
-              <Icons.chevronLeft className="mr-2 h-4 w-4" />
+              <ChevronLeft className="mr-2 h-4 w-4" />
               Back to Templates
             </Button>
           </Link>
