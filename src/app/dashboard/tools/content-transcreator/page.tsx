@@ -26,17 +26,33 @@ const languageOptions = [
 
 // Country options
 const countryOptions = [
-  { value: 'US', label: 'United States' },
-  { value: 'GB', label: 'United Kingdom' },
-  { value: 'ES', label: 'Spain' },
-  { value: 'FR', label: 'France' },
-  { value: 'DE', label: 'Germany' },
-  { value: 'IT', label: 'Italy' },
-  { value: 'BR', label: 'Brazil' },
-  { value: 'NL', label: 'Netherlands' },
-  { value: 'JP', label: 'Japan' },
-  { value: 'CN', label: 'China' },
-  { value: 'RU', label: 'Russia' },
+  { value: 'US', label: 'United States', language: 'en' },
+  { value: 'GB', label: 'United Kingdom', language: 'en' },
+  { value: 'AU', label: 'Australia', language: 'en' },
+  { value: 'CA', label: 'Canada', language: 'en' },
+  { value: 'ES', label: 'Spain', language: 'es' },
+  { value: 'MX', label: 'Mexico', language: 'es' },
+  { value: 'AR', label: 'Argentina', language: 'es' },
+  { value: 'CO', label: 'Colombia', language: 'es' },
+  { value: 'FR', label: 'France', language: 'fr' },
+  { value: 'CA_FR', label: 'Canada (French)', language: 'fr' },
+  { value: 'BE_FR', label: 'Belgium (French)', language: 'fr' },
+  { value: 'CH_FR', label: 'Switzerland (French)', language: 'fr' },
+  { value: 'DE', label: 'Germany', language: 'de' },
+  { value: 'AT', label: 'Austria', language: 'de' },
+  { value: 'CH_DE', label: 'Switzerland (German)', language: 'de' },
+  { value: 'IT', label: 'Italy', language: 'it' },
+  { value: 'CH_IT', label: 'Switzerland (Italian)', language: 'it' },
+  { value: 'BR', label: 'Brazil', language: 'pt' },
+  { value: 'PT', label: 'Portugal', language: 'pt' },
+  { value: 'NL', label: 'Netherlands', language: 'nl' },
+  { value: 'BE_NL', label: 'Belgium (Dutch)', language: 'nl' },
+  { value: 'JP', label: 'Japan', language: 'ja' },
+  { value: 'CN', label: 'China', language: 'zh' },
+  { value: 'TW', label: 'Taiwan', language: 'zh' },
+  { value: 'HK', label: 'Hong Kong', language: 'zh' },
+  { value: 'SG', label: 'Singapore', language: 'zh' },
+  { value: 'RU', label: 'Russia', language: 'ru' },
 ];
 
 export default function ContentTransCreatorPage() {
@@ -47,6 +63,22 @@ export default function ContentTransCreatorPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<{ transCreatedContent: string } | null>(null);
   const [characterCount, setCharacterCount] = useState(0);
+
+  // Filter country options based on selected target language
+  const filteredCountryOptions = countryOptions.filter(
+    country => country.language === targetLanguage
+  );
+
+  // Update target country when target language changes
+  const handleTargetLanguageChange = (value: string) => {
+    setTargetLanguage(value);
+    
+    // Find the first country that matches the new language
+    const matchingCountry = countryOptions.find(country => country.language === value);
+    if (matchingCountry) {
+      setTargetCountry(matchingCountry.value);
+    }
+  };
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value);
@@ -142,9 +174,19 @@ export default function ContentTransCreatorPage() {
   return (
     <div className="container mx-auto py-6">
       <h1 className="text-3xl font-bold mb-6">Content Trans-Creator</h1>
-      <p className="text-muted-foreground mb-8">
-        Trans-create content (not just translate) for different languages and cultures.
+      <p className="text-muted-foreground mb-2">
+        Transform content across languages and cultures with our AI-powered trans-creation tool.
       </p>
+      <div className="bg-slate-50 p-4 rounded-md mb-8">
+        <p className="text-sm text-slate-700 mb-2">
+          <strong>Why trans-creation matters:</strong> Unlike direct translation, trans-creation preserves 
+          the intent, emotion, and impact of your original content while adapting it for cultural nuances. 
+        </p>
+        <p className="text-sm text-slate-700">
+          This ensures your message resonates authentically with native speakers, maintaining brand voice 
+          while avoiding cultural missteps and translation awkwardness.
+        </p>
+      </div>
       
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
@@ -202,7 +244,7 @@ export default function ContentTransCreatorPage() {
                       <p className="text-xs font-medium text-muted-foreground mb-1">TO</p>
                       <Select
                         value={targetLanguage}
-                        onValueChange={setTargetLanguage}
+                        onValueChange={handleTargetLanguageChange}
                         disabled={isLoading}
                       >
                         <SelectTrigger id="targetLanguage" className="border-0 p-0 h-8 shadow-none">
@@ -231,7 +273,7 @@ export default function ContentTransCreatorPage() {
                           <SelectValue placeholder="Select country" />
                         </SelectTrigger>
                         <SelectContent>
-                          {countryOptions.map((option) => (
+                          {filteredCountryOptions.map((option) => (
                             <SelectItem key={option.value} value={option.value}>
                               {option.label}
                             </SelectItem>
