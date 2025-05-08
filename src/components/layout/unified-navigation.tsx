@@ -18,10 +18,12 @@ import {
   Wrench,
   Code,
   Image,
-  Globe
+  Globe,
+  MoreVertical,
+  Folder
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface NavItem {
   href: string;
@@ -37,6 +39,91 @@ interface NavGroupItem {
   segment?: string; // For matching the parent segment
   defaultOpen?: boolean; // Whether the group should be expanded by default
 }
+
+// Default templates to show in the navigation - these are system defaults
+const defaultTemplates = [
+  {
+    id: 'article-template',
+    name: 'Article',
+    icon: <FileText className="h-4 w-4" />
+  },
+  {
+    id: 'product-template',
+    name: 'Product',
+    icon: <ShoppingBag className="h-4 w-4" />
+  }
+];
+
+// Mock user templates for development mode only
+const mockTemplates = [
+  {
+    id: "mock-template-1",
+    name: "Mock Blog Template",
+    description: "A template for creating blog posts with introduction, body and conclusion",
+    fields: {
+      inputFields: [
+        { id: "title", name: "Title", type: "shortText", required: true, options: {} },
+        { id: "keywords", name: "Keywords", type: "tags", required: false, options: {} },
+        { id: "topic", name: "Topic", type: "shortText", required: true, options: {} }
+      ],
+      outputFields: [
+        { 
+          id: "content", 
+          name: "Blog Content", 
+          type: "richText", 
+          required: true, 
+          options: {},
+          aiAutoComplete: true,
+          aiPrompt: "Write a blog post about {{topic}} using the keywords {{keywords}}"
+        },
+        { 
+          id: "meta", 
+          name: "Meta Description", 
+          type: "plainText", 
+          required: false, 
+          options: {},
+          aiAutoComplete: true,
+          aiPrompt: "Write a meta description for a blog about {{topic}}"
+        }
+      ]
+    },
+    created_at: "2023-06-15T14:30:00Z",
+    created_by: "00000000-0000-0000-0000-000000000000"
+  },
+  {
+    id: "mock-template-2",
+    name: "Mock Email Template",
+    description: "A template for marketing emails with subject line and body",
+    fields: {
+      inputFields: [
+        { id: "campaign", name: "Campaign Name", type: "shortText", required: true, options: {} },
+        { id: "audience", name: "Target Audience", type: "shortText", required: true, options: {} }
+      ],
+      outputFields: [
+        { 
+          id: "subject", 
+          name: "Email Subject", 
+          type: "shortText", 
+          required: true, 
+          options: {},
+          aiAutoComplete: true,
+          aiPrompt: "Write an attention-grabbing email subject line for a {{campaign}} campaign targeting {{audience}}"
+        },
+        { 
+          id: "body", 
+          name: "Email Body", 
+          type: "richText", 
+          required: true, 
+          options: {},
+          aiAutoComplete: true,
+          aiPrompt: "Write an engaging email body for a {{campaign}} campaign targeting {{audience}}"
+        }
+      ]
+    },
+    created_at: "2023-07-22T09:15:00Z",
+    created_by: "00000000-0000-0000-0000-000000000000"
+  }
+];
 
 /**
  * Unified navigation component for MixerAI dashboard
@@ -54,10 +141,61 @@ export function UnifiedNavigation() {
     tools: true    // Tools section expanded by default
   });
 
+  // State for user templates
+  const [userTemplates, setUserTemplates] = useState<any[]>([]);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  
+  // Flag to track if templates have been fetched already
+  const templatesFetched = useRef(false);
+
+  // Fetch templates from the API only once when the component mounts or content section is expanded
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      // Avoid multiple fetches
+      if (templatesFetched.current || isLoadingTemplates) return;
+      
+      setIsLoadingTemplates(true);
+      templatesFetched.current = true;
+      
+      try {
+        // In development mode, use the mock data directly
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Navigation: Using mock templates in development mode');
+          setUserTemplates(mockTemplates);
+          setIsLoadingTemplates(false);
+          return;
+        }
+        
+        // In production, fetch from API
+        console.log('Navigation: Fetching templates from API');
+        const response = await fetch('/api/content-templates');
+        const data = await response.json();
+        
+        if (data.success && data.templates) {
+          console.log(`Navigation: Successfully fetched ${data.templates.length} templates`);
+          setUserTemplates(data.templates);
+        } else {
+          console.error('Failed to get templates:', data.error || 'Unknown error');
+        }
+      } catch (error) {
+        console.error('Failed to fetch templates:', error);
+      } finally {
+        setIsLoadingTemplates(false);
+      }
+    };
+
+    // Only fetch if the content section is expanded and templates haven't been fetched yet
+    if (expandedSections.content && !templatesFetched.current) {
+      fetchTemplates();
+    }
+  }, [expandedSections.content, isLoadingTemplates]);
+
   // Automatically expand sections based on current path
   useEffect(() => {
+    // Create new state without referring to previous state
     const newExpandedState = { ...expandedSections };
     
+    // Only update if the condition is different from current state
     if (pathname.includes('/content') && !expandedSections.content) {
       newExpandedState.content = true;
     }
@@ -66,8 +204,16 @@ export function UnifiedNavigation() {
       newExpandedState.tools = true;
     }
     
-    setExpandedSections(newExpandedState);
-  }, [pathname]);
+    if (pathname.includes('/templates') && !expandedSections.content) {
+      newExpandedState.content = true;
+    }
+    
+    // Only update state if there's a change
+    if (newExpandedState.content !== expandedSections.content || 
+        newExpandedState.tools !== expandedSections.tools) {
+      setExpandedSections(newExpandedState);
+    }
+  }, [pathname]); // Only depend on pathname changes
 
   // Toggle a section's expanded state
   const toggleSection = (section: string) => {
@@ -76,6 +222,17 @@ export function UnifiedNavigation() {
       [section]: !expandedSections[section]
     });
   };
+
+  // Content with submenu for creating new content - only include default templates
+  const contentItems = [
+    // Only include system default templates
+    ...defaultTemplates.map(template => ({
+      href: `/dashboard/content/new?type=${template.id}`,
+      label: `New ${template.name}`,
+      icon: template.icon,
+      segment: template.id
+    }))
+  ];
   
   // Primary nav items
   const navItems: (NavItem | NavGroupItem)[] = [
@@ -97,32 +254,20 @@ export function UnifiedNavigation() {
       icon: <Building2 className="h-5 w-5" />,
       segment: 'brands'
     },
-    // Content with submenu
+    // Content Templates as a separate top-level item
+    {
+      href: '/dashboard/templates',
+      label: 'Content Templates',
+      icon: <Folder className="h-5 w-5" />,
+      segment: 'templates'
+    },
+    // Content with submenu for creating new content using only system templates
     {
       label: 'Content',
       icon: <BookOpen className="h-5 w-5" />,
       segment: 'content',
       defaultOpen: true,
-      items: [
-        {
-          href: '/dashboard/content/article',
-          label: 'Articles',
-          icon: <FileText className="h-4 w-4" />,
-          segment: 'article'
-        },
-        {
-          href: '/dashboard/content/ownedpdp',
-          label: 'Owned PDP',
-          icon: <ShoppingBag className="h-4 w-4" />,
-          segment: 'ownedpdp'
-        },
-        {
-          href: '/dashboard/content/retailerpdp',
-          label: 'Retailer PDP',
-          icon: <Store className="h-4 w-4" />,
-          segment: 'retailerpdp'
-        }
-      ]
+      items: contentItems
     },
     // New Tools section with submenu
     {
