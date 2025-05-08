@@ -95,12 +95,26 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
   } catch (error) {
     console.error('Error generating alt text:', error);
     
+    // Provide more specific error message, especially for OpenAI API issues
+    let errorMessage = 'Failed to generate alt text';
+    let statusCode = 500;
+    
+    if (error instanceof Error) {
+      // Check if the error is related to OpenAI
+      if (error.message.includes('OpenAI') || error.message.includes('Azure') || error.message.includes('API')) {
+        errorMessage = 'Azure OpenAI service is temporarily unavailable. Please try again later.';
+        statusCode = 503;
+      } else {
+        errorMessage = error.message;
+      }
+    }
+    
     return NextResponse.json(
       { 
         success: false,
-        error: 'Failed to generate alt text' 
+        error: errorMessage
       },
-      { status: 500 }
+      { status: statusCode }
     );
   }
 }); 

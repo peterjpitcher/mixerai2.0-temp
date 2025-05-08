@@ -29,6 +29,7 @@ export default function AltTextGeneratorPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [results, setResults] = useState<{ altText: string } | null>(null);
   const [previewError, setPreviewError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch brands on component mount
   useEffect(() => {
@@ -66,6 +67,9 @@ export default function AltTextGeneratorPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Reset any previous error state
+    setError(null);
     
     if (!imageUrl) {
       toast({
@@ -120,7 +124,18 @@ export default function AltTextGeneratorPage() {
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate alt text');
+        // Get detailed error information
+        let errorMessage = data.error || 'Failed to generate alt text';
+        
+        // Customize message based on status code
+        if (response.status === 503) {
+          errorMessage = 'Azure OpenAI service is temporarily unavailable. Please try again later.';
+        } else if (response.status === 400 && errorMessage.includes('image')) {
+          errorMessage = 'The image could not be processed. Please try a different image URL or format.';
+        }
+        
+        setError(errorMessage);
+        throw new Error(errorMessage);
       }
       
       if (data.success) {
@@ -136,11 +151,19 @@ export default function AltTextGeneratorPage() {
         throw new Error(data.error || 'Failed to generate alt text');
       }
     } catch (error) {
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'An unknown error occurred while generating alt text';
+        
+      setError(errorMessage);
+      
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        description: errorMessage,
         variant: 'destructive',
       });
+      
+      console.error('Alt text generation error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -260,6 +283,18 @@ export default function AltTextGeneratorPage() {
                     onLoad={handleImageLoad}
                   />
                 )}
+              </div>
+            )}
+            
+            {error && (
+              <div className="p-4 mb-4 border border-red-200 bg-red-50 rounded-md">
+                <p className="text-red-800 font-medium">Error</p>
+                <p className="text-red-600">{error}</p>
+                {error.includes('OpenAI') || error.includes('service') ? (
+                  <p className="text-red-600 mt-2 text-sm">The AI service is currently unavailable. Please try again later.</p>
+                ) : error.includes('image') ? (
+                  <p className="text-red-600 mt-2 text-sm">The image may be inaccessible or in an unsupported format. Try using a different image URL.</p>
+                ) : null}
               </div>
             )}
             

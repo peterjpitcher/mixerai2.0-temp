@@ -29,7 +29,7 @@ export const getAzureOpenAIClient = () => {
     apiKey: apiKey,
     baseURL: endpoint,
     defaultQuery: { 
-      "api-version": "2023-05-15"
+      "api-version": "2023-12-01-preview"
     },
     defaultHeaders: { 
       "api-key": apiKey 
@@ -39,7 +39,16 @@ export const getAzureOpenAIClient = () => {
 
 // Get the model name from environment variables or use a reliable default
 export function getModelName(): string {
-  // Always use gpt-4o since this is what's working in the logs
+  // First check if an Azure deployment name is configured that supports vision
+  const deploymentName = process.env.AZURE_OPENAI_DEPLOYMENT_NAME || process.env.AZURE_OPENAI_DEPLOYMENT;
+  
+  if (deploymentName) {
+    console.log(`Using configured deployment name: ${deploymentName}`);
+    return deploymentName;
+  }
+  
+  // Default to gpt-4o which supports vision capabilities
+  console.log(`No deployment name configured, using default: gpt-4o`);
   return "gpt-4o";
 }
 
@@ -173,7 +182,7 @@ export async function generateContent(
     };
     
     // Specify the deployment in the URL path
-    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-05-15`;
+    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
     console.log(`Using direct endpoint URL: ${endpoint}`);
     
     // Make a direct fetch call
@@ -431,7 +440,7 @@ export async function generateMetadata(
       };
       
       // Specify the deployment in the URL path
-      const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-05-15`;
+      const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
       console.log(`Using direct endpoint URL: ${endpoint}`);
       
       // Make a direct fetch call instead
@@ -569,7 +578,7 @@ export async function generateMetadataFromContent(
     };
     
     // Specify the deployment in the URL path
-    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-05-15`;
+    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
     console.log(`Using direct endpoint URL: ${endpoint}`);
     
     // Make a direct fetch call
@@ -661,7 +670,7 @@ export async function generateAltText(
     systemPrompt += `\n\nContent guardrails: ${brandContext.guardrails}`;
   }
   
-  const userPrompt = `Generate accessible alt text for this image: ${imageUrl}
+  const userPromptText = `Generate accessible alt text for this image:
   
   Examples of good alt text:
   - "Woman holding a protest sign reading 'Equality for All' during a march in central London" (91 chars)
@@ -685,12 +694,23 @@ export async function generateAltText(
   try {
     console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
     
-    // Prepare the request body
+    // Prepare the request body with properly formatted image content
     const completionRequest = {
       model: deploymentName,
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
+        { 
+          role: "user", 
+          content: [
+            { type: "text", text: userPromptText },
+            { 
+              type: "image_url", 
+              image_url: { 
+                url: imageUrl 
+              } 
+            }
+          ]
+        }
       ],
       response_format: { type: "json_object" },
       max_tokens: 300,
@@ -698,7 +718,7 @@ export async function generateAltText(
     };
     
     // Specify the deployment in the URL path
-    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-05-15`;
+    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
     console.log(`Using direct endpoint URL: ${endpoint}`);
     
     // Make a direct fetch call
@@ -807,7 +827,7 @@ export async function transCreateContent(
     };
     
     // Specify the deployment in the URL path
-    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-05-15`;
+    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
     console.log(`Using direct endpoint URL: ${endpoint}`);
     
     // Make a direct fetch call

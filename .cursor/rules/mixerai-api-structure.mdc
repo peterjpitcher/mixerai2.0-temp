@@ -120,27 +120,24 @@ return NextResponse.json(
 );
 ```
 
-## Error Handling and Fallback Strategies
+## Error Handling - NO FALLBACKS
 
-### Brand Identity Generation
+### Strict No-Fallback Policy
 
-The brand identity generation feature relies on Azure OpenAI. When AI generation fails, the application follows these principles:
+MixerAI 2.0 strictly prohibits the implementation of any fallback mechanisms for AI generation:
 
-1. **Fallback Generation**:
-   - In `src/lib/azure/openai.ts`, the `generateBrandIdentityFromUrls` function should fall back to template-based content when OpenAI API calls fail
-   - The `generateFallbackBrandIdentity` function provides industry-specific templates using URL-based detection
+1. **NO Fallback Generation**:
+   - In `src/lib/azure/openai.ts`, AI generation functions must NEVER fall back to template-based content when API calls fail
+   - No default or pre-written content should be returned if the Azure OpenAI API is unavailable
 
-2. **Default Data Provision**:
-   - API route (`src/app/api/brands/identity/route.ts`) always ensures complete data is returned
-   - Even in error cases, default values should be provided for all required fields:
-     - Brand identity
-     - Tone of voice
-     - Content guardrails
-     - Suggested agencies
-     - Brand color
+2. **Transparent Error Reporting**:
+   - API routes must report actual errors directly to the client
+   - All failures must be clearly communicated to users through the UI
+   - Error states should suggest trying again later rather than using fallbacks
 
 3. **UI Handling**:
-   - In brand edit pages (`src/app/brands/[id]/edit/page.tsx` and `src/app/brands/new/page.tsx`), the `executeGenerateBrandIdentity` function should display a toast notification but continue with fallback data
-   - Set `usedFallback` state to true to inform users that default content is being used
+   - UI components must handle error states with appropriate messaging
+   - Loading states should be used during API calls
+   - Clear error feedback should be shown when calls fail
 
-This approach ensures users always have usable content, even when API services are unavailable.
+This approach ensures transparency with users and maintains consistent quality standards across all content generation features.

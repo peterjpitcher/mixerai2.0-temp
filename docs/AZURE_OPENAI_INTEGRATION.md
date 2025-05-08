@@ -85,6 +85,30 @@ try {
 }
 ```
 
+## NO FALLBACK GENERATION
+
+MixerAI 2.0a strictly prohibits the implementation of fallback generation mechanisms. This is a critical requirement:
+
+### Prohibited Practices
+- **No Template-Based Fallbacks**: The system must NEVER fall back to pre-written templates when AI generation fails
+- **No Default Content**: No default values or pre-written content should be returned if the Azure OpenAI API call fails
+- **No Local Generation**: No local language models or rule-based generation as alternatives to Azure OpenAI
+- **No Silent Failures**: All API failures must be explicitly reported to the user with clear error messages
+
+### Reasoning
+- Maintains transparency with users about service availability
+- Prevents misleading users with potentially low-quality template-based content
+- Ensures consistent quality of all generated content
+- Simplifies debugging by providing clear error states
+
+### Implementation
+API routes and generation functions must never include conditionals that substitute template-based or default content when API calls fail. When the Azure OpenAI service is unavailable, the application must:
+
+1. Return appropriate error codes
+2. Display clear error messages to the user
+3. Suggest that the user try again later
+4. Log the specific error for debugging purposes
+
 ## Brand Context Integration
 
 All AI tools in MixerAI 2.0a incorporate brand-specific context to ensure generated content aligns with the brand's identity and requirements.
