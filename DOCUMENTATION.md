@@ -1297,3 +1297,52 @@ MixerAI 2.0 includes several technical tools to enhance content creation workflo
   - Maintains tone and brand voice across languages
 - **API**: `POST /api/tools/content-transcreator`
 - **UI**: `/dashboard/tools/content-transcreator`
+
+## Content Template System
+
+MixerAI 2.0 includes a flexible Content Template System that replaces the previous static content types with customizable templates. This allows for creating diverse content types with configurable fields and AI integration.
+
+### Key Features
+
+- **Template Management**: Create, edit, and delete content templates with custom fields
+- **Field Configuration**: Configure input fields for user entry and output fields for AI generation
+- **AI Integration**: Field-level AI suggestions and auto-complete generation
+- **Dynamic Content Creation**: Create content using any custom template
+
+### Default Templates
+
+The system includes two pre-configured templates:
+
+1. **Article Template**
+   - For creating blog posts, articles, and long-form content 
+   - AI features: Title suggestions, keyword recommendations, and content generation
+
+2. **Product Template**
+   - For creating product descriptions with features and benefits
+   - AI features: Target audience suggestions and product descriptions
+
+### Dynamic Navigation
+
+The Content section in the navigation menu dynamically displays:
+- All Templates (list page)
+- System Default Templates
+- Up to 5 recently created custom templates
+
+### Implementation
+
+The system is implemented with:
+
+- Database tables for template storage (`content_templates`) and content structure
+- API routes for template management and AI operations
+- React components for template design and field configuration
+
+## AI Integration Testing
+
+MixerAI 2.0a includes a comprehensive suite of tools for testing and debugging the Azure OpenAI integration:
+
+- **Quick OpenAI Test**: A streamlined interface for testing Azure OpenAI with minimal configuration
+- **System Status Panel**: Real-time connection status for all system components
+- **Environment Configuration**: Detailed information about your environment setup
+- **Advanced Testing Tools**: Specialized tools for testing different aspects of the AI integration
+
+For detailed information about these tools, see [OpenAI Test Tool Documentation](docs/OPENAI_TEST_TOOL.md).

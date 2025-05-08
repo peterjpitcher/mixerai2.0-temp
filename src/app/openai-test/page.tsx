@@ -8,9 +8,10 @@ import ContentGenerationTest from './components/content-generation-test';
 import DirectApiTest from './components/direct-api-test';
 import EnvironmentCheck from './components/environment-check';
 import SystemStatus from './components/system-status';
+import QuickTest from './components/quick-test';
 
 export default function OpenAITestPage() {
-  const [activeTab, setActiveTab] = useState('brand-identity');
+  const [activeTab, setActiveTab] = useState('quick-test');
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -21,6 +22,7 @@ export default function OpenAITestPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-1">
+          <QuickTest className="mb-4" />
           <SystemStatus className="mb-4" />
           <EnvironmentCheck />
         </div>
