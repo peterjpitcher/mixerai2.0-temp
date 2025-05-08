@@ -193,27 +193,11 @@ export default function ContentTransCreatorPage() {
           <CardHeader>
             <CardTitle>Original Content</CardTitle>
             <CardDescription>
-              Enter the content you want to trans-create.
+              Select languages and enter content to trans-create.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="content">Content</Label>
-                <Textarea
-                  id="content"
-                  placeholder="Enter your content here..."
-                  value={content}
-                  onChange={handleContentChange}
-                  disabled={isLoading}
-                  className="min-h-[200px]"
-                  required
-                />
-                <p className="text-xs text-muted-foreground">
-                  {characterCount} characters
-                </p>
-              </div>
-              
               <div className="space-y-2">
                 <Label>Language Settings</Label>
                 <div className="flex flex-wrap gap-3">
@@ -283,6 +267,22 @@ export default function ContentTransCreatorPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="content">Content</Label>
+                <Textarea
+                  id="content"
+                  placeholder="Enter your content here..."
+                  value={content}
+                  onChange={handleContentChange}
+                  disabled={isLoading}
+                  className="min-h-[200px]"
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  {characterCount} characters
+                </p>
               </div>
               
               <input type="hidden" name="sourceLanguage" value={sourceLanguage} />
