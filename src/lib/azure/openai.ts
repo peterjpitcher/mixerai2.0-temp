@@ -235,6 +235,231 @@ export async function generateContent(
 }
 
 /**
+ * Generate content based on a template
+ */
+export async function generateContentFromTemplate(
+  contentType: "article" | "retailer_pdp" | "owned_pdp" | string, 
+  brand: {
+    name: string;
+    brand_identity?: string | null;
+    tone_of_voice?: string | null;
+    guardrails?: string | null;
+  },
+  template: {
+    id: string;
+    name: string;
+    inputFields: Array<{
+      id: string;
+      name: string;
+      type: string;
+      value: string;
+      aiPrompt?: string;
+    }>;
+    outputFields: Array<{
+      id: string;
+      name: string;
+      type: string;
+      aiPrompt?: string;
+      aiAutoComplete?: boolean;
+    }>;
+  },
+  input?: {
+    additionalInstructions?: string;
+    templateFields?: Record<string, string>;
+  }
+) {
+  console.log(`Generating template-based content for brand: ${brand.name} using template: ${template.name}`);
+  
+  const deploymentName = getModelName();
+  console.log(`Using deployment name: "${deploymentName}"`);
+  
+  // Build the system prompt with brand information
+  let systemPrompt = `You are an expert content creator for the brand "${brand.name}".`;
+  
+  if (brand.brand_identity) {
+    systemPrompt += ` The brand identity can be described as: ${brand.brand_identity}.`;
+  }
+  
+  if (brand.tone_of_voice) {
+    systemPrompt += ` The tone of voice should be: ${brand.tone_of_voice}.`;
+  }
+  
+  if (brand.guardrails) {
+    systemPrompt += ` Content guardrails: ${brand.guardrails}.`;
+  }
+  
+  systemPrompt += `\nYou are using a template called "${template.name}" to generate content.`;
+  
+  // Build the user prompt using template fields and prompts
+  let userPrompt = `Create content for content type "${contentType}" according to this template: "${template.name}".\n\n`;
+  userPrompt += `Template input fields:\n`;
+  
+  // Add each input field with its value to the prompt
+  template.inputFields.forEach(field => {
+    const fieldValue = field.value || '';
+    userPrompt += `- ${field.name}: ${fieldValue}\n`;
+  });
+  
+  userPrompt += `\nGenerate the following output fields:\n`;
+  
+  // Include output field requirements with their prompts
+  template.outputFields.forEach(field => {
+    userPrompt += `- ${field.name}`;
+    if (field.aiPrompt) {
+      const processedPrompt = field.aiPrompt.replace(/\{\{(\w+)\}\}/g, (match, fieldId) => {
+        // Replace template variables with actual values
+        const inputField = template.inputFields.find(f => f.id === fieldId);
+        return inputField && inputField.value ? inputField.value : match;
+      });
+      
+      userPrompt += `: ${processedPrompt}`;
+      console.log(`Using AI prompt for field ${field.name}: ${processedPrompt}`);
+    }
+    userPrompt += `\n`;
+  });
+  
+  // Add additional instructions if provided
+  if (input?.additionalInstructions) {
+    userPrompt += `\nAdditional instructions: ${input.additionalInstructions}`;
+  }
+  
+  userPrompt += `\nFormat each output field as follows (IMPORTANT: place the content BETWEEN the markers, not including the markers):
+##FIELD_ID:field_id## 
+content goes here 
+##END_FIELD_ID##
+
+Make sure you don't include the field markers (##FIELD_ID and ##END_FIELD_ID##) in the actual content.`;
+  
+  // Make the API call with error handling
+  try {
+    console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
+    
+    // Prepare the request body
+    const completionRequest = {
+      model: deploymentName,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      max_tokens: 2000,
+      temperature: 0.7,
+      top_p: 0.95,
+      frequency_penalty: 0.5,
+      presence_penalty: 0.5,
+    };
+    
+    // Specify the deployment in the URL path
+    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
+    console.log(`Using direct endpoint URL: ${endpoint}`);
+    
+    // Make a direct fetch call
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': process.env.AZURE_OPENAI_API_KEY || ''
+      },
+      body: JSON.stringify(completionRequest)
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+    }
+    
+    const responseData = await response.json();
+    console.log("API call successful");
+    
+    const content = responseData.choices?.[0]?.message?.content || "";
+    console.log(`Received response with content length: ${content.length}`);
+    
+    // Parse the fields from the response
+    const result: Record<string, string> = {};
+    let fieldsParsed = false;
+    
+    // Extract each field using regex
+    template.outputFields.forEach(field => {
+      // Look for field content between the markers with any whitespace
+      const fieldRegex = new RegExp(`##FIELD_ID:${field.id}##\\s*([\\s\\S]*?)\\s*##END_FIELD_ID##`, 'i');
+      const match = content.match(fieldRegex);
+      
+      if (match && match[1]) {
+        result[field.id] = match[1].trim();
+        fieldsParsed = true;
+        console.log(`Successfully parsed field ${field.id} with length ${result[field.id].length}`);
+      } else {
+        console.log(`No match found for field ${field.id}, trying alternative formats`);
+        
+        // Try alternative formats that the AI might use
+        const altRegex1 = new RegExp(`##FIELD_ID: *${field.id}##\\s*([\\s\\S]*?)\\s*##END_FIELD_ID##`, 'i');
+        const altRegex2 = new RegExp(`## *FIELD_ID: *${field.id} *##\\s*([\\s\\S]*?)\\s*## *END_FIELD_ID *##`, 'i');
+        const altRegex3 = new RegExp(`${field.name}:\\s*(.+?)(?=\\n\\n|\\n[^\\n]|$)`, 'i');
+        
+        const altMatch1 = content.match(altRegex1);
+        const altMatch2 = content.match(altRegex2);
+        const altMatch3 = content.match(altRegex3);
+        
+        if (altMatch1 && altMatch1[1]) {
+          result[field.id] = altMatch1[1].trim();
+          fieldsParsed = true;
+          console.log(`Parsed field ${field.id} with alternative format 1`);
+        } else if (altMatch2 && altMatch2[1]) {
+          result[field.id] = altMatch2[1].trim();
+          fieldsParsed = true;
+          console.log(`Parsed field ${field.id} with alternative format 2`);
+        } else if (altMatch3 && altMatch3[1]) {
+          result[field.id] = altMatch3[1].trim();
+          fieldsParsed = true;
+          console.log(`Parsed field ${field.id} using field name format`);
+        }
+      }
+    });
+    
+    // If no fields were parsed correctly, try to extract content without markers
+    if (!fieldsParsed) {
+      console.log('No fields parsed from template using expected formats, trying to extract content');
+      
+      // Look for each field ID in raw content (in case the AI included field ID but not markers)
+      template.outputFields.forEach(field => {
+        const simpleFieldRegex = new RegExp(`${field.name}:\\s*([\\s\\S]*?)(?=\\n\\n|\\n[A-Za-z]|$)`, 'i');
+        const simpleMatch = content.match(simpleFieldRegex);
+        
+        if (simpleMatch && simpleMatch[1]) {
+          result[field.id] = simpleMatch[1].trim();
+          fieldsParsed = true;
+          console.log(`Extracted field ${field.id} using simple field name extraction`);
+        }
+      });
+      
+      // If still no fields parsed, assign the entire content to the first output field
+      if (!fieldsParsed && template.outputFields.length > 0) {
+        const firstField = template.outputFields[0];
+        result[firstField.id] = content;
+        fieldsParsed = true;
+        console.log(`Assigned full content to first output field: ${firstField.id}`);
+      }
+    }
+    
+    // Check if any field contains the markers and strip them
+    Object.keys(result).forEach(fieldId => {
+      // Remove any field markers from the content
+      result[fieldId] = result[fieldId]
+        .replace(/##FIELD_ID:[a-zA-Z0-9_]+##/g, '')
+        .replace(/##END_FIELD_ID##/g, '')
+        .trim();
+    });
+    
+    // Log what fields we're returning
+    console.log('Returning only the template-based output fields:', Object.keys(result));
+    
+    return result;
+  } catch (error) {
+    console.error("Error generating content with template:", error);
+    throw new Error(`Failed to generate template-based content: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
  * Generates brand identity from a list of URLs
  */
 export async function generateBrandIdentityFromUrls(
