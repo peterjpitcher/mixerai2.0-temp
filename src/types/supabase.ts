@@ -72,6 +72,10 @@ export interface Database {
           current_step: number | null
           created_at: string
           updated_at: string
+          template_id: string | null
+          content_data: Json | null
+          version: number | null
+          published_version: number | null
         }
         Insert: {
           id?: string
@@ -87,6 +91,10 @@ export interface Database {
           current_step?: number | null
           created_at?: string
           updated_at?: string
+          template_id?: string | null
+          content_data?: Json | null
+          version?: number | null
+          published_version?: number | null
         }
         Update: {
           id?: string
@@ -102,6 +110,10 @@ export interface Database {
           current_step?: number | null
           created_at?: string
           updated_at?: string
+          template_id?: string | null
+          content_data?: Json | null
+          version?: number | null
+          published_version?: number | null
         }
         Relationships: [
           {
@@ -126,6 +138,52 @@ export interface Database {
             foreignKeyName: "content_workflow_id_fkey"
             columns: ["workflow_id"]
             referencedRelation: "workflows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_template_id_fkey"
+            columns: ["template_id"]
+            referencedRelation: "content_templates"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      content_templates: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          icon: string | null
+          fields: Json
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          icon?: string | null
+          fields: Json
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          icon?: string | null
+          fields?: Json
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_templates_created_by_fkey"
+            columns: ["created_by"]
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           }
         ]
