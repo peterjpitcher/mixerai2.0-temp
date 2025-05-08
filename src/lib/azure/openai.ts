@@ -15,26 +15,32 @@ export const getAzureOpenAIClient = () => {
     throw new Error("Azure OpenAI endpoint is missing");
   }
   
-  console.log(`Initializing Azure OpenAI client with endpoint: ${endpoint}`);
+  // Get deployment name but don't append it to baseURL
+  const deploymentName = getModelName();
   
+  console.log(`Initializing Azure OpenAI client with:
+  - Endpoint: ${endpoint}
+  - API Key: ${apiKey ? apiKey.substring(0, 5) + "..." : "undefined"}
+  - Deployment: ${deploymentName}
+  `);
+  
+  // Create the OpenAI client with Azure configuration
   return new OpenAI({
     apiKey: apiKey,
-    baseURL: `${endpoint}/openai/deployments`,
-    defaultQuery: { "api-version": "2023-09-01-preview" },
-    defaultHeaders: { "api-key": apiKey }
+    baseURL: endpoint,
+    defaultQuery: { 
+      "api-version": "2023-05-15"
+    },
+    defaultHeaders: { 
+      "api-key": apiKey 
+    }
   });
 };
 
-// Get the model name from environment variables without fallbacks
+// Get the model name from environment variables or use a reliable default
 export function getModelName(): string {
-  const configuredModel = process.env.AZURE_OPENAI_DEPLOYMENT || "";
-  
-  if (!configuredModel) {
-    console.warn("Azure OpenAI deployment name is not configured");
-    throw new Error("Azure OpenAI deployment name is not configured");
-  }
-  
-  return configuredModel;
+  // Always use gpt-4o since this is what's working in the logs
+  return "gpt-4o";
 }
 
 // Content vetting agencies by country
@@ -99,7 +105,8 @@ export async function generateContent(
 ) {
   console.log(`Generating ${contentType} content for brand: ${brand.name}`);
   
-  const client = getAzureOpenAIClient();
+  const deploymentName = getModelName();
+  console.log(`Using deployment name: "${deploymentName}"`);
   
   // Build the prompt based on content type and brand information
   let systemPrompt = `You are an expert content creator for the brand "${brand.name}".`;
@@ -149,8 +156,11 @@ export async function generateContent(
   
   // Make the API call directly with error handling
   try {
-    const response = await client.chat.completions.create({
-      model: getModelName(),
+    console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
+    
+    // Prepare the request body
+    const completionRequest = {
+      model: deploymentName,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
@@ -160,9 +170,32 @@ export async function generateContent(
       top_p: 0.95,
       frequency_penalty: 0.5,
       presence_penalty: 0.5,
+    };
+    
+    // Specify the deployment in the URL path
+    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-05-15`;
+    console.log(`Using direct endpoint URL: ${endpoint}`);
+    
+    // Make a direct fetch call
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': process.env.AZURE_OPENAI_API_KEY || ''
+      },
+      body: JSON.stringify(completionRequest)
     });
     
-    const content = response.choices[0]?.message?.content || "";
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+    }
+    
+    const responseData = await response.json();
+    console.log("API call successful");
+    
+    const content = responseData.choices?.[0]?.message?.content || "";
+    console.log(`Received response with content length: ${content.length}`);
     
     // Extract meta title and description
     const metaTitleMatch = content.match(/META TITLE: (.*?)($|\n)/i);
@@ -204,74 +237,74 @@ export async function generateBrandIdentityFromUrls(
   suggestedAgencies: Array<{name: string, description: string, priority: 'high' | 'medium' | 'low'}>;
   brandColor: string;
 }> {
-  console.log(`Generating brand identity for ${brandName} from ${urls.length} URLs`);
+    console.log(`Generating brand identity for ${brandName} from ${urls.length} URLs`);
+    
+    // Debug environment variables
+    console.log("Environment check:");
+    console.log("- NODE_ENV:", process.env.NODE_ENV);
+    console.log("- AZURE_OPENAI_API_KEY exists:", !!process.env.AZURE_OPENAI_API_KEY);
+    console.log("- AZURE_OPENAI_ENDPOINT exists:", !!process.env.AZURE_OPENAI_ENDPOINT);
+    console.log("- AZURE_OPENAI_DEPLOYMENT:", process.env.AZURE_OPENAI_DEPLOYMENT);
   
-  // Debug environment variables
-  console.log("Environment check:");
-  console.log("- NODE_ENV:", process.env.NODE_ENV);
-  console.log("- AZURE_OPENAI_API_KEY exists:", !!process.env.AZURE_OPENAI_API_KEY);
-  console.log("- AZURE_OPENAI_ENDPOINT exists:", !!process.env.AZURE_OPENAI_ENDPOINT);
-  console.log("- AZURE_OPENAI_DEPLOYMENT:", process.env.AZURE_OPENAI_DEPLOYMENT);
-  
-  const client = getAzureOpenAIClient();
+      const client = getAzureOpenAIClient();
   const deploymentName = getModelName();
-  
-  // Prepare the prompt
-  const prompt = `
-  Please analyze the following URLs related to the brand "${brandName}":
-  ${urls.map(url => `- ${url}`).join('\n')}
-  
-  Based on these URLs, generate a comprehensive brand identity profile with the following components:
-  
-  1. BRAND IDENTITY: A detailed description of the brand's personality, values, target audience, and key messaging themes. This should be in plain text paragraphs, not markdown.
-  
-  2. TONE OF VOICE: A description of how the brand communicates - the style, language, and approach it uses. This should be a concise paragraph.
-  
-  3. CONTENT GUARDRAILS: Provide 5 specific guidelines that content creators should follow when creating content for this brand. Format these as a bulleted list.
-  
-  4. SUGGESTED VETTING AGENCIES: Based on the industry and country (if known), recommend 3-5 regulatory or vetting agencies that might be relevant to this brand, with a brief description of each. Also assign each a priority level (high, medium, or low) based on how critical compliance with this agency is for the brand.
-  
-  5. BRAND COLOR: Suggest a primary brand color that would best represent this brand's identity and values. Provide the color in hex format (e.g., #FF5733).
-  
-  Format your response as a JSON object with these keys: brandIdentity, toneOfVoice, guardrails (as an array of strings), suggestedAgencies (as an array of objects with name, description, and priority fields), and brandColor (as a hex color code).
-  `;
-  
-  // Make the API call
+      
+      // Prepare the prompt
+      const prompt = `
+      Please analyze the following URLs related to the brand "${brandName}":
+      ${urls.map(url => `- ${url}`).join('\n')}
+      
+      Based on these URLs, generate a comprehensive brand identity profile with the following components:
+      
+      1. BRAND IDENTITY: A detailed description of the brand's personality, values, target audience, and key messaging themes. This should be in plain text paragraphs, not markdown.
+      
+      2. TONE OF VOICE: A description of how the brand communicates - the style, language, and approach it uses. This should be a concise paragraph.
+      
+      3. CONTENT GUARDRAILS: Provide 5 specific guidelines that content creators should follow when creating content for this brand. Format these as a bulleted list.
+      
+      4. SUGGESTED VETTING AGENCIES: Based on the industry and country (if known), recommend 3-5 regulatory or vetting agencies that might be relevant to this brand, with a brief description of each. Also assign each a priority level (high, medium, or low) based on how critical compliance with this agency is for the brand.
+      
+      5. BRAND COLOR: Suggest a primary brand color that would best represent this brand's identity and values. Provide the color in hex format (e.g., #FF5733).
+      
+      Format your response as a JSON object with these keys: brandIdentity, toneOfVoice, guardrails (as an array of strings), suggestedAgencies (as an array of objects with name, description, and priority fields), and brandColor (as a hex color code).
+      `;
+      
+      // Make the API call
   try {
-    console.log("Sending request to Azure OpenAI API");
-    console.log(`Using deployment: ${deploymentName}`);
-    
-    const completion = await client.chat.completions.create({
-      model: deploymentName,
-      messages: [
-        { role: "system", content: "You are a brand strategy expert that helps analyze and create detailed brand identities." },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.7,
-      max_tokens: 1000,
-      response_format: { type: "json_object" }
-    });
-    
-    console.log("Received response from Azure OpenAI API");
-    const responseContent = completion.choices[0]?.message?.content || "{}";
-    console.log("Raw API response:", responseContent.substring(0, 100) + "...");
-    
+      console.log("Sending request to Azure OpenAI API");
+      console.log(`Using deployment: ${deploymentName}`);
+      
+        const completion = await client.chat.completions.create({
+          model: deploymentName,
+          messages: [
+            { role: "system", content: "You are a brand strategy expert that helps analyze and create detailed brand identities." },
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.7,
+          max_tokens: 1000,
+          response_format: { type: "json_object" }
+        });
+        
+        console.log("Received response from Azure OpenAI API");
+        const responseContent = completion.choices[0]?.message?.content || "{}";
+        console.log("Raw API response:", responseContent.substring(0, 100) + "...");
+        
     const parsedResponse = JSON.parse(responseContent);
-    
-    // Ensure guardrails are formatted properly
-    if (Array.isArray(parsedResponse.guardrails)) {
-      parsedResponse.guardrails = parsedResponse.guardrails.map((item: string) => `- ${item}`).join('\n');
-    }
-    
-    console.log("Successfully parsed response and formatted guardrails");
-    return {
-      brandIdentity: parsedResponse.brandIdentity || "",
-      toneOfVoice: parsedResponse.toneOfVoice || "",
-      guardrails: parsedResponse.guardrails || "",
-      suggestedAgencies: parsedResponse.suggestedAgencies || [],
-      brandColor: parsedResponse.brandColor || ""
-    };
-  } catch (error) {
+          
+          // Ensure guardrails are formatted properly
+          if (Array.isArray(parsedResponse.guardrails)) {
+            parsedResponse.guardrails = parsedResponse.guardrails.map((item: string) => `- ${item}`).join('\n');
+          }
+          
+          console.log("Successfully parsed response and formatted guardrails");
+          return {
+            brandIdentity: parsedResponse.brandIdentity || "",
+            toneOfVoice: parsedResponse.toneOfVoice || "",
+            guardrails: parsedResponse.guardrails || "",
+            suggestedAgencies: parsedResponse.suggestedAgencies || [],
+            brandColor: parsedResponse.brandColor || ""
+          };
+        } catch (error) {
     console.error("Error generating brand identity with Azure OpenAI:", error);
     throw new Error(`Failed to generate brand identity: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
@@ -296,83 +329,127 @@ export async function generateMetadata(
 }> {
   console.log(`Generating metadata for ${url}`);
   
-  const client = getAzureOpenAIClient();
-  
-  // Prepare the prompt
-  let systemPrompt = `You are an expert SEO specialist who creates compelling, optimized metadata for webpages.
-  You're analyzing content in ${brandLanguage} for users in ${brandCountry}.
-  
-  You MUST follow these strict requirements:
-  1. Meta title MUST be EXACTLY between 50-60 characters
-  2. Meta description MUST be EXACTLY between 150-160 characters
-  
-  Focus on clarity, keywords, and attracting clicks while accurately representing the page content.`;
-  
-  // Add brand context if available
-  if (brandContext?.brandIdentity) {
-    systemPrompt += `\n\nBrand identity: ${brandContext.brandIdentity}`;
-  }
-  
-  if (brandContext?.toneOfVoice) {
-    systemPrompt += `\n\nTone of voice: ${brandContext.toneOfVoice}`;
-  }
-  
-  if (brandContext?.guardrails) {
-    systemPrompt += `\n\nContent guardrails: ${brandContext.guardrails}`;
-  }
-  
-  let userPrompt = `Generate SEO-optimized meta title and description for this URL: ${url}`;
-  
-  // Add page content if available
-  if (brandContext?.pageContent) {
-    // Extract more meaningful content for better metadata generation
-    const content = brandContext.pageContent;
-    const truncatedContent = content.length > 3000 
-      ? content.slice(0, 3000) + "..."
-      : content;
-    
-    userPrompt += `\n\nHere is the content from the webpage that should be used as the primary source for metadata generation:\n${truncatedContent}
-    
-    Important:
-    - Base your metadata primarily on this content. 
-    - The meta title should accurately represent the page content and NOT include the brand or website name.
-    - META TITLE MUST be EXACTLY 50-60 characters.
-    - META DESCRIPTION MUST be EXACTLY 150-160 characters.`;
-  } else {
-    userPrompt += `\n\nNote: No page content was available for analysis. Please create metadata based on the URL structure. 
-    
-    Important:
-    - The meta title should NOT include the brand or website name.
-    - META TITLE MUST be EXACTLY 50-60 characters.
-    - META DESCRIPTION MUST be EXACTLY 150-160 characters.`;
-  }
-  
-  userPrompt += `\n\nCreate:
-  1. A compelling meta title (MUST be EXACTLY 50-60 characters)
-  2. An informative meta description (MUST be EXACTLY 150-160 characters)
-  
-  Format as JSON with metaTitle and metaDescription keys.`;
-  
   try {
-    // Make the API call
-    const response = await client.chat.completions.create({
-      model: getModelName(),
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 500,
-      temperature: 0.7
-    });
+    const client = getAzureOpenAIClient();
+    const deploymentName = getModelName();
     
-    const content = response.choices[0]?.message?.content || "{}";
+    // Prepare the prompt
+    let systemPrompt = `You are an expert SEO specialist who creates compelling, optimized metadata for webpages.
+    You're analyzing content in ${brandLanguage} for users in ${brandCountry}.
     
-    const parsedResponse = JSON.parse(content);
-    return {
-      metaTitle: parsedResponse.metaTitle || "",
-      metaDescription: parsedResponse.metaDescription || ""
-    };
+    You MUST follow these strict requirements:
+    1. Meta title MUST be EXACTLY between 50-60 characters
+    2. Meta description MUST be EXACTLY between 150-160 characters
+    
+    Focus on clarity, keywords, and attracting clicks while accurately representing the page content.`;
+    
+    // Add brand context if available
+    if (brandContext?.brandIdentity) {
+      systemPrompt += `\n\nBrand identity: ${brandContext.brandIdentity}`;
+    }
+    
+    if (brandContext?.toneOfVoice) {
+      systemPrompt += `\n\nTone of voice: ${brandContext.toneOfVoice}`;
+    }
+    
+    if (brandContext?.guardrails) {
+      systemPrompt += `\n\nContent guardrails: ${brandContext.guardrails}`;
+    }
+    
+    let userPrompt = `Generate SEO-optimized meta title and description for this URL: ${url}`;
+    
+    // Add page content if available
+    if (brandContext?.pageContent) {
+      // Extract more meaningful content for better metadata generation
+      const content = brandContext.pageContent;
+      const truncatedContent = content.length > 3000 
+        ? content.slice(0, 3000) + "..."
+        : content;
+      
+      userPrompt += `\n\nHere is the content from the webpage that should be used as the primary source for metadata generation:\n${truncatedContent}
+      
+      Important:
+      - Base your metadata primarily on this content. 
+      - The meta title should accurately represent the page content and NOT include the brand or website name.
+      - META TITLE MUST be EXACTLY 50-60 characters.
+      - META DESCRIPTION MUST be EXACTLY 150-160 characters.`;
+    } else {
+      userPrompt += `\n\nNote: No page content was available for analysis. Please create metadata based on the URL structure. 
+      
+      Important:
+      - The meta title should NOT include the brand or website name.
+      - META TITLE MUST be EXACTLY 50-60 characters.
+      - META DESCRIPTION MUST be EXACTLY 150-160 characters.`;
+    }
+    
+    userPrompt += `\n\nCreate:
+    1. A compelling meta title (MUST be EXACTLY 50-60 characters)
+    2. An informative meta description (MUST be EXACTLY 150-160 characters)
+    
+    Format as JSON with metaTitle and metaDescription keys.`;
+    
+    try {
+      console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
+      console.log(`System prompt length: ${systemPrompt.length} characters`);
+      console.log(`User prompt length: ${userPrompt.length} characters`);
+      
+      // Make the API call using the deployment name in the deployment_id parameter
+      const completionRequest = {
+        model: deploymentName,
+              messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 500,
+        temperature: 0.7
+      };
+      
+      // Specify the deployment in the URL path
+      const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-05-15`;
+      console.log(`Using direct endpoint URL: ${endpoint}`);
+      
+      // Make a direct fetch call instead
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': process.env.AZURE_OPENAI_API_KEY || ''
+        },
+        body: JSON.stringify(completionRequest)
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log("API call successful");
+      
+      const content = responseData.choices?.[0]?.message?.content || "{}";
+      console.log(`Received response with content length: ${content.length}`);
+      
+      const parsedResponse = JSON.parse(content);
+      console.log(`Parsed response: ${JSON.stringify(parsedResponse, null, 2)}`);
+      
+              return {
+        metaTitle: parsedResponse.metaTitle || "",
+        metaDescription: parsedResponse.metaDescription || ""
+      };
+    } catch (error) {
+      console.error("Error calling Azure OpenAI API:", error);
+      
+      // Try to extract more detailed error info
+      let errorMessage = "Unknown error";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        console.error("Error details:", error);
+      }
+      
+      throw new Error(`Azure OpenAI API error: ${errorMessage}`);
+    }
   } catch (error) {
     console.error("Error generating metadata with Azure OpenAI:", error);
     throw new Error(`Failed to generate metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -400,6 +477,7 @@ export async function generateMetadataFromContent(
   console.log(`Generating metadata for content: ${contentTitle}`);
   
   const client = getAzureOpenAIClient();
+  const deploymentName = getModelName();
   
   // Prepare the prompt
   let systemPrompt = `You are an expert SEO specialist who creates compelling, optimized metadata for content.
@@ -447,9 +525,11 @@ export async function generateMetadataFromContent(
   Format as JSON with metaTitle, metaDescription, and keywords keys (keywords should be an array of strings).`;
   
   try {
-    // Make the API call
-    const response = await client.chat.completions.create({
-      model: getModelName(),
+    console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
+    
+    // Prepare the request body
+    const completionRequest = {
+      model: deploymentName,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
@@ -457,9 +537,32 @@ export async function generateMetadataFromContent(
       response_format: { type: "json_object" },
       max_tokens: 500,
       temperature: 0.7
+    };
+    
+    // Specify the deployment in the URL path
+    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-05-15`;
+    console.log(`Using direct endpoint URL: ${endpoint}`);
+    
+    // Make a direct fetch call
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': process.env.AZURE_OPENAI_API_KEY || ''
+      },
+      body: JSON.stringify(completionRequest)
     });
     
-    const content = response.choices[0]?.message?.content || "{}";
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+    }
+    
+    const responseData = await response.json();
+    console.log("API call successful");
+    
+    const content = responseData.choices?.[0]?.message?.content || "{}";
+    console.log(`Received response with content length: ${content.length}`);
     
     const parsedResponse = JSON.parse(content);
     return {
@@ -491,6 +594,7 @@ export async function generateAltText(
   console.log(`Generating alt text for ${imageUrl}`);
   
   const client = getAzureOpenAIClient();
+  const deploymentName = getModelName();
   
   // Prepare the prompt with best practices
   let systemPrompt = `You are an accessibility expert who creates clear and descriptive alt text for images.
@@ -545,9 +649,11 @@ export async function generateAltText(
   Format your response as JSON with an altText key.`;
   
   try {
-    // Make the API call without any fallbacks
-    const response = await client.chat.completions.create({
-      model: getModelName(),
+    console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
+    
+    // Prepare the request body
+    const completionRequest = {
+      model: deploymentName,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
@@ -555,9 +661,32 @@ export async function generateAltText(
       response_format: { type: "json_object" },
       max_tokens: 300,
       temperature: 0.7
+    };
+    
+    // Specify the deployment in the URL path
+    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-05-15`;
+    console.log(`Using direct endpoint URL: ${endpoint}`);
+    
+    // Make a direct fetch call
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': process.env.AZURE_OPENAI_API_KEY || ''
+      },
+      body: JSON.stringify(completionRequest)
     });
     
-    const content = response.choices[0]?.message?.content || "{}";
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+    }
+    
+    const responseData = await response.json();
+    console.log("API call successful");
+    
+    const content = responseData.choices?.[0]?.message?.content || "{}";
+    console.log(`Received response with content length: ${content.length}`);
     
     const parsedResponse = JSON.parse(content);
     return {
@@ -582,7 +711,8 @@ export async function transCreateContent(
 }> {
   console.log(`Trans-creating content from ${sourceLanguage} to ${targetLanguage} for ${targetCountry}`);
   
-  const client = getAzureOpenAIClient();
+  const deploymentName = getModelName();
+  console.log(`Using deployment name: "${deploymentName}"`);
   
   // Language map with common names to help with prompting
   const languageNames: Record<string, string> = {
@@ -624,9 +754,11 @@ export async function transCreateContent(
   Format your response as JSON with a transCreatedContent key containing ONLY the translated content.`;
   
   try {
-    // Make the API call
-    const response = await client.chat.completions.create({
-      model: getModelName(),
+    console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
+    
+    // Prepare the request body
+    const completionRequest = {
+      model: deploymentName,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
@@ -634,9 +766,32 @@ export async function transCreateContent(
       response_format: { type: "json_object" },
       max_tokens: 1500,
       temperature: 0.7
+    };
+    
+    // Specify the deployment in the URL path
+    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-05-15`;
+    console.log(`Using direct endpoint URL: ${endpoint}`);
+    
+    // Make a direct fetch call
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': process.env.AZURE_OPENAI_API_KEY || ''
+      },
+      body: JSON.stringify(completionRequest)
     });
     
-    const responseContent = response.choices[0]?.message?.content || "{}";
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+    }
+    
+    const responseData = await response.json();
+    console.log("API call successful");
+    
+    const responseContent = responseData.choices?.[0]?.message?.content || "{}";
+    console.log(`Received response with content length: ${responseContent.length}`);
     
     const parsedResponse = JSON.parse(responseContent);
     return {

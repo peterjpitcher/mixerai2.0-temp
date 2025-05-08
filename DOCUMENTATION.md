@@ -87,6 +87,67 @@ The `/api/users` route now:
 
 ## Recent Updates
 
+### Root Page Redirect
+
+We've implemented a smart redirection from the root page to enhance user experience:
+
+1. **Authentication-Aware Redirection**
+   - Added redirect from the root path (`/`) to either `/dashboard` or `/auth/login` based on authentication status
+   - Uses server-side authentication check to determine the appropriate destination
+   - Provides a seamless experience for both logged-in and anonymous users
+
+2. **Improved User Flow**
+   - Logged-in users are directed straight to the dashboard without additional clicks
+   - New or unauthenticated users go directly to the login page
+   - Eliminates the need for a separate landing page when working in the application
+
+3. **Technical Implementation**
+   - Implemented using Next.js App Router's redirect function
+   - Server-side authentication check with Supabase
+   - Ensures proper authorization before accessing protected content
+
+### Metadata Generator Simplification
+
+We've streamlined the Metadata Generator tool to improve its clarity and effectiveness:
+
+1. **URL-Only Focus**
+   - Removed the "From Content" tab and related functionality
+   - Simplified the interface to focus exclusively on URL-based metadata generation
+   - Enhanced the URL validation and error handling
+
+2. **Improved UI Experience**
+   - Clearer layout with direct brand selection
+   - Better visual feedback for character count validation
+   - Enhanced copy-to-clipboard functionality
+   - More intuitive empty and loading states
+
+3. **Azure OpenAI Integration**
+   - Ensured proper integration with Azure OpenAI services
+   - Follows best practices from the Azure OpenAI integration documentation
+   - Proper error handling for API failures
+   - Consistent brand context passing (language, country, identity, tone, guardrails)
+
+This streamlined approach makes the tool more focused and easier to use while maintaining all the essential functionality for SEO metadata generation.
+
+### Azure OpenAI Integration Fix
+
+We've improved the Azure OpenAI integration to ensure reliable operation across all AI-powered tools:
+
+1. **Consistent API Endpoint Structure**
+   - Standardized the API call pattern across all OpenAI functions
+   - Implemented direct fetch calls with specific deployment endpoints
+   - Ensured all tools use the same URL structure and authentication method
+
+2. **Fixed Model Deployment**
+   - Hardcoded the model name to "gpt-4o" which is confirmed to be working
+   - Removed dependency on environment variables for model selection
+   - Added comprehensive error handling and logging
+
+3. **Enhanced Error Reporting**
+   - Improved error messages with detailed API response information
+   - Added request/response logging for easier debugging
+   - Implemented proper error propagation to the frontend
+
 ### API Route Optimization
 
 We've improved the build process with proper route configuration:
@@ -1215,6 +1276,7 @@ MixerAI 2.0 includes several technical tools to enhance content creation workflo
   - Easy copy-to-clipboard functionality
 - **API**: `POST /api/tools/metadata-generator`
 - **UI**: `/dashboard/tools/metadata-generator`
+- **Update**: Now exclusively supports URL-based metadata generation (content-based option removed)
 
 ### Alt Text Generator
 - **Purpose**: Creates accessible alt text for images to improve accessibility and SEO

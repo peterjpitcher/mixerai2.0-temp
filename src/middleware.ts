@@ -138,7 +138,7 @@ export const config = {
      * 3. /public (public files)
      * 4. all root files inside /public (e.g. /favicon.ico)
      */
-    '/((?!api/env-check|api/test-connection|api/brands/identity|_next/static|_next/image|public|favicon.ico).*)',
+    '/((?!api/env-check|api/test-connection|api/test-metadata-generator|api/brands/identity|_next/static|_next/image|public|favicon.ico).*)',
     '/brands/:path*',
     '/workflows/:path*',
     '/content/:path*',
