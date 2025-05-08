@@ -273,42 +273,59 @@ export default function MetadataGeneratorPage() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <Label>Meta Title</Label>
-                    <Button variant="outline" size="sm" onClick={handleCopyTitle}>
-                      <ClipboardCopy className="h-4 w-4 mr-2" />
-                      Copy
+                    <Label htmlFor="metaTitle">Meta Title</Label>
+                    <span className={`text-xs ${results.metaTitle.length >= 45 && results.metaTitle.length <= 60 ? 'text-green-500' : 'text-red-500'}`}>
+                      {results.metaTitle.length} characters
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <Textarea
+                      id="metaTitle"
+                      value={results.metaTitle}
+                      readOnly
+                      className="pr-10 text-sm"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-2"
+                      onClick={handleCopyTitle}
+                      title="Copy to clipboard"
+                    >
+                      <ClipboardCopy className="h-4 w-4" />
                     </Button>
                   </div>
-                  <Textarea 
-                    readOnly 
-                    value={results.metaTitle}
-                    className="font-medium text-base h-16"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {results.metaTitle.length} characters
-                    {results.metaTitle.length < 50 && " (too short)"}
-                    {results.metaTitle.length > 60 && " (too long)"}
+                  <p className="text-xs text-amber-600 mt-1">
+                    Note: Most CMS systems will automatically append the brand name to the end of meta titles, 
+                    which will increase the character count. A slightly shorter meta title (45-50 characters) 
+                    allows room for this addition while staying within optimal SEO limits.
                   </p>
                 </div>
                 
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <Label>Meta Description</Label>
-                    <Button variant="outline" size="sm" onClick={handleCopyDescription}>
-                      <ClipboardCopy className="h-4 w-4 mr-2" />
-                      Copy
+                    <Label htmlFor="metaDescription">Meta Description</Label>
+                    <span className={`text-xs ${results.metaDescription.length >= 150 && results.metaDescription.length <= 160 ? 'text-green-500' : 'text-red-500'}`}>
+                      {results.metaDescription.length} characters
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <Textarea
+                      id="metaDescription"
+                      value={results.metaDescription}
+                      readOnly
+                      className="pr-10 text-sm"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-2"
+                      onClick={handleCopyDescription}
+                      title="Copy to clipboard"
+                    >
+                      <ClipboardCopy className="h-4 w-4" />
                     </Button>
                   </div>
-                  <Textarea 
-                    readOnly 
-                    value={results.metaDescription}
-                    className="h-24"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {results.metaDescription.length} characters
-                    {results.metaDescription.length < 150 && " (too short)"}
-                    {results.metaDescription.length > 160 && " (too long)"}
-                  </p>
                 </div>
                 
                 {results.keywords && results.keywords.length > 0 && (

@@ -98,4 +98,40 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Function to validate metadata length requirements
+function validateMetadata(metaTitle: string, metaDescription: string): { 
+  isValid: boolean; 
+  reason?: string;
+  titleLength?: number;
+  descriptionLength?: number;
+} {
+  // Remove any character count annotations that the AI might include
+  const cleanTitle = (metaTitle || "").replace(/\s*\(\d+\s*chars?\)$/i, "");
+  const cleanDescription = (metaDescription || "").replace(/\s*\(\d+\s*chars?\)$/i, "");
+  
+  const titleLength = cleanTitle?.length || 0;
+  const descriptionLength = cleanDescription?.length || 0;
+  
+  // More lenient title validation (45-60 chars) since CMS will append brand name
+  if (titleLength < 45 || titleLength > 60) {
+    return { 
+      isValid: false, 
+      reason: `Meta title length (${titleLength}) is outside the allowed range (45-60 characters). Note that CMS will append brand name.`,
+      titleLength,
+      descriptionLength
+    };
+  }
+  
+  if (descriptionLength < 150 || descriptionLength > 160) {
+    return { 
+      isValid: false, 
+      reason: `Meta description length (${descriptionLength}) is outside the required range (150-160 characters)`,
+      titleLength,
+      descriptionLength
+    };
+  }
+  
+  return { isValid: true, titleLength, descriptionLength };
 } 

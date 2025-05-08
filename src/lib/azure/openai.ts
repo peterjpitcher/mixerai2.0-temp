@@ -337,9 +337,12 @@ export async function generateMetadata(
     let systemPrompt = `You are an expert SEO specialist who creates compelling, optimized metadata for webpages.
     You're analyzing content in ${brandLanguage} for users in ${brandCountry}.
     
-    You MUST follow these strict requirements:
-    1. Meta title MUST be EXACTLY between 50-60 characters
-    2. Meta description MUST be EXACTLY between 150-160 characters
+    You MUST follow these STRICT requirements:
+    1. Meta title MUST be EXACTLY between 45-60 characters (NOT LESS THAN 45, NOT MORE THAN 60)
+    2. Meta description MUST be EXACTLY between 150-160 characters (NOT LESS THAN 150, NOT MORE THAN 160)
+    
+    IMPORTANT NOTE: The CMS will automatically append the brand name to the end of the meta title. 
+    Therefore, aim for a title closer to 45-50 characters to allow room for the brand name.
     
     Focus on clarity, keywords, and attracting clicks while accurately representing the page content.`;
     
@@ -368,25 +371,47 @@ export async function generateMetadata(
       
       userPrompt += `\n\nHere is the content from the webpage that should be used as the primary source for metadata generation:\n${truncatedContent}
       
-      Important:
-      - Base your metadata primarily on this content. 
-      - The meta title should accurately represent the page content and NOT include the brand or website name.
-      - META TITLE MUST be EXACTLY 50-60 characters.
-      - META DESCRIPTION MUST be EXACTLY 150-160 characters.`;
+      CRITICAL REQUIREMENTS:
+      1. Base your metadata primarily on this content
+      2. The meta title should accurately represent the page content
+      3. META TITLE MUST have EXACTLY 45-60 characters (count spaces too) - IMPORTANT: Aim for 45-50 chars as the CMS will add the brand name
+      4. META DESCRIPTION MUST have EXACTLY 150-160 characters (count spaces too)
+      
+      EXAMPLES OF GOOD META TITLES (note the character counts):
+      - "How to Measure Flour Without a Scale Perfectly" (45 chars)
+      - "Easy Methods to Measure Ingredients Without Tools" (47 chars)
+      - "Kitchen Tips: Measuring Ingredients Without Scales" (49 chars)
+      
+      Remember that the CMS will append the brand name automatically, so keep the title shorter than the maximum length.
+      
+      COUNT EVERY CHARACTER including spaces before submitting your response.`;
     } else {
       userPrompt += `\n\nNote: No page content was available for analysis. Please create metadata based on the URL structure. 
       
-      Important:
-      - The meta title should NOT include the brand or website name.
-      - META TITLE MUST be EXACTLY 50-60 characters.
-      - META DESCRIPTION MUST be EXACTLY 150-160 characters.`;
+      CRITICAL REQUIREMENTS:
+      1. META TITLE MUST have EXACTLY 45-60 characters (count spaces too) - IMPORTANT: Aim for 45-50 chars as the CMS will add the brand name
+      2. META DESCRIPTION MUST have EXACTLY 150-160 characters (count spaces too)
+      
+      EXAMPLES OF GOOD META TITLES (note the character counts):
+      - "How to Measure Flour Without a Scale Perfectly" (45 chars)
+      - "Easy Methods to Measure Ingredients Without Tools" (47 chars)
+      - "Kitchen Tips: Measuring Ingredients Without Scales" (49 chars)
+      
+      Remember that the CMS will append the brand name automatically, so keep the title shorter than the maximum length.
+      
+      COUNT EVERY CHARACTER including spaces before submitting your response.`;
     }
     
     userPrompt += `\n\nCreate:
-    1. A compelling meta title (MUST be EXACTLY 50-60 characters)
-    2. An informative meta description (MUST be EXACTLY 150-160 characters)
+    1. A compelling meta title (MUST have EXACTLY 45-60 characters, aim for 45-50 chars to allow room for brand name)
+    2. An informative meta description (MUST have EXACTLY 150-160 characters)
     
-    Format as JSON with metaTitle and metaDescription keys.`;
+    BEFORE FINALIZING:
+    1. Count the exact number of characters in your title (make sure it's 45-60, ideally 45-50)
+    2. Count the exact number of characters in your description (make sure it's 150-160)
+    3. Do NOT include character count numbers in your final JSON output
+    
+    Format as JSON with metaTitle and metaDescription keys. Do not include character counts in the actual values.`;
     
     try {
       console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
@@ -396,7 +421,7 @@ export async function generateMetadata(
       // Make the API call using the deployment name in the deployment_id parameter
       const completionRequest = {
         model: deploymentName,
-              messages: [
+        messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
         ],
@@ -433,9 +458,13 @@ export async function generateMetadata(
       const parsedResponse = JSON.parse(content);
       console.log(`Parsed response: ${JSON.stringify(parsedResponse, null, 2)}`);
       
-              return {
-        metaTitle: parsedResponse.metaTitle || "",
-        metaDescription: parsedResponse.metaDescription || ""
+      // Remove any character count annotations from the response
+      const metaTitle = (parsedResponse.metaTitle || "").replace(/\s*\(\d+\s*chars?\)$/i, "");
+      const metaDescription = (parsedResponse.metaDescription || "").replace(/\s*\(\d+\s*chars?\)$/i, "");
+      
+      return {
+        metaTitle,
+        metaDescription
       };
     } catch (error) {
       console.error("Error calling Azure OpenAI API:", error);
@@ -600,22 +629,22 @@ export async function generateAltText(
   let systemPrompt = `You are an accessibility expert who creates clear and descriptive alt text for images.
   You're writing alt text in ${brandLanguage} for users in ${brandCountry}.
   
-  Follow these best practices for creating alt text:
+  Follow these STRICT requirements for creating alt text:
   
-  ✅ DO:
+  ✅ MUST DO:
   - Be descriptive and specific about essential image details
-  - Keep it concise (under 125 characters)
+  - Keep it EXACTLY between 20-125 characters (including spaces)
   - Describe function if the image is a functional element
   - Include important text visible in the image
   - Consider the image's context on the page
   - Use keywords thoughtfully if they naturally fit
   
-  ❌ AVOID:
-  - Starting with "Image of..." or "Picture of..."
-  - Overly vague descriptions
-  - Keyword stuffing
-  - Long descriptions (use adjacent text for complex images)
-  - Decorative image descriptions (for purely decorative images)
+  ❌ NEVER DO:
+  - NEVER start with "Image of..." or "Picture of..."
+  - Never use overly vague descriptions
+  - Never use keyword stuffing
+  - Never have fewer than 20 characters
+  - Never exceed 125 characters
   
   Create alt text that clearly communicates what a user would miss if they couldn't see the image.`;
   
@@ -635,18 +664,23 @@ export async function generateAltText(
   const userPrompt = `Generate accessible alt text for this image: ${imageUrl}
   
   Examples of good alt text:
-  - "Woman holding a protest sign reading 'Equality for All' during a march in central London"
-  - "Mountain range at sunset with orange-pink sky reflected in a still lake"
-  - "Chef demonstrating how to knead bread dough on a flour-dusted countertop"
+  - "Woman holding a protest sign reading 'Equality for All' during a march in central London" (91 chars)
+  - "Mountain range at sunset with orange-pink sky reflected in a still lake" (73 chars)
+  - "Chef demonstrating how to knead bread dough on a flour-dusted countertop" (72 chars)
   
-  Bad examples to avoid:
-  - "Image of a nice scenery" (too vague)
+  Examples to avoid:
+  - "Image of a nice scenery" (too vague and starts with 'image of')
   - "Picture showing a person at an event" (starts with 'picture' and is vague)
   - "Beautiful product photo of our newest spring collection item perfect for your wardrobe essential must-have fashion trend 2023" (keyword stuffed)
   
-  Keep it under 125 characters and focus on the most important visual details. If there's text in the image, include it.
+  CRITICAL REQUIREMENTS:
+  - Keep it EXACTLY between 20-125 characters. Count carefully.
+  - NEVER start with "Image of..." or "Picture of..."
+  - Focus on the most important visual details
+  - If there's text in the image, include it
+  - Before submitting, count the exact number of characters to verify length
   
-  Format your response as JSON with an altText key.`;
+  Format your response as JSON with an altText key, and include the character count in your reasoning.`;
   
   try {
     console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
@@ -689,8 +723,12 @@ export async function generateAltText(
     console.log(`Received response with content length: ${content.length}`);
     
     const parsedResponse = JSON.parse(content);
+    
+    // Remove any character count that might have been included in the response
+    const altText = (parsedResponse.altText || "").replace(/\s*\(\d+\s*chars?\)$/i, "");
+    
     return {
-      altText: parsedResponse.altText || ""
+      altText
     };
   } catch (error) {
     console.error("Error generating alt text with Azure OpenAI:", error);
