@@ -40,91 +40,6 @@ interface NavGroupItem {
   defaultOpen?: boolean; // Whether the group should be expanded by default
 }
 
-// Default templates to show in the navigation - these are system defaults
-const defaultTemplates = [
-  {
-    id: 'article-template',
-    name: 'Article',
-    icon: <FileText className="h-4 w-4" />
-  },
-  {
-    id: 'product-template',
-    name: 'Product',
-    icon: <ShoppingBag className="h-4 w-4" />
-  }
-];
-
-// Mock user templates for development mode only
-const mockTemplates = [
-  {
-    id: "mock-template-1",
-    name: "Mock Blog Template",
-    description: "A template for creating blog posts with introduction, body and conclusion",
-    fields: {
-      inputFields: [
-        { id: "title", name: "Title", type: "shortText", required: true, options: {} },
-        { id: "keywords", name: "Keywords", type: "tags", required: false, options: {} },
-        { id: "topic", name: "Topic", type: "shortText", required: true, options: {} }
-      ],
-      outputFields: [
-        { 
-          id: "content", 
-          name: "Blog Content", 
-          type: "richText", 
-          required: true, 
-          options: {},
-          aiAutoComplete: true,
-          aiPrompt: "Write a blog post about {{topic}} using the keywords {{keywords}}"
-        },
-        { 
-          id: "meta", 
-          name: "Meta Description", 
-          type: "plainText", 
-          required: false, 
-          options: {},
-          aiAutoComplete: true,
-          aiPrompt: "Write a meta description for a blog about {{topic}}"
-        }
-      ]
-    },
-    created_at: "2023-06-15T14:30:00Z",
-    created_by: "00000000-0000-0000-0000-000000000000"
-  },
-  {
-    id: "mock-template-2",
-    name: "Mock Email Template",
-    description: "A template for marketing emails with subject line and body",
-    fields: {
-      inputFields: [
-        { id: "campaign", name: "Campaign Name", type: "shortText", required: true, options: {} },
-        { id: "audience", name: "Target Audience", type: "shortText", required: true, options: {} }
-      ],
-      outputFields: [
-        { 
-          id: "subject", 
-          name: "Email Subject", 
-          type: "shortText", 
-          required: true, 
-          options: {},
-          aiAutoComplete: true,
-          aiPrompt: "Write an attention-grabbing email subject line for a {{campaign}} campaign targeting {{audience}}"
-        },
-        { 
-          id: "body", 
-          name: "Email Body", 
-          type: "richText", 
-          required: true, 
-          options: {},
-          aiAutoComplete: true,
-          aiPrompt: "Write an engaging email body for a {{campaign}} campaign targeting {{audience}}"
-        }
-      ]
-    },
-    created_at: "2023-07-22T09:15:00Z",
-    created_by: "00000000-0000-0000-0000-000000000000"
-  }
-];
-
 /**
  * Unified navigation component for MixerAI dashboard
  * Uses Next.js useSelectedLayoutSegments() for accurate active state tracking
@@ -158,15 +73,6 @@ export function UnifiedNavigation() {
       templatesFetched.current = true;
       
       try {
-        // In development mode, use the mock data directly
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Navigation: Using mock templates in development mode');
-          setUserTemplates(mockTemplates);
-          setIsLoadingTemplates(false);
-          return;
-        }
-        
-        // In production, fetch from API
         console.log('Navigation: Fetching templates from API');
         const response = await fetch('/api/content-templates');
         const data = await response.json();
@@ -184,11 +90,9 @@ export function UnifiedNavigation() {
       }
     };
 
-    // Only fetch if the content section is expanded and templates haven't been fetched yet
-    if (expandedSections.content && !templatesFetched.current) {
-      fetchTemplates();
-    }
-  }, [expandedSections.content, isLoadingTemplates]);
+    // Always fetch templates when the component mounts
+    fetchTemplates();
+  }, [isLoadingTemplates]);
 
   // Automatically expand sections based on current path
   useEffect(() => {
@@ -223,16 +127,13 @@ export function UnifiedNavigation() {
     });
   };
 
-  // Content with submenu for creating new content - only include default templates
-  const contentItems = [
-    // Only include system default templates
-    ...defaultTemplates.map(template => ({
-      href: `/dashboard/content/new?type=${template.id}`,
-      label: `New ${template.name}`,
-      icon: template.icon,
-      segment: template.id
-    }))
-  ];
+  // Content items - use templates from database
+  const contentItems = userTemplates.map(template => ({
+    href: `/dashboard/content/new?template=${template.id}`,
+    label: template.name,
+    icon: <FileText className="h-4 w-4" />,
+    segment: template.id
+  }));
   
   // Primary nav items
   const navItems: (NavItem | NavGroupItem)[] = [
@@ -261,13 +162,13 @@ export function UnifiedNavigation() {
       icon: <Folder className="h-5 w-5" />,
       segment: 'templates'
     },
-    // Content with submenu for creating new content using only system templates
+    // Content with submenu for creating new content using templates from database
     {
       label: 'Content',
       icon: <BookOpen className="h-5 w-5" />,
+      items: contentItems,
       segment: 'content',
-      defaultOpen: true,
-      items: contentItems
+      defaultOpen: true
     },
     // New Tools section with submenu
     {
