@@ -24,6 +24,9 @@ interface Field {
   aiSuggester?: boolean;
   aiAutoComplete?: boolean;
   aiPrompt?: string;
+  useBrandIdentity?: boolean;
+  useToneOfVoice?: boolean;
+  useGuardrails?: boolean;
 }
 
 interface FieldDesignerProps {
@@ -95,7 +98,7 @@ export function FieldDesigner({ isOpen, fieldType, initialData, onSave, onCancel
     }));
   };
   
-  const handleAIFeatureChange = (feature: 'aiSuggester' | 'aiAutoComplete' | 'aiPrompt', value: boolean | string) => {
+  const handleAIFeatureChange = (feature: 'aiSuggester' | 'aiAutoComplete' | 'aiPrompt' | 'useBrandIdentity' | 'useToneOfVoice' | 'useGuardrails', value: boolean | string) => {
     setFieldData({
       ...fieldData,
       [feature]: value
@@ -390,6 +393,38 @@ export function FieldDesigner({ isOpen, fieldType, initialData, onSave, onCancel
                       onCheckedChange={(checked) => handleAIFeatureChange('aiAutoComplete', !!checked)}
                     />
                     <Label htmlFor="aiAutoComplete">AI Auto-Complete</Label>
+                  </div>
+                  
+                  <div className="border-t my-4 pt-4">
+                    <p className="text-sm font-medium mb-2">Brand Context Options</p>
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="useBrandIdentity"
+                          checked={fieldData.useBrandIdentity || false}
+                          onCheckedChange={(checked) => handleAIFeatureChange('useBrandIdentity', !!checked)}
+                        />
+                        <Label htmlFor="useBrandIdentity">Inject Brand Identity</Label>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="useToneOfVoice"
+                          checked={fieldData.useToneOfVoice || false}
+                          onCheckedChange={(checked) => handleAIFeatureChange('useToneOfVoice', !!checked)}
+                        />
+                        <Label htmlFor="useToneOfVoice">Use Brand Tone of Voice</Label>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="useGuardrails"
+                          checked={fieldData.useGuardrails || false}
+                          onCheckedChange={(checked) => handleAIFeatureChange('useGuardrails', !!checked)}
+                        />
+                        <Label htmlFor="useGuardrails">Apply Brand Guardrails</Label>
+                      </div>
+                    </div>
                   </div>
                   
                   <div className="space-y-2 mt-4">

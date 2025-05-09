@@ -261,6 +261,9 @@ export async function generateContentFromTemplate(
       type: string;
       aiPrompt?: string;
       aiAutoComplete?: boolean;
+      useBrandIdentity?: boolean;
+      useToneOfVoice?: boolean;
+      useGuardrails?: boolean;
     }>;
   },
   input?: {
@@ -276,15 +279,21 @@ export async function generateContentFromTemplate(
   // Build the system prompt with brand information
   let systemPrompt = `You are an expert content creator for the brand "${brand.name}".`;
   
-  if (brand.brand_identity) {
+  // Only add global brand information if there are no field-specific settings
+  const anyFieldUsesBrandIdentity = template.outputFields.some(field => field.useBrandIdentity);
+  const anyFieldUsesToneOfVoice = template.outputFields.some(field => field.useToneOfVoice);
+  const anyFieldUsesGuardrails = template.outputFields.some(field => field.useGuardrails);
+  
+  // Add global brand context only if no field-specific settings are used
+  if (brand.brand_identity && !anyFieldUsesBrandIdentity) {
     systemPrompt += ` The brand identity can be described as: ${brand.brand_identity}.`;
   }
   
-  if (brand.tone_of_voice) {
+  if (brand.tone_of_voice && !anyFieldUsesToneOfVoice) {
     systemPrompt += ` The tone of voice should be: ${brand.tone_of_voice}.`;
   }
   
-  if (brand.guardrails) {
+  if (brand.guardrails && !anyFieldUsesGuardrails) {
     systemPrompt += ` Content guardrails: ${brand.guardrails}.`;
   }
   
@@ -305,6 +314,22 @@ export async function generateContentFromTemplate(
   // Include output field requirements with their prompts
   template.outputFields.forEach(field => {
     userPrompt += `- ${field.name}`;
+    
+    // Add field-specific brand context if enabled
+    let fieldPrompt = '';
+    
+    if (field.useBrandIdentity && brand.brand_identity) {
+      fieldPrompt += ` Use this brand identity: ${brand.brand_identity}.`;
+    }
+    
+    if (field.useToneOfVoice && brand.tone_of_voice) {
+      fieldPrompt += ` Use this tone of voice: ${brand.tone_of_voice}.`;
+    }
+    
+    if (field.useGuardrails && brand.guardrails) {
+      fieldPrompt += ` Apply these guardrails: ${brand.guardrails}.`;
+    }
+    
     if (field.aiPrompt) {
       const processedPrompt = field.aiPrompt.replace(/\{\{(\w+)\}\}/g, (match, fieldId) => {
         // Replace template variables with actual values
@@ -312,9 +337,16 @@ export async function generateContentFromTemplate(
         return inputField && inputField.value ? inputField.value : match;
       });
       
-      userPrompt += `: ${processedPrompt}`;
+      // Add the processed prompt to field-specific prompt
+      fieldPrompt += fieldPrompt ? ` ${processedPrompt}` : processedPrompt;
       console.log(`Using AI prompt for field ${field.name}: ${processedPrompt}`);
     }
+    
+    // Add the field prompt to the user prompt if it exists
+    if (fieldPrompt) {
+      userPrompt += `: ${fieldPrompt}`;
+    }
+    
     userPrompt += `\n`;
   });
   

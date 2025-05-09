@@ -25,6 +25,9 @@ interface Field {
   aiSuggester?: boolean;
   aiAutoComplete?: boolean;
   aiPrompt?: string;
+  useBrandIdentity?: boolean;
+  useToneOfVoice?: boolean;
+  useGuardrails?: boolean;
 }
 
 interface TemplateData {
@@ -441,6 +444,21 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
                                           {field.aiAutoComplete && (
                                             <span className="ml-2 text-xs bg-blue-500/10 text-blue-600 px-1.5 py-0.5 rounded">
                                               AI Auto-Complete
+                                            </span>
+                                          )}
+                                          {field.useBrandIdentity && (
+                                            <span className="ml-2 text-xs bg-purple-500/10 text-purple-600 px-1.5 py-0.5 rounded">
+                                              Brand Identity
+                                            </span>
+                                          )}
+                                          {field.useToneOfVoice && (
+                                            <span className="ml-2 text-xs bg-pink-500/10 text-pink-600 px-1.5 py-0.5 rounded">
+                                              Tone of Voice
+                                            </span>
+                                          )}
+                                          {field.useGuardrails && (
+                                            <span className="ml-2 text-xs bg-amber-500/10 text-amber-600 px-1.5 py-0.5 rounded">
+                                              Guardrails
                                             </span>
                                           )}
                                         </div>

@@ -37,6 +37,9 @@ interface ContentGenerationRequest {
       type: string;
       aiPrompt?: string;
       aiAutoComplete?: boolean;
+      useBrandIdentity?: boolean;
+      useToneOfVoice?: boolean;
+      useGuardrails?: boolean;
     }>;
   };
 }
