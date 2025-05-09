@@ -7,7 +7,7 @@ import { withAuth } from '@/lib/auth/api-auth';
 export const dynamic = "force-dynamic";
 
 /**
- * Direct GET handler without auth to test route params
+ * Direct GET handler with development bypass for authentication
  */
 export async function GET(
   request: NextRequest,

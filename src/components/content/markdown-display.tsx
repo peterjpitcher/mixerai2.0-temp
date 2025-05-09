@@ -5,18 +5,18 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/card';
 
 interface MarkdownDisplayProps {
-  content: string;
+  markdown: string;
   className?: string;
 }
 
-export function MarkdownDisplay({ content, className = '' }: MarkdownDisplayProps) {
+export function MarkdownDisplay({ markdown, className = '' }: MarkdownDisplayProps) {
   // In a real app, this would use a markdown parser library like react-markdown
   // For this example, we'll do a very basic transformation
   const [formattedContent, setFormattedContent] = useState('');
   
   useEffect(() => {
     // Very basic markdown formatting
-    let formatted = content;
+    let formatted = markdown;
     
     // Convert headers
     formatted = formatted.replace(/^# (.+)$/gm, '<h1>$1</h1>');
@@ -43,7 +43,7 @@ export function MarkdownDisplay({ content, className = '' }: MarkdownDisplayProp
     );
     
     setFormattedContent(wrappedWithUl);
-  }, [content]);
+  }, [markdown]);
   
   return (
     <Card className={className}>

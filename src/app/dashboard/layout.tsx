@@ -6,7 +6,7 @@ import { NotificationCenter } from "@/components/dashboard/notification-center";
 import { UnifiedNavigation } from "@/components/layout/unified-navigation";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
-import { useToast } from "@/components/toast-provider";
+import { useToast } from "@/components/use-toast";
 
 export default function DashboardLayout({
   children,
