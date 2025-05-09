@@ -323,13 +323,6 @@ export async function generateContentFromTemplate(
     userPrompt += `\nAdditional instructions: ${input.additionalInstructions}`;
   }
   
-  userPrompt += `\nFormat each output field as follows (IMPORTANT: place the content BETWEEN the markers, not including the markers):
-##FIELD_ID:field_id## 
-content goes here 
-##END_FIELD_ID##
-
-Make sure you don't include the field markers (##FIELD_ID and ##END_FIELD_ID##) in the actual content.`;
-  
   // Make the API call with error handling
   try {
     console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
@@ -373,13 +366,20 @@ Make sure you don't include the field markers (##FIELD_ID and ##END_FIELD_ID##) 
     const content = responseData.choices?.[0]?.message?.content || "";
     console.log(`Received response with content length: ${content.length}`);
     
+    // Save full content for debugging and fallback
+    const fullContent = content;
+    
     // Parse the fields from the response
     const result: Record<string, string> = {};
     let fieldsParsed = false;
     
-    // Extract each field using regex
+    // Process each output field
     template.outputFields.forEach(field => {
-      // Look for field content between the markers with any whitespace
+      console.log(`Processing output field: ${field.name} (${field.id})`);
+      
+      // Try several approaches to extract the field content
+      
+      // 1. First try exact field ID marker format
       const fieldRegex = new RegExp(`##FIELD_ID:${field.id}##\\s*([\\s\\S]*?)\\s*##END_FIELD_ID##`, 'i');
       const match = content.match(fieldRegex);
       
@@ -388,16 +388,14 @@ Make sure you don't include the field markers (##FIELD_ID and ##END_FIELD_ID##) 
         fieldsParsed = true;
         console.log(`Successfully parsed field ${field.id} with length ${result[field.id].length}`);
       } else {
-        console.log(`No match found for field ${field.id}, trying alternative formats`);
+        console.log(`No exact field ID markers found for ${field.id}, trying alternatives`);
         
-        // Try alternative formats that the AI might use
+        // 2. Try alternate field ID formats
         const altRegex1 = new RegExp(`##FIELD_ID: *${field.id}##\\s*([\\s\\S]*?)\\s*##END_FIELD_ID##`, 'i');
         const altRegex2 = new RegExp(`## *FIELD_ID: *${field.id} *##\\s*([\\s\\S]*?)\\s*## *END_FIELD_ID *##`, 'i');
-        const altRegex3 = new RegExp(`${field.name}:\\s*(.+?)(?=\\n\\n|\\n[^\\n]|$)`, 'i');
         
         const altMatch1 = content.match(altRegex1);
         const altMatch2 = content.match(altRegex2);
-        const altMatch3 = content.match(altRegex3);
         
         if (altMatch1 && altMatch1[1]) {
           result[field.id] = altMatch1[1].trim();
@@ -407,50 +405,37 @@ Make sure you don't include the field markers (##FIELD_ID and ##END_FIELD_ID##) 
           result[field.id] = altMatch2[1].trim();
           fieldsParsed = true;
           console.log(`Parsed field ${field.id} with alternative format 2`);
-        } else if (altMatch3 && altMatch3[1]) {
-          result[field.id] = altMatch3[1].trim();
-          fieldsParsed = true;
-          console.log(`Parsed field ${field.id} using field name format`);
+        } else {
+          console.log(`No field ID markers found for ${field.id}, trying field name format`);
+          
+          // 3. Try extracting by field name
+          // Escape any special regex characters in the field name
+          const escapedFieldName = field.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          
+          // Look for the field name followed by colon and capture all content
+          const fieldNameRegex = new RegExp(`${escapedFieldName}:\\s*([\\s\\S]*)`, 'i');
+          const fieldNameMatch = content.match(fieldNameRegex);
+          
+          if (fieldNameMatch && fieldNameMatch[1]) {
+            // Extract the content and trim whitespace
+            result[field.id] = fieldNameMatch[1].trim();
+            fieldsParsed = true;
+            console.log(`Parsed field ${field.id} using field name format, length: ${result[field.id].length}`);
+          }
         }
       }
     });
     
-    // If no fields were parsed correctly, try to extract content without markers
-    if (!fieldsParsed) {
-      console.log('No fields parsed from template using expected formats, trying to extract content');
-      
-      // Look for each field ID in raw content (in case the AI included field ID but not markers)
-      template.outputFields.forEach(field => {
-        const simpleFieldRegex = new RegExp(`${field.name}:\\s*([\\s\\S]*?)(?=\\n\\n|\\n[A-Za-z]|$)`, 'i');
-        const simpleMatch = content.match(simpleFieldRegex);
-        
-        if (simpleMatch && simpleMatch[1]) {
-          result[field.id] = simpleMatch[1].trim();
-          fieldsParsed = true;
-          console.log(`Extracted field ${field.id} using simple field name extraction`);
-        }
-      });
-      
-      // If still no fields parsed, assign the entire content to the first output field
-      if (!fieldsParsed && template.outputFields.length > 0) {
-        const firstField = template.outputFields[0];
-        result[firstField.id] = content;
-        fieldsParsed = true;
-        console.log(`Assigned full content to first output field: ${firstField.id}`);
-      }
+    // If no fields were parsed correctly, use the entire content
+    if (!fieldsParsed && template.outputFields.length > 0) {
+      console.log('No fields parsed using any format, using the full content');
+      const mainField = template.outputFields[0];
+      result[mainField.id] = fullContent;
+      console.log(`Assigned full content (${fullContent.length} chars) to field ${mainField.id}`);
     }
     
-    // Check if any field contains the markers and strip them
-    Object.keys(result).forEach(fieldId => {
-      // Remove any field markers from the content
-      result[fieldId] = result[fieldId]
-        .replace(/##FIELD_ID:[a-zA-Z0-9_]+##/g, '')
-        .replace(/##END_FIELD_ID##/g, '')
-        .trim();
-    });
-    
     // Log what fields we're returning
-    console.log('Returning only the template-based output fields:', Object.keys(result));
+    console.log('Returning template-based output fields:', Object.keys(result));
     
     return result;
   } catch (error) {
@@ -699,390 +684,14 @@ export async function generateMetadata(
       
       return {
         metaTitle,
-        metaDescription
+        metaDescription,
       };
     } catch (error) {
-      console.error("Error calling Azure OpenAI API:", error);
-      
-      // Try to extract more detailed error info
-      let errorMessage = "Unknown error";
-      
-      if (error instanceof Error) {
-        errorMessage = error.message;
-        console.error("Error details:", error);
-      }
-      
-      throw new Error(`Azure OpenAI API error: ${errorMessage}`);
+      console.error("Error generating metadata with Azure OpenAI:", error);
+      throw new Error(`Failed to generate metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   } catch (error) {
-    console.error("Error generating metadata with Azure OpenAI:", error);
+    console.error("Error generating metadata:", error);
     throw new Error(`Failed to generate metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
-
-/**
- * Generates SEO-optimized meta title and description from content directly
- */
-export async function generateMetadataFromContent(
-  contentTitle: string,
-  contentBody: string,
-  brandLanguage: string = 'en',
-  brandCountry: string = 'US',
-  brandContext?: {
-    brandIdentity?: string;
-    toneOfVoice?: string;
-    guardrails?: string;
-  }
-): Promise<{
-  metaTitle: string;
-  metaDescription: string;
-  keywords: string[];
-}> {
-  console.log(`Generating metadata for content: ${contentTitle}`);
-  
-  const client = getAzureOpenAIClient();
-  const deploymentName = getModelName();
-  
-  // Prepare the prompt
-  let systemPrompt = `You are an expert SEO specialist who creates compelling, optimized metadata for content.
-  You're analyzing content in ${brandLanguage} for users in ${brandCountry}.
-  
-  You MUST follow these strict requirements:
-  1. Meta title MUST be EXACTLY between 50-60 characters
-  2. Meta description MUST be EXACTLY between 150-160 characters
-  3. Generate 5-8 relevant keywords or keyword phrases based on the content
-  
-  Focus on clarity, SEO optimization, and attracting clicks while accurately representing the content.`;
-  
-  // Add brand context if available
-  if (brandContext?.brandIdentity) {
-    systemPrompt += `\n\nBrand identity: ${brandContext.brandIdentity}`;
-  }
-  
-  if (brandContext?.toneOfVoice) {
-    systemPrompt += `\n\nTone of voice: ${brandContext.toneOfVoice}`;
-  }
-  
-  if (brandContext?.guardrails) {
-    systemPrompt += `\n\nContent guardrails: ${brandContext.guardrails}`;
-  }
-  
-  // Truncate content body if too long
-  const truncatedBody = contentBody.length > 3000 
-    ? contentBody.slice(0, 3000) + "..."
-    : contentBody;
-  
-  const userPrompt = `Generate SEO-optimized meta title, description, and keywords for this content:
-  
-  Title: ${contentTitle}
-  
-  Content:
-  ${truncatedBody}
-  
-  Important:
-  - Base your metadata on the content provided
-  - The meta title should accurately represent the content and NOT include the brand or website name
-  - META TITLE MUST be EXACTLY 50-60 characters
-  - META DESCRIPTION MUST be EXACTLY 150-160 characters
-  - Generate 5-8 relevant keywords or keyword phrases based on the content
-  
-  Format as JSON with metaTitle, metaDescription, and keywords keys (keywords should be an array of strings).`;
-  
-  try {
-    console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
-    
-    // Prepare the request body
-    const completionRequest = {
-      model: deploymentName,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 500,
-      temperature: 0.7
-    };
-    
-    // Specify the deployment in the URL path
-    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
-    console.log(`Using direct endpoint URL: ${endpoint}`);
-    
-    // Make a direct fetch call
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': process.env.AZURE_OPENAI_API_KEY || ''
-      },
-      body: JSON.stringify(completionRequest)
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
-    }
-    
-    const responseData = await response.json();
-    console.log("API call successful");
-    
-    const content = responseData.choices?.[0]?.message?.content || "{}";
-    console.log(`Received response with content length: ${content.length}`);
-    
-    const parsedResponse = JSON.parse(content);
-    return {
-      metaTitle: parsedResponse.metaTitle || "",
-      metaDescription: parsedResponse.metaDescription || "",
-      keywords: Array.isArray(parsedResponse.keywords) ? parsedResponse.keywords : []
-    };
-  } catch (error) {
-    console.error("Error generating metadata with Azure OpenAI:", error);
-    throw new Error(`Failed to generate metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-}
-
-/**
- * Generates accessible alt text for an image
- */
-export async function generateAltText(
-  imageUrl: string,
-  brandLanguage: string = 'en',
-  brandCountry: string = 'US',
-  brandContext?: {
-    brandIdentity?: string;
-    toneOfVoice?: string;
-    guardrails?: string;
-  }
-): Promise<{
-  altText: string;
-}> {
-  console.log(`Generating alt text for ${imageUrl}`);
-  
-  const client = getAzureOpenAIClient();
-  const deploymentName = getModelName();
-  
-  // Prepare the prompt with best practices
-  let systemPrompt = `You are an accessibility expert who creates clear and descriptive alt text for images.
-  You're writing alt text in ${brandLanguage} for users in ${brandCountry}.
-  
-  Follow these STRICT requirements for creating alt text:
-  
-  ✅ MUST DO:
-  - Be descriptive and specific about essential image details
-  - Keep it EXACTLY between 20-125 characters (including spaces)
-  - Describe function if the image is a functional element
-  - Include important text visible in the image
-  - Consider the image's context on the page
-  - Use keywords thoughtfully if they naturally fit
-  
-  ❌ NEVER DO:
-  - NEVER start with "Image of..." or "Picture of..."
-  - Never use overly vague descriptions
-  - Never use keyword stuffing
-  - Never have fewer than 20 characters
-  - Never exceed 125 characters
-  
-  Create alt text that clearly communicates what a user would miss if they couldn't see the image.`;
-  
-  // Add brand context if available
-  if (brandContext?.brandIdentity) {
-    systemPrompt += `\n\nBrand identity: ${brandContext.brandIdentity}`;
-  }
-  
-  if (brandContext?.toneOfVoice) {
-    systemPrompt += `\n\nTone of voice: ${brandContext.toneOfVoice}`;
-  }
-  
-  if (brandContext?.guardrails) {
-    systemPrompt += `\n\nContent guardrails: ${brandContext.guardrails}`;
-  }
-  
-  const userPromptText = `Generate accessible alt text for this image:
-  
-  Examples of good alt text:
-  - "Woman holding a protest sign reading 'Equality for All' during a march in central London" (91 chars)
-  - "Mountain range at sunset with orange-pink sky reflected in a still lake" (73 chars)
-  - "Chef demonstrating how to knead bread dough on a flour-dusted countertop" (72 chars)
-  
-  Examples to avoid:
-  - "Image of a nice scenery" (too vague and starts with 'image of')
-  - "Picture showing a person at an event" (starts with 'picture' and is vague)
-  - "Beautiful product photo of our newest spring collection item perfect for your wardrobe essential must-have fashion trend 2023" (keyword stuffed)
-  
-  CRITICAL REQUIREMENTS:
-  - Keep it EXACTLY between 20-125 characters. Count carefully.
-  - NEVER start with "Image of..." or "Picture of..."
-  - Focus on the most important visual details
-  - If there's text in the image, include it
-  - Before submitting, count the exact number of characters to verify length
-  
-  Format your response as JSON with an altText key, and include the character count in your reasoning.`;
-  
-  try {
-    console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
-    
-    // Prepare the request body with properly formatted image content
-    const completionRequest = {
-      model: deploymentName,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { 
-          role: "user", 
-          content: [
-            { type: "text", text: userPromptText },
-            { 
-              type: "image_url", 
-              image_url: { 
-                url: imageUrl 
-              } 
-            }
-          ]
-        }
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 300,
-      temperature: 0.7
-    };
-    
-    // Specify the deployment in the URL path
-    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
-    console.log(`Using direct endpoint URL: ${endpoint}`);
-    
-    // Make a direct fetch call
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': process.env.AZURE_OPENAI_API_KEY || ''
-      },
-      body: JSON.stringify(completionRequest)
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
-    }
-    
-    const responseData = await response.json();
-    console.log("API call successful");
-    
-    const content = responseData.choices?.[0]?.message?.content || "{}";
-    console.log(`Received response with content length: ${content.length}`);
-    
-    const parsedResponse = JSON.parse(content);
-    
-    // Remove any character count that might have been included in the response
-    const altText = (parsedResponse.altText || "").replace(/\s*\(\d+\s*chars?\)$/i, "");
-    
-    return {
-      altText
-    };
-  } catch (error) {
-    console.error("Error generating alt text with Azure OpenAI:", error);
-    throw new Error(`Failed to generate alt text: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-}
-
-/**
- * Trans-creates content from one language to another
- */
-export async function transCreateContent(
-  content: string,
-  sourceLanguage: string = 'en',
-  targetLanguage: string = 'es',
-  targetCountry: string = 'ES'
-): Promise<{
-  transCreatedContent: string;
-}> {
-  console.log(`Trans-creating content from ${sourceLanguage} to ${targetLanguage} for ${targetCountry}`);
-  
-  const deploymentName = getModelName();
-  console.log(`Using deployment name: "${deploymentName}"`);
-  
-  // Language map with common names to help with prompting
-  const languageNames: Record<string, string> = {
-    'en': 'English',
-    'es': 'Spanish',
-    'fr': 'French',
-    'de': 'German',
-    'it': 'Italian',
-    'pt': 'Portuguese',
-    'ru': 'Russian',
-    'zh': 'Chinese',
-    'ja': 'Japanese',
-    'ko': 'Korean'
-  };
-  
-  const sourceLangName = languageNames[sourceLanguage] || sourceLanguage;
-  const targetLangName = languageNames[targetLanguage] || targetLanguage;
-  
-  // Prepare the prompt
-  const systemPrompt = `You are an expert localisation specialist who trans-creates content from ${sourceLangName} to ${targetLangName} for audiences in ${targetCountry}.
-  Trans-creation means adapting content culturally and linguistically, not just translating it.
-  Consider cultural nuances, idioms, expressions, and preferences of the target audience.
-  Maintain the original meaning, tone, and intent while making it feel natural to native ${targetLangName} speakers.
-  
-  For Spanish content specifically:
-  - Adapt idioms and expressions to Spanish equivalents
-  - Consider cultural references relevant to Spanish-speaking audiences
-  - Use language that feels natural and authentic to native speakers
-  - Adapt humor appropriately for the culture
-  - Pay attention to formal vs. informal tone based on context`;
-  
-  const userPrompt = `Trans-create the following content from ${sourceLangName} to ${targetLangName} for audiences in ${targetCountry}:
-  
-  "${content}"
-  
-  Don't just translate literally - adapt the content to feel authentic and natural to ${targetLangName} native speakers in ${targetCountry}.
-  Adjust cultural references, idioms, humor, and examples as needed while preserving the main message.
-  
-  Format your response as JSON with a transCreatedContent key containing ONLY the translated content.`;
-  
-  try {
-    console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
-    
-    // Prepare the request body
-    const completionRequest = {
-      model: deploymentName,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 1500,
-      temperature: 0.7
-    };
-    
-    // Specify the deployment in the URL path
-    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
-    console.log(`Using direct endpoint URL: ${endpoint}`);
-    
-    // Make a direct fetch call
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': process.env.AZURE_OPENAI_API_KEY || ''
-      },
-      body: JSON.stringify(completionRequest)
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
-    }
-    
-    const responseData = await response.json();
-    console.log("API call successful");
-    
-    const responseContent = responseData.choices?.[0]?.message?.content || "{}";
-    console.log(`Received response with content length: ${responseContent.length}`);
-    
-    const parsedResponse = JSON.parse(responseContent);
-    return {
-      transCreatedContent: parsedResponse.transCreatedContent || ""
-    };
-  } catch (error) {
-    console.error("Error trans-creating content with Azure OpenAI:", error);
-    throw new Error(`Failed to trans-create content: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-} 
