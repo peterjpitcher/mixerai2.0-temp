@@ -101,12 +101,27 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         content: content,
         fieldId: data.outputFieldId
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating content with Azure OpenAI:", error);
-      throw new Error(`Failed to generate content: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      if (error instanceof Error) throw error;
+      throw new Error('Failed to generate content via Azure OpenAI.');
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error generating content:', error);
-    return handleApiError(error, 'Failed to generate content');
+
+    let errorMessage = 'Failed to generate AI content. Please try again later.';
+    let statusCode = 500;
+
+    if (error instanceof Error) {
+      if (error.message.includes('OpenAI') || error.message.includes('Azure') || error.message.includes('API') || (error as any).status === 429 || error.message.includes('Azure OpenAI')) {
+        errorMessage = 'The AI service is currently busy or unavailable. Please try again in a few moments.';
+        statusCode = 503;
+      } else {
+        errorMessage = error.message || errorMessage;
+      }
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    }
+    return handleApiError(new Error(errorMessage), 'AI Content Generation Error', statusCode);
   }
 }); 

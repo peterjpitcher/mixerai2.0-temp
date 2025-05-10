@@ -38,12 +38,11 @@ export default function TemplatesPage() {
         
         console.log('Templates response:', data);
         
-        if (data.success && Array.isArray(data.templates)) {
-          // Just use the templates from the database
-          setTemplates(data.templates);
+        if (data.success && Array.isArray(data.data)) {
+          setTemplates(data.data);
           
           // Log template IDs for debugging
-          data.templates.forEach((template: Template) => {
+          data.data.forEach((template: Template) => {
             console.log(`Template: ${template.name}, ID: ${template.id}`);
           });
         } else {

@@ -51,7 +51,7 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       return NextResponse.json({ 
         success: true, 
         isMockData: true,
-        brands: getFallbackBrands()
+        data: getFallbackBrands()
       });
     }
     
@@ -76,7 +76,7 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     
     return NextResponse.json({ 
       success: true, 
-      brands: formattedBrands 
+      data: formattedBrands 
     });
   } catch (error: any) {
     console.error('Error fetching brands:', error);
@@ -87,7 +87,7 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       return NextResponse.json({ 
         success: true, 
         isFallback: true,
-        brands: getFallbackBrands()
+        data: getFallbackBrands()
       });
     }
     

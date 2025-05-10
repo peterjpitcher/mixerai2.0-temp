@@ -1,6 +1,7 @@
 /**
  * Utility for fetching and extracting content from web pages
  */
+import * as cheerio from 'cheerio';
 
 /**
  * Fetches content from a web page URL
@@ -49,32 +50,52 @@ export async function fetchWebPageContent(url: string, timeout = 5000): Promise<
 }
 
 /**
- * Simple HTML text extraction (simplified for this example)
- * In production, consider using a proper HTML parser like jsdom or cheerio
+ * Extracts text content from an HTML string using cheerio.
+ * It attempts to remove common non-content elements and preserve some structure.
+ * @param html The HTML string to parse
+ * @returns The extracted text content
  */
 function extractTextFromHtml(html: string): string {
   if (!html || typeof html !== 'string') {
-    console.warn('Invalid HTML content received');
+    console.warn('Invalid HTML content received for parsing.');
     return '';
   }
-  
+
   try {
-    // Remove HTML tags
-    const text = html.replace(/<[^>]*>/g, ' ')
-      // Remove excessive whitespace
-      .replace(/\s+/g, ' ')
-      // Decode HTML entities
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .trim();
-    
-    return text;
+    const $ = cheerio.load(html);
+
+    // Remove script and style elements, common navigation and footer elements
+    $('script, style, nav, footer, aside, header, [role="navigation"], [role="banner"], [role="contentinfo"] ').remove();
+
+    // Attempt to get text from common main content containers first
+    let mainContentText = $('main, article, [role="main"], .content, #content, .main, #main').text();
+
+    let extractedText = '';
+
+    if (mainContentText && mainContentText.trim().length > 200) { // Heuristic: if main content is substantial
+        extractedText = mainContentText;
+    } else {
+        // Fallback to body if main content selectors don't yield much, or don't exist
+        // This is a simple text extraction, could be improved with more sophisticated selectors
+        // or by iterating over block-level elements and adding newlines.
+        $('body').find('p, h1, h2, h3, h4, h5, h6, li, div').each((i, elem) => {
+            const elementText = $(elem).text().trim();
+            if (elementText) {
+                extractedText += elementText + '\n'; // Add newline for block-like elements
+            }
+        });
+        if (!extractedText) { // If still no text, get all text from body
+            extractedText = $('body').text();
+        }
+    }
+
+    // Basic cleanup: replace multiple spaces/newlines with a single one
+    return extractedText.replace(/\s\s+/g, ' ').replace(/\n\s*\n/g, '\n').trim();
   } catch (error) {
-    console.error('Error extracting text from HTML:', error);
-    return html.substring(0, 5000); // Return truncated raw HTML as fallback
+    console.error('Error extracting text from HTML with Cheerio:', error);
+    // Fallback to returning a snippet of raw HTML if parsing fails catastrophically
+    // This is less ideal than returning empty or a more processed version, but better than crashing.
+    const snippet = html.substring(0, 2000).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    return snippet ? snippet + "... (parsing error, showing snippet)" : "Error parsing content.";
   }
 } 

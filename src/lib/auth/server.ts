@@ -1,11 +1,11 @@
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { Database } from '@/types/supabase';
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 
 // Helper to create a Supabase client for server components
 export function createSupabaseServerClient() {
-  // Import cookies dynamically to avoid error
-  const cookieStore = require('next/headers').cookies();
+  const cookieStore = cookies();
   
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,6 +14,24 @@ export function createSupabaseServerClient() {
       cookies: {
         get(name: string) {
           return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          try {
+            cookieStore.set({ name, value, ...options });
+          } catch (error) {
+            // The `set` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
+        },
+        remove(name: string, options: CookieOptions) {
+          try {
+            cookieStore.set({ name, value: '', ...options });
+          } catch (error) {
+            // The `delete` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
         },
       },
     }

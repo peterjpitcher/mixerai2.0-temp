@@ -116,7 +116,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       return NextResponse.json({ 
         success: true, 
         isMockData: true,
-        workflows: getFallbackWorkflows()
+        data: getFallbackWorkflows()
       });
     }
     
@@ -168,7 +168,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     
     return NextResponse.json({ 
       success: true, 
-      workflows: formattedWorkflows 
+      data: formattedWorkflows 
     });
   } catch (error) {
     console.error('Error fetching workflows:', error);
@@ -179,7 +179,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       return NextResponse.json({ 
         success: true, 
         isFallback: true,
-        workflows: getFallbackWorkflows()
+        data: getFallbackWorkflows()
       });
     }
     

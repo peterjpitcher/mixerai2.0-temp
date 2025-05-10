@@ -86,13 +86,14 @@ export default function UsersPage() {
         const brandsData = await brandsResponse.json();
         
         if (brandsData.success) {
-          setBrands(brandsData.brands || []);
+          const fetchedBrands = brandsData.data || [];
+          setBrands(fetchedBrands);
           
           // Merge brand data with user permissions
-          const usersWithBrands = usersData.users.map((user: User) => {
+          const usersWithBrands = (usersData.data || []).map((user: User) => {
             if (user.brand_permissions && user.brand_permissions.length > 0) {
               user.brand_permissions = user.brand_permissions.map(permission => {
-                const brand = brandsData.brands.find((b: Brand) => b.id === permission.brand_id);
+                const brand = fetchedBrands.find((b: Brand) => b.id === permission.brand_id);
                 return {
                   ...permission,
                   brand: brand || undefined
@@ -105,7 +106,7 @@ export default function UsersPage() {
           setUsers(usersWithBrands);
         } else {
           // Just set users without brand data
-          setUsers(usersData.users || []);
+          setUsers(usersData.data || []);
         }
       } catch (error) {
         console.error('Error loading data:', error);

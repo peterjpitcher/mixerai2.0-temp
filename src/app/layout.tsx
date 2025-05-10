@@ -6,7 +6,7 @@ import { ToastProvider } from "@/components/toast-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import RootLayoutWrapper from "@/components/layout/root-layout-wrapper";
 import Script from "next/script";
-import { Toaster as SonnerToaster } from "@/components/ui/sonner";
+import { Toaster as SonnerToaster } from "@/components/sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 

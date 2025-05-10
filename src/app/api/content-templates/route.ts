@@ -110,9 +110,9 @@ const mockTemplates = [
 ];
 
 /**
- * Direct GET handler for templates that bypasses auth in development mode
+ * GET handler for templates, now wrapped with authentication.
  */
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest, user) => {
   try {
     const url = new URL(request.url);
     const id = url.searchParams.get('id');
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     
     // If ID is provided, fetch a single template
     if (id) {
-      console.log('Direct API Route - GET single template with ID:', id);
+      console.log('Authenticated API Route - GET single template with ID:', id);
       const { data, error } = await supabase
         .from('content_templates')
         .select('*')
@@ -139,8 +139,8 @@ export async function GET(request: NextRequest) {
     }
     
     // Otherwise, fetch all templates
-    console.log('Direct API Route - GET all templates');
-    const { data: templates, error } = await supabase
+    console.log('Authenticated API Route - GET all templates');
+    const { data: templatesData, error } = await supabase
       .from('content_templates')
       .select('*')
       .order('name');
@@ -152,114 +152,58 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json({ 
       success: true, 
-      templates 
+      data: templatesData
     });
   } catch (error) {
     console.error('Error in GET templates route:', error);
-    
-    // If database access fails, use mock data in development mode
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Development mode: Using mock template data');
-      return NextResponse.json({ 
-        success: true, 
-        templates: mockTemplates,
-        mock: true
-      });
-    }
-    
     return handleApiError(error, 'Failed to fetch content templates');
   }
-}
+});
 
 /**
- * POST: Create a new content template
+ * POST: Create a new content template, withAuth applied directly.
  */
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest, user) => {
   try {
-    return await withAuth(async (req: NextRequest, user) => {
-      try {
-        const data = await request.json();
-        
-        // Validate required fields
-        if (!data.name || !data.fields) {
-          return NextResponse.json(
-            { success: false, error: 'Name and fields are required' },
-            { status: 400 }
-          );
-        }
-        
-        // Validate fields structure
-        if (!data.fields.inputFields || !data.fields.outputFields) {
-          return NextResponse.json(
-            { success: false, error: 'Template must contain inputFields and outputFields' },
-            { status: 400 }
-          );
-        }
-        
-        // Create the template in the database
-        const supabase = createSupabaseAdminClient();
-        const { data: template, error } = await supabase
-          .from('content_templates')
-          .insert({
-            name: data.name,
-            description: data.description || '',
-            fields: data.fields,
-            created_by: user.id
-          })
-          .select()
-          .single();
-        
-        if (error) throw error;
-        
-        return NextResponse.json({
-          success: true,
-          template
-        });
-      } catch (error) {
-        console.error('Error creating content template:', error);
-        
-        // If database access fails in development, create a mock template
-        if (process.env.NODE_ENV === 'development') {
-          try {
-            // Get the request data again
-            const data = await request.clone().json();
-            
-            // Create a mock template with a new ID
-            const newTemplate = {
-              id: `mock-template-${Date.now()}`,
-              name: data.name,
-              description: data.description || '',
-              icon: data.icon || null,
-              fields: data.fields,
-              created_by: "00000000-0000-0000-0000-000000000000",
-              created_at: new Date().toISOString(),
-            };
-            
-            console.log('Development mode: New template created (not saved to database):', newTemplate);
-            
-            return NextResponse.json({
-              success: true,
-              template: newTemplate,
-              mock: true
-            });
-          } catch (jsonError) {
-            console.error('Error parsing request JSON in fallback:', jsonError);
-            return NextResponse.json(
-              { success: false, error: 'Invalid template data' },
-              { status: 400 }
-            );
-          }
-        }
-        
-        return handleApiError(error, 'Failed to create content template');
-      }
-    })(request);
-  } catch (error) {
-    console.error('Authentication error in create template API:', error);
+    const data = await request.json();
     
-    return NextResponse.json(
-      { success: false, error: 'Authentication failed' },
-      { status: 401 }
-    );
+    // Validate required fields
+    if (!data.name || !data.fields) {
+      return NextResponse.json(
+        { success: false, error: 'Name and fields are required' },
+        { status: 400 }
+      );
+    }
+    
+    // Validate fields structure
+    if (!data.fields.inputFields || !data.fields.outputFields) {
+      return NextResponse.json(
+        { success: false, error: 'Template must contain inputFields and outputFields' },
+        { status: 400 }
+      );
+    }
+    
+    // Create the template in the database
+    const supabase = createSupabaseAdminClient();
+    const { data: template, error } = await supabase
+      .from('content_templates')
+      .insert({
+        name: data.name,
+        description: data.description || '',
+        fields: data.fields,
+        created_by: user.id
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return NextResponse.json({
+      success: true,
+      template
+    });
+  } catch (error) {
+    console.error('Error creating content template:', error);
+    return handleApiError(error, 'Failed to create content template');
   }
-} 
+}); 

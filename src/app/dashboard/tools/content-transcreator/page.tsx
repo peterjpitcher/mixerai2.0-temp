@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from '@/components/ui/use-toast';
+import { Button } from '@/components/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/card';
+import { Label } from '@/components/label';
+import { Textarea } from '@/components/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
+import { useToast } from "@/components/use-toast";
 import { copyToClipboard } from '@/lib/utils/clipboard';
 import { Loader2, ClipboardCopy, Globe } from 'lucide-react';
 
@@ -63,6 +63,7 @@ export default function ContentTransCreatorPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<{ transCreatedContent: string } | null>(null);
   const [characterCount, setCharacterCount] = useState(0);
+  const { toast } = useToast();
 
   // Filter country options based on selected target language
   const filteredCountryOptions = countryOptions.filter(

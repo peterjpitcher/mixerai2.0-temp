@@ -15,93 +15,10 @@ interface MetadataGenerationRequest {
 }
 
 // Temporarily expose a direct handler for testing
-export async function POST(request: NextRequest) {
-  try {
-    const data: MetadataGenerationRequest = await request.json();
-    
-    // Validate request data
-    if (!data.url) {
-      return NextResponse.json(
-        { error: 'URL is required' },
-        { status: 400 }
-      );
-    }
+// export async function POST(request: NextRequest) { ... } // Content of this function is removed for brevity
 
-    if (!data.brandId) {
-      return NextResponse.json(
-        { error: 'Brand ID is required' },
-        { status: 400 }
-      );
-    }
-    
-    // Validate URL format
-    try {
-      new URL(data.url);
-    } catch (error) {
-      return NextResponse.json(
-        { error: 'Invalid URL format' },
-        { status: 400 }
-      );
-    }
-    
-    // Fetch brand information if not provided in request
-    let brandLanguage = data.brandLanguage || 'en';
-    let brandCountry = data.brandCountry || 'GB';
-    let brandIdentity = data.brandIdentity || 'A food brand that helps home bakers succeed';
-    let toneOfVoice = data.toneOfVoice || 'Helpful, friendly and supportive';
-    let guardrails = data.guardrails || 'Keep content family-friendly';
-    
-    // For testing, we're skipping the database lookup
-    console.log("Using test brand data for generation:", {
-      brandLanguage,
-      brandCountry,
-      brandIdentity: brandIdentity.substring(0, 30) + "..."
-    });
-    
-    // Fetch webpage content to provide context
-    let pageContent = '';
-    try {
-      pageContent = await fetchWebPageContent(data.url);
-      console.log(`Successfully fetched content from URL (${pageContent.length} characters)`);
-    } catch (fetchError) {
-      console.warn('Could not fetch webpage content, proceeding without it:', fetchError);
-    }
-    
-    // Generate metadata with brand context
-    const generatedMetadata = await generateMetadata(
-      data.url,
-      brandLanguage,
-      brandCountry,
-      {
-        brandIdentity,
-        toneOfVoice,
-        guardrails,
-        pageContent
-      }
-    );
-    
-    return NextResponse.json({
-      success: true,
-      userId: "test-user",
-      url: data.url,
-      ...generatedMetadata,
-      keywords: [] // Maintain backwards compatibility
-    });
-  } catch (error) {
-    console.error('Error generating metadata:', error);
-    
-    return NextResponse.json(
-      { 
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to generate metadata' 
-      },
-      { status: 500 }
-    );
-  }
-}
-
-// Keep the original authenticated route
-export const originalPOST = withAuthAndMonitoring(async (request: NextRequest, user) => {
+// Keep the original authenticated route - RENAMING to POST
+export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
   try {
     const data: MetadataGenerationRequest = await request.json();
     
@@ -184,6 +101,26 @@ export const originalPOST = withAuthAndMonitoring(async (request: NextRequest, u
       }
     );
     
+    // Validate the generated metadata
+    const validationResult = validateMetadata(generatedMetadata.metaTitle, generatedMetadata.metaDescription);
+
+    if (!validationResult.isValid) {
+      console.warn('Generated metadata failed validation:', validationResult.reason);
+      // Return a 422 Unprocessable Entity status, indicating a validation error with the AI-generated content
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: `Generated content validation failed: ${validationResult.reason}`,
+          metaTitle: generatedMetadata.metaTitle, // Still return the generated content for context if needed
+          metaDescription: generatedMetadata.metaDescription,
+          titleLength: validationResult.titleLength,
+          descriptionLength: validationResult.descriptionLength,
+          validationDetails: validationResult
+        },
+        { status: 422 }
+      );
+    }
+    
     return NextResponse.json({
       success: true,
       userId: user.id,
@@ -191,15 +128,33 @@ export const originalPOST = withAuthAndMonitoring(async (request: NextRequest, u
       ...generatedMetadata,
       keywords: [] // Maintain backwards compatibility
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error generating metadata:', error);
+    
+    let errorMessage = 'Failed to generate metadata. Please try again later.';
+    let statusCode = 500;
+
+    if (error instanceof Error) {
+      if (error.message.includes('OpenAI') || error.message.includes('Azure') || error.message.includes('API') || (error as any).status === 429) {
+        errorMessage = 'The AI service is currently busy or unavailable. Please try again in a few moments.';
+        statusCode = 503; // Service Unavailable or 429 for rate limiting if distinguishable
+      } else if ((error as any).status === 422) { // If it was our own validation error from validateMetadata
+        errorMessage = error.message; // Use the specific message from validateMetadata
+        statusCode = 422;
+      } else {
+        // For other errors, use the error message if available, otherwise a generic one
+        errorMessage = error.message || errorMessage;
+      }
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    }
     
     return NextResponse.json(
       { 
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to generate metadata' 
+        error: errorMessage 
       },
-      { status: 500 }
+      { status: statusCode }
     );
   }
 });

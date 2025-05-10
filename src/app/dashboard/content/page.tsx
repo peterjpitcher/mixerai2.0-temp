@@ -35,7 +35,7 @@ export default function ContentPage() {
         const data = await response.json();
         
         if (data.success) {
-          setContent(data.content);
+          setContent(data.data);
         } else {
           throw new Error(data.error || 'Failed to fetch content');
         }

@@ -45,7 +45,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       return NextResponse.json({ 
         success: true, 
         isMockData: true,
-        content: getFallbackContent()
+        data: getFallbackContent()
       });
     }
     
@@ -90,7 +90,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     
     return NextResponse.json({ 
       success: true, 
-      content: formattedContent 
+      data: formattedContent 
     });
   } catch (error: any) {
     console.error('Error fetching content:', error);
@@ -101,7 +101,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       return NextResponse.json({ 
         success: true, 
         isFallback: true,
-        content: getFallbackContent()
+        data: getFallbackContent()
       });
     }
     

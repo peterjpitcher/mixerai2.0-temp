@@ -54,15 +54,29 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       targetCountry: data.targetCountry,
       ...transCreatedContent
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error trans-creating content:', error);
+    
+    let errorMessage = 'Failed to trans-create content. Please try again later.';
+    let statusCode = 500;
+
+    if (error instanceof Error) {
+      if (error.message.includes('OpenAI') || error.message.includes('Azure') || error.message.includes('API') || (error as any).status === 429) {
+        errorMessage = 'The AI service is currently busy or unavailable. Please try again in a few moments.';
+        statusCode = 503; // Service Unavailable
+      } else {
+        errorMessage = error.message || errorMessage;
+      }
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    }
     
     return NextResponse.json(
       { 
         success: false,
-        error: 'Failed to trans-create content' 
+        error: errorMessage
       },
-      { status: 500 }
+      { status: statusCode }
     );
   }
 }); 

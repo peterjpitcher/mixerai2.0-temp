@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from '@/components/ui/use-toast';
+import { Button } from '@/components/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
+import { Input } from '@/components/input';
+import { Label } from '@/components/label';
+import { Textarea } from "@/components/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/select";
+import { useToast } from "@/components/use-toast";
 import { copyToClipboard } from '@/lib/utils/clipboard';
 import { Loader2, ClipboardCopy, Globe } from 'lucide-react';
 
@@ -28,6 +28,7 @@ export default function MetadataGeneratorPage() {
   const [isFetchingBrands, setIsFetchingBrands] = useState(true);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [results, setResults] = useState<{ metaTitle: string; metaDescription: string; keywords?: string[] } | null>(null);
+  const { toast } = useToast();
 
   // Fetch brands on component mount
   useEffect(() => {

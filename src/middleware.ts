@@ -50,33 +50,110 @@ export async function middleware(request: NextRequest) {
         request.nextUrl.pathname.startsWith('/api/') ||
         request.nextUrl.pathname.startsWith('/account')) {
       try {
-        const { data } = await supabase.auth.getSession();
-        if (!data.session) {
+        const { data: authData, error: authError } = await supabase.auth.getSession();
+        
+        if (authError) {
+          console.error('Auth middleware session error:', authError);
+          // Potentially handle error, for now, let it proceed to be caught by page-level checks or return generic error
+        }
+
+        if (!authData.session) {
           // Redirect to login for dashboard or account routes
           if (request.nextUrl.pathname.startsWith('/dashboard') ||
               request.nextUrl.pathname.startsWith('/account')) {
             const redirectUrl = new URL('/auth/login', baseUrl);
             redirectUrl.searchParams.set('from', request.nextUrl.pathname);
-            return NextResponse.redirect(redirectUrl);
+            // Set headers on the redirect response as well
+            const redirectResponse = NextResponse.redirect(redirectUrl);
+            redirectResponse.headers.set('X-Content-Type-Options', 'nosniff');
+            redirectResponse.headers.set('X-Frame-Options', 'DENY');
+            redirectResponse.headers.set('X-XSS-Protection', '1; mode=block');
+            redirectResponse.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+            return redirectResponse;
           }
           
           // Return 401 for API routes
           if (request.nextUrl.pathname.startsWith('/api/')) {
-            return new NextResponse(
-              JSON.stringify({ 
-                success: false, 
-                error: 'Unauthorized', 
-                code: 'AUTH_REQUIRED' 
-              }),
-              { 
-                status: 401, 
-                headers: { 'content-type': 'application/json' } 
-              }
-            );
+            // Ensure this is not an explicitly public API route from the matcher
+            const publicApiPatterns = [
+              'api/env-check', 
+              'api/test-connection', 
+              'api/test-metadata-generator', 
+              'api/brands/identity'
+              // Note: api/content-templates/ is no longer public
+            ];
+            const isPublicApi = publicApiPatterns.some(pattern => request.nextUrl.pathname.includes(pattern));
+
+            if (!isPublicApi) {
+              const apiUnauthorizedResponse = new NextResponse(
+                JSON.stringify({ 
+                  success: false, 
+                  error: 'Unauthorized', 
+                  code: 'AUTH_REQUIRED' 
+                }),
+                { 
+                  status: 401, 
+                  headers: { 'content-type': 'application/json' } 
+                }
+              );
+              // Set headers on the 401 response
+              apiUnauthorizedResponse.headers.set('X-Content-Type-Options', 'nosniff');
+              apiUnauthorizedResponse.headers.set('X-Frame-Options', 'DENY');
+              apiUnauthorizedResponse.headers.set('X-XSS-Protection', '1; mode=block');
+              apiUnauthorizedResponse.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+              return apiUnauthorizedResponse;
+            }
+          }
+        } else {
+          // User is authenticated
+          // If they are on the root path, redirect to /dashboard
+          if (request.nextUrl.pathname === '/') {
+            const dashboardUrl = new URL('/dashboard', baseUrl);
+            // Set headers on the redirect response
+            const rootRedirectResponse = NextResponse.redirect(dashboardUrl);
+            rootRedirectResponse.headers.set('X-Content-Type-Options', 'nosniff');
+            rootRedirectResponse.headers.set('X-Frame-Options', 'DENY');
+            rootRedirectResponse.headers.set('X-XSS-Protection', '1; mode=block');
+            rootRedirectResponse.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+            return rootRedirectResponse;
           }
         }
       } catch (error) {
         console.error('Auth middleware error:', error);
+      }
+    } else if (request.nextUrl.pathname === '/') {
+      // Handle root path for potentially unauthenticated users if Supabase client wasn't initialized
+      // (e.g. env vars missing). This case should try to get session or redirect to login.
+      // This is a bit defensive, primary auth logic is inside the supabaseUrl && supabaseAnonKey block.
+      try {
+        const cookieStore = cookies();
+        const supabase = createServerClient(supabaseUrl!, supabaseAnonKey!, {
+          cookies: { /* cookie handlers */ }
+        });
+        const { data: authData } = await supabase.auth.getSession();
+        if (!authData.session) {
+          const redirectUrl = new URL('/auth/login', baseUrl);
+          redirectUrl.searchParams.set('from', '/');
+          const rootLoginRedirect = NextResponse.redirect(redirectUrl);
+          // Set headers
+          rootLoginRedirect.headers.set('X-Content-Type-Options', 'nosniff');
+          rootLoginRedirect.headers.set('X-Frame-Options', 'DENY');
+          rootLoginRedirect.headers.set('X-XSS-Protection', '1; mode=block');
+          rootLoginRedirect.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+          return rootLoginRedirect;
+        } else {
+          const dashboardUrl = new URL('/dashboard', baseUrl);
+          const rootDashboardRedirect = NextResponse.redirect(dashboardUrl);
+          // Set headers
+          rootDashboardRedirect.headers.set('X-Content-Type-Options', 'nosniff');
+          rootDashboardRedirect.headers.set('X-Frame-Options', 'DENY');
+          rootDashboardRedirect.headers.set('X-XSS-Protection', '1; mode=block');
+          rootDashboardRedirect.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+          return rootDashboardRedirect;
+        }
+      } catch(e) {
+        console.error('Error handling root path for unauthenticated or Supabase client issue:', e);
+        // Fallback, let it proceed to be handled by the page if possible
       }
     }
   }
@@ -138,7 +215,7 @@ export const config = {
      * 3. /public (public files)
      * 4. all root files inside /public (e.g. /favicon.ico)
      */
-    '/((?!api/env-check|api/test-connection|api/test-metadata-generator|api/brands/identity|api/content-templates/|_next/static|_next/image|public|favicon.ico).*)',
+    '/((?!api/env-check|api/test-connection|api/test-metadata-generator|api/brands/identity|_next/static|_next/image|public|favicon.ico).*)',
     '/brands/:path*',
     '/workflows/:path*',
     '/content/:path*',

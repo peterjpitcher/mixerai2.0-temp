@@ -6,78 +6,57 @@ import { Button } from '@/components/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/card';
 import { Input } from '@/components/input';
 import { useToast } from '@/components/toast-provider';
-import { Plus, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Search, Trash2, Eye, Edit3 } from 'lucide-react';
 
-interface Workflow {
+interface WorkflowFromAPI {
   id: string;
   name: string;
+  brand_id: string;
   brand_name: string;
+  brand_color?: string;
   content_type_name: string;
+  steps: any[];
   steps_count: number;
+  content_count: number;
+  created_at: string;
+  updated_at: string;
 }
 
 interface GroupedWorkflows {
   [key: string]: {
     brand_name: string;
-    workflows: Workflow[];
-    isOpen: boolean;
+    brand_color?: string;
+    workflows: WorkflowFromAPI[];
   }
 }
 
 export default function WorkflowsPage() {
-  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [allWorkflows, setAllWorkflows] = useState<WorkflowFromAPI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [groupedWorkflows, setGroupedWorkflows] = useState<GroupedWorkflows>({});
   const { toast } = useToast();
 
   useEffect(() => {
     const fetchWorkflows = async () => {
+      setIsLoading(true);
+      setError(null);
       try {
-        setIsLoading(true);
-        
-        // Fetch real data from the API
         const response = await fetch('/api/workflows');
-        const data = await response.json();
+        const apiResponse = await response.json();
         
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to fetch workflows');
+        if (!apiResponse.success) {
+          throw new Error(apiResponse.error || 'Failed to fetch workflows');
         }
         
-        const workflowsData = data.workflows || [];
-        
-        setWorkflows(workflowsData);
-        
-        // Group workflows by brand name
-        const grouped: GroupedWorkflows = {};
-        workflowsData.forEach((workflow: any) => {
-          const brandName = workflow.brand_name || 'Unknown';
-          
-          if (!grouped[brandName]) {
-            grouped[brandName] = {
-              brand_name: brandName,
-              workflows: [],
-              isOpen: true
-            };
-          }
-          
-          grouped[brandName].workflows.push(workflow);
-        });
-        
-        // Sort brands alphabetically
-        const sortedGrouped: GroupedWorkflows = {};
-        Object.keys(grouped).sort((a, b) => {
-          return a.localeCompare(b);
-        }).forEach(key => {
-          sortedGrouped[key] = grouped[key];
-        });
-        
-        setGroupedWorkflows(sortedGrouped);
-      } catch (error) {
-        console.error('Error loading workflows:', error);
+        setAllWorkflows(apiResponse.data || []);
+      } catch (err) {
+        console.error('Error loading workflows:', err);
+        const errorMessage = (err instanceof Error) ? err.message : 'Failed to load workflows. Please try again.';
+        setError(errorMessage);
         toast({
           title: 'Error',
-          description: 'Failed to load workflows. Please try again.',
+          description: errorMessage,
           variant: 'destructive'
         });
       } finally {
@@ -88,34 +67,56 @@ export default function WorkflowsPage() {
     fetchWorkflows();
   }, [toast]);
   
-  const filteredWorkflows = searchTerm.trim() === '' 
-    ? groupedWorkflows 
-    : Object.keys(groupedWorkflows).reduce((filtered: GroupedWorkflows, brandName) => {
-        const brandGroup = groupedWorkflows[brandName];
-        const filteredWorkflowsList = brandGroup.workflows.filter(workflow => 
-          workflow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          workflow.content_type_name.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        
-        if (filteredWorkflowsList.length > 0) {
-          filtered[brandName] = {
-            ...brandGroup,
-            workflows: filteredWorkflowsList
-          };
-        }
-        
-        return filtered;
-      }, {});
-  
-  const toggleBrandGroup = (brandName: string) => {
-    setGroupedWorkflows(prev => ({
-      ...prev,
-      [brandName]: {
-        ...prev[brandName],
-        isOpen: !prev[brandName].isOpen
+  const filteredWorkflowsList = allWorkflows.filter(workflow => 
+    workflow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    workflow.brand_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    workflow.content_type_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const groupWorkflowsByBrand = (workflowsToGroup: WorkflowFromAPI[]) => {
+    const grouped: GroupedWorkflows = {};
+    workflowsToGroup.forEach(workflow => {
+      const brandKey = workflow.brand_name || 'Unknown Brand';
+      if (!grouped[brandKey]) {
+        grouped[brandKey] = {
+          brand_name: brandKey,
+          brand_color: workflow.brand_color,
+          workflows: []
+        };
       }
-    }));
+      grouped[brandKey].workflows.push(workflow);
+    });
+    return Object.entries(grouped)
+      .sort((a, b) => a[1].brand_name.localeCompare(b[1].brand_name));
   };
+
+  const displayedGroupedWorkflows = groupWorkflowsByBrand(filteredWorkflowsList);
+
+  const ErrorState = () => (
+    <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
+      <div className="mb-4 text-red-500">
+        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+      </div>
+      <h3 className="text-xl font-bold mb-2">Failed to load workflows</h3>
+      <p className="text-muted-foreground mb-4 text-center max-w-md">{error}</p>
+      <Button onClick={() => window.location.reload()}>Try Again</Button>
+    </div>
+  );
+
+  const EmptyState = () => (
+    <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
+      <div className="mb-4 text-muted-foreground">
+         <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="8" height="8" x="2" y="2" rx="2" /><path d="M14 2c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2" /><path d="M20 2c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2" /><path d="M10 18H5c-1.7 0-3-1.3-3-3v-1" /><polyline points="7 21 10 18 7 15" /><rect width="8" height="8" x="14" y="14" rx="2" /></svg>
+      </div>
+      <h3 className="text-xl font-bold mb-2">No workflows yet</h3>
+      <p className="text-muted-foreground mb-4 text-center max-w-md">
+        Get started by creating your first content approval workflow.
+      </p>
+      <Button asChild>
+        <Link href="/dashboard/workflows/new">Add Your First Workflow</Link>
+      </Button>
+    </div>
+  );
   
   return (
     <div className="space-y-8">
@@ -128,15 +129,17 @@ export default function WorkflowsPage() {
         </Button>
       </div>
       
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input 
-          placeholder="Search workflows..." 
-          className="pl-10 max-w-md"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
+      {(allWorkflows.length > 0 || isLoading || error) && (
+         <div className="flex items-center justify-between">
+          <div className="max-w-sm w-full">
+            <Input 
+              placeholder="Search workflows by name, brand, or content type..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
       
       {isLoading ? (
         <div className="py-10 flex justify-center items-center min-h-[300px]">
@@ -145,90 +148,71 @@ export default function WorkflowsPage() {
             <p className="text-muted-foreground">Loading workflows...</p>
           </div>
         </div>
-      ) : Object.keys(filteredWorkflows).length === 0 ? (
-        <div className="text-center py-12 px-4">
-          <div className="mx-auto w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
-              <rect width="8" height="8" x="2" y="2" rx="2" />
-              <path d="M14 2c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2" />
-              <path d="M20 2c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2" />
-              <path d="M10 18H5c-1.7 0-3-1.3-3-3v-1" />
-              <polyline points="7 21 10 18 7 15" />
-              <rect width="8" height="8" x="14" y="14" rx="2" />
-            </svg>
-          </div>
-          <h3 className="text-xl font-semibold mb-2">No workflows found</h3>
-          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            {searchTerm ? 'No results match your search criteria. Try a different search term.' : 'You haven\'t created any content approval workflows yet. Create your first workflow to streamline content creation.'}
-          </p>
-          {!searchTerm && (
-            <Button size="lg" asChild>
-              <Link href="/dashboard/workflows/new">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                  <path d="M5 12h14" />
-                  <path d="M12 5v14" />
-                </svg>
-                Create First Workflow
-              </Link>
-            </Button>
-          )}
+      ) : error ? (
+        <ErrorState />
+      ) : allWorkflows.length === 0 ? (
+        <EmptyState />
+      ) : filteredWorkflowsList.length === 0 && searchTerm ? (
+        <div className="flex flex-col items-center justify-center min-h-[200px] py-8">
+          <h3 className="text-xl font-bold mb-2">No workflows found</h3>
+          <p className="text-muted-foreground mb-4">No workflows match your search criteria.</p>
+          <Button variant="outline" onClick={() => setSearchTerm("")}>
+            Clear Search
+          </Button>
         </div>
       ) : (
-        <div className="space-y-6">
-          {Object.values(filteredWorkflows).map((group) => (
-            <div key={group.brand_name} className="border rounded-lg overflow-hidden">
-              <div 
-                className="bg-muted p-4 flex justify-between items-center cursor-pointer"
-                onClick={() => toggleBrandGroup(group.brand_name)}
-              >
-                <h2 className="text-xl font-semibold flex items-center">
-                  {group.brand_name} <span className="ml-2 text-sm text-muted-foreground">({group.workflows.length})</span>
-                </h2>
-                {group.isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+        <div className="space-y-10">
+          {displayedGroupedWorkflows.map(([brandKey, group]) => (
+            <div key={brandKey} className="space-y-4">
+              <div className="flex items-center">
+                <h2 className="text-xl font-semibold">{group.brand_name}</h2>
+                <div className="ml-3 px-2 py-1 bg-muted rounded-full text-xs font-medium">
+                  {group.workflows.length} workflow{group.workflows.length !== 1 ? 's' : ''}
+                </div>
+                <div className="h-px flex-1 bg-border ml-4"></div>
               </div>
               
-              {group.isOpen && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-                  {group.workflows.map((workflow) => (
-                    <Card key={workflow.id}>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-xl">{workflow.name}</CardTitle>
-                        <CardDescription>
-                          {workflow.content_type_name}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex justify-between text-sm text-muted-foreground mb-3">
-                          <span>Steps</span>
-                          <span className="font-medium">{workflow.steps_count}</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {group.workflows.map((workflow) => (
+                  <Card key={workflow.id}>
+                    <CardHeader className="pb-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-xl">{workflow.name}</CardTitle>
+                          <CardDescription>
+                            For: {workflow.content_type_name}
+                          </CardDescription>
                         </div>
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {Array.from({ length: workflow.steps_count }).map((_, i) => (
-                            <div 
-                              key={i} 
-                              className="h-8 flex items-center justify-center rounded-md bg-primary/10 text-primary text-xs px-3"
-                            >
-                              Step {i + 1}
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                      <CardFooter className="border-t pt-4 flex justify-between">
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-sm text-muted-foreground">
+                        {workflow.steps_count} step{workflow.steps_count !== 1 ? 's' : ''}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {workflow.content_count > 0 ? 
+                          `${workflow.content_count} content item${workflow.content_count !== 1 ? 's' : ''} using this` :
+                          'No content items using this workflow yet'
+                        }
+                      </div>
+                    </CardContent>
+                    <CardFooter className="border-t pt-4 flex justify-between">
+                      <div className="flex gap-2">
                         <Button variant="ghost" size="sm" asChild>
                           <Link href={`/dashboard/workflows/${workflow.id}`}>
-                            View
+                            <Eye className="mr-2 h-4 w-4" /> View
                           </Link>
                         </Button>
                         <Button variant="ghost" size="sm" asChild>
                           <Link href={`/dashboard/workflows/${workflow.id}/edit`}>
-                            Edit
+                            <Edit3 className="mr-2 h-4 w-4" /> Edit
                           </Link>
                         </Button>
-                      </CardFooter>
-                    </Card>
-                  ))}
-                </div>
-              )}
+                      </div>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
             </div>
           ))}
         </div>
