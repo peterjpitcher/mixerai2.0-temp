@@ -10,7 +10,6 @@ import { useToast } from '@/components/toast-provider';
 interface ContentItem {
   id: string;
   title: string;
-  content_type_name: string;
   brand_name: string;
   status: string;
   created_at: string;
@@ -79,15 +78,17 @@ export default function ContentPage() {
       </div>
       <h3 className="text-xl font-semibold mb-2">No content found</h3>
       <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-        You haven't created any content yet. Create your first piece of content.
+        You haven't created any content yet. Create your first piece of content by selecting a template.
       </p>
       <Button size="lg" asChild>
-        <Link href="/content/new">
+        <Link href="/dashboard/templates">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-            <path d="M5 12h14" />
-            <path d="M12 5v14" />
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <line x1="9" y1="15" x2="15" y2="15"/>
           </svg>
-          Create First Content
+          Go to Templates
         </Link>
       </Button>
     </div>
@@ -123,9 +124,6 @@ export default function ContentPage() {
     <div className="space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">Content</h1>
-        <Button asChild>
-          <Link href="/content/new">Create Content</Link>
-        </Button>
       </div>
 
       <div className="flex items-center justify-between">
@@ -178,7 +176,6 @@ export default function ContentPage() {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left pb-3 font-medium">Title</th>
-                    <th className="text-left pb-3 font-medium">Type</th>
                     <th className="text-left pb-3 font-medium">Brand</th>
                     <th className="text-left pb-3 font-medium">Status</th>
                     <th className="text-left pb-3 font-medium">Created By</th>
@@ -190,7 +187,6 @@ export default function ContentPage() {
                   {content.map((item) => (
                     <tr key={item.id} className="border-b">
                       <td className="py-3">{item.title}</td>
-                      <td className="py-3">{item.content_type_name}</td>
                       <td className="py-3">{item.brand_name}</td>
                       <td className="py-3">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 

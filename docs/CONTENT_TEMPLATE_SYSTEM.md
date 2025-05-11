@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Content Template System replaces the static content types (Article, Owned PDP, Retailer PDP) with a flexible template designer that allows users to create custom content types with configurable input and output fields.
+The Content Template System replaced the previous static content types (formerly "Article", "Owned PDP", "Retailer PDP") with a flexible template designer that allows users to create custom content structures with configurable input and output fields.
 
 ## Navigation
 

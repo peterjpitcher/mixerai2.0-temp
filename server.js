@@ -84,39 +84,6 @@ if (maintenanceMode) {
         return;
       }
       
-      if (apiPath.startsWith('content-types')) {
-        // Fallback for content types API
-        res.statusCode = 200;
-        res.end(JSON.stringify({
-          success: true,
-          isFallback: true,
-          contentTypes: [
-            {
-              id: '1',
-              name: 'Article',
-              description: 'Long-form content pieces like blog posts and articles',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            },
-            {
-              id: '2',
-              name: 'Retailer PDP',
-              description: 'Product description pages for retailer websites',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            },
-            {
-              id: '3',
-              name: 'Owned PDP',
-              description: 'Product description pages for brand-owned websites',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            }
-          ]
-        }));
-        return;
-      }
-      
       if (apiPath.startsWith('content')) {
         // Fallback for content API
         res.statusCode = 200;
@@ -133,7 +100,6 @@ if (maintenanceMode) {
               updated_at: new Date().toISOString(),
               brand_name: 'Sample Brand',
               brand_color: '#3498db',
-              content_type_name: 'Article',
               created_by_name: 'System'
             },
             {
@@ -145,7 +111,6 @@ if (maintenanceMode) {
               updated_at: new Date().toISOString(),
               brand_name: 'Another Brand',
               brand_color: '#e74c3c',
-              content_type_name: 'Retailer PDP',
               created_by_name: 'System'
             }
           ]
@@ -215,7 +180,6 @@ if (maintenanceMode) {
             <ul>
               <li>/api/brands - Get all brands</li>
               <li>/api/content - Get all content</li>
-              <li>/api/content-types - Get all content types</li>
             </ul>
             <p><a href="/api-tester" style="color: #2563eb; text-decoration: none; font-weight: bold;">Use the API Tester</a></p>
           </div>

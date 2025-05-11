@@ -21,7 +21,6 @@ export interface Database {
           guardrails: string | null
           content_vetting_agencies: string | null
           brand_color: string | null
-          approved_content_types: Json | null
           created_at: string
           updated_at: string
         }
@@ -36,7 +35,6 @@ export interface Database {
           guardrails?: string | null
           content_vetting_agencies?: string | null
           brand_color?: string | null
-          approved_content_types?: Json | null
           created_at?: string
           updated_at?: string
         }
@@ -51,7 +49,6 @@ export interface Database {
           guardrails?: string | null
           content_vetting_agencies?: string | null
           brand_color?: string | null
-          approved_content_types?: Json | null
           created_at?: string
           updated_at?: string
         }
@@ -61,7 +58,6 @@ export interface Database {
         Row: {
           id: string
           brand_id: string
-          content_type_id: string
           workflow_id: string | null
           created_by: string | null
           title: string
@@ -80,7 +76,6 @@ export interface Database {
         Insert: {
           id?: string
           brand_id: string
-          content_type_id: string
           workflow_id?: string | null
           created_by?: string | null
           title: string
@@ -99,7 +94,6 @@ export interface Database {
         Update: {
           id?: string
           brand_id?: string
-          content_type_id?: string
           workflow_id?: string | null
           created_by?: string | null
           title?: string
@@ -120,12 +114,6 @@ export interface Database {
             foreignKeyName: "content_brand_id_fkey"
             columns: ["brand_id"]
             referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_content_type_id_fkey"
-            columns: ["content_type_id"]
-            referencedRelation: "content_types"
             referencedColumns: ["id"]
           },
           {
@@ -187,30 +175,6 @@ export interface Database {
             referencedColumns: ["id"]
           }
         ]
-      }
-      content_types: {
-        Row: {
-          id: string
-          name: string
-          description: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          description?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          description?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
       }
       profiles: {
         Row: {
@@ -287,7 +251,6 @@ export interface Database {
         Row: {
           id: string
           brand_id: string
-          content_type_id: string
           name: string
           steps: Json
           created_at: string
@@ -296,7 +259,6 @@ export interface Database {
         Insert: {
           id?: string
           brand_id: string
-          content_type_id: string
           name: string
           steps?: Json
           created_at?: string
@@ -305,7 +267,6 @@ export interface Database {
         Update: {
           id?: string
           brand_id?: string
-          content_type_id?: string
           name?: string
           steps?: Json
           created_at?: string
@@ -316,12 +277,6 @@ export interface Database {
             foreignKeyName: "workflows_brand_id_fkey"
             columns: ["brand_id"]
             referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflows_content_type_id_fkey"
-            columns: ["content_type_id"]
-            referencedRelation: "content_types"
             referencedColumns: ["id"]
           }
         ]

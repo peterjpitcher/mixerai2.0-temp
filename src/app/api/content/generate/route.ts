@@ -3,10 +3,10 @@ import { generateContent, generateContentFromTemplate } from '@/lib/azure/openai
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 
-type ContentType = "article" | "retailer_pdp" | "owned_pdp" | string;
+// type ContentType = "article" | "retailer_pdp" | "owned_pdp" | string; // Removed
 
 interface ContentGenerationRequest {
-  contentType: ContentType;
+  // contentType: ContentType; // Removed
   brand: {
     name: string;
     brand_identity?: string | null;
@@ -49,9 +49,9 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
   try {
     const data: ContentGenerationRequest = await request.json();
     
-    if (!data.contentType || !data.brand?.name) {
+    if (!data.brand?.name) {
       return NextResponse.json(
-        { success: false, error: 'Content type and brand name are required' },
+        { success: false, error: 'Brand name is required' },
         { status: 400 }
       );
     }
@@ -59,7 +59,6 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
     if (data.template && data.template.id) {
       try {
         const generatedContent = await generateContentFromTemplate(
-          data.contentType as ContentType,
           data.brand,
           data.template,
           data.input
@@ -74,6 +73,10 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       }
     }
     
+    // The following block is legacy logic based on the old contentType system.
+    // This should be reviewed based on whether non-template-based generation is still supported.
+    // For now, it's commented out as the primary flow is expected to be template-based.
+    /*
     if (data.contentType === 'article' && !data.input?.topic) {
       return NextResponse.json(
         { success: false, error: 'Topic is required for article content type' },
@@ -109,6 +112,16 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       userId: user.id,
       ...generatedContent
     });
+    */
+    
+    // If execution reaches here, it means no template was provided and the legacy path is commented out.
+    // This implies that template-based generation is now the primary/only path.
+    // If non-template generation is still required, this part of the code needs to be re-evaluated.
+    return NextResponse.json(
+        { success: false, error: 'Template ID is required for content generation.' },
+        { status: 400 }
+      );
+
   } catch (error) {
     return handleApiError(error, 'Failed to generate content');
   }

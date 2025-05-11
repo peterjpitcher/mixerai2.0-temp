@@ -48,7 +48,7 @@ EOL
 fi
 
 if [ ! -f migrations/001_initial_schema.sql ]; then
-    cat > migrations/001_initial_schema.sql << 'EOL'
+    cat > migrations/001_initial_schema.sql << EOL
 -- Create schema
 CREATE SCHEMA IF NOT EXISTS public;
 
@@ -96,33 +96,20 @@ CREATE TABLE IF NOT EXISTS user_brand_permissions (
   UNIQUE(user_id, brand_id)
 );
 
--- Create content types table
-CREATE TABLE IF NOT EXISTS content_types (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name TEXT NOT NULL,
-  description TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(name)
-);
-
 -- Create workflows table
 CREATE TABLE IF NOT EXISTS workflows (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   brand_id UUID REFERENCES brands(id) ON DELETE CASCADE,
-  content_type_id UUID REFERENCES content_types(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   steps JSONB NOT NULL DEFAULT '[]',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(brand_id, content_type_id)
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Create content table
 CREATE TABLE IF NOT EXISTS content (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   brand_id UUID REFERENCES brands(id) ON DELETE CASCADE,
-  content_type_id UUID REFERENCES content_types(id) ON DELETE CASCADE,
   workflow_id UUID REFERENCES workflows(id) ON DELETE SET NULL,
   created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
   title TEXT NOT NULL,
@@ -132,7 +119,8 @@ CREATE TABLE IF NOT EXISTS content (
   status content_status NOT NULL DEFAULT 'draft',
   current_step INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  template_id UUID
 );
 
 -- Create notifications table
@@ -159,13 +147,6 @@ CREATE TABLE IF NOT EXISTS analytics (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Insert default content types
-INSERT INTO content_types (name, description) VALUES
-  ('Article', 'Long-form content with structured sections'),
-  ('Retailer PDP', 'Product descriptions optimized for third-party retailers'),
-  ('Owned PDP', 'Product descriptions for the brand''s own website')
-ON CONFLICT (name) DO NOTHING;
-
 -- Create example brand
 INSERT INTO brands (name, country, language, brand_identity, tone_of_voice, guardrails)
 VALUES (
@@ -182,7 +163,7 @@ EOL
 fi
 
 if [ ! -f migrations/002_test_data.sql ]; then
-    cat > migrations/002_test_data.sql << 'EOL'
+    cat > migrations/002_test_data.sql << EOL
 -- Insert test admin user
 INSERT INTO profiles (id, full_name, avatar_url)
 VALUES (
@@ -223,39 +204,44 @@ FROM brands
 ON CONFLICT DO NOTHING;
 
 -- Create example workflows
-INSERT INTO workflows (brand_id, content_type_id, name, steps)
-SELECT 
-  b.id,
-  ct.id,
-  'Standard ' || ct.name || ' Workflow',
-  '[
-    {"name": "Draft", "description": "Initial content creation", "role": "editor"},
-    {"name": "Review", "description": "Content review and feedback", "role": "editor"},
-    {"name": "Approval", "description": "Final approval before publishing", "role": "admin"}
-  ]'::jsonb
-FROM brands b
-CROSS JOIN content_types ct
-WHERE b.name = 'Demo Brand'
-ON CONFLICT DO NOTHING;
+-- This section needs significant rework or simplification
+-- as it relied on CROSS JOIN content_types. 
+-- For now, commenting out to avoid errors. A new way to seed workflows linked to templates would be needed.
+-- INSERT INTO workflows (brand_id, content_type_id, name, steps)
+-- SELECT 
+--   b.id,
+--   ct.id,
+--   'Standard ' || ct.name || ' Workflow',
+--   '[
+--     {"name": "Draft", "description": "Initial content creation", "role": "editor"},
+--     {"name": "Review", "description": "Content review and feedback", "role": "editor"},
+--     {"name": "Approval", "description": "Final approval before publishing", "role": "admin"}
+--   ]'::jsonb
+-- FROM brands b
+-- CROSS JOIN content_types ct
+-- WHERE b.name = 'Demo Brand'
+-- ON CONFLICT DO NOTHING;
 
 -- Create sample content and notifications
-INSERT INTO content (brand_id, content_type_id, workflow_id, created_by, title, body, meta_title, meta_description, status)
-SELECT
-  b.id,
-  ct.id,
-  w.id,
-  '00000000-0000-0000-0000-000000000001',
-  'Sample ' || ct.name,
-  'This is a sample ' || ct.name || ' for testing purposes.',
-  'Sample ' || ct.name || ' Title',
-  'Sample ' || ct.name || ' Description',
-  'draft'
-FROM brands b
-JOIN content_types ct ON true
-JOIN workflows w ON w.brand_id = b.id AND w.content_type_id = ct.id
-WHERE b.name = 'Demo Brand'
-LIMIT 3
-ON CONFLICT DO NOTHING;
+-- This also relied on content_types and workflows linked to them.
+-- Commenting out to avoid errors. Sample content should ideally be created based on sample templates.
+-- INSERT INTO content (brand_id, content_type_id, workflow_id, created_by, title, body, meta_title, meta_description, status)
+-- SELECT
+--   b.id,
+--   ct.id,
+--   w.id,
+--   '00000000-0000-0000-0000-000000000001',
+--   'Sample ' || ct.name,
+--   'This is a sample ' || ct.name || ' for testing purposes.',
+--   'Sample ' || ct.name || ' Title',
+--   'Sample ' || ct.name || ' Description',
+--   'draft'
+-- FROM brands b
+-- JOIN content_types ct ON true
+-- JOIN workflows w ON w.brand_id = b.id AND w.content_type_id = ct.id
+-- WHERE b.name = 'Demo Brand'
+-- LIMIT 3
+-- ON CONFLICT DO NOTHING;
 
 -- Create example notifications for admin user
 INSERT INTO notifications (user_id, title, message, type, is_read, action_url, action_label)

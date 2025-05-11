@@ -19,7 +19,6 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       .select(`
         *,
         brands:brand_id(name, brand_color),
-        content_types:content_type_id(name),
         profiles:created_by(full_name)
       `)
       .order('created_at', { ascending: false });
@@ -36,7 +35,6 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       ...item,
       brand_name: item.brands?.name || null,
       brand_color: item.brands?.brand_color || null,
-      content_type_name: item.content_types?.name || null,
       created_by_name: item.profiles?.full_name || null
     }));
     
@@ -53,7 +51,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
   try {
     const data = await request.json();
     
-    if (!data.brand_id || !data.content_type_id || !data.title || !data.body) {
+    if (!data.brand_id || !data.title || !data.body) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
         { status: 400 }
@@ -66,7 +64,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       .from('content')
       .insert({
         brand_id: data.brand_id,
-        content_type_id: data.content_type_id,
         created_by: user.id,
         title: data.title,
         body: data.body,
@@ -74,7 +71,8 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         meta_description: data.meta_description,
         status: data.status || 'draft',
         workflow_id: data.workflow_id || null,
-        current_step: data.current_step || 0
+        current_step: data.current_step || 0,
+        template_id: data.template_id || null
       })
       .select();
     

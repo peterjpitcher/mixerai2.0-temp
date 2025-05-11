@@ -42,12 +42,9 @@ Custom configurable workflows for content approval with:
 - Email notifications
 
 ### 4. Content Generation
-AI-generated content using Azure OpenAI, supporting:
-- Articles
-- Retailer PDPs (Product Description Pages)
-- Owned PDPs
-- Includes meta title and description
-- Structured to industry best practices
+AI-generated content using Azure OpenAI, supporting generation via customizable Content Templates.
+- Includes meta title and description (often defined within templates).
+- Structured to industry best practices (guided by template structure).
 
 ## Database Architecture
 
@@ -138,29 +135,15 @@ CREATE TABLE user_brand_permissions (
 );
 ```
 
-#### Content Types Table
-```sql
-CREATE TABLE content_types (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name TEXT NOT NULL,
-  description TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(name)
-);
-```
-
 #### Workflows Table
 ```sql
 CREATE TABLE workflows (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   brand_id UUID REFERENCES brands(id) ON DELETE CASCADE,
-  content_type_id UUID REFERENCES content_types(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   steps JSONB NOT NULL DEFAULT '[]',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(brand_id, content_type_id)
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 ```
 
@@ -171,7 +154,7 @@ CREATE TYPE content_status AS ENUM ('draft', 'pending_review', 'approved', 'publ
 CREATE TABLE content (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   brand_id UUID REFERENCES brands(id) ON DELETE CASCADE,
-  content_type_id UUID REFERENCES content_types(id) ON DELETE CASCADE,
+  template_id UUID REFERENCES content_templates(id) ON DELETE SET NULL,
   workflow_id UUID REFERENCES workflows(id) ON DELETE SET NULL,
   created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
   title TEXT NOT NULL,
@@ -261,9 +244,9 @@ The application uses Supabase Auth for authentication with the following setup:
    - Fallback templates when AI generation fails
 
 2. **Content Generation**:
-   - Creates structured content based on brand guidelines
-   - Adapts to different content types (articles, PDPs)
-   - Includes meta information for SEO
+   - Creates structured content based on brand guidelines and user-defined Content Templates.
+   - Adapts to different content structures defined by templates.
+   - Includes meta information for SEO (often part of template design).
 
 ### Error Handling
 - All API calls use try/catch blocks

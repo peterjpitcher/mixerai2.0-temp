@@ -23,11 +23,6 @@ interface Brand {
   guardrails?: string | null;
 }
 
-interface ContentType {
-  id: string;
-  name: string;
-}
-
 interface Template {
   id: string;
   name: string;
@@ -39,19 +34,16 @@ interface Template {
 }
 
 interface ContentGeneratorFormProps {
-  preselectedContentType?: string | null;
   templateId?: string | null;
 }
 
-export function ContentGeneratorForm({ preselectedContentType, templateId }: ContentGeneratorFormProps) {
+export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
-  const [contentTypes, setContentTypes] = useState<ContentType[]>([]);
   const [selectedBrand, setSelectedBrand] = useState('');
-  const [selectedContentType, setSelectedContentType] = useState('');
   const [topic, setTopic] = useState('');
   const [keywords, setKeywords] = useState('');
   const [additionalInstructions, setAdditionalInstructions] = useState('');
@@ -98,7 +90,7 @@ export function ContentGeneratorForm({ preselectedContentType, templateId }: Con
   };
   
   useEffect(() => {
-    // Fetch brands and content types
+    // Fetch brands
     const fetchData = async () => {
       try {
         // Fetch brands
@@ -107,82 +99,31 @@ export function ContentGeneratorForm({ preselectedContentType, templateId }: Con
         
         if (brandsData.success && Array.isArray(brandsData.brands)) {
           setBrands(brandsData.brands);
-          // If there's only one brand, select it automatically
           if (brandsData.brands.length === 1) {
             setSelectedBrand(brandsData.brands[0].id);
           }
         } else {
           setBrands([]);
         }
-        
-        // Fetch content types
-        const contentTypesResponse = await fetch('/api/content-types');
-        const contentTypesData = await contentTypesResponse.json();
-        
-        if (contentTypesData.success && Array.isArray(contentTypesData.contentTypes)) {
-          setContentTypes(contentTypesData.contentTypes);
-          
-          // Set preselected content type if provided and valid
-          if (preselectedContentType) {
-            console.log('Preselected content type provided:', preselectedContentType);
-            console.log('Available content types:', contentTypesData.contentTypes.map(ct => ct.name));
-            
-            // Try to match by exact name or lowercase comparison
-            let matchedType = contentTypesData.contentTypes.find(
-              ct => ct.name === preselectedContentType
-            );
-            
-            if (!matchedType) {
-              // Try case-insensitive match
-              matchedType = contentTypesData.contentTypes.find(
-                ct => ct.name.toLowerCase() === preselectedContentType.toLowerCase()
-              );
-            }
-            
-            if (matchedType) {
-              console.log('Content type matched:', matchedType.name);
-              setSelectedContentType(matchedType.name);
-            } else {
-              console.warn('Could not match preselected content type:', preselectedContentType);
-              
-              // If no match but we have content types available, select the first one
-              if (contentTypesData.contentTypes.length > 0) {
-                console.log('Defaulting to first available content type:', contentTypesData.contentTypes[0].name);
-                setSelectedContentType(contentTypesData.contentTypes[0].name);
-              }
-            }
-          } else if (contentTypesData.contentTypes.length > 0) {
-            // If no preselected type but we have content types, select the first one
-            console.log('No preselected content type, defaulting to first available:', contentTypesData.contentTypes[0].name);
-            setSelectedContentType(contentTypesData.contentTypes[0].name);
-          }
-        } else {
-          console.error('No content types returned from API or response format incorrect');
-          setContentTypes([]);
-          // Set a hard-coded default content type
-          setSelectedContentType('Article');
-          console.log('Set hard-coded default content type: Article');
-        }
       } catch (error) {
-        console.error('Error fetching form data:', error);
+        console.error('Error fetching brand data:', error);
         setBrands([]);
-        setContentTypes([]);
-        // Set a hard-coded default content type in case of API error
-        setSelectedContentType('Article');
-        console.log('Set hard-coded default content type after API error: Article');
       }
     };
     
     fetchData();
     
-    // If templateId is provided, fetch the template
     if (templateId) {
-      console.log('ContentGeneratorForm: Template ID provided:', templateId);
       fetchTemplate(templateId);
     } else {
-      console.log('ContentGeneratorForm: No template ID provided');
+      console.warn('ContentGeneratorForm: No template ID provided. Form will not function correctly.');
+      toast({
+        title: "Template Missing",
+        description: "Cannot generate content without a template. Please select a template first.",
+        variant: "destructive"
+      });
     }
-  }, [preselectedContentType, templateId, toast]);
+  }, [templateId, toast]);
   
   useEffect(() => {
     // Use the topic as the initial title when content is generated
@@ -222,8 +163,6 @@ export function ContentGeneratorForm({ preselectedContentType, templateId }: Con
   }, [template]);
   
   const handleGenerate = async () => {
-    console.log('Generate button clicked');
-    console.log('Content type state:', selectedContentType);
     console.log('Brand state:', selectedBrand);
 
     if (!selectedBrand) {
@@ -235,17 +174,6 @@ export function ContentGeneratorForm({ preselectedContentType, templateId }: Con
       return;
     }
     
-    // Check for content type
-    if (!selectedContentType) {
-      console.warn('No content type selected, using default Article type');
-      setSelectedContentType('Article');
-      toast({
-        title: "Using default content type",
-        description: "Generating content with Article type"
-      });
-    }
-    
-    // Different validation based on whether we're using a template
     if (template) {
       console.log('Using template validation');
       console.log('Template field values:', templateFieldValues);
@@ -292,15 +220,12 @@ export function ContentGeneratorForm({ preselectedContentType, templateId }: Con
         setKeywords(templateFieldValues[keywordsField.id]);
       }
     } else {
-      // Standard validation for non-template content
-      if (!topic) {
-        toast({
-          title: "Topic required",
-          description: "Please enter a topic for your content",
-          variant: "destructive"
-        });
-        return;
-      }
+      toast({
+        title: "Template Required",
+        description: "Content generation requires a template. Please select one.",
+        variant: "destructive"
+      });
+      return;
     }
     
     setIsLoading(true);
@@ -323,7 +248,6 @@ export function ContentGeneratorForm({ preselectedContentType, templateId }: Con
         
         // Create properly formatted request with template information
         requestBody = {
-          contentType: selectedContentType,
           brand: {
             name: selectedBrandObj.name,
             brand_identity: selectedBrandObj.brand_identity,
@@ -343,21 +267,16 @@ export function ContentGeneratorForm({ preselectedContentType, templateId }: Con
           }
         };
       } else {
-        // Standard non-template request
-        requestBody = {
-          contentType: selectedContentType,
-          brand: {
-            name: selectedBrandObj.name,
-            brand_identity: selectedBrandObj.brand_identity,
-            tone_of_voice: selectedBrandObj.tone_of_voice,
-            guardrails: selectedBrandObj.guardrails
-          },
-          input: {
-            topic,
-            keywords: keywords.split(',').map(k => k.trim()).filter(k => k),
-            additionalInstructions,
-          }
-        };
+        // This path should ideally not be reached if templates are mandatory.
+        // The API /api/content/generate will also reject requests without a template.
+        console.error("Attempted to generate content without a template. This should not happen.");
+        toast({
+          title: "Error",
+          description: "Cannot generate content without a template.",
+          variant: "destructive"
+        });
+        setIsLoading(false);
+        return;
       }
       
       console.log('Sending generation request:', requestBody);
@@ -502,37 +421,21 @@ export function ContentGeneratorForm({ preselectedContentType, templateId }: Con
       return;
     }
     
-    // Check and handle missing content type
-    let contentTypeForRequest = selectedContentType;
-    if (!contentTypeForRequest) {
-      console.warn('No content type selected for save, using default Article type');
-      contentTypeForRequest = 'Article';
-      // Update state for future use
-      setSelectedContentType(contentTypeForRequest);
+    if (!template) {
+      console.error("Cannot save content without a loaded template.");
+      toast({
+        title: "Save failed",
+        description: "No template information available. Please ensure a template is selected and loaded.",
+        variant: "destructive"
+      });
+      setIsSaving(false);
+      return;
     }
-    
+
     setIsSaving(true);
     
     try {
-      // Get content type ID based on the name
-      let contentTypeObj = contentTypes.find(ct => ct.name === contentTypeForRequest);
-      
-      // If no content type found, create a fallback object
-      if (!contentTypeObj && contentTypes.length > 0) {
-        contentTypeObj = contentTypes[0];
-        console.log('Using first available content type for save:', contentTypeObj.name);
-      } else if (!contentTypeObj) {
-        console.error('Cannot save without a valid content type');
-        toast({
-          title: "Save failed",
-          description: "Could not determine content type. Please refresh and try again.",
-          variant: "destructive"
-        });
-        setIsSaving(false);
-        return;
-      }
-      
-      console.log('Saving content with content type:', contentTypeObj.name);
+      console.log('Saving content with content type:', template.name);
       
       // Create content in the database
       const response = await fetch('/api/content', {
@@ -542,8 +445,7 @@ export function ContentGeneratorForm({ preselectedContentType, templateId }: Con
         },
         body: JSON.stringify({
           brand_id: selectedBrand,
-          content_type_id: contentTypeObj.id,
-          template_id: template?.id, // Include template ID if available
+          template_id: template.id,
           title: title,
           body: generatedContent,
           meta_title: metaTitle,

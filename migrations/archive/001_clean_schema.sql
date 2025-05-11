@@ -45,33 +45,20 @@ CREATE TABLE IF NOT EXISTS user_brand_permissions (
   UNIQUE(user_id, brand_id)
 );
 
--- Create content types table
-CREATE TABLE IF NOT EXISTS content_types (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name TEXT NOT NULL,
-  description TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(name)
-);
-
 -- Create workflows table
 CREATE TABLE IF NOT EXISTS workflows (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   brand_id UUID REFERENCES brands(id) ON DELETE CASCADE,
-  content_type_id UUID REFERENCES content_types(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   steps JSONB NOT NULL DEFAULT '[]',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(brand_id, content_type_id)
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Create content table
 CREATE TABLE IF NOT EXISTS content (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   brand_id UUID REFERENCES brands(id) ON DELETE CASCADE,
-  content_type_id UUID REFERENCES content_types(id) ON DELETE CASCADE,
   workflow_id UUID REFERENCES workflows(id) ON DELETE SET NULL,
   created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
   title TEXT NOT NULL,
@@ -81,7 +68,8 @@ CREATE TABLE IF NOT EXISTS content (
   status content_status NOT NULL DEFAULT 'draft',
   current_step INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  template_id UUID
 );
 
 -- Create notifications table
@@ -94,7 +82,8 @@ CREATE TABLE IF NOT EXISTS notifications (
   is_read BOOLEAN DEFAULT FALSE,
   action_url TEXT,
   action_label TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Create analytics table
@@ -106,11 +95,4 @@ CREATE TABLE IF NOT EXISTS analytics (
   likes INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Just add standard content types without any brand or sample data
-INSERT INTO content_types (name, description) VALUES
-  ('Article', 'Long-form content with structured sections'),
-  ('Retailer PDP', 'Product descriptions optimized for third-party retailers'),
-  ('Owned PDP', 'Product descriptions for the brand''s own website')
-ON CONFLICT (name) DO NOTHING; 
+); 

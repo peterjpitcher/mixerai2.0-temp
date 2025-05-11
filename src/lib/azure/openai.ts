@@ -238,7 +238,6 @@ export async function generateContent(
  * Generate content based on a template
  */
 export async function generateContentFromTemplate(
-  contentType: "article" | "retailer_pdp" | "owned_pdp" | string, 
   brand: {
     name: string;
     brand_identity?: string | null;
@@ -300,7 +299,7 @@ export async function generateContentFromTemplate(
   systemPrompt += `\nYou are using a template called "${template.name}" to generate content.`;
   
   // Build the user prompt using template fields and prompts
-  let userPrompt = `Create content for content type "${contentType}" according to this template: "${template.name}".\n\n`;
+  let userPrompt = `Create content according to this template: "${template.name}".\n\n`;
   userPrompt += `Template input fields:\n`;
   
   // Add each input field with its value to the prompt
