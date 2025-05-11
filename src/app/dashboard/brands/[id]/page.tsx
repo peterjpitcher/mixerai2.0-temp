@@ -10,10 +10,12 @@ import { BrandIcon } from '@/components/brand-icon';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 import { toast } from 'sonner';
 import { Spinner } from '@/components/spinner';
-import { AlertCircle, HelpCircleIcon, FileText as ContentIcon, GitFork as WorkflowIcon } from 'lucide-react';
+import { AlertCircle, HelpCircleIcon, FileText as ContentIcon, GitFork as WorkflowIcon, ArchiveX } from 'lucide-react';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Label } from "@/components/label";
+import { createBrowserClient } from '@supabase/ssr';
+import RejectedContentList from '@/components/dashboard/brand/rejected-content-list';
 
 // export const metadata: Metadata = {
 //   title: 'Brand Details | MixerAI 2.0', // Dynamic title would be set server-side ideally
@@ -40,6 +42,20 @@ export default function BrandDetails({ params }: BrandDetailsProps) {
   const [error, setError] = useState<string | null>(null);
   const [contentCount, setContentCount] = useState(0);
   const [workflowCount, setWorkflowCount] = useState(0);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id || null);
+    };
+    getCurrentUser();
+  }, [supabase.auth]);
   
   useEffect(() => {
     const fetchBrandData = async () => {
@@ -80,7 +96,7 @@ export default function BrandDetails({ params }: BrandDetailsProps) {
     }
   }, [id]);
   
-  if (isLoading) {
+  if (isLoading || (brand && brand.brand_admin_id && !currentUserId) ) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,theme(spacing.16))-theme(spacing.12))] p-4">
         <Spinner className="h-12 w-12 text-primary" />
@@ -113,6 +129,8 @@ export default function BrandDetails({ params }: BrandDetailsProps) {
     );
   }
   
+  const isBrandAdmin = brand && brand.brand_admin_id && currentUserId === brand.brand_admin_id;
+
   const countryName = COUNTRIES.find(c => c.value === brand.country)?.label || brand.country || 'Not specified';
   const languageName = LANGUAGES.find(l => l.value === brand.language)?.label || brand.language || 'Not specified';
   
@@ -141,6 +159,9 @@ export default function BrandDetails({ params }: BrandDetailsProps) {
           <TabsTrigger value="identity">Brand Identity</TabsTrigger>
           <TabsTrigger value="content">Content ({contentCount})</TabsTrigger>
           <TabsTrigger value="workflows">Workflows ({workflowCount})</TabsTrigger>
+          {isBrandAdmin && (
+            <TabsTrigger value="rejected">Rejected Content</TabsTrigger>
+          )}
         </TabsList>
         
         <TabsContent value="overview" className="space-y-6">
@@ -300,6 +321,12 @@ export default function BrandDetails({ params }: BrandDetailsProps) {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {isBrandAdmin && (
+          <TabsContent value="rejected">
+            <RejectedContentList brandId={id} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

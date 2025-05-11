@@ -3,19 +3,46 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import { MarkdownDisplay } from '@/components/content/markdown-display';
-import { ContentApprovalWorkflow } from '@/components/content/content-approval-workflow';
+import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
 import { toast } from 'sonner';
-// import type { Metadata } from 'next'; // Metadata can be set dynamically if needed
+import { createBrowserClient } from '@supabase/ssr';
 
-// export const metadata: Metadata = {
-//   title: 'View Content | MixerAI 2.0',
-//   description: 'View detailed information and manage the workflow for a piece of content.',
-// };
+interface ContentData {
+  id: string;
+  title: string;
+  body: string;
+  meta_title: string;
+  meta_description: string;
+  status: string;
+  brand_name?: string;
+  brands?: any; // Simplified for now
+  template_name?: string;
+  content_templates?: any; // Simplified for now
+  template_id?: string;
+  content_data?: Record<string, any>;
+  created_at: string;
+  workflow_id?: string;
+  workflow?: { id: string; name: string; steps: any[] }; // Steps from JSONB
+  current_step: number; 
+  // other fields...
+}
+
+interface ContentVersion {
+  id: string;
+  workflow_step_identifier: string;
+  step_name: string;
+  version_number: number;
+  action_status: string;
+  feedback?: string;
+  reviewer_id?: string;
+  reviewer?: { id: string; full_name?: string; avatar_url?: string };
+  created_at: string;
+}
 
 interface ContentDetailPageProps {
   params: {
@@ -23,118 +50,77 @@ interface ContentDetailPageProps {
   };
 }
 
-/**
- * ContentDetailPage displays detailed information for a specific piece of content.
- * It includes the content body (as Markdown), SEO metadata, and an approval workflow.
- * Users can view content details and interact with the workflow (approve/reject steps).
- * Note: This component currently uses mock data and simulated API calls.
- */
 export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   const { id } = params;
-  const [content, setContent] = useState<any>(null);
+  const [content, setContent] = useState<ContentData | null>(null);
+  const [versions, setVersions] = useState<ContentVersion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const router = useRouter();
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
   useEffect(() => {
-    const fetchContentById = async () => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id || null);
+    };
+    getCurrentUser();
+  }, [supabase.auth]);
+
+  useEffect(() => {
+    const fetchData = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch(`/api/content/${id}`);
-        if (!response.ok) {
-          if (response.status === 404) {
-            notFound(); // Trigger 404 page if content not found by API
-            return;
-          }
-          throw new Error(`Failed to fetch content: ${response.statusText}`);
+        const [contentResponse, versionsResponse] = await Promise.all([
+          fetch(`/api/content/${id}`),
+          fetch(`/api/content/${id}/versions`)
+        ]);
+
+        if (!contentResponse.ok) {
+          if (contentResponse.status === 404) notFound();
+          throw new Error(`Failed to fetch content: ${contentResponse.statusText}`);
         }
-        const result = await response.json();
-        if (result.success && result.data) {
-          setContent(result.data);
+        const contentResult = await contentResponse.json();
+        if (contentResult.success && contentResult.data) {
+          setContent(contentResult.data);
         } else {
-          throw new Error(result.error || 'Failed to load content data.');
+          throw new Error(contentResult.error || 'Failed to load content data.');
         }
+
+        if (!versionsResponse.ok) {
+          console.error(`Failed to fetch content versions: ${versionsResponse.statusText}`);
+          toast.error('Could not load content history.');
+        } else {
+          const versionsResult = await versionsResponse.json();
+          if (versionsResult.success && versionsResult.data) {
+            setVersions(versionsResult.data);
+          } else {
+            console.error(versionsResult.error || 'Failed to load versions data.');
+          }
+        }
+
       } catch (error: any) {
-        console.error('Error fetching content:', error);
-        toast.error(error.message || 'Failed to load content. Please try again.');
-        // Optionally, redirect or show a more prominent error state on the page
+        console.error('Error fetching page data:', error);
+        toast.error(error.message || 'Failed to load page data. Please try again.');
       } finally {
         setIsLoading(false);
       }
     };
     
     if (id) {
-      fetchContentById();
+      fetchData();
     }
   }, [id]);
-  
-  const handleApprove = async (stepIndex: number, feedback: string) => {
-    // Mock API call - in a real implementation, we would call an API endpoint
-    // This logic would need to be updated to call `/api/content/${id}/workflow-action` or similar
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const updatedWorkflow = { ...content.workflow };
-      updatedWorkflow.steps[stepIndex].completed = true;
-      updatedWorkflow.steps[stepIndex].feedback = feedback || 'Approved';
-      updatedWorkflow.steps[stepIndex].approvedBy = 'Current User'; // Replace with actual user data
-      updatedWorkflow.steps[stepIndex].approvedAt = new Date().toISOString();
-      
-      if (stepIndex < updatedWorkflow.steps.length - 1) {
-        updatedWorkflow.currentStep = stepIndex + 1;
-      } else {
-        setContent(prev => ({
-          ...prev,
-          status: 'Published',
-          workflow: updatedWorkflow
-        }));
-        toast.success('Content approved and published!');
-        return;
-      }
-      
-      setContent(prev => ({
-        ...prev,
-        workflow: updatedWorkflow
-      }));
-      toast.success(`Step "${updatedWorkflow.steps[stepIndex].name}" approved.`);
-    } catch (error) {
-      console.error('Error approving content:', error);
-      toast.error('Failed to approve step.');
-      // throw error; // Re-throwing might not be needed if handled by toast
-    }
+
+  const handleWorkflowAction = () => {
+    router.refresh();
   };
-  
-  const handleReject = async (stepIndex: number, feedback: string) => {
-    // Mock API call - update similarly to handleApprove
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setContent(prev => ({
-        ...prev,
-        status: 'Rejected',
-        workflow: {
-          ...prev.workflow,
-          steps: prev.workflow.steps.map((step: any, index: number) => {
-            if (index === stepIndex) {
-              return {
-                ...step,
-                completed: false, // Ensure completed is false on reject
-                feedback: feedback,
-                rejectedBy: 'Current User', // Replace with actual user data
-                rejectedAt: new Date().toISOString()
-              };
-            }
-            return step;
-          })
-        }
-      }));
-      toast.warning(`Step "${content.workflow.steps[stepIndex].name}" rejected.`);
-    } catch (error) {
-      console.error('Error rejecting content:', error);
-      toast.error('Failed to reject step.');
-      // throw error;
-    }
-  };
-  
-  if (isLoading) {
+
+  if (isLoading || !currentUserId) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
         <div className="animate-spin rounded-full border-2 border-current border-t-transparent h-6 w-6"></div>
@@ -143,20 +129,16 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   }
   
   if (!content) {
-    // If notFound() was called in useEffect, this might not be reached, but good for safety.
-    // Alternatively, display an error message component here.
     return <p>Content could not be loaded or was not found.</p>; 
   }
-  
-  // Dynamic metadata based on content title
-  // Note: For this to work, this page needs to be a Server Component or use a different metadata strategy for Client Components.
-  // As it's a client component due to hooks, direct metadata export won't work. 
-  // Consider fetching metadata server-side or updating document.title in useEffect.
-  // useEffect(() => {
-  //   if (content?.title) {
-  //     document.title = `${content.title} | View Content | MixerAI 2.0`;
-  //   }
-  // }, [content?.title]);
+
+  const currentStepObject = content.workflow?.steps[content.current_step] as WorkflowStep | undefined;
+  let isCurrentUserStepOwner = false;
+  if (currentStepObject && currentUserId) {
+    if (Array.isArray(currentStepObject.assignees)) {
+      isCurrentUserStepOwner = currentStepObject.assignees.some((assignee: any) => assignee.id === currentUserId);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -167,7 +149,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
             View details, content body, SEO metadata, and manage the approval workflow.
           </p>
           <p className="text-sm text-muted-foreground mt-2">
-            Template: {content.template_name || content.content_templates?.name || 'N/A'} • Brand: {content.brand_name || content.brands?.name || 'N/A'} • Created: {new Date(content.createdAt).toLocaleDateString('en-GB')}
+            Template: {content.template_name || content.content_templates?.name || 'N/A'} • Brand: {content.brand_name || content.brands?.name || 'N/A'} • Created: {new Date(content.created_at).toLocaleDateString('en-GB')}
           </p>
         </div>
         <div className="flex space-x-2">
@@ -186,20 +168,22 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <Card>
+          <Card className="mb-6">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Content Details</CardTitle>
                 <span className={`text-xs px-2 py-1 rounded-full ${
-                  content.status === 'Published' 
+                  content.status === 'published' 
                     ? 'bg-success/20 text-success'
-                    : content.status === 'Rejected'
+                    : content.status === 'rejected'
                     ? 'bg-destructive/20 text-destructive'
-                    : content.status === 'Pending Review'
-                    ? 'bg-secondary/20 text-secondary'
-                    : 'bg-warning/20 text-warning'
+                    : content.status === 'pending_review'
+                    ? 'bg-yellow-300/20 text-yellow-700'
+                    : content.status === 'approved'
+                    ? 'bg-blue-300/20 text-blue-700'
+                    : 'bg-gray-100 text-gray-800'
                 }`}>
-                  {content.status}
+                  {content.status.replace('_',' ').replace(/\b\w/g, l => l.toUpperCase())}
                 </span>
               </div>
             </CardHeader>
@@ -211,14 +195,12 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
                 </TabsList>
                 <TabsContent value="content" className="mt-4">
                   <div className="prose prose-sm max-w-none">
-                    {/* Assuming content.body still holds the main markdown, or it might come from content.content_data based on template */}
                     <MarkdownDisplay markdown={content.body || (content.content_data?.contentBody || '')} />
                   </div>
                 </TabsContent>
                 <TabsContent value="seo" className="space-y-4 mt-4">
                   <div>
                     <h3 className="text-sm font-medium mb-1">Meta Title</h3>
-                    {/* Meta title might also come from content_data if template-driven */}
                     <p className="border rounded p-2">{content.meta_title || (content.content_data?.metaTitle || 'Not set')}</p>
                   </div>
                   <div>
@@ -228,32 +210,42 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
                 </TabsContent>
               </Tabs>
             </CardContent>
-            <CardFooter className="flex justify-end space-x-4 border-t pt-6">
-              <Button variant="outline">Download</Button>
-              {content.status !== 'Published' && content.status !== 'Pending Review' && (
-                <Button>Submit for Review</Button>
-              )}
-              {content.status === 'Published' && (
-                <Button>Unpublish</Button>
-              )}
-            </CardFooter>
           </Card>
+
+          {versions.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Content History & Feedback</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {versions.map(version => (
+                  <div key={version.id} className="p-3 border rounded-md bg-muted/50">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-medium">{version.step_name || `Step ${version.workflow_step_identifier}`} - <span className={`font-semibold ${version.action_status === 'Completed' ? 'text-green-600' : version.action_status === 'Rejected' ? 'text-red-600' : 'text-gray-600'}`}>{version.action_status}</span></span>
+                      <span className="text-xs text-muted-foreground">v{version.version_number}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      By: {version.reviewer?.full_name || 'N/A'} on {new Date(version.created_at).toLocaleString('en-GB')}
+                    </p>
+                    {version.feedback && (
+                      <p className="mt-2 text-sm italic border-l-2 pl-2 border-border">{version.feedback}</p>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
         
         <div className="lg:col-span-1">
-          {/* Ensure workflow data is present and valid before rendering */}
-          {content.workflow && Array.isArray(content.workflow.steps) && (
+          {content.workflow && currentStepObject && (
             <ContentApprovalWorkflow
               contentId={content.id}
               contentTitle={content.title}
-              // Pass template name instead of old content.type
-              contentType={content.template_name || content.content_templates?.name || 'Unknown Template'} 
-              workflowName={content.workflow.name}
-              currentStep={content.workflow.currentStep}
-              steps={content.workflow.steps}
-              onApprove={handleApprove}
-              onReject={handleReject}
-              canApprove={true} // This should be determined by user permissions
+              currentStepObject={currentStepObject}
+              isCurrentUserStepOwner={isCurrentUserStepOwner}
+              versions={versions}
+              onActionComplete={handleWorkflowAction}
             />
           )}
         </div>

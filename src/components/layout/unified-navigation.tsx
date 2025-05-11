@@ -20,7 +20,8 @@ import {
   Image,
   Globe,
   MoreVertical,
-  Folder
+  Folder,
+  ListChecks
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect, useRef } from 'react';
@@ -141,6 +142,12 @@ export function UnifiedNavigation() {
       label: 'Dashboard',
       icon: <Home className="h-5 w-5" />,
       segment: ''
+    },
+    {
+      href: '/dashboard/my-tasks',
+      label: 'My Tasks',
+      icon: <ListChecks className="h-5 w-5" />,
+      segment: 'my-tasks'
     },
     {
       href: '/dashboard/workflows',
