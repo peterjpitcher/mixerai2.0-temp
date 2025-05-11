@@ -14,7 +14,7 @@ interface AnalyticsData {
     pendingReview: number;
     rejected: number;
   };
-  contentByType: {
+  contentByTemplate: {
     label: string;
     value: number;
   }[];
@@ -30,7 +30,7 @@ interface AnalyticsData {
     id: string;
     title: string;
     views: number;
-    type: string;
+    templateName: string;
     brand: string;
   }[];
 }
@@ -49,7 +49,7 @@ export function AnalyticsOverview() {
         // Here we're just simulating a fetch with mock data
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Mock data
+        // Mock data updated to use template names
         const data: AnalyticsData = {
           contentCounts: {
             total: 42,
@@ -58,10 +58,9 @@ export function AnalyticsOverview() {
             pendingReview: 4,
             rejected: 2
           },
-          contentByType: [
-            { label: 'Article', value: 25 },
-            { label: 'Retailer PDP', value: 10 },
-            { label: 'Owned PDP', value: 7 }
+          contentByTemplate: [
+            { label: 'Basic Article', value: 25 + 7 }, // Summing Article and Owned PDP for example
+            { label: 'Product Description', value: 10 } // Was Retailer PDP
           ],
           contentByBrand: [
             { label: 'Demo Brand', value: 15 },
@@ -78,11 +77,11 @@ export function AnalyticsOverview() {
             { date: '2023-05-13', count: 6 }
           ],
           topPerformingContent: [
-            { id: '1', title: 'How to Increase Your Social Media Engagement', views: 1250, type: 'Article', brand: 'Demo Brand' },
-            { id: '6', title: 'Smart Home Security System Features', views: 980, type: 'Retailer PDP', brand: 'Tech Innovators' },
-            { id: '3', title: '10 Tips for Sustainable Living', views: 890, type: 'Article', brand: 'EcoFriendly' },
-            { id: '5', title: 'Best Practices for Email Marketing Campaigns', views: 720, type: 'Article', brand: 'Demo Brand' },
-            { id: '2', title: 'Premium Wireless Headphones Product Description', views: 680, type: 'Retailer PDP', brand: 'Tech Innovators' }
+            { id: '1', title: 'How to Increase Your Social Media Engagement', views: 1250, templateName: 'Basic Article', brand: 'Demo Brand' },
+            { id: '6', title: 'Smart Home Security System Features', views: 980, templateName: 'Product Description', brand: 'Tech Innovators' },
+            { id: '3', title: '10 Tips for Sustainable Living', views: 890, templateName: 'Basic Article', brand: 'EcoFriendly' },
+            { id: '5', title: 'Best Practices for Email Marketing Campaigns', views: 720, templateName: 'Basic Article', brand: 'Demo Brand' },
+            { id: '2', title: 'Premium Wireless Headphones Product Description', views: 680, templateName: 'Product Description', brand: 'Tech Innovators' }
           ]
         };
         
@@ -165,7 +164,7 @@ export function AnalyticsOverview() {
           <CardContent>
             <div className="text-3xl font-bold">{analyticsData.contentCounts.published}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {Math.round((analyticsData.contentCounts.published / analyticsData.contentCounts.total) * 100)}% of total
+              {analyticsData.contentCounts.total > 0 ? Math.round((analyticsData.contentCounts.published / analyticsData.contentCounts.total) * 100) : 0}% of total
             </p>
           </CardContent>
         </Card>
@@ -177,7 +176,7 @@ export function AnalyticsOverview() {
           <CardContent>
             <div className="text-3xl font-bold">{analyticsData.contentCounts.draft}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {Math.round((analyticsData.contentCounts.draft / analyticsData.contentCounts.total) * 100)}% of total
+              {analyticsData.contentCounts.total > 0 ? Math.round((analyticsData.contentCounts.draft / analyticsData.contentCounts.total) * 100) : 0}% of total
             </p>
           </CardContent>
         </Card>
@@ -189,7 +188,7 @@ export function AnalyticsOverview() {
           <CardContent>
             <div className="text-3xl font-bold">{analyticsData.contentCounts.pendingReview}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {Math.round((analyticsData.contentCounts.pendingReview / analyticsData.contentCounts.total) * 100)}% of total
+              {analyticsData.contentCounts.total > 0 ? Math.round((analyticsData.contentCounts.pendingReview / analyticsData.contentCounts.total) * 100) : 0}% of total
             </p>
           </CardContent>
         </Card>
@@ -198,24 +197,24 @@ export function AnalyticsOverview() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="col-span-1">
           <CardHeader>
-            <CardTitle>Content by Type</CardTitle>
-            <CardDescription>Distribution of content by type</CardDescription>
+            <CardTitle>Content by Template</CardTitle>
+            <CardDescription>Distribution of content by template</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-80">
               {/* This would be a real chart in a production app */}
               <div className="flex h-full items-center justify-center">
                 <div className="w-full max-w-md">
-                  {analyticsData.contentByType.map((item, index) => (
+                  {analyticsData.contentByTemplate.map((item, index) => (
                     <div key={item.label} className="mb-4">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-medium">{item.label}</span>
-                        <span className="text-sm text-muted-foreground">{item.value} ({Math.round((item.value / analyticsData.contentCounts.total) * 100)}%)</span>
+                        <span className="text-sm text-muted-foreground">{item.value} ({analyticsData.contentCounts.total > 0 ? Math.round((item.value / analyticsData.contentCounts.total) * 100) : 0}%)</span>
                       </div>
                       <div className="w-full bg-muted rounded-full h-2.5">
                         <div 
                           className="bg-primary h-2.5 rounded-full" 
-                          style={{ width: `${(item.value / analyticsData.contentCounts.total) * 100}%` }}
+                          style={{ width: `${analyticsData.contentCounts.total > 0 ? (item.value / analyticsData.contentCounts.total) * 100 : 0}%` }}
                         ></div>
                       </div>
                     </div>
@@ -240,14 +239,14 @@ export function AnalyticsOverview() {
                     <div key={item.label} className="mb-4">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-medium">{item.label}</span>
-                        <span className="text-sm text-muted-foreground">{item.value} ({Math.round((item.value / analyticsData.contentCounts.total) * 100)}%)</span>
+                        <span className="text-sm text-muted-foreground">{item.value} ({analyticsData.contentCounts.total > 0 ? Math.round((item.value / analyticsData.contentCounts.total) * 100) : 0}%)</span>
                       </div>
                       <div className="w-full bg-muted rounded-full h-2.5">
                         <div 
                           className={`h-2.5 rounded-full ${
                             index === 0 ? 'bg-blue-500' : index === 1 ? 'bg-green-500' : 'bg-yellow-500'
                           }`}
-                          style={{ width: `${(item.value / analyticsData.contentCounts.total) * 100}%` }}
+                          style={{ width: `${analyticsData.contentCounts.total > 0 ? (item.value / analyticsData.contentCounts.total) * 100 : 0}%` }}
                         ></div>
                       </div>
                     </div>
@@ -275,7 +274,7 @@ export function AnalyticsOverview() {
                     <div 
                       className="bg-primary w-12 rounded-t-md" 
                       style={{ 
-                        height: `${(dataPoint.count / Math.max(...analyticsData.contentCreationOverTime.map(d => d.count))) * 200}px` 
+                        height: `${Math.max(...analyticsData.contentCreationOverTime.map(d => d.count)) > 0 ? (dataPoint.count / Math.max(...analyticsData.contentCreationOverTime.map(d => d.count))) * 200 : 0}px` 
                       }}
                     ></div>
                     <div className="text-xs text-muted-foreground mt-2">
@@ -301,7 +300,7 @@ export function AnalyticsOverview() {
               <thead>
                 <tr className="border-b">
                   <th className="h-12 px-4 text-left font-medium">Title</th>
-                  <th className="h-12 px-4 text-left font-medium">Type</th>
+                  <th className="h-12 px-4 text-left font-medium">Template</th>
                   <th className="h-12 px-4 text-left font-medium">Brand</th>
                   <th className="h-12 px-4 text-right font-medium">Views</th>
                 </tr>
@@ -313,7 +312,7 @@ export function AnalyticsOverview() {
                     className="border-b transition-colors hover:bg-muted/50"
                   >
                     <td className="p-4 align-middle font-medium">{content.title}</td>
-                    <td className="p-4 align-middle">{content.type}</td>
+                    <td className="p-4 align-middle">{content.templateName}</td>
                     <td className="p-4 align-middle">{content.brand}</td>
                     <td className="p-4 align-middle text-right">{content.views.toLocaleString()}</td>
                   </tr>

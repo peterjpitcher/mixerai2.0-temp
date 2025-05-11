@@ -14,6 +14,8 @@ interface ContentItem {
   status: string;
   created_at: string;
   created_by_name: string;
+  template_name?: string;
+  template_icon?: string;
 }
 
 export default function ContentPage() {
@@ -176,6 +178,7 @@ export default function ContentPage() {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left pb-3 font-medium">Title</th>
+                    <th className="text-left pb-3 font-medium">Template</th>
                     <th className="text-left pb-3 font-medium">Brand</th>
                     <th className="text-left pb-3 font-medium">Status</th>
                     <th className="text-left pb-3 font-medium">Created By</th>
@@ -187,6 +190,7 @@ export default function ContentPage() {
                   {content.map((item) => (
                     <tr key={item.id} className="border-b">
                       <td className="py-3">{item.title}</td>
+                      <td className="py-3">{item.template_name || 'N/A'}</td>
                       <td className="py-3">{item.brand_name}</td>
                       <td className="py-3">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 

@@ -19,7 +19,8 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       .select(`
         *,
         brands:brand_id(name, brand_color),
-        profiles:created_by(full_name)
+        profiles:created_by(full_name),
+        content_templates:template_id(name, icon)
       `)
       .order('created_at', { ascending: false });
     
@@ -35,7 +36,9 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       ...item,
       brand_name: item.brands?.name || null,
       brand_color: item.brands?.brand_color || null,
-      created_by_name: item.profiles?.full_name || null
+      created_by_name: item.profiles?.full_name || null,
+      template_name: item.content_templates?.name || null,
+      template_icon: item.content_templates?.icon || null
     }));
     
     return NextResponse.json({ 

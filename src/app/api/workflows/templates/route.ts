@@ -4,7 +4,7 @@ import { handleApiError } from '@/lib/api-utils'; // Import for consistent error
 /**
  * GET endpoint to retrieve workflow templates
  * This is a static API that provides predefined templates for
- * different content types.
+ * different content templates.
  * This endpoint is currently unauthenticated.
  */
 export async function GET() {
@@ -12,10 +12,10 @@ export async function GET() {
     // Define standard workflow templates
     const templates = [
       {
-        id: 'article-standard',
-        name: 'Standard Article Workflow',
-        contentType: 'article',
-        description: 'A standard 3-step approval process for articles',
+        id: 'basic-article-standard-workflow',
+        name: 'Standard Workflow for Basic Article',
+        templateName: 'Basic Article',
+        description: 'A standard 3-step approval process for articles created with the Basic Article template',
         steps: [
           {
             id: 1,
@@ -41,10 +41,10 @@ export async function GET() {
         ]
       },
       {
-        id: 'retailer-pdp',
-        name: 'Retailer Product Description',
-        contentType: 'retailer_pdp',
-        description: 'Simplified 2-step approval process for retailer product descriptions',
+        id: 'product-description-standard-workflow',
+        name: 'Standard Workflow for Product Description',
+        templateName: 'Product Description',
+        description: 'A standard approval process for product descriptions created with the Product Description template',
         steps: [
           {
             id: 1,
@@ -55,42 +55,13 @@ export async function GET() {
           },
           {
             id: 2,
-            name: 'Brand Approval',
-            description: 'Final approval by brand representative',
-            role: 'admin',
-            approvalRequired: true
-          }
-        ]
-      },
-      {
-        id: 'owned-pdp',
-        name: 'Owned Product Description',
-        contentType: 'owned_pdp',
-        description: 'Comprehensive 4-step approval process for owned product descriptions',
-        steps: [
-          {
-            id: 1,
-            name: 'Author Review',
-            description: 'Initial review by the content author',
-            role: 'editor',
-            approvalRequired: true
-          },
-          {
-            id: 2,
-            name: 'Editorial Review',
-            description: 'Review by an editor for language and style',
-            role: 'editor',
-            approvalRequired: true
-          },
-          {
-            id: 3,
             name: 'SEO Review',
             description: 'Review by SEO team for optimization',
             role: 'editor',
             approvalRequired: true
           },
           {
-            id: 4,
+            id: 3,
             name: 'Brand Approval',
             description: 'Final approval by brand representative',
             role: 'admin',
@@ -99,10 +70,10 @@ export async function GET() {
         ]
       },
       {
-        id: 'quick-approval',
-        name: 'Quick Approval Workflow',
-        contentType: 'any',
-        description: 'Simple 1-step approval process for quick content approvals',
+        id: 'generic-quick-approval',
+        name: 'Quick Approval Workflow (Any Template)',
+        templateName: 'any',
+        description: 'Simple 1-step approval process for quick content approvals, applicable to any template',
         steps: [
           {
             id: 1,

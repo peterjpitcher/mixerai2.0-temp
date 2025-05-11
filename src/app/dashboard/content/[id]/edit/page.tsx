@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/card';
@@ -25,6 +25,21 @@ interface ContentEditPageProps {
   };
 }
 
+// Define a more specific type for the content state
+interface ContentState {
+  id: string;
+  title: string;
+  body: string;
+  metaTitle: string;
+  metaDescription: string;
+  status: string;
+  brand_name?: string; // From joined brands table
+  template_name?: string; // From joined content_templates table
+  template_id?: string;
+  content_data?: Record<string, any>; // For template-driven fields
+  // Add other fields from your actual content structure as needed
+}
+
 /**
  * ContentEditPage allows users to modify an existing piece of content.
  * It provides fields for editing the title, body (using Markdown with a live preview), 
@@ -37,77 +52,61 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Initial state with default values
-  const [content, setContent] = useState({
+  const [content, setContent] = useState<ContentState>({
     id: '',
     title: '',
     body: '',
     metaTitle: '',
     metaDescription: '',
     status: 'Draft',
-    type: '',
-    brand: '',
+    brand_name: '',
+    template_name: '', // Initialize template_name
+    template_id: '',
+    content_data: {}
   });
   
   useEffect(() => {
-    // Mock API call - in a real implementation, we would fetch from Supabase
-    const fetchContent = async () => {
+    const fetchContentById = async () => {
       setIsLoading(true);
-      
       try {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Mock data
-        const contentData = {
-          id: '1',
-          title: 'How to Increase Your Social Media Engagement',
-          type: 'Article',
-          brand: 'Demo Brand',
-          createdAt: '2023-10-15T10:30:00Z',
-          status: 'Draft',
-          body: `# How to Increase Your Social Media Engagement
-
-Social media engagement is crucial for building brand awareness and fostering customer relationships. Here are some effective strategies to boost your engagement rates:
-
-## Create Valuable Content
-
-The foundation of good engagement is content that provides value to your audience. This can be:
-
-* Educational posts that teach something new
-* Entertaining content that makes people smile
-* Inspirational stories that motivate action
-* Problem-solving tips relevant to your audience
-
-## Post Consistently
-
-Consistency is key to maintaining visibility in your followers' feeds. Develop a posting schedule that works for your brand and stick to it.
-
-## Encourage Interaction
-
-Ask questions, create polls, and invite followers to share their thoughts. The more you can get people to interact with your posts, the higher your engagement rates will be.
-
-## Respond to Comments
-
-Make a habit of responding to comments on your posts. This shows that you value your followers' input and can turn casual followers into loyal fans.
-
-## Use Visual Content
-
-Posts with images, videos, or infographics typically receive higher engagement than text-only posts. Invest in creating high-quality visual content for your social media channels.`,
-          metaTitle: 'How to Increase Your Social Media Engagement: 5 Proven Strategies',
-          metaDescription: 'Learn effective strategies to boost your social media engagement, including content creation tips, posting consistency, and interaction techniques.',
-        };
-        
-        setContent(contentData);
-      } catch (error) {
-        // console.error('Error fetching content:', error);
-        toast.error('Failed to load content. Please try again.');
+        const response = await fetch(`/api/content/${id}`);
+        if (!response.ok) {
+          if (response.status === 404) {
+            notFound();
+            return;
+          }
+          throw new Error(`Failed to fetch content: ${response.statusText}`);
+        }
+        const result = await response.json();
+        if (result.success && result.data) {
+          // Map API data to ContentState
+          setContent({
+            id: result.data.id,
+            title: result.data.title || '',
+            body: result.data.body || (result.data.content_data?.contentBody || ''), // Example fallback
+            metaTitle: result.data.meta_title || (result.data.content_data?.metaTitle || ''),
+            metaDescription: result.data.meta_description || (result.data.content_data?.metaDescription || ''),
+            status: result.data.status || 'Draft',
+            brand_name: result.data.brand_name || result.data.brands?.name || 'N/A',
+            template_name: result.data.template_name || result.data.content_templates?.name || 'N/A',
+            template_id: result.data.template_id || '',
+            content_data: result.data.content_data || {}
+          });
+        } else {
+          throw new Error(result.error || 'Failed to load content data.');
+        }
+      } catch (error: any) {
+        console.error('Error fetching content:', error);
+        toast.error(error.message || 'Failed to load content. Please try again.');
+        // Optionally redirect or show an error message
       } finally {
         setIsLoading(false);
       }
     };
     
-    fetchContent();
+    if (id) {
+      fetchContentById();
+    }
   }, [id]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -117,19 +116,26 @@ Posts with images, videos, or infographics typically receive higher engagement t
   
   const handleSave = async () => {
     setIsSaving(true);
-    
     try {
-      // In a real implementation, we would send this to an API endpoint
-      // that updates it in Supabase
-      // console.log('Content to save:', content);
+      // TODO: Implement actual API call to PUT /api/content/${id}
+      // The payload should include all editable fields, e.g., title, body, metaTitle, metaDescription, content_data etc.
+      const payloadToSave = {
+        title: content.title,
+        body: content.body, // Or derive from content_data if structured differently
+        meta_title: content.metaTitle,
+        meta_description: content.metaDescription,
+        // status: content.status, // Status might be updated via workflow actions typically
+        template_id: content.template_id, // May not be editable here, but good to have
+        content_data: content.content_data // If form edits structured data
+      };
+      console.log('Content to save (payload for PUT /api/content/[id]):', payloadToSave);
       
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
       
-      toast.success('Content updated successfully!');
-      router.push(`/dashboard/content/${id}`);
+      toast.success('Content updated successfully! (Mocked)');
+      router.push(`/dashboard/content/${id}`); // Redirect to view page
     } catch (error) {
-      // console.error('Error updating content:', error);
+      console.error('Error updating content:', error);
       toast.error('Failed to update content. Please try again.');
     } finally {
       setIsSaving(false);
@@ -180,12 +186,12 @@ Posts with images, videos, or infographics typically receive higher engagement t
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label>Content Type</Label>
-              <Input value={content.type} disabled />
+              <Label>Content Template</Label>
+              <Input value={content.template_name || 'N/A'} disabled />
             </div>
             <div>
               <Label>Brand</Label>
-              <Input value={content.brand} disabled />
+              <Input value={content.brand_name || 'N/A'} disabled />
             </div>
           </div>
         </CardContent>
@@ -193,7 +199,7 @@ Posts with images, videos, or infographics typically receive higher engagement t
       
       <Card>
         <CardHeader>
-          <CardTitle>Content</CardTitle>
+          <CardTitle>Content Body</CardTitle>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="edit" className="w-full">

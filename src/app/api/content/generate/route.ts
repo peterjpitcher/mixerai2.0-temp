@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateContent, generateContentFromTemplate } from '@/lib/azure/openai';
+import { generateContentFromTemplate } from '@/lib/azure/openai';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 
@@ -73,50 +73,9 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       }
     }
     
-    // The following block is legacy logic based on the old contentType system.
-    // This should be reviewed based on whether non-template-based generation is still supported.
-    // For now, it's commented out as the primary flow is expected to be template-based.
-    /*
-    if (data.contentType === 'article' && !data.input?.topic) {
-      return NextResponse.json(
-        { success: false, error: 'Topic is required for article content type' },
-        { status: 400 }
-      );
-    }
-    
-    if (['retailer_pdp', 'owned_pdp'].includes(data.contentType) && !data.input?.productName) {
-      return NextResponse.json(
-        { success: false, error: 'Product name is required for PDP content types' },
-        { status: 400 }
-      );
-    }
-    
-    let safeContentType: "article" | "retailer_pdp" | "owned_pdp";
-    if (data.contentType === 'article' || data.contentType === 'retailer_pdp' || data.contentType === 'owned_pdp') {
-      safeContentType = data.contentType;
-    } else {
-      return NextResponse.json(
-        { success: false, error: `Unsupported content type: ${data.contentType}` },
-        { status: 400 }
-      );
-    }
-    
-    const generatedContent = await generateContent(
-      safeContentType,
-      data.brand,
-      data.input || {}
-    );
-    
-    return NextResponse.json({
-      success: true,
-      userId: user.id,
-      ...generatedContent
-    });
-    */
-    
-    // If execution reaches here, it means no template was provided and the legacy path is commented out.
-    // This implies that template-based generation is now the primary/only path.
-    // If non-template generation is still required, this part of the code needs to be re-evaluated.
+    // Legacy block removed. 
+    // If execution reaches here, it means no template was provided.
+    // Template-based generation is now the primary/only path.
     return NextResponse.json(
         { success: false, error: 'Template ID is required for content generation.' },
         { status: 400 }

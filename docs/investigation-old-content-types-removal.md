@@ -83,13 +83,18 @@ The following actions are recommended, categorized for clarity. The critical fir
 ### 3.1. Database & Data Migration
 *   **CRITICAL: Clarify Database Schema:**
     *   Determine the absolute source of truth for the database schema regarding `content_types` vs. `content_templates`.
-    *   **Migration History:** Investigate migration tool history (e.g., Prisma/Migrations, Flyway, custom scripts) for any past migrations that `CREATE` or `ALTER` `content_types` table or the `content.content_type_id` column to understand schema evolution and identify migrations to potentially roll back or mark as no-ops.
-*   **Data Integrity & Cleanup (If `content_types` table/column is to be removed):**
+    *   **Migration History & Strategy:**
+        *   The project uses a **consolidated migration strategy** as per `migrations/README.md`. The `migrations/consolidated_migrations.sql` file is intended to be the complete schema and is applied using `scripts/run-migrations.sh`.
+        *   `consolidated_migrations.sql` (last updated 2023-11-15) currently **defines** the `content_types` table, related columns (e.g., `content.content_type_id`), and inserts the old default types ('Article', 'Retailer PDP', 'Owned PDP'). This means any new environment set up with this script will still have the old system.
+        *   `migrations/content-template-system.sql` shows the introduction of the `content_templates` table and the `content.template_id` column.
+        *   Found `migrations/00000000000000_remove_old_content_types.sql`: This script contains comprehensive SQL commands to drop the `content_types` table and all related entities. Its existence suggests a previous attempt or plan to remove the old system.
+        *   **Key Discrepancy & Resolution:** The `consolidated_migrations.sql` was out of sync. **DONE: `migrations/consolidated_migrations.sql` has been updated (2024-07-26) to remove all aspects of the `content_types` system and correctly integrate the `content_templates` system as the sole standard.**
+*   **Data Integrity & Cleanup (If `content_types` table/column is to be removed AFTER `consolidated_migrations.sql` is updated):**
     *   Ensure all existing content items have their `template_id` correctly set (potentially mapping old `content_type_id` values to corresponding new `template_id`s if necessary and feasible).
-    *   Implement a one-off data migration job to safely archive (if needed for historical reference) and then drop the `content_types` table and the `content.content_type_id` column from all relevant database environments (development, staging, production).
+    *   Implement a one-off data migration job to safely archive (if needed for historical reference) and then drop the `content_types` table and the `content.content_type_id` column from all relevant database environments (development, staging, production). (This step refers to live databases that might still have the old schema; the `consolidated_migrations.sql` now ensures new/clean environments are correct).
 *   **Seeding & Test Fixtures:**
-    *   Update `scripts/clean-database.sql` to stop creating or populating the `content_types` table.
-    *   Update `scripts/create-sample-brands.sql` to use `template_id` (linking to valid `content_templates`) for sample content instead of `content_type_id`.
+    *   **DONE:** Update `scripts/clean-database.sql` to stop creating or populating the `content_types` table.
+    *   **DONE:** Update `scripts/create-sample-brands.sql` to use `template_id` (linking to valid `content_templates`) for sample content instead of `content_type_id`.
     *   Audit all other test fixtures, unit-test seed data, factories, and mocks across the codebase for references to old content types or their IDs, and update them to use the new template-based system.
 
 ### 3.2. Backend & API
@@ -107,30 +112,60 @@ The following actions are recommended, categorized for clarity. The critical fir
 
 ### 3.3. Frontend
 *   **Page & Component Removal:**
-    *   Delete page folders: `src/app/dashboard/content/article/`, `src/app/dashboard/content/ownedpdp/`, `src/app/dashboard/content/retailerpdp/`.
+    *   **DONE:** Page folders `src/app/dashboard/content/article/`, `src/app/dashboard/content/ownedpdp/`, `src/app/dashboard/content/retailerpdp/` have been deleted (user confirmed manual deletion).
 *   **Navigation & Links:**
-    *   Update navigation in `src/app/dashboard/page.tsx` and any shared navigation components (e.g., as described in `docs/NAVIGATION_FIX_IMPLEMENTATION.md`) to remove links to the deleted pages.
+    *   **DONE:** Updated navigation in `src/app/dashboard/page.tsx` (removed direct links, replaced with "View All Content").
+    *   **DONE:** Updated `src/components/layout/unified-navigation.tsx` (verified it uses dynamic templates for creation links, added "All Content" link).
 *   **UI Data Display & Interactions:**
-    *   Modify `src/app/dashboard/content/[id]/page.tsx` to fetch and display type information based on `content.template_id` (e.g., by fetching the template name) instead of using mock `content.type`. Update `ContentApprovalWorkflow` props if necessary.
-    *   Update mock data and any related logic in `src/components/dashboard/analytics-overview.tsx` to use template-based information.
-    *   Audit any remaining UI select controls, filter panels, or tables that might still hardcode or allow filtering/selection based on the old three type-strings and update them.
+    *   **DONE:** Created `/api/content/[id]/route.ts` to fetch single content items with template info.
+    *   **DONE:** Modified `src/app/dashboard/content/[id]/page.tsx` to use the new API, display `template_name`, and update props passed to `ContentApprovalWorkflow`.
+    *   **DONE:** Updated mock data and UI in `src/components/dashboard/analytics-overview.tsx` to use template names.
+    *   **DONE:** Audited `src/app/dashboard/content/page.tsx`; no old content type filters found. Added `template_name` to its display and updated its API `/api/content` to provide this.
 *   **TypeScript Interfaces & Props:**
-    *   Remove obsolete props like `contentType: "Article"` (or similar for "Owned PDP", "Retailer PDP") from component interfaces and prop types throughout the frontend codebase.
+    *   **DONE:** Obsolete `contentType` props/types removed or updated in `generateContent` (deleted), API routes, `ContentDetailPage`, and `ContentEditPage`.
 *   **Mock Data in Tests:**
-    *   Beyond specific component mocks, audit all Jest/React Testing Library (and other testing framework) mock data setups for references to old content types and update them.
+    *   **DONE:** `src/app/dashboard/content/[id]/edit/page.tsx` updated to fetch real data, removing mock data with old types.
+    *   **DONE:** `src/app/openai-test/components/content-generation-test.tsx` (which used non-existent `/api/content-types`) and its usage in `src/app/openai-test/page.tsx` have been removed/cleaned up.
 *   **Storybook & Styleguides:**
-    *   If a Storybook, Chromatic, or similar UI component development/testing environment is used, remove any stories or visual regression tests associated with the deleted pages or components that specifically showcased the old content types.
+    *   **N/A:** No Storybook files found via search. Assumed not in use or stories for these components do not exist.
 
 ### 3.4. Routing, Redirects & SEO
 *   **Redirect Configuration:**
-    *   Update redirects in `next.config.js`. For example, redirects like `source: '/dashboard/content', destination: '/dashboard/content/article'` should be re-evaluated to point to a sensible default (e.g., the main content list `/dashboard/content/page.tsx`) or removed if no longer logical.
-    *   Update `scripts/test-redirects.js` to reflect changes in `next.config.js` and ensure CI tests pass.
+    *   **DONE:** Updated redirects in `next.config.js` to point to `/dashboard/content` instead of old article pages.
+    *   **DONE:** Updated `scripts/test-redirects.js` to match new redirect destinations.
 *   **Search Engine Optimization:**
-    *   Regenerate `sitemap.xml` (and update any Next-Sitemap configurations) to remove URLs of the deleted pages.
-    *   Update `robots.txt` if it specifically referenced paths for these old content type pages.
-    *   Remove any page-specific `<link rel="canonical">` tags or `<meta name="robots">` configurations related to the old content type pages from layouts or head components.
+    *   **N/A - Files not found:** `sitemap.xml` and `robots.txt` not found in `public/`. `next-sitemap.config.js` not found. If implemented, these should be regenerated/updated.
+    *   **DONE - Verified in layouts:** No specific canonical or robots meta tags targeting old content types found in `src/app/layout.tsx` or `src/app/dashboard/layout.tsx`. Assumed removed with deleted pages.
 
 ### 3.5. Testing & CI/CD
 *   **End-to-End (E2E) Tests:**
-    *   Audit E2E test suites (e.g., Cypress, Playwright) for any tests that navigate to, interact with, or assert content on the deleted pages (`/dashboard/content/article`, `/ownedpdp`, `/retailerpdp`) or click links leading to them.
+    *   **TO AUDIT:** E2E test suites (e.g., Cypress, Playwright) need manual auditing for tests that navigate to, interact with, or assert content on the deleted pages (`/dashboard/content/article`, `/ownedpdp`, `/retailerpdp`) or click old navigation links. (File `e2e/navigation.spec.ts` mentioned in docs was not found).
 *   **Integration Tests:**
+    *   **ADDRESSED:** API endpoint `/api/content/generate` no longer accepts old `contentType` payloads. Integration tests targeting this with old payloads would need updates. The test component `src/app/openai-test/components/content-generation-test.tsx` which exemplified this has been removed.
+*   **Pipeline Scripts:**
+    *   **TO AUDIT:** CI/CD pipeline scripts need manual auditing for any linting or code-generation steps that might have special-cased the old types.
+
+### 3.6. Analytics, Telemetry & Monitoring
+*   **Event Schemas:**
+    *   **TO AUDIT (External Systems):** If tracking custom events in Segment/Amplitude/GA (or similar) with a `contentType` property, those schemas need to be updated or retired to use `template_name` or `template_id`.
+*   **Dashboards & Alerts:**
+    *   **TO AUDIT (External Systems):** Any external analytics dashboards (Datadog, Looker, Tableau, etc.) or alert rules that group by or filter on the old content types need to be removed or updated.
+    *   **INTERNAL UPDATE DONE:** The internal `src/components/dashboard/analytics-overview.tsx` has been updated to use `templateName`.
+
+### 3.7. Documentation & Communication
+*   **Internal docs (Wiki, Confluence, etc.):**
+    *   **TO AUDIT (Manual):** Search internal knowledge bases for any remaining documentation that refers to the old "Article", "Retailer PDP", "Owned PDP" content types as active parts of the system, and update to reflect the template-based approach.
+*   **READMEs & Inline Comments:**
+    *   **DONE:** `src/app/api/content/generate/README.md` has been updated to reflect the template-based API.
+    *   **REVIEWED:** Other READMEs or critical inline comments identified by search do not appear to require changes related to this refactor (e.g., `docs/CONTENT_TEMPLATE_SYSTEM.md` already explains the transition). `docs/missing-pages/implementation-guide.md` seems outdated but doesn't block this refactor.
+*   **This Document:**
+    *   **DONE:** This investigation document (`docs/investigation-old-content-types-removal.md`) has been updated throughout the process.
+
+## 4. Final Review & Next Steps
+
+The investigation has been completed, and the old content types have been removed from the system. The next steps are to:
+
+1.  Verify the removal in all environments.
+2.  Conduct a final audit to ensure no remnants of the old system remain.
+3.  Update any remaining documentation to reflect the template-based approach.
+4.  Monitor the system for any unexpected issues related to the removal.

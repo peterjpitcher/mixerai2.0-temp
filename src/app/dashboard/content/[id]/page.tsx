@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import { MarkdownDisplay } from '@/components/content/markdown-display';
 import { ContentApprovalWorkflow } from '@/components/content/content-approval-workflow';
 import { toast } from 'sonner';
-import type { Metadata } from 'next';
+// import type { Metadata } from 'next'; // Metadata can be set dynamically if needed
 
 // export const metadata: Metadata = {
 //   title: 'View Content | MixerAI 2.0',
@@ -35,128 +35,58 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
-    // Mock API call - in a real implementation, we would fetch from Supabase
-    const fetchContent = async () => {
+    const fetchContentById = async () => {
       setIsLoading(true);
-      
       try {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Mock data
-        const contentData = {
-          id: '1',
-          title: 'How to Increase Your Social Media Engagement',
-          type: 'Article',
-          brand: 'Demo Brand',
-          createdAt: '2023-10-15T10:30:00Z',
-          status: 'Pending Review',
-          body: `# How to Increase Your Social Media Engagement
-
-Social media engagement is crucial for building brand awareness and fostering customer relationships. Here are some effective strategies to boost your engagement rates:
-
-## Create Valuable Content
-
-The foundation of good engagement is content that provides value to your audience. This can be:
-
-* Educational posts that teach something new
-* Entertaining content that makes people smile
-* Inspirational stories that motivate action
-* Problem-solving tips relevant to your audience
-
-## Post Consistently
-
-Consistency is key to maintaining visibility in your followers' feeds. Develop a posting schedule that works for your brand and stick to it.
-
-## Encourage Interaction
-
-Ask questions, create polls, and invite followers to share their thoughts. The more you can get people to interact with your posts, the higher your engagement rates will be.
-
-## Respond to Comments
-
-Make a habit of responding to comments on your posts. This shows that you value your followers' input and can turn casual followers into loyal fans.
-
-## Use Visual Content
-
-Posts with images, videos, or infographics typically receive higher engagement than text-only posts. Invest in creating high-quality visual content for your social media channels.`,
-          metaTitle: 'How to Increase Your Social Media Engagement: 5 Proven Strategies',
-          metaDescription: 'Learn effective strategies to boost your social media engagement, including content creation tips, posting consistency, and interaction techniques.',
-          workflow: {
-            id: '1',
-            name: 'Standard Content Approval',
-            currentStep: 0,
-            steps: [
-              {
-                id: 'step1',
-                name: 'Content Review',
-                description: 'Review content for accuracy and quality',
-                role: 'Editor',
-                completed: false,
-                skipped: false
-              },
-              {
-                id: 'step2',
-                name: 'SEO Optimization',
-                description: 'Verify SEO metadata and keywords',
-                role: 'SEO Specialist',
-                completed: false,
-                skipped: false
-              },
-              {
-                id: 'step3',
-                name: 'Brand Compliance',
-                description: 'Ensure content aligns with brand guidelines',
-                role: 'Brand Manager',
-                completed: false,
-                skipped: false
-              },
-              {
-                id: 'step4',
-                name: 'Final Approval',
-                description: 'Final review before publishing',
-                role: 'Content Manager',
-                completed: false,
-                skipped: false
-              }
-            ]
+        const response = await fetch(`/api/content/${id}`);
+        if (!response.ok) {
+          if (response.status === 404) {
+            notFound(); // Trigger 404 page if content not found by API
+            return;
           }
-        };
-        
-        setContent(contentData);
-      } catch (error) {
-        // console.error('Error fetching content:', error);
-        toast.error('Failed to load content. Please try again.');
+          throw new Error(`Failed to fetch content: ${response.statusText}`);
+        }
+        const result = await response.json();
+        if (result.success && result.data) {
+          setContent(result.data);
+        } else {
+          throw new Error(result.error || 'Failed to load content data.');
+        }
+      } catch (error: any) {
+        console.error('Error fetching content:', error);
+        toast.error(error.message || 'Failed to load content. Please try again.');
+        // Optionally, redirect or show a more prominent error state on the page
       } finally {
         setIsLoading(false);
       }
     };
     
-    fetchContent();
+    if (id) {
+      fetchContentById();
+    }
   }, [id]);
   
   const handleApprove = async (stepIndex: number, feedback: string) => {
     // Mock API call - in a real implementation, we would call an API endpoint
+    // This logic would need to be updated to call `/api/content/${id}/workflow-action` or similar
     try {
-      // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Update the workflow steps
       const updatedWorkflow = { ...content.workflow };
       updatedWorkflow.steps[stepIndex].completed = true;
       updatedWorkflow.steps[stepIndex].feedback = feedback || 'Approved';
-      updatedWorkflow.steps[stepIndex].approvedBy = 'John Doe';
+      updatedWorkflow.steps[stepIndex].approvedBy = 'Current User'; // Replace with actual user data
       updatedWorkflow.steps[stepIndex].approvedAt = new Date().toISOString();
       
-      // Move to the next step if not the last step
       if (stepIndex < updatedWorkflow.steps.length - 1) {
         updatedWorkflow.currentStep = stepIndex + 1;
       } else {
-        // If this is the last step, update content status to Published
         setContent(prev => ({
           ...prev,
           status: 'Published',
           workflow: updatedWorkflow
         }));
+        toast.success('Content approved and published!');
         return;
       }
       
@@ -164,19 +94,19 @@ Posts with images, videos, or infographics typically receive higher engagement t
         ...prev,
         workflow: updatedWorkflow
       }));
+      toast.success(`Step "${updatedWorkflow.steps[stepIndex].name}" approved.`);
     } catch (error) {
-      // console.error('Error approving content:', error);
-      throw error;
+      console.error('Error approving content:', error);
+      toast.error('Failed to approve step.');
+      // throw error; // Re-throwing might not be needed if handled by toast
     }
   };
   
   const handleReject = async (stepIndex: number, feedback: string) => {
-    // Mock API call - in a real implementation, we would call an API endpoint
+    // Mock API call - update similarly to handleApprove
     try {
-      // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Update the content status to Rejected
       setContent(prev => ({
         ...prev,
         status: 'Rejected',
@@ -186,8 +116,9 @@ Posts with images, videos, or infographics typically receive higher engagement t
             if (index === stepIndex) {
               return {
                 ...step,
+                completed: false, // Ensure completed is false on reject
                 feedback: feedback,
-                rejectedBy: 'John Doe',
+                rejectedBy: 'Current User', // Replace with actual user data
                 rejectedAt: new Date().toISOString()
               };
             }
@@ -195,13 +126,14 @@ Posts with images, videos, or infographics typically receive higher engagement t
           })
         }
       }));
+      toast.warning(`Step "${content.workflow.steps[stepIndex].name}" rejected.`);
     } catch (error) {
-      // console.error('Error rejecting content:', error);
-      throw error;
+      console.error('Error rejecting content:', error);
+      toast.error('Failed to reject step.');
+      // throw error;
     }
   };
   
-  // If content doesn't exist, show 404 page
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
@@ -211,9 +143,21 @@ Posts with images, videos, or infographics typically receive higher engagement t
   }
   
   if (!content) {
-    notFound();
+    // If notFound() was called in useEffect, this might not be reached, but good for safety.
+    // Alternatively, display an error message component here.
+    return <p>Content could not be loaded or was not found.</p>; 
   }
   
+  // Dynamic metadata based on content title
+  // Note: For this to work, this page needs to be a Server Component or use a different metadata strategy for Client Components.
+  // As it's a client component due to hooks, direct metadata export won't work. 
+  // Consider fetching metadata server-side or updating document.title in useEffect.
+  // useEffect(() => {
+  //   if (content?.title) {
+  //     document.title = `${content.title} | View Content | MixerAI 2.0`;
+  //   }
+  // }, [content?.title]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -223,7 +167,7 @@ Posts with images, videos, or infographics typically receive higher engagement t
             View details, content body, SEO metadata, and manage the approval workflow.
           </p>
           <p className="text-sm text-muted-foreground mt-2">
-            Type: {content.type} • Brand: {content.brand} • Created: {new Date(content.createdAt).toLocaleDateString('en-GB')}
+            Template: {content.template_name || content.content_templates?.name || 'N/A'} • Brand: {content.brand_name || content.brands?.name || 'N/A'} • Created: {new Date(content.createdAt).toLocaleDateString('en-GB')}
           </p>
         </div>
         <div className="flex space-x-2">
@@ -267,17 +211,19 @@ Posts with images, videos, or infographics typically receive higher engagement t
                 </TabsList>
                 <TabsContent value="content" className="mt-4">
                   <div className="prose prose-sm max-w-none">
-                    <MarkdownDisplay markdown={content.body} />
+                    {/* Assuming content.body still holds the main markdown, or it might come from content.content_data based on template */}
+                    <MarkdownDisplay markdown={content.body || (content.content_data?.contentBody || '')} />
                   </div>
                 </TabsContent>
                 <TabsContent value="seo" className="space-y-4 mt-4">
                   <div>
                     <h3 className="text-sm font-medium mb-1">Meta Title</h3>
-                    <p className="border rounded p-2">{content.metaTitle}</p>
+                    {/* Meta title might also come from content_data if template-driven */}
+                    <p className="border rounded p-2">{content.meta_title || (content.content_data?.metaTitle || 'Not set')}</p>
                   </div>
                   <div>
                     <h3 className="text-sm font-medium mb-1">Meta Description</h3>
-                    <p className="border rounded p-2">{content.metaDescription}</p>
+                    <p className="border rounded p-2">{content.meta_description || (content.content_data?.metaDescription || 'Not set')}</p>
                   </div>
                 </TabsContent>
               </Tabs>
@@ -295,17 +241,19 @@ Posts with images, videos, or infographics typically receive higher engagement t
         </div>
         
         <div className="lg:col-span-1">
-          {content.workflow && (
+          {/* Ensure workflow data is present and valid before rendering */}
+          {content.workflow && Array.isArray(content.workflow.steps) && (
             <ContentApprovalWorkflow
               contentId={content.id}
               contentTitle={content.title}
-              contentType={content.type}
+              // Pass template name instead of old content.type
+              contentType={content.template_name || content.content_templates?.name || 'Unknown Template'} 
               workflowName={content.workflow.name}
               currentStep={content.workflow.currentStep}
               steps={content.workflow.steps}
               onApprove={handleApprove}
               onReject={handleReject}
-              canApprove={true} // In a real implementation, this would be determined by user permissions
+              canApprove={true} // This should be determined by user permissions
             />
           )}
         </div>

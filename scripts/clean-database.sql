@@ -15,13 +15,13 @@ TRUNCATE TABLE brands CASCADE;
 DELETE FROM profiles WHERE id = '00000000-0000-0000-0000-000000000001';
 DELETE FROM profiles WHERE id = '11111111-1111-1111-1111-111111111111';
 
--- Re-insert only the content types (to have basic structure)
--- Ensure existing content types are cleared first
-TRUNCATE TABLE content_types CASCADE;
-INSERT INTO content_types (name, description) VALUES
-  ('Article', 'Long-form content with structured sections'),
-  ('Retailer PDP', 'Product descriptions optimized for third-party retailers'),
-  ('Owned PDP', 'Product descriptions for the brand''s own website');
+-- -- Re-insert only the content types (to have basic structure) -- Removed as content_types table is removed
+-- -- Ensure existing content types are cleared first -- Removed
+-- TRUNCATE TABLE content_types CASCADE; -- Removed
+-- INSERT INTO content_types (name, description) VALUES -- Removed
+--   ('Article', 'Long-form content with structured sections'), -- Removed
+--   ('Retailer PDP', 'Product descriptions optimized for third-party retailers'), -- Removed
+--   ('Owned PDP', 'Product descriptions for the brand\'s own website'); -- Removed
 
 -- Re-enable foreign key constraints
 SET session_replication_role = 'origin'; 

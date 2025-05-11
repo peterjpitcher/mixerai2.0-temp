@@ -55,7 +55,7 @@ const routes = [
   { source: '/workflows/abc', expected: '/dashboard/workflows/abc', description: 'Workflow detail redirect' },
   { source: '/workflows/def/edit', expected: '/dashboard/workflows/def/edit', description: 'Workflow edit redirect' },
   { source: '/workflows/new', expected: '/dashboard/workflows/new', description: 'New workflow redirect' },
-  { source: '/content', expected: '/dashboard/content/article', description: 'Content index redirect' },
+  { source: '/content', expected: '/dashboard/content', description: 'Content index redirect' },
   { source: '/content/article', expected: '/dashboard/content/article', description: 'Content article redirect' },
   { source: '/content/ownedpdp', expected: '/dashboard/content/ownedpdp', description: 'Content owned PDP redirect' },
   { source: '/content/retailerpdp', expected: '/dashboard/content/retailerpdp', description: 'Content retailer PDP redirect' },

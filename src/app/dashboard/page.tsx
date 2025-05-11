@@ -43,13 +43,7 @@ export default async function DashboardPage() {
               </p>
               <div className="flex flex-col space-y-2">
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/content/article">Articles</Link>
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/content/ownedpdp">Owned PDP</Link>
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/content/retailerpdp">Retailer PDP</Link>
+                  <Link href="/dashboard/content">View All Content</Link>
                 </Button>
               </div>
             </div>

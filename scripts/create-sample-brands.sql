@@ -53,19 +53,30 @@ VALUES
     'Highlight environmental credentials with specific details. Avoid vague sustainability claims.'
   );
 
--- Create content counts for each brand
-INSERT INTO content (brand_id, content_type_id, title, body, meta_title, meta_description, status)
+-- Create content for each brand using content_templates
+INSERT INTO content (brand_id, template_id, title, body, meta_title, meta_description, status, content_data)
 SELECT 
   b.id,
-  (SELECT id FROM content_types ORDER BY RANDOM() LIMIT 1),
-  'Sample Content ' || generate_series,
-  '# Sample Content
-
-This is placeholder content for testing the interface. In a real scenario, this would contain actual marketing content.',
-  'Sample Meta Title',
-  'Sample meta description for testing purposes',
-  'published'::content_status
+  ct.id, -- Use the selected template_id
+  'Sample ' || ct.name || ' ' || gs.val, -- Make title more descriptive
+  '# Sample ' || ct.name || '\n\nThis is placeholder content for testing using the ' || ct.name || ' template. In a real scenario, this would contain actual marketing content structured according to the template fields.', -- Updated body
+  'Sample Meta Title for ' || ct.name || ' ' || gs.val, -- Updated meta_title
+  'Sample meta description for ' || ct.name || ' ' || gs.val || ' testing purposes', -- Updated meta_description
+  'published'::content_status,
+  jsonb_build_object( -- Example content_data, adjust based on actual template fields
+    'title', 'Sample ' || ct.name || ' ' || gs.val,
+    'keywords', 'sample, test, ' || lower(ct.name),
+    'brief', 'This is a sample brief for ' || ct.name || ' ' || gs.val || '.',
+    -- Attempting to use a field name from the seeded templates, e.g., 'contentBody' for Basic Article
+    'contentBody', '<h2>Sample Heading</h2><p>This is sample rich text content for ' || ct.name || ' ' || gs.val || '.</p>',
+    -- Fallback generic field if specific one isn't in all templates (though title/brief are common)
+    'genericBody', 'This is generic body content for ' || ct.name || ' ' || gs.val || '.',
+    'metaDescription', 'Sample meta description for ' || ct.name || ' ' || gs.val || ' testing purposes'
+  )
 FROM brands b
+CROSS JOIN (
+    SELECT id, name FROM content_templates ORDER BY RANDOM() LIMIT 1 -- Select a random template
+) ct
 CROSS JOIN generate_series(1, (CASE 
   WHEN b.name = 'TechGadgets' THEN 12
   WHEN b.name = 'WearTech' THEN 8
@@ -73,7 +84,7 @@ CROSS JOIN generate_series(1, (CASE
   WHEN b.name = 'StyleHouse' THEN 6
   WHEN b.name = 'EcoLiving' THEN 9
   ELSE 1
-END));
+END)) AS gs(val);
 
 -- Assign user to all brands
 INSERT INTO user_brand_permissions (user_id, brand_id, role)
@@ -85,4 +96,4 @@ FROM brands
 ON CONFLICT DO NOTHING;
 
 -- Output confirmation
-SELECT 'Sample brands created successfully' as result; 
+SELECT 'Sample brands and content (using templates) created successfully' as result; 

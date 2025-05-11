@@ -126,6 +126,14 @@ export function UnifiedNavigation() {
     segment: template.id
   }));
   
+  // Prepend "All Content" link to the dynamic contentItems
+  const allContentLink: NavItem = {
+    href: '/dashboard/content',
+    label: 'All Content',
+    icon: <Folder className="h-4 w-4" />,
+    segment: 'content'
+  };
+
   // Primary nav items
   const navItems: (NavItem | NavGroupItem)[] = [
     {
@@ -157,7 +165,7 @@ export function UnifiedNavigation() {
     {
       label: 'Content',
       icon: <BookOpen className="h-5 w-5" />,
-      items: contentItems,
+      items: [allContentLink, ...contentItems],
       segment: 'content',
       defaultOpen: true
     },
