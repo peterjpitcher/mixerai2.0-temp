@@ -104,13 +104,14 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
         const brandsData = await brandsResponse.json();
         
         if (brandsData.success) {
-          setBrands(brandsData.brands || []);
+          const currentBrands = Array.isArray(brandsData.data) ? brandsData.data : [];
+          setBrands(currentBrands);
           
           // Initialize the selectedBrands state
           const brandPermissions: {[key: string]: {selected: boolean, role: string}} = {};
           
           // First, set all brands as unselected with default role of 'viewer'
-          brandsData.brands.forEach((brand: Brand) => {
+          currentBrands.forEach((brand: Brand) => {
             brandPermissions[brand.id] = { selected: false, role: 'viewer' };
           });
           

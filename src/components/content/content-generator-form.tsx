@@ -97,12 +97,13 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         const brandsResponse = await fetch('/api/brands');
         const brandsData = await brandsResponse.json();
         
-        if (brandsData.success && Array.isArray(brandsData.brands)) {
-          setBrands(brandsData.brands);
-          if (brandsData.brands.length === 1) {
-            setSelectedBrand(brandsData.brands[0].id);
+        if (brandsData.success) {
+          setBrands(Array.isArray(brandsData.data) ? brandsData.data : []);
+          if (Array.isArray(brandsData.data) && brandsData.data.length === 1) {
+            setSelectedBrand(brandsData.data[0].id);
           }
         } else {
+          console.error('Failed to fetch brands:', brandsData.error);
           setBrands([]);
         }
       } catch (error) {

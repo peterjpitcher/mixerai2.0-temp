@@ -77,7 +77,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
         }
         
         setWorkflow(workflowData.workflow);
-        setBrands(brandsData.brands || []);
+        setBrands(Array.isArray(brandsData.data) ? brandsData.data : []);
       } catch (error) {
         // console.error('Error fetching data:', error);
         setError((error as Error).message || 'Failed to load data.');

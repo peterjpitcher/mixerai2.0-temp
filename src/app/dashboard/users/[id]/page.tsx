@@ -105,10 +105,10 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
         const brandsResponse = await fetch('/api/brands');
         const brandsData = await brandsResponse.json();
         
-        if (brandsData.success && data.user.brand_permissions?.length > 0) {
+        if (brandsData.success && Array.isArray(brandsData.data) && data.user.brand_permissions?.length > 0) {
           // Enhance brand permissions with brand details
           data.user.brand_permissions = data.user.brand_permissions.map((permission: any) => {
-            const brand = brandsData.brands.find((b: Brand) => b.id === permission.brand_id);
+            const brand = brandsData.data.find((b: Brand) => b.id === permission.brand_id);
             return {
               ...permission,
               brand: brand || undefined

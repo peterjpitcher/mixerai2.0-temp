@@ -54,7 +54,7 @@ export default function BrandsPage() {
         const data = await response.json();
         
         if (data.success) {
-          setBrands(data.data);
+          setBrands(Array.isArray(data.data) ? data.data : []);
         } else {
           throw new Error(data.error || 'Failed to fetch brands');
         }
@@ -157,7 +157,7 @@ export default function BrandsPage() {
   };
   
   // Filter brands based on search term
-  const filteredBrands = brands.filter(brand => 
+  const filteredBrands = (Array.isArray(brands) ? brands : []).filter(brand => 
     brand.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (COUNTRIES.find(c => c.value === brand.country)?.label || brand.country)
       .toLowerCase().includes(searchTerm.toLowerCase())

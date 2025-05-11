@@ -7,8 +7,18 @@ import { Button } from '@/components/button';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { TemplateForm } from '@/components/template/template-form';
 import { useToast } from '@/components/toast-provider';
-import { Loader2, ChevronLeft } from 'lucide-react';
+import { Loader2, ChevronLeft, Trash2 } from 'lucide-react';
 import type { Metadata } from 'next';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/alert-dialog";
 
 // export const metadata: Metadata = {
 //   title: 'Edit Template | MixerAI 2.0',
@@ -158,6 +168,9 @@ export default function TemplateEditPage() {
   const { toast } = useToast();
   const [template, setTemplate] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Add debugging logs
   // console.log('Template Edit Page - Params:', params);
@@ -167,6 +180,7 @@ export default function TemplateEditPage() {
     const fetchTemplate = async () => {
       // console.log('Starting to fetch template with ID:', id);
       setLoading(true);
+      setDeleteError(null); // Clear delete error on load
 
       // Check if this is a default template
       if (id === 'article-template' || id === 'product-template') {
@@ -234,27 +248,136 @@ export default function TemplateEditPage() {
     );
   }
 
+  const handleOpenDeleteDialog = () => {
+    setDeleteError(null); // Clear previous errors
+    setShowDeleteDialog(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!id || (id === 'article-template' || id === 'product-template')) {
+      toast({
+        title: 'Error',
+        description: 'System templates cannot be deleted.',
+        variant: 'destructive',
+      });
+      setShowDeleteDialog(false);
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const response = await fetch(`/api/content-templates/${id}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        toast({
+          title: 'Success',
+          description: 'Template deleted successfully.',
+        });
+        router.push('/dashboard/templates');
+        setShowDeleteDialog(false);
+      } else {
+        // Specific error from API (e.g., template in use)
+        setDeleteError(data.error || 'Failed to delete template.');
+        // Keep dialog open to show the error
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'An unexpected error occurred while deleting the template.',
+        variant: 'destructive',
+      });
+      setShowDeleteDialog(false); // Close dialog on unexpected error
+    }
+    setIsDeleting(false);
+  };
+
+  // Prevent rendering if template is null and not loading (error case handled by useEffect)
+  if (!loading && !template) {
+    // useEffect should have redirected if there was an error and template is still null
+    // This is a fallback to prevent rendering with a null template
+    return (
+      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+        <PageHeader
+          title="Edit Template"
+          description="Modify your content template configuration."
+          actions={
+            <Link href="/dashboard/templates">
+              <Button variant="outline">
+                <ChevronLeft className="mr-2 h-4 w-4" />
+                Back to Templates
+              </Button>
+            </Link>
+          }
+        />
+        <div className="p-4 border border-destructive bg-destructive/10 text-destructive rounded-md">
+          <p>Error: Template data could not be loaded or template not found.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const isSystemTemplate = id === 'article-template' || id === 'product-template';
+
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
       <PageHeader
         title={`Edit ${template?.name || 'Template'}`}
         description="Modify your content template configuration."
         actions={
-          <Link href="/dashboard/templates">
-            <Button variant="outline">
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Back to Templates
-            </Button>
-          </Link>
+          <div className="flex space-x-2">
+            <Link href="/dashboard/templates">
+              <Button variant="outline">
+                <ChevronLeft className="mr-2 h-4 w-4" />
+                Back to Templates
+              </Button>
+            </Link>
+            {!isSystemTemplate && (
+              <Button variant="destructive" onClick={handleOpenDeleteDialog}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Template
+              </Button>
+            )}
+          </div>
         }
       />
       
       {template && <TemplateForm initialData={template} />}
-      {!template && (
-        <div className="p-4 border border-destructive bg-destructive/10 text-destructive rounded-md">
-          <p>Error: Template data could not be loaded.</p>
-        </div>
-      )}
+      {/* AlertDialog for delete confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deleteError ? 'Cannot Delete Template' : 'Are you sure you want to delete this template?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteError ? deleteError : 
+                `This action will permanently delete the template "${template?.name}". This cannot be undone.`
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            {!deleteError && (
+              <AlertDialogAction
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </AlertDialogAction>
+            )}
+            {deleteError && (
+              <AlertDialogAction onClick={() => setShowDeleteDialog(false)}>OK</AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 } 
