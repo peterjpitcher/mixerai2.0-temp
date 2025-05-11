@@ -52,39 +52,36 @@ export default function NewWorkflowPage() {
   });
   
   useEffect(() => {
-    // Mock API call - in a real implementation, we would fetch from Supabase
-    const fetchBrands = async () => {
+    const fetchRealBrands = async () => {
       setIsLoading(true);
-      
       try {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 500));
+        const response = await fetch('/api/brands');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch brands: ${response.status}`);
+        }
+        const data = await response.json();
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to process brands data');
+        }
         
-        // Mock data
-        const brandsData = [
-          { id: '1', name: 'Demo Brand', color: '#3B82F6' },
-          { id: '2', name: 'Another Brand', color: '#10B981' },
-          { id: '3', name: 'Test Brand', color: '#F59E0B' }
-        ];
+        const fetchedBrands = data.brands || [];
+        setBrands(fetchedBrands);
         
-        setBrands(brandsData);
-        
-        // Set default brand if available
-        if (brandsData.length > 0) {
+        if (fetchedBrands.length > 0) {
           setWorkflow(prev => ({
             ...prev,
-            brand: brandsData[0]
+            brand: fetchedBrands[0] // Set the full brand object for initial default
           }));
         }
-      } catch (error) {
-        // console.error('Error fetching brands:', error);
-        toast.error('Failed to load brands. Please try again.');
+      } catch (error: any) {
+        console.error('Error fetching brands:', error);
+        toast.error(error.message || 'Failed to load brands. Please try again.');
       } finally {
         setIsLoading(false);
       }
     };
     
-    fetchBrands();
+    fetchRealBrands();
   }, []);
 
   const handleUpdateWorkflowDetails = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -313,15 +310,44 @@ export default function NewWorkflowPage() {
 
     setIsSaving(true);
     
+    const payload = {
+      name: workflow.name,
+      brand_id: workflow.brand?.id, // Ensure you get the ID from the brand object
+      steps: workflow.steps.map((step: any) => ({ // Ensure steps are formatted as expected by the API
+        id: step.id, // Or remove if API generates it
+        name: step.name,
+        description: step.description,
+        role: step.role,
+        approvalRequired: step.approvalRequired,
+        assignees: step.assignees.map((assignee: any) => ({ email: assignee.email })) // Send only email
+      }))
+    };
+
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch('/api/workflows', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create workflow');
+      }
       
-      toast.success('Workflow created successfully');
-      router.push('/dashboard/workflows');
-    } catch (error) {
-      // console.error('Error creating workflow:', error);
-      toast.error('Failed to create workflow. Please try again.');
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success('Workflow created successfully');
+        router.push('/dashboard/workflows');
+      } else {
+        throw new Error(result.error || 'Failed to create workflow');
+      }
+    } catch (error: any) {
+      console.error('Error creating workflow:', error);
+      toast.error(error.message || 'Failed to create workflow. Please try again.');
     } finally {
       setIsSaving(false);
     }

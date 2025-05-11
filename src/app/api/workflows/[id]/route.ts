@@ -50,8 +50,7 @@ export async function GET(
       .from('workflows')
       .select(`
         *,
-        brands:brand_id(name, brand_color),
-        content_types:content_type_id(name)
+        brands:brand_id(name, brand_color)
       `)
       .eq('id', id)
       .single();
@@ -85,11 +84,11 @@ export async function GET(
       if (userIds.size > 0) {
         const { data: usersData, error: usersError } = await supabase
           .from('profiles') 
-          .select('id, full_name, email')
+          .select('id, full_name')
           .in('id', Array.from(userIds));
         
-        if (usersError) throw usersError; // Throw error if fetching profiles failed
-        if (!usersData) throw new Error('User profiles data not found for assignees'); // Throw if data is unexpectedly null/undefined
+        if (usersError) throw usersError;
+        if (!usersData) throw new Error('User profiles data not found for assignees');
           
         const userMap = new Map(usersData.map(user => [user.id, user]));
         
@@ -101,7 +100,6 @@ export async function GET(
                 return {
                   ...assignee,
                   name: userProfile.full_name,
-                  email: userProfile.email || assignee.email
                 };
               }
               return assignee;
@@ -117,8 +115,6 @@ export async function GET(
       brand_id: workflow.brand_id,
       brand_name: workflow.brands?.name || null,
       brand_color: workflow.brands?.brand_color || null,
-      content_type_id: workflow.content_type_id,
-      content_type_name: workflow.content_types?.name || null,
       steps: workflow.steps, // Return original steps structure which might have updated assignees
       steps_count: Array.isArray(workflow.steps) ? workflow.steps.length : 0,
       created_at: workflow.created_at,
@@ -193,7 +189,6 @@ export async function PUT(
     const updateData: any = {};
     if (body.name !== undefined) updateData.name = body.name;
     if (body.brand_id !== undefined) updateData.brand_id = body.brand_id;
-    if (body.content_type_id !== undefined) updateData.content_type_id = body.content_type_id;
     if (body.steps !== undefined) updateData.steps = steps; 
     
     if (Object.keys(updateData).length === 0 && newInvitationsToCreate.length === 0) {
@@ -214,7 +209,7 @@ export async function PUT(
       if (updateErrorData) {
         if (updateErrorData.code === '23505') { 
           return NextResponse.json(
-            { success: false, error: 'A workflow for this brand and content type already exists' },
+            { success: false, error: 'A workflow with similar identifying information already exists for this brand.' },
             { status: 409 }
           );
         }

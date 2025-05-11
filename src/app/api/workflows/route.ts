@@ -42,7 +42,6 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       .select(`
         *,
         brands:brand_id(name, brand_color),
-        content_types:content_type_id(name),
         content:content(count)
       `)
       .order('created_at', { ascending: false });
@@ -61,8 +60,6 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       brand_id: workflow.brand_id,
       brand_name: workflow.brands?.name || null,
       brand_color: workflow.brands?.brand_color || null,
-      content_type_id: workflow.content_type_id,
-      content_type_name: workflow.content_types?.name || null,
       steps: workflow.steps,
       steps_count: Array.isArray(workflow.steps) ? workflow.steps.length : 0,
       content_count: workflow.content?.[0]?.count || 0,
@@ -101,13 +98,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     if (!body.brand_id) {
       return NextResponse.json(
         { success: false, error: 'Brand ID is required' },
-        { status: 400 }
-      );
-    }
-    
-    if (!body.content_type_id) {
-      return NextResponse.json(
-        { success: false, error: 'Content type ID is required' },
         { status: 400 }
       );
     }
@@ -163,7 +153,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       .insert({
         name: body.name,
         brand_id: body.brand_id,
-        content_type_id: body.content_type_id,
         steps: steps,
         created_by: user.id
       })
@@ -232,17 +221,10 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       .eq('id', body.brand_id)
       .single();
     
-    const { data: contentType } = await supabase
-      .from('content_types')
-      .select('name')
-      .eq('id', body.content_type_id)
-      .single();
-    
     const formattedWorkflow = {
       ...workflow,
       brand_name: brand?.name || null,
       brand_color: brand?.brand_color || null,
-      content_type_name: contentType?.name || null,
       steps_count: Array.isArray(workflow.steps) ? workflow.steps.length : 0,
       content_count: 0
     };

@@ -109,8 +109,8 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
   }
   
   // Safely extract values with fallbacks
-  const brandName = workflow.brand?.name || 'Unknown Brand';
-  const brandColor = workflow.brand?.color || '#6E6E6E';
+  const brandName = workflow.brand_name || 'Unknown Brand';
+  const brandColor = workflow.brand_color || '#6E6E6E';
   const workflowStatus = workflow.status || 'draft';
   const workflowSteps = Array.isArray(workflow.steps) ? workflow.steps : [];
   const createdByName = workflow.createdBy?.name || 'Unknown User';

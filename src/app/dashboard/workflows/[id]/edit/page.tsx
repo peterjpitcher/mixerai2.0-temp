@@ -482,7 +482,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
             
             <div className="space-y-2">
               <Label htmlFor="brand">Brand</Label>
-              <Select defaultValue={brandId} onValueChange={handleUpdateBrand}>
+              <Select defaultValue={brandId} onValueChange={handleUpdateBrand} value={brandId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select brand" />
                 </SelectTrigger>
