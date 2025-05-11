@@ -39,31 +39,33 @@ const extractCompanyFromEmail = (email: string) => {
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
   } catch (error) {
-    console.error('Error extracting company from email:', error);
     return '';
   }
 };
+
+// The context for route handlers like POST, GET should include params for dynamic routes.
+// The user object is injected by withAuth wrapper.
+interface RouteContext {
+  params: { id?: string }; // workflowId will be in params.id
+}
 
 /**
  * POST endpoint to invite users to a workflow step
  * This handles sending new invitations for users who don't yet have accounts
  */
-export const POST = withAuth(async (request: NextRequest, user) => {
+export const POST = withAuth(async (request: NextRequest, user: any, context: RouteContext) => {
   try {
-    const { id } = request.nextUrl.pathname.match(/\/api\/workflows\/(.+?)\/invitations/)?.[1] 
-      ? { id: request.nextUrl.pathname.match(/\/api\/workflows\/(.+?)\/invitations/)?.[1] }
-      : { id: null };
+    const workflowId = context?.params?.id;
 
-    if (!id) {
+    if (!workflowId) {
       return NextResponse.json(
-        { success: false, error: 'Invalid workflow ID' },
+        { success: false, error: 'Workflow ID is required in path' },
         { status: 400 }
       );
     }
 
     const body = await request.json();
     
-    // Validate required fields
     if (!body.email || !body.stepId) {
       return NextResponse.json(
         { success: false, error: 'Email and step ID are required' },
@@ -73,26 +75,22 @@ export const POST = withAuth(async (request: NextRequest, user) => {
 
     const supabase = createSupabaseAdminClient();
     
-    // Get the workflow to validate it exists and get step info
     const { data: workflow, error: workflowError } = await supabase
       .from('workflows')
-      .select('*')
-      .eq('id', id)
+      .select('steps') // Only select steps, not '*', if that's all that's needed
+      .eq('id', workflowId)
       .single();
     
-    if (workflowError) {
+    if (workflowError || !workflow) {
       return NextResponse.json(
         { success: false, error: 'Workflow not found' },
         { status: 404 }
       );
     }
     
-    // Find the step in the workflow - handle safely with type checking and use any type to avoid TS errors
     let step: any = undefined;
-    
-    if (workflow && workflow.steps && Array.isArray(workflow.steps)) {
-      // Find the step with matching ID
-      step = workflow.steps.find((s: any) => 
+    if (workflow.steps && Array.isArray(workflow.steps)) {
+      step = (workflow.steps as any[]).find((s: any) => 
         s && typeof s === 'object' && 
         typeof s.id === 'number' && 
         s.id === parseInt(body.stepId)
@@ -106,25 +104,29 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       );
     }
     
-    // Check if user already exists in the system
-    const { data: existingUsers, error: userError } = await supabase.auth.admin.listUsers({
-      page: 1,
-      perPage: 100, // Get a reasonable batch to search through
-    });
-    
-    // Filter users by email
-    const matchingUsers = existingUsers?.users.filter(u => u.email === body.email) || [];
-    const userExists = matchingUsers.length > 0;
-    
-    // Generate an invitation token and expiry (7 days)
+    // Check if user profile exists for the email
+    let userExists = false;
+    const { data: existingProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', body.email)
+      .maybeSingle();
+
+    if (profileError) {
+        // Log this error to a proper system, but don't necessarily fail the whole invite creation
+        // It might be a transient DB issue for the profile check only.
+    }
+    if (existingProfile) {
+        userExists = true;
+    }
+
     const inviteToken = uuidv4();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     
-    // Create a workflow invitation record
-    const { data: invitation, error: invitationError } = await supabase
+    const { data: invitation, error: invitationDbError } = await supabase
       .from('workflow_invitations')
       .insert({
-        workflow_id: id,
+        workflow_id: workflowId,
         step_id: body.stepId,
         email: body.email,
         role: step.role || 'editor',
@@ -135,95 +137,32 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       .select()
       .single();
     
-    if (invitationError) {
-      return NextResponse.json(
-        { success: false, error: 'Failed to create invitation' },
-        { status: 500 }
-      );
+    if (invitationDbError) {
+      // This is a more critical error, as the invitation record failed.
+      return handleApiError(invitationDbError, 'Failed to create invitation record');
     }
     
-    // For new users, also send a Supabase auth invitation
+    // If user does not have a profile, send a Supabase auth invitation
     if (!userExists) {
       try {
-        // Verify email templates
         await verifyEmailTemplates();
-        
-        // Determine role based on step role
         let userRole = 'viewer';
-        if (step.role === 'admin') {
-          userRole = 'admin';
-        } else if (step.role === 'editor' || step.role === 'brand' || step.role === 'legal') {
-          userRole = 'editor';
-        }
+        if (step.role === 'admin') userRole = 'admin';
+        else if (['editor', 'brand', 'legal'].includes(step.role)) userRole = 'editor';
         
-        // Send the invitation
-        const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(body.email, {
+        await supabase.auth.admin.inviteUserByEmail(body.email, {
           data: {
             full_name: body.full_name || '',
             job_title: body.job_title || '',
             company: body.company || extractCompanyFromEmail(body.email) || '',
             role: userRole,
             invited_by: user.id,
-            invited_from_workflow: id
+            invited_from_workflow: workflowId
           }
         });
-        
-        if (inviteError) {
-          console.error('Error inviting user:', inviteError);
-          // Continue anyway since we created the workflow invitation
-        }
       } catch (emailError) {
-        console.error('Error sending email invitation:', emailError);
-        // Continue anyway since we created the workflow invitation
+        // Non-critical: Invitation record created, but email failed. Log to monitoring.
       }
-    }
-    
-    // Update the step in the workflow to include this assignee
-    try {
-      if (workflow && workflow.steps && Array.isArray(workflow.steps)) {
-        // Create a deep copy to avoid mutating the original
-        const updatedSteps = JSON.parse(JSON.stringify(workflow.steps));
-        
-        // Find the step to update
-        const stepIndex = updatedSteps.findIndex((s: any) => 
-          s && typeof s === 'object' && 
-          typeof s.id === 'number' && 
-          s.id === parseInt(body.stepId)
-        );
-        
-        if (stepIndex !== -1) {
-          // Initialize assignees array if it doesn't exist
-          if (!updatedSteps[stepIndex].assignees) {
-            updatedSteps[stepIndex].assignees = [];
-          }
-          
-          // Check if the assignee is already in the list
-          const assignees = updatedSteps[stepIndex].assignees;
-          const existingAssignee = Array.isArray(assignees) ? 
-            assignees.find((a: any) => a && a.email === body.email) : 
-            undefined;
-          
-          if (!existingAssignee) {
-            // Add the new assignee
-            updatedSteps[stepIndex].assignees.push({
-              email: body.email,
-              id: userExists && matchingUsers[0]?.id ? matchingUsers[0].id : undefined
-            });
-            
-            // Update the workflow steps
-            const { error: updateError } = await supabase
-              .from('workflows')
-              .update({ steps: updatedSteps })
-              .eq('id', id);
-            
-            if (updateError) {
-              console.error('Error updating workflow steps:', updateError);
-            }
-          }
-        }
-      }
-    } catch (updateError) {
-      console.error('Error updating workflow assignees:', updateError);
     }
     
     return NextResponse.json({
@@ -238,15 +177,13 @@ export const POST = withAuth(async (request: NextRequest, user) => {
 /**
  * GET endpoint to get all invitations for a workflow
  */
-export const GET = withAuth(async (request: NextRequest) => {
+export const GET = withAuth(async (request: NextRequest, user: any, context: RouteContext) => {
   try {
-    const { id } = request.nextUrl.pathname.match(/\/api\/workflows\/(.+?)\/invitations/)?.[1] 
-      ? { id: request.nextUrl.pathname.match(/\/api\/workflows\/(.+?)\/invitations/)?.[1] }
-      : { id: null };
+    const workflowId = context?.params?.id;
 
-    if (!id) {
+    if (!workflowId) {
       return NextResponse.json(
-        { success: false, error: 'Invalid workflow ID' },
+        { success: false, error: 'Workflow ID is required in path' },
         { status: 400 }
       );
     }
@@ -256,7 +193,7 @@ export const GET = withAuth(async (request: NextRequest) => {
     const { data: invitations, error } = await supabase
       .from('workflow_invitations')
       .select('*')
-      .eq('workflow_id', id)
+      .eq('workflow_id', workflowId)
       .order('created_at', { ascending: false });
     
     if (error) throw error;

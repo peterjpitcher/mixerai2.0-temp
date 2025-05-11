@@ -3,7 +3,11 @@
 import React from 'react';
 import { Toaster, toast, useToast } from '@/components/toast';
 
-// This is just a wrapper component for the Toaster
+/**
+ * ToastProvider component.
+ * A wrapper component that includes the main Toaster component to display notifications.
+ * It also re-exports the `toast` function and `useToast` hook for convenience.
+ */
 export function ToastProvider({ children }: { children?: React.ReactNode }) {
   return (
     <>

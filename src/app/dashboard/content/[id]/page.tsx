@@ -10,6 +10,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import { MarkdownDisplay } from '@/components/content/markdown-display';
 import { ContentApprovalWorkflow } from '@/components/content/content-approval-workflow';
 import { toast } from 'sonner';
+import type { Metadata } from 'next';
+
+// export const metadata: Metadata = {
+//   title: 'View Content | MixerAI 2.0',
+//   description: 'View detailed information and manage the workflow for a piece of content.',
+// };
 
 interface ContentDetailPageProps {
   params: {
@@ -17,6 +23,12 @@ interface ContentDetailPageProps {
   };
 }
 
+/**
+ * ContentDetailPage displays detailed information for a specific piece of content.
+ * It includes the content body (as Markdown), SEO metadata, and an approval workflow.
+ * Users can view content details and interact with the workflow (approve/reject steps).
+ * Note: This component currently uses mock data and simulated API calls.
+ */
 export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   const { id } = params;
   const [content, setContent] = useState<any>(null);
@@ -112,7 +124,7 @@ Posts with images, videos, or infographics typically receive higher engagement t
         
         setContent(contentData);
       } catch (error) {
-        console.error('Error fetching content:', error);
+        // console.error('Error fetching content:', error);
         toast.error('Failed to load content. Please try again.');
       } finally {
         setIsLoading(false);
@@ -153,7 +165,7 @@ Posts with images, videos, or infographics typically receive higher engagement t
         workflow: updatedWorkflow
       }));
     } catch (error) {
-      console.error('Error approving content:', error);
+      // console.error('Error approving content:', error);
       throw error;
     }
   };
@@ -184,7 +196,7 @@ Posts with images, videos, or infographics typically receive higher engagement t
         }
       }));
     } catch (error) {
-      console.error('Error rejecting content:', error);
+      // console.error('Error rejecting content:', error);
       throw error;
     }
   };
@@ -207,8 +219,11 @@ Posts with images, videos, or infographics typically receive higher engagement t
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{content.title}</h1>
-          <p className="text-muted-foreground">
-            {content.type} • {content.brand} • Created on {new Date(content.createdAt).toLocaleDateString()}
+          <p className="text-muted-foreground mt-1">
+            View details, content body, SEO metadata, and manage the approval workflow.
+          </p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Type: {content.type} • Brand: {content.brand} • Created: {new Date(content.createdAt).toLocaleDateString('en-GB')}
           </p>
         </div>
         <div className="flex space-x-2">
@@ -233,12 +248,12 @@ Posts with images, videos, or infographics typically receive higher engagement t
                 <CardTitle>Content Details</CardTitle>
                 <span className={`text-xs px-2 py-1 rounded-full ${
                   content.status === 'Published' 
-                    ? 'bg-green-100 text-green-700'
+                    ? 'bg-success/20 text-success'
                     : content.status === 'Rejected'
-                    ? 'bg-red-100 text-red-700'
+                    ? 'bg-destructive/20 text-destructive'
                     : content.status === 'Pending Review'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-amber-100 text-amber-700'
+                    ? 'bg-secondary/20 text-secondary'
+                    : 'bg-warning/20 text-warning'
                 }`}>
                   {content.status}
                 </span>
@@ -252,7 +267,7 @@ Posts with images, videos, or infographics typically receive higher engagement t
                 </TabsList>
                 <TabsContent value="content" className="mt-4">
                   <div className="prose prose-sm max-w-none">
-                    <MarkdownDisplay content={content.body} />
+                    <MarkdownDisplay markdown={content.body} />
                   </div>
                 </TabsContent>
                 <TabsContent value="seo" className="space-y-4 mt-4">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { transCreateContent } from '@/lib/azure/openai';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
+import { handleApiError } from '@/lib/api-utils';
 
 interface ContentTransCreationRequest {
   content: string;
@@ -13,32 +14,29 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
   try {
     const data: ContentTransCreationRequest = await request.json();
     
-    // Validate request data
     if (!data.content) {
       return NextResponse.json(
-        { error: 'Content is required' },
+        { success: false, error: 'Content is required' },
         { status: 400 }
       );
     }
     
     if (!data.targetLanguage) {
       return NextResponse.json(
-        { error: 'Target language is required' },
+        { success: false, error: 'Target language is required' },
         { status: 400 }
       );
     }
     
     if (!data.targetCountry) {
       return NextResponse.json(
-        { error: 'Target country is required' },
+        { success: false, error: 'Target country is required' },
         { status: 400 }
       );
     }
     
-    // Use provided source language or default to English
     const sourceLanguage = data.sourceLanguage || 'en';
     
-    // Generate trans-created content
     const transCreatedContent = await transCreateContent(
       data.content,
       sourceLanguage,
@@ -55,15 +53,13 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       ...transCreatedContent
     });
   } catch (error: any) {
-    console.error('Error trans-creating content:', error);
-    
     let errorMessage = 'Failed to trans-create content. Please try again later.';
     let statusCode = 500;
 
     if (error instanceof Error) {
-      if (error.message.includes('OpenAI') || error.message.includes('Azure') || error.message.includes('API') || (error as any).status === 429) {
+      if (error.message.includes('OpenAI') || error.message.includes('Azure') || error.message.includes('API') || (error as any).status === 429 || error.message.includes('AI service')) {
         errorMessage = 'The AI service is currently busy or unavailable. Please try again in a few moments.';
-        statusCode = 503; // Service Unavailable
+        statusCode = 503;
       } else {
         errorMessage = error.message || errorMessage;
       }
@@ -71,12 +67,6 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       errorMessage = error;
     }
     
-    return NextResponse.json(
-      { 
-        success: false,
-        error: errorMessage
-      },
-      { status: statusCode }
-    );
+    return handleApiError(new Error(errorMessage), 'Content Trans-creation Error', statusCode);
   }
 }); 

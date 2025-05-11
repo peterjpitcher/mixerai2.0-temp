@@ -14,7 +14,20 @@ import { Badge } from '@/components/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2 } from 'lucide-react';
+import type { Metadata } from 'next';
 
+// export const metadata: Metadata = {
+//   title: 'Create New Workflow | MixerAI 2.0',
+//   description: 'Design and configure a new content approval workflow for your brands.',
+// };
+
+/**
+ * NewWorkflowPage allows users to create a new content approval workflow.
+ * It provides fields for defining the workflow's name, description, associated brand, and status.
+ * Users can dynamically add, remove, reorder, and configure multiple steps, including step name,
+ * description, assigned role, approval requirements, and user assignees by email.
+ * This page currently uses mock data for brand selection.
+ */
 export default function NewWorkflowPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
@@ -64,7 +77,7 @@ export default function NewWorkflowPage() {
           }));
         }
       } catch (error) {
-        console.error('Error fetching brands:', error);
+        // console.error('Error fetching brands:', error);
         toast.error('Failed to load brands. Please try again.');
       } finally {
         setIsLoading(false);
@@ -157,7 +170,7 @@ export default function NewWorkflowPage() {
 
   const handleAddAssignee = (stepIndex: number) => {
     if (!newAssigneeEmail || !newAssigneeEmail.includes('@')) {
-      toast.error('Please enter a valid email address');
+      toast.error('Please enter a valid email address.');
       return;
     }
 
@@ -166,7 +179,7 @@ export default function NewWorkflowPage() {
     const exists = stepAssignees.some((a: any) => a.email === newAssigneeEmail);
     
     if (exists) {
-      toast.error('This assignee is already added to this step');
+      toast.error('This assignee is already added to this step.');
       return;
     }
 
@@ -259,7 +272,7 @@ export default function NewWorkflowPage() {
 
   const handleRemoveStep = (index: number) => {
     if (workflow.steps.length <= 1) {
-      toast.error('Workflow must have at least one step');
+      toast.error('A workflow must have at least one step.');
       return;
     }
     
@@ -274,19 +287,19 @@ export default function NewWorkflowPage() {
 
   const validateWorkflow = () => {
     if (!workflow.name.trim()) {
-      toast.error('Please enter a workflow name');
+      toast.error('Please enter a workflow name.');
       return false;
     }
 
     if (!workflow.brand) {
-      toast.error('Please select a brand');
+      toast.error('Please select a brand.');
       return false;
     }
 
     // Check if all steps have names
     const invalidSteps = workflow.steps.filter((step: any) => !step.name.trim());
     if (invalidSteps.length > 0) {
-      toast.error('All steps must have a name');
+      toast.error('All steps must have a name.');
       return false;
     }
 
@@ -307,7 +320,7 @@ export default function NewWorkflowPage() {
       toast.success('Workflow created successfully');
       router.push('/dashboard/workflows');
     } catch (error) {
-      console.error('Error creating workflow:', error);
+      // console.error('Error creating workflow:', error);
       toast.error('Failed to create workflow. Please try again.');
     } finally {
       setIsSaving(false);
@@ -325,7 +338,12 @@ export default function NewWorkflowPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Create New Workflow</h1>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Create New Workflow</h1>
+          <p className="text-muted-foreground mt-1">
+            Define the name, brand, and steps for your new content approval process.
+          </p>
+        </div>
         <div className="flex space-x-2">
           <Button variant="outline" asChild>
             <Link href="/dashboard/workflows">Cancel</Link>
@@ -347,12 +365,12 @@ export default function NewWorkflowPage() {
         <Card>
           <CardHeader>
             <CardTitle>Workflow Details</CardTitle>
-            <CardDescription>Basic information about the workflow</CardDescription>
+            <CardDescription>Basic information about the workflow.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Workflow Name <span className="text-red-500">*</span></Label>
+                <Label htmlFor="name">Workflow Name <span className="text-destructive">*</span></Label>
                 <Input
                   id="name"
                   name="name"
@@ -377,7 +395,7 @@ export default function NewWorkflowPage() {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="brand">Brand <span className="text-red-500">*</span></Label>
+              <Label htmlFor="brand">Brand <span className="text-destructive">*</span></Label>
               <Select 
                 defaultValue={workflow.brand?.id} 
                 onValueChange={handleUpdateBrand}
@@ -392,7 +410,7 @@ export default function NewWorkflowPage() {
                       <div className="flex items-center">
                         <div 
                           className="w-3 h-3 rounded-full mr-2" 
-                          style={{ backgroundColor: brand.color }}
+                          style={{ backgroundColor: brand.color || 'var(--muted)' }}
                         />
                         {brand.name}
                       </div>
@@ -426,7 +444,7 @@ export default function NewWorkflowPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Workflow Steps</CardTitle>
-                <CardDescription>Define the steps in your workflow</CardDescription>
+                <CardDescription>Define the steps in your workflow.</CardDescription>
               </div>
               <Button onClick={handleAddStep} size="sm">
                 <Plus className="h-4 w-4 mr-1" />
@@ -476,7 +494,7 @@ export default function NewWorkflowPage() {
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor={`step-name-${index}`}>Step Name <span className="text-red-500">*</span></Label>
+                        <Label htmlFor={`step-name-${index}`}>Step Name <span className="text-destructive">*</span></Label>
                         <Input
                           id={`step-name-${index}`}
                           value={step.name}
@@ -531,7 +549,7 @@ export default function NewWorkflowPage() {
                       <div className="flex items-center space-x-2">
                         <Input
                           id={`step-assignees-${index}`}
-                          placeholder="Enter email address"
+                          placeholder="Enter email address."
                           value={newAssigneeEmail}
                           onChange={(e) => setNewAssigneeEmail(e.target.value)}
                           onKeyDown={(e) => {
@@ -572,7 +590,7 @@ export default function NewWorkflowPage() {
           </CardContent>
           <CardFooter>
             <p className="text-sm text-muted-foreground">
-              <span className="text-red-500">*</span> Indicates required fields
+              <span className="text-destructive">*</span> Indicates required fields
             </p>
           </CardFooter>
         </Card>

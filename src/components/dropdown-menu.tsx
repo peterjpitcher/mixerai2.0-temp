@@ -6,12 +6,21 @@ import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * DropdownMenu component (Root).
+ * Displays a menu to the user — such as a set of actions or functions — triggered by a button.
+ * Based on Radix UI Dropdown Menu.
+ */
 function DropdownMenu({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
   return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />
 }
 
+/**
+ * DropdownMenuPortal component.
+ * Portals its children to the body, used for DropdownMenuContent and sub-menus.
+ */
 function DropdownMenuPortal({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Portal>) {
@@ -20,6 +29,10 @@ function DropdownMenuPortal({
   )
 }
 
+/**
+ * DropdownMenuTrigger component.
+ * The button or element that toggles the open state of the DropdownMenu.
+ */
 function DropdownMenuTrigger({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>) {
@@ -31,6 +44,11 @@ function DropdownMenuTrigger({
   )
 }
 
+/**
+ * DropdownMenuContent component.
+ * The container for DropdownMenuItems, DropdownMenuSub etc.
+ * Styled with theme variables and animations.
+ */
 function DropdownMenuContent({
   className,
   sideOffset = 4,
@@ -51,6 +69,10 @@ function DropdownMenuContent({
   )
 }
 
+/**
+ * DropdownMenuGroup component.
+ * Used to group multiple DropdownMenuItems or DropdownMenuSub components.
+ */
 function DropdownMenuGroup({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Group>) {
@@ -59,6 +81,11 @@ function DropdownMenuGroup({
   )
 }
 
+/**
+ * DropdownMenuItem component.
+ * An item within a DropdownMenu that can be clicked to trigger an action.
+ * Supports `inset` for spacing and `variant` for destructive styling.
+ */
 function DropdownMenuItem({
   className,
   inset,
@@ -82,6 +109,10 @@ function DropdownMenuItem({
   )
 }
 
+/**
+ * DropdownMenuCheckboxItem component.
+ * An item that can be checked or unchecked.
+ */
 function DropdownMenuCheckboxItem({
   className,
   children,
@@ -108,6 +139,10 @@ function DropdownMenuCheckboxItem({
   )
 }
 
+/**
+ * DropdownMenuRadioGroup component.
+ * Used to group multiple DropdownMenuRadioItems.
+ */
 function DropdownMenuRadioGroup({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.RadioGroup>) {
@@ -119,6 +154,10 @@ function DropdownMenuRadioGroup({
   )
 }
 
+/**
+ * DropdownMenuRadioItem component.
+ * An item that can be selected from a group of radio items.
+ */
 function DropdownMenuRadioItem({
   className,
   children,
@@ -143,6 +182,11 @@ function DropdownMenuRadioItem({
   )
 }
 
+/**
+ * DropdownMenuLabel component.
+ * A non-interactive label used to title a group of items or provide context.
+ * Supports `inset` for spacing.
+ */
 function DropdownMenuLabel({
   className,
   inset,
@@ -155,7 +199,7 @@ function DropdownMenuLabel({
       data-slot="dropdown-menu-label"
       data-inset={inset}
       className={cn(
-        "px-2 py-1.5 text-sm font-medium data-[inset]:pl-8",
+        "px-2 py-1.5 text-sm font-medium data-[inset]:pl-8", // Default text color will be text-foreground
         className
       )}
       {...props}
@@ -163,6 +207,10 @@ function DropdownMenuLabel({
   )
 }
 
+/**
+ * DropdownMenuSeparator component.
+ * A visual separator between items or groups in a DropdownMenu.
+ */
 function DropdownMenuSeparator({
   className,
   ...props
@@ -176,6 +224,10 @@ function DropdownMenuSeparator({
   )
 }
 
+/**
+ * DropdownMenuShortcut component.
+ * Displays a keyboard shortcut hint next to a DropdownMenuItem.
+ */
 function DropdownMenuShortcut({
   className,
   ...props
@@ -192,12 +244,20 @@ function DropdownMenuShortcut({
   )
 }
 
+/**
+ * DropdownMenuSub component (Root for sub-menus).
+ * Contains components for a nested sub-menu.
+ */
 function DropdownMenuSub({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Sub>) {
   return <DropdownMenuPrimitive.Sub data-slot="dropdown-menu-sub" {...props} />
 }
 
+/**
+ * DropdownMenuSubTrigger component.
+ * An item that opens a sub-menu.
+ */
 function DropdownMenuSubTrigger({
   className,
   inset,
@@ -222,6 +282,10 @@ function DropdownMenuSubTrigger({
   )
 }
 
+/**
+ * DropdownMenuSubContent component.
+ * The container for the items of a sub-menu.
+ */
 function DropdownMenuSubContent({
   className,
   ...props

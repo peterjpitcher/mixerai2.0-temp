@@ -6,9 +6,14 @@ import { requireAuth } from '@/lib/auth/server';
 
 export const metadata = {
   title: 'Help & Support | MixerAI',
-  description: 'Get help with using MixerAI',
+  description: 'Get help with using MixerAI. Find FAQs, documentation, tutorials, and contact support.',
 };
 
+/**
+ * HelpPage component.
+ * Displays help and support information for MixerAI users, including links to documentation,
+ * FAQs, contact methods, training materials, and release notes.
+ */
 export default async function HelpPage() {
   await requireAuth();
   
@@ -78,7 +83,7 @@ export default async function HelpPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              Need personalized help? Our support team is ready to assist with any questions or issues you may have.
+              Need personalised help? Our support team is ready to assist with any questions or issues you may have.
             </p>
             <Button variant="outline" asChild>
               <Link href="mailto:support@mixerai.com">

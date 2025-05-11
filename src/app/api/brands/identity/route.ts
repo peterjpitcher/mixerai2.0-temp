@@ -1,58 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { COUNTRIES } from '@/lib/constants';
+import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
+import { handleApiError } from '@/lib/api-utils';
 
-// Simple in-memory rate limiting
+// In-memory rate limiting - consider a more robust solution for production
 const rateLimit = new Map<string, { count: number, timestamp: number }>();
 const RATE_LIMIT_PERIOD = 60 * 1000; // 1 minute
 const MAX_REQUESTS = 5; // 5 requests per minute
 
-// Simplified OpenAI client - will try to use Azure OpenAI first
-const getOpenAIClient = () => {
-  try {
-    console.log('OpenAI client initialization:');
-    console.log(`- AZURE_OPENAI_API_KEY exists: ${!!process.env.AZURE_OPENAI_API_KEY}`);
-    console.log(`- AZURE_OPENAI_ENDPOINT exists: ${!!process.env.AZURE_OPENAI_ENDPOINT}`);
-    console.log(`- AZURE_OPENAI_DEPLOYMENT exists: ${!!process.env.AZURE_OPENAI_DEPLOYMENT}`);
-    console.log(`- OPENAI_API_KEY exists: ${!!process.env.OPENAI_API_KEY}`);
-    
-    // Use Azure OpenAI if available
-    if (process.env.AZURE_OPENAI_API_KEY && process.env.AZURE_OPENAI_ENDPOINT) {
-      console.log(`Using Azure OpenAI client with endpoint: ${process.env.AZURE_OPENAI_ENDPOINT}`);
-      
-      try {
-        const client = new OpenAI({
-          apiKey: process.env.AZURE_OPENAI_API_KEY,
-          baseURL: process.env.AZURE_OPENAI_ENDPOINT,
-          defaultQuery: { 'api-version': '2023-05-15' },
-        });
-        console.log('Successfully initialized Azure OpenAI client');
-        return client;
-      } catch (error) {
-        console.error('Error initializing Azure OpenAI client:', error);
-      }
+// Simplified OpenAI client initialization: Prioritizes Azure, falls back to standard OpenAI if configured, else error.
+const getOpenAIClientOrThrow = () => {
+  if (process.env.AZURE_OPENAI_API_KEY && process.env.AZURE_OPENAI_ENDPOINT && process.env.AZURE_OPENAI_DEPLOYMENT) {
+    try {
+      return new OpenAI({
+        apiKey: process.env.AZURE_OPENAI_API_KEY,
+        baseURL: `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT}`,
+        defaultQuery: { 'api-version': process.env.AZURE_OPENAI_API_VERSION || '2023-05-15' },
+        defaultHeaders: { 'api-key': process.env.AZURE_OPENAI_API_KEY },
+      });
+    } catch (azureError) {
+      // Log actual azureError to a secure server-side logging system in production
+      // Fall through to check standard OpenAI if Azure init fails but standard one is configured
     }
-    
-    // Fallback to OpenAI
-    if (process.env.OPENAI_API_KEY) {
-      console.log('Using standard OpenAI client');
-      try {
-        const client = new OpenAI({
-          apiKey: process.env.OPENAI_API_KEY,
-        });
-        console.log('Successfully initialized standard OpenAI client');
-        return client;
-      } catch (error) {
-        console.error('Error initializing standard OpenAI client:', error);
-      }
-    }
-  } catch (error) {
-    console.error('Unexpected error during OpenAI client initialization:', error);
   }
-  
-  // No credentials available or initialization failed
-  console.warn('No OpenAI credentials available or initialization failed, will use fallback generation');
-  return null;
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    } catch (openAIError) {
+      // Log actual openAIError to a secure server-side logging system in production
+      throw new Error('Standard OpenAI client initialization failed. Check API key.');
+    }
+  }
+  throw new Error('OpenAI service is not configured on the server. Please set Azure or standard OpenAI API keys and endpoints.');
 };
 
 // Validate URL function
@@ -88,22 +68,11 @@ function getLanguageName(languageCode: string): string {
 // Function to extract website content from a URL
 async function scrapeWebsiteContent(url: string): Promise<string> {
   try {
-    console.log(`Attempting to scrape content from URL: ${url}`);
-    
-    // Use axios or another HTTP client to directly fetch the URL content
-    // This is a simplified version - in production you'd want more robust error handling
     const axios = require('axios');
-    
     const response = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5'
-      },
+      headers: { 'User-Agent': 'Mozilla/5.0 compatible MixerAIContentScraper/1.0', 'Accept': 'text/html', 'Accept-Language': 'en-GB,en;q=0.5' },
       timeout: 8000 // 8 second timeout
     });
-    
-    // Simple content extraction - in production you'd use a more robust HTML parser
     const htmlContent = response.data;
     
     // Very basic HTML to text conversion
@@ -118,140 +87,17 @@ async function scrapeWebsiteContent(url: string): Promise<string> {
     // Get a reasonable chunk of content
     const truncatedContent = textContent.substring(0, 5000);
     
-    console.log(`Successfully scraped content from ${url}, length: ${truncatedContent.length}`);
     return truncatedContent;
-  } catch (error) {
-    console.error(`Error scraping URL ${url}:`, error);
-    return `[Error extracting content from ${url}]`;
+  } catch (error: any) {
+    // Log scraping errors to a secure server-side log in production.
+    // Return an empty string or a specific marker if content extraction fails, rather than error string in content.
+    return ''; // Or throw a specific error to be handled upstream
   }
 }
 
-// Template-based fallback generation
-function generateFallbackBrandIdentity(name: string, industry = 'general', country = 'GB', language = 'en-GB') {
-  console.log(`Using fallback generation for: ${name}, industry: ${industry}, country: ${country}, language: ${language}`);
-  
-  // Get country label
-  const countryObj = COUNTRIES.find(c => c.value === country);
-  const countryName = countryObj ? countryObj.label : country;
-  const languageName = getLanguageName(language);
-  
-  // Use language-specific templates if available
-  // For demo purposes, we'll stick with English but note the language consideration
-  console.log(`Note: Using English templates for fallback, but would ideally use ${languageName} templates`);
-  
-  // Default templates by industry
-  const templates: Record<string, any> = {
-    food: {
-      brandIdentity: `${name} is a trusted food brand focused on quality ingredients and delicious flavors. The brand values nutrition, taste, and culinary tradition, while prioritizing customer satisfaction and food safety. Operating in ${countryName}, ${name} has deep understanding of local food preferences and regulations.`,
-      toneOfVoice: `Warm, inviting, and knowledgeable. Communications should be friendly yet professional, using appetizing descriptions and avoiding overly technical language. The tone reflects the culinary traditions of ${countryName}.`,
-      guardrails: `- Never make unsubstantiated health claims\n- Always prioritize food safety in messaging\n- Be transparent about ingredients and nutritional information\n- Respect dietary restrictions and cultural food practices\n- Avoid negative language about food choices`,
-      brandColor: "#E57373", // Soft red
-      agencies: [
-        { name: "Food Standards Agency", description: `Ensures food safety and standards in ${countryName}`, priority: "high" },
-        { name: "Advertising Standards Authority", description: `Regulates food advertising claims in ${countryName}`, priority: "high" },
-        { name: "Trading Standards", description: `Enforces food labeling regulations in ${countryName}`, priority: "medium" },
-        { name: "Department of Health", description: `Provides public health guidance in ${countryName}`, priority: "medium" },
-        { name: "Environmental Health Department", description: `Local authority responsible for food hygiene standards in ${countryName}`, priority: "high" },
-        { name: "Nutrition Advisory Board", description: `Provides guidance on nutritional claims in ${countryName}`, priority: "medium" },
-        { name: "Consumer Protection Agency", description: `Protects consumer rights in ${countryName}`, priority: "medium" },
-        { name: "Food Allergy Association", description: `Provides guidance on allergen labeling in ${countryName}`, priority: "high" },
-        { name: "Organic Certification Body", description: `Certifies organic food products in ${countryName}`, priority: "low" },
-        { name: "Sustainability Standards Board", description: `Sets standards for sustainability claims in ${countryName}`, priority: "low" }
-      ]
-    },
-    technology: {
-      brandIdentity: `${name} is an innovative technology company that creates intuitive, reliable solutions. The brand values cutting-edge development, user-centered design, and technical excellence. As a tech company in ${countryName}, ${name} adheres to local data protection and privacy standards while driving digital innovation.`,
-      toneOfVoice: `Clear, confident, and forward-thinking. Communications should balance technical authority with accessibility, avoiding unnecessary jargon while maintaining precision. The tone combines innovation with reliability.`,
-      guardrails: `- Never over-promise on capabilities or features\n- Be transparent about data usage and privacy practices\n- Avoid technical language that excludes non-expert users\n- Don't make unsupported claims about competitors\n- Ensure all security claims are accurate and verifiable`,
-      brandColor: "#2196F3", // Blue
-      agencies: [
-        { name: "Information Commissioner's Office", description: `Data protection and privacy regulation in ${countryName}`, priority: "high" },
-        { name: "Advertising Standards Authority", description: `Regulates advertising claims in ${countryName}`, priority: "medium" },
-        { name: "Trading Standards", description: `Consumer protection for tech products in ${countryName}`, priority: "medium" },
-        { name: "Communications Regulatory Authority", description: `Regulates telecommunications and internet services in ${countryName}`, priority: "high" },
-        { name: "Competition and Markets Authority", description: `Promotes fair competition in ${countryName}`, priority: "medium" },
-        { name: "Office of Digital Oversight", description: `Monitors digital platforms in ${countryName}`, priority: "medium" },
-        { name: "National Cybersecurity Centre", description: `Provides security guidance for technology in ${countryName}`, priority: "high" },
-        { name: "Financial Conduct Authority", description: `Regulates financial technology services in ${countryName}`, priority: "medium" },
-        { name: "Consumer Electronics Safety Board", description: `Ensures safety of consumer electronics in ${countryName}`, priority: "low" },
-        { name: "Technology Standards Institution", description: `Sets technical standards in ${countryName}`, priority: "low" }
-      ]
-    },
-    general: {
-      brandIdentity: `${name} is a trusted brand that delivers quality products and services with integrity and professionalism. The brand values excellence, reliability, and customer satisfaction. Operating in ${countryName}, ${name} understands the local market and consumer expectations, following all relevant business practices and regulations.`,
-      toneOfVoice: `Professional, clear, and approachable. Communications should convey expertise without being condescending, using straightforward language that builds trust. The tone balances authority with accessibility.`,
-      guardrails: `- Maintain transparency in all communications\n- Avoid making exaggerated or unsubstantiated claims\n- Use inclusive language that respects diversity\n- Don't disparage competitors\n- Ensure all claims are accurate and can be verified`,
-      brandColor: "#607D8B", // Blue grey
-      agencies: [
-        { name: "Advertising Standards Authority", description: `Regulates advertising across all media in ${countryName}`, priority: "high" },
-        { name: "Trading Standards", description: `Enforces consumer protection regulations in ${countryName}`, priority: "medium" },
-        { name: "Competition and Markets Authority", description: `Promotes competition in ${countryName}`, priority: "medium" },
-        { name: "Data Protection Authority", description: `Enforces data protection laws in ${countryName}`, priority: "high" },
-        { name: "Consumer Rights Association", description: `Protects consumer rights in ${countryName}`, priority: "medium" },
-        { name: "Industry Regulatory Board", description: `Sets standards for industry practices in ${countryName}`, priority: "medium" },
-        { name: "Quality Assurance Institute", description: `Certifies product and service quality in ${countryName}`, priority: "low" },
-        { name: "Fair Trading Commission", description: `Ensures fair business practices in ${countryName}`, priority: "medium" },
-        { name: "Environmental Standards Agency", description: `Regulates environmental claims in ${countryName}`, priority: "low" },
-        { name: "Standards and Compliance Board", description: `Monitors compliance with regulations in ${countryName}`, priority: "medium" }
-      ]
-    }
-  };
-  
-  // Use appropriate template or default to general
-  const template = templates[industry] || templates.general;
-  
-  return {
-    brandIdentity: template.brandIdentity,
-    toneOfVoice: template.toneOfVoice,
-    guardrails: template.guardrails,
-    suggestedAgencies: template.agencies,
-    brandColor: template.brandColor,
-    usedFallback: true
-  };
-}
-
-export async function POST(req: NextRequest) {
-  console.log('Starting brand identity generation process');
-  
-  // Check if this is a build-time call
-  const isBuildTime = process.env.NODE_ENV === 'production' && 
-                     typeof window === 'undefined' &&
-                     (process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview' || 
-                      process.env.VERCEL_ENV === 'preview') &&
-                     process.env.IGNORE_BUILD_TIME_CHECK !== 'true';
-  
-  if (isBuildTime) {
-    console.log('Detected build-time environment, returning mock data');
-    try {
-      // Try to extract the brand name from the request body
-      const body = await req.json();
-      const brandName = body.name || body.brandName || 'Example Brand';
-      const country = body.country || 'GB';
-      
-      console.log(`Generating fallback brand identity for ${brandName} in build-time environment`);
-      return NextResponse.json({
-        success: true,
-        data: generateFallbackBrandIdentity(brandName, 'general', country)
-      });
-    } catch (error) {
-      console.error('Error extracting brand details during build time:', error);
-      return NextResponse.json({
-        success: true,
-        data: generateFallbackBrandIdentity('Example Brand')
-      });
-    }
-  }
-  
-  // Additional logging to help diagnose environment variables
-  console.log('Environment check:');
-  console.log(`- NODE_ENV: ${process.env.NODE_ENV}`);
-  console.log(`- VERCEL_ENV: ${process.env.VERCEL_ENV}`);
-  console.log(`- NEXT_PUBLIC_VERCEL_ENV: ${process.env.NEXT_PUBLIC_VERCEL_ENV}`);
-  console.log(`- IGNORE_BUILD_TIME_CHECK: ${process.env.IGNORE_BUILD_TIME_CHECK}`);
-  console.log(`- Running in build-time mode: ${isBuildTime}`);
-  
-  // Apply rate limiting
-  const ip = req.headers.get('x-forwarded-for') || 'unknown';
+export const POST = withAuthAndMonitoring(async (req: NextRequest, user) => {
+  // Rate limiting logic remains as is for now.
+  const ip = req.headers.get('x-forwarded-for') || req.ip || 'unknown'; // Enhanced IP detection
   const now = Date.now();
   
   if (rateLimit.has(ip)) {
@@ -272,10 +118,7 @@ export async function POST(req: NextRequest) {
   }
   
   try {
-    // Parse request body
     const body = await req.json();
-    
-    // Accept either name or brandName for flexibility
     const name = body.name || body.brandName;
     let urls = body.urls || [];
     
@@ -290,9 +133,6 @@ export async function POST(req: NextRequest) {
     const country = body.country || 'GB';
     const language = body.language || 'en-GB';
     
-    console.log('Request parameters:', { name, urlsCount: urls.length, country, language });
-    
-    // Validate required parameters
     if (!name) {
       return NextResponse.json(
         { success: false, error: 'Brand name is required' },
@@ -308,7 +148,7 @@ export async function POST(req: NextRequest) {
     }
     
     // Filter to valid URLs
-    const validUrls = urls.filter(url => typeof url === 'string' && isValidUrl(url));
+    const validUrls = urls.filter((url): url is string => typeof url === 'string' && isValidUrl(url));
     if (validUrls.length === 0) {
       return NextResponse.json(
         { success: false, error: 'No valid URLs provided' },
@@ -316,31 +156,9 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Attempt to use OpenAI for generation
-    const openai = getOpenAIClient();
-    
-    // If no OpenAI client available, use fallback
-    if (!openai) {
-      console.log('No OpenAI client available, using fallback generation');
-      
-      // Determine industry based on URLs
-      let industry = 'general';
-      const urlsString = validUrls.join(' ').toLowerCase();
-      
-      if (urlsString.includes('food') || urlsString.includes('recipe') || urlsString.includes('meal')) {
-        industry = 'food';
-      } else if (urlsString.includes('tech') || urlsString.includes('software') || urlsString.includes('digital')) {
-        industry = 'technology';
-      }
-      
-      return NextResponse.json({
-        success: true,
-        data: generateFallbackBrandIdentity(name, industry, country, language)
-      });
-    }
-    
+    const openai = getOpenAIClientOrThrow(); // Throws if no client can be configured.
+
     // Get content from URLs
-    console.log('Fetching content from URLs...');
     const contentPromises = validUrls.map(url => scrapeWebsiteContent(url));
     const contents = await Promise.all(contentPromises);
     
@@ -379,119 +197,54 @@ Format your response as a structured JSON object with these keys: brandIdentity,
 Remember that ALL text fields must be written in ${languageName}, not English.`;
     
     try {
-      // Use direct fetch to handle both Azure and standard OpenAI
-      let completion;
+      const modelToUse = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
+      const completionResponse = await openai.chat.completions.create({
+        model: modelToUse,
+        messages: [{ role: "system", content: systemMessage }, { role: "user", content: userMessage }],
+        max_tokens: 1500, // Increased max_tokens for potentially longer agency lists
+        temperature: 0.7,
+        response_format: { type: "json_object" }, // Request JSON output
+      });
       
-      if (process.env.AZURE_OPENAI_API_KEY && process.env.AZURE_OPENAI_ENDPOINT && process.env.AZURE_OPENAI_DEPLOYMENT) {
-        // Azure OpenAI
-        const response = await fetch(
-          `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2023-05-15`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'api-key': process.env.AZURE_OPENAI_API_KEY
-            },
-            body: JSON.stringify({
-              messages: [
-                { role: "system", content: systemMessage },
-                { role: "user", content: userMessage }
-              ],
-              max_tokens: 1000,
-              temperature: 0.7
-            })
-          }
-        );
-        
-        if (!response.ok) {
-          console.error('Azure OpenAI API error:', response.status);
-          throw new Error(`Azure OpenAI API error: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        completion = data.choices?.[0]?.message?.content;
-      } else {
-        // Standard OpenAI
-        const response = await openai.chat.completions.create({
-          model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
-          messages: [
-            { role: "system", content: systemMessage },
-            { role: "user", content: userMessage }
-          ],
-          max_tokens: 1000,
-          temperature: 0.7
-        });
-        
-        completion = response.choices[0]?.message?.content;
-      }
+      const completion = completionResponse.choices[0]?.message?.content;
+      if (!completion) throw new Error('No completion received from AI service.');
       
-      if (!completion) {
-        throw new Error('No completion received from API');
-      }
-      
-      console.log('Received completion from OpenAI');
-      
-      // Parse JSON from completion
       let jsonData;
       try {
-        // Try to parse the response as JSON directly
         jsonData = JSON.parse(completion);
       } catch (e) {
-        // If that fails, try to extract JSON from the text
-        console.log('Failed to parse direct JSON, trying to extract JSON from text');
-        const jsonMatch = completion.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          jsonData = JSON.parse(jsonMatch[0]);
-        } else {
-          throw new Error('Could not extract JSON from response');
-        }
+        // Log this parsing error securely on server-side in production
+        throw new Error('AI service returned malformed JSON. Please try again.');
       }
       
-      // Validate and ensure all required fields
+      // Validate and structure the result - remove defaults for missing fields
       const result = {
-        brandIdentity: jsonData.brandIdentity || 'Brand identity not provided by AI service.',
-        toneOfVoice: jsonData.toneOfVoice || 'Tone of voice not provided by AI service.',
-        guardrails: jsonData.guardrails || '- Maintain professional tone\n- Be accurate\n- Be consistent',
+        brandIdentity: jsonData.brandIdentity,
+        toneOfVoice: jsonData.toneOfVoice,
+        guardrails: jsonData.guardrails,
         suggestedAgencies: Array.isArray(jsonData.suggestedAgencies) ? jsonData.suggestedAgencies : [],
-        brandColor: (jsonData.brandColor && /^#[0-9A-Fa-f]{6}$/.test(jsonData.brandColor)) 
-          ? jsonData.brandColor 
-          : '#3498db', // Default blue
-        usedFallback: false
+        brandColor: (jsonData.brandColor && /^#[0-9A-Fa-f]{6}$/.test(jsonData.brandColor)) ? jsonData.brandColor : null,
+        // usedFallback: false, // This flag is no longer relevant
       };
       
-      return NextResponse.json({
-        success: true,
-        data: result
-      });
+      // Ensure all expected fields are present, even if null, to maintain consistent structure
+      const requiredKeys = ['brandIdentity', 'toneOfVoice', 'guardrails', 'suggestedAgencies', 'brandColor'];
+      for (const key of requiredKeys) {
+        if (!(key in result) || result[key as keyof typeof result] === undefined) {
+          (result as any)[key] = null; // Set to null if undefined or missing
+        }
+      }
+
+      return NextResponse.json({ success: true, data: result });
       
     } catch (aiError) {
-      console.error('AI generation error:', aiError);
-      
-      // Use fallback generation when AI fails
-      console.log('Using fallback generation due to AI error');
-      
-      // Determine industry based on URLs
-      let industry = 'general';
-      const urlsString = validUrls.join(' ').toLowerCase();
-      
-      if (urlsString.includes('food') || urlsString.includes('recipe') || urlsString.includes('meal')) {
-        industry = 'food';
-      } else if (urlsString.includes('tech') || urlsString.includes('software') || urlsString.includes('digital')) {
-        industry = 'technology';
-      }
-      
-      return NextResponse.json({
-        success: true,
-        data: generateFallbackBrandIdentity(name, industry, country, language)
-      });
+      // AI call or parsing failed. This will be handled by the outer catch block.
+      throw aiError; 
     }
     
   } catch (error) {
-    console.error('Error processing brand identity request:', error);
-    
-    return NextResponse.json(
-      { success: false, error: 'Failed to process brand identity request' },
-      { status: 500 }
-    );
+    // All console.errors removed, handleApiError will manage the response.
+    // The custom error message logic in handleApiError can be enhanced if needed for AI specific public messages.
+    return handleApiError(error, 'Failed to process brand identity request');
   }
-} 
+}); 

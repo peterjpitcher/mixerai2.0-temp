@@ -6,8 +6,17 @@ import { ChevronDown } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Accordion component (Root).
+ * A vertically stacked set of interactive headings that each reveal a section of content.
+ * Based on Radix UI Accordion.
+ */
 const Accordion = AccordionPrimitive.Root
 
+/**
+ * AccordionItem component.
+ * An individual item within the Accordion, containing a trigger and content.
+ */
 const AccordionItem = React.forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Item>
@@ -20,6 +29,11 @@ const AccordionItem = React.forwardRef<
 ))
 AccordionItem.displayName = "AccordionItem"
 
+/**
+ * AccordionTrigger component.
+ * The button that toggles the open state of an AccordionItem.
+ * Includes a ChevronDown icon that rotates on open/close.
+ */
 const AccordionTrigger = React.forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger>
@@ -40,6 +54,10 @@ const AccordionTrigger = React.forwardRef<
 ))
 AccordionTrigger.displayName = "AccordionTrigger"
 
+/**
+ * AccordionContent component.
+ * The section of content that is revealed when an AccordionItem is open.
+ */
 const AccordionContent = React.forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Content>

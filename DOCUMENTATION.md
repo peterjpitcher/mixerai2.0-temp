@@ -1336,6 +1336,26 @@ The system is implemented with:
 - API routes for template management and AI operations
 - React components for template design and field configuration
 
+## Navigation and Workflow Page Error Fix (YYYY-MM-DD)
+
+A recent issue was identified where the content templates were not loading in the sidebar navigation's "Content" menu, and a related "Unknown error" was appearing on the `/dashboard/workflows` page.
+
+### Problem
+- The `unified-navigation.tsx` component was expecting an API response with a `templates` key when fetching content templates from `/api/content-templates`.
+- The `/api/content-templates/route.ts` was returning the list of templates under a `data` key instead of `templates`.
+- This mismatch caused the `fetchTemplates` function in `unified-navigation.tsx` to fail silently for the list, leading to an empty "Content" submenu and an "Unknown error" log when `data.error` was also undefined.
+
+### Solution Implemented
+- Modified `src/app/api/content-templates/route.ts` to change the response key from `data` to `templates` when returning all content templates.
+  ```typescript
+  // In src/app/api/content-templates/route.ts
+  return NextResponse.json({ 
+    success: true, 
+    templates: templatesData // Changed from 'data: templatesData'
+  });
+  ```
+- This change ensures that the frontend component `unified-navigation.tsx` receives the data in the expected format, allowing it to correctly populate the navigation and resolving the associated error on the workflows page.
+
 ## AI Integration Testing
 
 MixerAI 2.0a includes a comprehensive suite of tools for testing and debugging the Azure OpenAI integration:

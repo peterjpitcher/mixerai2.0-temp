@@ -22,6 +22,11 @@ interface Template {
   created_by?: string;
 }
 
+/**
+ * TemplatesPage component.
+ * Displays a list of available content templates, allowing users to view, 
+ * manage, and create new content based on these templates.
+ */
 export default function TemplatesPage() {
   const { toast } = useToast();
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -32,25 +37,22 @@ export default function TemplatesPage() {
       try {
         setIsLoading(true);
         
-        console.log('Templates page: Fetching templates from API');
         const response = await fetch('/api/content-templates');
         const data = await response.json();
         
-        console.log('Templates response:', data);
-        
-        if (data.success && Array.isArray(data.data)) {
-          setTemplates(data.data);
-          
-          // Log template IDs for debugging
-          data.data.forEach((template: Template) => {
-            console.log(`Template: ${template.name}, ID: ${template.id}`);
-          });
+        if (data.success && Array.isArray(data.templates)) {
+          setTemplates(data.templates);
         } else {
-          console.error('Failed to get templates:', data.error || 'Unknown error');
           setTemplates([]);
+          if (!data.success) {
+            toast({
+              title: 'Error Loading Templates',
+              description: data.error || 'An unknown error occurred while fetching templates.',
+              variant: 'destructive',
+            });
+          }
         }
       } catch (error) {
-        console.error('Failed to fetch templates:', error);
         toast({
           title: 'Error',
           description: 'Failed to load templates. Please try again.',

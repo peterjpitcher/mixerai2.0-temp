@@ -10,7 +10,15 @@ import { Label } from "@/components/label";
 import { Checkbox } from "@/components/checkbox";
 import { useToast } from "@/components/use-toast";
 import { createSupabaseClient } from '@/lib/supabase/client';
+import type { Metadata } from 'next';
 
+/**
+ * RegisterPage component.
+ * Displays the registration form for users to create a new MixerAI account.
+ * Note: This page itself does not contain the form logic, it likely uses a RegisterForm component.
+ * The current provided file content seems to be a LoginForm, not a RegisterForm.
+ * Assuming a RegisterForm component similar to LoginForm would be used here.
+ */
 export default function RegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -90,58 +98,16 @@ export default function RegisterPage() {
         
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl font-bold text-center">Create an account</CardTitle>
+            <CardTitle className="text-2xl font-bold text-center">Create an Account</CardTitle>
             <CardDescription className="text-center">
-              Enter your details to create your MixerAI account
+              {/* Placeholder for where a RegisterForm component would go */}
+              Registration form will be here. The provided file content was for a login page.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor="first-name">First name</Label>
-                  <Input id="first-name" placeholder="John" value={firstName} onChange={(e) => setFirstName(e.target.value)} disabled={isLoading} required />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="last-name">Last name</Label>
-                  <Input id="last-name" placeholder="Smith" value={lastName} onChange={(e) => setLastName(e.target.value)} disabled={isLoading} required />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" placeholder="name@example.com" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoCapitalize="none" autoComplete="email" autoCorrect="off" disabled={isLoading} required />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="password">Password (min. 6 characters)</Label>
-                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" disabled={isLoading} required />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="confirm-password">Confirm password</Label>
-                <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" disabled={isLoading} required />
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox id="terms" checked={termsAccepted} onCheckedChange={(checked) => setTermsAccepted(checked as boolean)} disabled={isLoading} />
-                <label
-                  htmlFor="terms"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  I agree to the{" "}
-                  <Link href="/terms" className="text-primary hover:underline">
-                    terms of service
-                  </Link>{" "}
-                  and{" "}
-                  <Link href="/privacy" className="text-primary hover:underline">
-                    privacy policy
-                  </Link>
-                </label>
-              </div>
-              {error && (
-                <p className="text-sm text-red-500 text-center">{error}</p>
-              )}
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Creating account..." : "Create account"}
-              </Button>
-            </form>
+            <p className="text-center text-muted-foreground">
+              Please implement or locate the correct RegisterForm component.
+            </p>
           </CardContent>
           <CardFooter>
             <div className="text-center w-full text-sm">

@@ -12,16 +12,16 @@ function ContentFormWithParams() {
   const templateId = searchParams?.get('template');
   
   useEffect(() => {
-    console.log('ContentFormWithParams: Search params received');
-    console.log('- Content Type:', contentType);
-    console.log('- Template ID:', templateId);
+    // console.log('ContentFormWithParams: Search params received');
+    // console.log('- Content Type:', contentType);
+    // console.log('- Template ID:', templateId);
     
     // Log all search params for debugging
-    const allParams: Record<string, string> = {};
-    searchParams?.forEach((value, key) => {
-      allParams[key] = value;
-    });
-    console.log('- All URL params:', allParams);
+    // const allParams: Record<string, string> = {};
+    // searchParams?.forEach((value, key) => {
+    //   allParams[key] = value;
+    // });
+    // console.log('- All URL params:', allParams);
   }, [contentType, templateId, searchParams]);
   
   return (
@@ -41,7 +41,7 @@ function PageContent() {
     : '';
   
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
@@ -50,7 +50,7 @@ function PageContent() {
               : 'Create New Content'}
           </h1>
           <p className="text-muted-foreground">
-            Generate high-quality content with AI assistance
+            Generate high-quality content with AI assistance.
           </p>
         </div>
       </div>
@@ -64,7 +64,7 @@ function PageContent() {
 export default function NewContentPage() {
   return (
     <Suspense fallback={
-      <div className="container mx-auto py-6 space-y-6">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         <div className="flex justify-center items-center py-10">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
           <span className="ml-3">Loading content tools...</span>

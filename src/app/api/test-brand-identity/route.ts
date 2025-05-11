@@ -1,5 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { generateBrandIdentityFromUrls } from '@/lib/azure/openai';
+import { withAuth } from '@/lib/auth/api-auth';
+import { handleApiError } from '@/lib/api-utils';
 
 // Detect if we're in a build environment (Vercel)
 const isBuildEnvironment = process.env.VERCEL_ENV === 'production' || 
@@ -19,15 +21,13 @@ const mockResponse = {
 };
 
 /**
- * API route to test field mapping between the brand identity generation and frontend
+ * API route to test field mapping between the brand identity generation and frontend.
+ * NOTE: This test endpoint should be admin-only or restricted if kept in deployed environments.
  */
-export async function GET() {
+export const GET = withAuth(async (request: NextRequest, user) => {
   try {
     // Check if we're in a build environment and use mock data
     if (isBuildEnvironment) {
-      console.log("Build environment detected - using mock brand identity data");
-      
-      // Return a successful mock response
       return NextResponse.json({
         success: true,
         original: mockResponse,
@@ -63,36 +63,10 @@ export async function GET() {
         toneOfVoice: result.toneOfVoice || "",
         guardrails: result.guardrails || "",
         vettingAgencies: result.suggestedAgencies || [],
-        brandColor: result.brandColor || "#3498db" // Default blue color
+        brandColor: result.brandColor
       }
     };
     
-    // Debug logs
-    console.log("Field Mapping Test:");
-    console.log("Original result object:", {
-      brandIdentity: result.brandIdentity?.substring(0, 20) + "...",
-      toneOfVoice: result.toneOfVoice?.substring(0, 20) + "...",
-      guardrails: result.guardrails?.substring(0, 20) + "...",
-      suggestedAgencies: Array.isArray(result.suggestedAgencies) 
-        ? `[${result.suggestedAgencies.length} agencies]` 
-        : typeof result.suggestedAgencies,
-      brandColor: result.brandColor,
-    });
-    
-    console.log("Transformed to API response:", {
-      success: apiResponse.success,
-      data: {
-        brandIdentity: apiResponse.data.brandIdentity?.substring(0, 20) + "...",
-        toneOfVoice: apiResponse.data.toneOfVoice?.substring(0, 20) + "...",
-        guardrails: apiResponse.data.guardrails?.substring(0, 20) + "...",
-        vettingAgencies: Array.isArray(apiResponse.data.vettingAgencies) 
-          ? `[${apiResponse.data.vettingAgencies.length} agencies]` 
-          : typeof apiResponse.data.vettingAgencies,
-        brandColor: apiResponse.data.brandColor,
-      }
-    });
-    
-    // Return both the original result and final response for comparison
     return NextResponse.json({
       success: true,
       original: result,
@@ -106,14 +80,6 @@ export async function GET() {
       }
     });
   } catch (error: any) {
-    console.error("Error in test brand identity API:", error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Test failed', 
-        message: error.message 
-      }, 
-      { status: 500 }
-    );
+    return handleApiError(error, 'Test brand identity generation failed');
   }
-} 
+}); 

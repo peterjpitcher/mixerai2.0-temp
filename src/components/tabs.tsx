@@ -5,6 +5,11 @@ import * as TabsPrimitive from "@radix-ui/react-tabs"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Tabs component (Root).
+ * A set of layered sections of content, known as tab panels, that are displayed one at a time.
+ * Based on Radix UI Tabs.
+ */
 function Tabs({
   className,
   ...props
@@ -18,6 +23,10 @@ function Tabs({
   )
 }
 
+/**
+ * TabsList component.
+ * Contains the set of triggers that are aligned along the edge of the active tab panel.
+ */
 function TabsList({
   className,
   ...props
@@ -34,6 +43,10 @@ function TabsList({
   )
 }
 
+/**
+ * TabsTrigger component.
+ * An interactive element that switches the active tab panel when clicked.
+ */
 function TabsTrigger({
   className,
   ...props
@@ -50,6 +63,10 @@ function TabsTrigger({
   )
 }
 
+/**
+ * TabsContent component.
+ * Contains the content associated with a TabsTrigger.
+ */
 function TabsContent({
   className,
   ...props

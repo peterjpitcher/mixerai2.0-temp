@@ -9,6 +9,12 @@ export const metadata = {
   description: 'MixerAI dashboard home',
 };
 
+/**
+ * DashboardPage component.
+ * Serves as the main landing page for authenticated users.
+ * Displays an overview of key application sections like Content, Brands, Workflows, and Users,
+ * along with quick action buttons for common tasks.
+ */
 export default async function DashboardPage() {
   await requireAuth();
   

@@ -13,10 +13,10 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     const supabase = createSupabaseAdminClient();
     const body = await request.json();
     
-    // Verify email templates in development mode
+    // The necessity of calling this on every invite should be reviewed.
+    // If it's a heavy operation or mainly for dev, consider conditional execution.
     await verifyEmailTemplates();
     
-    // Validate required fields
     if (!body.email) {
       return NextResponse.json(
         { success: false, error: 'Email is required' },
@@ -31,7 +31,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       );
     }
     
-    // Check if the role is valid
     if (!['admin', 'editor', 'viewer'].includes(body.role.toLowerCase())) {
       return NextResponse.json(
         { success: false, error: 'Invalid role. Must be admin, editor, or viewer' },
@@ -39,10 +38,9 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       );
     }
     
-    // Check if the current user has admin permissions
     const { data: userPermissions, error: permissionCheckError } = await supabase
       .from('user_brand_permissions')
-      .select('role')
+      .select('role', {count: 'exact'}) // Added count for a more reliable check
       .eq('user_id', user.id)
       .eq('role', 'admin');
     
@@ -50,73 +48,63 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       throw permissionCheckError;
     }
     
-    // If the user has no admin role, reject the invitation request
-    if (!userPermissions || userPermissions.length === 0) {
+    if (!userPermissions || userPermissions.length === 0) { // Check length for admin roles
       return NextResponse.json(
         { success: false, error: 'Only administrators can invite users' },
         { status: 403 }
       );
     }
     
-    // Send the invitation via Supabase Auth
-    const { data, error } = await supabase.auth.admin.inviteUserByEmail(body.email, {
+    const { data: inviteData, error: inviteErrorData } = await supabase.auth.admin.inviteUserByEmail(body.email, { // Renamed data and error
       data: {
         full_name: body.full_name || '',
         job_title: body.job_title || '',
         company: body.company || '',
         role: body.role.toLowerCase(),
-        invited_by: user.id // Track who sent the invitation
+        invited_by: user.id
       }
     });
     
-    if (error) {
-      // Check if it's an already-invited user error
-      if (error.message.includes('already exists')) {
+    if (inviteErrorData) {
+      if (inviteErrorData.message.includes('already exists')) {
         return NextResponse.json(
-          { success: false, error: 'User with this email already exists' },
+          { success: false, error: 'User with this email already exists or has been invited' }, // Clarified error
           { status: 409 }
         );
       }
-      throw error;
+      throw inviteErrorData;
     }
     
-    // If a brand_id is provided, assign the user to that brand with the specified role
-    if (body.brand_id && data.user) {
-      // Insert a record in the user_brand_permissions table
+    if (body.brand_id && inviteData?.user) { // Ensure inviteData.user exists
       const { error: permissionError } = await supabase
         .from('user_brand_permissions')
         .insert([
           {
-            user_id: data.user.id,
+            user_id: inviteData.user.id,
             brand_id: body.brand_id,
             role: body.role.toLowerCase(),
-            assigned_by: user.id // Track who assigned the permission
+            assigned_by: user.id
           }
         ]);
       
       if (permissionError) {
-        console.error('Error assigning brand to user:', permissionError);
-        // Don't fail the whole operation if brand assignment fails
-        // We'll still return success but with a warning
+        // This error is significant enough to report more directly if desired.
+        // For now, returning a specific warning as per original logic.
         return NextResponse.json({ 
           success: true, 
-          message: 'Invitation sent successfully, but brand assignment failed',
-          warning: 'Failed to assign user to the selected brand',
-          data
+          message: 'Invitation sent successfully, but brand assignment failed.',
+          warning: `Failed to assign user to the selected brand: ${permissionError.message}`,
+          data: inviteData
         });
       }
     }
     
-    // Log the successful invitation
-    console.log(`User ${user.id} invited ${body.email} with role ${body.role}`);
-    
     return NextResponse.json({ 
       success: true, 
       message: 'Invitation sent successfully',
-      data
+      data: inviteData
     });
   } catch (error) {
-    console.error('Error inviting user:', error);
     return handleApiError(error, 'Failed to invite user');
   }
 }); 

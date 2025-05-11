@@ -3,13 +3,27 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
+import Link from 'next/link';
 import { Input } from '@/components/input';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/card';
 import { Label } from '@/components/label';
-import { Alert } from '@/components/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/alert';
 import { Spinner } from '@/components/spinner';
+import type { Metadata } from 'next';
+import { CheckCheck, Bell } from 'lucide-react';
 
+// It's good practice to define metadata for pages, though this is a client component.
+// If this page had a server component wrapper, metadata export would go there.
+// export const metadata: Metadata = {
+//   title: 'Confirm Account | MixerAI 2.0',
+//   description: 'Confirm your MixerAI account registration or invitation.',
+// };
+
+/**
+ * Main content for the account confirmation page.
+ * Handles token verification, password setting for invites, and user profile updates.
+ */
 function ConfirmContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -31,67 +45,58 @@ function ConfirmContent() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
   );
   
-  // Extract company name from email domain
-  const extractCompanyFromEmail = (email: string) => {
+  const extractCompanyFromEmail = (emailAddress: string) => {
+    if (!emailAddress) return '';
     try {
-      const domain = email.split('@')[1];
+      const domain = emailAddress.split('@')[1];
       if (!domain) return '';
-      
-      // Remove common TLDs and extract the main domain name
       const mainDomain = domain.split('.')[0];
-      
-      // Capitalize the first letter of each word
       return mainDomain
         .split(/[-_]/)
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
-    } catch (error) {
-      console.error('Error extracting company from email:', error);
-      return '';
+    } catch (e) {
+      return ''; // Error in extraction, return empty
     }
   };
   
   useEffect(() => {
-    // Verify the token is present
     if (!token) {
-      setError('Missing confirmation token. Please check your invitation link.');
+      setError('Missing confirmation token. Please check your invitation link or confirmation email.');
       return;
     }
 
-    // Try to extract information about the invitation
     const getInvitationInfo = async () => {
       try {
-        const { data, error } = await supabase.auth.getUser();
-        console.log('Auth user data:', data);
-        if (error) {
-          console.error('Error getting user information:', error);
-        } else if (data?.user?.email) {
-          setEmail(data.user.email);
-          
-          // Pre-fill name from metadata if available
-          if (data.user.user_metadata?.full_name) {
-            setFullName(data.user.user_metadata.full_name);
+        const { data: userDataResponse, error: userError } = await supabase.auth.getUser();
+        
+        if (userError && userError.message !== "User not found" && userError.message !== "Invalid token: token contains an invalid number of segments") { 
+          // Only throw if not common "User not found" or specific token parsing issues before verification
+          throw userError;
+        }
+        if (userDataResponse?.user?.email) {
+          setEmail(userDataResponse.user.email);
+          if (userDataResponse.user.user_metadata?.full_name) {
+            setFullName(userDataResponse.user.user_metadata.full_name);
           }
-          
-          // Pre-fill job title from metadata if available
-          if (data.user.user_metadata?.job_title) {
-            setJobTitle(data.user.user_metadata.job_title);
+          if (userDataResponse.user.user_metadata?.job_title) {
+            setJobTitle(userDataResponse.user.user_metadata.job_title);
           }
-          
-          // Pre-fill company from metadata if available, or extract from email
-          if (data.user.user_metadata?.company) {
-            setCompany(data.user.user_metadata.company);
-          } else if (data.user.email) {
-            setCompany(extractCompanyFromEmail(data.user.email));
+          if (userDataResponse.user.user_metadata?.company) {
+            setCompany(userDataResponse.user.user_metadata.company);
+          } else if (userDataResponse.user.email) {
+            setCompany(extractCompanyFromEmail(userDataResponse.user.email));
           }
         }
-      } catch (err) {
-        console.error('Error getting invitation details:', err);
+      } catch (err: any) {
+        setError(err.message || 'Could not retrieve invitation details. The link may be invalid or expired.');
       }
     };
 
-    getInvitationInfo();
-  }, [token, supabase.auth]);
+    if (type === 'invite') {
+        getInvitationInfo();
+    }
+  }, [token, type, supabase.auth]);
   
   const handleConfirmation = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,39 +104,20 @@ function ConfirmContent() {
     setError(null);
     
     try {
-      // Debug logging
-      console.log('Confirming invitation with token:', token);
-      console.log('Form data:', { fullName, jobTitle, company, passwordLength: password.length });
-      
-      if (type === 'invite' && !password) {
-        throw new Error('Please set a password to complete your registration');
-      }
-      
-      if (type === 'invite' && !fullName.trim()) {
-        throw new Error('Full name is required');
-      }
-      
-      if (type === 'invite' && !jobTitle.trim()) {
-        throw new Error('Job title is required');
-      }
-      
-      if (type === 'invite' && !company.trim()) {
-        throw new Error('Company is required');
-      }
-      
-      // For invited users, they need to set a password
       if (type === 'invite') {
-        // First verify the token without setting password
-        const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        if (!password) throw new Error('Please set a password to complete your registration.');
+        if (password.length < 6) throw new Error('Password must be at least 6 characters long.');
+        if (!fullName.trim()) throw new Error('Full name is required.');
+        if (!jobTitle.trim()) throw new Error('Job title is required.');
+        if (!company.trim()) throw new Error('Company name is required.');
+        
+        const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
           token_hash: token,
           type: 'invite',
         });
-        
         if (verifyError) throw verifyError;
         
-        // Then update the password separately
-        if (data?.user) {
-          // Update user metadata first
+        if (verifyData?.user) {
           const { error: updateUserError } = await supabase.auth.updateUser({
             password: password,
             data: {
@@ -140,264 +126,183 @@ function ConfirmContent() {
               company: company.trim()
             }
           });
-          
           if (updateUserError) throw updateUserError;
           
-          // Update the user's profile with additional information without job_description
           const { error: profileError } = await supabase
             .from('profiles')
             .upsert({
-              id: data.user.id,
+              id: verifyData.user.id,
               full_name: fullName.trim(),
               job_title: jobTitle.trim(),
               company: company.trim(),
+              email: verifyData.user.email,
               updated_at: new Date().toISOString()
             });
+          if (profileError) throw profileError;
           
-          if (profileError) {
-            console.error('Error updating profile:', profileError);
-            throw profileError;
-          } else {
-            console.log('Profile updated successfully');
-          }
-          
-          // Update any pending brand assignments
-          const { error: permissionError } = await supabase
-            .from('user_brand_permissions')
-            .update({ user_id: data.user.id })
-            .is('user_id', null)
-            .eq('email', data.user.email);
-          
-          if (permissionError) {
-            console.error('Error updating permissions:', permissionError);
-          }
-          
-          // Update workflow invitations status to accepted and link to user ID
-          if (data?.user?.email) {
-            const userEmail = data.user.email;
-            const userId = data.user.id;
-            
-            const { error: workflowInviteError } = await supabase
-              .from('workflow_invitations')
-              .update({ status: 'accepted' })
-              .eq('email', userEmail)
-              .eq('status', 'pending');
-            
-            if (workflowInviteError) {
-              console.error('Error updating workflow invitations:', workflowInviteError);
-            } else {
-              console.log('Workflow invitations updated successfully');
-            }
-            
-            // Update the assignees in workflow steps to include proper name instead of just email
-            try {
-              // Get all workflows that have this user's email in steps
-              const { data: workflows, error: workflowsError } = await supabase
-                .from('workflows')
-                .select('id, steps');
-              
-              if (workflowsError) {
-                console.error('Error fetching workflows:', workflowsError);
-              } else if (workflows) {
-                // For each workflow, check if any steps have assignees with this email
-                for (const workflow of workflows) {
-                  if (workflow.steps && Array.isArray(workflow.steps)) {
-                    let updated = false;
-                    const updatedSteps = workflow.steps.map((step: any) => {
-                      if (step.assignees && Array.isArray(step.assignees)) {
-                        step.assignees = step.assignees.map((assignee: any) => {
-                          if (assignee.email === userEmail) {
-                            updated = true;
-                            return {
-                              ...assignee,
-                              id: userId,
-                              name: fullName.trim()
-                            };
-                          }
-                          return assignee;
-                        });
-                      }
-                      return step;
-                    });
-                    
-                    // If any steps were updated, save the workflow
-                    if (updated) {
-                      const { error: updateError } = await supabase
-                        .from('workflows')
-                        .update({ steps: updatedSteps })
-                        .eq('id', workflow.id);
-                      
-                      if (updateError) {
-                        console.error(`Error updating workflow ${workflow.id}:`, updateError);
-                      } else {
-                        console.log(`Updated workflow ${workflow.id} with user's name`);
-                      }
-                    }
-                  }
-                }
-              }
-            } catch (workflowUpdateError) {
-              console.error('Error updating workflow assignees:', workflowUpdateError);
-            }
-          }
+          // Server-side logic should ideally handle further operations like:
+          // - Updating user_brand_permissions based on invite details
+          // - Updating workflow_invitations status to 'accepted'
+          // - Updating assignees in workflow.steps JSONB (complex, best server-side)
+          // A dedicated API call could be made here to trigger those server-side actions.
+
+        } else {
+            throw new Error("User details could not be confirmed with the provided token.");
         }
       } else {
-        // For regular signups (not invites)
         const { error: confirmError } = await supabase.auth.verifyOtp({
           token_hash: token,
-          type: 'signup',
+          type: type as any,
         });
-        
         if (confirmError) throw confirmError;
       }
       
       setSuccess(true);
-      
-      // Redirect after a short delay
       setTimeout(() => {
-        // Use the redirect_to parameter if provided, otherwise go to dashboard
         try {
-          const redirectUrl = new URL(redirectTo);
-          window.location.href = redirectUrl.toString();
+          const redirectUrlObj = new URL(redirectTo, window.location.origin);
+          window.location.href = redirectUrlObj.toString();
         } catch (e) {
-          // If the URL is invalid or relative, use router
-          router.push(redirectTo);
+          router.push(redirectTo.startsWith('/') ? redirectTo : '/dashboard');
         }
       }, 1500);
     } catch (err: any) {
-      console.error('Confirmation error:', err);
-      setError(err.message || 'Failed to confirm your account. Please try again.');
+      setError(err.message || 'Failed to confirm your account. Please check the link or try again.');
     } finally {
       setLoading(false);
     }
   };
   
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="flex min-h-screen items-center justify-center bg-background text-foreground py-12 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md">
         <Card className="shadow-lg">
           <CardHeader className="pb-4">
             <CardTitle className="text-2xl font-bold text-center">
-              {type === 'invite' ? 'Accept Invitation' : 'Confirm Account'}
+              {type === 'invite' ? 'Accept Invitation & Set Up Account' : 'Confirm Your Account'}
             </CardTitle>
           </CardHeader>
           
-          <CardContent>
+          <CardContent className="pt-6">
             {error && (
-              <Alert variant="destructive" className="mb-4">
-                {error}
+              <Alert variant="destructive" className="mb-6">
+                <AlertTitle>Confirmation Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
             
             {success ? (
               <div className="text-center py-8">
                 <div className="mb-4 flex justify-center">
-                  <div className="rounded-full bg-green-100 p-3">
-                    <svg 
-                      className="h-6 w-6 text-green-600" 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      fill="none" 
-                      viewBox="0 0 24 24" 
-                      stroke="currentColor"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
+                  <div className="rounded-full bg-success/10 p-3 text-success">
+                    <CheckCheck className="h-8 w-8" />
                   </div>
                 </div>
-                <h3 className="text-lg font-medium text-gray-900">Welcome, {fullName}!</h3>
-                <p className="mt-2 text-sm text-gray-500">
+                <h3 className="text-xl font-semibold">{type === 'invite' && fullName ? `Welcome, ${fullName}!` : 'Account Confirmed!'}</h3>
+                <p className="mt-2 text-muted-foreground">
                   Your account has been confirmed successfully.
                 </p>
-                <p className="mt-1 text-sm text-gray-500">
-                  You'll be redirected to the dashboard in a moment...
+                <p className="mt-1 text-muted-foreground">
+                  You will be redirected shortly...
                 </p>
               </div>
             ) : (
-              <form onSubmit={handleConfirmation} className="space-y-4">
+              <form onSubmit={handleConfirmation} className="space-y-6">
                 {type === 'invite' && (
                   <>
                     {email && (
-                      <div className="bg-blue-50 p-4 rounded-md mb-4">
-                        <p className="text-sm text-blue-800">
-                          You're confirming an invitation for <strong>{email}</strong>
-                        </p>
-                      </div>
+                      <Alert variant="default" className="mb-6 bg-secondary/10 border-secondary/30 text-secondary">
+                        <Bell className="h-4 w-4" />
+                        <AlertTitle className="text-secondary-foreground">Invitation for {email}</AlertTitle>
+                        <AlertDescription className="text-secondary-foreground/80">
+                          Please complete your account set up below.
+                        </AlertDescription>
+                      </Alert>
                     )}
                     
-                    <div className="space-y-1">
-                      <Label htmlFor="fullName">Full Name</Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="fullName">Full Name <span className="text-destructive">*</span></Label>
                       <Input
                         id="fullName"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
-                        placeholder="Your full name"
+                        placeholder="Enter your full name"
+                        required
+                        aria-required="true"
                       />
                     </div>
                     
-                    <div className="space-y-1">
-                      <Label htmlFor="jobTitle">Job Title <span className="text-red-500">*</span></Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="jobTitle">Job Title <span className="text-destructive">*</span></Label>
                       <Input
                         id="jobTitle"
                         value={jobTitle}
                         onChange={(e) => setJobTitle(e.target.value)}
-                        placeholder="Your job title"
+                        placeholder="e.g. Marketing Manager"
                         required
+                        aria-required="true"
                       />
                     </div>
                     
-                    <div className="space-y-1">
-                      <Label htmlFor="company">Company <span className="text-red-500">*</span></Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="company">Company <span className="text-destructive">*</span></Label>
                       <Input
                         id="company"
                         value={company}
                         onChange={(e) => setCompany(e.target.value)}
-                        placeholder="Your company"
+                        placeholder="Your company name"
                         required
+                        aria-required="true"
                       />
                     </div>
                     
-                    <div className="space-y-1">
-                      <Label htmlFor="password">Set Password</Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="password">Set Password <span className="text-destructive">*</span></Label>
                       <Input
                         id="password"
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Choose a secure password"
+                        placeholder="Minimum 6 characters"
                         required
+                        aria-required="true"
+                        minLength={6}
                       />
                     </div>
                   </>
                 )}
                 
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? (
-                    <Spinner className="mr-2" />
-                  ) : null}
-                  {type === 'invite' ? 'Complete Registration' : 'Confirm Account'}
+                <Button type="submit" className="w-full" disabled={loading || !token}>
+                  {loading && <Spinner className="mr-2 h-4 w-4 animate-spin" />}
+                  {type === 'invite' ? 'Complete Account Setup' : 'Confirm Account'}
                 </Button>
               </form>
             )}
           </CardContent>
           
-          <CardFooter>
-            <div className="text-center w-full text-sm text-gray-500">
-              Already have an account?{" "}
-              <a href="/auth/login" className="font-medium text-primary hover:underline">
-                Log in
-              </a>
-            </div>
-          </CardFooter>
+          { !success && type !== 'invite' && (
+            <CardFooter className="pt-4">
+              <div className="text-center w-full text-sm text-muted-foreground">
+                {'Already confirmed?'}{" "}
+                <Link href="/auth/login" className="font-medium text-primary hover:underline">
+                  Log in here
+                </Link>
+              </div>
+            </CardFooter>
+          )}
         </Card>
       </div>
     </div>
   );
 }
 
-// Main component with suspense boundary
+/**
+ * ConfirmPage wraps ConfirmContent with Suspense for client-side data fetching.
+ * It serves as the entry point for account confirmation links.
+ */
 export default function ConfirmPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><Spinner size="lg" /></div>}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-center"><Spinner size="lg" /><p className="text-muted-foreground ml-2">Loading confirmation...</p></div>}>
       <ConfirmContent />
     </Suspense>
   );

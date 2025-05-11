@@ -1,7 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { handleApiError, isDatabaseConnectionError } from '@/lib/api-utils';
+import { withAuth } from '@/lib/auth/api-auth';
 
-export async function GET() {
+/**
+ * API route to test environment status, including DB connectivity and some env var presence.
+ * WARNING: This endpoint is now protected by `withAuth`, but reveals server configuration status.
+ * Further role-based restrictions (e.g., admin-only) are HIGHLY recommended if this endpoint is kept.
+ */
+export const GET = withAuth(async (request: NextRequest, user) => {
+  const startTime = Date.now();
+  
   try {
     // Check environment variables
     const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
@@ -15,19 +24,24 @@ export async function GET() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     let supabaseConnected = false;
+    let supabaseTestQueryError: string | null = null;
     
     if (supabaseUrl && supabaseAnonKey) {
       try {
         const supabase = createClient(supabaseUrl, supabaseAnonKey);
-        const { data, error } = await supabase.from('brands').select('id').limit(1);
-        supabaseConnected = !error;
-      } catch (error) {
-        console.error('Supabase connection error:', error);
+        const { error } = await supabase.from('brands').select('id', { head: true }).limit(1);
+        if (error) {
+            supabaseTestQueryError = error.message;
+        } else {
+            supabaseConnected = true;
+        }
+      } catch (error: any) {
+        supabaseTestQueryError = error.message || 'Unknown Supabase client error';
       }
     }
 
     // Check for direct database connection
-    const directDbConnected = Boolean(
+    const directDbConnected = !!(
       process.env.POSTGRES_HOST && 
       process.env.POSTGRES_PORT && 
       process.env.POSTGRES_USER && 
@@ -38,33 +52,53 @@ export async function GET() {
     // Check template availability
     const localTemplatesAvailable = true; // Should always be available as fallback
 
-    // Format response with available environment info
     return NextResponse.json({
       success: true,
-      azureOpenAIEnabled: Boolean(azureEndpoint && azureApiKey && azureDeployment),
-      azureEndpoint: azureEndpoint ? `${azureEndpoint}` : null,
-      azureApiKey: Boolean(azureApiKey),
-      azureDeployment,
-      azureApiVersion,
-      useLocalGeneration,
-      supabaseConnected,
-      supabaseUrl: Boolean(supabaseUrl),
-      databaseProvider: supabaseConnected ? 'Supabase' : (directDbConnected ? 'Direct PostgreSQL' : 'None'),
-      localTemplatesAvailable,
-      directDbConnected,
-      debugMode,
-      nodeEnv: process.env.NODE_ENV,
-      timestamp: new Date().toISOString()
+      diagnostics: {
+        azureOpenAIConfigured: !!(azureEndpoint && azureApiKey && azureDeployment),
+        azureOpenAIApiKeySet: !!azureApiKey,
+        azureOpenAIEndpointSet: !!azureEndpoint,
+        azureOpenAIDeploymentSet: !!azureDeployment,
+        azureApiVersionUsed: azureApiVersion,
+        useLocalGenerationEnabled: useLocalGeneration,
+        supabaseClientConnection: supabaseConnected,
+        supabaseClientTestQueryError: supabaseTestQueryError,
+        supabaseUrlConfigured: !!supabaseUrl,
+        databaseProvider: supabaseConnected ? 'Supabase (via client)' : (directDbConnected ? 'Direct PostgreSQL (env vars set)' : 'None Configured'),
+        localFallbackTemplatesMarkedAvailable: localTemplatesAvailable,
+        directDbConfigSet: directDbConnected,
+        debugModeEnabled: debugMode,
+        nodeEnv: process.env.NODE_ENV,
+        timestamp: new Date().toISOString(),
+        checkedByUserId: user.id
+      }
     });
   } catch (error: any) {
-    console.error('Error checking environment:', error);
-    
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: `Failed to check environment: ${error.message}`
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, `Failed to check environment: ${error.message}`);
   }
-} 
+});
+
+// IMPORTANT: The GET_ENV_VARS function below is NOT a standard Next.js API route handler due to its name.
+// It has been commented out as its functionality is largely covered by the secured GET above,
+// and exposing env vars directly, even booleans for existence, should be done with extreme caution
+// via a well-secured and purpose-built endpoint if absolutely necessary.
+// If this specific breakout of env var existence is still needed, it must be:
+// 1. Renamed to `GET` (or another standard HTTP verb).
+// 2. Placed in its own route file (e.g., /api/test-specific-env-vars/route.ts).
+// 3. STRICTLY SECURED with authentication and admin-level authorization.
+/*
+export async function GET_ENV_VARS() {
+  const envVars = {
+    NODE_ENV: process.env.NODE_ENV,
+    AZURE_OPENAI_API_KEY_EXISTS: !!process.env.AZURE_OPENAI_API_KEY,
+    AZURE_OPENAI_ENDPOINT_EXISTS: !!process.env.AZURE_OPENAI_ENDPOINT,
+    AZURE_OPENAI_DEPLOYMENT_EXISTS: !!process.env.AZURE_OPENAI_DEPLOYMENT,
+  };
+
+  return NextResponse.json({ 
+    success: true, 
+    message: "Environment variable status check (minimal info for security)", 
+    data: envVars 
+  });
+}
+*/ 

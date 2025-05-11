@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
-import { getAzureOpenAIClient, getModelName } from '@/lib/azure/openai';
+import { getModelName } from '@/lib/azure/openai';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -66,12 +65,12 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     }
 
     const deploymentName = getModelName();
-    
+    const azureApiVersion = process.env.AZURE_OPENAI_API_VERSION || '2023-12-01-preview';
+
     // Make the API call directly with error handling
     try {
       // Prepare the request body
       const completionRequest = {
-        model: deploymentName,
         messages: [
           { role: "system", content: systemMessage },
           { role: "user", content: processedPrompt }
@@ -81,7 +80,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       };
       
       // Specify the deployment in the URL path
-      const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
+      const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=${azureApiVersion}`;
       
       // Make a direct fetch call
       const response = await fetch(endpoint, {
@@ -101,18 +100,16 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       const responseData = await response.json();
       
       // Extract the suggestion from the response
-      const suggestion = responseData.choices?.[0]?.message?.content || '';
+      const suggestion = responseData.choices?.[0]?.message?.content?.trim() || '';
       
       return NextResponse.json({
         success: true,
         suggestion
       });
     } catch (error) {
-      console.error('Error calling Azure OpenAI:', error);
       throw error;
     }
   } catch (error) {
-    console.error('Error generating suggestion:', error);
     return handleApiError(error, 'Failed to generate suggestion');
   }
 }); 

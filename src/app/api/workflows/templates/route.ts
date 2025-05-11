@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
+import { handleApiError } from '@/lib/api-utils'; // Import for consistent error handling
 
 /**
  * GET endpoint to retrieve workflow templates
  * This is a static API that provides predefined templates for
- * different content types
+ * different content types.
+ * This endpoint is currently unauthenticated.
  */
 export async function GET() {
   try {
@@ -118,10 +120,7 @@ export async function GET() {
       templates 
     });
   } catch (error) {
-    console.error('Error fetching workflow templates:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch workflow templates' },
-      { status: 500 }
-    );
+    // Removed console.error
+    return handleApiError(error, 'Failed to fetch workflow templates');
   }
 } 

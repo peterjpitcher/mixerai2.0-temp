@@ -1,102 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
+import { withAuth } from '@/lib/auth/api-auth';
+
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
 
 // GET a single brand by ID
-export async function GET(
+export const GET = withAuth(async (
   request: NextRequest,
+  user: any,
   { params }: { params: { id: string } }
-) {
-  const requestHeaders = Object.fromEntries(request.headers.entries());
-  console.log(`🔍 API: GET /api/brands/${params.id} - Request headers:`, requestHeaders);
-  
+) => {
   try {
-    // Return mock data during static site generation
-    if (isBuildPhase()) {
-      console.log('Returning mock brand during build');
-      return NextResponse.json({ 
-        success: true, 
-        isMockData: true,
-        brand: {
-          id: params.id,
-          name: 'Demo Brand',
-          website_url: 'https://example.com',
-          country: 'United States',
-          language: 'English', 
-          brand_identity: 'A sample brand identity for demonstration purposes.',
-          tone_of_voice: 'Professional yet friendly, with a focus on clarity and simplicity.',
-          guardrails: 'Avoid technical jargon. Focus on benefits rather than features.',
-          content_vetting_agencies: 'FDA, FTC, EPA',
-          brand_color: '#3498db',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        contentCount: 5,
-        workflowCount: 2
-      }, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Cache-Control': 'no-store',
-          'x-data-source': 'mock-build-phase'
-        }
-      });
-    }
-    
-    console.log(`Attempting to fetch brand with ID: ${params.id}`);
-    
     const supabase = createSupabaseAdminClient();
     const { id } = params;
     
-    // Get the brand
-    const { data: brand, error } = await supabase
+    const { data: brand, error: brandFetchError } = await supabase
       .from('brands')
       .select('*')
       .eq('id', id)
       .single();
     
-    if (error) throw error;
+    if (brandFetchError) {
+        throw brandFetchError;
+    }
     
     if (!brand) {
       return NextResponse.json(
         { success: false, error: 'Brand not found' },
         { 
           status: 404,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Cache-Control': 'no-store'
-          }
+          headers: { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }
         }
       );
     }
 
-    // Get content count for this brand
-    const { count: contentCount, error: contentError } = await supabase
+    const { count: contentCount, error: contentCountError } = await supabase
       .from('content')
       .select('id', { count: 'exact', head: true })
       .eq('brand_id', id);
       
-    if (contentError) {
-      console.error('Error fetching content count:', contentError);
-    }
+    if (contentCountError) throw contentCountError; 
     
-    // Get workflow count for this brand
-    const { count: workflowCount, error: workflowError } = await supabase
+    const { count: workflowCount, error: workflowCountError } = await supabase
       .from('workflows')
       .select('id', { count: 'exact', head: true })
       .eq('brand_id', id);
       
-    if (workflowError) {
-      console.error('Error fetching workflow count:', workflowError);
-    }
+    if (workflowCountError) throw workflowCountError;
 
-    console.log(`Successfully fetched brand: ${brand.name}`);
-    
-    // Add metadata to help identify the response (using type assertion for extra properties)
-    (brand as any).source = 'database';
-    (brand as any).fetchedAt = new Date().toISOString();
-    
     return NextResponse.json({ 
       success: true, 
       brand,
@@ -116,63 +69,21 @@ export async function GET(
       }
     });
   } catch (error: any) {
-    console.error('Error fetching brand:', error);
-    
-    // Only use fallback for genuine database connection errors
-    if (isDatabaseConnectionError(error)) {
-      console.error('Database connection error, using fallback brand data:', error);
-      return NextResponse.json({ 
-        success: true, 
-        isFallback: true,
-        brand: {
-          id: params.id,
-          name: 'Fallback Brand (Connection Error)',
-          website_url: 'https://example.com',
-          country: 'United States',
-          language: 'English', 
-          brand_identity: 'Fallback brand data due to database connection issue.',
-          tone_of_voice: 'Professional yet friendly.',
-          guardrails: 'Avoid technical jargon.',
-          content_vetting_agencies: 'FDA, FTC',
-          brand_color: '#e74c3c',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          source: 'fallback',
-          fetchedAt: new Date().toISOString()
-        },
-        contentCount: 0,
-        workflowCount: 0,
-        meta: {
-          source: 'fallback',
-          isFallback: true,
-          errorType: 'database_connection',
-          requestId: crypto.randomUUID(),
-          timestamp: new Date().toISOString()
-        }
-      }, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Cache-Control': 'no-store',
-          'x-data-source': 'fallback'
-        }
-      });
-    }
-    
     return handleApiError(error, 'Error fetching brand');
   }
-}
+});
 
 // PUT endpoint to update a brand
-export async function PUT(
+export const PUT = withAuth(async (
   request: NextRequest,
+  user: any,
   { params }: { params: { id: string } }
-) {
+) => {
   try {
     const supabase = createSupabaseAdminClient();
     const { id } = params;
     const body = await request.json();
     
-    // Validate required fields
     if (!body.name || body.name.trim() === '') {
       return NextResponse.json(
         { success: false, error: 'Brand name is required' },
@@ -180,7 +91,6 @@ export async function PUT(
       );
     }
     
-    // Prepare update object with only valid fields
     const updateData: any = {};
     if (body.name !== undefined) updateData.name = body.name;
     if (body.website_url !== undefined) updateData.website_url = body.website_url;
@@ -191,51 +101,39 @@ export async function PUT(
     if (body.brand_color !== undefined) updateData.brand_color = body.brand_color;
     if (body.approved_content_types !== undefined) updateData.approved_content_types = body.approved_content_types;
     
-    // Handle brand_summary field
     if (body.brand_summary !== undefined) {
       updateData.brand_summary = body.brand_summary;
     } else if (body.brand_identity !== undefined && (body.brand_identity !== "")) {
-      // Generate summary from brand_identity if it's updated and summary isn't provided
       updateData.brand_summary = body.brand_identity.slice(0, 250);
       if (body.brand_identity.length > 250) {
         updateData.brand_summary += '...';
       }
     }
     
-    // Handle guardrails specially to ensure proper format
     if (body.guardrails !== undefined) {
-      // Handle case where guardrails might be a JSON array string or an actual array
       let formattedGuardrails = body.guardrails;
-      
-      // If it's already an array (parsed from JSON)
       if (Array.isArray(body.guardrails)) {
-        formattedGuardrails = body.guardrails.map(item => `- ${item}`).join('\n');
+        formattedGuardrails = body.guardrails.map((item:string) => `- ${item}`).join('\n');
       } 
-      // If it's a JSON string containing an array
       else if (typeof body.guardrails === 'string' && 
                body.guardrails.trim().startsWith('[') && 
                body.guardrails.trim().endsWith(']')) {
         try {
           const guardrailsArray = JSON.parse(body.guardrails);
           if (Array.isArray(guardrailsArray)) {
-            formattedGuardrails = guardrailsArray.map(item => `- ${item}`).join('\n');
+            formattedGuardrails = guardrailsArray.map((item:string) => `- ${item}`).join('\n');
           }
         } catch (e) {
-          // If parsing fails, use as is
-          console.log("Failed to parse guardrails as JSON array, using as-is");
+          // console.log removed
         }
       }
-      
       updateData.guardrails = formattedGuardrails;
     }
     
     if (body.content_vetting_agencies !== undefined) updateData.content_vetting_agencies = body.content_vetting_agencies;
     
-    // If updated fields include brand_admin_id, update permissions
     if (body.brand_admin_id) {
       const brandAdminId = body.brand_admin_id;
-      
-      // Check if this brand admin already has admin permissions
       const { data: existingPermission, error: permCheckError } = await supabase
         .from('user_brand_permissions')
         .select('id, role')
@@ -244,37 +142,22 @@ export async function PUT(
         .maybeSingle();
       
       if (permCheckError) {
-        console.error('Error checking existing brand admin permission:', permCheckError);
-      } else {
-        // If exists but not admin, update to admin role
-        if (existingPermission && existingPermission.role !== 'admin') {
-          const { error: updatePermError } = await supabase
-            .from('user_brand_permissions')
-            .update({ role: 'admin' })
-            .eq('id', existingPermission.id);
-          
-          if (updatePermError) {
-            console.error('Error updating brand admin permission:', updatePermError);
-          }
-        } 
-        // If doesn't exist, create new admin permission
-        else if (!existingPermission) {
-          const { error: createPermError } = await supabase
-            .from('user_brand_permissions')
-            .insert({
-              user_id: brandAdminId,
-              brand_id: id,
-              role: 'admin'
-            });
-          
-          if (createPermError) {
-            console.error('Error creating brand admin permission:', createPermError);
-          }
-        }
+        throw permCheckError;
+      } 
+      if (existingPermission && existingPermission.role !== 'admin') {
+        const { error: updatePermError } = await supabase
+          .from('user_brand_permissions')
+          .update({ role: 'admin' })
+          .eq('id', existingPermission.id);
+        if (updatePermError) throw updatePermError;
+      } else if (!existingPermission) {
+        const { error: createPermError } = await supabase
+          .from('user_brand_permissions')
+          .insert({ user_id: brandAdminId, brand_id: id, role: 'admin' });
+        if (createPermError) throw createPermError;
       }
     }
     
-    // Check if there's anything to update
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { success: false, error: 'No valid fields to update' },
@@ -282,89 +165,76 @@ export async function PUT(
       );
     }
     
-    // Update the brand
-    const { data, error } = await supabase
+    updateData.updated_at = new Date().toISOString();
+
+    const { data: updatedBrandData, error: updateErrorData } = await supabase
       .from('brands')
       .update(updateData)
       .eq('id', id)
-      .select();
+      .select()
+      .single();
     
-    if (error) throw error;
+    if (updateErrorData) throw updateErrorData;
     
-    // Check if any rows were affected
-    if (!data || data.length === 0) {
+    if (!updatedBrandData) {
       return NextResponse.json(
-        { success: false, error: 'Brand not found' },
+        { success: false, error: 'Brand not found or no changes made' },
         { status: 404 }
       );
     }
     
     return NextResponse.json({ 
       success: true, 
-      brand: data[0] 
+      brand: updatedBrandData 
     });
   } catch (error) {
     return handleApiError(error, 'Error updating brand');
   }
-}
+});
 
 // DELETE a brand by ID
-export async function DELETE(
+export const DELETE = withAuth(async (
   request: NextRequest,
+  user: any,
   { params }: { params: { id: string } }
-) {
-  console.log("DELETE brand API called for ID:", params.id);
+) => {
   try {
     const supabase = createSupabaseAdminClient();
     const { id } = params;
     
-    // Parse the URL to get the query parameters
     const url = new URL(request.url);
     const deleteCascade = url.searchParams.get('deleteCascade') === 'true';
-    console.log("deleteCascade parameter:", deleteCascade);
     
-    // First check if the brand exists
-    const { data: brand, error: fetchError } = await supabase
+    const { data: brandToCheck, error: fetchError } = await supabase
       .from('brands')
       .select('id, name')
       .eq('id', id)
       .single();
     
     if (fetchError) throw fetchError;
-    
-    if (!brand) {
-      console.log("Brand not found:", id);
+    if (!brandToCheck) {
       return NextResponse.json(
         { success: false, error: 'Brand not found' },
         { status: 404 }
       );
     }
     
-    // Check if there's any content associated with this brand
-    const { count: contentCount, error: countError } = await supabase
+    const { count: contentCount, error: contentCountErr } = await supabase
       .from('content')
       .select('id', { count: 'exact', head: true })
       .eq('brand_id', id);
+    if (contentCountErr) throw contentCountErr;
     
-    if (countError) throw countError;
-    
-    // Check if there's any workflows associated with this brand
-    const { count: workflowCount, error: workflowCountError } = await supabase
+    const { count: workflowCount, error: workflowCountErr } = await supabase
       .from('workflows')
       .select('id', { count: 'exact', head: true })
       .eq('brand_id', id);
-    
-    if (workflowCountError) throw workflowCountError;
+    if (workflowCountErr) throw workflowCountErr;
     
     const contentCountValue = contentCount || 0;
     const workflowCountValue = workflowCount || 0;
     
-    console.log("Associated content count:", contentCountValue);
-    console.log("Associated workflow count:", workflowCountValue);
-    
-    // If cascade delete is not specified, and there's associated content or workflows, return an error
     if (!deleteCascade && (contentCountValue > 0 || workflowCountValue > 0)) {
-      console.log("Cascade delete required but not specified");
       return NextResponse.json(
         { 
           success: false, 
@@ -377,56 +247,32 @@ export async function DELETE(
       );
     }
     
-    // If cascade delete is specified, first delete all associated content and workflows
     if (deleteCascade) {
-      // For cascade delete, we'll do it manually since RPC may not be set up
-      // First delete all content
       if (contentCountValue > 0) {
-        const { error: contentDeleteError } = await supabase
-          .from('content')
-          .delete()
-          .eq('brand_id', id);
-        
-        if (contentDeleteError) throw contentDeleteError;
+        const { error: cascadeContentDeleteError } = await supabase.from('content').delete().eq('brand_id', id);
+        if (cascadeContentDeleteError) throw cascadeContentDeleteError;
       }
-      
-      // Then delete all workflows
       if (workflowCountValue > 0) {
-        const { error: workflowDeleteError } = await supabase
-          .from('workflows')
-          .delete()
-          .eq('brand_id', id);
-        
-        if (workflowDeleteError) throw workflowDeleteError;
+        const { error: cascadeWorkflowDeleteError } = await supabase.from('workflows').delete().eq('brand_id', id);
+        if (cascadeWorkflowDeleteError) throw cascadeWorkflowDeleteError;
       }
-      
-      // Finally delete the brand
-      const { error: deleteError } = await supabase
-        .from('brands')
-        .delete()
-        .eq('id', id);
-      
-      if (deleteError) throw deleteError;
+      const { error: cascadeBrandDeleteError } = await supabase.from('brands').delete().eq('id', id);
+      if (cascadeBrandDeleteError) throw cascadeBrandDeleteError;
       
       return NextResponse.json({ 
         success: true, 
-        message: `Brand "${brand.name}" and all associated content and workflows have been deleted successfully` 
+        message: `Brand "${brandToCheck.name}" and all associated content and workflows have been deleted successfully` 
       });
     }
     
-    // If we're here, then there's no associated content or workflows, so just delete the brand
-    const { error: deleteError } = await supabase
-      .from('brands')
-      .delete()
-      .eq('id', id);
-    
-    if (deleteError) throw deleteError;
+    const { error: finalBrandDeleteError } = await supabase.from('brands').delete().eq('id', id);
+    if (finalBrandDeleteError) throw finalBrandDeleteError;
     
     return NextResponse.json({ 
       success: true, 
-      message: `Brand "${brand.name}" has been deleted successfully` 
+      message: `Brand "${brandToCheck.name}" has been deleted successfully` 
     });
   } catch (error) {
     return handleApiError(error, 'Error deleting brand');
   }
-} 
+}); 

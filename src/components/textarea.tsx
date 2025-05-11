@@ -5,6 +5,11 @@ import { cn } from "@/lib/utils"
 export interface TextareaProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
 
+/**
+ * Textarea component.
+ * A standard HTML textarea element styled for the application theme.
+ * Supports all standard HTMLTextareaAttributes.
+ */
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ className, ...props }, ref) => {
     return (

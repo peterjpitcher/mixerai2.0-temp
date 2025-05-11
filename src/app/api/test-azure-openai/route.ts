@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { withAuth } from '@/lib/auth/api-auth';
+import { handleApiError } from '@/lib/api-utils';
 
-export async function GET(req: NextRequest) {
+export const GET = withAuth(async (req: NextRequest, user) => {
   try {
     const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
     const azureApiKey = process.env.AZURE_OPENAI_API_KEY;
@@ -11,16 +13,15 @@ export async function GET(req: NextRequest) {
     if (!azureEndpoint || !azureApiKey || !azureDeployment) {
       return NextResponse.json({
         success: false,
-        error: 'Azure OpenAI configuration is incomplete',
+        error: 'Azure OpenAI configuration is incomplete on the server.',
         missingConfig: {
           endpoint: !azureEndpoint,
           apiKey: !azureApiKey,
           deployment: !azureDeployment
         }
-      }, { status: 400 });
+      }, { status: 500 });
     }
 
-    // Configure Azure OpenAI
     const openai = new OpenAI({
       apiKey: azureApiKey,
       baseURL: `${azureEndpoint}/openai/deployments/${azureDeployment}`,
@@ -28,9 +29,7 @@ export async function GET(req: NextRequest) {
       defaultHeaders: { 'api-key': azureApiKey }
     });
 
-    // Send a simple ping with a minimal prompt
     const startTime = Date.now();
-    
     const response = await openai.chat.completions.create({
       model: azureDeployment,
       messages: [
@@ -40,13 +39,12 @@ export async function GET(req: NextRequest) {
       max_tokens: 10,
       temperature: 0.1,
     });
-    
     const endTime = Date.now();
     const responseTime = endTime - startTime;
 
     return NextResponse.json({
       success: true,
-      message: 'Azure OpenAI API is working correctly',
+      message: 'Azure OpenAI API test ping successful.',
       responseTime: `${responseTime}ms`,
       modelUsed: response.model,
       modelResponse: response.choices[0]?.message?.content,
@@ -56,50 +54,34 @@ export async function GET(req: NextRequest) {
     });
     
   } catch (error: any) {
-    console.error('Azure OpenAI test error:', error);
-    
-    return NextResponse.json({
-      success: false,
-      error: `Azure OpenAI test failed: ${error.message}`,
-      errorDetails: error.response?.data || null
-    }, { status: 500 });
+    return handleApiError(error, `Azure OpenAI GET test failed`);
   }
-}
+});
 
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (req: NextRequest, user) => {
   try {
-    // Get configuration
     const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
     const azureApiKey = process.env.AZURE_OPENAI_API_KEY;
     const azureDeployment = process.env.AZURE_OPENAI_DEPLOYMENT;
     const azureApiVersion = process.env.AZURE_OPENAI_API_VERSION || '2023-05-15';
 
-    // Check required config
     if (!azureEndpoint || !azureApiKey || !azureDeployment) {
       return NextResponse.json({
         success: false,
-        error: 'Azure OpenAI configuration is incomplete',
+        error: 'Azure OpenAI configuration is incomplete on the server.',
         missingConfig: {
           endpoint: !azureEndpoint,
           apiKey: !azureApiKey,
           deployment: !azureDeployment
         }
-      }, { status: 400 });
+      }, { status: 500 });
     }
 
-    // Get request parameters
     const body = await req.json();
     const prompt = body.prompt || 'Hello, world!';
     const temperature = typeof body.temperature === 'number' ? body.temperature : 0.7;
     const max_tokens = typeof body.max_tokens === 'number' ? body.max_tokens : 100;
 
-    console.log(`Running OpenAI test with:
-      - Prompt: ${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}
-      - Temperature: ${temperature}
-      - Max Tokens: ${max_tokens}
-    `);
-
-    // Configure Azure OpenAI
     const openai = new OpenAI({
       apiKey: azureApiKey,
       baseURL: `${azureEndpoint}/openai/deployments/${azureDeployment}`,
@@ -107,9 +89,7 @@ export async function POST(req: NextRequest) {
       defaultHeaders: { 'api-key': azureApiKey }
     });
 
-    // Send the request with custom parameters
     const startTime = Date.now();
-    
     const response = await openai.chat.completions.create({
       model: azureDeployment,
       messages: [
@@ -119,13 +99,12 @@ export async function POST(req: NextRequest) {
       max_tokens,
       temperature,
     });
-    
     const endTime = Date.now();
     const responseTime = endTime - startTime;
 
     return NextResponse.json({
       success: true,
-      message: 'Azure OpenAI API request successful',
+      message: 'Azure OpenAI API custom request successful.',
       responseTime: `${responseTime}ms`,
       modelUsed: response.model,
       modelResponse: response.choices[0]?.message?.content,
@@ -135,12 +114,6 @@ export async function POST(req: NextRequest) {
     });
     
   } catch (error: any) {
-    console.error('Azure OpenAI test error:', error);
-    
-    return NextResponse.json({
-      success: false,
-      error: `Azure OpenAI test failed: ${error.message}`,
-      errorDetails: error.response?.data || null
-    }, { status: 500 });
+    return handleApiError(error, `Azure OpenAI POST test failed`);
   }
-} 
+}); 

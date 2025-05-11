@@ -14,12 +14,24 @@ import { Loader2 } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 
+// export const metadata: Metadata = {
+//   title: 'Edit Brand | MixerAI 2.0',
+//   description: 'Edit the details, brand identity, and settings for an existing brand.',
+// };
+
 interface BrandEditPageProps {
   params: {
     id: string;
   };
 }
 
+/**
+ * BrandEditPage allows users to modify the details of an existing brand.
+ * It includes sections for basic information (name, website, country, language, brand colour)
+ * and brand identity (AI-generated or manually entered brand identity, tone of voice, guardrails,
+ * and content vetting agencies).
+ * The page fetches brand data on load and allows saving changes or generating brand identity content.
+ */
 export default function BrandEditPage({ params }: BrandEditPageProps) {
   const router = useRouter();
   const { id } = params;
@@ -73,7 +85,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
           content_vetting_agencies: data.brand.content_vetting_agencies || ''
         });
       } catch (error) {
-        console.error('Error loading brand data:', error);
+        // console.error('Error loading brand data:', error);
         setError((error as Error).message);
         toast.error('Failed to load brand details. Please try again.');
       } finally {
@@ -101,7 +113,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   
   const handleGenerateBrandIdentity = async () => {
     if (!formData.name) {
-      toast.error('Please enter a brand name before generating brand identity.');
+      toast.error('Please enter a brand name before generating the brand identity.');
       return;
     }
     
@@ -170,7 +182,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       // Switch to brand identity tab
       setActiveTab('identity');
     } catch (error) {
-      console.error('Error generating brand identity:', error);
+      // console.error('Error generating brand identity:', error);
       toast.error('Failed to generate brand identity. Please try again.');
     } finally {
       setIsGenerating(false);
@@ -183,7 +195,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       
       // Validate required fields
       if (!formData.name) {
-        toast.error('Brand name is required');
+        toast.error('Brand name is required.');
         setIsSaving(false);
         return;
       }
@@ -212,7 +224,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       toast.success('Brand updated successfully!');
       router.push(`/dashboard/brands/${id}`);
     } catch (error) {
-      console.error('Error saving brand:', error);
+      // console.error('Error saving brand:', error);
       toast.error('Failed to save brand. Please try again.');
     } finally {
       setIsSaving(false);
@@ -235,7 +247,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px]">
-        <div className="text-red-500 mb-4">
+        <div className="text-destructive mb-4">
           <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
@@ -253,7 +265,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   if (!brand) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px]">
-        <div className="text-amber-500 mb-4">
+        <div className="text-warning mb-4">
           <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
@@ -261,7 +273,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
           </svg>
         </div>
         <h3 className="text-xl font-bold mb-2">Brand Not Found</h3>
-        <p className="text-muted-foreground mb-4 text-center max-w-md">The brand you're looking for doesn't exist or has been deleted.</p>
+        <p className="text-muted-foreground mb-4 text-center max-w-md">The brand for which you are looking does not exist or has been deleted.</p>
         <Button onClick={() => router.push('/dashboard/brands')}>Back to Brands</Button>
       </div>
     );
@@ -277,8 +289,10 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         <div className="flex items-center gap-3">
           <BrandIcon name={formData.name} color={formData.brand_color} size="lg" />
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Edit Brand</h1>
-            <p className="text-muted-foreground">{brand.name}</p>
+            <h1 className="text-3xl font-bold tracking-tight">Edit: {brand?.name || 'Brand'}</h1>
+            <p className="text-muted-foreground">
+              Update the name, identity, and other settings for this brand.
+            </p>
           </div>
         </div>
         
@@ -315,7 +329,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
             <CardHeader>
               <CardTitle>Basic Information</CardTitle>
               <CardDescription>
-                Update the basic details for your brand
+                Update the basic details for your brand.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -384,21 +398,21 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="brand_color">Brand Color</Label>
+                <Label htmlFor="brand_color">Brand Colour</Label>
                 <div className="flex gap-2 items-center">
                   <input
                     type="color"
                     id="brand_color"
                     name="brand_color"
-                    value={formData.brand_color || '#3498db'}
+                    value={formData.brand_color || '#1982C4'}
                     onChange={handleInputChange}
                     className="w-10 h-10 rounded cursor-pointer"
                   />
                   <Input
-                    value={formData.brand_color || '#3498db'}
+                    value={formData.brand_color || '#1982C4'}
                     onChange={handleInputChange}
                     name="brand_color"
-                    placeholder="#HEX color"
+                    placeholder="#HEX colour"
                     className="w-32"
                   />
                 </div>
@@ -423,7 +437,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
             <CardHeader>
               <CardTitle>Brand Identity</CardTitle>
               <CardDescription>
-                Update or generate your brand identity profile
+                Update or generate your brand identity profile.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -508,7 +522,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                         name="guardrails"
                         value={formData.guardrails}
                         onChange={handleInputChange}
-                        placeholder="Enter content guardrails"
+                        placeholder="Enter guardrails"
                         rows={6}
                       />
                     </div>
@@ -520,8 +534,8 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                         name="content_vetting_agencies"
                         value={formData.content_vetting_agencies}
                         onChange={handleInputChange}
-                        placeholder="Enter content vetting agencies"
-                        rows={6}
+                        placeholder="Enter agency names, separated by commas."
+                        rows={3}
                       />
                     </div>
                   </div>
@@ -530,26 +544,24 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                 <div className="lg:col-span-1">
                   <div className="bg-muted rounded-lg p-4 space-y-6 sticky top-4">
                     <div className="space-y-2">
-                      <h4 className="font-medium">Brand Preview</h4>
-                      <div className="flex items-center space-x-3">
-                        <BrandIcon name={formData.name} color={formData.brand_color} size="md" />
-                        <div>
-                          <p className="font-semibold">{formData.name || 'Brand Name'}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {countryName} • {languageName}
-                          </p>
-                        </div>
+                      <h4 className="font-semibold">Quick Preview</h4>
+                      <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/30">
+                        <BrandIcon name={formData.name || 'Brand Name'} color={formData.brand_color || '#1982C4'} />
+                        <span>{formData.name || 'Your Brand Name'}</span>
                       </div>
+                      <p className="text-xs text-muted-foreground">
+                        This is a preview of how your brand colour and icon might appear.
+                      </p>
                     </div>
                     
                     <div className="space-y-2">
                       <h4 className="font-medium">Brand Color</h4>
                       <div 
                         className="w-full h-12 rounded-md"
-                        style={{ backgroundColor: formData.brand_color || '#3498db' }}
+                        style={{ backgroundColor: formData.brand_color || '#1982C4' }}
                       />
                       <p className="text-xs text-center text-muted-foreground">
-                        {formData.brand_color || '#3498db'}
+                        {formData.brand_color || '#1982C4'}
                       </p>
                     </div>
                     

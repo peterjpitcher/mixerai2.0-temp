@@ -8,6 +8,11 @@ interface PageHeaderProps {
   actions?: React.ReactNode;
 }
 
+/**
+ * PageHeader component.
+ * Displays a standard header for dashboard pages, including a title, 
+ * an optional description, and optional action buttons or other elements.
+ */
 export function PageHeader({ title, description, actions }: PageHeaderProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">

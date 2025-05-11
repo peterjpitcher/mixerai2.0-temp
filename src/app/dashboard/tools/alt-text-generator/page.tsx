@@ -10,6 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/components/use-toast";
 import { copyToClipboard } from '@/lib/utils/clipboard';
 import { Loader2, ClipboardCopy, Image } from 'lucide-react';
+import type { Metadata } from 'next';
+
+// export const metadata: Metadata = {
+//   title: 'Alt Text Generator | MixerAI 2.0',
+//   description: 'Generate accessible alt text for images using your brand guidelines.',
+// };
 
 interface Brand {
   id: string;
@@ -21,6 +27,12 @@ interface Brand {
   guardrails?: string | null;
 }
 
+/**
+ * AltTextGeneratorPage provides a tool for generating accessible alt text for images.
+ * Users can select a brand, provide an image URL, and the tool will generate alt text
+ * based on the image content and the selected brand's voice and style.
+ * It includes an image preview and options to copy the generated alt text.
+ */
 export default function AltTextGeneratorPage() {
   const [imageUrl, setImageUrl] = useState('');
   const [selectedBrandId, setSelectedBrandId] = useState('');
@@ -42,7 +54,7 @@ export default function AltTextGeneratorPage() {
         if (data.success && Array.isArray(data.brands)) {
           setBrands(data.brands);
         } else {
-          console.error('Failed to fetch brands:', data);
+          // console.error('Failed to fetch brands:', data);
           toast({
             title: 'Error',
             description: 'Failed to fetch brands. Please try again later.',
@@ -50,7 +62,7 @@ export default function AltTextGeneratorPage() {
           });
         }
       } catch (error) {
-        console.error('Error fetching brands:', error);
+        // console.error('Error fetching brands:', error);
         toast({
           title: 'Error',
           description: 'Failed to fetch brands. Please try again later.',
@@ -75,7 +87,7 @@ export default function AltTextGeneratorPage() {
     if (!imageUrl) {
       toast({
         title: 'Image URL required',
-        description: 'Please enter an image URL to generate alt text',
+        description: 'Please enter an image URL for which to generate alt text.',
         variant: 'destructive',
       });
       return;
@@ -84,7 +96,7 @@ export default function AltTextGeneratorPage() {
     if (!selectedBrandId) {
       toast({
         title: 'Brand required',
-        description: 'Please select a brand',
+        description: 'Please select a brand.',
         variant: 'destructive',
       });
       return;
@@ -96,7 +108,7 @@ export default function AltTextGeneratorPage() {
     } catch (error) {
       toast({
         title: 'Invalid URL',
-        description: 'Please enter a valid URL (e.g., https://example.com/image.jpg)',
+        description: 'Please enter a valid URL (e.g., https://example.com/image.jpg).',
         variant: 'destructive',
       });
       return;
@@ -126,7 +138,7 @@ export default function AltTextGeneratorPage() {
       
       if (!response.ok) {
         // Get detailed error information
-        let errorMessage = data.error || 'Failed to generate alt text';
+        let errorMessage = data.error || 'Failed to generate alt text.';
         
         // Customize message based on status code
         if (response.status === 503) {
@@ -145,16 +157,16 @@ export default function AltTextGeneratorPage() {
         });
         
         toast({
-          title: 'Alt text generated',
-          description: 'Accessible alt text has been generated successfully',
+          title: 'Alt Text Generated',
+          description: 'Accessible alt text has been generated successfully.',
         });
       } else {
-        throw new Error(data.error || 'Failed to generate alt text');
+        throw new Error(data.error || 'Failed to generate alt text.');
       }
     } catch (error) {
       const errorMessage = error instanceof Error 
         ? error.message 
-        : 'An unknown error occurred while generating alt text';
+        : 'An unknown error occurred whilst generating alt text.';
         
       setError(errorMessage);
       
@@ -164,7 +176,7 @@ export default function AltTextGeneratorPage() {
         variant: 'destructive',
       });
       
-      console.error('Alt text generation error:', error);
+      // console.error('Alt text generation error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -174,8 +186,8 @@ export default function AltTextGeneratorPage() {
     if (results?.altText) {
       copyToClipboard(results.altText);
       toast({
-        title: 'Copied to clipboard',
-        description: 'Alt text has been copied to clipboard',
+        title: 'Copied to Clipboard',
+        description: 'The alt text has been copied to your clipboard.',
       });
     }
   };
@@ -189,7 +201,7 @@ export default function AltTextGeneratorPage() {
   };
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-6">
       <h1 className="text-3xl font-bold mb-6">Alt Text Generator</h1>
       <p className="text-muted-foreground mb-8">
         Generate accessible alt text for images to improve accessibility and SEO using your brand's voice and style.
@@ -273,7 +285,7 @@ export default function AltTextGeneratorPage() {
               <div className="mb-4 overflow-hidden rounded-md border border-border">
                 {previewError ? (
                   <div className="flex h-48 items-center justify-center bg-muted text-muted-foreground">
-                    <p>Image preview not available</p>
+                    <p>Image preview not available.</p>
                   </div>
                 ) : (
                   <img
@@ -288,13 +300,13 @@ export default function AltTextGeneratorPage() {
             )}
             
             {error && (
-              <div className="p-4 mb-4 border border-red-200 bg-red-50 rounded-md">
-                <p className="text-red-800 font-medium">Error</p>
-                <p className="text-red-600">{error}</p>
+              <div className="p-4 mb-4 border border-destructive/50 bg-destructive/10 rounded-md">
+                <p className="text-destructive font-medium">Error</p>
+                <p className="text-destructive">{error}</p>
                 {error.includes('OpenAI') || error.includes('service') ? (
-                  <p className="text-red-600 mt-2 text-sm">The AI service is currently unavailable. Please try again later.</p>
+                  <p className="text-destructive mt-2 text-sm">The AI service is currently unavailable. Please try again later.</p>
                 ) : error.includes('image') ? (
-                  <p className="text-red-600 mt-2 text-sm">The image may be inaccessible or in an unsupported format. Try using a different image URL.</p>
+                  <p className="text-destructive mt-2 text-sm">The image may be inaccessible or in an unsupported format. Try using a different image URL.</p>
                 ) : null}
               </div>
             )}
@@ -322,7 +334,7 @@ export default function AltTextGeneratorPage() {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                {results?.altText?.length || 0}/125 characters recommended
+                {results?.altText?.length || 0}/125 characters recommended.
               </p>
               <p className="text-xs text-muted-foreground mt-4">
                 Good alt text should be concise but descriptive, focusing on key information conveyed by the image.

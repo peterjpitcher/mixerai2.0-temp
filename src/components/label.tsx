@@ -5,6 +5,11 @@ import * as LabelPrimitive from "@radix-ui/react-label"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Label component.
+ * A styled wrapper around Radix UI LabelPrimitive.Root for form field labels.
+ * Includes styles for disabled states based on peer input elements.
+ */
 function Label({
   className,
   ...props

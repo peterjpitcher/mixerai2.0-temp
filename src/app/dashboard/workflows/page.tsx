@@ -7,6 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Input } from '@/components/input';
 import { useToast } from '@/components/toast-provider';
 import { Plus, Search, Trash2, Eye, Edit3 } from 'lucide-react';
+import type { Metadata } from 'next';
+
+// export const metadata: Metadata = {
+//   title: 'Manage Workflows | MixerAI 2.0',
+//   description: 'View, search, and manage content approval workflows for your brands.',
+// };
 
 interface WorkflowFromAPI {
   id: string;
@@ -30,6 +36,12 @@ interface GroupedWorkflows {
   }
 }
 
+/**
+ * WorkflowsPage displays a list of all content approval workflows, grouped by brand.
+ * It allows users to search for workflows and provides navigation to create new ones,
+ * or view/edit existing ones. Each workflow card shows its name, content type, 
+ * step count, and usage by content items.
+ */
 export default function WorkflowsPage() {
   const [allWorkflows, setAllWorkflows] = useState<WorkflowFromAPI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,7 +63,7 @@ export default function WorkflowsPage() {
         
         setAllWorkflows(apiResponse.data || []);
       } catch (err) {
-        console.error('Error loading workflows:', err);
+        // console.error('Error loading workflows:', err);
         const errorMessage = (err instanceof Error) ? err.message : 'Failed to load workflows. Please try again.';
         setError(errorMessage);
         toast({
@@ -94,10 +106,10 @@ export default function WorkflowsPage() {
 
   const ErrorState = () => (
     <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
-      <div className="mb-4 text-red-500">
+      <div className="mb-4 text-destructive">
         <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
       </div>
-      <h3 className="text-xl font-bold mb-2">Failed to load workflows</h3>
+      <h3 className="text-xl font-bold mb-2">Failed to Load Workflows</h3>
       <p className="text-muted-foreground mb-4 text-center max-w-md">{error}</p>
       <Button onClick={() => window.location.reload()}>Try Again</Button>
     </div>
@@ -108,7 +120,7 @@ export default function WorkflowsPage() {
       <div className="mb-4 text-muted-foreground">
          <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="8" height="8" x="2" y="2" rx="2" /><path d="M14 2c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2" /><path d="M20 2c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2" /><path d="M10 18H5c-1.7 0-3-1.3-3-3v-1" /><polyline points="7 21 10 18 7 15" /><rect width="8" height="8" x="14" y="14" rx="2" /></svg>
       </div>
-      <h3 className="text-xl font-bold mb-2">No workflows yet</h3>
+      <h3 className="text-xl font-bold mb-2">No Workflows Yet</h3>
       <p className="text-muted-foreground mb-4 text-center max-w-md">
         Get started by creating your first content approval workflow.
       </p>
@@ -121,7 +133,12 @@ export default function WorkflowsPage() {
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold tracking-tight">Workflows</h1>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Workflows</h1>
+          <p className="text-muted-foreground mt-1">
+            Manage and create content approval workflows for your brands.
+          </p>
+        </div>
         <Button asChild>
           <Link href="/dashboard/workflows/new">
             <Plus className="mr-2 h-4 w-4" /> Create Workflow
@@ -154,7 +171,7 @@ export default function WorkflowsPage() {
         <EmptyState />
       ) : filteredWorkflowsList.length === 0 && searchTerm ? (
         <div className="flex flex-col items-center justify-center min-h-[200px] py-8">
-          <h3 className="text-xl font-bold mb-2">No workflows found</h3>
+          <h3 className="text-xl font-bold mb-2">No Workflows Found</h3>
           <p className="text-muted-foreground mb-4">No workflows match your search criteria.</p>
           <Button variant="outline" onClick={() => setSearchTerm("")}>
             Clear Search

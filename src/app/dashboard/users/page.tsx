@@ -31,6 +31,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/dialog";
+import type { Metadata } from 'next';
+
+// export const metadata: Metadata = {
+//   title: 'Manage Users | MixerAI 2.0',
+//   description: 'View, search, sort, and manage users in your MixerAI workspace.',
+// };
 
 interface Brand {
   id: string;
@@ -56,6 +62,11 @@ interface User {
   company?: string;
 }
 
+/**
+ * UsersPage displays a list of all users in the system.
+ * It allows for searching, sorting, and managing users, including inviting new users
+ * and deleting existing ones. User roles and brand permissions are also displayed.
+ */
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -109,7 +120,7 @@ export default function UsersPage() {
           setUsers(usersData.data || []);
         }
       } catch (error) {
-        console.error('Error loading data:', error);
+        // console.error('Error loading data:', error);
         toast({
           title: 'Error',
           description: 'Failed to load users. Please try again.',
@@ -189,14 +200,14 @@ export default function UsersPage() {
         setUsers(users.filter(user => user.id !== userToDelete.id));
         
         toast({
-          title: 'User deleted',
+          title: 'User Deleted',
           description: `${userToDelete.full_name} has been removed.`,
         });
       } else {
         throw new Error(data.error || 'Failed to delete user');
       }
     } catch (error) {
-      console.error('Error deleting user:', error);
+      // console.error('Error deleting user:', error);
       toast({
         title: 'Error',
         description: 'Failed to delete user. Please try again.',
@@ -251,7 +262,12 @@ export default function UsersPage() {
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold tracking-tight">Users</h1>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Users</h1>
+          <p className="text-muted-foreground mt-1">
+            View, search, sort, and manage users in your workspace.
+          </p>
+        </div>
         <Button asChild>
           <Link href="/dashboard/users/invite">
             <Plus className="mr-2 h-4 w-4" /> Invite User
@@ -286,7 +302,7 @@ export default function UsersPage() {
               <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
             </svg>
           </div>
-          <h3 className="text-xl font-semibold mb-2">No users found</h3>
+          <h3 className="text-xl font-semibold mb-2">No Users Found</h3>
           <p className="text-muted-foreground mb-6 max-w-md mx-auto">
             {searchTerm ? 'No results match your search criteria. Try a different search term.' : 'No users have been created yet. Invite your first user to get started.'}
           </p>
@@ -364,8 +380,8 @@ export default function UsersPage() {
                       user.role?.toLowerCase().includes('admin') 
                         ? 'bg-primary/20 text-primary'
                         : user.role?.toLowerCase().includes('editor')
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-gray-100 text-gray-700'
+                          ? 'bg-secondary/20 text-secondary'
+                          : 'bg-muted text-muted-foreground'
                     }`}>
                       {user.role}
                     </span>

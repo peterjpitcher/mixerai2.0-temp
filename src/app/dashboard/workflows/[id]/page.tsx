@@ -10,6 +10,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import { toast } from 'sonner';
 import { Separator } from '@/components/separator';
 import { Badge } from '@/components/badge';
+import type { Metadata } from 'next';
+
+// export const metadata: Metadata = {
+//   title: 'Workflow Details | MixerAI 2.0',
+//   description: 'View the details, steps, and configuration of a specific content workflow.',
+// };
 
 interface WorkflowDetailPageProps {
   params: {
@@ -17,6 +23,11 @@ interface WorkflowDetailPageProps {
   };
 }
 
+/**
+ * WorkflowDetailPage displays detailed information for a specific content workflow.
+ * It shows the workflow's name, associated brand, description, steps (with assignees and roles),
+ * status, creator, and usage statistics. Links to edit the workflow or return to the list are provided.
+ */
 export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) {
   const { id } = params;
   const [workflow, setWorkflow] = useState<any>(null);
@@ -36,13 +47,13 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
         const data = await response.json();
         
         if (!data.success) {
-          throw new Error(data.error || 'Failed to fetch workflow data');
+          throw new Error(data.error || 'Failed to fetch workflow data.');
         }
         
         setWorkflow(data.workflow);
       } catch (error) {
-        console.error('Error fetching workflow:', error);
-        setError((error as Error).message || 'An error occurred');
+        // console.error('Error fetching workflow:', error);
+        setError((error as Error).message || 'An error occurred.');
         toast.error('Failed to load workflow. Please try again.');
       } finally {
         setIsLoading(false);
@@ -53,14 +64,16 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
   }, [id]);
 
   const getRoleBadgeStyles = (role: string) => {
+    const lowerRole = role.toLowerCase();
     const styles: Record<string, string> = {
-      'admin': 'bg-red-100 text-red-800 hover:bg-red-100',
-      'editor': 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-      'seo': 'bg-green-100 text-green-800 hover:bg-green-100',
-      'viewer': 'bg-gray-100 text-gray-800 hover:bg-gray-100',
+      'admin': 'bg-primary/20 text-primary',
+      'editor': 'bg-secondary/20 text-secondary',
+      'seo': 'bg-accent/20 text-accent-foreground',
+      'viewer': 'bg-muted text-muted-foreground',
+      'brand manager': 'bg-purple-100 text-purple-800',
     };
     
-    return styles[role] || styles.viewer;
+    return styles[lowerRole] || styles.viewer;
   };
   
   // Loading state
@@ -76,7 +89,7 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px]">
-        <div className="text-red-500 mb-4">
+        <div className="text-destructive mb-4">
           <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
@@ -108,8 +121,11 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{workflow.name || 'Unnamed Workflow'}</h1>
-          <p className="text-muted-foreground">
-            Brand: {brandName} • Created on {new Date(workflow.createdAt || Date.now()).toLocaleDateString()}
+          <p className="text-muted-foreground mt-1">
+            View the details, steps, and configuration for this content workflow.
+          </p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Brand: {brandName} • Created on: {new Date(workflow.createdAt || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
         <div className="flex space-x-2">
@@ -132,7 +148,7 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Workflow Steps</CardTitle>
-                <Badge className={`bg-${workflowStatus === 'active' ? 'green' : 'gray'}-100 text-${workflowStatus === 'active' ? 'green' : 'gray'}-800`}>
+                <Badge className={`${workflowStatus === 'active' ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'}`}>
                   {workflowStatus.charAt(0).toUpperCase() + workflowStatus.slice(1)}
                 </Badge>
               </div>
@@ -209,7 +225,7 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
               
               <div>
                 <p className="text-sm font-medium mb-1">Status</p>
-                <Badge className={`bg-${workflowStatus === 'active' ? 'green' : 'gray'}-100 text-${workflowStatus === 'active' ? 'green' : 'gray'}-800`}>
+                <Badge className={`${workflowStatus === 'active' ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'}`}>
                   {workflowStatus.charAt(0).toUpperCase() + workflowStatus.slice(1)}
                 </Badge>
               </div>
@@ -221,12 +237,12 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
               
               <div>
                 <p className="text-sm font-medium mb-1">Created At</p>
-                <span>{new Date(workflow.createdAt || Date.now()).toLocaleString()}</span>
+                <span>{new Date(workflow.createdAt || Date.now()).toLocaleString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'})}</span>
               </div>
               
               <div>
                 <p className="text-sm font-medium mb-1">Last Updated</p>
-                <span>{new Date(workflow.updatedAt || workflow.createdAt || Date.now()).toLocaleString()}</span>
+                <span>{new Date(workflow.updatedAt || workflow.createdAt || Date.now()).toLocaleString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'})}</span>
               </div>
               
               <Separator />

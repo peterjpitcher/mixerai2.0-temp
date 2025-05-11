@@ -23,24 +23,16 @@ module.exports = {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         primary: {
-          DEFAULT: "#0066CC",
-          light: "#4D94DB",
-          dark: "#004C99",
-          50: "#E6F0FA",
-          100: "#CCE0F5",
-          200: "#99C2EB",
-          300: "#66A3E0",
-          400: "#3385D6",
-          500: "#0066CC", 
-          600: "#0052A3",
-          700: "#003D7A",
-          800: "#002952",
-          900: "#001429",
+          DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
         },
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
@@ -49,22 +41,6 @@ module.exports = {
         muted: {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "#CC3333",
-          light: "#E66666",
-          dark: "#992626",
-          50: "#FAEBEB",
-          100: "#F5D6D6",
-          200: "#EBADAD",
-          300: "#E08585",
-          400: "#D65C5C",
-          500: "#CC3333",
-          600: "#A32929",
-          700: "#7A1F1F",
-          800: "#521414",
-          900: "#290A0A",
-          foreground: "hsl(var(--accent-foreground))",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",
@@ -86,19 +62,10 @@ module.exports = {
           800: "#323F4B",
           900: "#1F2933",
         },
-        success: "#22C55E",
-        warning: "#FBBF24",
-        error: "#EF4444",
-        info: "#3B82F6",
-      },
-      backgroundColor: {
-        'top-nav': '#0066CC',
-        'side-nav': '#E6F0FA',
-        'app': '#F5F7FA',
-      },
-      textColor: {
-        'nav': '#FFFFFF',
-        'accent': '#CC3333',
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
+        error: "hsl(var(--destructive))",
+        highlight: "hsl(var(--highlight))",
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -107,12 +74,12 @@ module.exports = {
       },
       keyframes: {
         "accordion-down": {
-          from: { height: 0 },
+          from: { height: "0" },
           to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
           from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: 0 },
+          to: { height: "0" },
         },
       },
       animation: {

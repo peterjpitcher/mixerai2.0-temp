@@ -14,6 +14,12 @@ import {
   Send, 
   Loader2
 } from 'lucide-react';
+import type { Metadata } from 'next';
+
+// export const metadata: Metadata = {
+//   title: 'Invite User | MixerAI 2.0',
+//   description: 'Invite a new user to join your MixerAI workspace and assign their role.',
+// };
 
 interface Brand {
   id: string;
@@ -21,6 +27,12 @@ interface Brand {
   brand_color?: string;
 }
 
+/**
+ * InviteUserPage provides a form to invite new users to the platform.
+ * Administrators can specify the user's email, full name, job title, company,
+ * default system role, and optionally assign them to an initial brand.
+ * On submission, an invitation is sent to the specified email address.
+ */
 export default function InviteUserPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -50,7 +62,7 @@ export default function InviteUserPage() {
           throw new Error(data.error || 'Failed to fetch brands');
         }
       } catch (error) {
-        console.error('Error fetching brands:', error);
+        // console.error('Error fetching brands:', error);
         toast({
           title: 'Error',
           description: 'Failed to load brands. You may not be able to assign the user to a brand.',
@@ -117,10 +129,10 @@ export default function InviteUserPage() {
         // Navigate back to the users list
         router.push('/dashboard/users');
       } else {
-        throw new Error(data.error || 'Failed to send invitation');
+        throw new Error(data.error || 'Failed to send invitation.');
       }
     } catch (error) {
-      console.error('Error sending invitation:', error);
+      // console.error('Error sending invitation:', error);
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to send invitation. Please try again.',
@@ -140,14 +152,19 @@ export default function InviteUserPage() {
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <h1 className="text-3xl font-bold tracking-tight">Invite User</h1>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Invite User</h1>
+            <p className="text-muted-foreground mt-1">
+              Fill in the details below to send an invitation to a new user.
+            </p>
+          </div>
         </div>
       </div>
       
       <Card>
         <CardHeader>
           <CardTitle>New User Invitation</CardTitle>
-          <CardDescription>Send an invitation to join the platform</CardDescription>
+          <CardDescription>Send an invitation to join the platform.</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-6">
@@ -166,7 +183,7 @@ export default function InviteUserPage() {
                   required
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  An invitation will be sent to this email address
+                  An invitation will be sent to this email address.
                 </p>
               </div>
               
@@ -255,7 +272,7 @@ export default function InviteUserPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">
-                  You can assign this user to additional brands later
+                  You can assign this user to additional brands later.
                 </p>
               </div>
             </div>

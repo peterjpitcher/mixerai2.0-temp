@@ -12,6 +12,12 @@ import { Textarea } from '@/components/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import { MarkdownDisplay } from '@/components/content/markdown-display';
 import { toast } from 'sonner';
+import type { Metadata } from 'next';
+
+// export const metadata: Metadata = {
+//   title: 'Edit Content | MixerAI 2.0',
+//   description: 'Modify the details, body, and SEO metadata for a piece of content.',
+// };
 
 interface ContentEditPageProps {
   params: {
@@ -19,6 +25,12 @@ interface ContentEditPageProps {
   };
 }
 
+/**
+ * ContentEditPage allows users to modify an existing piece of content.
+ * It provides fields for editing the title, body (using Markdown with a live preview), 
+ * and SEO metadata (meta title, meta description).
+ * Note: This component currently uses mock data and simulated API calls.
+ */
 export default function ContentEditPage({ params }: ContentEditPageProps) {
   const { id } = params;
   const router = useRouter();
@@ -88,7 +100,7 @@ Posts with images, videos, or infographics typically receive higher engagement t
         
         setContent(contentData);
       } catch (error) {
-        console.error('Error fetching content:', error);
+        // console.error('Error fetching content:', error);
         toast.error('Failed to load content. Please try again.');
       } finally {
         setIsLoading(false);
@@ -109,7 +121,7 @@ Posts with images, videos, or infographics typically receive higher engagement t
     try {
       // In a real implementation, we would send this to an API endpoint
       // that updates it in Supabase
-      console.log('Content to save:', content);
+      // console.log('Content to save:', content);
       
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -117,7 +129,7 @@ Posts with images, videos, or infographics typically receive higher engagement t
       toast.success('Content updated successfully!');
       router.push(`/dashboard/content/${id}`);
     } catch (error) {
-      console.error('Error updating content:', error);
+      // console.error('Error updating content:', error);
       toast.error('Failed to update content. Please try again.');
     } finally {
       setIsSaving(false);
@@ -136,9 +148,9 @@ Posts with images, videos, or infographics typically receive higher engagement t
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Edit Content</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Edit: {content.title || 'Content'}</h1>
           <p className="text-muted-foreground">
-            Edit and update your content
+            Modify the title, body, SEO metadata, and other settings for this piece of content.
           </p>
         </div>
         <div className="flex space-x-2">
@@ -203,7 +215,7 @@ Posts with images, videos, or infographics typically receive higher engagement t
             </TabsContent>
             <TabsContent value="preview" className="mt-4">
               <div className="border rounded p-4 overflow-auto max-h-[500px]">
-                <MarkdownDisplay content={content.body} />
+                <MarkdownDisplay markdown={content.body} />
               </div>
             </TabsContent>
           </Tabs>

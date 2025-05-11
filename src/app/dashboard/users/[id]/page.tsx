@@ -27,6 +27,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/dialog";
+import type { Metadata } from 'next';
+
+// export const metadata: Metadata = {
+//   title: 'User Details | MixerAI 2.0',
+//   description: 'View detailed information and brand permissions for a specific user.',
+// };
 
 interface Brand {
   id: string;
@@ -52,6 +58,13 @@ interface User {
   company?: string;
 }
 
+/**
+ * UserDetailPage displays comprehensive details for a specific user account.
+ * This includes their profile information (name, email, company, job title, role, avatar),
+ * account activity (creation date, last sign-in), and a list of brands they have 
+ * permissions for, along with their role for each brand.
+ * It also provides actions to edit or delete the user.
+ */
 export default function UserDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -71,7 +84,7 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
         if (!response.ok) {
           if (response.status === 404) {
             toast({
-              title: 'User not found',
+              title: 'User Not Found',
               description: 'The requested user could not be found.',
               variant: 'destructive'
             });
@@ -85,7 +98,7 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
         const data = await response.json();
         
         if (!data.success) {
-          throw new Error(data.error || 'Failed to fetch user');
+          throw new Error(data.error || 'Failed to fetch user.');
         }
         
         // Fetch brands to get extra information
@@ -105,7 +118,7 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
         
         setUser(data.user);
       } catch (error) {
-        console.error('Error fetching user:', error);
+        // console.error('Error fetching user:', error);
         toast({
           title: 'Error',
           description: 'Failed to load user information. Please try again.',
@@ -133,16 +146,16 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
       
       if (data.success) {
         toast({
-          title: 'User deleted',
+          title: 'User Deleted',
           description: `${user.full_name} has been removed.`
         });
         
         router.push('/dashboard/users');
       } else {
-        throw new Error(data.error || 'Failed to delete user');
+        throw new Error(data.error || 'Failed to delete user.');
       }
     } catch (error) {
-      console.error('Error deleting user:', error);
+      // console.error('Error deleting user:', error);
       toast({
         title: 'Error',
         description: 'Failed to delete user. Please try again.',
@@ -203,7 +216,12 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <h1 className="text-3xl font-bold tracking-tight">{user.full_name}</h1>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">{user.full_name}</h1>
+            <p className="text-muted-foreground mt-1">
+              View detailed profile information, account activity, and brand permissions for this user.
+            </p>
+          </div>
         </div>
         
         <div className="flex items-center gap-2">
@@ -223,7 +241,7 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
           <Card>
             <CardHeader>
               <CardTitle>Profile</CardTitle>
-              <CardDescription>User information and account details</CardDescription>
+              <CardDescription>User information and account details.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex justify-center mb-4">
@@ -280,8 +298,8 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
                         user.role?.toLowerCase().includes('admin') 
                           ? 'bg-primary/20 text-primary'
                           : user.role?.toLowerCase().includes('editor')
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-gray-100 text-gray-700'
+                            ? 'bg-secondary/20 text-secondary'
+                            : 'bg-muted text-muted-foreground'
                       }`}>
                         {user.role}
                       </span>
@@ -318,12 +336,12 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
               <Card>
                 <CardHeader>
                   <CardTitle>Brand Permissions</CardTitle>
-                  <CardDescription>User's access rights to brands</CardDescription>
+                  <CardDescription>User's access rights to brands.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {(!user.brand_permissions || user.brand_permissions.length === 0) ? (
                     <div className="text-center py-6">
-                      <p className="text-muted-foreground">This user doesn't have access to any brands.</p>
+                      <p className="text-muted-foreground">This user does not have access to any brands.</p>
                     </div>
                   ) : (
                     <div className="space-y-6">
@@ -350,8 +368,8 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
                                 permission.role.toLowerCase() === 'admin' 
                                   ? 'bg-primary/20 text-primary'
                                   : permission.role.toLowerCase() === 'editor'
-                                    ? 'bg-blue-100 text-blue-700'
-                                    : 'bg-gray-100 text-gray-700'
+                                    ? 'bg-secondary/20 text-secondary'
+                                    : 'bg-muted text-muted-foreground'
                               }`}>
                                 {permission.role.charAt(0).toUpperCase() + permission.role.slice(1)}
                               </span>

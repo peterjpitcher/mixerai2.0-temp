@@ -41,13 +41,13 @@ interface NavGroupItem {
 }
 
 /**
- * Unified navigation component for MixerAI dashboard
- * Uses Next.js useSelectedLayoutSegments() for accurate active state tracking
+ * Unified navigation component for MixerAI dashboard.
+ * Provides sidebar navigation with collapsible sections and dynamic content template links.
+ * Uses Next.js useSelectedLayoutSegments() for accurate active state tracking.
  */
 export function UnifiedNavigation() {
   const pathname = usePathname() || '';
   const layoutSegments = useSelectedLayoutSegments();
-  // Ensure segments is always an array to fix linter errors
   const segments = layoutSegments || [];
   
   // Track expanded state for collapsible sections
@@ -66,25 +66,20 @@ export function UnifiedNavigation() {
   // Fetch templates from the API only once when the component mounts or content section is expanded
   useEffect(() => {
     const fetchTemplates = async () => {
-      // Avoid multiple fetches
       if (templatesFetched.current || isLoadingTemplates) return;
-      
       setIsLoadingTemplates(true);
       templatesFetched.current = true;
-      
       try {
-        console.log('Navigation: Fetching templates from API');
         const response = await fetch('/api/content-templates');
         const data = await response.json();
         
         if (data.success && data.templates) {
-          console.log(`Navigation: Successfully fetched ${data.templates.length} templates`);
           setUserTemplates(data.templates);
         } else {
-          console.error('Failed to get templates:', data.error || 'Unknown error');
+          // Consider adding a toast notification for failure here
         }
       } catch (error) {
-        console.error('Failed to fetch templates:', error);
+        // Consider adding a toast notification for failure here
       } finally {
         setIsLoadingTemplates(false);
       }
@@ -96,35 +91,31 @@ export function UnifiedNavigation() {
 
   // Automatically expand sections based on current path
   useEffect(() => {
-    // Create new state without referring to previous state
     const newExpandedState = { ...expandedSections };
-    
-    // Only update if the condition is different from current state
+    let changed = false;
     if (pathname.includes('/content') && !expandedSections.content) {
       newExpandedState.content = true;
+      changed = true;
     }
-    
     if (pathname.includes('/tools') && !expandedSections.tools) {
       newExpandedState.tools = true;
+      changed = true;
     }
-    
     if (pathname.includes('/templates') && !expandedSections.content) {
       newExpandedState.content = true;
+      changed = true;
     }
-    
-    // Only update state if there's a change
-    if (newExpandedState.content !== expandedSections.content || 
-        newExpandedState.tools !== expandedSections.tools) {
+    if (changed) {
       setExpandedSections(newExpandedState);
     }
-  }, [pathname]); // Only depend on pathname changes
+  }, [pathname]); // Removed expandedSections from dependency array as it causes re-runs
 
   // Toggle a section's expanded state
   const toggleSection = (section: string) => {
-    setExpandedSections({
-      ...expandedSections,
-      [section]: !expandedSections[section]
-    });
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
   };
 
   // Content items - use templates from database
@@ -250,7 +241,7 @@ export function UnifiedNavigation() {
   };
   
   return (
-    <nav className="bg-side-nav w-64 p-4 h-[calc(100vh-4rem)] overflow-y-auto border-r border-border sticky top-16 hidden lg:block">
+    <nav className="bg-card w-64 p-4 h-[calc(100vh-4rem)] overflow-y-auto border-r border-border sticky top-16 hidden lg:block">
       <div className="space-y-8">
         <div className="space-y-1">
           {navItems.map((item, index) => (
@@ -263,8 +254,8 @@ export function UnifiedNavigation() {
                   className={cn(
                     "flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
                     isActive(item)
-                      ? "text-primary bg-primary-50"
-                      : "text-neutral-700 hover:text-primary hover:bg-primary-50"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-primary"
                   )}
                 >
                   <span className="flex items-center gap-3">
@@ -287,8 +278,8 @@ export function UnifiedNavigation() {
                         className={cn(
                           'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors',
                           (segments.includes(subItem.segment || '') || pathname === subItem.href)
-                            ? 'bg-primary text-white'
-                            : 'text-neutral-700 hover:text-primary hover:bg-primary-50'
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:bg-muted hover:text-primary"
                         )}
                       >
                         {subItem.icon}
@@ -306,8 +297,8 @@ export function UnifiedNavigation() {
                 className={cn(
                   'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
                   isActive(item)
-                    ? 'bg-primary text-white'
-                    : 'text-neutral-700 hover:text-primary hover:bg-primary-50'
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-primary"
                 )}
               >
                 {item.icon}
@@ -325,9 +316,9 @@ export function UnifiedNavigation() {
               href={item.href}
               className={cn(
                 'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors mt-1',
-                segments.includes(item.segment || '')
-                  ? 'bg-primary text-white'
-                  : 'text-neutral-700 hover:text-primary hover:bg-primary-50'
+                (segments.includes(item.segment || '') || pathname === item.href)
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-primary"
               )}
             >
               {item.icon}

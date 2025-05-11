@@ -10,6 +10,12 @@ import { Label } from "@/components/label";
 import { createSupabaseClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/toast-provider";
 
+/**
+ * LoginForm component.
+ * Provides a form for users to log in using their email and password.
+ * Handles form submission, communicates with Supabase for authentication,
+ * and displays loading states, errors, and success notifications.
+ */
 export function LoginForm() {
   const router = useRouter();
   const { toast } = useToast();
@@ -26,37 +32,31 @@ export function LoginForm() {
     try {
       const supabase = createSupabaseClient();
       
-      // Log client-side URL for debugging
-      console.log("Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
-      
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) {
-        console.error("Authentication error:", error);
-        setError(error.message);
+      if (signInError) {
+        setError(signInError.message);
         toast({
           title: "Login failed",
-          description: error.message,
+          description: signInError.message,
           variant: "destructive",
         });
       } else {
-        // Successfully logged in
         toast({
           title: "Success",
-          description: "You have been logged in",
+          description: "You have been logged in successfully.",
         });
         router.push("/dashboard");
         router.refresh();
       }
-    } catch (err) {
-      console.error("Login error:", err);
+    } catch (err: any) {
       setError("An unexpected error occurred. Please try again.");
       toast({
-        title: "Error",
-        description: "An unexpected error occurred. Please try again.",
+        title: "Login Error",
+        description: err?.message || "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -75,7 +75,7 @@ export function LoginForm() {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-1">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">Email address</Label>
             <Input 
               id="email" 
               value={email}

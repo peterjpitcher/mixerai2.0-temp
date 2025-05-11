@@ -12,13 +12,13 @@ const buttonVariants = cva(
         default:
           "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
         destructive:
-          "bg-destructive text-white shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+          "bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
         outline:
-          "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
+          "border border-input bg-background shadow-xs hover:bg-highlight hover:text-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
         secondary:
           "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80",
         ghost:
-          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
+          "hover:bg-highlight hover:text-primary dark:hover:bg-highlight/20 dark:hover:text-primary",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
@@ -35,6 +35,11 @@ const buttonVariants = cva(
   }
 )
 
+/**
+ * Button component with consistent styling and variants.
+ * Based on shadcn/ui button, utilizing cva for managing variants and sizes.
+ * Supports an `asChild` prop to render as a child component (e.g., Link) while maintaining button styling.
+ */
 const Button = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<"button"> &

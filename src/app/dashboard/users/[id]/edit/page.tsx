@@ -16,6 +16,12 @@ import {
   Loader2
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
+import type { Metadata } from 'next';
+
+// export const metadata: Metadata = {
+//   title: 'Edit User | MixerAI 2.0',
+//   description: 'Modify user profile details, roles, and brand permissions.',
+// };
 
 interface Brand {
   id: string;
@@ -43,6 +49,12 @@ interface User {
   company?: string;
 }
 
+/**
+ * EditUserPage allows administrators to modify details for an existing user.
+ * This includes updating their full name, job title, company, and default system role.
+ * It also provides an interface to manage brand-specific permissions, allowing assignment
+ * of users to brands with specific roles (Admin, Editor, Viewer) for each brand.
+ */
 export default function EditUserPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -84,7 +96,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
         const userData = await userResponse.json();
         
         if (!userData.success) {
-          throw new Error(userData.error || 'Failed to fetch user');
+          throw new Error(userData.error || 'Failed to fetch user.');
         }
         
         // Fetch all brands
@@ -128,7 +140,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
           role: userData.user.role || 'Viewer'
         });
       } catch (error) {
-        console.error('Error loading data:', error);
+        // console.error('Error loading data:', error);
         toast({
           title: 'Error',
           description: 'Failed to load user information. Please try again.',
@@ -212,17 +224,17 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
       
       if (data.success) {
         toast({
-          title: 'User updated',
+          title: 'User Updated',
           description: 'User information has been updated successfully.'
         });
         
         // Navigate back to the user details page
         router.push(`/dashboard/users/${user.id}`);
       } else {
-        throw new Error(data.error || 'Failed to update user');
+        throw new Error(data.error || 'Failed to update user.');
       }
     } catch (error) {
-      console.error('Error updating user:', error);
+      // console.error('Error updating user:', error);
       toast({
         title: 'Error',
         description: 'Failed to update user. Please try again.',
@@ -267,7 +279,12 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <h1 className="text-3xl font-bold tracking-tight">Edit User: {user.full_name}</h1>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Edit User: {user.full_name}</h1>
+            <p className="text-muted-foreground mt-1">
+              Modify the user's profile information, system role, and brand-specific permissions.
+            </p>
+          </div>
         </div>
       </div>
       
@@ -283,7 +300,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
               <Card>
                 <CardHeader>
                   <CardTitle>Profile Information</CardTitle>
-                  <CardDescription>Update user profile details</CardDescription>
+                  <CardDescription>Update user profile details.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="flex justify-center mb-4">
@@ -312,7 +329,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                           disabled
                           className="bg-muted"
                         />
-                        <p className="text-xs text-muted-foreground mt-1">Email cannot be changed</p>
+                        <p className="text-xs text-muted-foreground mt-1">Email address cannot be changed.</p>
                       </div>
                       
                       <div>
@@ -373,7 +390,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
               <Card>
                 <CardHeader>
                   <CardTitle>Brand Permissions</CardTitle>
-                  <CardDescription>Manage which brands this user can access and their role for each</CardDescription>
+                  <CardDescription>Manage which brands this user can access and their role for each.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">

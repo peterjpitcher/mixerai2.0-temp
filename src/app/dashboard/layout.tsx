@@ -7,7 +7,13 @@ import { UnifiedNavigation } from "@/components/layout/unified-navigation";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { useToast } from "@/components/use-toast";
+import { LogOut } from "lucide-react";
 
+/**
+ * DashboardLayout component.
+ * Provides the main layout structure for all authenticated dashboard pages.
+ * Includes a header with navigation and user actions, and a sidebar navigation.
+ */
 export default function DashboardLayout({
   children,
 }: Readonly<{
@@ -31,54 +37,48 @@ export default function DashboardLayout({
         description: "You have been successfully signed out."
       });
       router.push('/auth/login');
-    } catch (error) {
-      console.error("Error signing out:", error);
+      router.refresh();
+    } catch (error: any) {
       toast({
-        title: "Error",
-        description: "There was a problem signing out. Please try again.",
+        title: "Error Signing Out",
+        description: error?.message || "There was a problem signing out. Please try again.",
         variant: "destructive"
       });
     }
   };
 
   return (
-    <div className="flex min-h-screen flex-col">
-      {/* Header */}
-      <header className="border-b" style={{ backgroundColor: '#13599f' }}>
-        <div className="w-full mx-auto px-4 py-4 flex items-center justify-between text-white">
+    <div className="flex min-h-screen flex-col bg-background">
+      <header className="border-b bg-secondary text-secondary-foreground sticky top-0 z-40">
+        <div className="w-full mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Link href="/dashboard" className="flex items-center space-x-2">
-              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-[#13599f] font-bold text-xl">M</div>
+              <div 
+                className="w-10 h-10 rounded-full bg-secondary-foreground text-secondary flex items-center justify-center font-bold text-xl shadow-sm"
+              >
+                M
+              </div>
               <h1 className="text-2xl font-bold">MixerAI 2.0</h1>
             </Link>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             <NotificationCenter />
             <Button 
               variant="ghost" 
-              className="text-white hover:bg-[#13599f]/80"
+              className="text-secondary-foreground hover:bg-black/10"
               onClick={handleSignOut}
+              aria-label="Log out"
             >
-              <span className="flex items-center space-x-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-                <span>Log out</span>
-              </span>
+              <LogOut className="h-5 w-5" />
+              <span className="hidden sm:inline ml-2">Log out</span>
             </Button>
           </div>
         </div>
       </header>
 
       <div className="flex flex-1">
-        {/* Replace SideNavigationV2 with UnifiedNavigation */}
         <UnifiedNavigation />
-
-        {/* Main content */}
-        <main className="flex-1 p-6 overflow-auto">
-          {/* Dynamic import for DomainVerification to avoid build errors */}
+        <main className="flex-1 p-4 sm:p-6 overflow-auto">
           {process.env.NODE_ENV === 'development' && (
             <div id="domain-verification-container" className="mb-4">
               {/* This will be populated client-side */}

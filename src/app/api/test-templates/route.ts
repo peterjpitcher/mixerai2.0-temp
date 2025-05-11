@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { handleApiError } from '@/lib/api-utils'; // Import for consistent error handling
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
 
-// Mock templates for development environment
+// Mock templates for development environment or specific testing scenarios.
+// This endpoint should be used with caution and potentially secured if accessible in staging/prod.
 const mockTemplates = [
   {
     id: "mock-template-1",
@@ -75,34 +77,35 @@ const mockTemplates = [
 ];
 
 /**
- * GET: Always returns mock templates for testing
+ * GET: Always returns mock templates for testing.
+ * Note: This endpoint is currently unauthenticated.
  */
 export async function GET(request: NextRequest) {
-  console.log('Test templates API: Returning mock templates');
-  
-  // Get ID from query parameters
-  const url = new URL(request.url);
-  const id = url.searchParams.get('id');
-  
-  // If ID is provided, return a single template
-  if (id) {
-    const template = mockTemplates.find(t => t.id === id);
-    if (template) {
-      return NextResponse.json({ 
-        success: true, 
-        template 
-      });
-    } else {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Template not found' 
-      }, { status: 404 });
+  // Console.log removed
+  try {
+    const url = new URL(request.url);
+    const id = url.searchParams.get('id');
+    
+    if (id) {
+      const template = mockTemplates.find(t => t.id === id);
+      if (template) {
+        return NextResponse.json({ 
+          success: true, 
+          template 
+        });
+      } else {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'Template not found' 
+        }, { status: 404 });
+      }
     }
+    
+    return NextResponse.json({ 
+      success: true, 
+      templates: mockTemplates 
+    });
+  } catch (error) {
+    return handleApiError(error, 'Error fetching test templates');
   }
-  
-  // Otherwise return all templates
-  return NextResponse.json({ 
-    success: true, 
-    templates: mockTemplates 
-  });
 } 

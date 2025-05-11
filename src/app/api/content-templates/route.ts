@@ -120,7 +120,6 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     
     // If ID is provided, fetch a single template
     if (id) {
-      console.log('Authenticated API Route - GET single template with ID:', id);
       const { data, error } = await supabase
         .from('content_templates')
         .select('*')
@@ -128,7 +127,6 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         .single();
       
       if (error) {
-        console.error('Error fetching template:', error);
         throw error;
       }
       
@@ -139,23 +137,20 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     }
     
     // Otherwise, fetch all templates
-    console.log('Authenticated API Route - GET all templates');
     const { data: templatesData, error } = await supabase
       .from('content_templates')
       .select('*')
       .order('name');
     
     if (error) {
-      console.error('Error fetching templates:', error);
       throw error;
     }
     
     return NextResponse.json({ 
       success: true, 
-      data: templatesData
+      templates: templatesData
     });
   } catch (error) {
-    console.error('Error in GET templates route:', error);
     return handleApiError(error, 'Failed to fetch content templates');
   }
 });
@@ -203,7 +198,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       template
     });
   } catch (error) {
-    console.error('Error creating content template:', error);
     return handleApiError(error, 'Failed to create content template');
   }
 }); 

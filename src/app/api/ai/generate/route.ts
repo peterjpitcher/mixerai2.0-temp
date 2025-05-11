@@ -52,14 +52,11 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     const systemMessage = 'You are an expert content creator generating high-quality content based on the provided details. Your response should be well-formatted and ready to use.';
     
     const deploymentName = getModelName();
+    const azureApiVersion = process.env.AZURE_OPENAI_API_VERSION || '2023-12-01-preview';
     
     // Make the API call directly with error handling
     try {
-      console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
-      
-      // Prepare the request body
       const completionRequest = {
-        model: deploymentName,
         messages: [
           { role: "system", content: systemMessage },
           { role: "user", content: processedPrompt }
@@ -71,11 +68,8 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         presence_penalty: 0.5,
       };
       
-      // Specify the deployment in the URL path
-      const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
-      console.log(`Using direct endpoint URL: ${endpoint}`);
+      const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=${azureApiVersion}`;
       
-      // Make a direct fetch call
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -87,33 +81,27 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+        throw new Error(`AI service request failed with status ${response.status}`);
       }
       
       const responseData = await response.json();
-      console.log("API call successful");
       
-      const content = responseData.choices?.[0]?.message?.content || "";
-      console.log(`Received response with content length: ${content.length}`);
+      const content = responseData.choices?.[0]?.message?.content?.trim() || "";
       
       return NextResponse.json({
         success: true,
         content: content,
         fieldId: data.outputFieldId
       });
-    } catch (error: any) {
-      console.error("Error generating content with Azure OpenAI:", error);
-      if (error instanceof Error) throw error;
-      throw new Error('Failed to generate content via Azure OpenAI.');
+    } catch (aiError: any) {
+      throw aiError;
     }
   } catch (error: any) {
-    console.error('Error generating content:', error);
-
     let errorMessage = 'Failed to generate AI content. Please try again later.';
     let statusCode = 500;
 
     if (error instanceof Error) {
-      if (error.message.includes('OpenAI') || error.message.includes('Azure') || error.message.includes('API') || (error as any).status === 429 || error.message.includes('Azure OpenAI')) {
+      if (error.message.includes('OpenAI') || error.message.includes('Azure') || error.message.includes('API') || (error as any).status === 429 || error.message.includes('Azure OpenAI') || error.message.includes('AI service request failed')) {
         errorMessage = 'The AI service is currently busy or unavailable. Please try again in a few moments.';
         statusCode = 503;
       } else {
@@ -122,6 +110,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     } else if (typeof error === 'string') {
       errorMessage = error;
     }
-    return handleApiError(new Error(errorMessage), 'AI Content Generation Error', statusCode);
+    return handleApiError(error, errorMessage, statusCode);
   }
 }); 

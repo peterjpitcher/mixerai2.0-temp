@@ -1,6 +1,8 @@
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
+import { cn } from "@/lib/utils"
+
 const alertVariants = cva(
   "relative w-full rounded-lg border p-4 [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground",
   {
@@ -10,7 +12,7 @@ const alertVariants = cva(
         destructive:
           "border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive",
         warning:
-          "border-yellow-500/50 text-yellow-700 dark:border-yellow-500/30 dark:text-yellow-500 bg-yellow-50 dark:bg-yellow-950/20 [&>svg]:text-yellow-600",
+          "border-warning/50 bg-warning/10 text-amber-800 dark:border-warning/70 dark:text-warning dark:bg-warning/20 [&>svg]:text-amber-700 dark:[&>svg]:text-warning",
       },
     },
     defaultVariants: {
@@ -19,41 +21,55 @@ const alertVariants = cva(
   }
 )
 
-interface AlertProps
+export interface AlertProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof alertVariants> {}
 
+/**
+ * Alert component.
+ * Displays a callout box with a message, often used for important notices or warnings.
+ * Comes in different variants (default, destructive, warning) which affect styling.
+ */
 const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
   ({ className, variant, ...props }, ref) => (
     <div
       ref={ref}
       role="alert"
-      className={alertVariants({ variant, className })}
+      className={cn(alertVariants({ variant }), className)}
       {...props}
     />
   )
 )
 Alert.displayName = "Alert"
 
+/**
+ * AlertTitle component.
+ * Used to display the title within an Alert.
+ */
 const AlertTitle = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLHeadingElement>
 >(({ className, ...props }, ref) => (
-  <h5
+  // Using <h6> for semantic heading but styled as h5 or similar by className
+  <h6 
     ref={ref}
-    className="mb-1 font-medium leading-none tracking-tight"
+    className={cn("mb-1 font-medium leading-none tracking-tight", className)}
     {...props}
   />
 ))
 AlertTitle.displayName = "AlertTitle"
 
+/**
+ * AlertDescription component.
+ * Used to display the main description or message content within an Alert.
+ */
 const AlertDescription = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className="text-sm [&_p]:leading-relaxed"
+    className={cn("text-sm [&_p]:leading-relaxed", className)}
     {...props}
   />
 ))

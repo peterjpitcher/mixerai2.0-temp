@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateAltText } from '@/lib/azure/openai';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { handleApiError } from '@/lib/api-utils';
 
 interface AltTextGenerationRequest {
   imageUrl: string;
@@ -17,32 +18,29 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
   try {
     const data: AltTextGenerationRequest = await request.json();
     
-    // Validate request data
     if (!data.imageUrl) {
       return NextResponse.json(
-        { error: 'Image URL is required' },
+        { success: false, error: 'Image URL is required' },
         { status: 400 }
       );
     }
     
     if (!data.brandId) {
       return NextResponse.json(
-        { error: 'Brand ID is required' },
+        { success: false, error: 'Brand ID is required' },
         { status: 400 }
       );
     }
     
-    // Make sure we have a valid URL
     try {
       new URL(data.imageUrl);
     } catch (error) {
       return NextResponse.json(
-        { error: 'Invalid image URL format' },
+        { success: false, error: 'Invalid image URL format' },
         { status: 400 }
       );
     }
     
-    // Fetch brand information if not provided in request
     let brandLanguage = data.brandLanguage;
     let brandCountry = data.brandCountry;
     let brandIdentity = data.brandIdentity;
@@ -50,7 +48,6 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
     let guardrails = data.guardrails;
     
     if (!brandLanguage || !brandCountry || !brandIdentity || !toneOfVoice || !guardrails) {
-      // Fetch brand details from the database
       const supabase = createSupabaseAdminClient();
       const { data: brandData, error: brandError } = await supabase
         .from('brands')
@@ -59,14 +56,15 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
         .single();
         
       if (brandError) {
-        console.error('Error fetching brand data:', brandError);
+        return handleApiError(brandError, 'Failed to fetch brand information');
+      }
+      if (!brandData) {
         return NextResponse.json(
-          { error: 'Failed to fetch brand information' },
-          { status: 500 }
+            { success: false, error: 'Brand not found for the provided Brand ID' }, 
+            { status: 404 }
         );
       }
       
-      // Use brand data from database or defaults
       brandLanguage = brandLanguage || brandData.language || 'en';
       brandCountry = brandCountry || brandData.country || 'US';
       brandIdentity = brandIdentity || brandData.brand_identity || '';
@@ -74,7 +72,6 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       guardrails = guardrails || brandData.guardrails || '';
     }
     
-    // Generate alt text with brand context
     const generatedAltText = await generateAltText(
       data.imageUrl,
       brandLanguage,
@@ -92,29 +89,23 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       imageUrl: data.imageUrl,
       ...generatedAltText
     });
-  } catch (error) {
-    console.error('Error generating alt text:', error);
-    
-    // Provide more specific error message, especially for OpenAI API issues
+  } catch (error: any) {
     let errorMessage = 'Failed to generate alt text';
     let statusCode = 500;
     
     if (error instanceof Error) {
-      // Check if the error is related to OpenAI
-      if (error.message.includes('OpenAI') || error.message.includes('Azure') || error.message.includes('API')) {
-        errorMessage = 'Azure OpenAI service is temporarily unavailable. Please try again later.';
+      if (error.message.includes('OpenAI') || error.message.includes('Azure') || error.message.includes('API') || (error as any).status === 429 || error.message.includes('AI service')) {
+        errorMessage = 'The AI service is currently busy or unavailable. Please try again later.';
         statusCode = 503;
-      } else {
+      } else if (error.message.includes('Failed to fetch brand information') || error.message.includes('Brand not found')){
+        statusCode = (error as any).status || 404; 
         errorMessage = error.message;
+      }else {
+        errorMessage = error.message || errorMessage;
       }
+    } else if (typeof error === 'string') {
+      errorMessage = error;
     }
-    
-    return NextResponse.json(
-      { 
-        success: false,
-        error: errorMessage
-      },
-      { status: statusCode }
-    );
+    return handleApiError(new Error(errorMessage), 'Alt Text Generation Error', statusCode);
   }
 }); 

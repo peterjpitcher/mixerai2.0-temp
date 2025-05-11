@@ -4,7 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/button";
 import { NotificationCenter } from "@/components/dashboard/notification-center";
+import { User, LogOut, LayoutDashboard, Tags, Users2, GitFork, FileText, Settings, HelpCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
+import React from "react";
 
+/**
+ * RootLayoutWrapper component.
+ * Provides a general layout for public-facing or non-dashboard authenticated pages 
+ * (e.g., /release-notes, potentially /account if it doesn't use DashboardLayout).
+ * This layout is skipped for paths starting with /auth, /api, or /dashboard.
+ */
 export default function RootLayoutWrapper({
   children,
 }: Readonly<{
@@ -27,185 +36,116 @@ export default function RootLayoutWrapper({
   }
 
   const isActive = (path: string) => {
-    return pathname === path || pathname.startsWith(`${path}/`);
+    // Handle root path exact match, otherwise startsWith for sections
+    if (path === "/") return pathname === path;
+    return pathname.startsWith(path);
   };
 
+  // Simplified navigation items for this generic layout. 
+  // Links point to dashboard versions as top-level paths should redirect there.
+  const navLinks = [
+    { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
+    { href: "/dashboard/brands", label: "Brands", icon: <Tags /> }, // Changed icon
+    { href: "/dashboard/users", label: "Users", icon: <Users2 /> }, // Changed icon
+    { href: "/dashboard/workflows", label: "Workflows", icon: <GitFork /> }, // Changed icon
+    { href: "/dashboard/content", label: "Content", icon: <FileText /> }, // Changed icon
+  ];
+
+  const bottomNavLinks = [
+    { href: "/dashboard/account", label: "Account Settings", icon: <Settings /> },
+    { href: "/dashboard/help", label: "Help & Support", icon: <HelpCircle /> },
+  ];
+
   return (
-    <div className="flex min-h-screen flex-col">
-      {/* Header */}
-      <header className="border-b" style={{ backgroundColor: '#13599f' }}>
-        <div className="w-full px-4 py-4 flex items-center justify-between text-white">
-          <div className="flex items-center space-x-2">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      {/* Header: Updated to use primary theme color */}
+      <header className="border-b bg-primary text-primary-foreground sticky top-0 z-40 shadow-sm">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
             <Link href="/" className="flex items-center space-x-2">
-              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-[#13599f] font-bold text-xl">M</div>
-              <h1 className="text-2xl font-bold">MixerAI 2.0</h1>
+              <div 
+                className="w-9 h-9 rounded-full bg-primary-foreground text-primary flex items-center justify-center font-bold text-lg shadow-sm"
+              >
+                M
+              </div>
+              <h1 className="text-xl font-semibold">MixerAI</h1> {/* Simplified title */}
             </Link>
           </div>
-          <div className="flex items-center space-x-4">
-            <NotificationCenter />
-            <Button variant="ghost" asChild className="text-white hover:bg-[#13599f]/80">
-              <Link href="/account">
-                <span className="flex items-center space-x-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
-                  <span>Account</span>
-                </span>
+          <div className="flex items-center space-x-2">
+            <NotificationCenter /> 
+            {/* Mock Sign Out / Account buttons for non-dashboard layout - actual logic in DashboardLayout */}
+            <Button variant="ghost" asChild className="text-primary-foreground hover:bg-white/20">
+              <Link href="/dashboard/account" aria-label="Account">
+                 <User className="h-5 w-5" /> 
+                 <span className="hidden sm:inline ml-1.5">Account</span>
               </Link>
             </Button>
-            <Button variant="ghost" className="text-white hover:bg-[#13599f]/80">
-              <span className="flex items-center space-x-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-                <span>Log out</span>
-              </span>
-            </Button>
+            {/* Log out button might not be relevant here if this layout is for unauthenticated pages or if auth is handled elsewhere */}
+            {/* <Button variant="ghost" className="text-primary-foreground hover:bg-white/20" aria-label="Log out">
+              <LogOut className="h-5 w-5" />
+              <span className="hidden sm:inline ml-1.5">Log out</span>
+            </Button> */}
           </div>
         </div>
       </header>
 
-      <div className="flex flex-1">
-        {/* Sidebar */}
-        <aside className="w-64 border-r hidden md:block">
-          <nav className="p-4 space-y-2">
+      <div className="flex flex-1 container mx-auto">
+        {/* Sidebar: Simplified or potentially removed if this layout is very generic */}
+        {/* For now, keeping a simplified version, links point to dashboard routes */}
+        <aside className="w-56 border-r bg-card p-4 space-y-2 hidden md:block shrink-0 h-[calc(100vh-var(--header-height,61px))] sticky top-[var(--header-height,61px)] overflow-y-auto">
+          <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider px-2">Menu</span>
+          {navLinks.map((link) => (
             <Link 
-              href="/" 
-              className={`flex items-center space-x-2 p-2 rounded-md ${isActive('/') ? 'bg-muted' : 'hover:bg-muted'}`}
+              key={link.href}
+              href={link.href} 
+              className={cn(
+                "flex items-center space-x-3 p-2 rounded-md text-sm font-medium transition-colors",
+                isActive(link.href) 
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-primary"
+              )}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect width="7" height="9" x="3" y="3" rx="1" />
-                <rect width="7" height="5" x="14" y="3" rx="1" />
-                <rect width="7" height="9" x="14" y="12" rx="1" />
-                <rect width="7" height="5" x="3" y="16" rx="1" />
-              </svg>
-              <span>Dashboard</span>
+              {link.icon && React.cloneElement(link.icon as React.ReactElement, { className: "h-5 w-5" })}
+              <span>{link.label}</span>
             </Link>
-            <Link 
-              href="/brands" 
-              className={`flex items-center space-x-2 p-2 rounded-md ${isActive('/brands') ? 'bg-muted' : 'hover:bg-muted'}`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M2 7V2h5" />
-                <path d="M16 2h5v5" />
-                <path d="M22 16v5h-5" />
-                <path d="M7 22H2v-5" />
-                <path d="M22 2 2 22" />
-              </svg>
-              <span>Brands</span>
-            </Link>
-            <Link 
-              href="/users" 
-              className={`flex items-center space-x-2 p-2 rounded-md ${isActive('/users') ? 'bg-muted' : 'hover:bg-muted'}`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-              <span>Users</span>
-            </Link>
-            <Link 
-              href="/workflows" 
-              className={`flex items-center space-x-2 p-2 rounded-md ${isActive('/workflows') ? 'bg-muted' : 'hover:bg-muted'}`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect width="8" height="8" x="2" y="2" rx="2" />
-                <path d="M14 2c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2" />
-                <path d="M20 2c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2" />
-                <path d="M10 18H5c-1.7 0-3-1.3-3-3v-1" />
-                <polyline points="7 21 10 18 7 15" />
-                <rect width="8" height="8" x="14" y="14" rx="2" />
-              </svg>
-              <span>Workflows</span>
-            </Link>
-            <Link 
-              href="/content" 
-              className={`flex items-center space-x-2 p-2 rounded-md ${isActive('/content') ? 'bg-muted' : 'hover:bg-muted'}`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" x2="8" y1="13" y2="13" />
-                <line x1="16" x2="8" y1="17" y2="17" />
-                <line x1="10" x2="8" y1="9" y2="9" />
-              </svg>
-              <span>Content</span>
-            </Link>
-          </nav>
+          ))}
+          <div className="pt-4 mt-4 border-t border-border">
+          <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider px-2">Support</span>
+            {bottomNavLinks.map((link) => (
+              <Link 
+                key={link.href}
+                href={link.href} 
+                className={cn(
+                  "flex items-center space-x-3 p-2 rounded-md text-sm font-medium transition-colors mt-1",
+                  isActive(link.href) 
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-primary"
+                )}
+              >
+                {link.icon && React.cloneElement(link.icon as React.ReactElement, { className: "h-5 w-5" })}
+                <span>{link.label}</span>
+              </Link>
+            ))}
+          </div>
         </aside>
 
-        {/* Mobile navigation (hidden on medium screens and above) */}
-        <div className="fixed bottom-0 left-0 z-50 w-full h-16 bg-background border-t md:hidden">
-          <div className="grid h-full grid-cols-5">
-            <Link href="/" className={`flex flex-col items-center justify-center ${isActive('/') ? 'text-primary' : 'text-muted-foreground'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect width="7" height="9" x="3" y="3" rx="1" />
-                <rect width="7" height="5" x="14" y="3" rx="1" />
-                <rect width="7" height="9" x="14" y="12" rx="1" />
-                <rect width="7" height="5" x="3" y="16" rx="1" />
-              </svg>
-              <span className="text-xs">Dashboard</span>
-            </Link>
-            <Link href="/brands" className={`flex flex-col items-center justify-center ${isActive('/brands') ? 'text-primary' : 'text-muted-foreground'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M2 7V2h5" />
-                <path d="M16 2h5v5" />
-                <path d="M22 16v5h-5" />
-                <path d="M7 22H2v-5" />
-                <path d="M22 2 2 22" />
-              </svg>
-              <span className="text-xs">Brands</span>
-            </Link>
-            <Link href="/content" className={`flex flex-col items-center justify-center ${isActive('/content') ? 'text-primary' : 'text-muted-foreground'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" x2="8" y1="13" y2="13" />
-                <line x1="16" x2="8" y1="17" y2="17" />
-                <line x1="10" x2="8" y1="9" y2="9" />
-              </svg>
-              <span className="text-xs">Content</span>
-            </Link>
-            <Link href="/workflows" className={`flex flex-col items-center justify-center ${isActive('/workflows') ? 'text-primary' : 'text-muted-foreground'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect width="8" height="8" x="2" y="2" rx="2" />
-                <path d="M14 2c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2" />
-                <path d="M20 2c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2" />
-                <path d="M10 18H5c-1.7 0-3-1.3-3-3v-1" />
-                <polyline points="7 21 10 18 7 15" />
-                <rect width="8" height="8" x="14" y="14" rx="2" />
-              </svg>
-              <span className="text-xs">Workflows</span>
-            </Link>
-            <Link href="/account" className={`flex flex-col items-center justify-center ${isActive('/account') ? 'text-primary' : 'text-muted-foreground'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-              <span className="text-xs">Account</span>
-            </Link>
-          </div>
-        </div>
+        {/* Mobile navigation not implemented for this generic wrapper, focus on dashboard nav */}
 
-        {/* Main content */}
-        <main className="flex-1 overflow-auto pb-20 md:pb-6 p-6">
+        <main className="flex-1 overflow-auto p-4 sm:p-6">
           {children}
         </main>
       </div>
       
-      {/* Footer */}
-      <footer className="border-t py-6 bg-muted/40">
-        <div className="w-full px-4">
-          <div className="flex justify-end">
-            <Link href="/release-notes" className="hover:text-foreground hover:underline text-sm text-muted-foreground">
-              Release Notes
-            </Link>
-          </div>
+      <footer className="border-t py-4 bg-muted/40 text-center">
+        <div className="container mx-auto px-4">
+          <p className="text-xs text-muted-foreground">
+            &copy; {new Date().getFullYear()} MixerAI. All rights reserved.
+            <Link href="/privacy-policy" className="ml-2 hover:text-primary hover:underline">Privacy Policy</Link>
+            <span className="mx-1">|</span>
+            <Link href="/terms" className="ml-1 hover:text-primary hover:underline">Terms of Service</Link>
+            <span className="mx-1">|</span>
+            <Link href="/release-notes" className="ml-1 hover:text-primary hover:underline">Release Notes</Link>
+          </p>
         </div>
       </footer>
     </div>

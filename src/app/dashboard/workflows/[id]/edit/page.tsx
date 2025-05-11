@@ -16,6 +16,12 @@ import { Badge } from '@/components/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2 } from 'lucide-react';
+import type { Metadata } from 'next';
+
+// export const metadata: Metadata = {
+//   title: 'Edit Workflow | MixerAI 2.0',
+//   description: 'Modify the details, steps, and configuration of an existing content workflow.',
+// };
 
 interface WorkflowEditPageProps {
   params: {
@@ -23,6 +29,13 @@ interface WorkflowEditPageProps {
   };
 }
 
+/**
+ * WorkflowEditPage allows users to modify an existing content approval workflow.
+ * Users can update the workflow's name, description, status, and associated brand.
+ * The core functionality involves managing the workflow steps: adding, removing, reordering,
+ * and configuring each step's name, description, assigned role, approval requirement,
+ * and specific user assignees by email.
+ */
 export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
   const { id } = params;
   const router = useRouter();
@@ -66,8 +79,8 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
         setWorkflow(workflowData.workflow);
         setBrands(brandsData.brands || []);
       } catch (error) {
-        console.error('Error fetching data:', error);
-        setError((error as Error).message || 'Failed to load data');
+        // console.error('Error fetching data:', error);
+        setError((error as Error).message || 'Failed to load data.');
         toast.error('Failed to load data. Please try again.');
       } finally {
         setIsLoading(false);
@@ -170,12 +183,12 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
 
   const handleAddAssignee = (stepIndex: number) => {
     if (!newAssigneeEmail || !newAssigneeEmail.includes('@')) {
-      toast.error('Please enter a valid email address');
+      toast.error('Please enter a valid email address.');
       return;
     }
 
     if (!workflow || !workflow.steps || !workflow.steps[stepIndex]) {
-      toast.error('Cannot add assignee - workflow step not found');
+      toast.error('Cannot add assignee - workflow step not found.');
       return;
     }
 
@@ -184,7 +197,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
     const exists = Array.isArray(stepAssignees) && stepAssignees.some((a: any) => a.email === newAssigneeEmail);
     
     if (exists) {
-      toast.error('This assignee is already added to this step');
+      toast.error('This assignee is already added to this step.');
       return;
     }
 
@@ -313,7 +326,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
     if (!workflow || !Array.isArray(workflow.steps)) return;
     
     if (workflow.steps.length <= 1) {
-      toast.error('Workflow must have at least one step');
+      toast.error('A workflow must have at least one step.');
       return;
     }
     
@@ -358,13 +371,13 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
       const data = await response.json();
       
       if (!data.success) {
-        throw new Error(data.error || 'Failed to update workflow');
+        throw new Error(data.error || 'Failed to update workflow.');
       }
       
       toast.success('Workflow updated successfully');
       router.push(`/dashboard/workflows/${id}`);
     } catch (error) {
-      console.error('Error saving workflow:', error);
+      // console.error('Error saving workflow:', error);
       toast.error('Failed to save workflow. Please try again.');
     } finally {
       setIsSaving(false);
@@ -384,7 +397,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px]">
-        <div className="text-red-500 mb-4">
+        <div className="text-destructive mb-4">
           <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
@@ -411,7 +424,12 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Edit Workflow</h1>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Edit: {workflow?.name || 'Workflow'}</h1>
+          <p className="text-muted-foreground mt-1">
+            Modify the details, steps, assignees, and other settings for this workflow.
+          </p>
+        </div>
         <div className="flex space-x-2">
           <Button variant="outline" asChild>
             <Link href={`/dashboard/workflows/${id}`}>Cancel</Link>
@@ -433,7 +451,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
         <Card>
           <CardHeader>
             <CardTitle>Workflow Details</CardTitle>
-            <CardDescription>Basic information about the workflow</CardDescription>
+            <CardDescription>Basic information about the workflow.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -502,7 +520,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Workflow Steps</CardTitle>
-                <CardDescription>Define the steps in your workflow</CardDescription>
+                <CardDescription>Define the approval stages for this workflow.</CardDescription>
               </div>
               <Button onClick={handleAddStep} size="sm">
                 <Plus className="h-4 w-4 mr-1" />
@@ -610,7 +628,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                         <div className="flex items-center space-x-2">
                           <Input
                             id={`step-assignees-${index}`}
-                            placeholder="Enter email address"
+                            placeholder="Enter email address to add assignee."
                             value={newAssigneeEmail}
                             onChange={(e) => setNewAssigneeEmail(e.target.value)}
                             onKeyDown={(e) => {
@@ -619,6 +637,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                                 handleAddAssignee(index);
                               }
                             }}
+                            className="flex-grow mr-2"
                           />
                           <Button 
                             variant="outline" 

@@ -9,6 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from "@/components/use-toast";
 import { copyToClipboard } from '@/lib/utils/clipboard';
 import { Loader2, ClipboardCopy, Globe } from 'lucide-react';
+import type { Metadata } from 'next';
+
+// export const metadata: Metadata = {
+//   title: 'Content Trans-Creator | MixerAI 2.0',
+//   description: 'Adapt your content for different languages and cultural contexts with AI-powered trans-creation.',
+// };
 
 // Language options
 const languageOptions = [
@@ -55,6 +61,12 @@ const countryOptions = [
   { value: 'RU', label: 'Russia', language: 'ru' },
 ];
 
+/**
+ * ContentTransCreatorPage provides a tool for trans-creating content across different
+ * languages and cultural contexts. Users can input original content, specify source
+ * and target languages/locales, and receive an AI-generated trans-creation that aims
+ * to preserve intent, emotion, and impact while adapting to cultural nuances.
+ */
 export default function ContentTransCreatorPage() {
   const [content, setContent] = useState('');
   const [sourceLanguage, setSourceLanguage] = useState('en');
@@ -92,7 +104,7 @@ export default function ContentTransCreatorPage() {
     if (!content) {
       toast({
         title: 'Content required',
-        description: 'Please enter content to trans-create',
+        description: 'Please enter content to trans-create.',
         variant: 'destructive',
       });
       return;
@@ -101,7 +113,7 @@ export default function ContentTransCreatorPage() {
     if (!targetLanguage) {
       toast({
         title: 'Target language required',
-        description: 'Please select a target language',
+        description: 'Please select a target language.',
         variant: 'destructive',
       });
       return;
@@ -110,7 +122,7 @@ export default function ContentTransCreatorPage() {
     if (!targetCountry) {
       toast({
         title: 'Target country required',
-        description: 'Please select a target country',
+        description: 'Please select a target country.',
         variant: 'destructive',
       });
       return;
@@ -136,7 +148,7 @@ export default function ContentTransCreatorPage() {
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to trans-create content');
+        throw new Error(data.error || 'Failed to trans-create content.');
       }
       
       if (data.success) {
@@ -145,16 +157,16 @@ export default function ContentTransCreatorPage() {
         });
         
         toast({
-          title: 'Content trans-created',
-          description: 'Content has been successfully trans-created',
+          title: 'Content Trans-Created',
+          description: 'Content has been successfully trans-created.',
         });
       } else {
-        throw new Error(data.error || 'Failed to trans-create content');
+        throw new Error(data.error || 'Failed to trans-create content.');
       }
     } catch (error) {
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        description: error instanceof Error ? error.message : 'An unknown error occurred.',
         variant: 'destructive',
       });
     } finally {
@@ -166,14 +178,14 @@ export default function ContentTransCreatorPage() {
     if (results?.transCreatedContent) {
       copyToClipboard(results.transCreatedContent);
       toast({
-        title: 'Copied to clipboard',
-        description: 'Trans-created content has been copied to clipboard',
+        title: 'Copied to Clipboard',
+        description: 'The trans-created content has been copied to your clipboard.',
       });
     }
   };
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-6">
       <h1 className="text-3xl font-bold mb-6">Content Trans-Creator</h1>
       <p className="text-muted-foreground mb-2">
         Transform content across languages and cultures with our AI-powered trans-creation tool.

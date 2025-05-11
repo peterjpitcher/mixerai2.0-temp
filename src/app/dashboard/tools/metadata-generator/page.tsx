@@ -10,6 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/components/use-toast";
 import { copyToClipboard } from '@/lib/utils/clipboard';
 import { Loader2, ClipboardCopy, Globe } from 'lucide-react';
+import type { Metadata } from 'next';
+
+// export const metadata: Metadata = {
+//   title: 'Metadata Generator | MixerAI 2.0',
+//   description: 'Generate SEO-optimised meta titles, descriptions, and keywords for your web pages.',
+// };
 
 interface Brand {
   id: string;
@@ -21,6 +27,12 @@ interface Brand {
   guardrails?: string | null;
 }
 
+/**
+ * MetadataGeneratorPage provides a tool for users to generate SEO metadata
+ * (meta title, meta description, keywords) for a given URL, tailored to a selected brand.
+ * It fetches available brands, allows URL input, and calls an API to get metadata suggestions.
+ * Results can be copied to the clipboard.
+ */
 export default function MetadataGeneratorPage() {
   const [url, setUrl] = useState('');
   const [selectedBrandId, setSelectedBrandId] = useState('');
@@ -40,7 +52,7 @@ export default function MetadataGeneratorPage() {
         if (data.success && Array.isArray(data.brands)) {
           setBrands(data.brands);
         } else {
-          console.error('Failed to fetch brands:', data);
+          // console.error('Failed to fetch brands:', data);
           toast({
             title: 'Error',
             description: 'Failed to fetch brands. Please try again later.',
@@ -48,7 +60,7 @@ export default function MetadataGeneratorPage() {
           });
         }
       } catch (error) {
-        console.error('Error fetching brands:', error);
+        // console.error('Error fetching brands:', error);
         toast({
           title: 'Error',
           description: 'Failed to fetch brands. Please try again later.',
@@ -70,7 +82,7 @@ export default function MetadataGeneratorPage() {
     if (!url) {
       toast({
         title: 'URL required',
-        description: 'Please enter a URL to generate metadata',
+        description: 'Please enter a URL for which to generate metadata.',
         variant: 'destructive',
       });
       return;
@@ -79,7 +91,7 @@ export default function MetadataGeneratorPage() {
     if (!selectedBrandId) {
       toast({
         title: 'Brand required',
-        description: 'Please select a brand',
+        description: 'Please select a brand.',
         variant: 'destructive',
       });
       return;
@@ -91,7 +103,7 @@ export default function MetadataGeneratorPage() {
     } catch (error) {
       toast({
         title: 'Invalid URL',
-        description: 'Please enter a valid URL (e.g., https://example.com)',
+        description: 'Please enter a valid URL (e.g., https://example.com).',
         variant: 'destructive',
       });
       return;
@@ -120,7 +132,7 @@ export default function MetadataGeneratorPage() {
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate metadata');
+        throw new Error(data.error || 'Failed to generate metadata.');
       }
       
       if (data.success) {
@@ -131,16 +143,16 @@ export default function MetadataGeneratorPage() {
         });
         
         toast({
-          title: 'Metadata generated',
-          description: 'SEO-optimised metadata has been generated successfully',
+          title: 'Metadata Generated',
+          description: 'SEO-optimised metadata has been generated successfully.',
         });
       } else {
-        throw new Error(data.error || 'Failed to generate metadata');
+        throw new Error(data.error || 'Failed to generate metadata.');
       }
     } catch (error) {
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        description: error instanceof Error ? error.message : 'An unknown error occurred.',
         variant: 'destructive',
       });
     } finally {
@@ -152,8 +164,8 @@ export default function MetadataGeneratorPage() {
     if (results?.metaTitle) {
       copyToClipboard(results.metaTitle);
       toast({
-        title: 'Copied to clipboard',
-        description: 'Meta title has been copied to clipboard',
+        title: 'Copied to Clipboard',
+        description: 'The meta title has been copied to your clipboard.',
       });
     }
   };
@@ -162,8 +174,8 @@ export default function MetadataGeneratorPage() {
     if (results?.metaDescription) {
       copyToClipboard(results.metaDescription);
       toast({
-        title: 'Copied to clipboard',
-        description: 'Meta description has been copied to clipboard',
+        title: 'Copied to Clipboard',
+        description: 'The meta description has been copied to your clipboard.',
       });
     }
   };
@@ -172,14 +184,14 @@ export default function MetadataGeneratorPage() {
     if (results?.keywords && results.keywords.length > 0) {
       copyToClipboard(results.keywords.join(', '));
       toast({
-        title: 'Copied to clipboard',
-        description: 'Keywords have been copied to clipboard',
+        title: 'Copied to Clipboard',
+        description: 'The keywords have been copied to your clipboard.',
       });
     }
   };
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-6">
       <h1 className="text-3xl font-bold mb-6">Metadata Generator</h1>
       <p className="text-muted-foreground mb-8">
         Generate SEO-optimised meta titles, descriptions, and keywords using your brand's voice and style.
@@ -275,7 +287,7 @@ export default function MetadataGeneratorPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <Label htmlFor="metaTitle">Meta Title</Label>
-                    <span className={`text-xs ${results.metaTitle.length >= 45 && results.metaTitle.length <= 60 ? 'text-green-500' : 'text-red-500'}`}>
+                    <span className={`text-xs ${results.metaTitle.length >= 45 && results.metaTitle.length <= 60 ? 'text-success' : 'text-destructive'}`}>
                       {results.metaTitle.length} characters
                     </span>
                   </div>
@@ -296,7 +308,7 @@ export default function MetadataGeneratorPage() {
                       <ClipboardCopy className="h-4 w-4" />
                     </Button>
                   </div>
-                  <p className="text-xs text-amber-600 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Note: Most CMS systems will automatically append the brand name to the end of meta titles, 
                     which will increase the character count. A slightly shorter meta title (45-50 characters) 
                     allows room for this addition while staying within optimal SEO limits.
@@ -306,7 +318,7 @@ export default function MetadataGeneratorPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <Label htmlFor="metaDescription">Meta Description</Label>
-                    <span className={`text-xs ${results.metaDescription.length >= 150 && results.metaDescription.length <= 160 ? 'text-green-500' : 'text-red-500'}`}>
+                    <span className={`text-xs ${results.metaDescription.length >= 150 && results.metaDescription.length <= 160 ? 'text-success' : 'text-destructive'}`}>
                       {results.metaDescription.length} characters
                     </span>
                   </div>

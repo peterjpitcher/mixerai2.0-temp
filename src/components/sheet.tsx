@@ -7,14 +7,34 @@ import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Sheet component (Root).
+ * A Radix UI Dialog primitive styled as a slide-out panel.
+ */
 const Sheet = SheetPrimitive.Root
 
+/**
+ * SheetTrigger component.
+ * A button or element that triggers the opening of a Sheet.
+ */
 const SheetTrigger = SheetPrimitive.Trigger
 
+/**
+ * SheetClose component.
+ * A button or element that triggers the closing of a Sheet.
+ */
 const SheetClose = SheetPrimitive.Close
 
+/**
+ * SheetPortal component.
+ * Portals its children into a new part of the DOM, often used for overlays and content.
+ */
 const SheetPortal = SheetPrimitive.Portal
 
+/**
+ * SheetOverlay component.
+ * A fixed overlay that covers the screen content when the Sheet is open.
+ */
 const SheetOverlay = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Overlay>
@@ -53,6 +73,10 @@ interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
     VariantProps<typeof sheetVariants> {}
 
+/**
+ * SheetContent component.
+ * The main content area of the Sheet, which slides in from a specified side.
+ */
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
@@ -74,6 +98,10 @@ const SheetContent = React.forwardRef<
 ))
 SheetContent.displayName = SheetPrimitive.Content.displayName
 
+/**
+ * SheetHeader component.
+ * A container for the header section within a SheetContent.
+ */
 const SheetHeader = ({
   className,
   ...props
@@ -88,6 +116,10 @@ const SheetHeader = ({
 )
 SheetHeader.displayName = "SheetHeader"
 
+/**
+ * SheetFooter component.
+ * A container for the footer section within a SheetContent.
+ */
 const SheetFooter = ({
   className,
   ...props
@@ -102,6 +134,10 @@ const SheetFooter = ({
 )
 SheetFooter.displayName = "SheetFooter"
 
+/**
+ * SheetTitle component.
+ * Used to display the title within a SheetHeader.
+ */
 const SheetTitle = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Title>
@@ -114,6 +150,10 @@ const SheetTitle = React.forwardRef<
 ))
 SheetTitle.displayName = SheetPrimitive.Title.displayName
 
+/**
+ * SheetDescription component.
+ * Used to display a description or subtitle within a SheetHeader.
+ */
 const SheetDescription = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Description>

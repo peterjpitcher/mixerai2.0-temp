@@ -6,30 +6,55 @@ import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Dialog component (Root).
+ * A window overlaid on either the primary window or another dialog window, rendering the content underneath inert.
+ * Based on Radix UI Dialog.
+ */
 const Dialog = DialogPrimitive.Root
 
+/**
+ * DialogTrigger component.
+ * The button or element that opens the Dialog.
+ */
 const DialogTrigger = DialogPrimitive.Trigger
 
-const DialogPortal = ({ className, ...props }: DialogPrimitive.DialogPortalProps) => (
-  <DialogPrimitive.Portal className={cn(className)} {...props} />
+/**
+ * DialogPortal component.
+ * Portals its children (typically DialogOverlay and DialogContent) to the body.
+ * Note: Radix UI DialogPortal does not accept a className directly.
+ */
+const DialogPortal = (props: DialogPrimitive.DialogPortalProps) => (
+  <DialogPrimitive.Portal {...props} />
 )
 DialogPortal.displayName = DialogPrimitive.Portal.displayName
 
+/**
+ * DialogOverlay component.
+ * A fixed overlay that covers the screen content when the Dialog is open.
+ * Styled with a semi-transparent background and backdrop blur.
+ */
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
+    ref={ref}
     className={cn(
       "fixed inset-0 z-50 bg-background/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
     )}
     {...props}
-    ref={ref}
   />
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+/**
+ * DialogContent component.
+ * The main content container of the Dialog.
+ * Styled with theme variables, shadow, and animations.
+ * Includes a close button.
+ */
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
@@ -45,7 +70,12 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+      {/* Close button styling: data-[state=open]:bg-accent data-[state=open]:text-muted-foreground 
+          This uses Accent color for background when open. Needs review for new theme. 
+          text-muted-foreground for the icon might be too light on accent background.
+          Consider text-accent-foreground or a more consistently contrasting color for the X icon.
+      */}
+      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-accent-foreground">
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
@@ -54,6 +84,10 @@ const DialogContent = React.forwardRef<
 ))
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
+/**
+ * DialogHeader component.
+ * A container for the header section (e.g., title, description) within DialogContent.
+ */
 const DialogHeader = ({
   className,
   ...props
@@ -68,6 +102,10 @@ const DialogHeader = ({
 )
 DialogHeader.displayName = "DialogHeader"
 
+/**
+ * DialogFooter component.
+ * A container for the footer section (e.g., action buttons) within DialogContent.
+ */
 const DialogFooter = ({
   className,
   ...props
@@ -82,6 +120,10 @@ const DialogFooter = ({
 )
 DialogFooter.displayName = "DialogFooter"
 
+/**
+ * DialogTitle component.
+ * Used for the main title within a DialogHeader.
+ */
 const DialogTitle = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
@@ -97,6 +139,10 @@ const DialogTitle = React.forwardRef<
 ))
 DialogTitle.displayName = DialogPrimitive.Title.displayName
 
+/**
+ * DialogDescription component.
+ * Used for additional descriptive text within a DialogHeader.
+ */
 const DialogDescription = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
@@ -112,6 +158,8 @@ DialogDescription.displayName = DialogPrimitive.Description.displayName
 export {
   Dialog,
   DialogTrigger,
+  DialogPortal,
+  DialogOverlay,
   DialogContent,
   DialogHeader,
   DialogFooter,

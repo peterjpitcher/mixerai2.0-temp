@@ -21,113 +21,22 @@ interface WorkflowInvitation {
   status?: string;
 }
 
-// Sample fallback data for when DB connection fails
-const getFallbackWorkflows = () => {
-  return [
-    {
-      id: '1',
-      name: 'Sample Content Workflow',
-      brand_id: '1',
-      brand_name: 'Sample Brand',
-      content_type_id: '1',
-      content_type_name: 'Article',
-      steps: [
-        { 
-          id: 1, 
-          name: 'Draft', 
-          description: 'Initial draft creation',
-          role: 'editor',
-          approvalRequired: true,
-          assignees: [
-            { email: 'editor@example.com' }
-          ] 
-        },
-        { 
-          id: 2, 
-          name: 'Review', 
-          description: 'Content review by editorial team',
-          role: 'editor',
-          approvalRequired: true,
-          assignees: [
-            { email: 'reviewer@example.com' }
-          ] 
-        },
-        { 
-          id: 3, 
-          name: 'Publish', 
-          description: 'Final approval and publishing',
-          role: 'admin',
-          approvalRequired: true,
-          assignees: [
-            { email: 'admin@example.com' }
-          ] 
-        }
-      ],
-      steps_count: 3,
-      content_count: 2,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    },
-    {
-      id: '2',
-      name: 'Another Workflow',
-      brand_id: '2',
-      brand_name: 'Another Brand',
-      content_type_id: '2',
-      content_type_name: 'Retailer PDP',
-      steps: [
-        { 
-          id: 1, 
-          name: 'Draft', 
-          description: 'Initial product description',
-          role: 'editor',
-          approvalRequired: true,
-          assignees: [
-            { email: 'pdp@example.com' }
-          ]
-        },
-        { 
-          id: 2, 
-          name: 'Publish', 
-          description: 'Final approval',
-          role: 'admin',
-          approvalRequired: true,
-          assignees: [
-            { email: 'admin@example.com' }
-          ]
-        }
-      ],
-      steps_count: 2,
-      content_count: 1,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-  ];
-};
+// Fallback data function removed as per no-fallback policy
+// const getFallbackWorkflows = () => { ... };
 
 /**
  * GET endpoint to retrieve all workflows with related data
  */
 export const GET = withAuth(async (request: NextRequest, user) => {
   try {
-    // During static site generation, return mock data
-    if (isBuildPhase()) {
-      console.log('Returning mock workflows during build');
-      return NextResponse.json({ 
-        success: true, 
-        isMockData: true,
-        data: getFallbackWorkflows()
-      });
-    }
+    // Build phase fallback removed
+    // if (isBuildPhase()) { ... }
     
-    console.log('Attempting to fetch workflows from database');
     const supabase = createSupabaseAdminClient();
     
-    // Parse URL to check for brand_id filter
     const url = new URL(request.url);
     const brandId = url.searchParams.get('brand_id');
     
-    // Base query
     let query = supabase
       .from('workflows')
       .select(`
@@ -138,17 +47,14 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       `)
       .order('created_at', { ascending: false });
     
-    // Apply brand_id filter if specified
     if (brandId) {
       query = query.eq('brand_id', brandId);
     }
     
-    // Execute the query
     const { data: workflows, error } = await query;
     
     if (error) throw error;
     
-    // Format the response
     const formattedWorkflows = workflows.map(workflow => ({
       id: workflow.id,
       name: workflow.name,
@@ -163,26 +69,16 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       created_at: workflow.created_at,
       updated_at: workflow.updated_at
     }));
-
-    console.log(`Successfully fetched ${formattedWorkflows.length} workflows`);
     
     return NextResponse.json({ 
       success: true, 
       data: formattedWorkflows 
     });
   } catch (error) {
-    console.error('Error fetching workflows:', error);
+    // Database connection error fallback removed
+    // if (isDatabaseConnectionError(error)) { ... }
     
-    // Only use fallback for genuine database connection errors
-    if (isDatabaseConnectionError(error)) {
-      console.error('Database connection error, using fallback workflows data:', error);
-      return NextResponse.json({ 
-        success: true, 
-        isFallback: true,
-        data: getFallbackWorkflows()
-      });
-    }
-    
+    // Generic error handling (console.error removed from handleApiError or here)
     return handleApiError(error, 'Error fetching workflows');
   }
 });
@@ -195,7 +91,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     const supabase = createSupabaseAdminClient();
     const body = await request.json();
     
-    // Validate required fields
     if (!body.name) {
       return NextResponse.json(
         { success: false, error: 'Workflow name is required' },
@@ -217,7 +112,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       );
     }
     
-    // Validate steps format if provided
     if (body.steps && !Array.isArray(body.steps)) {
       return NextResponse.json(
         { success: false, error: 'Steps must be an array' },
@@ -225,7 +119,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       );
     }
     
-    // Process assignees - create invitations for each email if needed
     const steps = body.steps || [];
     const invitationItems: {
       step_id: number;
@@ -235,12 +128,11 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       expires_at: string;
     }[] = [];
     
-    const pendingInvites: string[] = []; // Track emails that need invites
+    const pendingInvites: string[] = [];
     
     for (const step of steps) {
       if (step.assignees && Array.isArray(step.assignees)) {
         for (const assignee of step.assignees) {
-          // Check if the user exists
           const { data: existingUser } = await supabase
             .from('profiles')
             .select('id')
@@ -248,19 +140,16 @@ export const POST = withAuth(async (request: NextRequest, user) => {
             .maybeSingle();
             
           if (existingUser) {
-            // User exists, set their ID in the assignee
             assignee.id = existingUser.id;
           } else {
-            // User doesn't exist, prepare an invitation
             invitationItems.push({
               step_id: step.id,
               email: assignee.email,
               role: step.role || 'editor',
               invite_token: uuidv4(),
-              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days expiry
+              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
             });
             
-            // Add to pending invites if not already added
             if (!pendingInvites.includes(assignee.email)) {
               pendingInvites.push(assignee.email);
             }
@@ -269,7 +158,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       }
     }
     
-    // Insert the new workflow with the current user as created_by
     const { data: workflow, error } = await supabase
       .from('workflows')
       .insert({
@@ -277,14 +165,13 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         brand_id: body.brand_id,
         content_type_id: body.content_type_id,
         steps: steps,
-        created_by: user.id // Set the authenticated user as the creator
+        created_by: user.id
       })
       .select()
       .single();
     
     if (error) throw error;
     
-    // If we have workflow invitations to create, insert them
     if (invitationItems.length > 0 && workflow) {
       const workflowInvitations: WorkflowInvitation[] = invitationItems.map(item => ({
         workflow_id: workflow.id,
@@ -297,19 +184,15 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         .insert(workflowInvitations);
       
       if (invitationError) {
-        console.error('Error creating workflow invitations:', invitationError);
-        // We'll continue even if there's an error with invitations
+        // Logged error removed, handleApiError or specific response preferred
+        // Consider if this should be a more critical error response to client
       }
       
-      // Send email invitations to users who don't exist yet
       if (pendingInvites.length > 0) {
         try {
-          // Verify email templates
           await verifyEmailTemplates();
           
-          // Send invites
           for (const email of pendingInvites) {
-            // Find the highest role for this user across all steps
             let highestRole = 'viewer';
             for (const item of invitationItems) {
               if (item.email === email) {
@@ -322,31 +205,27 @@ export const POST = withAuth(async (request: NextRequest, user) => {
               }
             }
             
-            // Send the invitation
             const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
               data: {
                 full_name: '',
                 role: highestRole,
-                invited_by: user.id, // Track who sent the invitation
+                invited_by: user.id,
                 invited_from_workflow: workflow.id
               }
             });
             
             if (inviteError) {
-              console.error(`Error inviting user ${email}:`, inviteError);
-              // Continue with other invites
+              // Logged error removed
             } else {
-              console.log(`Successfully invited user ${email} with role ${highestRole}`);
+              // Logged success removed
             }
           }
         } catch (inviteError) {
-          console.error('Error sending user invitations:', inviteError);
-          // Continue with the workflow creation
+          // Logged error removed
         }
       }
     }
     
-    // Fetch brand and content type data to include in response
     const { data: brand } = await supabase
       .from('brands')
       .select('name, brand_color')
@@ -359,7 +238,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       .eq('id', body.content_type_id)
       .single();
     
-    // Format the workflow response
     const formattedWorkflow = {
       ...workflow,
       brand_name: brand?.name || null,
@@ -374,7 +252,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       workflow: formattedWorkflow
     });
   } catch (error) {
-    console.error('Error creating workflow:', error);
+    // Logged error removed
     return handleApiError(error, 'Error creating workflow');
   }
 }); 

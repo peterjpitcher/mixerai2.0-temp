@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateMetadata } from '@/lib/azure/openai';
 import { fetchWebPageContent } from '@/lib/utils/web-scraper';
+import { handleApiError } from '@/lib/api-utils'; // Import for consistent error handling
+
+// WARNING: This is an open test endpoint not protected by authentication.
+// It allows unauthenticated calls to Azure OpenAI services.
+// It should be REMOVED or STRICTLY SECURED before any deployment to non-local environments.
 
 interface MetadataGenerationRequest {
   url: string;
-  brandId: string;
+  brandId: string; // Note: brandId is required but not used to fetch live brand data in this test route.
   brandLanguage?: string;
   brandCountry?: string;
   brandIdentity?: string;
@@ -12,62 +17,54 @@ interface MetadataGenerationRequest {
   guardrails?: string;
 }
 
-// This is an open test endpoint not protected by authentication
 export async function POST(request: NextRequest) {
-  console.log("Test metadata generator API called");
-  
+  // console.log removed
   try {
     const data: MetadataGenerationRequest = await request.json();
     
-    // Validate request data
     if (!data.url) {
       return NextResponse.json(
-        { error: 'URL is required' },
+        { success: false, error: 'URL is required' },
         { status: 400 }
       );
     }
 
     if (!data.brandId) {
+      // brandId is required by the interface but not strictly needed for this test endpoint's logic
+      // as it uses defaults. However, keeping the check for consistency with the main tool.
       return NextResponse.json(
-        { error: 'Brand ID is required' },
+        { success: false, error: 'Brand ID is required (though not used for DB fetch in this test route)' },
         { status: 400 }
       );
     }
     
-    // Validate URL format
     try {
       new URL(data.url);
     } catch (error) {
       return NextResponse.json(
-        { error: 'Invalid URL format' },
+        { success: false, error: 'Invalid URL format' },
         { status: 400 }
       );
     }
     
-    // Use provided brand information or defaults
+    // Using defaults for brand context in this test route
     const brandLanguage = data.brandLanguage || 'en';
-    const brandCountry = data.brandCountry || 'GB';
-    const brandIdentity = data.brandIdentity || 'A food brand that helps home bakers succeed';
-    const toneOfVoice = data.toneOfVoice || 'Helpful, friendly and supportive';
-    const guardrails = data.guardrails || 'Keep content family-friendly';
+    const brandCountry = data.brandCountry || 'GB'; // Defaulting to GB for test
+    const brandIdentity = data.brandIdentity || 'A generic test brand focused on clarity.';
+    const toneOfVoice = data.toneOfVoice || 'Neutral and informative.';
+    const guardrails = data.guardrails || 'Keep content factual and brief.';
     
-    console.log("Using test brand data for generation:", {
-      brandLanguage,
-      brandCountry,
-      brandIdentity: brandIdentity.substring(0, 30) + "..."
-    });
+    // console.log removed
     
-    // Fetch webpage content to provide context
     let pageContent = '';
     try {
       pageContent = await fetchWebPageContent(data.url);
-      console.log(`Successfully fetched content from URL (${pageContent.length} characters)`);
+      // console.log removed
     } catch (fetchError) {
-      console.warn('Could not fetch webpage content, proceeding without it:', fetchError);
+      // console.warn removed. Proceeding without pageContent is acceptable for this test.
     }
     
-    // Generate metadata with brand context
-    console.log("Calling generateMetadata...");
+    // console.log removed
     const generatedMetadata = await generateMetadata(
       data.url,
       brandLanguage,
@@ -80,41 +77,36 @@ export async function POST(request: NextRequest) {
       }
     );
     
-    console.log("Metadata generation successful");
+    // console.log removed
+    // Note: The validateMetadata function is defined below but NOT called in this test route.
+    // The main tool at /api/tools/metadata-generator DOES call it.
+
     return NextResponse.json({
       success: true,
       url: data.url,
       ...generatedMetadata,
-      keywords: []
+      keywords: [] // Retained for now
     });
-  } catch (error) {
-    console.error('Error generating metadata:', error);
-    
-    return NextResponse.json(
-      { 
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to generate metadata' 
-      },
-      { status: 500 }
-    );
+  } catch (error: any) {
+    // console.error removed
+    // Simplified error handling for this test route
+    return handleApiError(error, 'Test metadata generation failed');
   }
 }
 
-// Function to validate metadata length requirements
+// Function to validate metadata length requirements (copied from main tool, but not used in this test route)
 function validateMetadata(metaTitle: string, metaDescription: string): { 
   isValid: boolean; 
   reason?: string;
   titleLength?: number;
   descriptionLength?: number;
 } {
-  // Remove any character count annotations that the AI might include
   const cleanTitle = (metaTitle || "").replace(/\s*\(\d+\s*chars?\)$/i, "");
   const cleanDescription = (metaDescription || "").replace(/\s*\(\d+\s*chars?\)$/i, "");
   
   const titleLength = cleanTitle?.length || 0;
   const descriptionLength = cleanDescription?.length || 0;
   
-  // More lenient title validation (45-60 chars) since CMS will append brand name
   if (titleLength < 45 || titleLength > 60) {
     return { 
       isValid: false, 

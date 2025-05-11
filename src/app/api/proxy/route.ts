@@ -1,32 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
+import { handleApiError } from '@/lib/api-utils';
 
+/**
+ * GET endpoint acting as an HTTP proxy.
+ * IMPORTANT: This proxy can make requests from the server to any URL specified by an authenticated user.
+ * This poses a Server-Side Request Forgery (SSRF) risk if not properly restricted.
+ * RECOMMENDATION: Implement a strict allowlist of target domains/protocols if this proxy is for specific known services.
+ * If for general user-provided URLs, consider adding restrictions to prevent requests to internal/private IP ranges.
+ */
 export const GET = withAuthAndMonitoring(async (request: NextRequest) => {
   try {
-    // Get the URL parameter
-    const url = request.nextUrl.searchParams.get('url');
+    const urlToProxy = request.nextUrl.searchParams.get('url');
     
-    if (!url) {
+    if (!urlToProxy) {
       return NextResponse.json(
         { success: false, error: 'URL parameter is required' },
         { status: 400 }
       );
     }
     
-    console.log(`Proxying request to: ${url}`);
-    
-    // Validate URL format
     try {
-      new URL(url);
+      new URL(urlToProxy);
     } catch (error) {
       return NextResponse.json(
-        { success: false, error: 'Invalid URL format' },
+        { success: false, error: 'Invalid URL format provided' },
         { status: 400 }
       );
     }
     
-    // Fetch the URL
-    const response = await fetch(url, {
+    const response = await fetch(urlToProxy, {
       headers: {
         'User-Agent': 'MixerAI/1.0',
       },
@@ -36,19 +39,15 @@ export const GET = withAuthAndMonitoring(async (request: NextRequest) => {
       return NextResponse.json(
         { 
           success: false, 
-          error: `Failed to fetch URL: ${response.status} ${response.statusText}` 
+          error: `Failed to fetch the requested URL. Upstream server responded with: ${response.status} ${response.statusText}` 
         },
         { status: response.status }
       );
     }
     
-    // Get content type from response
     const contentType = response.headers.get('content-type') || 'text/plain';
-    
-    // Get the response body
     const body = await response.text();
     
-    // Return the response with appropriate content type
     return new NextResponse(body, {
       status: 200,
       headers: {
@@ -56,14 +55,6 @@ export const GET = withAuthAndMonitoring(async (request: NextRequest) => {
       },
     });
   } catch (error) {
-    console.error('Error in proxy endpoint:', error);
-    
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: `Failed to proxy request: ${error instanceof Error ? error.message : String(error)}` 
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, 'Failed to proxy request');
   }
 }); 

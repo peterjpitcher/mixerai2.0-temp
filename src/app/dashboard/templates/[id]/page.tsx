@@ -8,6 +8,12 @@ import { PageHeader } from '@/components/dashboard/page-header';
 import { TemplateForm } from '@/components/template/template-form';
 import { useToast } from '@/components/toast-provider';
 import { Loader2, ChevronLeft } from 'lucide-react';
+import type { Metadata } from 'next';
+
+// export const metadata: Metadata = {
+//   title: 'Edit Template | MixerAI 2.0',
+//   description: 'Modify and configure an existing content template.',
+// };
 
 // Default templates data for system templates
 const defaultTemplates = {
@@ -139,6 +145,12 @@ const defaultTemplates = {
   }
 };
 
+/**
+ * TemplateEditPage allows users to view and modify a specific content template.
+ * It handles both system-defined default templates (like 'article-template') and
+ * user-created templates fetched from an API.
+ * The core editing functionality is provided by the `TemplateForm` component.
+ */
 export default function TemplateEditPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id || '';
@@ -148,17 +160,17 @@ export default function TemplateEditPage() {
   const [loading, setLoading] = useState(true);
 
   // Add debugging logs
-  console.log('Template Edit Page - Params:', params);
-  console.log('Template Edit Page - ID:', id);
+  // console.log('Template Edit Page - Params:', params);
+  // console.log('Template Edit Page - ID:', id);
 
   useEffect(() => {
     const fetchTemplate = async () => {
-      console.log('Starting to fetch template with ID:', id);
+      // console.log('Starting to fetch template with ID:', id);
       setLoading(true);
 
       // Check if this is a default template
       if (id === 'article-template' || id === 'product-template') {
-        console.log('Using default template:', id);
+        // console.log('Using default template:', id);
         setTemplate(defaultTemplates[id as keyof typeof defaultTemplates]);
         setLoading(false);
         return;
@@ -166,32 +178,32 @@ export default function TemplateEditPage() {
 
       // Otherwise, try to fetch from the API
       try {
-        console.log('Fetching template from API for ID:', id);
+        // console.log('Fetching template from API for ID:', id);
         const response = await fetch(`/api/content-templates/${id}`);
         const data = await response.json();
-        console.log('API response:', data);
+        // console.log('API response:', data);
 
         if (data.success) {
-          console.log('Successfully fetched template:', data.template);
+          // console.log('Successfully fetched template:', data.template);
           setTemplate(data.template);
         } else {
-          console.error('Error from API:', data.error);
+          // console.error('Error from API:', data.error);
           toast({
             title: 'Error',
-            description: data.error || 'Failed to load template',
+            description: data.error || 'Failed to load the template.',
             variant: 'destructive',
           });
-          console.log('Redirecting to templates page due to API error');
+          // console.log('Redirecting to templates page due to API error');
           router.push('/dashboard/templates');
         }
       } catch (error) {
-        console.error('Error fetching template:', error);
+        // console.error('Error fetching template:', error);
         toast({
           title: 'Error',
-          description: 'Failed to load template',
+          description: 'Failed to load the template.',
           variant: 'destructive',
         });
-        console.log('Redirecting to templates page due to fetch error');
+        // console.log('Redirecting to templates page due to fetch error');
         router.push('/dashboard/templates');
       } finally {
         setLoading(false);
@@ -199,13 +211,13 @@ export default function TemplateEditPage() {
     };
 
     if (id) {
-      console.log('Template ID is available, fetching template');
+      // console.log('Template ID is available, fetching template');
       fetchTemplate();
     } else {
-      console.error('No template ID provided');
+      // console.error('No template ID provided');
       toast({
         title: 'Error',
-        description: 'Template ID is required',
+        description: 'Template ID is required.',
         variant: 'destructive',
       });
       router.push('/dashboard/templates');
@@ -214,7 +226,7 @@ export default function TemplateEditPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-6 space-y-8">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
@@ -223,10 +235,10 @@ export default function TemplateEditPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 space-y-8">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
       <PageHeader
         title={`Edit ${template?.name || 'Template'}`}
-        description="Modify your content template configuration"
+        description="Modify your content template configuration."
         actions={
           <Link href="/dashboard/templates">
             <Button variant="outline">
@@ -239,8 +251,8 @@ export default function TemplateEditPage() {
       
       {template && <TemplateForm initialData={template} />}
       {!template && (
-        <div className="p-4 border border-red-300 bg-red-50 rounded-md">
-          <p>Error: Template data could not be loaded</p>
+        <div className="p-4 border border-destructive bg-destructive/10 text-destructive rounded-md">
+          <p>Error: Template data could not be loaded.</p>
         </div>
       )}
     </div>
