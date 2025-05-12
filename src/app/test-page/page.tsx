@@ -3,18 +3,14 @@
 import { useState } from 'react';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/card';
-import { useToast } from '@/components/use-toast';
+import { toast } from 'sonner';
 
 export default function TestPage() {
-  const { toast } = useToast();
   const [count, setCount] = useState(0);
 
   const handleClick = () => {
     setCount(count + 1);
-    toast({
-      title: 'Test Toast',
-      description: `Button clicked ${count + 1} times`,
-    });
+    toast(`Button clicked ${count + 1} times`);
   };
 
   return (

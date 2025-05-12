@@ -6,12 +6,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/input';
 import { Label } from '@/components/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
-import { useToast } from '@/components/toast-provider';
 import { Switch } from '@/components/switch';
 import { createBrowserClient } from '@supabase/ssr';
+import { toast } from 'sonner';
 
 export default function AccountPage() {
-  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -71,11 +70,7 @@ export default function AccountPage() {
         }
       } catch (error) {
         console.error('Error loading user data:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load user profile data',
-          variant: 'destructive'
-        });
+        toast.error('Failed to load user profile data');
       } finally {
         setIsLoading(false);
       }
@@ -133,17 +128,10 @@ export default function AccountPage() {
         }
       });
       
-      toast({
-        title: 'Profile updated',
-        description: 'Your profile has been updated successfully.'
-      });
+      toast('Your profile has been updated successfully.');
     } catch (error) {
       console.error('Error updating profile:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update profile. Please try again.',
-        variant: 'destructive'
-      });
+      toast.error('Failed to update profile. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -158,20 +146,12 @@ export default function AccountPage() {
     const confirmPassword = formData.get('confirm-password') as string;
     
     if (!currentPassword || !newPassword || !confirmPassword) {
-      toast({
-        title: 'Missing fields',
-        description: 'Please fill in all password fields.',
-        variant: 'destructive'
-      });
+      toast.error('Please fill in all password fields.');
       return;
     }
     
     if (newPassword !== confirmPassword) {
-      toast({
-        title: 'Password mismatch',
-        description: 'New password and confirmation do not match.',
-        variant: 'destructive'
-      });
+      toast.error('New password and confirmation do not match.');
       return;
     }
     
@@ -185,20 +165,13 @@ export default function AccountPage() {
       
       if (error) throw error;
       
-      toast({
-        title: 'Password updated',
-        description: 'Your password has been updated successfully.'
-      });
+      toast('Your password has been updated successfully.');
       
       // Reset the form
       form.reset();
     } catch (error) {
       console.error('Error updating password:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update password. Please try again.',
-        variant: 'destructive'
-      });
+      toast.error('Failed to update password. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -225,17 +198,10 @@ export default function AccountPage() {
       
       if (error) throw error;
       
-      toast({
-        title: 'Notification settings updated',
-        description: 'Your notification preferences have been saved.'
-      });
+      toast('Your notification preferences have been saved.');
     } catch (error) {
       console.error('Error updating notification settings:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update notification settings. Please try again.',
-        variant: 'destructive'
-      });
+      toast.error('Failed to update notification settings. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

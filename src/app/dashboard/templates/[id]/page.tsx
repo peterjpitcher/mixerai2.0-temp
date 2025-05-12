@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { Button } from '@/components/button';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { TemplateForm } from '@/components/template/template-form';
-import { useToast } from '@/components/toast-provider';
 import { Loader2, ChevronLeft, Trash2 } from 'lucide-react';
 import type { Metadata } from 'next';
 import {
@@ -19,6 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/alert-dialog";
+import { toast } from 'sonner';
 
 // export const metadata: Metadata = {
 //   title: 'Edit Template | MixerAI 2.0',
@@ -165,7 +165,6 @@ export default function TemplateEditPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id || '';
   const router = useRouter();
-  const { toast } = useToast();
   const [template, setTemplate] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -202,21 +201,13 @@ export default function TemplateEditPage() {
           setTemplate(data.template);
         } else {
           // console.error('Error from API:', data.error);
-          toast({
-            title: 'Error',
-            description: data.error || 'Failed to load the template.',
-            variant: 'destructive',
-          });
+          toast.error(data.error || 'Failed to load the template.');
           // console.log('Redirecting to templates page due to API error');
           router.push('/dashboard/templates');
         }
       } catch (error) {
         // console.error('Error fetching template:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load the template.',
-          variant: 'destructive',
-        });
+        toast.error('Failed to load the template.');
         // console.log('Redirecting to templates page due to fetch error');
         router.push('/dashboard/templates');
       } finally {
@@ -229,14 +220,10 @@ export default function TemplateEditPage() {
       fetchTemplate();
     } else {
       // console.error('No template ID provided');
-      toast({
-        title: 'Error',
-        description: 'Template ID is required.',
-        variant: 'destructive',
-      });
+      toast.error('Template ID is required.');
       router.push('/dashboard/templates');
     }
-  }, [id, router, toast]);
+  }, [id, router]);
 
   if (loading) {
     return (
@@ -255,11 +242,7 @@ export default function TemplateEditPage() {
 
   const handleConfirmDelete = async () => {
     if (!id || (id === 'article-template' || id === 'product-template')) {
-      toast({
-        title: 'Error',
-        description: 'System templates cannot be deleted.',
-        variant: 'destructive',
-      });
+      toast.error('System templates cannot be deleted.');
       setShowDeleteDialog(false);
       return;
     }
@@ -274,10 +257,7 @@ export default function TemplateEditPage() {
       const data = await response.json();
 
       if (data.success) {
-        toast({
-          title: 'Success',
-          description: 'Template deleted successfully.',
-        });
+        toast('Template deleted successfully.');
         router.push('/dashboard/templates');
         setShowDeleteDialog(false);
       } else {
@@ -286,11 +266,7 @@ export default function TemplateEditPage() {
         // Keep dialog open to show the error
       }
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'An unexpected error occurred while deleting the template.',
-        variant: 'destructive',
-      });
+      toast.error('An unexpected error occurred while deleting the template.');
       setShowDeleteDialog(false); // Close dialog on unexpected error
     }
     setIsDeleting(false);

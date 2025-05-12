@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/input";
 import { Label } from "@/components/label";
 import { createSupabaseClient } from "@/lib/supabase/client";
-import { useToast } from "@/components/toast-provider";
+import { toast } from 'sonner';
 
 /**
  * LoginForm component.
@@ -18,7 +18,6 @@ import { useToast } from "@/components/toast-provider";
  */
 export function LoginForm() {
   const router = useRouter();
-  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,26 +38,15 @@ export function LoginForm() {
 
       if (signInError) {
         setError(signInError.message);
-        toast({
-          title: "Login failed",
-          description: signInError.message,
-          variant: "destructive",
-        });
+        toast.error(signInError.message);
       } else {
-        toast({
-          title: "Success",
-          description: "You have been logged in successfully.",
-        });
+        toast('You have been logged in successfully.');
         router.push("/dashboard");
         router.refresh();
       }
     } catch (err: any) {
       setError("An unexpected error occurred. Please try again.");
-      toast({
-        title: "Login Error",
-        description: err?.message || "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-      });
+      toast.error(err?.message || "An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }

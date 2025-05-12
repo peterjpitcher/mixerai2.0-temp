@@ -8,7 +8,9 @@ import { Icons } from '@/components/icons';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { Badge } from '@/components/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/dropdown-menu';
-import { useToast } from '@/components/toast-provider';
+import { toast } from 'sonner';
+import { Loader2, PlusCircle, LayoutTemplate } from 'lucide-react';
+import type { Metadata } from 'next';
 
 interface Template {
   id: string;
@@ -28,14 +30,14 @@ interface Template {
  * manage, and create new content based on these templates.
  */
 export default function TemplatesPage() {
-  const { toast } = useToast();
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
-        setIsLoading(true);
+        setLoading(true);
         
         const response = await fetch('/api/content-templates');
         const data = await response.json();
@@ -45,26 +47,21 @@ export default function TemplatesPage() {
         } else {
           setTemplates([]);
           if (!data.success) {
-            toast({
-              title: 'Error Loading Templates',
+            toast.error('Error Loading Templates', {
               description: data.error || 'An unknown error occurred while fetching templates.',
-              variant: 'destructive',
             });
           }
         }
       } catch (error) {
-        toast({
-          title: 'Error',
-          description: 'Failed to load templates. Please try again.',
-          variant: 'destructive',
-        });
+        console.error('Error fetching templates:', error);
+        toast.error('Failed to load templates. Please try refreshing the page.');
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
     fetchTemplates();
-  }, [toast]);
+  }, []);
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-8">
@@ -81,7 +78,7 @@ export default function TemplatesPage() {
         }
       />
       
-      {isLoading ? (
+      {loading ? (
         <div className="flex justify-center items-center py-8">
           <Icons.spinner className="h-8 w-8 animate-spin text-primary" />
         </div>

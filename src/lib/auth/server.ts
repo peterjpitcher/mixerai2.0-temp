@@ -60,4 +60,23 @@ export async function getCurrentUser() {
   }
   
   return session.user;
+}
+
+// Helper to check if user is admin and redirect if not
+export async function requireAdmin() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect('/auth/login?message=Authentication required');
+  }
+
+  // Assuming 'admin' role is stored in app_metadata.roles or a similar field
+  // Adjust this logic based on your actual Supabase user role setup
+  const isAdmin = user.app_metadata?.roles?.includes('admin') || user.app_metadata?.role === 'admin';
+
+  if (!isAdmin) {
+    redirect('/dashboard?error=admin_required');
+  }
+
+  return user; // Return the admin user object if needed
 } 

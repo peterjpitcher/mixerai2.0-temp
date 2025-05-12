@@ -11,8 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/separator';
 import { MarkdownDisplay } from './markdown-display';
 import { useRouter } from 'next/navigation';
-import { useToast } from '@/components/toast-provider';
 import { BrandIcon } from '@/components/brand-icon';
+import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 
 interface Brand {
   id: string;
@@ -39,7 +40,6 @@ interface ContentGeneratorFormProps {
 
 export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) {
   const router = useRouter();
-  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -71,19 +71,11 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         setTitle(`New ${data.template.name}`);
       } else {
         console.error('Failed to load template:', data.error);
-        toast({
-          title: "Error loading content tool",
-          description: data.error || "Failed to load content generator",
-          variant: "destructive"
-        });
+        toast.error(data.error || "Failed to load content generator");
       }
     } catch (error) {
       console.error('Error fetching template:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load template",
-        variant: "destructive"
-      });
+      toast.error("Failed to load template");
     } finally {
       setIsLoadingTemplate(false);
     }
@@ -118,13 +110,9 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
       fetchTemplate(templateId);
     } else {
       console.warn('ContentGeneratorForm: No template ID provided. Form will not function correctly.');
-      toast({
-        title: "Template Missing",
-        description: "Cannot generate content without a template. Please select a template first.",
-        variant: "destructive"
-      });
+      toast.error("Cannot generate content without a template. Please select a template first.");
     }
-  }, [templateId, toast]);
+  }, [templateId]);
   
   useEffect(() => {
     // Use the topic as the initial title when content is generated
@@ -167,11 +155,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     console.log('Brand state:', selectedBrand);
 
     if (!selectedBrand) {
-      toast({
-        title: "Brand required",
-        description: "Please select a brand before generating content",
-        variant: "destructive"
-      });
+      toast.error("Please select a brand before generating content");
       return;
     }
     
@@ -190,11 +174,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         const missingNames = missingFields.map(field => field.name).join(', ');
         console.log('Missing required fields:', missingNames);
         
-        toast({
-          title: "Missing required information",
-          description: `Please fill in: ${missingNames}`,
-          variant: "destructive"
-        });
+        toast.error(`Please fill in: ${missingNames}`);
         return;
       }
       
@@ -221,11 +201,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         setKeywords(templateFieldValues[keywordsField.id]);
       }
     } else {
-      toast({
-        title: "Template Required",
-        description: "Content generation requires a template. Please select one.",
-        variant: "destructive"
-      });
+      toast.error("Content generation requires a template. Please select one.");
       return;
     }
     
@@ -249,403 +225,169 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         
         // Create properly formatted request with template information
         requestBody = {
-          brand: {
-            name: selectedBrandObj.name,
-            brand_identity: selectedBrandObj.brand_identity,
-            tone_of_voice: selectedBrandObj.tone_of_voice,
-            guardrails: selectedBrandObj.guardrails
-          },
-          template: {
-            id: template.id,
-            name: template.name,
-            inputFields: updatedInputFields,
-            outputFields: template.fields.outputFields
-          },
-          input: {
-            templateId: template.id,
-            templateFields: templateFieldValues,
-            additionalInstructions
-          }
+          brand_id: selectedBrand,
+          template_id: template.id,
+          input_fields: updatedInputFields,
+          additional_instructions: additionalInstructions
         };
       } else {
-        // This path should ideally not be reached if templates are mandatory.
-        // The API /api/content/generate will also reject requests without a template.
-        console.error("Attempted to generate content without a template. This should not happen.");
-        toast({
-          title: "Error",
-          description: "Cannot generate content without a template.",
-          variant: "destructive"
-        });
-        setIsLoading(false);
-        return;
+        throw new Error('Template not found');
       }
-      
-      console.log('Sending generation request:', requestBody);
       
       const response = await fetch('/api/content/generate', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(requestBody)
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate content');
-      }
-      
       const data = await response.json();
-      console.log('Response data:', data);
       
-      // Store the full response data
-      setResponseData(data);
-      
-      // Process the response differently based on whether we're using a template
-      if (template && template.fields.outputFields.length > 0) {
-        console.log('Processing template-based response with output fields:', template.fields.outputFields);
-        
-        // For template-based content, find a suitable field to display in the main content area
-        // Look for fields in this priority: content field, first field with longText, or first field
-        const contentFieldId = findMainContentFieldId(template.fields.outputFields, data);
-        
-        if (contentFieldId && data[contentFieldId]) {
-          console.log(`Using template output field ${contentFieldId} for main content display`);
-          setGeneratedContent(data[contentFieldId]);
-        } else {
-          console.warn('No suitable content field found in response');
-          setGeneratedContent('');
-        }
-        
-        // Set a title for database saving purposes (not displayed if not in template)
-        if (topic) {
-          setTitle(topic);
-        } else {
-          setTitle(`New ${template.name}`);
-        }
-        
-        // Only set meta fields if they're explicitly in the template
-        const metaTitleField = template.fields.outputFields.find(
-          field => field.id === 'metaTitle' || field.name.toLowerCase().includes('meta title')
-        );
-        
-        if (metaTitleField && data[metaTitleField.id]) {
-          setMetaTitle(data[metaTitleField.id]);
-        } else {
-          setMetaTitle('');
-        }
-        
-        const metaDescField = template.fields.outputFields.find(
-          field => field.id === 'metaDescription' || field.name.toLowerCase().includes('meta description')
-        );
-        
-        if (metaDescField && data[metaDescField.id]) {
-          setMetaDescription(data[metaDescField.id]);
-        } else {
-          setMetaDescription('');
-        }
+      if (data.success) {
+        console.log('Content generated successfully:', data);
+        setGeneratedContent(data.content);
+        setResponseData(data);
+        toast('Content generated successfully.');
       } else {
-        // Standard content fields for non-template content
-        setGeneratedContent(data.content || '');
-        setMetaTitle(data.metaTitle || '');
-        setMetaDescription(data.metaDescription || '');
-        
-        // Set title for non-template content
-        if (!title && topic) {
-          setTitle(topic);
-        }
+        console.error('Failed to generate content:', data.error);
+        toast.error(data.error || 'Failed to generate content. Please try again.');
       }
     } catch (error) {
       console.error('Error generating content:', error);
-      toast({
-        title: "Generation failed",
-        description: error instanceof Error ? error.message : "Failed to generate content. Please try again.",
-        variant: "destructive"
-      });
+      toast.error('Failed to generate content. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
   
-  // Helper function to find the best field to use as main content
-  const findMainContentFieldId = (
-    outputFields: Array<any>, 
-    responseData: Record<string, string>
-  ): string | null => {
-    // First, look for a field named "content"
-    const contentField = outputFields.find(field => 
-      field.id === 'content' || field.name.toLowerCase() === 'content'
-    );
-    
-    if (contentField && responseData[contentField.id]) {
-      return contentField.id;
-    }
-    
-    // Next, look for any longText field
-    const longTextField = outputFields.find(field => 
-      field.type === 'longText' && responseData[field.id]
-    );
-    
-    if (longTextField) {
-      return longTextField.id;
-    }
-    
-    // Next, look for any field with "body" or "text" in the name
-    const textField = outputFields.find(field => 
-      (field.name.toLowerCase().includes('body') || 
-       field.name.toLowerCase().includes('text')) && 
-      responseData[field.id]
-    );
-    
-    if (textField) {
-      return textField.id;
-    }
-    
-    // Finally, just use the first field that has data
-    for (const field of outputFields) {
-      if (responseData[field.id]) {
-        return field.id;
-      }
-    }
-    
-    // If nothing found, return null
-    return null;
-  };
-  
   const handleSave = async () => {
-    if (!selectedBrand || !title || !generatedContent) {
-      toast({
-        title: "Missing fields",
-        description: "Please fill in all required fields and generate content first",
-        variant: "destructive"
-      });
+    if (!generatedContent) {
+      toast.error('No content to save. Please generate content first.');
       return;
     }
     
-    if (!template) {
-      console.error("Cannot save content without a loaded template.");
-      toast({
-        title: "Save failed",
-        description: "No template information available. Please ensure a template is selected and loaded.",
-        variant: "destructive"
-      });
-      setIsSaving(false);
-      return;
-    }
-
     setIsSaving(true);
     
     try {
-      console.log('Saving content with content type:', template.name);
-      
-      // Create content in the database
       const response = await fetch('/api/content', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           brand_id: selectedBrand,
-          template_id: template.id,
-          title: title,
-          body: generatedContent,
+          template_id: template?.id,
+          title,
+          topic,
+          keywords,
           meta_title: metaTitle,
           meta_description: metaDescription,
-          status: 'draft'
-        }),
+          content: generatedContent,
+          additional_instructions: additionalInstructions
+        })
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to save content');
-      }
       
       const data = await response.json();
       
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to save content');
+      if (data.success) {
+        console.log('Content saved successfully:', data);
+        toast('Content saved successfully.');
+        router.push(`/dashboard/content/${data.content.id}`);
+      } else {
+        console.error('Failed to save content:', data.error);
+        toast.error(data.error || 'Failed to save content. Please try again.');
       }
-      
-      toast({
-        title: "Content saved",
-        description: "Your content has been saved successfully",
-      });
-      
-      // Redirect to content list
-      router.push('/dashboard/content');
-      router.refresh();
     } catch (error) {
       console.error('Error saving content:', error);
-      toast({
-        title: "Save failed",
-        description: "Failed to save content. Please try again.",
-        variant: "destructive"
-      });
+      toast.error('Failed to save content. Please try again.');
     } finally {
       setIsSaving(false);
     }
   };
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Content Generator</h1>
+          <p className="text-muted-foreground mt-1">
+            Generate content using AI-powered templates.
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => router.back()}>
+          Back
+        </Button>
+      </div>
+      
       <Card>
         <CardHeader>
-          <CardTitle>
-            {template ? `Create ${template.name}` : "Generate New Content"}
-          </CardTitle>
-          <CardDescription>
-            {template ? template.description : "Use AI to generate high-quality marketing content"}
-          </CardDescription>
+          <CardTitle>Generate New Content</CardTitle>
+          <CardDescription>Fill in the details below to generate content.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {isLoadingTemplate ? (
-            <div className="flex justify-center items-center py-6">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              <span className="ml-2">Loading content tools...</span>
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="brand" className="text-right">
+                Brand
+              </Label>
+              <Select
+                value={selectedBrand}
+                onValueChange={setSelectedBrand}
+                required
+              >
+                <SelectTrigger id="brand">
+                  <SelectValue placeholder="Select a brand" />
+                </SelectTrigger>
+                <SelectContent>
+                  {brands.map(brand => (
+                    <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="brand">Brand</Label>
-                  <Select
-                    value={selectedBrand}
-                    onValueChange={setSelectedBrand}
-                  >
-                    <SelectTrigger id="brand">
-                      <SelectValue placeholder="Select brand" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.isArray(brands) && brands.map(brand => (
-                        <SelectItem key={brand.id} value={brand.id}>
-                          <div className="flex items-center">
-                            <BrandIcon name={brand.name} color={brand.brand_color} size="sm" className="mr-2" />
-                            {brand.name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              {/* Template input fields */}
-              {template && template.fields.inputFields.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="text-lg font-medium mb-3">Content Information</h3>
-                  <div className="grid grid-cols-1 gap-4">
-                    {template.fields.inputFields.map((field) => (
-                      <div key={field.id} className="space-y-2">
-                        <Label htmlFor={field.id}>{field.name}{field.required && <span className="text-red-500 ml-1">*</span>}</Label>
-                        {field.type === 'shortText' && (
-                          <Input 
-                            id={field.id} 
-                            placeholder={field.options?.placeholder || `Enter ${field.name.toLowerCase()}`}
-                            required={field.required}
-                            value={templateFieldValues[field.id] || ''}
-                            onChange={(e) => setTemplateFieldValues({
-                              ...templateFieldValues,
-                              [field.id]: e.target.value
-                            })}
-                          />
-                        )}
-                        {field.type === 'longText' && (
-                          <Textarea 
-                            id={field.id} 
-                            placeholder={field.options?.placeholder || `Enter ${field.name.toLowerCase()}`}
-                            required={field.required}
-                            rows={4}
-                            value={templateFieldValues[field.id] || ''}
-                            onChange={(e) => setTemplateFieldValues({
-                              ...templateFieldValues,
-                              [field.id]: e.target.value
-                            })}
-                          />
-                        )}
-                        {field.type === 'tags' && (
-                          <Input 
-                            id={field.id} 
-                            placeholder="Enter tags separated by commas"
-                            required={field.required}
-                            value={templateFieldValues[field.id] || ''}
-                            onChange={(e) => setTemplateFieldValues({
-                              ...templateFieldValues,
-                              [field.id]: e.target.value
-                            })}
-                          />
-                        )}
-                        {field.type === 'select' && (
-                          <Select
-                            value={templateFieldValues[field.id] || ''}
-                            onValueChange={(value) => setTemplateFieldValues({
-                              ...templateFieldValues,
-                              [field.id]: value
-                            })}
-                          >
-                            <SelectTrigger id={field.id}>
-                              <SelectValue placeholder={`Select ${field.name.toLowerCase()}`} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Array.isArray(field.options?.choices) && field.options.choices.map((choice: string) => (
-                                <SelectItem key={choice} value={choice}>{choice}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Default fields when no template is selected */}
-              {(!template || template.fields.inputFields.length === 0) && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="topic">Topic</Label>
-                    <Input
-                      id="topic"
-                      placeholder="e.g. Benefits of Solar Energy"
-                      value={topic}
-                      onChange={(e) => setTopic(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="keywords">Keywords (comma-separated)</Label>
-                    <Input
-                      id="keywords"
-                      placeholder="e.g. solar panels, renewable energy, green living"
-                      value={keywords}
-                      onChange={(e) => setKeywords(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="additionalInstructions">Additional Instructions (optional)</Label>
-                    <Textarea
-                      id="additionalInstructions"
-                      placeholder="Include specific points or instructions for the AI"
-                      value={additionalInstructions}
-                      onChange={(e) => setAdditionalInstructions(e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-                </>
-              )}
-            </>
-          )}
+            
+            <div>
+              <Label htmlFor="topic" className="text-right">
+                Topic
+              </Label>
+              <Input
+                id="topic"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder="e.g. AI in Marketing"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="keywords" className="text-right">
+                Keywords
+              </Label>
+              <Input
+                id="keywords"
+                value={keywords}
+                onChange={(e) => setKeywords(e.target.value)}
+                placeholder="e.g. AI, marketing, technology"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="additionalInstructions" className="text-right">
+                Additional Instructions
+              </Label>
+              <Textarea
+                id="additionalInstructions"
+                value={additionalInstructions}
+                onChange={(e) => setAdditionalInstructions(e.target.value)}
+                placeholder="Any additional instructions for the content generator"
+              />
+            </div>
+          </div>
         </CardContent>
-        <CardFooter>
-          <Button
-            onClick={handleGenerate}
-            disabled={isLoading || isLoadingTemplate || !selectedBrand}
-          >
-            {isLoading ? (
-              <span className="flex items-center">
-                <span className="animate-spin mr-2">⟳</span>
-                Generating...
-              </span>
-            ) : "Generate Content"}
+        <CardFooter className="flex justify-end">
+          <Button onClick={handleGenerate} disabled={isLoading} className="flex items-center gap-2">
+            {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+            {isLoading ? 'Generating...' : 'Generate Content'}
           </Button>
         </CardFooter>
       </Card>
@@ -654,137 +396,40 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         <Card>
           <CardHeader>
             <CardTitle>Generated Content</CardTitle>
-            <CardDescription>
-              Review and edit your content before saving
-            </CardDescription>
+            <CardDescription>Review and edit the generated content below.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Hidden title field for saving functionality */}
-            {template && 
-              !template.fields.outputFields.some(field => 
-                field.id === 'title' || field.name.toLowerCase().includes('title')
-              ) && (
-              <input 
-                type="hidden" 
-                id="hidden-title" 
-                value={title} 
-              />
-            )}
-            
-            {/* Non-template fields or explicit template fields */}
-            {/* Title field */}
-            {(!template || template.fields.outputFields.some(field => 
-              field.id === 'title' || field.name.toLowerCase().includes('title'))
-            ) && (
-              <div className="space-y-2">
-                <Label htmlFor="title">Title</Label>
-                <Input
-                  id="title"
-                  placeholder="Enter content title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-              </div>
-            )}
-            
-            {/* Meta Title field */}
-            {(!template || template.fields.outputFields.some(field => 
-              field.id === 'metaTitle' || field.name.toLowerCase().includes('meta title'))
-            ) && (
-              <div className="space-y-2">
-                <Label htmlFor="metaTitle">Meta Title (for SEO)</Label>
+          <CardContent className="space-y-4">
+            <MarkdownDisplay markdown={generatedContent} />
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="metaTitle" className="text-right">
+                  Meta Title
+                </Label>
                 <Input
                   id="metaTitle"
-                  placeholder="Enter meta title"
                   value={metaTitle}
                   onChange={(e) => setMetaTitle(e.target.value)}
+                  placeholder="SEO-friendly title for the content"
                 />
               </div>
-            )}
-            
-            {/* Meta Description field */}
-            {(!template || template.fields.outputFields.some(field => 
-              field.id === 'metaDescription' || field.name.toLowerCase().includes('meta description'))
-            ) && (
-              <div className="space-y-2">
-                <Label htmlFor="metaDescription">Meta Description (for SEO)</Label>
+              
+              <div>
+                <Label htmlFor="metaDescription" className="text-right">
+                  Meta Description
+                </Label>
                 <Textarea
                   id="metaDescription"
-                  placeholder="Enter meta description"
                   value={metaDescription}
                   onChange={(e) => setMetaDescription(e.target.value)}
-                  rows={2}
+                  placeholder="SEO-friendly description for the content"
                 />
               </div>
-            )}
-            
-            <Separator />
-            
-            {/* Display all template output fields */}
-            {template && template.fields.outputFields.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Generated Sections</h3>
-                
-                {template.fields.outputFields.map((field) => {
-                  // Skip title and meta fields that are already shown above
-                  if ((field.id === 'title' || field.name.toLowerCase().includes('title')) ||
-                      (field.id === 'metaTitle' || field.name.toLowerCase().includes('meta title')) ||
-                      (field.id === 'metaDescription' || field.name.toLowerCase().includes('meta description'))) {
-                    return null;
-                  }
-                  
-                  // Define if this is a content field that should be shown with markdown
-                  const isContentField = field.id === 'content' || 
-                    field.name.toLowerCase().includes('content') ||
-                    field.type === 'longText' ||
-                    field.name.toLowerCase().includes('body');
-                  
-                  // Only show fields that have data
-                  if (!(field.id in responseData)) {
-                    return null;
-                  }
-                  
-                  return (
-                    <div key={field.id} className="space-y-2 border rounded-md p-4">
-                      <Label htmlFor={field.id}>{field.name}</Label>
-                      
-                      {isContentField ? (
-                        <div className="mt-2 border rounded-md p-4 bg-background">
-                          <MarkdownDisplay markdown={responseData[field.id] || ''} />
-                        </div>
-                      ) : (
-                        <div className="mt-2">
-                          <p className="text-sm whitespace-pre-wrap">{responseData[field.id] || ''}</p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            
-            {/* Content Preview - only show if not using a template */}
-            {!template && (
-              <div className="space-y-2">
-                <Label>Content Preview</Label>
-                <div className="border rounded-md p-4 bg-background">
-                  <MarkdownDisplay markdown={generatedContent} />
-                </div>
-              </div>
-            )}
+            </div>
           </CardContent>
-          <CardFooter>
-            <Button
-              onClick={handleSave}
-              disabled={isSaving || !title || !generatedContent}
-              className="w-full"
-            >
-              {isSaving ? (
-                <span className="flex items-center">
-                  <span className="animate-spin mr-2">⟳</span>
-                  Saving...
-                </span>
-              ) : "Save Content"}
+          <CardFooter className="flex justify-end">
+            <Button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2">
+              {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isSaving ? 'Saving...' : 'Save Content'}
             </Button>
           </CardFooter>
         </Card>

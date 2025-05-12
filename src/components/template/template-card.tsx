@@ -7,7 +7,7 @@ import { Button } from '@/components/button';
 import { Badge } from '@/components/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/alert-dialog';
-import { useToast } from '@/components/toast-provider';
+import { toast } from 'sonner';
 
 interface TemplateCardProps {
   id: string;
@@ -22,7 +22,6 @@ interface TemplateCardProps {
 export function TemplateCard({ id, name, description, inputFieldCount, outputFieldCount, createdBy, updatedAt }: TemplateCardProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const { toast } = useToast();
   
   const handleDelete = async () => {
     try {
@@ -38,21 +37,14 @@ export function TemplateCard({ id, name, description, inputFieldCount, outputFie
         throw new Error(data.error || 'Failed to delete template');
       }
       
-      toast({
-        title: 'Template deleted',
-        description: 'The template has been deleted successfully',
-      });
+      toast('Template deleted successfully.');
       
       // Refresh the page
       window.location.reload();
     } catch (error: any) {
       console.error('Error deleting template:', error);
       
-      toast({
-        title: 'Delete failed',
-        description: error.message || 'Failed to delete template',
-        variant: 'destructive',
-      });
+      toast(`Delete failed: ${error.message || 'Failed to delete template'}`);
     } finally {
       setIsDeleting(false);
       setIsDeleteDialogOpen(false);

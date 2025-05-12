@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/input';
 import { Label } from '@/components/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
-import { useToast } from '@/components/toast-provider';
+import { toast } from 'sonner';
 import { UserCircle } from 'lucide-react';
 
 interface User {
@@ -47,7 +47,6 @@ export function UserProfile({ user, isCurrentUser = false, canEdit = false, onUs
     job_title: user.job_title || '',
     role: (user.role?.toLowerCase() || 'viewer') as 'admin' | 'editor' | 'viewer'
   });
-  const { toast } = useToast();
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Never';
@@ -66,19 +65,15 @@ export function UserProfile({ user, isCurrentUser = false, canEdit = false, onUs
     e.preventDefault();
     
     if (!editForm.full_name.trim()) {
-      toast({
-        title: 'Error',
+      toast.error('Error', {
         description: 'Name is required',
-        variant: 'destructive'
       });
       return;
     }
     
     if (!editForm.job_title.trim()) {
-      toast({
-        title: 'Error',
+      toast.error('Error', {
         description: 'Job title is required',
-        variant: 'destructive'
       });
       return;
     }
@@ -115,8 +110,7 @@ export function UserProfile({ user, isCurrentUser = false, canEdit = false, onUs
           onUserUpdated(updatedUser);
         }
         
-        toast({
-          title: 'Success',
+        toast.success('Success', {
           description: 'Profile updated successfully'
         });
       } else {
@@ -124,10 +118,8 @@ export function UserProfile({ user, isCurrentUser = false, canEdit = false, onUs
       }
     } catch (error) {
       console.error('Error updating profile:', error);
-      toast({
-        title: 'Error',
+      toast.error('Error', {
         description: (error as Error).message || 'Failed to update profile. Please try again.',
-        variant: 'destructive'
       });
     } finally {
       setIsSubmitting(false);

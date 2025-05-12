@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/card';
-import { useToast } from '@/components/toast-provider';
 import { Eye, Edit, AlertCircle, ListChecks } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface TaskItem {
   id: string;
@@ -22,7 +22,6 @@ export default function MyTasksPage() {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
 
   useEffect(() => {
     async function fetchTasks() {
@@ -42,17 +41,15 @@ export default function MyTasksPage() {
       } catch (err: any) {
         console.error('Error fetching tasks:', err);
         setError(err.message || 'Failed to load tasks');
-        toast({
-          title: "Error",
-          description: "Failed to load your tasks. Please try again.",
-          variant: "destructive",
+        toast.error("Failed to load your tasks. Please try again.", {
+          description: "Error",
         });
       } finally {
         setIsLoading(false);
       }
     }
     fetchTasks();
-  }, [toast]);
+  }, []);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-GB', {

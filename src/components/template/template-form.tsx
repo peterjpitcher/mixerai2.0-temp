@@ -9,10 +9,11 @@ import { Label } from '@/components/label';
 import { Textarea } from '@/components/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import { ScrollArea } from '@/components/scroll-area';
-import { useToast } from '@/components/toast-provider';
 import { FieldDesigner } from './field-designer';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Icons } from '@/components/icons';
+import { toast } from 'sonner';
+import { Menu } from 'lucide-react';
 
 type FieldType = 'shortText' | 'longText' | 'richText' | 'select' | 'number' | 'date' | 'tags' | 'url' | 'fileUpload' | 'plainText' | 'html';
 
@@ -47,7 +48,6 @@ interface TemplateFormProps {
 
 export function TemplateForm({ initialData }: TemplateFormProps) {
   const router = useRouter();
-  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('input');
   const [templateData, setTemplateData] = useState<TemplateData>(
@@ -152,29 +152,17 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
     
     // Validate form
     if (!templateData.name) {
-      toast({
-        title: 'Error',
-        description: 'Template name is required',
-        variant: 'destructive',
-      });
+      toast.error('Template name is required');
       return;
     }
     
     if (templateData.fields.inputFields.length === 0) {
-      toast({
-        title: 'Error',
-        description: 'At least one input field is required',
-        variant: 'destructive',
-      });
+      toast.error('At least one input field is required');
       return;
     }
     
     if (templateData.fields.outputFields.length === 0) {
-      toast({
-        title: 'Error',
-        description: 'At least one output field is required',
-        variant: 'destructive',
-      });
+      toast.error('At least one output field is required');
       return;
     }
     
@@ -201,22 +189,13 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
         throw new Error(data.error || 'Failed to save template');
       }
       
-      toast({
-        title: initialData ? 'Template updated' : 'Template created',
-        description: initialData 
-          ? 'Your template has been updated successfully'
-          : 'Your new template has been created successfully',
-      });
+      toast(initialData ? 'Template updated successfully' : 'Template created successfully');
       
       router.push('/dashboard/templates');
     } catch (error: any) {
       console.error('Error saving template:', error);
       
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to save template',
-        variant: 'destructive',
-      });
+      toast.error(error.message || 'Failed to save template');
     } finally {
       setIsSubmitting(false);
     }
@@ -249,287 +228,101 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
               <Textarea
                 id="description"
                 name="description"
-                placeholder="Describe what this template is used for"
+                placeholder="Briefly describe what this template is for"
                 value={templateData.description}
                 onChange={handleBasicInfoChange}
-                rows={3}
               />
             </div>
           </CardContent>
         </Card>
         
-        <div className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Field Configuration</CardTitle>
-              <CardDescription>
-                Configure the input and output fields for your template
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Tabs
-                defaultValue="input"
-                value={activeTab}
-                onValueChange={setActiveTab}
-                className="w-full"
-              >
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="input">Input Fields</TabsTrigger>
-                  <TabsTrigger value="output">Output Fields</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="input" className="py-4">
-                  <div className="mb-4">
-                    <Button type="button" onClick={handleAddField}>
-                      <Icons.plus className="mr-2 h-4 w-4" />
-                      Add Input Field
-                    </Button>
-                  </div>
-                  
-                  <DragDropContext onDragEnd={handleDragEnd}>
-                    <Droppable droppableId="input-fields">
-                      {(provided) => (
-                        <div
-                          {...provided.droppableProps}
-                          ref={provided.innerRef}
-                          className="space-y-2"
-                        >
-                          {templateData.fields.inputFields.length > 0 ? (
-                            templateData.fields.inputFields.map((field, index) => (
-                              <Draggable key={field.id} draggableId={field.id} index={index}>
-                                {(provided) => (
-                                  <div
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                    className="flex items-center justify-between p-3 border rounded-md bg-card"
-                                  >
-                                    <div className="flex items-center space-x-3">
-                                      <div className="text-muted-foreground">
-                                        <svg
-                                          width="15"
-                                          height="15"
-                                          viewBox="0 0 15 15"
-                                          fill="none"
-                                          xmlns="http://www.w3.org/2000/svg"
-                                          className="h-4 w-4"
-                                        >
-                                          <path
-                                            d="M5.5 4.625C5.5 4.97018 5.22018 5.25 4.875 5.25C4.52982 5.25 4.25 4.97018 4.25 4.625C4.25 4.27982 4.52982 4 4.875 4C5.22018 4 5.5 4.27982 5.5 4.625ZM5.5 7.625C5.5 7.97018 5.22018 8.25 4.875 8.25C4.52982 8.25 4.25 7.97018 4.25 7.625C4.25 7.27982 4.52982 7 4.875 7C5.22018 7 5.5 7.27982 5.5 7.625ZM4.875 11.25C5.22018 11.25 5.5 10.9702 5.5 10.625C5.5 10.2798 5.22018 10 4.875 10C4.52982 10 4.25 10.2798 4.25 10.625C4.25 10.9702 4.52982 11.25 4.875 11.25Z"
-                                            fill="currentColor"
-                                            fillRule="evenodd"
-                                            clipRule="evenodd"
-                                          ></path>
-                                          <path
-                                            d="M10.5 4.625C10.5 4.97018 10.2202 5.25 9.875 5.25C9.52982 5.25 9.25 4.97018 9.25 4.625C9.25 4.27982 9.52982 4 9.875 4C10.2202 4 10.5 4.27982 10.5 4.625ZM10.5 7.625C10.5 7.97018 10.2202 8.25 9.875 8.25C9.52982 8.25 9.25 7.97018 9.25 7.625C9.25 7.27982 9.52982 7 9.875 7C10.2202 7 10.5 7.27982 10.5 7.625ZM9.875 11.25C10.2202 11.25 10.5 10.9702 10.5 10.625C10.5 10.2798 10.2202 10 9.875 10C9.52982 10 9.25 10.2798 9.25 10.625C9.25 10.9702 9.52982 11.25 9.875 11.25Z"
-                                            fill="currentColor"
-                                            fillRule="evenodd"
-                                            clipRule="evenodd"
-                                          ></path>
-                                        </svg>
-                                      </div>
-                                      <div>
-                                        <div className="font-medium">{field.name}</div>
-                                        <div className="text-sm text-muted-foreground flex items-center">
-                                          <span className="capitalize">{field.type}</span>
-                                          {field.required && (
-                                            <span className="ml-2 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                                              Required
-                                            </span>
-                                          )}
-                                          {field.aiSuggester && (
-                                            <span className="ml-2 text-xs bg-green-500/10 text-green-600 px-1.5 py-0.5 rounded">
-                                              AI Suggester
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleEditField(field)}
-                                      >
-                                        Edit
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-red-500 hover:text-red-600"
-                                        onClick={() => handleFieldDelete(field.id)}
-                                      >
-                                        <Icons.trash className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                )}
-                              </Draggable>
-                            ))
-                          ) : (
-                            <div className="text-center py-8">
-                              <p className="text-muted-foreground">
-                                No input fields added yet. Click the "Add Input Field" button to add one.
-                              </p>
-                            </div>
-                          )}
-                          {provided.placeholder}
-                        </div>
-                      )}
-                    </Droppable>
-                  </DragDropContext>
-                </TabsContent>
-                
-                <TabsContent value="output" className="py-4">
-                  <div className="mb-4">
-                    <Button type="button" onClick={handleAddField}>
-                      <Icons.plus className="mr-2 h-4 w-4" />
-                      Add Output Field
-                    </Button>
-                  </div>
-                  
-                  <DragDropContext onDragEnd={handleDragEnd}>
-                    <Droppable droppableId="output-fields">
-                      {(provided) => (
-                        <div
-                          {...provided.droppableProps}
-                          ref={provided.innerRef}
-                          className="space-y-2"
-                        >
-                          {templateData.fields.outputFields.length > 0 ? (
-                            templateData.fields.outputFields.map((field, index) => (
-                              <Draggable key={field.id} draggableId={field.id} index={index}>
-                                {(provided) => (
-                                  <div
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                    className="flex items-center justify-between p-3 border rounded-md bg-card"
-                                  >
-                                    <div className="flex items-center space-x-3">
-                                      <div className="text-muted-foreground">
-                                        <svg
-                                          width="15"
-                                          height="15"
-                                          viewBox="0 0 15 15"
-                                          fill="none"
-                                          xmlns="http://www.w3.org/2000/svg"
-                                          className="h-4 w-4"
-                                        >
-                                          <path
-                                            d="M5.5 4.625C5.5 4.97018 5.22018 5.25 4.875 5.25C4.52982 5.25 4.25 4.97018 4.25 4.625C4.25 4.27982 4.52982 4 4.875 4C5.22018 4 5.5 4.27982 5.5 4.625ZM5.5 7.625C5.5 7.97018 5.22018 8.25 4.875 8.25C4.52982 8.25 4.25 7.97018 4.25 7.625C4.25 7.27982 4.52982 7 4.875 7C5.22018 7 5.5 7.27982 5.5 7.625ZM4.875 11.25C5.22018 11.25 5.5 10.9702 5.5 10.625C5.5 10.2798 5.22018 10 4.875 10C4.52982 10 4.25 10.2798 4.25 10.625C4.25 10.9702 4.52982 11.25 4.875 11.25Z"
-                                            fill="currentColor"
-                                            fillRule="evenodd"
-                                            clipRule="evenodd"
-                                          ></path>
-                                          <path
-                                            d="M10.5 4.625C10.5 4.97018 10.2202 5.25 9.875 5.25C9.52982 5.25 9.25 4.97018 9.25 4.625C9.25 4.27982 9.52982 4 9.875 4C10.2202 4 10.5 4.27982 10.5 4.625ZM10.5 7.625C10.5 7.97018 10.2202 8.25 9.875 8.25C9.52982 8.25 9.25 7.97018 9.25 7.625C9.25 7.27982 9.52982 7 9.875 7C10.2202 7 10.5 7.27982 10.5 7.625ZM9.875 11.25C10.2202 11.25 10.5 10.9702 10.5 10.625C10.5 10.2798 10.2202 10 9.875 10C9.52982 10 9.25 10.2798 9.25 10.625C9.25 10.9702 9.52982 11.25 9.875 11.25Z"
-                                            fill="currentColor"
-                                            fillRule="evenodd"
-                                            clipRule="evenodd"
-                                          ></path>
-                                        </svg>
-                                      </div>
-                                      <div>
-                                        <div className="font-medium">{field.name}</div>
-                                        <div className="text-sm text-muted-foreground flex items-center">
-                                          <span className="capitalize">{field.type}</span>
-                                          {field.required && (
-                                            <span className="ml-2 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                                              Required
-                                            </span>
-                                          )}
-                                          {field.aiAutoComplete && (
-                                            <span className="ml-2 text-xs bg-blue-500/10 text-blue-600 px-1.5 py-0.5 rounded">
-                                              AI Auto-Complete
-                                            </span>
-                                          )}
-                                          {field.useBrandIdentity && (
-                                            <span className="ml-2 text-xs bg-purple-500/10 text-purple-600 px-1.5 py-0.5 rounded">
-                                              Brand Identity
-                                            </span>
-                                          )}
-                                          {field.useToneOfVoice && (
-                                            <span className="ml-2 text-xs bg-pink-500/10 text-pink-600 px-1.5 py-0.5 rounded">
-                                              Tone of Voice
-                                            </span>
-                                          )}
-                                          {field.useGuardrails && (
-                                            <span className="ml-2 text-xs bg-amber-500/10 text-amber-600 px-1.5 py-0.5 rounded">
-                                              Guardrails
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleEditField(field)}
-                                      >
-                                        Edit
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-red-500 hover:text-red-600"
-                                        onClick={() => handleFieldDelete(field.id)}
-                                      >
-                                        <Icons.trash className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                )}
-                              </Draggable>
-                            ))
-                          ) : (
-                            <div className="text-center py-8">
-                              <p className="text-muted-foreground">
-                                No output fields added yet. Click the "Add Output Field" button to add one.
-                              </p>
-                            </div>
-                          )}
-                          {provided.placeholder}
-                        </div>
-                      )}
-                    </Droppable>
-                  </DragDropContext>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-            <CardFooter className="flex justify-between border-t pt-5">
-              <Button variant="outline" type="button" onClick={() => router.push('/dashboard/templates')}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="input">Input Fields ({templateData.fields.inputFields.length})</TabsTrigger>
+            <TabsTrigger value="output">Output Fields ({templateData.fields.outputFields.length})</TabsTrigger>
+          </TabsList>
+          
+          {(activeTab === 'input' || activeTab === 'output') && (
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>{activeTab === 'input' ? 'Input' : 'Output'} Fields</CardTitle>
+                <CardDescription>
+                  Define the {activeTab === 'input' ? 'information needed to generate content' : 'content sections to be generated'}.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isAddingField ? (
+                  <FieldDesigner 
+                    isOpen={isAddingField}
+                    fieldType={activeTab === 'input' ? 'input' : 'output'}
+                    initialData={editingField}
+                    onSave={handleFieldSave}
+                    onCancel={handleFieldCancel}
+                  />
                 ) : (
-                  'Save Template'
+                  <>                  
+                    <DragDropContext onDragEnd={handleDragEnd}>
+                      <Droppable droppableId="fields">
+                        {(provided) => (
+                          <div
+                            {...provided.droppableProps}
+                            ref={provided.innerRef}
+                            className="space-y-4"
+                          >
+                            {(activeTab === 'input' ? templateData.fields.inputFields : templateData.fields.outputFields).map((field, index) => (
+                              <Draggable key={field.id} draggableId={field.id} index={index}>
+                                {(provided) => (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    className="flex items-center justify-between p-4 border rounded-lg bg-card hover:bg-muted/50"
+                                  >
+                                    <div className="flex items-center space-x-3">
+                                      <Menu className="h-5 w-5 text-muted-foreground" />
+                                      <div>
+                                        <p className="font-medium">{field.name}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                          Type: {field.type} {field.required ? ' (Required)' : ''}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="space-x-2">
+                                      <Button variant="outline" size="sm" onClick={() => handleEditField(field)}>
+                                        Edit
+                                      </Button>
+                                      <Button variant="destructive" size="sm" onClick={() => handleFieldDelete(field.id)}>
+                                        Delete
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </Draggable>
+                            ))}
+                            {provided.placeholder}
+                          </div>
+                        )}
+                      </Droppable>
+                    </DragDropContext>
+                    <Button variant="outline" className="mt-6 w-full" onClick={handleAddField}>
+                      <Icons.plus className="mr-2 h-4 w-4" /> Add Field
+                    </Button>
+                  </>
                 )}
-              </Button>
-            </CardFooter>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
+        </Tabs>
+        
+        <div className="flex justify-end pt-6 space-x-4">
+          <Button variant="outline" type="button" onClick={() => router.push('/dashboard/templates')}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Saving...' : 'Save Template'}
+          </Button>
         </div>
       </form>
-      
-      {isAddingField && (
-        <FieldDesigner
-          isOpen={isAddingField}
-          fieldType={activeTab === 'input' ? 'input' : 'output'}
-          initialData={editingField}
-          onSave={handleFieldSave}
-          onCancel={handleFieldCancel}
-        />
-      )}
     </div>
   );
 } 

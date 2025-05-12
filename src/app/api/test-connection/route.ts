@@ -52,6 +52,7 @@ export const GET = withAdminAuth(async (request: NextRequest, user) => {
 // 3. STRICTLY SECURED with authentication and authorization (e.g., admin-only),
 //    as exposing environment variable status can be a security risk.
 // If it's obsolete or for internal non-HTTP use, it should be removed to avoid confusion.
+/*
 export async function GET_ENV_VARS() {
   const envVars = {
     NODE_ENV: process.env.NODE_ENV,
@@ -65,4 +66,5 @@ export async function GET_ENV_VARS() {
     message: "Environment variable status check (minimal info for security)", 
     data: envVars 
   });
-} 
+}
+*/ 

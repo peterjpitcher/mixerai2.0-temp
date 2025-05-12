@@ -7,10 +7,10 @@ import { Input } from '@/components/input';
 import { Label } from '@/components/label';
 import { Textarea } from "@/components/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/select";
-import { useToast } from "@/components/use-toast";
 import { copyToClipboard } from '@/lib/utils/clipboard';
 import { Loader2, ClipboardCopy, Globe } from 'lucide-react';
 import type { Metadata } from 'next';
+import { toast } from 'sonner';
 
 // export const metadata: Metadata = {
 //   title: 'Metadata Generator | MixerAI 2.0',
@@ -40,7 +40,6 @@ export default function MetadataGeneratorPage() {
   const [isFetchingBrands, setIsFetchingBrands] = useState(true);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [results, setResults] = useState<{ metaTitle: string; metaDescription: string; keywords?: string[] } | null>(null);
-  const { toast } = useToast();
 
   // Fetch brands on component mount
   useEffect(() => {
@@ -54,19 +53,11 @@ export default function MetadataGeneratorPage() {
           setBrands(data.data);
         } else {
           // console.error('Failed to fetch brands:', data);
-          toast({
-            title: 'Error',
-            description: 'Failed to fetch brands. Please try again later.',
-            variant: 'destructive',
-          });
+          toast.error('Failed to fetch brands. Please try again later.');
         }
       } catch (error) {
         // console.error('Error fetching brands:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch brands. Please try again later.',
-          variant: 'destructive',
-        });
+        toast.error('Failed to fetch brands. Please try again later.');
       } finally {
         setIsFetchingBrands(false);
       }
@@ -81,20 +72,12 @@ export default function MetadataGeneratorPage() {
     e.preventDefault();
     
     if (!url) {
-      toast({
-        title: 'URL required',
-        description: 'Please enter a URL for which to generate metadata.',
-        variant: 'destructive',
-      });
+      toast.error('Please enter a URL for which to generate metadata.');
       return;
     }
     
     if (!selectedBrandId) {
-      toast({
-        title: 'Brand required',
-        description: 'Please select a brand.',
-        variant: 'destructive',
-      });
+      toast.error('Please select a brand.');
       return;
     }
     
@@ -102,11 +85,7 @@ export default function MetadataGeneratorPage() {
     try {
       new URL(url);
     } catch (error) {
-      toast({
-        title: 'Invalid URL',
-        description: 'Please enter a valid URL (e.g., https://example.com).',
-        variant: 'destructive',
-      });
+      toast.error('Please enter a valid URL (e.g., https://example.com).');
       return;
     }
     
@@ -143,19 +122,12 @@ export default function MetadataGeneratorPage() {
           keywords: data.keywords,
         });
         
-        toast({
-          title: 'Metadata Generated',
-          description: 'SEO-optimised metadata has been generated successfully.',
-        });
+        toast('SEO-optimised metadata has been generated successfully.');
       } else {
         throw new Error(data.error || 'Failed to generate metadata.');
       }
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'An unknown error occurred.',
-        variant: 'destructive',
-      });
+      toast.error(error instanceof Error ? error.message : 'An unknown error occurred.');
     } finally {
       setIsLoading(false);
     }
@@ -164,30 +136,21 @@ export default function MetadataGeneratorPage() {
   const handleCopyTitle = () => {
     if (results?.metaTitle) {
       copyToClipboard(results.metaTitle);
-      toast({
-        title: 'Copied to Clipboard',
-        description: 'The meta title has been copied to your clipboard.',
-      });
+      toast('The meta title has been copied to your clipboard.');
     }
   };
 
   const handleCopyDescription = () => {
     if (results?.metaDescription) {
       copyToClipboard(results.metaDescription);
-      toast({
-        title: 'Copied to Clipboard',
-        description: 'The meta description has been copied to your clipboard.',
-      });
+      toast('The meta description has been copied to your clipboard.');
     }
   };
   
   const handleCopyKeywords = () => {
     if (results?.keywords && results.keywords.length > 0) {
       copyToClipboard(results.keywords.join(', '));
-      toast({
-        title: 'Copied to Clipboard',
-        description: 'The keywords have been copied to your clipboard.',
-      });
+      toast('The keywords have been copied to your clipboard.');
     }
   };
 

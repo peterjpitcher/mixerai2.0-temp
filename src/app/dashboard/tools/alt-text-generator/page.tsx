@@ -7,10 +7,10 @@ import { Input } from '@/components/input';
 import { Label } from '@/components/label';
 import { Textarea } from "@/components/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/select";
-import { useToast } from "@/components/use-toast";
 import { copyToClipboard } from '@/lib/utils/clipboard';
 import { Loader2, ClipboardCopy, Image } from 'lucide-react';
 import type { Metadata } from 'next';
+import { toast } from 'sonner';
 
 // export const metadata: Metadata = {
 //   title: 'Alt Text Generator | MixerAI 2.0',
@@ -42,7 +42,6 @@ export default function AltTextGeneratorPage() {
   const [results, setResults] = useState<{ altText: string } | null>(null);
   const [previewError, setPreviewError] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
 
   // Fetch brands on component mount
   useEffect(() => {
@@ -56,19 +55,11 @@ export default function AltTextGeneratorPage() {
           setBrands(data.data);
         } else {
           // console.error('Failed to fetch brands:', data);
-          toast({
-            title: 'Error',
-            description: 'Failed to fetch brands. Please try again later.',
-            variant: 'destructive',
-          });
+          toast.error('Failed to fetch brands. Please try again later.');
         }
       } catch (error) {
         // console.error('Error fetching brands:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch brands. Please try again later.',
-          variant: 'destructive',
-        });
+        toast.error('Failed to fetch brands. Please try again later.');
       } finally {
         setIsFetchingBrands(false);
       }
@@ -86,20 +77,12 @@ export default function AltTextGeneratorPage() {
     setError(null);
     
     if (!imageUrl) {
-      toast({
-        title: 'Image URL required',
-        description: 'Please enter an image URL for which to generate alt text.',
-        variant: 'destructive',
-      });
+      toast.error('Please enter an image URL for which to generate alt text.');
       return;
     }
     
     if (!selectedBrandId) {
-      toast({
-        title: 'Brand required',
-        description: 'Please select a brand.',
-        variant: 'destructive',
-      });
+      toast.error('Please select a brand.');
       return;
     }
     
@@ -107,11 +90,7 @@ export default function AltTextGeneratorPage() {
     try {
       new URL(imageUrl);
     } catch (error) {
-      toast({
-        title: 'Invalid URL',
-        description: 'Please enter a valid URL (e.g., https://example.com/image.jpg).',
-        variant: 'destructive',
-      });
+      toast.error('Please enter a valid URL (e.g., https://example.com/image.jpg).');
       return;
     }
     
@@ -157,10 +136,7 @@ export default function AltTextGeneratorPage() {
           altText: data.altText,
         });
         
-        toast({
-          title: 'Alt Text Generated',
-          description: 'Accessible alt text has been generated successfully.',
-        });
+        toast('Accessible alt text has been generated successfully.');
       } else {
         throw new Error(data.error || 'Failed to generate alt text.');
       }
@@ -171,11 +147,7 @@ export default function AltTextGeneratorPage() {
         
       setError(errorMessage);
       
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      toast.error(errorMessage);
       
       // console.error('Alt text generation error:', error);
     } finally {
@@ -186,10 +158,7 @@ export default function AltTextGeneratorPage() {
   const handleCopyAltText = () => {
     if (results?.altText) {
       copyToClipboard(results.altText);
-      toast({
-        title: 'Copied to Clipboard',
-        description: 'The alt text has been copied to your clipboard.',
-      });
+      toast('The alt text has been copied to your clipboard.');
     }
   };
 

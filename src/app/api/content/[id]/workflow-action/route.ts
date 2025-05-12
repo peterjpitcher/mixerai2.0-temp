@@ -42,8 +42,8 @@ async function getNextVersionNumber(supabase: any, contentId: string): Promise<n
   return (data?.version_number || 0) + 1;
 }
 
-export const POST = withAuth(async (request: NextRequest, { params }: { params: { id: string } }, user) => {
-  const contentId = params.id;
+export const POST = withAuth(async (request: NextRequest, user, context: { params: { id: string } }) => {
+  const contentId = context.params.id;
   let requestData: WorkflowActionRequest;
 
   try {

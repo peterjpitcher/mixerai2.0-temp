@@ -8,13 +8,13 @@ import { Input } from '@/components/input';
 import { Label } from '@/components/label';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from '@/components/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
-import { useToast } from '@/components/toast-provider';
 import { 
   ArrowLeft, 
   Send, 
   Loader2
 } from 'lucide-react';
 import type { Metadata } from 'next';
+import { toast } from 'sonner';
 
 // export const metadata: Metadata = {
 //   title: 'Invite User | MixerAI 2.0',
@@ -35,7 +35,6 @@ interface Brand {
  */
 export default function InviteUserPage() {
   const router = useRouter();
-  const { toast } = useToast();
   const [form, setForm] = useState({
     email: '',
     full_name: '',
@@ -67,19 +66,14 @@ export default function InviteUserPage() {
           throw new Error(data.error || 'Failed to fetch brands');
         }
       } catch (error) {
-        // console.error('Error fetching brands:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load brands. You may not be able to assign the user to a brand.',
-          variant: 'destructive'
-        });
+        toast.error('Failed to load brands. You may not be able to assign the user to a brand.');
       } finally {
         setIsLoading(false);
       }
     };
     
     fetchBrands();
-  }, [toast]);
+  }, []);
   
   // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,11 +97,7 @@ export default function InviteUserPage() {
     
     // Validate required fields
     if (!form.email) {
-      toast({
-        title: 'Error',
-        description: 'Email is required.',
-        variant: 'destructive'
-      });
+      toast.error('Email is required.');
       return;
     }
     
@@ -126,10 +116,7 @@ export default function InviteUserPage() {
       const data = await response.json();
       
       if (data.success) {
-        toast({
-          title: 'Invitation Sent',
-          description: `Invitation has been sent to ${form.email}.`
-        });
+        toast(`Invitation has been sent to ${form.email}.`);
         
         // Navigate back to the users list
         router.push('/dashboard/users');
@@ -137,12 +124,7 @@ export default function InviteUserPage() {
         throw new Error(data.error || 'Failed to send invitation.');
       }
     } catch (error) {
-      // console.error('Error sending invitation:', error);
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to send invitation. Please try again.',
-        variant: 'destructive'
-      });
+      toast.error(error instanceof Error ? error.message : 'Failed to send invitation. Please try again.');
     } finally {
       setIsSending(false);
     }
@@ -257,49 +239,33 @@ export default function InviteUserPage() {
               </div>
               
               <div>
-                <Label htmlFor="brand" className="text-right">
+                <Label htmlFor="brand_id" className="text-right">
                   Assign to Brand
                 </Label>
-                {mounted && (
-                  <Select
-                    value={form.brand_id === '' ? 'none' : form.brand_id}
-                    onValueChange={handleBrandChange}
-                  >
-                    <SelectTrigger id="brand">
-                      <SelectValue placeholder="Select a brand (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {brands.map(brand => (
-                        <SelectItem key={brand.id} value={brand.id}>
-                          {brand.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+                <Select
+                  value={form.brand_id || 'none'}
+                  onValueChange={handleBrandChange}
+                >
+                  <SelectTrigger id="brand_id">
+                    <SelectValue placeholder="Select a brand" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Brand</SelectItem>
+                    {brands.map(brand => (
+                      <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <p className="text-xs text-muted-foreground mt-1">
                   You can assign this user to additional brands later.
                 </p>
               </div>
             </div>
           </CardContent>
-          <CardFooter className="flex justify-between border-t px-6 py-4">
-            <Button variant="outline" type="button" asChild>
-              <Link href="/dashboard/users">Cancel</Link>
-            </Button>
-            <Button type="submit" disabled={isSending}>
-              {isSending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Sending Invitation...
-                </>
-              ) : (
-                <>
-                  <Send className="mr-2 h-4 w-4" />
-                  Send Invitation
-                </>
-              )}
+          <CardFooter className="flex justify-end">
+            <Button type="submit" disabled={isSending} className="flex items-center gap-2">
+              {isSending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isSending ? 'Sending...' : 'Send Invitation'}
             </Button>
           </CardFooter>
         </form>

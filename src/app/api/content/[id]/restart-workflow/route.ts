@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import { User } from '@supabase/supabase-js';
 
 export const dynamic = "force-dynamic";
 
-export const POST = withAuth(async (request: NextRequest, { params }: { params: { id: string } }, user) => {
-  const contentId = params.id;
+export const POST = withAuth(async (request: NextRequest, user: User, context: { params: { id: string } }) => {
+  const contentId = context.params.id;
 
   const supabase = createSupabaseAdminClient();
 

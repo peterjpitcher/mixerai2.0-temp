@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/card';
-import { useToast } from '@/components/toast-provider'; // Assuming you might want toasts
-import { Eye, AlertCircle, Inbox } from 'lucide-react'; // Added Inbox icon
+import { Eye, AlertCircle, Inbox } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface RejectedContentItem {
   id: string;
@@ -24,7 +24,6 @@ export default function RejectedContentList({ brandId }: RejectedContentListProp
   const [rejectedContent, setRejectedContent] = useState<RejectedContentItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
 
   useEffect(() => {
     if (!brandId) return;
@@ -51,18 +50,13 @@ export default function RejectedContentList({ brandId }: RejectedContentListProp
       } catch (err: any) {
         console.error('Error fetching rejected content:', err);
         setError(err.message || 'Failed to load rejected content.');
-        // Toast might be redundant if the parent page (BrandDetails) handles API errors more globally
-        // toast({
-        //   title: "Error Loading Rejected Content",
-        //   description: err.message || "Could not load rejected items.",
-        //   variant: "destructive",
-        // });
+        toast.error(err.message || 'Failed to load rejected content.');
       } finally {
         setIsLoading(false);
       }
     }
     fetchRejectedContent();
-  }, [brandId, toast]);
+  }, [brandId]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-GB', {

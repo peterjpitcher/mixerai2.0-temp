@@ -5,8 +5,8 @@ import { withAuth } from '@/lib/auth/api-auth';
 
 export const dynamic = "force-dynamic";
 
-export const GET = withAuth(async (request: NextRequest, { params }: { params: { id: string } }, user) => {
-  const contentId = params.id;
+export const GET = withAuth(async (request: NextRequest, user, context: { params: { id: string } }) => {
+  const contentId = context.params.id;
 
   if (!contentId) {
     return NextResponse.json({ success: false, error: 'Content ID is required' }, { status: 400 });

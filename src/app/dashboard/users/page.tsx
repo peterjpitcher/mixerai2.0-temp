@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/button';
 import { Input } from '@/components/input';
-import { useToast } from '@/components/toast-provider';
 import { 
   Plus, 
   Search, 
@@ -32,6 +31,7 @@ import {
   DialogTitle,
 } from "@/components/dialog";
 import type { Metadata } from 'next';
+import { toast } from 'sonner';
 
 // export const metadata: Metadata = {
 //   title: 'Manage Users | MixerAI 2.0',
@@ -76,7 +76,6 @@ export default function UsersPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const { toast } = useToast();
 
   // Fetch users and brands data
   useEffect(() => {
@@ -121,18 +120,14 @@ export default function UsersPage() {
         }
       } catch (error) {
         // console.error('Error loading data:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load users. Please try again.',
-          variant: 'destructive'
-        });
+        toast.error('Failed to load users. Please try again.');
       } finally {
         setIsLoading(false);
       }
     };
     
     fetchData();
-  }, [toast]);
+  }, []);
   
   // Filter users based on search term
   const filteredUsers = searchTerm.trim() === '' 
@@ -199,20 +194,13 @@ export default function UsersPage() {
         // Remove user from the list
         setUsers(users.filter(user => user.id !== userToDelete.id));
         
-        toast({
-          title: 'User Deleted',
-          description: `${userToDelete.full_name} has been removed.`,
-        });
+        toast(`User ${userToDelete.full_name} has been removed.`);
       } else {
         throw new Error(data.error || 'Failed to delete user');
       }
     } catch (error) {
       // console.error('Error deleting user:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete user. Please try again.',
-        variant: 'destructive'
-      });
+      toast.error('Failed to delete user. Please try again.');
     } finally {
       setIsDeleting(false);
       setUserToDelete(null);
@@ -249,7 +237,6 @@ export default function UsersPage() {
               key={`${permission.brand_id}-${index}`}
               className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium text-white"
               style={{ backgroundColor: color }}
-              title={`${brand?.name || 'Unknown brand'} (${permission.role})`}
             >
               {initial}
             </div>

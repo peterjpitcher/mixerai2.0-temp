@@ -290,86 +290,90 @@ export const DELETE = withRouteAuth(async (request: NextRequest, user: any, cont
           let updated = false;
           
           // Find brand admin for this workflow's brand
-          const { data: brandAdmins, error: brandAdminError } = await supabase
-            .from('user_brand_permissions')
-            .select('user_id')
-            .eq('brand_id', workflow.brand_id)
-            .eq('role', 'admin')
-            .limit(1);
-          
-          if (brandAdminError) continue; // Skip this workflow if we can't find the brand admin
-          
-          // Skip if no brand admin found
-          if (!brandAdmins || brandAdmins.length === 0) {
-            continue;
-          }
-          
-          const brandAdminId = brandAdmins[0].user_id;
-          
-          // Get brand admin's details
-          const { data: adminProfile, error: adminProfileError } = await supabase
-            .from('profiles')
-            .select('id, full_name')
-            .eq('id', brandAdminId)
-            .single();
-          
-          if (adminProfileError || !adminProfile) continue;
-          
-          // Get admin's email from auth.users
-          const { data: adminAuthUser, error: adminAuthError } = await supabase.auth.admin.getUserById(brandAdminId);
-          
-          if (adminAuthError || !adminAuthUser || !adminAuthUser.user) continue;
-          
-          const adminEmail = adminAuthUser.user.email;
-
-          // Process workflows steps and reassign as needed
-          const updatedSteps = workflow.steps.map((step: any) => {
-            if (step.assignees && Array.isArray(step.assignees)) {
-              // Check if this step has the deleted user as an assignee
-              const hasDeletedUser = step.assignees.some((assignee: any) => 
-                assignee.id === params.id || 
-                (assignee.email && assignee.email === params.id)
-              );
+          if (workflow.brand_id) {
+            const { data: brandAdmins, error: brandAdminError } = await supabase
+              .from('user_brand_permissions')
+              .select('user_id')
+              .eq('brand_id', workflow.brand_id)
+              .eq('role', 'admin')
+              .limit(1);
+            
+            if (brandAdminError) continue; // Skip this workflow if we can't find the brand admin
+            
+            // Skip if no brand admin found
+            if (!brandAdmins || brandAdmins.length === 0) {
+              continue;
+            }
+            
+            const brandAdminId = brandAdmins[0].user_id;
+            
+            // Get brand admin's details
+            if (brandAdminId) {
+              const { data: adminProfile, error: adminProfileError } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .eq('id', brandAdminId)
+                .single();
               
-              if (hasDeletedUser) {
-                updated = true;
-                
-                // Remove the deleted user
-                const filteredAssignees = step.assignees.filter((assignee: any) => 
-                  assignee.id !== params.id && 
-                  (!assignee.email || assignee.email !== params.id)
-                );
-                
-                // Check if the brand admin is already assigned
-                const adminAlreadyAssigned = filteredAssignees.some((assignee: any) => 
-                  assignee.id === brandAdminId || 
-                  (assignee.email && assignee.email === adminEmail)
-                );
-                
-                // Add the brand admin if not already assigned
-                if (!adminAlreadyAssigned) {
-                  filteredAssignees.push({
-                    id: brandAdminId,
-                    email: adminEmail || '',
-                    name: adminProfile?.full_name || 'Brand Admin',
-                    reassigned_from_deleted_user: params.id
-                  });
+              if (adminProfileError || !adminProfile) continue;
+              
+              // Get admin's email from auth.users
+              const { data: adminAuthUser, error: adminAuthError } = await supabase.auth.admin.getUserById(brandAdminId);
+              
+              if (adminAuthError || !adminAuthUser || !adminAuthUser.user) continue;
+              
+              const adminEmail = adminAuthUser.user.email;
+
+              // Process workflows steps and reassign as needed
+              const updatedSteps = workflow.steps.map((step: any) => {
+                if (step.assignees && Array.isArray(step.assignees)) {
+                  // Check if this step has the deleted user as an assignee
+                  const hasDeletedUser = step.assignees.some((assignee: any) => 
+                    assignee.id === params.id || 
+                    (assignee.email && assignee.email === params.id)
+                  );
+                  
+                  if (hasDeletedUser) {
+                    updated = true;
+                    
+                    // Remove the deleted user
+                    const filteredAssignees = step.assignees.filter((assignee: any) => 
+                      assignee.id !== params.id && 
+                      (!assignee.email || assignee.email !== params.id)
+                    );
+                    
+                    // Check if the brand admin is already assigned
+                    const adminAlreadyAssigned = filteredAssignees.some((assignee: any) => 
+                      assignee.id === brandAdminId || 
+                      (assignee.email && assignee.email === adminEmail)
+                    );
+                    
+                    // Add the brand admin if not already assigned
+                    if (!adminAlreadyAssigned) {
+                      filteredAssignees.push({
+                        id: brandAdminId,
+                        email: adminEmail || '',
+                        name: adminProfile?.full_name || 'Brand Admin',
+                        reassigned_from_deleted_user: params.id
+                      });
+                    }
+                    
+                    step.assignees = filteredAssignees;
+                  }
                 }
+                return step;
+              });
+              
+              // Only update the workflow if changes were made
+              if (updated) {
+                const { error: updateWfError } = await supabase
+                  .from('workflows')
+                  .update({ steps: updatedSteps })
+                  .eq('id', workflow.id);
                 
-                step.assignees = filteredAssignees;
+                // Log updateWfError to a proper monitoring service in production if it occurs
               }
             }
-            return step;
-          });
-          
-          // Only update the workflow if changes were made
-          if (updated) {
-            const { error: updateWfError } = await supabase
-              .from('workflows')
-              .update({ steps: updatedSteps })
-              .eq('id', workflow.id);
-            
-            // Log updateWfError to a proper monitoring service in production if it occurs
           }
         }
       }

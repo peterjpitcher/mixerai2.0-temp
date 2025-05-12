@@ -9,7 +9,6 @@ import { Label } from '@/components/label';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from '@/components/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { Checkbox } from '@/components/checkbox';
-import { useToast } from '@/components/toast-provider';
 import { 
   ArrowLeft, 
   Save, 
@@ -17,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import type { Metadata } from 'next';
+import { toast } from 'sonner';
 
 // export const metadata: Metadata = {
 //   title: 'Edit User | MixerAI 2.0',
@@ -57,7 +57,6 @@ interface User {
  */
 export default function EditUserPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { toast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [form, setForm] = useState({
@@ -81,11 +80,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
         
         if (!userResponse.ok) {
           if (userResponse.status === 404) {
-            toast({
-              title: 'User not found',
-              description: 'The requested user could not be found.',
-              variant: 'destructive'
-            });
+            toast.error('User not found: The requested user could not be found.');
             router.push('/dashboard/users');
             return;
           }
@@ -142,18 +137,14 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
         });
       } catch (error) {
         // console.error('Error loading data:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load user information. Please try again.',
-          variant: 'destructive'
-        });
+        toast.error('Failed to load user information. Please try again.');
       } finally {
         setIsLoading(false);
       }
     };
     
     fetchData();
-  }, [params.id, router, toast]);
+  }, [params.id, router]);
   
   // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -224,10 +215,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
       const data = await response.json();
       
       if (data.success) {
-        toast({
-          title: 'User Updated',
-          description: 'User information has been updated successfully.'
-        });
+        toast('User information has been updated successfully.');
         
         // Navigate back to the user details page
         router.push(`/dashboard/users/${user.id}`);
@@ -236,11 +224,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
       }
     } catch (error) {
       // console.error('Error updating user:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update user. Please try again.',
-        variant: 'destructive'
-      });
+      toast.error('Failed to update user. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -248,25 +232,8 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
   
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="flex flex-col items-center">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-muted-foreground">Loading user information...</p>
-        </div>
-      </div>
-    );
-  }
-  
-  if (!user) {
-    return (
-      <div className="p-8 text-center">
-        <h2 className="text-2xl font-bold mb-2">User Not Found</h2>
-        <p className="text-muted-foreground mb-6">The requested user could not be found or may have been deleted.</p>
-        <Button asChild>
-          <Link href="/dashboard/users">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Users
-          </Link>
-        </Button>
+      <div className="flex justify-center items-center min-h-[300px]">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -276,201 +243,94 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" asChild>
-            <Link href={`/dashboard/users/${user.id}`}>
+            <Link href="/dashboard/users">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Edit User: {user.full_name}</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Edit User</h1>
             <p className="text-muted-foreground mt-1">
-              Modify the user's profile information, system role, and brand-specific permissions.
+              Modify user profile details, roles, and brand permissions.
             </p>
           </div>
         </div>
       </div>
       
-      <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 gap-6">
-          <Tabs defaultValue="profile" className="w-full">
-            <TabsList>
-              <TabsTrigger value="profile">Profile Information</TabsTrigger>
-              <TabsTrigger value="brands">Brand Permissions</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="profile">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Profile Information</CardTitle>
-                  <CardDescription>Update user profile details.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex justify-center mb-4">
-                    <div className="relative h-32 w-32 rounded-full bg-primary/10 overflow-hidden">
-                      {user.avatar_url ? (
-                        <img
-                          src={user.avatar_url}
-                          alt={user.full_name}
-                          className="object-cover w-full h-full"
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-full w-full text-4xl font-semibold text-primary">
-                          {form.full_name.charAt(0)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4">
-                      <div>
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          value={user.email}
-                          disabled
-                          className="bg-muted"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">Email address cannot be changed.</p>
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="full_name">Full Name</Label>
-                        <Input
-                          id="full_name"
-                          name="full_name"
-                          value={form.full_name}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="job_title">Job Title</Label>
-                        <Input
-                          id="job_title"
-                          name="job_title"
-                          value={form.job_title}
-                          onChange={handleInputChange}
-                          placeholder="e.g. Marketing Manager"
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="company">Company</Label>
-                        <Input
-                          id="company"
-                          name="company"
-                          value={form.company}
-                          onChange={handleInputChange}
-                          placeholder="e.g. Acme Inc."
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="role">Default Role</Label>
-                        <Select value={form.role} onValueChange={handleRoleChange}>
-                          <SelectTrigger id="role">
-                            <SelectValue placeholder="Select a role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Admin">Admin</SelectItem>
-                            <SelectItem value="Editor">Editor</SelectItem>
-                            <SelectItem value="Viewer">Viewer</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          This is the default role. Specific permissions can be set per brand.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="brands">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Brand Permissions</CardTitle>
-                  <CardDescription>Manage which brands this user can access and their role for each.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {brands.length === 0 ? (
-                      <div className="text-center py-6">
-                        <p className="text-muted-foreground">No brands available to assign.</p>
-                      </div>
-                    ) : (
-                      brands.map(brand => (
-                        <div key={brand.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex items-center space-x-3">
-                            <Checkbox 
-                              id={`brand-${brand.id}`}
-                              checked={selectedBrands[brand.id]?.selected || false}
-                              onCheckedChange={(checked) => 
-                                handleBrandSelectionChange(brand.id, checked as boolean)
-                              }
-                            />
-                            <div 
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-white font-medium"
-                              style={{ backgroundColor: brand.brand_color || '#cbd5e1' }}
-                            >
-                              {brand.name.charAt(0).toUpperCase()}
-                            </div>
-                            <Label htmlFor={`brand-${brand.id}`} className="cursor-pointer">
-                              {brand.name}
-                            </Label>
-                          </div>
-                          
-                          <Select 
-                            value={selectedBrands[brand.id]?.role || 'viewer'} 
-                            onValueChange={(value) => handleBrandRoleChange(brand.id, value)}
-                            disabled={!selectedBrands[brand.id]?.selected}
-                          >
-                            <SelectTrigger className="w-32">
-                              <SelectValue placeholder="Role" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="admin">Admin</SelectItem>
-                              <SelectItem value="editor">Editor</SelectItem>
-                              <SelectItem value="viewer">Viewer</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </CardContent>
-                <CardFooter className="border-t px-6 py-4">
-                  <p className="text-sm text-muted-foreground">
-                    <strong>Admin:</strong> Can manage brands, content, and users.<br />
-                    <strong>Editor:</strong> Can create and edit content, but cannot manage users.<br />
-                    <strong>Viewer:</strong> Can only view content.
-                  </p>
-                </CardFooter>
-              </Card>
-            </TabsContent>
-          </Tabs>
-          
-          <div className="flex justify-end space-x-4">
-            <Button variant="outline" type="button" asChild>
-              <Link href={`/dashboard/users/${user.id}`}>Cancel</Link>
+      <Card>
+        <CardHeader>
+          <CardTitle>User Information</CardTitle>
+          <CardDescription>Update user details and brand permissions.</CardDescription>
+        </CardHeader>
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="full_name" className="text-right">
+                  Full Name
+                </Label>
+                <Input
+                  id="full_name"
+                  name="full_name"
+                  value={form.full_name}
+                  onChange={handleInputChange}
+                  placeholder="John Doe"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="job_title" className="text-right">
+                  Job Title
+                </Label>
+                <Input
+                  id="job_title"
+                  name="job_title"
+                  value={form.job_title}
+                  onChange={handleInputChange}
+                  placeholder="Marketing Manager"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="company" className="text-right">
+                  Company
+                </Label>
+                <Input
+                  id="company"
+                  name="company"
+                  value={form.company}
+                  onChange={handleInputChange}
+                  placeholder="Acme Inc."
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="role" className="text-right">
+                  User Role
+                </Label>
+                <Select
+                  value={form.role}
+                  onValueChange={handleRoleChange}
+                >
+                  <SelectTrigger id="role">
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Admin">Admin</SelectItem>
+                    <SelectItem value="Editor">Editor</SelectItem>
+                    <SelectItem value="Viewer">Viewer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-end">
+            <Button type="submit" disabled={isSaving} className="flex items-center gap-2">
+              {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isSaving ? 'Saving...' : 'Save Changes'}
             </Button>
-            <Button type="submit" disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      </form>
+          </CardFooter>
+        </form>
+      </Card>
     </div>
   );
 } 

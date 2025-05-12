@@ -6,11 +6,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/input';
 import { Label } from '@/components/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
-import { useToast } from '@/components/toast-provider';
 import { Switch } from '@/components/switch';
 import { createBrowserClient } from '@supabase/ssr';
 import { Spinner } from '@/components/spinner';
 import type { Metadata } from 'next';
+import { toast } from 'sonner';
 
 // Page metadata should ideally be exported from a server component or the page file if it's RSC.
 // For client components, this is more of a placeholder for what should be set.
@@ -26,7 +26,6 @@ import type { Metadata } from 'next';
  * Uses tabs for different settings sections.
  */
 export default function AccountPage() {
-  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -89,17 +88,16 @@ export default function AccountPage() {
         
       } catch (error: any) {
         // console.error removed
-        toast({
-          title: 'Error Loading Profile',
-          description: error?.message || 'Failed to load your profile data. Please try again later.',
-          variant: 'destructive'
-        });
+        toast.error(
+          error?.message || 'Failed to load your profile data. Please try again later.',
+          { description: 'Error Loading Profile' }
+        );
       } finally {
         setIsLoading(false);
       }
     }
     fetchUserData();
-  }, [supabase, toast]); // supabase.auth might be too broad, consider specific dependencies if issues arise
+  }, [supabase]); // supabase.auth might be too broad, consider specific dependencies if issues arise
 
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -140,10 +138,10 @@ export default function AccountPage() {
         if (metadataError) throw metadataError;
       }
       
-      toast({ title: 'Profile Updated', description: 'Your profile information has been successfully updated.' });
+      toast('Your profile information has been successfully updated.', { description: 'Profile Updated' });
     } catch (error: any) {
       // console.error removed
-      toast({ title: 'Profile Update Error', description: error?.message || 'Failed to update your profile. Please try again.', variant: 'destructive' });
+      toast.error(error?.message || 'Failed to update your profile. Please try again.', { description: 'Profile Update Error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -157,15 +155,15 @@ export default function AccountPage() {
     const confirmPassword = (form.elements.namedItem('confirm-password') as HTMLInputElement)?.value;
     
     if (!currentPassword || !newPassword || !confirmPassword) {
-      toast({ title: 'Missing Fields', description: 'Please complete all password fields.', variant: 'destructive' });
+      toast.error('Please complete all password fields.', { description: 'Missing Fields' });
       return;
     }
     if (newPassword.length < 6) {
-      toast({ title: 'Password Too Short', description: 'New password must be at least 6 characters long.', variant: 'destructive' });
+      toast.error('New password must be at least 6 characters long.', { description: 'Password Too Short' });
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast({ title: 'Password Mismatch', description: 'Your new password and confirmation password do not match.', variant: 'destructive' });
+      toast.error('Your new password and confirmation password do not match.', { description: 'Password Mismatch' });
       return;
     }
     
@@ -177,11 +175,11 @@ export default function AccountPage() {
       // Here we rely on the fact that this action is performed by an authenticated user.
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
-      toast({ title: 'Password Updated', description: 'Your password has been changed successfully.' });
+      toast('Your password has been changed successfully.', { description: 'Password Updated' });
       form.reset();
     } catch (error: any) {
       // console.error removed
-      toast({ title: 'Password Update Error', description: error?.message || 'Failed to update your password. Please try again.', variant: 'destructive' });
+      toast.error(error?.message || 'Failed to update your password. Please try again.', { description: 'Password Update Error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -194,10 +192,10 @@ export default function AccountPage() {
       // TODO: Implement API call to save notificationSettings for the current user.
       // Example: await fetch('/api/user/notification-settings', { method: 'POST', body: JSON.stringify(notificationSettings) });
       await new Promise(resolve => setTimeout(resolve, 750)); // Simulate API delay
-      toast({ title: 'Preferences Saved', description: 'Your notification preferences have been updated.' });
+      toast('Your notification preferences have been updated.', { description: 'Preferences Saved' });
     } catch (error: any) {
       // console.error removed
-      toast({ title: 'Save Error', description: error?.message || 'Failed to save your notification preferences.', variant: 'destructive' });
+      toast.error(error?.message || 'Failed to save your notification preferences.', { description: 'Save Error' });
     } finally {
       setIsSubmitting(false);
     }

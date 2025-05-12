@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Button } from "@/components/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/card";
 import { Input } from "@/components/input";
-import { useToast } from "@/components/toast-provider";
 import { BrandIcon } from "@/components/brand-icon";
 import { COUNTRIES, LANGUAGES } from "@/lib/constants";
 import { 
@@ -19,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/alert-dialog";
 import { Trash2 } from "lucide-react";
+import { toast } from 'sonner';
 
 interface Brand {
   id: string;
@@ -33,7 +33,6 @@ export default function BrandsPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
   const [brandToDelete, setBrandToDelete] = useState<Brand | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -61,10 +60,8 @@ export default function BrandsPage() {
       } catch (error) {
         console.error('Error fetching brands:', error);
         setError((error as Error).message || 'Failed to load brands');
-        toast({
-          title: "Error",
-          description: "Failed to load brands. Please try again.",
-          variant: "destructive",
+        toast.error("Failed to load brands. Please try again.", {
+          description: "Error",
         });
       } finally {
         setIsLoading(false);
@@ -72,7 +69,7 @@ export default function BrandsPage() {
     }
 
     fetchBrands();
-  }, [toast]);
+  }, []);
 
   const handleDeleteBrand = async (cascade: boolean = false) => {
     if (!brandToDelete) return;
@@ -91,32 +88,29 @@ export default function BrandsPage() {
       const data = await response.json();
       
       if (data.success) {
-        toast({
-          title: "Success",
-          description: data.message || "Brand deleted successfully",
+        toast("Brand deleted successfully", {
+          description: data.message || "Success",
         });
         // Remove the brand from the state
         setBrands(prevBrands => prevBrands.filter(b => b.id !== brandToDelete.id));
         setShowDeleteDialog(false);
         setBrandToDelete(null);
         setRequiresCascade(false);
+        setContentCount(data.contentCount || 0);
+        setWorkflowCount(data.workflowCount || 0);
       } else if (data.requiresCascade) {
         setRequiresCascade(true);
         setContentCount(data.contentCount || 0);
         setWorkflowCount(data.workflowCount || 0);
       } else {
-        toast({
-          title: "Error",
-          description: data.error || "Failed to delete brand",
-          variant: "destructive",
+        toast.error(data.error || "Failed to delete brand", {
+          description: "Error",
         });
       }
     } catch (error) {
       console.error('Error deleting brand:', error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive",
+      toast.error("An unexpected error occurred", {
+        description: "Error",
       });
     } finally {
       setIsDeleting(false);

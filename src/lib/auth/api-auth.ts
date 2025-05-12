@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
 import { Database } from '@/types/supabase';
+import { User } from '@supabase/supabase-js';
 
 /**
  * Higher-order function to wrap API handlers with authentication
@@ -9,7 +10,7 @@ import { Database } from '@/types/supabase';
  * @returns A new handler function that first checks authentication
  */
 export function withAuth<T>(
-  handler: (req: NextRequest, user: any, context?: any) => Promise<Response>
+  handler: (req: NextRequest, user: User, context?: any) => Promise<Response>
 ) {
   return async (req: NextRequest, context?: any) => {
     try {
@@ -84,7 +85,7 @@ export function withAuth<T>(
  * @returns A new handler function with auth checks and monitoring
  */
 export function withAuthAndMonitoring<T>(
-  handler: (req: NextRequest, user: any, context?: any) => Promise<Response>
+  handler: (req: NextRequest, user: User, context?: any) => Promise<Response>
 ) {
   return async (req: NextRequest, context?: any) => {
     const startTime = Date.now();
@@ -174,7 +175,7 @@ export function withAuthAndMonitoring<T>(
  * @returns A new handler function that first checks authentication and admin role
  */
 export function withAdminAuth<T>(
-  handler: (req: NextRequest, user: any, context?: any) => Promise<Response>
+  handler: (req: NextRequest, user: User, context?: any) => Promise<Response>
 ) {
   return async (req: NextRequest, context?: any) => {
     try {

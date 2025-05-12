@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/card';
 import { Input } from '@/components/input';
-import { useToast } from '@/components/toast-provider';
 import { Plus, Search, Trash2, Eye, Edit3 } from 'lucide-react';
 import type { Metadata } from 'next';
+import { toast } from 'sonner';
 
 // export const metadata: Metadata = {
 //   title: 'Manage Workflows | MixerAI 2.0',
@@ -47,7 +47,6 @@ export default function WorkflowsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const { toast } = useToast();
 
   useEffect(() => {
     const fetchWorkflows = async () => {
@@ -66,18 +65,14 @@ export default function WorkflowsPage() {
         // console.error('Error loading workflows:', err);
         const errorMessage = (err instanceof Error) ? err.message : 'Failed to load workflows. Please try again.';
         setError(errorMessage);
-        toast({
-          title: 'Error',
-          description: errorMessage,
-          variant: 'destructive'
-        });
+        toast.error(errorMessage);
       } finally {
         setIsLoading(false);
       }
     };
     
     fetchWorkflows();
-  }, [toast]);
+  }, []);
   
   const filteredWorkflowsList = allWorkflows.filter(workflow => 
     workflow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

@@ -6,10 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/label';
 import { Textarea } from '@/components/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
-import { useToast } from "@/components/use-toast";
 import { copyToClipboard } from '@/lib/utils/clipboard';
 import { Loader2, ClipboardCopy, Globe } from 'lucide-react';
 import type { Metadata } from 'next';
+import { toast } from 'sonner';
 
 // export const metadata: Metadata = {
 //   title: 'Content Trans-Creator | MixerAI 2.0',
@@ -75,7 +75,6 @@ export default function ContentTransCreatorPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<{ transCreatedContent: string } | null>(null);
   const [characterCount, setCharacterCount] = useState(0);
-  const { toast } = useToast();
 
   // Filter country options based on selected target language
   const filteredCountryOptions = countryOptions.filter(
@@ -102,29 +101,17 @@ export default function ContentTransCreatorPage() {
     e.preventDefault();
     
     if (!content) {
-      toast({
-        title: 'Content required',
-        description: 'Please enter content to trans-create.',
-        variant: 'destructive',
-      });
+      toast.error('Please enter content to trans-create.');
       return;
     }
     
     if (!targetLanguage) {
-      toast({
-        title: 'Target language required',
-        description: 'Please select a target language.',
-        variant: 'destructive',
-      });
+      toast.error('Please select a target language.');
       return;
     }
     
     if (!targetCountry) {
-      toast({
-        title: 'Target country required',
-        description: 'Please select a target country.',
-        variant: 'destructive',
-      });
+      toast.error('Please select a target country.');
       return;
     }
     
@@ -156,19 +143,12 @@ export default function ContentTransCreatorPage() {
           transCreatedContent: data.transCreatedContent,
         });
         
-        toast({
-          title: 'Content Trans-Created',
-          description: 'Content has been successfully trans-created.',
-        });
+        toast('Content has been successfully trans-created.');
       } else {
         throw new Error(data.error || 'Failed to trans-create content.');
       }
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'An unknown error occurred.',
-        variant: 'destructive',
-      });
+      toast.error(error instanceof Error ? error.message : 'An unknown error occurred.');
     } finally {
       setIsLoading(false);
     }
@@ -177,10 +157,7 @@ export default function ContentTransCreatorPage() {
   const handleCopyContent = () => {
     if (results?.transCreatedContent) {
       copyToClipboard(results.transCreatedContent);
-      toast({
-        title: 'Copied to Clipboard',
-        description: 'The trans-created content has been copied to your clipboard.',
-      });
+      toast('The trans-created content has been copied to your clipboard.');
     }
   };
 

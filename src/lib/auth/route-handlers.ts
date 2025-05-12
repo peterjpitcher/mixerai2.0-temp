@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { Database } from '@/types/supabase';
+import { User } from '@supabase/supabase-js';
 
 /**
  * Wrapper for Next.js App Router route handlers that require authentication
@@ -11,7 +12,7 @@ import { Database } from '@/types/supabase';
  * @returns A new route handler with authentication
  */
 export function withRouteAuth<T>(
-  handler: (req: NextRequest, user: any, context: any) => Promise<Response>
+  handler: (req: NextRequest, user: User, context: any) => Promise<Response>
 ) {
   return async (req: NextRequest, context: any) => {
     try {
