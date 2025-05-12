@@ -40,9 +40,16 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     let query = supabase
       .from('workflows')
       .select(`
-        *,
-        brands:brand_id(name, brand_color),
-        content:content(count)
+        id,
+        name,
+        brand_id,
+        steps,
+        created_at,
+        updated_at,
+        template_id, 
+        brands:brand_id ( name, brand_color ),
+        content_templates:template_id ( name ), 
+        content ( count )
       `)
       .order('created_at', { ascending: false });
     
@@ -54,12 +61,14 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     
     if (error) throw error;
     
-    const formattedWorkflows = workflows.map(workflow => ({
+    const formattedWorkflows = workflows.map((workflow: any) => ({
       id: workflow.id,
       name: workflow.name,
       brand_id: workflow.brand_id,
       brand_name: workflow.brands?.name || null,
       brand_color: workflow.brands?.brand_color || null,
+      template_id: workflow.template_id,
+      template_name: workflow.content_templates?.name || null,
       steps: workflow.steps,
       steps_count: Array.isArray(workflow.steps) ? workflow.steps.length : 0,
       content_count: workflow.content?.[0]?.count || 0,

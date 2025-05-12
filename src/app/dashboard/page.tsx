@@ -1,13 +1,41 @@
-import { Button } from "@/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/card";
-import Link from "next/link";
-import { BookOpen, Building2, GitBranch, Users } from "lucide-react";
-import { requireAuth } from '@/lib/auth/server';
+'use client'; // Make it a client component to fetch data
 
-export const metadata = {
-  title: 'Dashboard | MixerAI',
-  description: 'MixerAI dashboard home',
-};
+import { useState, useEffect } from 'react';
+import { Button } from "@/components/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/card";
+import Link from "next/link";
+import { ListChecks, Package, Users, GitBranch, AlertTriangle, CheckCircle2, Clock, FileText, BarChart3, Loader2 } from "lucide-react";
+import { toast } from 'sonner';
+
+// Interface for workflow step (simplified, based on what's needed for display)
+interface WorkflowStepInfo {
+  id: number | string; // Step ID can be number or string from JSON
+  name: string;
+  // Add other properties if needed from the actual step structure
+}
+
+// Interface for a task item, ensuring workflow includes steps array
+interface TaskItem {
+  id: string;
+  title: string;
+  status: string;
+  updated_at: string;
+  brand?: { name: string; brand_color?: string };
+  workflow?: {
+    id: string;
+    name: string;
+    steps: WorkflowStepInfo[]; // Expecting steps to be an array on the workflow object
+  };
+  current_step?: number | null; // current_step is an index or step ID, ensure it matches step.id type
+}
+
+// Interface for metrics
+interface DashboardMetrics {
+  totalBrands: number;
+  totalContent: number;
+  totalWorkflows: number;
+  // Add more metrics as needed
+}
 
 /**
  * DashboardPage component.
@@ -15,141 +43,173 @@ export const metadata = {
  * Displays an overview of key application sections like Content, Brands, Workflows, and Users,
  * along with quick action buttons for common tasks.
  */
-export default async function DashboardPage() {
-  await requireAuth();
+export default function DashboardPage() {
+  // await requireAuth(); // Auth is typically handled by middleware or layout for client components
   
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(true);
+  const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
+
+  useEffect(() => {
+    // Fetch tasks
+    const fetchTasks = async () => {
+      setIsLoadingTasks(true);
+      try {
+        const response = await fetch('/api/me/tasks');
+        const data = await response.json();
+        if (data.success && Array.isArray(data.data)) {
+          setTasks(data.data);
+        } else {
+          toast.error(data.error || 'Failed to load your tasks.');
+        }
+      } catch (error) {
+        toast.error('An error occurred while fetching tasks.');
+      } finally {
+        setIsLoadingTasks(false);
+      }
+    };
+
+    // Fetch metrics
+    const fetchMetrics = async () => {
+      setIsLoadingMetrics(true);
+      try {
+        const [brandsRes, contentRes, workflowsRes] = await Promise.all([
+          fetch('/api/brands'),
+          fetch('/api/content'),
+          fetch('/api/workflows'),
+        ]);
+
+        const brandsData = await brandsRes.json();
+        const contentData = await contentRes.json();
+        const workflowsData = await workflowsRes.json();
+
+        setMetrics({
+          totalBrands: brandsData.success && Array.isArray(brandsData.data) ? brandsData.data.length : 0,
+          totalContent: contentData.success && Array.isArray(contentData.data) ? contentData.data.length : 0,
+          totalWorkflows: workflowsData.success && Array.isArray(workflowsData.data) ? workflowsData.data.length : 0,
+        });
+
+      } catch (error) {
+        toast.error('An error occurred while fetching dashboard metrics.');
+      } finally {
+        setIsLoadingMetrics(false);
+      }
+    };
+
+    fetchTasks();
+    fetchMetrics();
+  }, []);
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pending_review': return <Clock className="h-4 w-4 text-yellow-500" />;
+      case 'approved': return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+      case 'rejected': return <AlertTriangle className="h-4 w-4 text-red-500" />;
+      default: return <FileText className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground">
-          Welcome to MixerAI. Manage your content, brands, workflows, and users.
+          Welcome back! Here's an overview of your workspace and tasks.
         </p>
       </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Content Card */}
+
+      {/* Metrics Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-lg font-medium">
-              Content
-            </CardTitle>
-            <BookOpen className="h-5 w-5 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total Content</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Create and manage different types of marketing content
-              </p>
-              <div className="flex flex-col space-y-2">
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/content">View All Content</Link>
-                </Button>
-              </div>
-            </div>
+            {isLoadingMetrics ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-2xl font-bold">{metrics?.totalContent ?? 'N/A'}</div>
+            )}
+            <p className="text-xs text-muted-foreground">items managed</p>
           </CardContent>
         </Card>
-        
-        {/* Brands Card */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-lg font-medium">
-              Brands
-            </CardTitle>
-            <Building2 className="h-5 w-5 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Managed Brands</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Manage your brands and their identity
-              </p>
-              <div className="flex flex-col space-y-2">
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/brands">View All Brands</Link>
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/brands/new">Create New Brand</Link>
-                </Button>
-              </div>
-            </div>
+            {isLoadingMetrics ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-2xl font-bold">{metrics?.totalBrands ?? 'N/A'}</div>
+            )}
+            <p className="text-xs text-muted-foreground">brands configured</p>
           </CardContent>
         </Card>
-        
-        {/* Workflows Card */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-lg font-medium">
-              Workflows
-            </CardTitle>
-            <GitBranch className="h-5 w-5 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Active Workflows</CardTitle>
+            <GitBranch className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Create and manage content approval workflows
-              </p>
-              <div className="flex flex-col space-y-2">
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/workflows">View All Workflows</Link>
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/workflows/templates">Templates</Link>
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* Users Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-lg font-medium">
-              Users
-            </CardTitle>
-            <Users className="h-5 w-5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Manage users and their permissions
-              </p>
-              <div className="flex flex-col space-y-2">
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/users">View All Users</Link>
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/users/invite">Invite User</Link>
-                </Button>
-              </div>
-            </div>
+            {isLoadingMetrics ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-2xl font-bold">{metrics?.totalWorkflows ?? 'N/A'}</div>
+            )}
+            <p className="text-xs text-muted-foreground">approval processes</p>
           </CardContent>
         </Card>
       </div>
-      
-      {/* Quick Actions */}
+
+      {/* My Tasks Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>
-            Get started with these common tasks
-          </CardDescription>
+          <CardTitle className="flex items-center"><ListChecks className="h-5 w-5 mr-2" /> My Tasks</CardTitle>
+          <CardDescription>Content items assigned to you that require your attention.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild>
-              <Link href="/dashboard/content/new">Create New Content</Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link href="/dashboard/brands/new">Add New Brand</Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link href="/dashboard/users/invite">Invite Team Member</Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link href="/dashboard/workflows/new">Create Workflow</Link>
-            </Button>
-          </div>
+          {isLoadingTasks ? (
+            <div className="flex justify-center items-center py-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+          ) : tasks.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">You have no pending tasks. Great job!</p>
+          ) : (
+            <ul className="space-y-3">
+              {tasks.map(task => (
+                <li key={task.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center space-x-3">
+                    {getStatusIcon(task.status)}
+                    <div>
+                      <Link href={`/dashboard/content/${task.id}/edit`} className="font-medium hover:underline">
+                        {task.title}
+                      </Link>
+                      <p className="text-xs text-muted-foreground">
+                        Brand: {task.brand?.name || 'N/A'} | Workflow: {task.workflow?.name || 'N/A'}
+                        {task.current_step !== null && task.current_step !== undefined && task.workflow?.steps && task.workflow.steps[task.current_step] ? 
+                           ` - Step: ${(task.workflow.steps[task.current_step] as any).name || `Step ${task.current_step + 1}`}` 
+                           : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Last updated</p>
+                    <p className="text-xs font-medium">{new Date(task.updated_at).toLocaleDateString()}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
+        {tasks.length > 0 && (
+            <CardFooter>
+                <Button variant="outline" size="sm" asChild className="ml-auto">
+                    <Link href="/dashboard/my-tasks">View All My Tasks</Link>
+                </Button>
+            </CardFooter>
+        )}
       </Card>
     </div>
   );

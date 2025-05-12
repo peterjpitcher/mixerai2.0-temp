@@ -20,7 +20,8 @@ interface WorkflowFromAPI {
   brand_id: string;
   brand_name: string;
   brand_color?: string;
-  content_type_name: string;
+  template_id?: string | null;
+  template_name?: string | null;
   steps: any[];
   steps_count: number;
   content_count: number;
@@ -77,7 +78,7 @@ export default function WorkflowsPage() {
   const filteredWorkflowsList = allWorkflows.filter(workflow => 
     workflow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     workflow.brand_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    workflow.content_type_name.toLowerCase().includes(searchTerm.toLowerCase())
+    (workflow.template_name && workflow.template_name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const groupWorkflowsByBrand = (workflowsToGroup: WorkflowFromAPI[]) => {
@@ -192,7 +193,11 @@ export default function WorkflowsPage() {
                         <div>
                           <CardTitle className="text-xl">{workflow.name}</CardTitle>
                           <CardDescription>
-                            For: {workflow.content_type_name}
+                            {workflow.template_name 
+                              ? `For Template: ${workflow.template_name}` 
+                              : (workflow as any).content_type_name 
+                                ? `For Content Type: ${(workflow as any).content_type_name}`
+                                : 'Generic Workflow'}
                           </CardDescription>
                         </div>
                       </div>
