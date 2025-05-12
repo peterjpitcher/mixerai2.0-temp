@@ -48,11 +48,12 @@ export default function AltTextGeneratorPage() {
   useEffect(() => {
     const fetchBrands = async () => {
       try {
+        setIsFetchingBrands(true);
         const response = await fetch('/api/brands');
         const data = await response.json();
         
-        if (data.success && Array.isArray(data.brands)) {
-          setBrands(data.brands);
+        if (data.success && Array.isArray(data.data)) {
+          setBrands(data.data);
         } else {
           // console.error('Failed to fetch brands:', data);
           toast({
