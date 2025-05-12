@@ -87,15 +87,12 @@ const nextConfig = {
         permanent: true 
       },
       
-      // Special case: Redirect dashboard content root to itself (or remove if /dashboard/content is now the direct page)
-      // Assuming /dashboard/content is now the main listing page, this redirect can be removed or point to itself (which is redundant).
-      // For clarity and to ensure it lands on the correct page, let's keep it pointing to /dashboard/content.
-      // If /dashboard/content were a layout and /dashboard/content/some-default-child was desired, this would be different.
-      {
-        source: '/dashboard/content',
-        destination: '/dashboard/content',
-        permanent: true,
-      }
+      // Special case: Redirect dashboard content root to itself - REMOVED as redundant
+      // {
+      //   source: '/dashboard/content',
+      //   destination: '/dashboard/content',
+      //   permanent: true,
+      // }
     ];
   },
 };

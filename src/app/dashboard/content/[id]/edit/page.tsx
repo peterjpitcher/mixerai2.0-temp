@@ -30,14 +30,14 @@ interface ContentState {
   id: string;
   title: string;
   body: string;
-  metaTitle: string;
-  metaDescription: string;
   status: string;
   brand_name?: string; // From joined brands table
   template_name?: string; // From joined content_templates table
   template_id?: string;
   content_data?: Record<string, any>; // For template-driven fields
   // Add other fields from your actual content structure as needed
+  // Add fields for actual template output fields if they need to be directly editable
+  // For example, if an outputField from template is 'summary', you might add: summary?: string;
 }
 
 /**
@@ -56,9 +56,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     id: '',
     title: '',
     body: '',
-    metaTitle: '',
-    metaDescription: '',
-    status: 'draft', // Default status to 'draft' as per schema
+    status: 'draft',
     brand_name: '',
     template_name: '',
     template_id: '',
@@ -83,9 +81,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             id: result.data.id,
             title: result.data.title || '',
             body: result.data.body || (result.data.content_data?.contentBody || ''),
-            metaTitle: result.data.meta_title || (result.data.content_data?.metaTitle || ''),
-            metaDescription: result.data.meta_description || (result.data.content_data?.metaDescription || ''),
-            status: result.data.status || 'draft', // Ensure status is initialized
+            status: result.data.status || 'draft',
             brand_name: result.data.brand_name || result.data.brands?.name || 'N/A',
             template_name: result.data.template_name || result.data.content_templates?.name || 'N/A',
             template_id: result.data.template_id || '',
@@ -115,6 +111,17 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   const handleContentBodyChange = (newBodyValue: string) => {
     setContent(prev => ({ ...prev, body: newBodyValue }));
   };
+
+  // Handler for dynamic output field changes (if we make them editable)
+  const handleOutputFieldChange = (fieldName: string, value: string) => {
+    setContent(prev => ({
+      ...prev,
+      content_data: {
+        ...prev.content_data,
+        [fieldName]: value,
+      },
+    }));
+  };
   
   const handleSave = async () => {
     setIsSaving(true);
@@ -122,41 +129,27 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       const payloadToSave = {
         title: content.title,
         body: content.body,
-        meta_title: content.metaTitle,
-        meta_description: content.metaDescription,
-        status: content.status, // Include status in the payload
-        // template_id: content.template_id, // Typically not user-editable, removed
-        // content_data: content.content_data, // API not set up to handle arbitrary content_data yet
+        status: content.status,
+        content_data: content.content_data 
       };
       
       console.log('Saving content with payload:', payloadToSave);
-
       const response = await fetch(`/api/content/${id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payloadToSave),
       });
-
       const result = await response.json();
-
       if (!response.ok || !result.success) {
         throw new Error(result.error || `Failed to update content. Status: ${response.status}`);
       }
-      
       toast.success('Content updated successfully!');
       if (result.data) {
-        // Optionally update state with the definitively saved data from the server
         setContent(prev => ({ 
             ...prev, 
             ...result.data, 
-            // Ensure local display fields are also updated if they derive from API response
-            metaTitle: result.data.meta_title || '',
-            metaDescription: result.data.meta_description || '',
         }));
       }
-      // router.push(`/dashboard/content/${id}`); // Consider if redirect is always desired or if user wants to continue editing
     } catch (error: any) {
       console.error('Error updating content:', error);
       toast.error(error.message || 'Failed to update content. Please try again.');
@@ -173,13 +166,22 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     );
   }
   
+  // Logic to get output field definitions from template (needs template fetching if not already on content)
+  // This is a placeholder - actual template fetching/structure would be needed.
+  // For now, we assume content.content_data holds the output fields from generation.
+  const outputFieldsToDisplay = content.template_id && content.content_data 
+    ? Object.keys(content.content_data) // Simplistic: assumes all keys in content_data are output fields to display
+        .filter(key => key !== 'templateInputValues' && key !== 'generatedOutput' && key !== 'contentBody') // Filter out known non-output data
+        .map(key => ({ id: key, name: key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) , type: 'text' /* Default type, ideally from template */ }))
+    : [];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Edit: {content.title || 'Content'}</h1>
           <p className="text-muted-foreground">
-            Modify the title, body, SEO metadata, and other settings for this piece of content.
+            Modify the title, body, and other generated fields for this piece of content.
           </p>
         </div>
         <div className="flex space-x-2">
@@ -199,75 +201,53 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         <CardContent className="space-y-4">
           <div>
             <Label htmlFor="title">Title</Label>
-            <Input 
-              id="title"
-              name="title"
-              value={content.title}
-              onChange={handleInputChange}
-            />
+            <Input id="title" name="title" value={content.title} onChange={handleInputChange}/>
           </div>
-          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label>Content Template</Label>
-              <Input value={content.template_name || 'N/A'} disabled />
-            </div>
-            <div>
-              <Label>Brand</Label>
-              <Input value={content.brand_name || 'N/A'} disabled />
-            </div>
+            <div><Label>Content Template</Label><Input value={content.template_name || 'N/A'} disabled /></div>
+            <div><Label>Brand</Label><Input value={content.brand_name || 'N/A'} disabled /></div>
           </div>
         </CardContent>
       </Card>
       
       <Card>
-        <CardHeader>
-          <CardTitle>Content Body</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Content Body</CardTitle></CardHeader>
         <CardContent>
-          <RichTextEditor 
-            value={content.body} 
-            onChange={handleContentBodyChange}
-            placeholder="Enter your content here..."
-            className="min-h-[300px] border rounded-md"
-          />
+          <RichTextEditor value={content.body} onChange={handleContentBodyChange} placeholder="Enter your content here..." className="min-h-[300px] border rounded-md"/>
         </CardContent>
       </Card>
+
+      {/* Card for Dynamic Output Fields from Template */}
+      {outputFieldsToDisplay.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle>Generated Output Fields</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            {outputFieldsToDisplay.map(field => (
+              <div key={field.id}>
+                <Label htmlFor={field.id}>{field.name}</Label>
+                {/* Basic Textarea for all output fields for now. Could be enhanced based on field.type if available from template schema */}
+                <Textarea 
+                  id={field.id} 
+                  name={field.id} 
+                  value={content.content_data?.[field.id] || ''} 
+                  onChange={(e) => handleOutputFieldChange(field.id, e.target.value)}
+                  rows={3}
+                />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
       
-      <Card>
-        <CardHeader>
-          <CardTitle>SEO Metadata</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="metaTitle">Meta Title</Label>
-            <Input 
-              id="metaTitle"
-              name="metaTitle"
-              value={content.metaTitle}
-              onChange={handleInputChange}
-            />
-          </div>
-          <div>
-            <Label htmlFor="metaDescription">Meta Description</Label>
-            <Textarea 
-              id="metaDescription"
-              name="metaDescription"
-              value={content.metaDescription}
-              onChange={handleInputChange}
-              rows={3}
-            />
-          </div>
-        </CardContent>
-        <CardFooter className="flex justify-end space-x-4 border-t pt-6">
-          <Button variant="outline" onClick={() => router.push(`/dashboard/content/${id}`)}>
+      {/* Add a Save Changes button at the bottom of the page for better UX if SEO card was the only one with it */}
+      <div className="flex justify-end space-x-2 pt-4 border-t">
+        <Button variant="outline" onClick={() => router.push(`/dashboard/content/${id}`)}>
             Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? 'Saving...' : 'Save Changes'}
-          </Button>
-        </CardFooter>
-      </Card>
+        </Button>
+        <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? 'Saving...' : 'Save All Changes'}
+        </Button>
+      </div>
     </div>
   );
 } 

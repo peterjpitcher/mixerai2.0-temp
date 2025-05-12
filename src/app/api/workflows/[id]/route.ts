@@ -141,7 +141,7 @@ export const GET = withAuth(async (
  */
 export const PUT = withAuth(async (
   request: NextRequest,
-  user: any, // Added user parameter from withAuth
+  user: any,
   { params }: { params: { id: string } }
 ) => {
   try {
@@ -164,22 +164,18 @@ export const PUT = withAuth(async (
       if (step.assignees && Array.isArray(step.assignees)) {
         for (const assignee of step.assignees) {
           if (assignee.id) continue;
-          
-          const { data: existingUser, error: userFetchError } = await supabase
+          const { data: existingUser /*, error: userFetchError*/ } = await supabase
             .from('profiles') 
             .select('id')
             .eq('email', assignee.email)
             .maybeSingle();
-          
-          if (userFetchError) {
-            // Potentially log this error to a proper logging service in production
-            // For now, continue, as the workflow update might still proceed for other parts
-          } else if (existingUser) {
+          // if (userFetchError) { console.error('User fetch error for assignee:', userFetchError); /* Consider how to handle */ }
+          if (existingUser) {
             assignee.id = existingUser.id;
           } else {
             newInvitationsToCreate.push({
               workflow_id: id,
-              step_id: step.id,
+              step_id: step.id, 
               email: assignee.email,
               role: step.role || 'editor',
               invite_token: uuidv4(),
@@ -193,62 +189,70 @@ export const PUT = withAuth(async (
       }
     }
     
-    const updateData: any = {};
-    if (body.name !== undefined) updateData.p_name = body.name;
-    if (body.brand_id !== undefined) updateData.p_brand_id = body.brand_id;
-    if (body.steps !== undefined) updateData.p_steps = steps; 
-    // Always include the workflow ID and new invitations
-    updateData.p_workflow_id = id;
-    updateData.p_new_invitation_items = newInvitationsToCreate;
+    const rpcParams: any = {
+      p_workflow_id: id,
+      p_new_invitation_items: newInvitationsToCreate.length > 0 ? newInvitationsToCreate : null // Pass null if empty, as some RPCs might expect JSONB or null
+    };
 
-    // Ensure there's something to do (workflow fields to update or new invites)
-    const hasWorkflowChanges = (body.name !== undefined || body.brand_id !== undefined || body.steps !== undefined);
+    if (body.name !== undefined) rpcParams.p_name = body.name;
+    if (body.brand_id !== undefined) rpcParams.p_brand_id = body.brand_id;
+    if (body.steps !== undefined) rpcParams.p_steps = steps;
+    // Ensure template_id is passed as p_template_id, allowing null
+    rpcParams.p_template_id = body.template_id !== undefined ? body.template_id : null;
+
+    const hasWorkflowChanges = (
+      body.name !== undefined || 
+      body.brand_id !== undefined || 
+      body.steps !== undefined ||
+      body.template_id !== undefined
+    );
+
     if (!hasWorkflowChanges && newInvitationsToCreate.length === 0) {
       return NextResponse.json(
         { success: false, error: 'No valid fields to update or new invitations to create' },
         { status: 400 }
       );
     }
+    
+    console.log('Calling RPC update_workflow_and_handle_invites with params:', rpcParams);
 
-    // Call RPC function
     const { data: rpcSuccess, error: rpcError } = await supabase.rpc(
-      'update_workflow_and_handle_invites' as any, // TODO: Regenerate types
-      updateData // Pass the combined parameters
+      'update_workflow_and_handle_invites' as any, 
+      rpcParams
     );
 
-    if (rpcError || !rpcSuccess) {
+    if (rpcError) {
       console.error('RPC Error updating workflow and invitations:', rpcError);
-      throw new Error(`Failed to update workflow and invitations: ${rpcError?.message || 'RPC returned false'}`);
+      // Provide more specific error message if possible
+      let errorMessage = `Failed to update workflow: ${rpcError.message}`;
+      if (rpcError.details) errorMessage += ` Details: ${rpcError.details}`;
+      if (rpcError.hint) errorMessage += ` Hint: ${rpcError.hint}`;
+      // Do not throw here, let handleApiError manage the response
+      return handleApiError(rpcError, errorMessage);
+    }
+    if (!rpcSuccess) {
+        // This case might occur if RPC returns false explicitly for a handled failure
+        console.error('RPC call update_workflow_and_handle_invites returned false or no data.');
+        return handleApiError(new Error('RPC returned non-successful status'), 'Workflow update via RPC failed.');
     }
         
-    // If new users were identified for invitation, send auth invites
     if (newUsersToInviteByEmail.length > 0) {
       try {
         await verifyEmailTemplates();
-        // Fetch current user for invited_by field, though user param from withAuth should be preferred
         const { data: { user: currentUser } } = await supabase.auth.getUser();
-        const inviterId = user?.id || currentUser?.id; // Prefer user from HOF
-
+        const inviterId = user?.id || currentUser?.id;
         for (const email of newUsersToInviteByEmail) {
           try {
             let highestRole = 'viewer' as 'admin' | 'editor' | 'viewer';
-            // Find the role from newInvitationsToCreate, as these are the ones being processed
             for (const item of newInvitationsToCreate) { 
               if (item.email === email) {
-                if (item.role === 'admin') {
-                  highestRole = 'admin';
-                  break;
-                } else if (item.role === 'editor' && highestRole !== 'admin') {
-                  highestRole = 'editor';
-                }
+                if (item.role === 'admin') { highestRole = 'admin'; break; }
+                else if (item.role === 'editor' && highestRole !== 'admin') { highestRole = 'editor'; }
               }
             }
-            
-            const userFullName = ''; // Placeholder, as name isn't reliably available here
-
             await supabase.auth.admin.inviteUserByEmail(email, {
               data: {
-                full_name: userFullName || email, 
+                full_name: '', 
                 role: highestRole,
                 invited_by: inviterId || undefined, 
                 invited_from_workflow: id
@@ -256,12 +260,10 @@ export const PUT = withAuth(async (
             });
           } catch (individualEmailInviteError: any) {
             console.error(`Failed to send invitation email to ${email} via Supabase Auth:`, individualEmailInviteError);
-            // Don't throw here, let the main process complete. Log and monitor.
           }
         } 
       } catch (setupEmailError: any) {
-        console.error('Error during email invitation setup (before sending individual invites):', setupEmailError);
-        // Log and monitor this error.
+        console.error('Error during email invitation setup:', setupEmailError);
       }
     } 
     
@@ -279,7 +281,10 @@ export const PUT = withAuth(async (
       success: true, 
       workflow: finalWorkflowData 
     });
-  } catch (error) {
+
+  } catch (error: any) {
+    // General error catching for unexpected issues before or after RPC
+    console.error('General error in PUT /api/workflows/[id]:', error);
     return handleApiError(error, 'Error updating workflow');
   }
 });

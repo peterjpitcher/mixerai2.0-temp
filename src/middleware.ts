@@ -171,16 +171,16 @@ export async function middleware(request: NextRequest) {
   // Normalize path to handle path traversal attempts
   const normalizedPath = pathname.replace(/\/\.\.\//g, '/');
   
-  // Special case for /content root
-  if (pathname === '/content') {
-    const url = new URL('/dashboard/content/article', request.url);
-    // Preserve query parameters
-    request.nextUrl.searchParams.forEach((value, key) => {
-      url.searchParams.set(key, value);
-    });
-    console.log(`Redirecting content root: ${pathname} → ${url.pathname}${url.search}`);
-    return NextResponse.redirect(url);
-  }
+  // Special case for /content root - REMOVED as next.config.js handles this
+  // if (pathname === '/content') {
+  //   const url = new URL('/dashboard/content/article', request.url);
+  //   // Preserve query parameters
+  //   request.nextUrl.searchParams.forEach((value, key) => {
+  //     url.searchParams.set(key, value);
+  //   });
+  //   console.log(`Redirecting content root: ${pathname} → ${url.pathname}${url.search}`);
+  //   return NextResponse.redirect(url);
+  // }
   
   // Check if path starts with any of our top-level non-dashboard routes
   if (['/brands', '/workflows', '/content', '/users']

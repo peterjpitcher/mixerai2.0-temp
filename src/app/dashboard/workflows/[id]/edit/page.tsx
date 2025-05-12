@@ -31,6 +31,11 @@ interface WorkflowEditPageProps {
   };
 }
 
+interface ContentTemplateSummary {
+  id: string;
+  name: string;
+}
+
 /**
  * WorkflowEditPage allows users to modify an existing content approval workflow.
  * Users can update the workflow's name, description, status, and associated brand.
@@ -49,50 +54,44 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
   const [userSearchResults, setUserSearchResults] = useState<Record<number, any[]>>({});
   const [userSearchLoading, setUserSearchLoading] = useState<Record<number, boolean>>({});
   const [brands, setBrands] = useState<any[]>([]);
+  const [contentTemplates, setContentTemplates] = useState<ContentTemplateSummary[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
   useEffect(() => {
-    // Fetch both workflow and brands data
     const fetchData = async () => {
+      setIsLoading(true);
       try {
         // Fetch workflow data
         const workflowResponse = await fetch(`/api/workflows/${id}`);
-        
-        if (!workflowResponse.ok) {
-          throw new Error(`Failed to fetch workflow: ${workflowResponse.status}`);
-        }
-        
+        if (!workflowResponse.ok) throw new Error(`Failed to fetch workflow: ${workflowResponse.status}`);
         const workflowData = await workflowResponse.json();
-        
-        if (!workflowData.success) {
-          throw new Error(workflowData.error || 'Failed to fetch workflow data');
-        }
-        
+        if (!workflowData.success) throw new Error(workflowData.error || 'Failed to fetch workflow data');
+        setWorkflow(workflowData.workflow);
+        setSelectedTemplateId(workflowData.workflow?.template_id || '');
+
         // Fetch brands data
         const brandsResponse = await fetch('/api/brands');
-        
-        if (!brandsResponse.ok) {
-          throw new Error(`Failed to fetch brands: ${brandsResponse.status}`);
-        }
-        
+        if (!brandsResponse.ok) throw new Error(`Failed to fetch brands: ${brandsResponse.status}`);
         const brandsData = await brandsResponse.json();
-        
-        if (!brandsData.success) {
-          throw new Error(brandsData.error || 'Failed to fetch brands data');
-        }
-        
-        setWorkflow(workflowData.workflow);
+        if (!brandsData.success) throw new Error(brandsData.error || 'Failed to fetch brands data');
         setBrands(Array.isArray(brandsData.data) ? brandsData.data : []);
+
+        // Fetch content templates data
+        const templatesResponse = await fetch('/api/content-templates');
+        if (!templatesResponse.ok) throw new Error(`Failed to fetch content templates: ${templatesResponse.status}`);
+        const templatesData = await templatesResponse.json();
+        if (!templatesData.success) throw new Error(templatesData.error || 'Failed to fetch content templates data');
+        setContentTemplates(Array.isArray(templatesData.templates) ? templatesData.templates : []);
+
       } catch (error) {
-        // console.error('Error fetching data:', error);
         setError((error as Error).message || 'Failed to load data.');
         toast.error('Failed to load data. Please try again.');
       } finally {
         setIsLoading(false);
       }
     };
-    
     fetchData();
   }, [id]);
 
@@ -121,6 +120,14 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
         brand_id: selectedBrand.id
       }));
     }
+  };
+
+  const handleUpdateTemplate = (value: string) => {
+    setSelectedTemplateId(value);
+    setWorkflow((prev: any) => ({
+      ...prev,
+      template_id: value || null,
+    }));
   };
 
   const handleUpdateStepName = (index: number, value: string) => {
@@ -371,41 +378,33 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
 
   const handleSaveWorkflow = async () => {
     setIsSaving(true);
-    
     try {
-      if (!workflow) {
-        throw new Error('Workflow data is missing');
-      }
+      if (!workflow) throw new Error('Workflow data is missing');
       
-      // Prepare data for API call
-      const workflowData = {
+      const workflowDataToSave = {
         ...workflow,
+        template_id: selectedTemplateId || null,
         updated_at: new Date().toISOString()
       };
       
-      // Send updated workflow to the API
+      // Remove client-side only brand object if it exists to avoid sending nested object if API expects only brand_id
+      if (workflowDataToSave.brand) delete workflowDataToSave.brand;
+      
+      console.log("Saving workflow with data:", workflowDataToSave);
+
       const response = await fetch(`/api/workflows/${id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(workflowData)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(workflowDataToSave)
       });
       
-      if (!response.ok) {
-        throw new Error(`Failed to update workflow: ${response.status}`);
-      }
-      
+      if (!response.ok) throw new Error(`Failed to update workflow: ${response.status}`);
       const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to update workflow.');
-      }
+      if (!data.success) throw new Error(data.error || 'Failed to update workflow.');
       
       toast.success('Workflow updated successfully');
       router.push(`/dashboard/workflows/${id}`);
     } catch (error) {
-      // console.error('Error saving workflow:', error);
       toast.error('Failed to save workflow. Please try again.');
     } finally {
       setIsSaving(false);
@@ -574,6 +573,25 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="contentTemplate">Content Template (Optional)</Label>
+              <Select value={selectedTemplateId} onValueChange={handleUpdateTemplate}>
+                <SelectTrigger id="contentTemplate">
+                  <SelectValue placeholder="Select a content template" />
+                </SelectTrigger>
+                <SelectContent>
+                  {contentTemplates.map((template) => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Link this workflow to a specific content template to automatically use it when new content is created from that template for the selected brand.
+              </p>
             </div>
             
             <div className="space-y-2">

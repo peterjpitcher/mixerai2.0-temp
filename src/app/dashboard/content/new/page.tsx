@@ -32,17 +32,6 @@ function ContentFormWithParams() {
 function PageContent() {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Create New Content from Template
-          </h1>
-          <p className="text-muted-foreground">
-            Generate high-quality content with AI assistance using a template.
-          </p>
-        </div>
-      </div>
-      
       <ContentFormWithParams />
     </div>
   );

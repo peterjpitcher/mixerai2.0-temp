@@ -17,6 +17,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     const supabase = createSupabaseAdminClient();
     const url = new URL(request.url);
     const query = url.searchParams.get('query');
+    const brandId = url.searchParams.get('brandId');
 
     let queryBuilder = supabase
       .from('content')
@@ -33,7 +34,9 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         created_by,
         profiles ( full_name, avatar_url ),
         template_id,
-        content_templates ( name, icon )
+        content_templates ( name, icon ),
+        current_step,
+        workflow_id
       `)
       .order('updated_at', { ascending: false });
 
@@ -42,6 +45,10 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       // For now, using ilike on title. Body search via ilike can be slow on large text fields.
       // Consider adding a dedicated search vector column in Postgres for more performant full-text search on body.
       queryBuilder = queryBuilder.or(`title.ilike.%${query}%,meta_description.ilike.%${query}%`);
+    }
+
+    if (brandId) {
+      queryBuilder = queryBuilder.eq('brand_id', brandId);
     }
 
     const { data, error } = await queryBuilder;
@@ -69,6 +76,8 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       template_id: item.template_id,
       template_name: item.content_templates?.name || null,
       template_icon: item.content_templates?.icon || null,
+      current_step: item.current_step,
+      workflow_id: item.workflow_id,
     }));
 
     return NextResponse.json({

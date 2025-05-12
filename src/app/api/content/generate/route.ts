@@ -2,17 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateContentFromTemplate } from '@/lib/azure/openai';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
 
 // type ContentType = "article" | "retailer_pdp" | "owned_pdp" | string; // Removed
 
 interface ContentGenerationRequest {
-  // contentType: ContentType; // Removed
-  brand: {
-    name: string;
-    brand_identity?: string | null;
-    tone_of_voice?: string | null;
-    guardrails?: string | null;
-  };
+  brand_id: string;
+  // Removed brand object from here
   input?: {
     topic?: string;
     keywords?: string[];
@@ -49,17 +45,48 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
   try {
     const data: ContentGenerationRequest = await request.json();
     
-    if (!data.brand?.name) {
+    if (!data.brand_id) {
       return NextResponse.json(
-        { success: false, error: 'Brand name is required' },
+        { success: false, error: 'Brand ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const supabase = createSupabaseAdminClient();
+    const { data: brandData, error: brandError } = await supabase
+      .from('brands')
+      .select('name, brand_identity, tone_of_voice, guardrails, language, country')
+      .eq('id', data.brand_id)
+      .single();
+
+    if (brandError || !brandData) {
+      console.error('Error fetching brand:', brandError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to fetch brand details or brand not found.' },
+        { status: 404 }
+      );
+    }
+
+    if (!brandData.language || !brandData.country) {
+      return NextResponse.json(
+        { success: false, error: 'Brand language and country are required for localized content generation and are missing for this brand.' },
         { status: 400 }
       );
     }
     
     if (data.template && data.template.id) {
       try {
+        const brandInfoForGeneration = {
+          name: brandData.name,
+          brand_identity: brandData.brand_identity,
+          tone_of_voice: brandData.tone_of_voice,
+          guardrails: brandData.guardrails,
+          language: brandData.language,
+          country: brandData.country,
+        };
+
         const generatedContent = await generateContentFromTemplate(
-          data.brand,
+          brandInfoForGeneration,
           data.template,
           data.input
         );
@@ -69,19 +96,18 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
           ...generatedContent
         });
       } catch (templateError) {
+        console.error('Error during generateContentFromTemplate:', templateError);
         return handleApiError(templateError, 'Failed to generate content from template');
       }
     }
     
-    // Legacy block removed. 
-    // If execution reaches here, it means no template was provided.
-    // Template-based generation is now the primary/only path.
     return NextResponse.json(
         { success: false, error: 'Template ID is required for content generation.' },
         { status: 400 }
       );
 
   } catch (error) {
+    console.error('Generic error in content generation POST handler:', error);
     return handleApiError(error, 'Failed to generate content');
   }
 }); 

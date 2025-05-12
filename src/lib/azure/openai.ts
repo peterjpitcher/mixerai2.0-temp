@@ -103,6 +103,8 @@ export async function generateContentFromTemplate(
     brand_identity?: string | null;
     tone_of_voice?: string | null;
     guardrails?: string | null;
+    language?: string | null;
+    country?: string | null;
   },
   template: {
     id: string;
@@ -131,12 +133,20 @@ export async function generateContentFromTemplate(
   }
 ) {
   console.log(`Generating template-based content for brand: ${brand.name} using template: ${template.name}`);
+  console.log(`Targeting Language: ${brand.language || 'not specified'}, Country: ${brand.country || 'not specified'}`);
   
   const deploymentName = getModelName();
   console.log(`Using deployment name: "${deploymentName}"`);
   
   // Build the system prompt with brand information
   let systemPrompt = `You are an expert content creator for the brand "${brand.name}".`;
+  
+  // Add localization instructions if provided
+  if (brand.language && brand.country) {
+    systemPrompt += ` Generate content in ${brand.language} for an audience in ${brand.country}.`;
+  } else if (brand.language) {
+    systemPrompt += ` Generate content in ${brand.language}.`;
+  }
   
   // Only add global brand information if there are no field-specific settings
   const anyFieldUsesBrandIdentity = template.outputFields.some(field => field.useBrandIdentity);
@@ -846,10 +856,15 @@ export async function generateSuggestions(
       name?: string;
       brand_identity?: string | null;
       tone_of_voice?: string | null;
+      language?: string | null;
+      country?: string | null;
     };
   }
 ): Promise<string[]> {
   console.log(`Generating suggestions of type: ${suggestionType}`);
+  if (context.brandContext?.language || context.brandContext?.country) {
+    console.log(`Targeting Language: ${context.brandContext.language || 'not specified'}, Country: ${context.brandContext.country || 'not specified'}`);
+  }
 
   const client = getAzureOpenAIClient();
   const deploymentName = getModelName();
@@ -859,6 +874,12 @@ export async function generateSuggestions(
     systemPrompt += ` You are generating suggestions for the brand "${context.brandContext.name || 'Unknown Brand'}".`;
     if (context.brandContext.tone_of_voice) {
       systemPrompt += ` Maintain a ${context.brandContext.tone_of_voice} tone.`;
+    }
+    // Add localization instructions if provided
+    if (context.brandContext.language && context.brandContext.country) {
+      systemPrompt += ` Generate suggestions in ${context.brandContext.language} targeted for an audience in ${context.brandContext.country}.`;
+    } else if (context.brandContext.language) {
+      systemPrompt += ` Generate suggestions in ${context.brandContext.language}.`;
     }
   }
 
@@ -949,5 +970,89 @@ export async function generateSuggestions(
   } catch (error) {
     console.error(`Error generating suggestions (${suggestionType}) with Azure OpenAI:`, error);
     throw new Error(`Failed to generate ${suggestionType}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Generates a compelling content title based on provided context.
+ */
+export async function generateContentTitleFromContext(
+  contentBody: string,
+  brandContext: {
+    name?: string;
+    brand_identity?: string | null;
+    tone_of_voice?: string | null;
+    language: string; // Language is mandatory for title generation
+    country: string;  // Country is mandatory for title generation
+    topic?: string | null; // Optional topic for more context
+    keywords?: string[] | null; // Optional keywords
+  }
+): Promise<string> {
+  console.log(`Generating content title for brand: ${brandContext.name || 'Unknown Brand'}`);
+  console.log(`Targeting Language: ${brandContext.language}, Country: ${brandContext.country}`);
+
+  const client = getAzureOpenAIClient();
+  const deploymentName = getModelName();
+
+  let systemPrompt = `You are an expert content strategist specializing in creating compelling and SEO-friendly titles.`;
+  systemPrompt += ` Generate a title in ${brandContext.language} suitable for an audience in ${brandContext.country}.`;
+  if (brandContext.name) {
+    systemPrompt += ` The title is for the brand "${brandContext.name}".`;
+  }
+  if (brandContext.tone_of_voice) {
+    systemPrompt += ` The tone of voice should be: ${brandContext.tone_of_voice}.`;
+  }
+
+  let userPrompt = `Based on the following content body, generate a concise, engaging, and relevant title.`;
+  if (brandContext.topic) {
+    userPrompt += `\nThe main topic is: "${brandContext.topic}".`;
+  }
+  if (brandContext.keywords && brandContext.keywords.length > 0) {
+    userPrompt += `\nKey keywords to consider: ${brandContext.keywords.join(', ')}.`;
+  }
+  
+  const truncatedContentBody = contentBody.length > 2000 ? contentBody.substring(0, 2000) + '...' : contentBody;
+  userPrompt += `\n\nContent Body (excerpt):\n"${truncatedContentBody}"`;
+  userPrompt += `\n\nProvide just the title as a plain string, without any labels, quotes, or explanations. The title should be relatively short and impactful.`;
+
+  try {
+    console.log(`Making API call to Azure OpenAI for title generation. Deployment: ${deploymentName}`);
+    const completionRequest = {
+      model: deploymentName,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      max_tokens: 50, // Titles are short
+      temperature: 0.7,
+      top_p: 0.9,
+    };
+
+    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': process.env.AZURE_OPENAI_API_KEY || ''
+      },
+      body: JSON.stringify(completionRequest)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API request for title generation failed with status ${response.status}: ${errorText}`);
+    }
+
+    const responseData = await response.json();
+    const title = responseData.choices?.[0]?.message?.content?.trim() || "Suggested Title (Error)";
+    
+    // Remove any surrounding quotes from the title if present
+    const cleanedTitle = title.replace(/^[\"\'\\u2018\\u2019\\u201C\\u201D]+|[\"\'\\u2018\\u2019\\u201C\\u201D]+$/g, '');
+    console.log(`Generated title: "${cleanedTitle}"`);
+    return cleanedTitle;
+
+  } catch (error) {
+    console.error('Error generating content title with Azure OpenAI:', error);
+    throw new Error(`Failed to generate content title: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
