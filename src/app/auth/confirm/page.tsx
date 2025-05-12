@@ -35,10 +35,11 @@ function ConfirmContent() {
   const [fullName, setFullName] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [company, setCompany] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
+  const [initialMessage, setInitialMessage] = useState<string | null>('Loading invitation details...');
   
   const supabase = createSupabaseClient();
   
@@ -60,40 +61,64 @@ function ConfirmContent() {
   useEffect(() => {
     if (!token) {
       setError('Missing confirmation token. Please check your invitation link or confirmation email.');
+      setLoading(false);
+      setInitialMessage(null);
       return;
     }
 
     const getInvitationInfo = async () => {
+      setLoading(true);
+      setInitialMessage('Verifying invitation...');
       try {
-        const { data: userDataResponse, error: userError } = await supabase.auth.getUser();
-        
-        if (userError && userError.message !== "User not found" && userError.message !== "Invalid token: token contains an invalid number of segments") { 
-          // Only throw if not common "User not found" or specific token parsing issues before verification
-          throw userError;
+        // For an invite, Supabase internally uses the token to fetch associated user data 
+        // if the token is valid, even without a prior session. This usually happens upon verification.
+        // Let's try to get user data associated with the token to prefill.
+        // This step is primarily for pre-filling UI, not strict auth validation before form submission.
+
+        // Attempt to get user details if a session was perhaps created by a redirect_to after email click
+        // but before this page fully loads its JS. Or if Supabase has a way to peek at token data.
+        const { data: { user } , error: sessionError } = await supabase.auth.getUser();
+
+        if (sessionError && sessionError.message !== 'No active session') {
+            // An actual error trying to get user, not just no session
+            console.warn('Error trying to get user for prefill:', sessionError.message);
         }
-        if (userDataResponse?.user?.email) {
-          setEmail(userDataResponse.user.email);
-          if (userDataResponse.user.user_metadata?.full_name) {
-            setFullName(userDataResponse.user.user_metadata.full_name);
-          }
-          if (userDataResponse.user.user_metadata?.job_title) {
-            setJobTitle(userDataResponse.user.user_metadata.job_title);
-          }
-          if (userDataResponse.user.user_metadata?.company) {
-            setCompany(userDataResponse.user.user_metadata.company);
-          } else if (userDataResponse.user.email) {
-            setCompany(extractCompanyFromEmail(userDataResponse.user.email));
-          }
+
+        if (user?.email) {
+          setEmail(user.email);
+          setFullName(user.user_metadata?.full_name || '');
+          setJobTitle(user.user_metadata?.job_title || '');
+          setCompany(user.user_metadata?.company || extractCompanyFromEmail(user.email));
+          setInitialMessage(null); // Prefilled, remove loading message
+        } else {
+          // No user session found. This is expected for a fresh invite link.
+          // The form will be empty, and the user will fill it.
+          // We might not be able to get the email before they submit and verify OTP.
+          // If your invite email template shows the email, the user knows it's for them.
+          setInitialMessage('Please complete your account details.');
         }
       } catch (err: any) {
-        setError(err.message || 'Could not retrieve invitation details. The link may be invalid or expired.');
+        console.warn('Could not retrieve initial invitation details for prefill:', err.message);
+        setInitialMessage('Could not load all invitation details. Please complete the form.');
+        // Do not set a blocking setError here for type=invite if just prefill fails.
+      } finally {
+        setLoading(false);
       }
     };
 
     if (type === 'invite') {
-        getInvitationInfo();
+      getInvitationInfo();
+    } else if (type === 'signup') {
+      // For direct email confirmation (not invite), we expect a session after clicking the link.
+      // The `handleConfirmation` will call verifyOtp with type 'signup'.
+      setLoading(false); 
+      setInitialMessage(null);
+    } else {
+        setLoading(false); // Other types, just allow form submission for verifyOtp
+        setInitialMessage(null);
     }
-  }, [token, type, supabase.auth]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, type]); // Removed supabase.auth, it should be stable from createSupabaseClient()
   
   const handleConfirmation = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -212,7 +237,7 @@ function ConfirmContent() {
                         <Bell className="h-4 w-4" />
                         <AlertTitle className="text-secondary-foreground">Invitation for {email}</AlertTitle>
                         <AlertDescription className="text-secondary-foreground/80">
-                          Please complete your account set up below.
+                          {initialMessage}
                         </AlertDescription>
                       </Alert>
                     )}
