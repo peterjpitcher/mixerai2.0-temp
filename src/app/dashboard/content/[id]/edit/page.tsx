@@ -58,9 +58,9 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     body: '',
     metaTitle: '',
     metaDescription: '',
-    status: 'Draft',
+    status: 'draft', // Default status to 'draft' as per schema
     brand_name: '',
-    template_name: '', // Initialize template_name
+    template_name: '',
     template_id: '',
     content_data: {}
   });
@@ -79,14 +79,13 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         }
         const result = await response.json();
         if (result.success && result.data) {
-          // Map API data to ContentState
           setContent({
             id: result.data.id,
             title: result.data.title || '',
-            body: result.data.body || (result.data.content_data?.contentBody || ''), // Example fallback
+            body: result.data.body || (result.data.content_data?.contentBody || ''),
             metaTitle: result.data.meta_title || (result.data.content_data?.metaTitle || ''),
             metaDescription: result.data.meta_description || (result.data.content_data?.metaDescription || ''),
-            status: result.data.status || 'Draft',
+            status: result.data.status || 'draft', // Ensure status is initialized
             brand_name: result.data.brand_name || result.data.brands?.name || 'N/A',
             template_name: result.data.template_name || result.data.content_templates?.name || 'N/A',
             template_id: result.data.template_id || '',
@@ -98,7 +97,6 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       } catch (error: any) {
         console.error('Error fetching content:', error);
         toast.error(error.message || 'Failed to load content. Please try again.');
-        // Optionally redirect or show an error message
       } finally {
         setIsLoading(false);
       }
@@ -107,7 +105,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     if (id) {
       fetchContentById();
     }
-  }, [id]);
+  }, [id]); // Removed notFound from dependencies as it's stable
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -117,26 +115,47 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // TODO: Implement actual API call to PUT /api/content/${id}
-      // The payload should include all editable fields, e.g., title, body, metaTitle, metaDescription, content_data etc.
       const payloadToSave = {
         title: content.title,
-        body: content.body, // Or derive from content_data if structured differently
+        body: content.body,
         meta_title: content.metaTitle,
         meta_description: content.metaDescription,
-        // status: content.status, // Status might be updated via workflow actions typically
-        template_id: content.template_id, // May not be editable here, but good to have
-        content_data: content.content_data // If form edits structured data
+        status: content.status, // Include status in the payload
+        // template_id: content.template_id, // Typically not user-editable, removed
+        // content_data: content.content_data, // API not set up to handle arbitrary content_data yet
       };
-      console.log('Content to save (payload for PUT /api/content/[id]):', payloadToSave);
       
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      console.log('Saving content with payload:', payloadToSave);
+
+      const response = await fetch(`/api/content/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payloadToSave),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || `Failed to update content. Status: ${response.status}`);
+      }
       
-      toast.success('Content updated successfully! (Mocked)');
-      router.push(`/dashboard/content/${id}`); // Redirect to view page
-    } catch (error) {
+      toast.success('Content updated successfully!');
+      if (result.data) {
+        // Optionally update state with the definitively saved data from the server
+        setContent(prev => ({ 
+            ...prev, 
+            ...result.data, 
+            // Ensure local display fields are also updated if they derive from API response
+            metaTitle: result.data.meta_title || '',
+            metaDescription: result.data.meta_description || '',
+        }));
+      }
+      // router.push(`/dashboard/content/${id}`); // Consider if redirect is always desired or if user wants to continue editing
+    } catch (error: any) {
       console.error('Error updating content:', error);
-      toast.error('Failed to update content. Please try again.');
+      toast.error(error.message || 'Failed to update content. Please try again.');
     } finally {
       setIsSaving(false);
     }

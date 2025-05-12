@@ -100,14 +100,86 @@ export default function RegisterPage() {
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-center">Create an Account</CardTitle>
             <CardDescription className="text-center">
-              {/* Placeholder for where a RegisterForm component would go */}
-              Registration form will be here. The provided file content was for a login page.
+              Enter your details below to create your account.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-center text-muted-foreground">
-              Please implement or locate the correct RegisterForm component.
-            </p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="first-name">First Name</Label>
+                  <Input 
+                    id="first-name" 
+                    placeholder="John" 
+                    required 
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="last-name">Last Name</Label>
+                  <Input 
+                    id="last-name" 
+                    placeholder="Doe" 
+                    required 
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)} 
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input 
+                  id="email" 
+                  type="email" 
+                  placeholder="m@example.com" 
+                  required 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)} 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input 
+                  id="password" 
+                  type="password" 
+                  required 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)} 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <Input 
+                  id="confirm-password" 
+                  type="password" 
+                  required 
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)} 
+                />
+              </div>
+              <div className="flex items-center space-x-2 pt-2">
+                <Checkbox 
+                  id="terms" 
+                  required 
+                  checked={termsAccepted}
+                  onCheckedChange={(checked) => setTermsAccepted(Boolean(checked))} 
+                />
+                <Label htmlFor="terms" className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  I agree to the{" "}
+                  <Link href="/terms" className="underline" target="_blank">Terms of Service</Link> and{" "}
+                  <Link href="/privacy-policy" className="underline" target="_blank">Privacy Policy</Link>.
+                </Label>
+              </div>
+              
+              {error && (
+                <p className="text-sm text-destructive text-center pt-2">{error}</p>
+              )}
+
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'Creating Account...' : 'Create Account'}
+              </Button>
+            </form>
           </CardContent>
           <CardFooter>
             <div className="text-center w-full text-sm">

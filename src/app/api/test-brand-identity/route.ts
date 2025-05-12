@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateBrandIdentityFromUrls } from '@/lib/azure/openai';
-import { withAuth } from '@/lib/auth/api-auth';
+// import { withAuth } from '@/lib/auth/api-auth'; // No longer used
+import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
 import { handleApiError } from '@/lib/api-utils';
 
 // Detect if we're in a build environment (Vercel)
@@ -22,9 +23,9 @@ const mockResponse = {
 
 /**
  * API route to test field mapping between the brand identity generation and frontend.
- * NOTE: This test endpoint should be admin-only or restricted if kept in deployed environments.
+ * NOTE: This test endpoint is admin-only.
  */
-export const GET = withAuth(async (request: NextRequest, user) => {
+export const GET = withAdminAuth(async (request: NextRequest, user) => {
   try {
     // Check if we're in a build environment and use mock data
     if (isBuildEnvironment) {

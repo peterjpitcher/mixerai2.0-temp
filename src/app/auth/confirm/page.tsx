@@ -162,11 +162,26 @@ function ConfirmContent() {
             });
           if (profileError) throw profileError;
           
-          // Server-side logic should ideally handle further operations like:
-          // - Updating user_brand_permissions based on invite details
-          // - Updating workflow_invitations status to 'accepted'
-          // - Updating assignees in workflow.steps JSONB (complex, best server-side)
-          // A dedicated API call could be made here to trigger those server-side actions.
+          // --- Call backend API to complete invite process (assign permissions, etc.) ---
+          console.log('Calling backend to complete invite process...');
+          const completeInviteResponse = await fetch('/api/auth/complete-invite', {
+            method: 'POST', // Method is POST
+            headers: {
+                'Content-Type': 'application/json',
+                // Cookies are usually sent automatically by the browser
+            },
+            // Body can be empty as user info is derived from the authenticated session via withAuth
+            // body: JSON.stringify({}) 
+          });
+
+          if (!completeInviteResponse.ok) {
+            const completeErrorData = await completeInviteResponse.json().catch(() => ({ error: 'Failed to parse complete-invite response' }));
+            console.error('Error completing invite process on backend:', completeErrorData);
+            // Throw an error to prevent redirect and show feedback to user
+            throw new Error(completeErrorData.error || 'Failed to finalize account setup. Please contact support.');
+          }
+          console.log('Backend invite completion successful.');
+          // --- End backend API call ---
 
         } else {
             throw new Error("User details could not be confirmed with the provided token.");

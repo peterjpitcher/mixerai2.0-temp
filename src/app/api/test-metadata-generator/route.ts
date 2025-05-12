@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateMetadata } from '@/lib/azure/openai';
 import { fetchWebPageContent } from '@/lib/utils/web-scraper';
 import { handleApiError } from '@/lib/api-utils'; // Import for consistent error handling
+// import { withAuth } from '@/lib/auth/api-auth'; // No longer used
+import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
 
-// WARNING: This is an open test endpoint not protected by authentication.
-// It allows unauthenticated calls to Azure OpenAI services.
+// WARNING: This is a test endpoint that allows calls to Azure OpenAI services.
+// It is now protected by admin-only authorization.
 // It should be REMOVED or STRICTLY SECURED before any deployment to non-local environments.
 
 interface MetadataGenerationRequest {
@@ -17,7 +19,7 @@ interface MetadataGenerationRequest {
   guardrails?: string;
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAdminAuth(async (request: NextRequest, user: any) => {
   // console.log removed
   try {
     const data: MetadataGenerationRequest = await request.json();
@@ -92,7 +94,7 @@ export async function POST(request: NextRequest) {
     // Simplified error handling for this test route
     return handleApiError(error, 'Test metadata generation failed');
   }
-}
+});
 
 // Function to validate metadata length requirements (copied from main tool, but not used in this test route)
 function validateMetadata(metaTitle: string, metaDescription: string): { 

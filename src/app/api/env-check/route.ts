@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { handleApiError, isDatabaseConnectionError } from '@/lib/api-utils';
-import { withAuth } from '@/lib/auth/api-auth';
+// import { withAuth } from '@/lib/auth/api-auth'; // No longer used
+import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
 
 /**
  * API route to test environment status, including DB connectivity and some env var presence.
- * WARNING: This endpoint is now protected by `withAuth`, but reveals server configuration status.
- * Further role-based restrictions (e.g., admin-only) are HIGHLY recommended if this endpoint is kept.
+ * WARNING: This endpoint is now protected by admin-only authorization.
+ * It should be REMOVED or STRICTLY SECURED if kept in deployment.
  */
-export const GET = withAuth(async (request: NextRequest, user) => {
+export const GET = withAdminAuth(async (request: NextRequest, user) => {
   const startTime = Date.now();
   
   try {

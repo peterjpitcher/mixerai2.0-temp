@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError } from '@/lib/api-utils'; // Import for consistent error handling
+// import { withAuth } from '@/lib/auth/api-auth'; // No longer used
+import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -77,10 +79,10 @@ const mockTemplates = [
 ];
 
 /**
- * GET: Always returns mock templates for testing.
- * Note: This endpoint is currently unauthenticated.
+ * GET: Returns mock templates for testing. Admin-only access required.
+ * This endpoint should be REMOVED or STRICTLY SECURED if kept in deployment.
  */
-export async function GET(request: NextRequest) {
+export const GET = withAdminAuth(async (request: NextRequest, user: any) => {
   // Console.log removed
   try {
     const url = new URL(request.url);
@@ -108,4 +110,4 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     return handleApiError(error, 'Error fetching test templates');
   }
-} 
+}); 

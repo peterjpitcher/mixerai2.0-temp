@@ -12,11 +12,17 @@ const nextConfig = {
   },
   // Skip type checking during build
   typescript: {
-    ignoreBuildErrors: true,
+    // !! WARN !!
+    // Dangerously allow production builds to successfully complete even if
+    // your project has type errors.
+    // !! WARN !!
+    ignoreBuildErrors: false,
   },
   // Skip ESLint during build
   eslint: {
-    ignoreDuringBuilds: true,
+    // Warning: Dangerously allow production builds to successfully complete even if
+    // your project has ESLint errors.
+    ignoreDuringBuilds: false,
   },
   // Security settings
   poweredByHeader: false,

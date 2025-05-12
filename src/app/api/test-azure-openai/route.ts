@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { withAuth } from '@/lib/auth/api-auth';
+// import { withAuth } from '@/lib/auth/api-auth'; // No longer used
+import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
 import { handleApiError } from '@/lib/api-utils';
 
-export const GET = withAuth(async (req: NextRequest, user) => {
+/**
+ * GET: Test basic Azure OpenAI connectivity (admin only).
+ */
+export const GET = withAdminAuth(async (req: NextRequest, user) => {
   try {
     const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
     const azureApiKey = process.env.AZURE_OPENAI_API_KEY;
@@ -58,7 +62,10 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   }
 });
 
-export const POST = withAuth(async (req: NextRequest, user) => {
+/**
+ * POST: Test Azure OpenAI with custom prompt (admin only).
+ */
+export const POST = withAdminAuth(async (req: NextRequest, user) => {
   try {
     const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
     const azureApiKey = process.env.AZURE_OPENAI_API_KEY;

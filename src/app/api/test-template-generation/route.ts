@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError } from '@/lib/api-utils'; // For consistent error handling
+// import { withAuth } from '@/lib/auth/api-auth'; // No longer used
+import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
 
 // Template-based brand identity generation (Non-AI)
 function generateBrandIdentityTemplate(brandName: string, country: string, language: string) {
@@ -47,10 +49,10 @@ function generateContentTemplate(title: string, contentType: string, brandIdenti
 
 /**
  * POST endpoint for testing static (non-AI) template generation for brand identity and content.
- * NOTE: This endpoint is unauthenticated. Its purpose should be clarified, and if kept,
- * consider if authentication is appropriate even without direct AI calls.
+ * NOTE: This endpoint is now protected by admin-only authorization.
+ * It should be REMOVED or STRICTLY SECURED if kept in deployment.
  */
-export async function POST(req: NextRequest) {
+export const POST = withAdminAuth(async (req: NextRequest, user: any) => {
   try {
     const payload = await req.json();
     const { type, brandName, country, language, contentType, title } = payload;
@@ -84,4 +86,4 @@ export async function POST(req: NextRequest) {
     // console.error removed
     return handleApiError(error, `Template generation test failed`);
   }
-} 
+}); 

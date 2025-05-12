@@ -833,3 +833,121 @@ export async function transCreateContent(
     throw new Error(`Failed to trans-create content: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
+
+/**
+ * Generates suggestions like article titles or keywords based on context.
+ */
+export async function generateSuggestions(
+  suggestionType: 'article-titles' | 'keywords',
+  context: {
+    topic?: string;
+    content?: string;
+    brandContext?: { // Optional brand context for tailoring suggestions
+      name?: string;
+      brand_identity?: string | null;
+      tone_of_voice?: string | null;
+    };
+  }
+): Promise<string[]> {
+  console.log(`Generating suggestions of type: ${suggestionType}`);
+
+  const client = getAzureOpenAIClient();
+  const deploymentName = getModelName();
+
+  let systemPrompt = `You are an expert assistant skilled in generating content ideas and extracting information.`;
+  if (context.brandContext) {
+    systemPrompt += ` You are generating suggestions for the brand "${context.brandContext.name || 'Unknown Brand'}".`;
+    if (context.brandContext.tone_of_voice) {
+      systemPrompt += ` Maintain a ${context.brandContext.tone_of_voice} tone.`;
+    }
+  }
+
+  let userPrompt = '';
+  let expectedOutputFormat = 'Return the suggestions as a JSON array of strings.';
+
+  if (suggestionType === 'article-titles') {
+    if (!context.topic) {
+      throw new Error('Topic is required to generate article titles.');
+    }
+    userPrompt = `Generate 5 diverse and compelling article titles based on the following topic: "${context.topic}".`;
+    expectedOutputFormat = 'Return the titles as a JSON array of strings, like: ["Title 1", "Title 2", ...]';
+  } else if (suggestionType === 'keywords') {
+    if (!context.content) {
+      throw new Error('Content is required to generate keywords.');
+    }
+    const truncatedContent = context.content.length > 1500 ? context.content.substring(0, 1500) + '...' : context.content;
+    userPrompt = `Extract the 5-10 most relevant and important keywords or key phrases from the following content:\n\n"${truncatedContent}"`;
+    expectedOutputFormat = 'Return the keywords as a JSON array of strings, like: ["keyword1", "key phrase 2", ...]';
+  } else {
+    throw new Error(`Unsupported suggestion type: ${suggestionType}`);
+  }
+
+  userPrompt += `\n\n${expectedOutputFormat}`; // Add output format instruction
+
+  try {
+    console.log(`Making API call to Azure OpenAI deployment: ${deploymentName} for ${suggestionType}`);
+
+    const completionRequest = {
+      model: deploymentName,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 300, // Adjust as needed
+      temperature: 0.7
+    };
+
+    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
+    console.log(`Using direct endpoint URL: ${endpoint}`);
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': process.env.AZURE_OPENAI_API_KEY || ''
+      },
+      body: JSON.stringify(completionRequest)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+    }
+
+    const responseData = await response.json();
+    console.log("API call successful");
+
+    const content = responseData.choices?.[0]?.message?.content || "[]"; // Default to empty array string
+    console.log(`Received response content for suggestions: ${content}`);
+
+    // Attempt to parse the JSON array directly from the content
+    let suggestions: string[] = [];
+    try {
+        const parsedJson = JSON.parse(content);
+        // Basic validation to check if it's an array of strings
+        if (Array.isArray(parsedJson) && parsedJson.every(item => typeof item === 'string')) {
+            suggestions = parsedJson;
+        } else {
+            // If the root is not an array, check common nested structures like { "suggestions": [...] } or { "keywords": [...] }
+            const keys = Object.keys(parsedJson);
+            if (keys.length === 1 && Array.isArray(parsedJson[keys[0]]) && parsedJson[keys[0]].every((item: unknown) => typeof item === 'string')) {
+                suggestions = parsedJson[keys[0]];
+            } else {
+              console.warn('Parsed JSON is not a direct array of strings or a simple object containing one. Returning empty array.', parsedJson);
+            }
+        }
+    } catch (parseError) {
+        console.error('Failed to parse suggestions JSON from AI response:', parseError, 'Raw content:', content);
+        // Fallback or throw error depending on desired behavior
+        // Returning empty array for now
+    }
+
+    console.log(`Returning ${suggestions.length} suggestions of type ${suggestionType}`);
+    return suggestions;
+
+  } catch (error) {
+    console.error(`Error generating suggestions (${suggestionType}) with Azure OpenAI:`, error);
+    throw new Error(`Failed to generate ${suggestionType}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}

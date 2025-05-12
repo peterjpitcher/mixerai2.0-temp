@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError } from '@/lib/api-utils'; // Import for consistent error handling
+// import { withAuth } from '@/lib/auth/api-auth'; // No longer used
+import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
 
 export const dynamic = "force-dynamic";
 
 /**
- * GET: Test route to verify dynamic parameters.
- * NOTE: This route is likely for development/testing purposes only and should be considered for removal
- * or strict access control in production environments.
- * It is currently unauthenticated.
+ * GET: Test route to verify dynamic parameters. Admin-only access required.
+ * NOTE: This route is for development/testing purposes only and should be REMOVED
+ * or STRICTLY SECURED if kept in deployment.
  */
-export async function GET(request: NextRequest, context: { params: { id: string } }) {
+export const GET = withAdminAuth(async (request: NextRequest, user: any, context: { params: { id: string } }) => {
   try {
     const id = context?.params?.id;
     
@@ -28,4 +29,4 @@ export async function GET(request: NextRequest, context: { params: { id: string 
   } catch (error) {
     return handleApiError(error, 'Error in test dynamic parameter route');
   }
-} 
+}); 

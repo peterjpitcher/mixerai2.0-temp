@@ -4,6 +4,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 import { handleApiError } from '@/lib/api-utils'; // Added for using in catch blocks
 import { verifyEmailTemplates } from '@/lib/auth/email-templates'; // Added for sending invites
+import { withAuth } from '@/lib/auth/api-auth'; // Import withAuth
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
 
@@ -38,10 +39,11 @@ interface WorkflowStep {
 /**
  * GET endpoint to retrieve a specific workflow by ID
  */
-export async function GET(
+export const GET = withAuth(async (
   request: NextRequest,
+  user: any, // Added user parameter from withAuth
   { params }: { params: { id: string } }
-) {
+) => {
   try {
     const supabase = createSupabaseAdminClient();
     const id = params.id;
@@ -132,15 +134,16 @@ export async function GET(
   } catch (error) {
     return handleApiError(error, 'Failed to fetch workflow');
   }
-}
+});
 
 /**
  * PUT endpoint to update a specific workflow
  */
-export async function PUT(
+export const PUT = withAuth(async (
   request: NextRequest,
+  user: any, // Added user parameter from withAuth
   { params }: { params: { id: string } }
-) {
+) => {
   try {
     const supabase = createSupabaseAdminClient();
     const id = params.id;
@@ -301,15 +304,16 @@ export async function PUT(
   } catch (error) {
     return handleApiError(error, 'Error updating workflow');
   }
-}
+});
 
 /**
  * DELETE endpoint to remove a specific workflow
  */
-export async function DELETE(
+export const DELETE = withAuth(async (
   request: NextRequest,
+  user: any, // Added user parameter from withAuth
   { params }: { params: { id: string } }
-) {
+) => {
   try {
     const supabase = createSupabaseAdminClient();
     const id = params.id;
@@ -359,4 +363,4 @@ export async function DELETE(
   } catch (error) {
     return handleApiError(error, 'Error deleting workflow');
   }
-} 
+}); 

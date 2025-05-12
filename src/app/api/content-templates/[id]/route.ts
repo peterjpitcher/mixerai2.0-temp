@@ -7,19 +7,20 @@ import { withAuth } from '@/lib/auth/api-auth';
 export const dynamic = "force-dynamic";
 
 /**
- * Direct GET handler with development bypass for authentication
+ * GET: Retrieve a specific content template by ID
  */
-export async function GET(
+export const GET = withAuth(async (
   request: NextRequest,
+  user: any,
   context: { params: { id: string } }
-) {
+) => {
   try {
-    console.log('Direct API Route - GET template - Context:', context);
+    console.log('API Route - GET template - Context:', context);
     const id = context.params.id;
-    console.log('Direct API Route - Template ID from params:', id);
+    console.log('API Route - Template ID from params:', id);
     
     if (!id) {
-      console.error('Direct API Route - Missing template ID in params');
+      console.error('API Route - Missing template ID in params');
       return NextResponse.json(
         { success: false, error: 'Template ID is required' },
         { status: 400 }
@@ -36,11 +37,11 @@ export async function GET(
       .single();
     
     if (error) {
-      console.error('Direct API Route - Supabase error fetching template:', error);
+      console.error('API Route - Supabase error fetching template:', error);
       throw error;
     }
     
-    console.log('Direct API Route - Successfully fetched template:', template?.id);
+    console.log('API Route - Successfully fetched template:', template?.id);
     return NextResponse.json({ 
       success: true, 
       template 
@@ -49,7 +50,7 @@ export async function GET(
     console.error('Error fetching content template:', error);
     return handleApiError(error, 'Failed to fetch content template');
   }
-}
+});
 
 /**
  * PUT: Update a specific content template
@@ -143,7 +144,7 @@ export const DELETE = withAuth(async (
     // Unassign template from content items and set their status to cancelled
     const { error: updateContentError } = await supabase
       .from('content')
-      .update({ template_id: null, status: 'cancelled' })
+      .update({ template_id: null, status: 'rejected' })
       .eq('template_id', id);
 
     if (updateContentError) {
