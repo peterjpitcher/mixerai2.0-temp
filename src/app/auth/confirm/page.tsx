@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { createSupabaseClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { Input } from '@/components/input';
 import { Button } from '@/components/button';
@@ -40,10 +40,7 @@ function ConfirmContent() {
   const [success, setSuccess] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
   
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-  );
+  const supabase = createSupabaseClient();
   
   const extractCompanyFromEmail = (emailAddress: string) => {
     if (!emailAddress) return '';
