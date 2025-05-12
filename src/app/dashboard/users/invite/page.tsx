@@ -47,7 +47,12 @@ export default function InviteUserPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [mounted, setMounted] = useState(false);
   
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Fetch brands data
   useEffect(() => {
     const fetchBrands = async () => {
@@ -89,7 +94,7 @@ export default function InviteUserPage() {
   
   // Handle brand change
   const handleBrandChange = (value: string) => {
-    setForm(prev => ({ ...prev, brand_id: value }));
+    setForm(prev => ({ ...prev, brand_id: value === 'none' ? '' : value }));
   };
   
   // Handle form submission
@@ -255,22 +260,24 @@ export default function InviteUserPage() {
                 <Label htmlFor="brand" className="text-right">
                   Assign to Brand
                 </Label>
-                <Select
-                  value={form.brand_id}
-                  onValueChange={handleBrandChange}
-                >
-                  <SelectTrigger id="brand">
-                    <SelectValue placeholder="Select a brand (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">None</SelectItem>
-                    {brands.map(brand => (
-                      <SelectItem key={brand.id} value={brand.id}>
-                        {brand.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {mounted && (
+                  <Select
+                    value={form.brand_id === '' ? 'none' : form.brand_id}
+                    onValueChange={handleBrandChange}
+                  >
+                    <SelectTrigger id="brand">
+                      <SelectValue placeholder="Select a brand (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {brands.map(brand => (
+                        <SelectItem key={brand.id} value={brand.id}>
+                          {brand.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 <p className="text-xs text-muted-foreground mt-1">
                   You can assign this user to additional brands later.
                 </p>

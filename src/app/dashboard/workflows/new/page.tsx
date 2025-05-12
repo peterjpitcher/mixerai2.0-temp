@@ -64,7 +64,7 @@ export default function NewWorkflowPage() {
           throw new Error(data.error || 'Failed to process brands data');
         }
         
-        const fetchedBrands = data.brands || [];
+        const fetchedBrands = data.data || [];
         setBrands(fetchedBrands);
         
         if (fetchedBrands.length > 0) {

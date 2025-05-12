@@ -17,6 +17,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2 } from 'lucide-react';
 import type { Metadata } from 'next';
+import debounce from 'lodash.debounce';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 
 // export const metadata: Metadata = {
 //   title: 'Edit Workflow | MixerAI 2.0',
@@ -43,8 +45,12 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [newAssigneeEmail, setNewAssigneeEmail] = useState('');
+  const [assigneeInputs, setAssigneeInputs] = useState<string[]>([]);
+  const [userSearchResults, setUserSearchResults] = useState<Record<number, any[]>>({});
+  const [userSearchLoading, setUserSearchLoading] = useState<Record<number, boolean>>({});
   const [brands, setBrands] = useState<any[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
   useEffect(() => {
     // Fetch both workflow and brands data
@@ -181,43 +187,60 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
     });
   };
 
-  const handleAddAssignee = (stepIndex: number) => {
-    if (!newAssigneeEmail || !newAssigneeEmail.includes('@')) {
+  // Debounced user search function
+  const searchUsers = React.useCallback(
+    debounce(async (query: string, stepIndex: number) => {
+      if (!query || query.length < 2) {
+        setUserSearchResults((prev) => ({ ...prev, [stepIndex]: [] }));
+        return;
+      }
+      setUserSearchLoading((prev) => ({ ...prev, [stepIndex]: true }));
+      try {
+        const res = await fetch(`/api/users/search?query=${encodeURIComponent(query)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setUserSearchResults((prev) => ({ ...prev, [stepIndex]: data.users || [] }));
+        } else {
+          setUserSearchResults((prev) => ({ ...prev, [stepIndex]: [] }));
+        }
+      } catch {
+        setUserSearchResults((prev) => ({ ...prev, [stepIndex]: [] }));
+      } finally {
+        setUserSearchLoading((prev) => ({ ...prev, [stepIndex]: false }));
+      }
+    }, 300),
+    []
+  );
+
+  const handleAddAssignee = (stepIndex: number, email?: string) => {
+    const value = typeof email === 'string' ? email : assigneeInputs[stepIndex];
+    if (!value || !value.includes('@')) {
       toast.error('Please enter a valid email address.');
       return;
     }
-
     if (!workflow || !workflow.steps || !workflow.steps[stepIndex]) {
       toast.error('Cannot add assignee - workflow step not found.');
       return;
     }
-
-    // Check if assignee already exists in this step
     const stepAssignees = workflow.steps[stepIndex].assignees || [];
-    const exists = Array.isArray(stepAssignees) && stepAssignees.some((a: any) => a.email === newAssigneeEmail);
-    
+    const exists = Array.isArray(stepAssignees) && stepAssignees.some((a: any) => a.email === value);
     if (exists) {
       toast.error('This assignee is already added to this step.');
       return;
     }
-
     setWorkflow((prev: any) => {
       if (!prev || !Array.isArray(prev.steps)) return prev;
-      
       const updatedSteps = [...prev.steps];
-      
-      // Ensure assignees array exists
       if (!updatedSteps[stepIndex].assignees) {
         updatedSteps[stepIndex].assignees = [];
       }
-      
       updatedSteps[stepIndex] = {
         ...updatedSteps[stepIndex],
         assignees: [
           ...updatedSteps[stepIndex].assignees,
           {
             id: `temp-${Date.now()}`,
-            email: newAssigneeEmail
+            email: value
           }
         ]
       };
@@ -226,8 +249,13 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
         steps: updatedSteps
       };
     });
-
-    setNewAssigneeEmail('');
+    // Clear only this input
+    setAssigneeInputs((prev) => {
+      const updated = [...prev];
+      updated[stepIndex] = '';
+      return updated;
+    });
+    setUserSearchResults((prev) => ({ ...prev, [stepIndex]: [] }));
   };
 
   const handleRemoveAssignee = (stepIndex: number, assigneeId: string) => {
@@ -383,6 +411,35 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
       setIsSaving(false);
     }
   };
+
+  const handleDeleteWorkflow = async () => {
+    setIsDeleting(true);
+    setShowDeleteConfirm(false); // Close confirm dialog
+
+    try {
+      const response = await fetch(`/api/workflows/${id}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        toast.success('Workflow deleted successfully');
+        router.push('/dashboard/workflows');
+      } else {
+        throw new Error(data.error || 'Failed to delete workflow.');
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'An unexpected error occurred.',
+        {
+          description: 'Please check if content items are using this workflow.',
+        }
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
   
   // Loading state
   if (isLoading) {
@@ -431,10 +488,27 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
           </p>
         </div>
         <div className="flex space-x-2">
+          <Button 
+            variant="destructive"
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={isDeleting || isSaving}
+          >
+            {isDeleting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Deleting...
+              </>
+            ) : (
+              <>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Workflow
+              </>
+            )}
+          </Button>
           <Button variant="outline" asChild>
             <Link href={`/dashboard/workflows/${id}`}>Cancel</Link>
           </Button>
-          <Button onClick={handleSaveWorkflow} disabled={isSaving}>
+          <Button onClick={handleSaveWorkflow} disabled={isSaving || isDeleting}>
             {isSaving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -625,13 +699,21 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                       
                       <div className="space-y-2">
                         <Label htmlFor={`step-assignees-${index}`}>Assignees</Label>
-                        <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center space-x-2">
                           <Input
                             id={`step-assignees-${index}`}
-                            placeholder="Enter email address to add assignee."
-                            value={newAssigneeEmail}
-                            onChange={(e) => setNewAssigneeEmail(e.target.value)}
-                            onKeyDown={(e) => {
+                            placeholder="Enter email address or search for user."
+                            value={assigneeInputs[index] || ''}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setAssigneeInputs(prev => {
+                                const updated = [...prev];
+                                updated[index] = val;
+                                return updated;
+                              });
+                              searchUsers(val, index);
+                            }}
+                            onKeyDown={e => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
                                 handleAddAssignee(index);
@@ -646,8 +728,21 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                           >
                             Add
                           </Button>
+                          {userSearchLoading[index] && <span className="ml-2 text-xs">Searching...</span>}
+                          {userSearchResults[index] && userSearchResults[index].length > 0 && (
+                            <div className="absolute left-0 top-full z-10 bg-white border rounded shadow mt-1 w-full max-w-xs">
+                              {userSearchResults[index].map((user: any) => (
+                                <div
+                                  key={user.id}
+                                  className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                                  onClick={() => handleAddAssignee(index, user.email)}
+                                >
+                                  {user.full_name ? `${user.full_name} <${user.email}>` : user.email}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        
                         <div className="flex flex-wrap gap-2 mt-2">
                           {Array.isArray(step.assignees) ? (
                             step.assignees.map((assignee: any) => (
@@ -675,6 +770,15 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
           </CardContent>
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete Workflow?"
+        description="Are you sure you want to delete this workflow? This action cannot be undone. Any content items using this workflow may need to be reassigned."
+        confirmText="Delete"
+        onConfirm={handleDeleteWorkflow}
+      />
     </div>
   );
 } 
