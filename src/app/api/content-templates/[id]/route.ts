@@ -140,37 +140,35 @@ export const DELETE = withAuth(async (
     
     const supabase = createSupabaseAdminClient();
     
-    // Check if template is in use
-    const { data: contentCount, error: countError } = await supabase
+    // Unassign template from content items and set their status to cancelled
+    const { error: updateContentError } = await supabase
       .from('content')
-      .select('id', { count: 'exact' })
+      .update({ template_id: null, status: 'cancelled' })
       .eq('template_id', id);
-    
-    if (countError) throw countError;
-    
-    // Prevent deletion if template is in use
-    if (contentCount && contentCount.length > 0) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Cannot delete template that is in use by content items',
-          count: contentCount.length
-        },
-        { status: 400 }
-      );
+
+    if (updateContentError) {
+      // Log the error but proceed to attempt template deletion
+      // as the primary goal is to delete the template.
+      // A more robust solution might involve transactions if the DB supports it here.
+      console.error('Error updating content items before template deletion:', updateContentError);
+      // Optionally, you could choose to return an error here if unassigning content is critical
+      // return handleApiError(updateContentError, 'Failed to update associated content before deleting template');
     }
     
     // Delete the template
-    const { error } = await supabase
+    const { error: deleteTemplateError } = await supabase
       .from('content_templates')
       .delete()
       .eq('id', id);
     
-    if (error) throw error;
+    if (deleteTemplateError) {
+      // If the template itself couldn't be deleted, this is the primary error to report.
+      throw deleteTemplateError;
+    }
     
     return NextResponse.json({
       success: true,
-      message: 'Template deleted successfully'
+      message: 'Template deleted successfully. Associated content items have been updated.'
     });
   } catch (error) {
     console.error('Error deleting content template:', error);

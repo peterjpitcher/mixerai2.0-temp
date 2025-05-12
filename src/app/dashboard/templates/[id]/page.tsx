@@ -356,7 +356,7 @@ export default function TemplateEditPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {deleteError ? deleteError : 
-                `This action will permanently delete the template "${template?.name}". This cannot be undone.`
+                `Are you sure you want to delete the template "${template?.name}"? Any content items currently using this template will have it unassigned and their status will be set to 'cancelled'. This action cannot be undone for the template itself.`
               }
             </AlertDialogDescription>
           </AlertDialogHeader>
