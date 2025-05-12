@@ -10,7 +10,7 @@ import { Input } from '@/components/input';
 import { Label } from '@/components/label';
 import { Textarea } from '@/components/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
-import { MarkdownDisplay } from '@/components/content/markdown-display';
+import { RichTextEditor } from '@/components/content/rich-text-editor';
 import { toast } from 'sonner';
 import type { Metadata } from 'next';
 
@@ -110,6 +110,10 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setContent(prev => ({ ...prev, [name]: value }));
+  };
+  
+  const handleContentBodyChange = (newBodyValue: string) => {
+    setContent(prev => ({ ...prev, body: newBodyValue }));
   };
   
   const handleSave = async () => {
@@ -221,29 +225,12 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
           <CardTitle>Content Body</CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="edit" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="edit">Edit</TabsTrigger>
-              <TabsTrigger value="preview">Preview</TabsTrigger>
-            </TabsList>
-            <TabsContent value="edit" className="mt-4">
-              <Textarea 
-                name="body"
-                value={content.body}
-                onChange={handleInputChange}
-                rows={15}
-                className="font-mono"
-              />
-              <p className="text-sm text-muted-foreground mt-2">
-                Use Markdown syntax for formatting.
-              </p>
-            </TabsContent>
-            <TabsContent value="preview" className="mt-4">
-              <div className="border rounded p-4 overflow-auto max-h-[500px]">
-                <MarkdownDisplay markdown={content.body} />
-              </div>
-            </TabsContent>
-          </Tabs>
+          <RichTextEditor 
+            value={content.body} 
+            onChange={handleContentBodyChange}
+            placeholder="Enter your content here..."
+            className="min-h-[300px] border rounded-md"
+          />
         </CardContent>
       </Card>
       

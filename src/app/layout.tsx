@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "@/components/toast";
-import { ToastProvider } from "@/components/toast-provider";
+// import { Toaster } from "@/components/toast"; // Radix Toaster, to be removed
+// import { ToastProvider } from "@/components/toast-provider"; // Radix Provider, to be removed
 import { ThemeProvider } from "@/components/theme-provider";
 import RootLayoutWrapper from "@/components/layout/root-layout-wrapper";
-import { Toaster as SonnerToaster } from "@/components/sonner";
+import { Toaster as SonnerToaster } from "@/components/sonner"; // Keep Sonner
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -35,11 +35,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ToastProvider>
+          {/* <ToastProvider> */}{/* Removed Radix ToastProvider */}
             <RootLayoutWrapper>{children}</RootLayoutWrapper>
-            <Toaster />
-            <SonnerToaster />
-          </ToastProvider>
+            {/* <Toaster /> */}{/* Removed Radix Toaster */}
+            <SonnerToaster /> {/* Keep Sonner Toaster */}
+          {/* </ToastProvider> */}{/* Removed Radix ToastProvider */}
         </ThemeProvider>
       </body>
     </html>

@@ -1,36 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
-import { withAuth } from '@/lib/auth/api-auth';
+// import { withAuth } from '@/lib/auth/api-auth'; // No longer used
+import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth for global admin check
 
 export const dynamic = "force-dynamic";
 
 /**
- * POST endpoint to fix user role permissions
+ * POST endpoint to fix user role permissions across all their associated brands.
+ * Also updates the user's global role in metadata.
  * Body should contain:
  * - userId: string (required)
  * - role: 'admin' | 'editor' | 'viewer' (required)
+ * REQUIRES GLOBAL ADMIN PRIVILEGES.
  */
-export const POST = withAuth(async (request: NextRequest, user) => {
+export const POST = withAdminAuth(async (request: NextRequest, adminUser: any) => {
   try {
-    // Check if the current user is an admin
+    // adminUser is the authenticated global admin from withAdminAuth
     const supabase = createSupabaseAdminClient();
-    const { data: isAdmin, error: adminCheckError } = await supabase
-      .from('user_brand_permissions')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .maybeSingle();
-    
-    if (adminCheckError) throw adminCheckError;
-    
-    // Only allow admins to fix roles
-    if (!isAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Only admin users can fix user roles' },
-        { status: 403 }
-      );
-    }
     
     // Parse the request body
     const body = await request.json();

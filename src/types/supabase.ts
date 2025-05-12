@@ -879,7 +879,12 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      delete_brand_and_dependents: {
+        Args: {
+          brand_id_to_delete: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       content_status:

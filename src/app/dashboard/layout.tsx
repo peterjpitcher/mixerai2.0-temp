@@ -6,7 +6,7 @@ import { NotificationCenter } from "@/components/dashboard/notification-center";
 import { UnifiedNavigation } from "@/components/layout/unified-navigation";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
-import { useToast } from "@/components/use-toast";
+import { toast as sonnerToast } from "sonner";
 import { LogOut } from "lucide-react";
 
 /**
@@ -20,7 +20,6 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }>) {
   const router = useRouter();
-  const { toast } = useToast();
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -32,18 +31,12 @@ export default function DashboardLayout({
       if (error) {
         throw error;
       }
-      toast({
-        title: "Signed out",
-        description: "You have been successfully signed out."
-      });
+      sonnerToast.success("You have been successfully signed out.");
+
       router.push('/auth/login');
       router.refresh();
     } catch (error: any) {
-      toast({
-        title: "Error Signing Out",
-        description: error?.message || "There was a problem signing out. Please try again.",
-        variant: "destructive"
-      });
+      sonnerToast.error(error?.message || "There was a problem signing out. Please try again.");
     }
   };
 

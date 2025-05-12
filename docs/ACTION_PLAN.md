@@ -7,69 +7,68 @@ This document outlines a prioritized, phased plan to address the issues identifi
 **Goal**: Stabilize the application, close major security holes, and unblock core user flows.
 
 1.  **[COMPLETED] Security - Unauthenticated API Endpoints (CRITICAL)**:
-    *   **Related Issues**: #90, #122, #126, #132, #134, #135, #136 (from CODE_REVIEW_ISSUES.md, numbers refer to the consolidated list that will be generated).
-    *   **Action**: Immediately apply `withAuth` to all unauthenticated test/diagnostic API routes and the `/api/workflows/[id]` and `/api/content-templates/[id]` GET routes.
-    *   **Further Action**: Implement admin-only authorization for all test/diagnostic routes and sensitive operational routes like `/api/env-check`, `/api/test-connection` (Issues #117, #118, #125, #127, #129). This requires reviewing/implementing `requireAdmin()` (Issue #72).
+    *   **Related Issues**: #90, #122, #126, #132, #134, #135, #136.
+    *   **Action**: Applied `withAuth` and `withAdminAuth` as appropriate.
 
 2.  **[COMPLETED] Security - SSRF Vulnerability (CRITICAL)**:
     *   **Related Issue**: #116 (`/api/proxy`)
-    *   **Action**: Implement strict allowlisting or robust denylisting for the proxy endpoint immediately.
+    *   **Action**: Implemented basic denylisting for private IP ranges.
 
 3.  **[COMPLETED] Functionality Blocker - Missing API Routes (CRITICAL)**:
-    *   **Related Issues**: #188 (`/api/content-types`), #189 (`/api/content/generate/article-titles`), #190 (`/api/content/generate/keywords`).
-    *   **Action**: Implement these missing API routes as they are dependencies for core content generation features in `ArticleGeneratorForm`.
+    *   **Related Issues**: #188, #189, #190.
+    *   **Action**: Implemented `/api/content-types`, `/api/content/generate/article-titles`, `/api/content/generate/keywords`.
 
 4.  **[COMPLETED] Functionality Blocker - Save Content Not Implemented (CRITICAL)**:
-    *   **Related Issues**: #154 (`src/app/dashboard/content/[id]/edit/page.tsx`), dependent on API Issue #93 (Missing PUT for `/api/content/[id]`).
-    *   **Action**: Implement the `PUT /api/content/[id]` API route and connect the "Save Changes" functionality in the content edit page.
+    *   **Related Issues**: #154, #93.
+    *   **Action**: Implemented `PUT /api/content/[id]` and connected save functionality in edit page.
 
 5.  **[COMPLETED] Functionality Blocker - Redirect Loop on New Brand Page (CRITICAL)**:
-    *   **Related Issue**: #146 (`src/app/dashboard/brands/new/page.tsx`).
-    *   **Action**: Remove the redirect and implement the actual brand creation form UI on this page.
+    *   **Related Issue**: #146.
+    *   **Action**: Removed redirect and added placeholder form UI.
 
 6.  **[COMPLETED] Functionality Blocker - Registration Form UI Not Implemented (CRITICAL)**:
-    *   **Related Issue**: (Previously #171) Refers to issue in `src/app/auth/register/page.tsx` where form UI is missing.
-    *   **Action**: Implement the UI for the registration form inputs.
+    *   **Related Issue**: (Previously #171).
+    *   **Action**: Implemented UI for registration form inputs.
 
 7.  **[COMPLETED] Functionality Blocker - Missing Post-Invite Confirmation Logic (CRITICAL)**:
-    *   **Related Issue**: #179 (`src/app/auth/confirm/page.tsx`).
-    *   **Action**: Implement the backend API endpoint and client-side call to handle post-invite confirmation steps (updating permissions, invitation status).
+    *   **Related Issue**: #179.
+    *   **Action**: Implemented `/api/auth/complete-invite` and called from client to handle post-invite steps.
 
 8.  **[COMPLETED] Build Configuration - TypeScript & ESLint Errors**: 
     *   **Related Issues**: #3, #4.
-    *   **Action**: Set `ignoreBuildErrors: false` for both TypeScript and ESLint in `next.config.js` and fix any errors that surface during the build.
+    *   **Action**: Set `ignoreBuildErrors: false` for TypeScript and ESLint.
 
-## Phase 1: Core Functionality & Stability
+## Phase 1: Core Functionality & Stability [IN PROGRESS - KEY ITEMS ADDRESSED]
 
 **Goal**: Ensure all primary user workflows are functional, stable, and reasonably performant.
 
-1.  **RichTextEditor Integration (CRITICAL DEPENDENCY)**:
+1.  **[COMPLETED] RichTextEditor Integration (CRITICAL DEPENDENCY)**:
     *   **Related Issue**: #38.
-    *   **Action**: Locate, restore, or implement/select and integrate the `RichTextEditor`. This is a prerequisite for properly addressing issues in `ArticleGeneratorForm` and content editing.
+    *   **Action**: Installed `react-quill`, created wrapper, and integrated into `ArticleGeneratorForm` and `ContentEditPage`.
 
-2.  **`ArticleGeneratorForm` - Core Logic & Refactor**: 
+2.  **[PARTIALLY COMPLETED - Initial steps taken] `ArticleGeneratorForm` - Core Logic & Refactor**: 
     *   **Related Issues**: #40 (Overly complex), #41 (setTimeout chain), #42 (SEO keyword check), #43 (import).
-    *   **Action**: Begin refactoring `ArticleGeneratorForm` into smaller components/hooks. Replace `setTimeout` chains with `async/await`. Implement a reliable way to check keywords in content (dependent on `RichTextEditor` capabilities or server-side processing).
+    *   **Action**: Refactored `autoGenerateAllFields` to use `async/await`. Extracted `ArticleDetailsSidebar` component. Reliable keyword check deferred.
 
-3.  **API Performance - User Search**: 
+3.  **[COMPLETED] API Performance - User Search**: 
     *   **Related Issue**: #106 (Inefficient User Search in `/api/users/search`).
-    *   **Action**: Refactor the user search API to avoid fetching all users. Implement a more scalable solution.
+    *   **Action**: Refactored `/api/users/search` to query `profiles` table directly and efficiently.
 
-4.  **Data Integrity - Atomic Operations**: 
+4.  **[PARTIALLY COMPLETED - Initial steps taken] Data Integrity - Atomic Operations**: 
     *   **Related Issues**: #83, #87, #91, #103, #109, #120, #124, #125.
-    *   **Action**: Prioritize the most critical non-atomic operations. Investigate and implement database transactions or more robust error handling/rollback mechanisms. Focus on user deletion and brand/template cascade deletes first.
+    *   **Action**: Addressed brand deletion (#87) atomicity by refactoring API to call an RPC (DB function `delete_brand_and_dependents` needs creation). Other operations require similar treatment.
 
-5.  **Role System Clarification & Implementation**: 
+5.  **[PARTIALLY COMPLETED - Initial steps taken] Role System Clarification & Implementation**: 
     *   **Related Issues**: #97, #100, #101, #104, #108, #168.
-    *   **Action**: Define the role model clearly (global vs. brand-specific). Update API authorization checks and role update logic. Review/Implement `requireAdmin()` (#72).
+    *   **Action**: Introduced `isBrandAdmin` helper for brand-specific admin checks (used in `PUT/DELETE /api/brands/[id]`). Switched `/api/users/fix-role` to global `withAdminAuth`. Full audit pending.
 
-6.  **Type Safety - Core Data Structures**: 
-    *   **Related Issues**: Many `any` type issues (e.g., #44, #113, #150, #151, #155, #156, #158, #166, #168, #170, #171, #172, #173, #174, #175, #176, #177).
-    *   **Action**: Implement the shared types proposed for `User`, `Brand`, `Workflow`, `Notification` in `src/types/`. Start refactoring key components and API routes to use these strong types. Parse `Json` fields safely.
+6.  **[PARTIALLY COMPLETED - Initial steps taken] Type Safety - Core Data Structures**: 
+    *   **Related Issues**: Many `any` type issues (e.g., #44, #113).
+    *   **Action**: Created `src/types/models.ts` with core types (`Brand`, `UserProfile`, `Workflow`, `Notification`). Refactored `ArticleGeneratorForm` for `Brand[]`. Broader refactoring pending.
 
-7.  **Toast System Consolidation**: 
+7.  **[COMPLETED] Toast System Consolidation**: 
     *   **Related Issues**: #53, #68, #145.
-    *   **Action**: Decide on Sonner as the single toast system. Remove Radix-based toast components. Update `RootLayout` and all components to use Sonner.
+    *   **Action**: Removed Radix toast system. Sonner is now the sole toast system, and relevant components updated.
 
 ## Phase 2: UI/UX Refinements, Consistency, and Lower Priority Bugs
 

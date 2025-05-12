@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/input";
 import { Label } from "@/components/label";
 import { Checkbox } from "@/components/checkbox";
-import { useToast } from "@/components/use-toast";
+import { toast as sonnerToast } from "sonner";
 import { createSupabaseClient } from '@/lib/supabase/client';
 import type { Metadata } from 'next';
 
@@ -21,7 +21,6 @@ import type { Metadata } from 'next';
  */
 export default function RegisterPage() {
   const router = useRouter();
-  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -37,12 +36,12 @@ export default function RegisterPage() {
 
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
-      toast({ title: "Error", description: "Passwords do not match.", variant: "destructive" });
+      sonnerToast.error("Passwords do not match.");
       return;
     }
     if (!termsAccepted) {
       setError("You must accept the terms and conditions.");
-      toast({ title: "Error", description: "You must accept the terms and conditions.", variant: "destructive" });
+      sonnerToast.error("You must accept the terms and conditions.");
       return;
     }
 
@@ -62,25 +61,25 @@ export default function RegisterPage() {
 
       if (signUpError) {
         setError(signUpError.message);
-        toast({ title: "Registration failed", description: signUpError.message, variant: "destructive" });
+        sonnerToast.error("Registration failed", { description: signUpError.message });
       } else if (data.user?.identities?.length === 0) {
         // This case might indicate the user already exists but is not confirmed (social auth linking issue, less common with email)
         setError("This email may already be registered. Please try logging in or use a different email.");
-        toast({ title: "Registration notice", description: "This email may already be registered.", variant: "default" });
+        sonnerToast.info("This email may already be registered.", { description: "Please try logging in or use a different email."});
       } else if (data.session) {
         // User is signed up and logged in (e.g. if auto-confirm is on and secure email disabled)
-        toast({ title: "Success!", description: "Account created and you are logged in." });
+        sonnerToast.success("Account created and you are logged in!");
         router.push('/dashboard');
         router.refresh();
       } else {
         // Standard case: user signed up, needs to confirm email
-        toast({ title: "Registration successful!", description: "Please check your email to confirm your account." });
+        sonnerToast.success("Registration successful!", { description: "Please check your email to confirm your account." });
         // Optionally redirect to a page saying "check your email"
         // router.push('/auth/check-email'); 
       }
     } catch (err: any) {
       setError("An unexpected error occurred. Please try again.");
-      toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
+      sonnerToast.error("An unexpected error occurred.", { description: "Please try again." });
     } finally {
       setIsLoading(false);
     }

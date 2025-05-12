@@ -261,4 +261,41 @@ export function withAdminAuth<T>(
       );
     }
   };
+}
+
+/**
+ * Checks if a user has an 'admin' role for a specific brand.
+ * @param userId The ID of the user.
+ * @param brandId The ID of the brand.
+ * @param supabase An initialized Supabase client (usually admin client for this check).
+ * @returns True if the user is an admin for the brand, false otherwise.
+ */
+export async function isBrandAdmin(
+  userId: string,
+  brandId: string,
+  supabase: any // SupabaseClient from @supabase/supabase-js, but using any to avoid import cycle if used in HOFs
+): Promise<boolean> {
+  if (!userId || !brandId) {
+    return false;
+  }
+  try {
+    const { data, error } = await supabase
+      .from('user_brand_permissions')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('brand_id', brandId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') { // Not found
+        return false;
+      }
+      console.error(`Error checking brand admin permission for user ${userId}, brand ${brandId}:`, error);
+      return false; // Fail closed on other errors
+    }
+    return data?.role === 'admin';
+  } catch (e) {
+    console.error(`Exception checking brand admin permission for user ${userId}, brand ${brandId}:`, e);
+    return false;
+  }
 } 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import { isBrandAdmin } from '@/lib/auth/api-auth';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -77,11 +78,21 @@ export const GET = withAuth(async (
 export const PUT = withAuth(async (
   request: NextRequest,
   user: any,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) => {
   try {
     const supabase = createSupabaseAdminClient();
-    const { id } = params;
+    const brandIdToUpdate = context.params.id;
+    
+    // Authorize: Check if the authenticated user is an admin for this specific brand
+    const hasPermission = await isBrandAdmin(user.id, brandIdToUpdate, supabase);
+    if (!hasPermission) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: You do not have admin rights for this brand.' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     
     if (!body.name || body.name.trim() === '') {
@@ -133,12 +144,12 @@ export const PUT = withAuth(async (
     if (body.content_vetting_agencies !== undefined) updateData.content_vetting_agencies = body.content_vetting_agencies;
     
     if (body.brand_admin_id) {
-      const brandAdminId = body.brand_admin_id;
+      const newBrandAdminId = body.brand_admin_id;
       const { data: existingPermission, error: permCheckError } = await supabase
         .from('user_brand_permissions')
         .select('id, role')
-        .eq('user_id', brandAdminId)
-        .eq('brand_id', id)
+        .eq('user_id', newBrandAdminId)
+        .eq('brand_id', brandIdToUpdate)
         .maybeSingle();
       
       if (permCheckError) {
@@ -153,7 +164,7 @@ export const PUT = withAuth(async (
       } else if (!existingPermission) {
         const { error: createPermError } = await supabase
           .from('user_brand_permissions')
-          .insert({ user_id: brandAdminId, brand_id: id, role: 'admin' });
+          .insert({ user_id: newBrandAdminId, brand_id: brandIdToUpdate, role: 'admin' });
         if (createPermError) throw createPermError;
       }
     }
@@ -170,7 +181,7 @@ export const PUT = withAuth(async (
     const { data: updatedBrandData, error: updateErrorData } = await supabase
       .from('brands')
       .update(updateData)
-      .eq('id', id)
+      .eq('id', brandIdToUpdate)
       .select()
       .single();
     
@@ -196,22 +207,35 @@ export const PUT = withAuth(async (
 export const DELETE = withAuth(async (
   request: NextRequest,
   user: any,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) => {
   try {
     const supabase = createSupabaseAdminClient();
-    const { id } = params;
+    const brandIdToDelete = context.params.id;
     
+    // Authorize: Check if the authenticated user is an admin for this specific brand
+    const hasPermission = await isBrandAdmin(user.id, brandIdToDelete, supabase);
+    if (!hasPermission) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: You do not have admin rights for this brand to delete it.' },
+        { status: 403 }
+      );
+    }
+
     const url = new URL(request.url);
     const deleteCascade = url.searchParams.get('deleteCascade') === 'true';
     
+    // Check if brand exists before attempting to fetch dependents or delete
     const { data: brandToCheck, error: fetchError } = await supabase
       .from('brands')
       .select('id, name')
-      .eq('id', id)
-      .single();
+      .eq('id', brandIdToDelete)
+      .maybeSingle();
     
-    if (fetchError) throw fetchError;
+    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "Fetched template not found"
+        // An actual error occurred, not just not found
+        throw fetchError;
+    }
     if (!brandToCheck) {
       return NextResponse.json(
         { success: false, error: 'Brand not found' },
@@ -219,59 +243,60 @@ export const DELETE = withAuth(async (
       );
     }
     
-    const { count: contentCount, error: contentCountErr } = await supabase
-      .from('content')
-      .select('id', { count: 'exact', head: true })
-      .eq('brand_id', id);
-    if (contentCountErr) throw contentCountErr;
-    
-    const { count: workflowCount, error: workflowCountErr } = await supabase
-      .from('workflows')
-      .select('id', { count: 'exact', head: true })
-      .eq('brand_id', id);
-    if (workflowCountErr) throw workflowCountErr;
-    
-    const contentCountValue = contentCount || 0;
-    const workflowCountValue = workflowCount || 0;
-    
-    if (!deleteCascade && (contentCountValue > 0 || workflowCountValue > 0)) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: `Cannot delete brand. It has ${contentCountValue} piece${contentCountValue === 1 ? '' : 's'} of content and ${workflowCountValue} workflow${workflowCountValue === 1 ? '' : 's'} associated with it.`,
-          contentCount: contentCountValue,
-          workflowCount: workflowCountValue,
-          requiresCascade: true
-        },
-        { status: 400 }
-      );
-    }
-    
-    if (deleteCascade) {
-      if (contentCountValue > 0) {
-        const { error: cascadeContentDeleteError } = await supabase.from('content').delete().eq('brand_id', id);
-        if (cascadeContentDeleteError) throw cascadeContentDeleteError;
-      }
-      if (workflowCountValue > 0) {
-        const { error: cascadeWorkflowDeleteError } = await supabase.from('workflows').delete().eq('brand_id', id);
-        if (cascadeWorkflowDeleteError) throw cascadeWorkflowDeleteError;
-      }
-      const { error: cascadeBrandDeleteError } = await supabase.from('brands').delete().eq('id', id);
-      if (cascadeBrandDeleteError) throw cascadeBrandDeleteError;
+    // If not cascading, check for dependents first
+    if (!deleteCascade) {
+      const { count: contentCount, error: contentCountErr } = await supabase
+        .from('content')
+        .select('id', { count: 'exact', head: true })
+        .eq('brand_id', brandIdToDelete);
+      if (contentCountErr) throw contentCountErr;
       
-      return NextResponse.json({ 
-        success: true, 
-        message: `Brand "${brandToCheck.name}" and all associated content and workflows have been deleted successfully` 
-      });
+      const { count: workflowCount, error: workflowCountErr } = await supabase
+        .from('workflows')
+        .select('id', { count: 'exact', head: true })
+        .eq('brand_id', brandIdToDelete);
+      if (workflowCountErr) throw workflowCountErr;
+      
+      const contentCountValue = contentCount || 0;
+      const workflowCountValue = workflowCount || 0;
+      
+      if (contentCountValue > 0 || workflowCountValue > 0) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: `Cannot delete brand. It has ${contentCountValue} piece${contentCountValue === 1 ? '' : 's'} of content and ${workflowCountValue} workflow${workflowCountValue === 1 ? '' : 's'} associated. Use deleteCascade=true to override.`,
+            contentCount: contentCountValue,
+            workflowCount: workflowCountValue,
+            requiresCascade: true
+          },
+          { status: 400 } // Bad Request or 409 Conflict could also be used
+        );
+      }
     }
     
-    const { error: finalBrandDeleteError } = await supabase.from('brands').delete().eq('id', id);
-    if (finalBrandDeleteError) throw finalBrandDeleteError;
+    // Call the database function to perform atomic delete
+    // This function (delete_brand_and_dependents) needs to be created in your PostgreSQL database.
+    // It should handle deleting related user_brand_permissions, workflows, and then the brand.
+    // Content associated with the brand should be handled by ON DELETE CASCADE on content.brand_id.
+    // Workflows associated with the brand will set content.workflow_id to NULL (ON DELETE SET NULL).
+    const { error: rpcError } = await supabase.rpc('delete_brand_and_dependents', {
+      brand_id_to_delete: brandIdToDelete
+    });
+
+    if (rpcError) {
+      console.error('Error calling delete_brand_and_dependents RPC:', rpcError);
+      // Check for specific PostgreSQL error codes if the function indicates brand not found after attempting delete
+      if (rpcError.code === 'P0001' && rpcError.message.includes('Brand not found')) { // Example custom error from function
+           return NextResponse.json({ success: false, error: 'Brand not found or already deleted.' }, { status: 404 });
+      }
+      throw rpcError; // Re-throw for generic handling by handleApiError
+    }
     
     return NextResponse.json({ 
       success: true, 
-      message: `Brand "${brandToCheck.name}" has been deleted successfully` 
+      message: `Brand "${brandToCheck.name}" and its direct dependents (permissions, workflows) have been scheduled for deletion. Content will be cascade deleted.` 
     });
+
   } catch (error) {
     return handleApiError(error, 'Error deleting brand');
   }
