@@ -240,8 +240,6 @@ export async function PUT(
         .insert(newInvitationsToCreate.map(inv => ({...inv, status: 'pending'})));
       
       if (dbInvitationError) {
-        // Error creating invitations in DB. This is more critical than email sending.
-        // Consider how to report this. For now, it will be caught by the main try-catch.
         throw dbInvitationError;
       } else {
         if (newUsersToInviteByEmail.length > 0) {
@@ -251,30 +249,36 @@ export async function PUT(
             const adminUserId = currentUser?.id;
 
             for (const email of newUsersToInviteByEmail) {
-              let highestRole = 'viewer';
-              for (const item of newInvitationsToCreate) {
-                if (item.email === email) {
-                  if (item.role === 'admin') {
-                    highestRole = 'admin';
-                    break;
-                  } else if (item.role === 'editor' && highestRole !== 'admin') {
-                    highestRole = 'editor';
+              try {
+                let highestRole = 'viewer';
+                for (const item of newInvitationsToCreate) {
+                  if (item.email === email) {
+                    if (item.role === 'admin') {
+                      highestRole = 'admin';
+                      break;
+                    } else if (item.role === 'editor' && highestRole !== 'admin') {
+                      highestRole = 'editor';
+                    }
                   }
                 }
+                
+                const userFullName = ''; // Placeholder
+
+                await supabase.auth.admin.inviteUserByEmail(email, {
+                  data: {
+                    full_name: userFullName || email, 
+                    role: highestRole,
+                    invited_by: adminUserId || undefined, 
+                    invited_from_workflow: id
+                  }
+                });
+              } catch (individualEmailInviteError: any) {
+                console.error(`Failed to send invitation email to ${email} via Supabase Auth:`, individualEmailInviteError);
+                throw new Error(`Failed to invite user ${email} via Supabase Auth. Original error: ${individualEmailInviteError.message}`);
               }
-              
-              await supabase.auth.admin.inviteUserByEmail(email, {
-                data: {
-                  full_name: '',
-                  role: highestRole,
-                  invited_by: adminUserId || undefined, 
-                  invited_from_workflow: id
-                }
-              });
             } 
-          } catch (emailInviteError) {
-            // Email sending failed. This is often non-critical to the core operation success.
-            // Log to a proper monitoring service in production.
+          } catch (setupEmailError: any) {
+            console.error('Error during email invitation setup (before sending individual invites):', setupEmailError);
           }
         }
       } 
