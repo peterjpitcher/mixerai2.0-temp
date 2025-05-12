@@ -166,7 +166,7 @@ export function withAuthAndMonitoring<T>(
       );
     }
   };
-}
+} 
 
 /**
  * Higher-order function to wrap API handlers with admin-level authentication
