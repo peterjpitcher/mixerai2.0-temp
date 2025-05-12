@@ -107,25 +107,17 @@ export const GET = withRouteAuth(async (request: NextRequest, user: any, context
 export const PUT = withRouteAuth(async (request: NextRequest, user: any, context: Params) => {
   const { params } = context;
   try {
-    // Only allow admins or the user themselves to update
-    if (user.id !== params.id) {
-      // Check if the user has admin permissions
-      const supabaseInner = createSupabaseAdminClient();
-      const { data: userPermissions, error: permissionError } = await supabaseInner
-        .from('user_brand_permissions')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-      
-      if (permissionError) throw permissionError;
-      
-      if (!userPermissions) {
-        return NextResponse.json(
-          { success: false, error: 'Not authorized to update this user' },
-          { status: 403 }
-        );
-      }
+    // Authorization Check:
+    // Allow users to update themselves OR require global admin role.
+    const isSelf = user.id === params.id;
+    // Assume global admin role is stored in user_metadata.role for now (needs clarification - see Issue #97)
+    const isGlobalAdmin = user.user_metadata?.role === 'admin'; 
+
+    if (!isSelf && !isGlobalAdmin) {
+      return NextResponse.json(
+        { success: false, error: 'Not authorized to update this user' },
+        { status: 403 }
+      );
     }
     
     const supabase = createSupabaseAdminClient();
@@ -158,33 +150,6 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: any, context
             .update(profileUpdates)
             .eq('id', params.id);
         if (profileUpdateError) throw profileUpdateError;
-    }
-    
-    // If role was provided and the current user is an admin, update the role
-    if (body.role && user.id !== params.id) {
-      // Get existing brand permissions
-      const { data: existingPermissions, error: permissionsError } = await supabase
-        .from('user_brand_permissions')
-        .select('id, brand_id, role, user_id')
-        .eq('user_id', params.id);
-      
-      if (permissionsError) throw permissionsError;
-      
-      // Update all brand permissions to the new role if no specific brand_permissions provided
-      if (!body.brand_permissions && existingPermissions && existingPermissions.length > 0) {
-        const permissionUpdates = existingPermissions.map(permission => ({
-          id: permission.id,
-          user_id: permission.user_id,
-          brand_id: permission.brand_id,
-          role: body.role.toLowerCase()
-        }));
-        
-        const { error: permUpdateError } = await supabase
-          .from('user_brand_permissions')
-          .upsert(permissionUpdates);
-        
-        if (permUpdateError) throw permUpdateError;
-      }
     }
     
     // Handle brand permissions if provided
@@ -384,10 +349,14 @@ export const DELETE = withRouteAuth(async (request: NextRequest, user: any, cont
     
     if (deleteAuthError) throw deleteAuthError;
     
-    // The cascade delete should handle the profiles and permissions tables,
-    // but we'll manually clean them up just to be sure
-    await supabase.from('user_brand_permissions').delete().eq('user_id', params.id);
+    // Manually delete the user's profile and permissions, as there is no direct
+    // cascade from auth.users to profiles in the current schema.
+    // The cascade from profiles to user_brand_permissions handles permission cleanup
+    // once the profile is deleted.
     await supabase.from('profiles').delete().eq('id', params.id);
+    // Note: Deleting from user_brand_permissions explicitly might be redundant 
+    // if the profile delete cascade works, but it doesn't hurt.
+    await supabase.from('user_brand_permissions').delete().eq('user_id', params.id);
     
     return NextResponse.json({
       success: true,

@@ -148,85 +148,95 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       }
     }
     
-    const { data: workflow, error } = await supabase
-      .from('workflows')
-      .insert({
-        name: body.name,
-        brand_id: body.brand_id,
-        steps: steps,
-        created_by: user.id
-      })
-      .select()
-      .single();
+    // Prepare data for RPC call
+    const rpcParams = {
+      p_name: body.name,
+      p_brand_id: body.brand_id,
+      p_steps: steps, // Use the processed steps (with assignee IDs if found)
+      p_created_by: user.id,
+      p_invitation_items: invitationItems // Array of items for users needing invites
+    };
+
+    // Call the database function to create workflow and log invitations atomically
+    const { data: newWorkflowId, error: rpcError } = await supabase.rpc(
+      'create_workflow_and_log_invitations' as any, // TODO: Regenerate types
+      rpcParams
+    );
+
+    if (rpcError) {
+      console.error('RPC Error creating workflow and logging invitations:', rpcError);
+      throw new Error(`Failed to create workflow: ${rpcError.message}`);
+    }
+
+    if (!newWorkflowId) {
+      throw new Error('Workflow creation failed, no ID returned from function.');
+    }
     
-    if (error) throw error;
-    
-    if (invitationItems.length > 0 && workflow) {
-      const workflowInvitations: WorkflowInvitation[] = invitationItems.map(item => ({
-        workflow_id: workflow.id,
-        ...item,
-        status: 'pending'
-      }));
-      
-      const { error: invitationError } = await supabase
-        .from('workflow_invitations')
-        .insert(workflowInvitations);
-      
-      if (invitationError) {
-        // Logged error removed, handleApiError or specific response preferred
-        // Consider if this should be a more critical error response to client
-      }
-      
-      if (pendingInvites.length > 0) {
-        try {
-          await verifyEmailTemplates();
-          
-          for (const email of pendingInvites) {
-            let highestRole = 'viewer';
-            for (const item of invitationItems) {
-              if (item.email === email) {
-                if (item.role === 'admin') {
-                  highestRole = 'admin';
-                  break;
-                } else if (item.role === 'editor' && highestRole !== 'admin') {
-                  highestRole = 'editor';
-                }
+    // If invitations were logged, send auth invites
+    if (pendingInvites.length > 0) {
+      try {
+        await verifyEmailTemplates(); // Ensure email templates are okay
+        
+        for (const email of pendingInvites) {
+          // Determine highest role for this email from the originally prepared items
+          let highestRole = 'viewer' as 'admin' | 'editor' | 'viewer'; 
+          for (const item of invitationItems) {
+            if (item.email === email) {
+              if (item.role === 'admin') {
+                highestRole = 'admin';
+                break;
+              } else if (item.role === 'editor' && highestRole !== 'admin') {
+                highestRole = 'editor';
               }
-            }
-            
-            const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
-              data: {
-                full_name: '',
-                role: highestRole,
-                invited_by: user.id,
-                invited_from_workflow: workflow.id
-              }
-            });
-            
-            if (inviteError) {
-              // Logged error removed
-            } else {
-              // Logged success removed
             }
           }
-        } catch (inviteError) {
-          // Logged error removed
+          
+          const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
+            data: {
+              full_name: '', // Cannot determine name reliably here
+              role: highestRole,
+              invited_by: user.id,
+              invited_from_workflow: newWorkflowId // Use the returned ID
+            }
+          });
+          
+          if (inviteError) {
+            // Log error, but don't fail the whole request as workflow/logs are created
+            console.error(`Failed to send auth invite to ${email}:`, inviteError);
+          } else {
+            // console.log(`Successfully sent auth invite to ${email}`);
+          }
         }
+      } catch (inviteProcessError) {
+        console.error('Error during the auth invite sending process:', inviteProcessError);
       }
     }
     
-    const { data: brand } = await supabase
-      .from('brands')
-      .select('name, brand_color')
-      .eq('id', body.brand_id)
+    // Fetch the created workflow details to return in the response
+    const { data: createdWorkflow, error: fetchError } = await supabase
+      .from('workflows')
+      .select(`
+        *,
+        brands:brand_id(name, brand_color)
+      `)
+      .eq('id', newWorkflowId)
       .single();
-    
+
+    if (fetchError) {
+      console.error('Error fetching newly created workflow:', fetchError);
+      return NextResponse.json({ 
+        success: true, 
+        workflow_id: newWorkflowId,
+        warning: 'Workflow created, but failed to fetch full data.'
+      });
+    }
+
     const formattedWorkflow = {
-      ...workflow,
-      brand_name: brand?.name || null,
-      brand_color: brand?.brand_color || null,
-      steps_count: Array.isArray(workflow.steps) ? workflow.steps.length : 0,
-      content_count: 0
+      ...createdWorkflow,
+      brand_name: createdWorkflow?.brands?.name || null,
+      brand_color: createdWorkflow?.brands?.brand_color || null,
+      steps_count: Array.isArray(createdWorkflow?.steps) ? createdWorkflow.steps.length : 0,
+      content_count: 0 // Assuming new workflow has no content yet
     };
     
     return NextResponse.json({

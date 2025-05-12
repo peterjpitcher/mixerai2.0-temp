@@ -40,7 +40,7 @@ export function LoginForm() {
         setError(signInError.message);
         toast.error(signInError.message);
       } else {
-        toast('You have been logged in successfully.');
+        toast.success('You have been logged in successfully.');
         router.push("/dashboard");
         router.refresh();
       }

@@ -46,12 +46,7 @@ export default function InviteUserPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [mounted, setMounted] = useState(false);
   
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   // Fetch brands data
   useEffect(() => {
     const fetchBrands = async () => {
@@ -116,7 +111,15 @@ export default function InviteUserPage() {
       const data = await response.json();
       
       if (data.success) {
-        toast(`Invitation has been sent to ${form.email}.`);
+        if (data.data?.warning) {
+          // Handle partial success (e.g., invite sent, brand assignment failed)
+          toast.warning(data.data.message || 'Invitation sent with warnings', {
+            description: data.data.warning,
+          });
+        } else {
+          // Handle full success
+          toast.success(data.data?.message || `Invitation has been sent to ${form.email}.`);
+        }
         
         // Navigate back to the users list
         router.push('/dashboard/users');

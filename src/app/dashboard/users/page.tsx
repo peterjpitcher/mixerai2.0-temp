@@ -12,7 +12,7 @@ import {
   ExternalLink, 
   Pencil, 
   Trash2, 
-  AlertCircle 
+  AlertCircle,
 } from 'lucide-react';
 import {
   Table,
@@ -32,6 +32,7 @@ import {
 } from "@/components/dialog";
 import type { Metadata } from 'next';
 import { toast } from 'sonner';
+import { Badge } from '@/components/badge';
 
 // export const metadata: Metadata = {
 //   title: 'Manage Users | MixerAI 2.0',
@@ -245,7 +246,7 @@ export default function UsersPage() {
       </div>
     );
   };
-  
+
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
@@ -363,15 +364,13 @@ export default function UsersPage() {
                   <TableCell className="font-medium">{user.full_name}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      user.role?.toLowerCase().includes('admin') 
-                        ? 'bg-primary/20 text-primary'
-                        : user.role?.toLowerCase().includes('editor')
-                          ? 'bg-secondary/20 text-secondary'
-                          : 'bg-muted text-muted-foreground'
-                    }`}>
+                    <Badge variant={
+                      user.role?.toLowerCase().includes('admin') ? 'default' : 
+                      user.role?.toLowerCase().includes('editor') ? 'secondary' : 
+                      'outline'
+                    }>
                       {user.role}
-                    </span>
+                    </Badge>
                   </TableCell>
                   <TableCell>{renderBrandIcons(user)}</TableCell>
                   <TableCell>{user.company || '-'}</TableCell>

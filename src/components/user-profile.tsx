@@ -11,6 +11,7 @@ import { Label } from '@/components/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { toast } from 'sonner';
 import { UserCircle } from 'lucide-react';
+import { format as formatDateFns } from 'date-fns';
 
 interface User {
   id: string;
@@ -50,15 +51,13 @@ export function UserProfile({ user, isCurrentUser = false, canEdit = false, onUs
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Never';
-    
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
+    try {
+      const date = new Date(dateString);
+      return formatDateFns(date, 'dd MMM yyyy, HH:mm');
+    } catch (error) {
+      console.error('Error formatting date:', dateString, error);
+      return 'Invalid Date';
+    }
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -160,10 +159,10 @@ export function UserProfile({ user, isCurrentUser = false, canEdit = false, onUs
               
               <div className="flex flex-wrap gap-2 justify-center md:justify-start">
                 {user.role && (
-                  <Badge className={
-                    user.role === 'Admin' ? 'bg-blue-100 text-blue-800' : 
-                    user.role === 'Editor' ? 'bg-green-100 text-green-800' : 
-                    'bg-gray-100 text-gray-800'
+                  <Badge variant={
+                    user.role.toLowerCase() === 'admin' ? 'default' : 
+                    user.role.toLowerCase() === 'editor' ? 'secondary' : 
+                    'outline' // Default to outline for Viewer or other roles
                   }>
                     {user.role}
                   </Badge>
@@ -203,10 +202,10 @@ export function UserProfile({ user, isCurrentUser = false, canEdit = false, onUs
                 {user.brand_permissions.map(permission => (
                   <div key={permission.id} className="flex items-center justify-between p-2 border rounded-md">
                     <span>{permission.brand?.name || 'Unknown Brand'}</span>
-                    <Badge className={
-                      permission.role === 'admin' ? 'bg-blue-100 text-blue-800' : 
-                      permission.role === 'editor' ? 'bg-green-100 text-green-800' : 
-                      'bg-gray-100 text-gray-800'
+                    <Badge variant={
+                      permission.role === 'admin' ? 'default' : 
+                      permission.role === 'editor' ? 'secondary' : 
+                      'outline' // Default to outline for viewer
                     }>
                       {permission.role.charAt(0).toUpperCase() + permission.role.slice(1)}
                     </Badge>
@@ -230,7 +229,7 @@ export function UserProfile({ user, isCurrentUser = false, canEdit = false, onUs
           
           <form onSubmit={handleEditSubmit} className="space-y-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="full_name">Full Name <span className="text-red-500">*</span></Label>
+              <Label htmlFor="full_name">Full Name <span className="text-destructive">*</span></Label>
               <Input
                 id="full_name"
                 value={editForm.full_name}
@@ -241,7 +240,7 @@ export function UserProfile({ user, isCurrentUser = false, canEdit = false, onUs
             </div>
             
             <div className="grid gap-2">
-              <Label htmlFor="job_title">Job Title <span className="text-red-500">*</span></Label>
+              <Label htmlFor="job_title">Job Title <span className="text-destructive">*</span></Label>
               <Input
                 id="job_title"
                 value={editForm.job_title}

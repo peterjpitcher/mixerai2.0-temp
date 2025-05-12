@@ -38,7 +38,7 @@ This document outlines a prioritized, phased plan to address the issues identifi
     *   **Related Issues**: #3, #4.
     *   **Action**: Set `ignoreBuildErrors: false` for TypeScript and ESLint.
 
-## Phase 1: Core Functionality & Stability [IN PROGRESS - KEY ITEMS ADDRESSED]
+## Phase 1: Core Functionality & Stability [IN PROGRESS - SIGNIFICANT PROGRESS]
 
 **Goal**: Ensure all primary user workflows are functional, stable, and reasonably performant.
 
@@ -46,25 +46,43 @@ This document outlines a prioritized, phased plan to address the issues identifi
     *   **Related Issue**: #38.
     *   **Action**: Installed `react-quill`, created wrapper, and integrated into `ArticleGeneratorForm` and `ContentEditPage`.
 
-2.  **[PARTIALLY COMPLETED - Initial steps taken] `ArticleGeneratorForm` - Core Logic & Refactor**: 
+2.  **[COMPLETED] `ArticleGeneratorForm` - Core Logic & Refactor**: 
     *   **Related Issues**: #40 (Overly complex), #41 (setTimeout chain), #42 (SEO keyword check), #43 (import).
-    *   **Action**: Refactored `autoGenerateAllFields` to use `async/await`. Extracted `ArticleDetailsSidebar` component. Reliable keyword check deferred.
+    *   **Action**: Refactored `autoGenerateAllFields` to use `async/await`. Extracted `ArticleDetailsSidebar` component. SEO keyword check (#42) refactored for reliability using DOM parsing.
 
 3.  **[COMPLETED] API Performance - User Search**: 
     *   **Related Issue**: #106 (Inefficient User Search in `/api/users/search`).
     *   **Action**: Refactored `/api/users/search` to query `profiles` table directly and efficiently.
 
-4.  **[PARTIALLY COMPLETED - Brand & Template Deletion Addressed] Data Integrity - Atomic Operations**: 
+4.  **[PARTIALLY COMPLETED - Key Issues Addressed, Further Review for others] Data Integrity - Atomic Operations**: 
     *   **Related Issues**: #83, #87, #91, #103, #109, #120, #124, #125.
-    *   **Action**: Addressed brand deletion (#87) and template deletion (#91) atomicity by creating DB functions and updating APIs to use RPC. Other operations require similar treatment.
+    *   **Action**:
+        *   Brand deletion (#87) and template deletion (#91) atomicity by creating DB functions and updating APIs to use RPC - **COMPLETED**.
+        *   Non-atomic Brand creation (#83) - **COMPLETED** (RPC function `create_brand_and_set_admin`).
+        *   Redundant manual deletes after auth user deletion (#103) - **VERIFIED/COMMENTED** (Manual deletes necessary, comment updated).
+        *   Non-atomic ops in `fix-role` (#109) - **COMPLETED** (RPC function `set_user_role_for_all_assigned_brands`).
+        *   Non-atomic workflow creation (#120) - **COMPLETED** (RPC function `create_workflow_and_log_invitations` for DB operations).
+        *   Non-atomic workflow invitation updates (#124) - **COMPLETED** (RPC function `update_workflow_and_handle_invites` for DB operations).
+        *   Non-atomic workflow deletes (#125) - **COMPLETED** (Redundant delete removed, cascade handles it).
+    *   **Remaining**: Review if other operations require similar treatment.
 
-5.  **[PARTIALLY COMPLETED - Initial steps taken] Role System Clarification & Implementation**: 
+5.  **[PARTIALLY COMPLETED - Key Issues Addressed, Full Audit Pending] Role System Clarification & Implementation**: 
     *   **Related Issues**: #97, #100, #101, #104, #108, #168.
-    *   **Action**: Introduced `isBrandAdmin` helper for brand-specific admin checks (used in `PUT/DELETE /api/brands/[id]`). Switched `/api/users/fix-role` to global `withAdminAuth`. Full audit pending.
+    *   **Action**: 
+        *   Introduced `isBrandAdmin` helper (used in `PUT/DELETE /api/brands/[id]`). Switched `/api/users/fix-role` to global `withAdminAuth`.
+        *   Issue #97 (Dual source user role in `GET /api/users`) - **ANALYZED & COMMENTED**.
+        *   Issue #100 (Overly broad admin auth `PUT /api/users/[id]`) - **COMPLETED**.
+        *   Issue #101 (Unintended bulk role update `PUT /api/users/[id]`) - **COMPLETED**.
+        *   Issue #104 (Overly broad admin auth `POST /api/users/invite`) - **COMPLETED**.
+        *   Issue #108 (Destructive bulk role assignment `fix-role`) - **VERIFIED/ADDRESSED**.
+        *   Issue #168 (Clarity of "Default Role" on User Edit Page) - **COMPLETED**.
+    *   **Remaining**: Full audit pending on overall role system usage and definition of global vs. brand roles.
 
-6.  **[PARTIALLY COMPLETED - Initial steps taken] Type Safety - Core Data Structures**: 
+6.  **[PARTIALLY COMPLETED - Initial types created, some specific issues addressed, Broader Refactoring Pending] Type Safety - Core Data Structures**: 
     *   **Related Issues**: Many `any` type issues (e.g., #44, #113).
-    *   **Action**: Created `src/types/models.ts` with core types (`Brand`, `UserProfile`, `Workflow`, `Notification`). Refactored `ArticleGeneratorForm` for `Brand[]`. Broader refactoring pending.
+    *   **Action**: Created `src/types/models.ts` with core types (`Brand`, `UserProfile`, `Workflow`, `Notification`). Refactored `ArticleGeneratorForm` for `Brand[]`.
+        *   Issue #113 (`any` type for workflow step data in `/api/me/tasks`) - **COMPLETED**.
+    *   **Remaining**: Broader refactoring pending to apply strong types across components and APIs.
 
 7.  **[COMPLETED] Toast System Consolidation**: 
     *   **Related Issues**: #53, #68, #145.
@@ -74,24 +92,34 @@ This document outlines a prioritized, phased plan to address the issues identifi
 
 **Goal**: Improve user experience, code consistency, and address remaining functional gaps.
 
-1.  **[PARTIALLY COMPLETED - Examples Addressed] Styling Consistency - Colors & Icons**: 
+1.  **[PARTIALLY COMPLETED - Examples Addressed, Full Audit Pending] Styling Consistency - Colors & Icons**: 
     *   **Related Issues**: Many issues on hardcoded colors/icons (e.g., #45, #47, #48, #49, #57, #60, #61, #62, #64, #75, #76, #78, #147, #148, #152, #153, #160, #161, #173, #174, #175, #177, #182, #183, #184).
-    *   **Action**: Replaced hardcoded colors/SVG icons in `FieldDesigner`, `DomainVerification`, `UIShowcasePage` with theme-based classes/Icon components. Full audit pending.
+    *   **Action**: 
+        *   Replaced hardcoded colors/SVG icons in `FieldDesigner`, `DomainVerification`, `UIShowcasePage` with theme-based classes/Icon components.
+        *   Issue #45 (`TemplateForm` colors) - **VERIFIED/RESOLVED**.
+        *   Issue #47 (`FieldDesigner` required asterisk) - **VERIFIED/RESOLVED**.
+        *   Issue #48 (`UserProfile` role badges) - **COMPLETED**.
+        *   Issue #49 (`UserProfile` required indicator) - **COMPLETED**.
+    *   **Remaining**: Full audit pending.
 
-2.  **[PARTIALLY COMPLETED - Example Addressed] Date Formatting Standardization**: 
+2.  **[PARTIALLY COMPLETED - Example Addressed, Full Audit Pending] Date Formatting Standardization**: 
     *   **Related Issue**: #187 (Consolidated).
-    *   **Action**: Refactored date display in `ContentPage` to use `date-fns`. Full audit pending.
+    *   **Action**: 
+        *   Refactored date display in `ContentPage` to use `date-fns`.
+        *   Updated `UserProfile` to use `date-fns`.
+    *   **Remaining**: Full audit pending.
 
-3.  **[PARTIALLY COMPLETED - Content Search Implemented] Non-Functional UI Elements**: 
+3.  **[COMPLETED - Scope Reduced] Non-Functional UI Elements**: 
     *   **Related Issues**: #150 (Content Search), #163 (User Page Export/Import), #130 (Brand Page Export/Import).
-    *   **Action**: Implemented Content Search on frontend and updated backend API. Export/Import buttons pending.
+    *   **Action**: Implemented Content Search on frontend and updated backend API. Export/Import buttons for users and brands **REMOVED FROM SCOPE** per user request.
 
-4.  **API Response Consistency (Remaining Checks)**: 
+4.  **[PARTIALLY COMPLETED - Example Addressed, Full Audit Pending] API Response Consistency**: 
     *   **Related Issue**: #2.
-    *   **Action**: Final pass over all API routes for strict adherence to standard response format.
+    *   **Action**: `/api/users/invite` reviewed and updated for stricter consistency.
+    *   **Remaining**: Final pass over all API routes for strict adherence to standard response format.
 
 5.  **Form Enhancements & Minor UI Bugs**: 
-    *   Address issues like #164 (unnecessary `mounted` state), #114 & #115 (Metadata generator keyword/scraping feedback), #122 (User Invite partial success handling).
+    *   Address issues like #164 (unnecessary `mounted` state) - VERIFIED/NOT FOUND, #114 & #115 (Metadata generator keyword/scraping feedback), #122 (User Invite partial success handling) - COMPLETED.
     *   Review UI component usage based on specific page contexts.
 
 6.  **Semantic HTML & Accessibility**: 
@@ -113,7 +141,9 @@ This document outlines a prioritized, phased plan to address the issues identifi
 2.  **Code Cleanup**: 
     *   Remove dead/commented-out code (e.g., Issue #9, #119, #126).
     *   Address minor considerations (e.g., `node-fetch` usage, `cheerio`/`jsdom` bundling).
+    *   **NOTE**: Commented-out code (metadata exports, unused imports like withAuth, Radix Toaster, RadioGroup, specific logic blocks) could not be automatically removed due to tool limitations. Manual review/removal suggested.
 
 3.  **Final Polish**: 
     *   Address any remaining low-priority bugs or UI inconsistencies.
-    *   Performance profiling and optimization if needed. 
+    *   Performance profiling and optimization if needed.
+    *   **Completed**: Final pass on API route error handling. Routes reviewed handle errors consistently using `handleApiError`. 

@@ -2,21 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import type { WorkflowStep, WorkflowAssignee } from '@/types/models'; // Import shared types
 
 export const dynamic = "force-dynamic";
-
-interface WorkflowStepAssignee {
-  id?: string; // Assuming assignee object has an id property which is the user_id
-  email?: string;
-  // other potential assignee properties
-}
-
-interface WorkflowStep {
-  id: string | number; // id of the step within the JSONB array
-  name: string;
-  assignees?: WorkflowStepAssignee[];
-  // other step properties
-}
 
 export const GET = withAuth(async (request: NextRequest, user) => {
   if (!user) {
@@ -59,19 +47,24 @@ export const GET = withAuth(async (request: NextRequest, user) => {
 
       // More careful access to step object and its properties
       const stepDataFromJSON = contentItem.workflow.steps[currentStepIndex];
+      
+      // Runtime check for the step data structure
       if (!stepDataFromJSON || typeof stepDataFromJSON !== 'object') {
         return false;
       }
-      // Assert known properties, allow others to be potentially undefined as per WorkflowStep interface
-      const currentStepObject: WorkflowStep = {
-        id: (stepDataFromJSON as any).id || currentStepIndex, // Fallback to index if id field isn't in JSON step
-        name: (stepDataFromJSON as any).name || 'Unnamed Step',
-        assignees: (stepDataFromJSON as any).assignees as WorkflowStepAssignee[] | undefined,
-        // include other properties from WorkflowStep if they are expected
-      };
+      // Assert type after runtime check
+      const currentStepObject = stepDataFromJSON as unknown as WorkflowStep;
       
-      if (currentStepObject && Array.isArray(currentStepObject.assignees)) {
-        return currentStepObject.assignees.some(assignee => assignee && assignee.id === currentUserId);
+      // Check if the assignees array exists and includes the current user
+      if (Array.isArray(currentStepObject.assignees)) {
+        return currentStepObject.assignees.some(assignee => {
+          // Runtime check for individual assignee object
+          if (assignee && typeof assignee === 'object' && assignee.id) {
+            // Assert type after runtime check for assignee
+            return (assignee as WorkflowAssignee).id === currentUserId;
+          }
+          return false;
+        });
       }
       return false;
     });

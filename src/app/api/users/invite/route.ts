@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { withAuth } from '@/lib/auth/api-auth';
+import { withAdminAuth } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import { verifyEmailTemplates } from '@/lib/auth/email-templates';
 
 /**
  * POST endpoint to invite a new user
- * Only users with admin role can invite others
+ * Only global administrators can invite users.
  */
-export const POST = withAuth(async (request: NextRequest, user) => {
+export const POST = withAdminAuth(async (request: NextRequest, adminUser) => {
   console.log('[API /api/users/invite] Received POST request');
   try {
     const supabase = createSupabaseAdminClient();
@@ -44,28 +44,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       );
     }
     
-    console.log(`[API /api/users/invite] Checking permissions for inviting user: ${user.id}`);
-    const { data: userPermissions, error: permissionCheckError } = await supabase
-      .from('user_brand_permissions')
-      .select('role', {count: 'exact'})
-      .eq('user_id', user.id)
-      .eq('role', 'admin');
-    
-    if (permissionCheckError) {
-      console.error('[API /api/users/invite] Error checking user permissions:', permissionCheckError);
-      throw permissionCheckError;
-    }
-    
-    console.log('[API /api/users/invite] User permissions check result count:', userPermissions?.length);
-    if (!userPermissions || userPermissions.length === 0) {
-      console.warn(`[API /api/users/invite] Permission denied: User ${user.id} is not an admin.`);
-      return NextResponse.json(
-        { success: false, error: 'Only administrators can invite users' },
-        { status: 403 }
-      );
-    }
-    
-    console.log(`[API /api/users/invite] Attempting to invite user: ${body.email}`);
+    console.log(`[API /api/users/invite] Attempting to invite user: ${body.email} by admin: ${adminUser.id}`);
     const invitePayload = {
       email: body.email,
       options: {
@@ -74,9 +53,8 @@ export const POST = withAuth(async (request: NextRequest, user) => {
           job_title: body.job_title || '',
           company: body.company || '',
           role: body.role.toLowerCase(),
-          invited_by: user.id
+          invited_by: adminUser.id
         },
-        // redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/confirm` // Ensure this is correctly handled by Supabase defaults or set if needed
       }
     };
     console.log('[API /api/users/invite] Supabase invite payload:', JSON.stringify(invitePayload));
@@ -107,7 +85,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
             user_id: inviteData.user.id,
             brand_id: body.brand_id,
             role: body.role.toLowerCase(),
-            assigned_by: user.id
           }
         ]);
       
@@ -115,9 +92,11 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         console.warn(`[API /api/users/invite] Failed to assign user ${inviteData.user.id} to brand ${body.brand_id}:`, JSON.stringify(permissionError));
         return NextResponse.json({ 
           success: true, 
-          message: 'Invitation sent successfully, but brand assignment failed.',
-          warning: `Failed to assign user to the selected brand: ${permissionError.message}`,
-          data: inviteData
+          data: {
+            user: inviteData.user,
+            message: 'Invitation sent successfully, but brand assignment failed.',
+            warning: `Failed to assign user to the selected brand: ${permissionError.message}`
+          }
         });
       }
       console.log(`[API /api/users/invite] Successfully assigned user ${inviteData.user.id} to brand ${body.brand_id}`);
@@ -126,8 +105,10 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     console.log('[API /api/users/invite] Invitation process completed successfully.');
     return NextResponse.json({ 
       success: true, 
-      message: 'Invitation sent successfully',
-      data: inviteData
+      data: { 
+        user: inviteData.user,
+        message: 'Invitation sent successfully'
+      }
     });
   } catch (error: any) {
     console.error('[API /api/users/invite] Unhandled error in POST handler:', error);

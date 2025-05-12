@@ -29,6 +29,10 @@ interface Brand {
   brand_color?: string;
 }
 
+interface BrandsPageClientProps {
+  initialBrands: Brand[];
+}
+
 export default function BrandsPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(true);

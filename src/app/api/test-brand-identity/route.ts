@@ -4,6 +4,8 @@ import { generateBrandIdentityFromUrls } from '@/lib/azure/openai';
 import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
 import { handleApiError } from '@/lib/api-utils';
 
+export const dynamic = "force-dynamic";
+
 // Detect if we're in a build environment (Vercel)
 const isBuildEnvironment = process.env.VERCEL_ENV === 'production' || 
                            process.env.NEXT_PHASE === 'phase-production-build';

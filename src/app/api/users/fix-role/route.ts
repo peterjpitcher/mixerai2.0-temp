@@ -62,41 +62,39 @@ export const POST = withAdminAuth(async (request: NextRequest, adminUser: any) =
       details: [] as string[]
     };
     
-    // If user has existing permissions, update them all to the new role
+    // If user has existing permissions, update them all to the new role using RPC
     if (existingPermissions && existingPermissions.length > 0) {
-      for (const permission of existingPermissions) {
-        const { error: updateError } = await supabase
-          .from('user_brand_permissions')
-          .update({ role })
-          .eq('id', permission.id);
-        
-        if (updateError) throw updateError;
-        operations.updated++;
-        operations.details.push(`Updated permission ${permission.id} for brand ${permission.brand_id}`);
+      const { data: updatedCount, error: rpcError } = await supabase.rpc(
+        'set_user_role_for_all_assigned_brands' as any, // TODO: Regenerate types
+        {
+          target_user_id: userId,
+          new_role: role
+        }
+      );
+
+      if (rpcError) {
+        console.error('RPC Error updating user roles:', rpcError);
+        throw new Error(`Failed to update user roles: ${rpcError.message}`);
       }
+
+      operations.updated = updatedCount || 0;
+      operations.details.push(`Atomically updated ${updatedCount || 0} existing brand permissions to role '${role}'.`);
+      
+      // REMOVED LOOP FOR INDIVIDUAL UPDATES
+      // for (const permission of existingPermissions) {
+      //   const { error: updateError } = await supabase
+      //     .from('user_brand_permissions')
+      //     .update({ role })
+      //     .eq('id', permission.id);
+        
+      //   if (updateError) throw updateError;
+      //   operations.updated++;
+      //   operations.details.push(`Updated permission ${permission.id} for brand ${permission.brand_id}`);
+      // }
     } else {
-      // If user has no permissions, add one for each brand with the specified role
-      const { data: brands, error: brandsError } = await supabase
-        .from('brands')
-        .select('id');
-      
-      if (brandsError) throw brandsError;
-      
-      for (const brand of brands) {
-        const { data: newPermission, error: insertError } = await supabase
-          .from('user_brand_permissions')
-          .insert({
-            user_id: userId,
-            brand_id: brand.id,
-            role
-          })
-          .select()
-          .single();
-        
-        if (insertError) throw insertError;
-        operations.created++;
-        operations.details.push(`Created permission for brand ${brand.id}`);
-      }
+      // If user has no existing permissions, just log this fact.
+      // We will still update the metadata role.
+      operations.details.push('User has no existing brand permissions to update.');
     }
     
     // Also update the user's metadata to reflect the new role

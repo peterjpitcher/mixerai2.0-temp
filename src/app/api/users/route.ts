@@ -66,6 +66,12 @@ export const GET = withAuth(async (req: NextRequest, user) => {
         }
       }
       
+      // Role Determination Logic (Issue #97):
+      // 1. Find the highest role ('admin' > 'editor' > 'viewer') across all the user's brand permissions.
+      // 2. If the highest brand permission role is still 'viewer', check auth.user_metadata.role as a fallback.
+      // 3. This provides a primary role for display but conflates brand-specific and potential global roles.
+      // TODO: Conduct full role system audit - clarify if user_metadata.role represents a true global role
+      //       and ensure API authorization checks the correct permission source (brand vs. global).
       if (highestRole === 'viewer' && authUser.user_metadata?.role) {
         const metadataRole = typeof authUser.user_metadata.role === 'string' ? 
           authUser.user_metadata.role.toLowerCase() : '';

@@ -7,6 +7,7 @@ export default function PrivacyPolicyPage() {
     <div className="container max-w-4xl mx-auto py-12">
       <h1 className="text-3xl font-bold mb-8">Privacy Policy</h1>
       
+      {/* TODO: Update with current Privacy Policy content */}
       <Card>
         <CardHeader>
           <CardTitle>MixerAI 2.0 Privacy Policy</CardTitle>

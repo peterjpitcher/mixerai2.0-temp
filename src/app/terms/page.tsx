@@ -7,6 +7,7 @@ export default function TermsPage() {
     <div className="container max-w-4xl mx-auto py-12">
       <h1 className="text-3xl font-bold mb-8">Terms of Service</h1>
       
+      {/* TODO: Update with current Terms of Service content */}
       <Card>
         <CardHeader>
           <CardTitle>MixerAI 2.0 Terms of Service</CardTitle>

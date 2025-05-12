@@ -25,10 +25,9 @@ export default function DirectApiTest() {
   const [requestTime, setRequestTime] = useState<number | null>(null);
   const [showRawResponse, setShowRawResponse] = useState(false);
   const [useCustomEndpoint, setUseCustomEndpoint] = useState(false);
-  const [customEndpoint, setCustomEndpoint] = useState('https://api.openai.com/v1/chat/completions');
+  const [customEndpoint, setCustomEndpoint] = useState('https://api.example.com/v1/test');
   const [customHeaders, setCustomHeaders] = useState(JSON.stringify({
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer YOUR_API_KEY_HERE'
+    'Content-Type': 'application/json'
   }, null, 2));
 
   const availableEndpoints = [

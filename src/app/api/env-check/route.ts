@@ -4,6 +4,8 @@ import { handleApiError, isDatabaseConnectionError } from '@/lib/api-utils';
 // import { withAuth } from '@/lib/auth/api-auth'; // No longer used
 import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
 
+export const dynamic = "force-dynamic"; // Ensures the route is always dynamic
+
 /**
  * API route to test environment status, including DB connectivity and some env var presence.
  * WARNING: This endpoint is now protected by admin-only authorization.

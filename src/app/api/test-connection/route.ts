@@ -4,6 +4,8 @@ import { isDatabaseConnectionError, handleApiError } from '@/lib/api-utils';
 // import { withAuth } from '@/lib/auth/api-auth'; // No longer used
 import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
 
+export const dynamic = "force-dynamic";
+
 /**
  * API route to test database connectivity.
  * WARNING: This endpoint uses an admin Supabase client and is now protected by admin-only authorization.

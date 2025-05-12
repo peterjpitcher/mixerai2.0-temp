@@ -4,6 +4,8 @@ import { handleApiError } from '@/lib/api-utils';
 import dns from 'dns';
 import ipaddr from 'ipaddr.js'; // Using ipaddr.js for robust IP checking
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET endpoint acting as an HTTP proxy.
  * IMPORTANT: This proxy can make requests from the server to any URL specified by an authenticated user.

@@ -98,7 +98,8 @@ export const GET = withAuth(async (req: NextRequest, user) => {
 // Authenticated POST handler for creating brands
 export const POST = withAuth(async (req: NextRequest, user) => {
   try {
-    const supabase = createSupabaseAdminClient();
+    // Use the standard Supabase client for RPC calls
+    const supabase = createSupabaseAdminClient(); 
     const body = await req.json();
     
     // Validate required fields
@@ -109,16 +110,12 @@ export const POST = withAuth(async (req: NextRequest, user) => {
       );
     }
     
-    // Format guardrails to ensure proper display
+    // Format guardrails (retain existing formatting logic)
     let formattedGuardrails = body.guardrails || null;
-    
-    // Handle case where guardrails might be in array format
     if (formattedGuardrails) {
-      // If it's already an array (parsed from JSON)
       if (Array.isArray(formattedGuardrails)) {
         formattedGuardrails = formattedGuardrails.map(item => `- ${item}`).join('\n');
       } 
-      // If it's a JSON string containing an array
       else if (typeof formattedGuardrails === 'string' && 
               formattedGuardrails.trim().startsWith('[') && 
               formattedGuardrails.trim().endsWith(']')) {
@@ -128,116 +125,75 @@ export const POST = withAuth(async (req: NextRequest, user) => {
             formattedGuardrails = guardrailsArray.map(item => `- ${item}`).join('\n');
           }
         } catch (e) {
-          // If parsing fails, use as is
           console.log("Failed to parse guardrails as JSON array in POST, using as-is");
         }
       }
     }
-    
-    // Generate brand_summary from identity if provided
-    let brandSummary = body.brand_summary || null;
-    if (!brandSummary && body.brand_identity) {
-      // Get first 250 characters from brand_identity
-      brandSummary = body.brand_identity.slice(0, 250);
-      if (body.brand_identity.length > 250) {
-        brandSummary += '...';
+
+    // Call the database function to create the brand and set the creator as admin
+    const { data: newBrandId, error: rpcError } = await supabase.rpc(
+      'create_brand_and_set_admin' as any,
+      {
+        creator_user_id: user.id,
+        brand_name: body.name,
+        brand_website_url: body.website_url || null,
+        brand_country: body.country || null,
+        brand_language: body.language || null,
+        brand_identity_text: body.brand_identity || null,
+        brand_tone_of_voice: body.tone_of_voice || null,
+        brand_guardrails: formattedGuardrails,
+        brand_content_vetting_agencies: body.content_vetting_agencies || null
       }
+    );
+
+    if (rpcError) {
+      console.error('RPC Error creating brand:', rpcError);
+      throw new Error(`Failed to create brand: ${rpcError.message}`);
+    }
+
+    if (!newBrandId) {
+      throw new Error('Failed to create brand, no ID returned from function.');
     }
     
-    // Insert the new brand with the user ID as created_by
-    const { data, error } = await supabase
-      .from('brands')
-      .insert([{
-        name: body.name,
-        website_url: body.website_url || null,
-        country: body.country || null,
-        language: body.language || null,
-        brand_identity: body.brand_identity || null,
-        tone_of_voice: body.tone_of_voice || null,
-        guardrails: formattedGuardrails,
-        content_vetting_agencies: body.content_vetting_agencies || null,
-        brand_color: body.brand_color || '#3498db',
-        brand_summary: brandSummary,
-        approved_content_types: body.approved_content_types || null,
-        created_by: user.id // Add the authenticated user ID
-      }])
-      .select();
-    
-    if (error) throw error;
-    
-    // Set brand admin permissions (if provided)
-    if (body.brand_admin_ids && Array.isArray(body.brand_admin_ids) && body.brand_admin_ids.length > 0 && data?.[0]?.id) {
-      const brandId = data[0].id;
-      
-      // Process each brand admin ID
-      for (const brandAdminId of body.brand_admin_ids) {
-        // Create admin permission record for each brand admin
-        const { error: permissionError } = await supabase
-          .from('user_brand_permissions')
-          .upsert({
-            user_id: brandAdminId,
-            brand_id: brandId,
-            role: 'admin'
-          });
-        
-        if (permissionError) {
-          console.error(`Error setting brand admin permission for ${brandAdminId}:`, permissionError);
-          // Don't throw here, as the brand has been successfully created
-        }
-      }
-      
-      // Also add a permission for the creating user if not already included
-      if (!body.brand_admin_ids.includes(user.id)) {
-        const { error: creatorPermissionError } = await supabase
-          .from('user_brand_permissions')
-          .upsert({
-            user_id: user.id,
-            brand_id: brandId,
-            role: 'admin' // Give admin rights to creator as well
-          });
-        
-        if (creatorPermissionError) {
-          console.error('Error setting creator permission:', creatorPermissionError);
-        }
-      }
-    } 
-    // Backwards compatibility for single brand_admin_id
-    else if (body.brand_admin_id && data?.[0]?.id) {
-      const brandId = data[0].id;
-      const brandAdminId = body.brand_admin_id;
-      
-      // Create admin permission record for the brand admin
+    // Handle additional brand admins if provided (excluding the creator)
+    const additionalAdminIds = (body.brand_admin_ids || []).filter((id: string) => id !== user.id);
+
+    if (Array.isArray(additionalAdminIds) && additionalAdminIds.length > 0) {
+      const permissionUpserts = additionalAdminIds.map((adminId: string) => ({
+        user_id: adminId,
+        brand_id: newBrandId as string,
+        role: 'admin' as 'admin'
+      }));
+
       const { error: permissionError } = await supabase
         .from('user_brand_permissions')
-        .upsert({
-          user_id: brandAdminId,
-          brand_id: brandId,
-          role: 'admin'
-        });
-      
+        .upsert(permissionUpserts);
+
       if (permissionError) {
-        console.error('Error setting brand admin permission:', permissionError);
+        // Log the error but don't fail the request, as the brand exists with the creator as admin
+        console.error('Error setting additional brand admin permissions:', permissionError);
       }
-      
-      // Also add a permission for the creating user (if different from admin)
-      if (user.id !== brandAdminId) {
-        const { error: creatorPermissionError } = await supabase
-          .from('user_brand_permissions')
-          .upsert({
-            user_id: user.id,
-            brand_id: brandId,
-            role: 'admin' // Give admin rights to creator as well
-          });
-        
-        if (creatorPermissionError) {
-          console.error('Error setting creator permission:', creatorPermissionError);
-        }
-      }
+    }
+
+    // Fetch the newly created brand data to return
+    const { data: newBrandData, error: fetchError } = await supabase
+      .from('brands')
+      .select('*')
+      .eq('id', newBrandId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching newly created brand:', fetchError);
+      return NextResponse.json({ 
+        success: true, 
+        brand_id: newBrandId,
+        warning: 'Brand created, but failed to fetch full data.'
+      });
     }
     
     return NextResponse.json({ 
       success: true, 
-      brand: data[0]
+      data: newBrandData 
     });
   } catch (error) {
     return handleApiError(error, 'Error creating brand');

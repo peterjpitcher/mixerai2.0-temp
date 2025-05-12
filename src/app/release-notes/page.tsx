@@ -7,6 +7,7 @@ export default function ReleaseNotesPage() {
     <div className="container max-w-4xl mx-auto py-12">
       <h1 className="text-3xl font-bold mb-8">MixerAI 2.0 Release Notes</h1>
       
+      {/* TODO: Update with current release notes, summarizing recent changes. */}
       <Card className="mb-8">
         <CardHeader>
           <CardTitle>Version 2.1.0 - June 2023</CardTitle>

@@ -17,6 +17,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import type { Metadata } from 'next';
 import { toast } from 'sonner';
+import { Separator } from '@/components/separator';
 
 // export const metadata: Metadata = {
 //   title: 'Edit User | MixerAI 2.0',
@@ -302,24 +303,54 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                   placeholder="Acme Inc."
                 />
               </div>
-              
-              <div>
-                <Label htmlFor="role" className="text-right">
-                  User Role
-                </Label>
-                <Select
-                  value={form.role}
-                  onValueChange={handleRoleChange}
-                >
-                  <SelectTrigger id="role">
-                    <SelectValue placeholder="Select a role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Admin">Admin</SelectItem>
-                    <SelectItem value="Editor">Editor</SelectItem>
-                    <SelectItem value="Viewer">Viewer</SelectItem>
-                  </SelectContent>
-                </Select>
+            </div>
+            
+            {/* Brand Permissions Section */}
+            <Separator className="my-6" />
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Brand Permissions</h3>
+              <p className="text-sm text-muted-foreground">
+                Assign this user to specific brands and set their role for each.
+              </p>
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2"> 
+                {brands.map((brand) => (
+                  <div key={brand.id} className="flex items-center justify-between p-3 border rounded-md">
+                    <div className="flex items-center space-x-3">
+                      <Checkbox
+                        id={`brand-${brand.id}`}
+                        checked={selectedBrands[brand.id]?.selected || false}
+                        onCheckedChange={(checked) => 
+                          handleBrandSelectionChange(brand.id, checked as boolean)
+                        }
+                      />
+                      <label
+                        htmlFor={`brand-${brand.id}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        {brand.name}
+                      </label>
+                    </div>
+                    <Select
+                      value={selectedBrands[brand.id]?.role || 'viewer'}
+                      onValueChange={(value) => handleBrandRoleChange(brand.id, value)}
+                      disabled={!selectedBrands[brand.id]?.selected}
+                    >
+                      <SelectTrigger className="w-[120px]">
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="editor">Editor</SelectItem>
+                        <SelectItem value="viewer">Viewer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+                {brands.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No brands available to assign.
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>

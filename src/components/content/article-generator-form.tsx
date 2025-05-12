@@ -87,32 +87,31 @@ export function ArticleGeneratorForm() {
   // Check SEO criteria whenever content changes
   useEffect(() => {
     if (editableContent && focusKeyword) {
-      const lowercaseContent = editableContent.toLowerCase();
       const lowercaseKeyword = focusKeyword.toLowerCase();
       
-      // Current string-based check - acknowledge it works on HTML
-      // TODO: Issue #42 - Implement reliable keyword check in HTML content (server-side or better client-side parsing)
-      const hasH1WithKeyword = lowercaseContent.includes("<h1") && 
-                              lowercaseContent.includes(lowercaseKeyword) && 
-                              lowercaseContent.substring(lowercaseContent.indexOf("<h1")).includes("</h1>");
-      // Simplified check for brevity, assuming keyword is between h1 tags if both exist after initial h1
-      
-      const hasH2WithKeyword = lowercaseContent.includes("<h2") && 
-                              lowercaseContent.includes(lowercaseKeyword) && 
-                              lowercaseContent.substring(lowercaseContent.indexOf("<h2")).includes("</h2>");
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = editableContent;
 
-      const hasH3WithKeyword = lowercaseContent.includes("<h3") && 
-                              lowercaseContent.includes(lowercaseKeyword) && 
-                              lowercaseContent.substring(lowercaseContent.indexOf("<h3")).includes("</h3>");
-
-      const hasH4WithKeyword = lowercaseContent.includes("<h4") && 
-                              lowercaseContent.includes(lowercaseKeyword) && 
-                              lowercaseContent.substring(lowercaseContent.indexOf("<h4")).includes("</h4>");
+      const checkKeywordInHeadings = (tag: string): boolean => {
+        const headings = tempDiv.getElementsByTagName(tag);
+        for (let i = 0; i < headings.length; i++) {
+          if (headings[i].textContent?.toLowerCase().includes(lowercaseKeyword)) {
+            return true;
+          }
+        }
+        return false;
+      };
       
-      setHasKeywordInH1(hasH1WithKeyword);
-      setHasKeywordInH2(hasH2WithKeyword);
-      setHasKeywordInH3(hasH3WithKeyword);
-      setHasKeywordInH4(hasH4WithKeyword);
+      setHasKeywordInH1(checkKeywordInHeadings('h1'));
+      setHasKeywordInH2(checkKeywordInHeadings('h2'));
+      setHasKeywordInH3(checkKeywordInHeadings('h3'));
+      setHasKeywordInH4(checkKeywordInHeadings('h4'));
+    } else {
+      // Reset if no content or keyword
+      setHasKeywordInH1(false);
+      setHasKeywordInH2(false);
+      setHasKeywordInH3(false);
+      setHasKeywordInH4(false);
     }
   }, [editableContent, focusKeyword, contentLastUpdated]);
   
@@ -357,6 +356,8 @@ export function ArticleGeneratorForm() {
     } catch (error) {
       console.error('Error generating content:', error);
       sonnerToast.error("Generation failed", { description: "Failed to generate article content. Please try again." });
+      // Add a warning toast for URL scraping failure
+      sonnerToast.warning("URL scraping issue during content generation", { description: "Could not scrape some URLs. Content generation will proceed without them." });
     } finally {
       setIsGeneratingContent(false);
     }
