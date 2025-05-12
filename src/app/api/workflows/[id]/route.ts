@@ -70,11 +70,15 @@ export async function GET(
     const stepsArray = (workflow.steps || []) as any[]; 
 
     if (stepsArray.length > 0) {
+      // Helper function to validate UUIDs
+      const isValidUUID = (id: string) => {
+        return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
+      };
       const userIds = new Set<string>();
       for (const step of stepsArray) {
         if (step && step.assignees && Array.isArray(step.assignees)) {
           for (const assignee of (step.assignees as WorkflowAssignee[])) {
-            if (assignee.id) {
+            if (assignee.id && isValidUUID(assignee.id)) {
               userIds.add(assignee.id);
             }
           }
@@ -95,7 +99,7 @@ export async function GET(
         for (const step of stepsArray) {
           if (step && step.assignees && Array.isArray(step.assignees)) {
             step.assignees = (step.assignees as WorkflowAssignee[]).map(assignee => {
-              if (assignee.id && userMap.has(assignee.id)) {
+              if (assignee.id && isValidUUID(assignee.id) && userMap.has(assignee.id)) {
                 const userProfile = userMap.get(assignee.id)!;
                 return {
                   ...assignee,
