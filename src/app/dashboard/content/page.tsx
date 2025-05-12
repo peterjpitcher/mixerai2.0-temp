@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/card';
 import { Input } from '@/components/input';
-import { useToast } from '@/components/toast-provider';
+import { toast as sonnerToast } from "sonner";
+import { format as formatDateFns } from 'date-fns';
+import { useDebounce } from '@/lib/hooks/use-debounce';
 
 interface ContentItem {
   id: string;
@@ -22,12 +24,18 @@ export default function ContentPage() {
   const [content, setContent] = useState<ContentItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
 
   useEffect(() => {
     async function fetchContent() {
+      setIsLoading(true);
       try {
-        const response = await fetch('/api/content');
+        const apiUrl = debouncedSearchQuery 
+          ? `/api/content?query=${encodeURIComponent(debouncedSearchQuery)}` 
+          : '/api/content';
+        
+        const response = await fetch(apiUrl);
         
         if (!response.ok) {
           throw new Error('Failed to fetch content');
@@ -36,34 +44,33 @@ export default function ContentPage() {
         const data = await response.json();
         
         if (data.success) {
-          setContent(data.data);
+          setContent(data.data || []);
         } else {
+          setContent([]);
           throw new Error(data.error || 'Failed to fetch content');
         }
       } catch (error) {
         console.error('Error fetching content:', error);
         setError((error as Error).message || 'Failed to load content');
-        toast({
-          title: "Error",
-          description: "Failed to load content. Please try again.",
-          variant: "destructive",
-        });
+        setContent([]);
+        sonnerToast.error("Failed to load content", { description: "Please try again." });
       } finally {
         setIsLoading(false);
       }
     }
 
     fetchContent();
-  }, [toast]);
+  }, [debouncedSearchQuery]);
 
-  // Format date for display
+  // Format date for display using date-fns
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
+    if (!dateString) return 'N/A';
+    try {
+      return formatDateFns(new Date(dateString), 'dd MMM yyyy');
+    } catch (e) {
+      console.error('Error formatting date:', dateString, e);
+      return 'Invalid Date';
+    }
   };
 
   // Empty state component
@@ -129,8 +136,12 @@ export default function ContentPage() {
       </div>
 
       <div className="flex items-center justify-between">
-        <div className="max-w-sm">
-          <Input placeholder="Search content..." />
+        <div className="max-w-sm w-full">
+          <Input 
+            placeholder="Search content by title or body..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm">

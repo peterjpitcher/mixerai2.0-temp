@@ -118,6 +118,7 @@ export type Database = {
           body: string
           brand_id: string | null
           content_data: Json | null
+          content_type_id: string | null
           created_at: string | null
           created_by: string | null
           current_step: number | null
@@ -136,6 +137,7 @@ export type Database = {
           body: string
           brand_id?: string | null
           content_data?: Json | null
+          content_type_id?: string | null
           created_at?: string | null
           created_by?: string | null
           current_step?: number | null
@@ -154,6 +156,7 @@ export type Database = {
           body?: string
           brand_id?: string | null
           content_data?: Json | null
+          content_type_id?: string | null
           created_at?: string | null
           created_by?: string | null
           current_step?: number | null
@@ -174,6 +177,13 @@ export type Database = {
             columns: ["brand_id"]
             isOneToOne: false
             referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_content_type_id_fkey"
+            columns: ["content_type_id"]
+            isOneToOne: false
+            referencedRelation: "content_types"
             referencedColumns: ["id"]
           },
           {

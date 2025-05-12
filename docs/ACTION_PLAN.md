@@ -54,9 +54,9 @@ This document outlines a prioritized, phased plan to address the issues identifi
     *   **Related Issue**: #106 (Inefficient User Search in `/api/users/search`).
     *   **Action**: Refactored `/api/users/search` to query `profiles` table directly and efficiently.
 
-4.  **[PARTIALLY COMPLETED - Initial steps taken] Data Integrity - Atomic Operations**: 
+4.  **[COMPLETED - Brand Deletion] Data Integrity - Atomic Operations**: 
     *   **Related Issues**: #83, #87, #91, #103, #109, #120, #124, #125.
-    *   **Action**: Addressed brand deletion (#87) atomicity by refactoring API to call an RPC (DB function `delete_brand_and_dependents` needs creation). Other operations require similar treatment.
+    *   **Action**: Addressed brand deletion (#87) atomicity: created DB function `delete_brand_and_dependents` and updated API to use RPC. Other operations require similar treatment.
 
 5.  **[PARTIALLY COMPLETED - Initial steps taken] Role System Clarification & Implementation**: 
     *   **Related Issues**: #97, #100, #101, #104, #108, #168.
@@ -70,21 +70,21 @@ This document outlines a prioritized, phased plan to address the issues identifi
     *   **Related Issues**: #53, #68, #145.
     *   **Action**: Removed Radix toast system. Sonner is now the sole toast system, and relevant components updated.
 
-## Phase 2: UI/UX Refinements, Consistency, and Lower Priority Bugs
+## Phase 2: UI/UX Refinements, Consistency, and Lower Priority Bugs [IN PROGRESS - INITIAL STEPS TAKEN]
 
 **Goal**: Improve user experience, code consistency, and address remaining functional gaps.
 
-1.  **Styling Consistency - Colors & Icons**: 
+1.  **[PARTIALLY COMPLETED - Examples Addressed] Styling Consistency - Colors & Icons**: 
     *   **Related Issues**: Many issues on hardcoded colors/icons (e.g., #45, #47, #48, #49, #57, #60, #61, #62, #64, #75, #76, #78, #147, #148, #152, #153, #160, #161, #173, #174, #175, #177, #182, #183, #184).
-    *   **Action**: Systematically replace hardcoded colors with theme-based Tailwind classes or CSS variables. Replace inline SVGs with icons from the `Icons` component.
+    *   **Action**: Replaced hardcoded colors/SVG icons in `FieldDesigner`, `DomainVerification`, `UIShowcasePage` with theme-based classes/Icon components. Full audit pending.
 
-2.  **Date Formatting Standardization**: 
+2.  **[PARTIALLY COMPLETED - Example Addressed] Date Formatting Standardization**: 
     *   **Related Issue**: #187 (Consolidated).
-    *   **Action**: Refactor all date displays to use `date-fns`.
+    *   **Action**: Refactored date display in `ContentPage` to use `date-fns`. Full audit pending.
 
-3.  **Non-Functional UI Elements**: 
+3.  **[PARTIALLY COMPLETED - Content Search Implemented] Non-Functional UI Elements**: 
     *   **Related Issues**: #150 (Content Search), #163 (User Page Export/Import), #130 (Brand Page Export/Import).
-    *   **Action**: Implement functionality or remove/disable these elements.
+    *   **Action**: Implemented Content Search on frontend and updated backend API. Export/Import buttons pending.
 
 4.  **API Response Consistency (Remaining Checks)**: 
     *   **Related Issue**: #2.

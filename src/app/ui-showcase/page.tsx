@@ -9,12 +9,12 @@ export const metadata: Metadata = {
 export default function UIShowcasePage() {
   return (
     <div className="flex flex-col min-h-screen">
-      <div className="w-full bg-top-nav text-white px-6 py-4">
+      <div className="w-full bg-secondary text-secondary-foreground px-6 py-4">
         <h1 className="text-2xl font-bold">MixerAI 2.0 UI Style Guide</h1>
         <p className="text-sm opacity-80">A showcase of the new UI standardization</p>
       </div>
       
-      <div className="bg-app flex-1">
+      <div className="bg-background flex-1">
         <div className="max-w-7xl mx-auto">
           <UIShowcase />
         </div>

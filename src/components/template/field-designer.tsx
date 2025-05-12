@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/textarea';
 import { Icons } from '@/components/icons';
 import { v4 as uuidv4 } from 'uuid';
-import { toast } from '@/components/toast-provider';
+import { toast as sonnerToast } from 'sonner';
 
 type FieldType = 'shortText' | 'longText' | 'richText' | 'select' | 'number' | 'date' | 'tags' | 'url' | 'fileUpload' | 'plainText' | 'html';
 
@@ -126,21 +126,13 @@ export function FieldDesigner({ isOpen, fieldType, initialData, onSave, onCancel
   const validateField = () => {
     // Basic validations
     if (!fieldData.name.trim()) {
-      toast({
-        title: "Error",
-        description: "Field name is required",
-        variant: "destructive",
-      });
+      sonnerToast.error("Field name is required");
       return false;
     }
 
     // For output fields, require an AI prompt
     if (fieldType === 'output' && fieldData.aiAutoComplete && (!fieldData.aiPrompt || !fieldData.aiPrompt.trim())) {
-      toast({
-        title: "Error",
-        description: "AI prompt is required for output fields",
-        variant: "destructive",
-      });
+      sonnerToast.error("AI prompt is required for output fields when AI Auto-Complete is enabled.");
       return false;
     }
 
@@ -187,7 +179,7 @@ export function FieldDesigner({ isOpen, fieldType, initialData, onSave, onCancel
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="basic">Basic Info</TabsTrigger>
               <TabsTrigger value="options">Field Options</TabsTrigger>
-              <TabsTrigger value="ai">AI Features {fieldType === 'output' && <span className="text-red-500 ml-1">*</span>}</TabsTrigger>
+              <TabsTrigger value="ai">AI Features {fieldType === 'output' && <span className="text-destructive ml-1">*</span>}</TabsTrigger>
             </TabsList>
             
             {/* Basic Info Tab */}
