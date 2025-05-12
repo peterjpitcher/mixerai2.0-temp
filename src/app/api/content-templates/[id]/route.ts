@@ -119,7 +119,7 @@ export const PUT = withAuth(async (
 });
 
 /**
- * DELETE: Remove a content template
+ * DELETE: Remove a content template atomically using an RPC.
  */
 export const DELETE = withAuth(async (
   request: NextRequest,
@@ -127,11 +127,10 @@ export const DELETE = withAuth(async (
   context: { params: { id: string } }
 ) => {
   try {
-    console.log('API Route - DELETE template - Context:', context);
-    const id = context.params.id;
-    console.log('API Route - Template ID from params:', id);
+    const templateIdToDelete = context.params.id;
+    console.log('API Route - DELETE template - Template ID from params:', templateIdToDelete);
     
-    if (!id) {
+    if (!templateIdToDelete) {
       console.error('API Route - Missing template ID in params');
       return NextResponse.json(
         { success: false, error: 'Template ID is required' },
@@ -140,39 +139,34 @@ export const DELETE = withAuth(async (
     }
     
     const supabase = createSupabaseAdminClient();
-    
-    // Unassign template from content items and set their status to cancelled
-    const { error: updateContentError } = await supabase
-      .from('content')
-      .update({ template_id: null, status: 'rejected' })
-      .eq('template_id', id);
 
-    if (updateContentError) {
-      // Log the error but proceed to attempt template deletion
-      // as the primary goal is to delete the template.
-      // A more robust solution might involve transactions if the DB supports it here.
-      console.error('Error updating content items before template deletion:', updateContentError);
-      // Optionally, you could choose to return an error here if unassigning content is critical
-      // return handleApiError(updateContentError, 'Failed to update associated content before deleting template');
-    }
-    
-    // Delete the template
-    const { error: deleteTemplateError } = await supabase
-      .from('content_templates')
-      .delete()
-      .eq('id', id);
-    
-    if (deleteTemplateError) {
-      // If the template itself couldn't be deleted, this is the primary error to report.
-      throw deleteTemplateError;
+    // Call the database function to perform atomic delete and content update
+    const { error: rpcError } = await supabase.rpc('delete_template_and_update_content', {
+      template_id_to_delete: templateIdToDelete
+    });
+
+    if (rpcError) {
+      console.error('Error calling delete_template_and_update_content RPC:', rpcError);
+      // Check for specific PostgreSQL error codes if the function indicates template not found
+      // This depends on how the function handles "not found" (e.g., raises an error or warning)
+      // If it raises a specific error or a general one that we can identify:
+      // if (rpcError.code === 'P0001' && rpcError.message.includes('Template not found')) { 
+      //      return NextResponse.json({ success: false, error: 'Template not found or already deleted.' }, { status: 404 });
+      // }
+      throw rpcError; // Re-throw for generic handling by handleApiError
     }
     
     return NextResponse.json({
       success: true,
-      message: 'Template deleted successfully. Associated content items have been updated.'
+      message: 'Content template deleted successfully and associated content items have been updated.'
     });
+
   } catch (error) {
     console.error('Error deleting content template:', error);
-    return handleApiError(error, 'Failed to delete content template');
+    // Ensure the error response structure is consistent if handleApiError is not already doing so
+    const apiError = handleApiError(error, 'Failed to delete content template');
+    // Check if apiError is already a NextResponse, if so return it, otherwise wrap it.
+    // This depends on the implementation of handleApiError. For now, assume it returns a valid response.
+    return apiError;
   }
 }); 

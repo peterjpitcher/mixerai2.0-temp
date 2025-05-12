@@ -54,9 +54,9 @@ This document outlines a prioritized, phased plan to address the issues identifi
     *   **Related Issue**: #106 (Inefficient User Search in `/api/users/search`).
     *   **Action**: Refactored `/api/users/search` to query `profiles` table directly and efficiently.
 
-4.  **[COMPLETED - Brand Deletion] Data Integrity - Atomic Operations**: 
+4.  **[PARTIALLY COMPLETED - Brand & Template Deletion Addressed] Data Integrity - Atomic Operations**: 
     *   **Related Issues**: #83, #87, #91, #103, #109, #120, #124, #125.
-    *   **Action**: Addressed brand deletion (#87) atomicity: created DB function `delete_brand_and_dependents` and updated API to use RPC. Other operations require similar treatment.
+    *   **Action**: Addressed brand deletion (#87) and template deletion (#91) atomicity by creating DB functions and updating APIs to use RPC. Other operations require similar treatment.
 
 5.  **[PARTIALLY COMPLETED - Initial steps taken] Role System Clarification & Implementation**: 
     *   **Related Issues**: #97, #100, #101, #104, #108, #168.

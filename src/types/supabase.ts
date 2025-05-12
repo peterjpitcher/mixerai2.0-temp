@@ -894,6 +894,12 @@ export type Database = {
           brand_id_to_delete: string
         }
         Returns: undefined
+      },
+      delete_template_and_update_content: {
+        Args: {
+          template_id_to_delete: string
+        }
+        Returns: undefined
       }
     }
     Enums: {
