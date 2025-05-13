@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import { User } from '@supabase/supabase-js';
+import { TablesUpdate, TablesInsert } from '@/types/supabase'; // Import types
 
 export const dynamic = "force-dynamic";
 
@@ -10,39 +12,22 @@ interface WorkflowActionRequest {
   feedback?: string;
 }
 
-// Helper to get the current owner_id for a step
-async function getStepOwnerId(supabase: any, workflowId: string, stepNumericId: number): Promise<string | null> {
-  // Query workflow_user_assignments to find the owner for the given workflow_id and step_id (numeric)
-  const { data: assignment, error: assignError } = await supabase
-    .from('workflow_user_assignments')
-    .select('user_id')
-    .eq('workflow_id', workflowId)
-    .eq('step_id', stepNumericId) // step_id in this table is the numeric ID/index from JSON
-    .maybeSingle(); // Use maybeSingle as a step might not have an assignee or could have one
-
-  if (assignError) {
-    console.error('Error fetching step assignment:', assignError);
-    return null;
-  }
-  return assignment?.user_id || null;
-}
-
 async function getNextVersionNumber(supabase: any, contentId: string): Promise<number> {
   const { data, error } = await supabase
     .from('content_versions')
-    .select('version_number', { count: 'exact', head: false }) // Use count if just checking existence for version 1
+    .select('version_number')
     .eq('content_id', contentId)
     .order('version_number', { ascending: false })
     .limit(1)
-    .maybeSingle(); // Use maybeSingle as there might be no versions yet
+    .maybeSingle();
 
-  if (error && error.code !== 'PGRST116') { // PGRST116: no rows found, which is fine for first version
+  if (error && error.code !== 'PGRST116') { 
     throw error;
   }
   return (data?.version_number || 0) + 1;
 }
 
-export const POST = withAuth(async (request: NextRequest, user, context: { params: { id: string } }) => {
+export const POST = withAuth(async (request: NextRequest, user: User, context: { params: { id: string } }) => {
   const contentId = context.params.id;
   let requestData: WorkflowActionRequest;
 
@@ -57,7 +42,6 @@ export const POST = withAuth(async (request: NextRequest, user, context: { param
   if (!['approve', 'reject'].includes(action)) {
     return NextResponse.json({ success: false, error: 'Invalid action specified.' }, { status: 400 });
   }
-
   if (action === 'reject' && (!feedback || feedback.trim() === '')) {
     return NextResponse.json({ success: false, error: 'Feedback is required for rejection.' }, { status: 400 });
   }
@@ -65,86 +49,114 @@ export const POST = withAuth(async (request: NextRequest, user, context: { param
   const supabase = createSupabaseAdminClient();
 
   try {
-    // 1. Fetch current content and its workflow (including steps JSONB)
+    // 1. Fetch current content and its current_step (UUID)
     const { data: currentContent, error: contentError } = await supabase
       .from('content')
-      .select('*, workflow:workflows(*)') // Fetch the full workflow, including its steps JSONB
+      .select('id, status, workflow_id, current_step, content_data, assigned_to')
       .eq('id', contentId)
       .single();
 
-    if (contentError || !currentContent) {
+    if (contentError) {
+      console.error("Error fetching content for action:", contentError);
       return NextResponse.json({ success: false, error: contentError?.message || 'Content not found.' }, { status: 404 });
     }
-
-    if (!currentContent.workflow_id || !currentContent.workflow || !Array.isArray(currentContent.workflow.steps) || currentContent.workflow.steps.length === 0) {
-      return NextResponse.json({ success: false, error: 'Content is not associated with a valid workflow or workflow has no steps.' }, { status: 400 });
+    if (!currentContent) {
+        return NextResponse.json({ success: false, error: 'Content data not found after fetch.'}, { status: 404 });
     }
-    
-    const currentStepIndex = currentContent.current_step as number; // current_step is an integer index
-    const workflowSteps = currentContent.workflow.steps as any[]; // Array of step objects from JSONB
 
-    if (currentStepIndex < 0 || currentStepIndex >= workflowSteps.length) {
-      return NextResponse.json({ success: false, error: 'Invalid current step index for content.' }, { status: 400 });
+    if (!currentContent.workflow_id) {
+      return NextResponse.json({ success: false, error: 'Content is not associated with a workflow.' }, { status: 400 });
     }
-    
-    const currentStepObject = workflowSteps[currentStepIndex];
-    // Assume steps in JSONB have a numeric `id` field that corresponds to `workflow_user_assignments.step_id`
-    // and `content.current_step` also stores this numeric `id` or index.
-    const currentStepNumericId = currentStepObject.id || currentStepIndex; // Prefer step.id from JSON if present, else use index.
+    if (!currentContent.current_step) {
+      return NextResponse.json({ success: false, error: 'Content is not currently at a valid workflow step.' }, { status: 400 });
+    }
 
-    // 2. Verify Ownership
-    const stepOwnerId = await getStepOwnerId(supabase, currentContent.workflow_id, currentStepNumericId);
-    if (!stepOwnerId) {
-         return NextResponse.json({ success: false, error: 'Could not determine step owner or step has no owner.' }, { status: 403 });
+    // Fetch current workflow step details from workflow_steps table
+    const { data: currentDbStep, error: currentStepDetailsError } = await supabase
+      .from('workflow_steps')
+      .select('id, name, step_order, approval_required, assigned_user_ids')
+      .eq('id', currentContent.current_step) // current_step is UUID
+      .single();
+
+    if (currentStepDetailsError || !currentDbStep) {
+      console.error("Error fetching current step details:", currentStepDetailsError);
+      return NextResponse.json({ success: false, error: currentStepDetailsError?.message || 'Current workflow step details not found.' }, { status: 404 });
     }
-    if (stepOwnerId !== user.id) {
-      return NextResponse.json({ success: false, error: 'User is not authorized to perform this action on the current step.' }, { status: 403 });
+
+    // 2. Verify Ownership/Authorization (user must be in assigned_user_ids of the current step)
+    if (!currentDbStep.assigned_user_ids || !currentDbStep.assigned_user_ids.includes(user.id)) {
+      // Also check if the user is a brand admin as a fallback for actioning tasks.
+      // This might require fetching brand admin id similar to restart-workflow if not directly available.
+      // For now, strictly checking step assignment.
+      console.warn(`User ${user.id} not in assigned_user_ids ${currentDbStep.assigned_user_ids} for step ${currentDbStep.id}`);
+      return NextResponse.json({ success: false, error: 'User is not assigned to the current step or not authorized.' }, { status: 403 });
     }
 
     // 3. Create Content Version
     const versionNumber = await getNextVersionNumber(supabase, contentId);
-    const { error: versionError } = await supabase
-      .from('content_versions')
-      .insert({
-        content_id: contentId,
-        workflow_step_identifier: String(currentStepNumericId), // Store the numeric ID/index from JSON step
-        step_name: currentStepObject.name || `Step ${currentStepIndex + 1}`,
-        version_number: versionNumber,
-        content_json: currentContent.content_data, // Snapshot current content_data
-        action_status: action === 'approve' ? 'Completed' : 'Rejected',
-        feedback: feedback || null,
-        reviewer_id: user.id,
-      });
+    const versionPayload: TablesInsert<'content_versions'> = {
+      content_id: contentId,
+      workflow_step_identifier: currentDbStep.id, // Store the UUID of the step
+      step_name: currentDbStep.name,
+      version_number: versionNumber,
+      content_json: currentContent.content_data, 
+      action_status: action === 'approve' ? 'Completed' : 'Rejected',
+      feedback: feedback || null,
+      reviewer_id: user.id,
+    };
+    const { error: versionError } = await supabase.from('content_versions').insert(versionPayload);
+    if (versionError) {
+        console.error("Error creating content version:", versionError);
+        throw versionError;
+    }
 
-    if (versionError) throw versionError;
-
-    // 4. Update Content Status & Current Step
-    let updatedContentStatus = currentContent.status;
-    let nextStepIndex = currentContent.current_step; // Remains same for reject or if it's the last step approved
+    // 4. Determine Next Step & Prepare Content Update Payload
+    let updatePayload: TablesUpdate<'content'> = {
+        updated_at: new Date().toISOString(),
+    };
 
     if (action === 'approve') {
-      if (currentStepIndex < workflowSteps.length - 1) {
-        nextStepIndex = currentStepIndex + 1;
-        updatedContentStatus = 'pending_review';
+      // Find the next step in the workflow based on step_order
+      const { data: nextDbStep, error: nextStepError } = await supabase
+        .from('workflow_steps')
+        .select('id, assigned_user_ids')
+        .eq('workflow_id', currentContent.workflow_id)
+        .gt('step_order', currentDbStep.step_order)
+        .order('step_order', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (nextStepError) {
+        console.error("Error fetching next step:", nextStepError);
+        throw nextStepError;
+      }
+
+      if (nextDbStep) {
+        updatePayload.current_step = nextDbStep.id;
+        updatePayload.status = 'pending_review';
+        updatePayload.assigned_to = (nextDbStep.assigned_user_ids && nextDbStep.assigned_user_ids.length > 0) ? nextDbStep.assigned_user_ids[0] : null;
       } else {
-        updatedContentStatus = 'approved'; 
+        // This was the last step
+        updatePayload.status = 'approved';
+        // updatePayload.current_step = null; // Or keep it as the last step ID
+        // updatePayload.assigned_to = null;
       }
     } else { // action === 'reject'
-      updatedContentStatus = 'rejected';
+      updatePayload.status = 'rejected';
+      // current_step and assigned_to remain the same for rejection
     }
 
     const { data: updatedContent, error: updateContentError } = await supabase
       .from('content')
-      .update({
-        status: updatedContentStatus,
-        current_step: nextStepIndex, // This will be the next step index or same if rejected/last step
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', contentId)
       .select()
       .single();
 
-    if (updateContentError) throw updateContentError;
+    if (updateContentError) {
+        console.error("Error updating content after action:", updateContentError);
+        throw updateContentError;
+    }
 
     return NextResponse.json({ success: true, message: `Content ${action}d successfully.`, data: updatedContent });
 

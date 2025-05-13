@@ -249,7 +249,6 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         template_id: template?.id,
         title,
         workflow_id: associatedWorkflowId,
-        ...(associatedWorkflowId && { current_step: 0 }),
         body: generatedContent,
         content_data: {
             templateInputValues: templateFieldValues,
@@ -262,9 +261,11 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         body: JSON.stringify(payload) 
       });
       const data = await response.json();
-      if (data.success && data.content?.id) {
+      console.log('Server response in handleSave:', data);
+
+      if (data.success && data.data?.id) {
         toast.success('Content saved.');
-        router.push(`/dashboard/content/${data.content.id}`);
+        router.push(`/dashboard/content/${data.data.id}`);
       } else {
         toast.error(data.error || 'Failed to save content.');
       }

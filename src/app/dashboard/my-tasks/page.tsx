@@ -7,15 +7,23 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Eye, Edit, AlertCircle, ListChecks } from 'lucide-react';
 import { toast } from 'sonner';
 
+// Updated TaskItem interface to match the new API response from /api/me/tasks
 interface TaskItem {
-  id: string;
-  title: string;
-  status: string; // e.g., pending_review
-  current_step: number;
-  updated_at: string;
-  brand?: { name?: string; brand_color?: string };
-  template?: { name?: string; icon?: string };
-  workflow?: { id: string; name: string; steps: any[] }; 
+  id: string; // This is user_tasks.id
+  task_status: string | null;
+  due_date: string | null;
+  created_at: string | null;
+  content_id: string | null;
+  content_title: string | null;
+  content_status: string | null;
+  brand_id?: string | null;
+  brand_name: string | null;
+  brand_color?: string | null;
+  workflow_id?: string | null;
+  workflow_name?: string | null;
+  workflow_step_id?: string | null;
+  workflow_step_name: string | null;
+  workflow_step_order?: number | null;
 }
 
 export default function MyTasksPage() {
@@ -42,7 +50,7 @@ export default function MyTasksPage() {
         console.error('Error fetching tasks:', err);
         setError(err.message || 'Failed to load tasks');
         toast.error("Failed to load your tasks. Please try again.", {
-          description: "Error",
+          description: err.message || "Unknown error", // Provide fallback for description
         });
       } finally {
         setIsLoading(false);
@@ -51,18 +59,14 @@ export default function MyTasksPage() {
     fetchTasks();
   }, []);
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-GB', {
       day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
     });
   };
 
-  const getStepName = (task: TaskItem): string => {
-    if (task.workflow && Array.isArray(task.workflow.steps) && task.workflow.steps[task.current_step]) {
-      return task.workflow.steps[task.current_step].name || `Step ${task.current_step + 1}`;
-    }
-    return `Step ${task.current_step + 1}`;
-  };
+  // getStepName function is no longer needed as workflow_step_name is directly available.
 
   if (isLoading) {
     return (
@@ -101,7 +105,7 @@ export default function MyTasksPage() {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Pending Your Review</CardTitle>
+            <CardTitle>Pending Your Action</CardTitle> {/* Updated Title */}
             <CardDescription>{tasks.length} item(s) requiring your attention.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -110,25 +114,37 @@ export default function MyTasksPage() {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left p-3 font-medium">Content Title</th>
-                    <th className="text-left p-3 font-medium">Template</th>
+                    {/* <th className="text-left p-3 font-medium">Template</th> */}{/* Template removed for now */}
                     <th className="text-left p-3 font-medium">Brand</th>
-                    <th className="text-left p-3 font-medium">Current Step</th>
-                    <th className="text-left p-3 font-medium">Last Updated</th>
+                    <th className="text-left p-3 font-medium">Workflow Step</th>
+                    <th className="text-left p-3 font-medium">Task Status</th>
+                    <th className="text-left p-3 font-medium">Due Date</th>
+                    {/* <th className="text-left p-3 font-medium">Last Updated</th> */}{/* Replaced by Due Date or Task Creation */}
                     <th className="text-left p-3 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tasks.map((task) => (
                     <tr key={task.id} className="border-b hover:bg-muted/50">
-                      <td className="p-3 font-medium">{task.title}</td>
-                      <td className="p-3">{task.template?.name || 'N/A'}</td>
-                      <td className="p-3">{task.brand?.name || 'N/A'}</td>
-                      <td className="p-3">{getStepName(task)}</td>
-                      <td className="p-3 text-muted-foreground">{formatDate(task.updated_at)}</td>
+                      <td className="p-3 font-medium">{task.content_title || 'N/A'}</td>
+                      {/* <td className="p-3">{task.template_name || 'N/A'}</td> */}{/* Template removed for now */}
+                      <td className="p-3">{task.brand_name || 'N/A'}</td>
+                      <td className="p-3">{task.workflow_step_name || 'N/A'}</td>
+                      <td className="p-3">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium 
+                          ${task.task_status === 'completed' ? 'bg-green-100 text-green-800' : 
+                            task.task_status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                            'bg-gray-100 text-gray-800'}`}>
+                          {task.task_status ? task.task_status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'N/A'}
+                        </span>
+                      </td>
+                      <td className="p-3 text-muted-foreground">{formatDate(task.due_date)}</td>
+                      {/* <td className="p-3 text-muted-foreground">{formatDate(task.created_at)}</td> */}
                       <td className="p-3">
                         <Button variant="outline" size="sm" asChild>
-                          <Link href={`/dashboard/content/${task.id}`}>
-                            <Eye className="h-4 w-4 mr-1.5" /> Review
+                          {/* Ensure task.content_id is used for the link if task.id is user_task.id */}
+                          <Link href={`/dashboard/content/${task.content_id}`}>
+                            <Eye className="h-4 w-4 mr-1.5" /> Review Content
                           </Link>
                         </Button>
                       </td>

@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
-import { Database } from '@/types/supabase';
+import { Database, TablesInsert } from '@/types/supabase';
+import { User } from '@supabase/supabase-js';
 
 /**
  * GET: Retrieve all content, optionally filtered by a search query.
@@ -22,28 +23,17 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     let queryBuilder = supabase
       .from('content')
       .select(`
-        id,
-        title,
-        status,
-        created_at,
-        updated_at,
-        brand_id,
+        *,
         brands ( name, brand_color ),
-        content_type_id,
         content_types ( name ),
-        created_by,
-        profiles:profiles!content_created_by_fkey ( full_name, avatar_url ),
-        template_id,
+        creator_profile:profiles!created_by ( full_name, avatar_url ),
         content_templates ( name, icon ),
-        current_step,
-        workflow_id
+        current_step_details:workflow_steps!current_step ( name ), 
+        assignee_profile:profiles!assigned_to ( full_name, avatar_url )
       `)
       .order('updated_at', { ascending: false });
 
     if (query) {
-      // Apply search query to title and body (using textSearch for body might be better if enabled and FTS is set up)
-      // For now, using ilike on title. Body search via ilike can be slow on large text fields.
-      // Consider adding a dedicated search vector column in Postgres for more performant full-text search on body.
       queryBuilder = queryBuilder.or(`title.ilike.%${query}%,meta_description.ilike.%${query}%`);
     }
 
@@ -58,8 +48,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       throw error;
     }
 
-    // Flatten related data for easier client consumption
-    const formattedContent = (data || []).map(item => ({
+    const formattedContent = (data || []).map((item: any) => ({
       id: item.id,
       title: item.title,
       status: item.status,
@@ -71,13 +60,16 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       content_type_id: item.content_type_id,
       content_type_name: item.content_types?.name || null,
       created_by: item.created_by,
-      created_by_name: item.profiles?.full_name || null,
-      creator_avatar_url: item.profiles?.avatar_url || null,
+      created_by_name: item.creator_profile?.full_name || null,
+      creator_avatar_url: item.creator_profile?.avatar_url || null,
       template_id: item.template_id,
       template_name: item.content_templates?.name || null,
       template_icon: item.content_templates?.icon || null,
-      current_step: item.current_step,
       workflow_id: item.workflow_id,
+      current_step_id: item.current_step, 
+      current_step_name: item.current_step_details?.name || (item.current_step ? 'Step not found' : 'N/A'), 
+      assigned_to_id: item.assigned_to, 
+      assigned_to_name: item.assignee_profile?.full_name || (item.assigned_to ? 'Assignee not found' : 'N/A') 
     }));
 
     return NextResponse.json({
@@ -102,30 +94,60 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     }
     
     const supabase = createSupabaseAdminClient();
-    
-    const { data: newContent, error } = await supabase
+
+    let assignedToUserId: string | null = null;
+    let currentWorkflowStepId: string | null = null;
+
+    if (data.workflow_id) {
+      const { data: workflowFirstStep, error: workflowStepError } = await supabase
+        .from('workflow_steps')
+        .select('id, assigned_user_ids, step_order')
+        .eq('workflow_id', data.workflow_id)
+        .order('step_order', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (workflowStepError) {
+        console.error('Error fetching first workflow step:', workflowStepError);
+        throw workflowStepError;
+      }
+
+      if (workflowFirstStep) {
+        currentWorkflowStepId = workflowFirstStep.id;
+        if (workflowFirstStep.assigned_user_ids && workflowFirstStep.assigned_user_ids.length > 0) {
+          assignedToUserId = workflowFirstStep.assigned_user_ids[0];
+        }
+      }
+    }
+
+    const newContentPayload: TablesInsert<'content'> = {
+      brand_id: data.brand_id,
+      title: data.title,
+      body: data.body,
+      meta_title: data.meta_title || null,
+      meta_description: data.meta_description || null,
+      content_type_id: data.content_type_id || null,
+      template_id: data.template_id || null,
+      created_by: user.id,
+      workflow_id: data.workflow_id || null,
+      current_step: currentWorkflowStepId,
+      assigned_to: assignedToUserId,
+      status: data.status || 'draft'
+    };
+
+    const { data: newContentData, error: newContentError } = await supabase
       .from('content')
-      .insert({
-        brand_id: data.brand_id,
-        created_by: user.id,
-        title: data.title,
-        body: data.body,
-        meta_title: data.meta_title,
-        meta_description: data.meta_description,
-        status: data.status || 'draft',
-        workflow_id: data.workflow_id || null,
-        current_step: data.current_step || 0,
-        template_id: data.template_id || null
-      })
-      .select();
-    
-    if (error) throw error;
-    
-    return NextResponse.json({
-      success: true,
-      content: newContent[0]
-    });
+      .insert(newContentPayload)
+      .select()
+      .single();
+
+    if (newContentError) {
+      console.error('Error inserting new content:', newContentError);
+      throw newContentError;
+    }
+
+    return NextResponse.json({ success: true, data: newContentData });
   } catch (error) {
-    return handleApiError(error, 'Failed to create content', 500);
+    return handleApiError(error);
   }
 }); 

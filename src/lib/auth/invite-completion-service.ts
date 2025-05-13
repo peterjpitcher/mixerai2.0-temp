@@ -64,7 +64,8 @@ async function assignBrandPermissions(userId: string, brandId: string, role: Use
 
 async function finalizeWorkflowUser(
     userId: string, userEmail: string, workflowId: string, 
-    stepId: number | string | null, brandId: string, role: UserRoles, 
+    stepId: number | string | null, // stepId should be the UUID string now
+    brandId: string, role: UserRoles, 
     supabase: SupabaseClient<Database>
 ) {
   console.log(`[InviteService] Finalizing workflow user ${userId} for workflow ${workflowId}, brand ${brandId}, role ${role}`);
@@ -82,12 +83,14 @@ async function finalizeWorkflowUser(
   else console.log(`[InviteService] Updated workflow_invitation status for ${userEmail}, workflow ${workflowId}`);
 
   // 3. Ensure workflow_user_assignments
-  if (stepId !== null) {
+  if (stepId !== null && typeof stepId === 'string') { // Ensure stepId is a string (UUID)
     const { error: assignError } = await supabase
       .from('workflow_user_assignments')
-      .upsert({ workflow_id: workflowId, step_id: Number(stepId), user_id: userId }, { onConflict: 'workflow_id,step_id,user_id' });
+      .upsert({ workflow_id: workflowId, step_id: stepId, user_id: userId }, { onConflict: 'workflow_id,step_id,user_id' }); // Use stepId directly
     if (assignError) console.warn(`[InviteService] Failed to upsert workflow_user_assignment: ${assignError.message}`);
     else console.log(`[InviteService] Ensured workflow_user_assignment for user ${userId}, workflow ${workflowId}, step ${stepId}`);
+  } else if (stepId !== null) {
+    console.warn(`[InviteService] stepId for workflow user assignment was not a string (expected UUID): ${stepId}`);
   } else {
     console.warn(`[InviteService] No stepId provided for workflow user assignment for user ${userId}, workflow ${workflowId}.`);
   }

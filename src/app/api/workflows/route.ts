@@ -43,13 +43,13 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         id,
         name,
         brand_id,
-        steps,
         created_at,
         updated_at,
-        template_id, 
+        template_id,
         brands:brand_id ( name, brand_color ),
-        content_templates:template_id ( name ), 
-        content ( count )
+        content_templates:template_id ( name ),
+        content ( count ),
+        workflow_steps ( count )
       `)
       .order('created_at', { ascending: false });
     
@@ -69,9 +69,8 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       brand_color: workflow.brands?.brand_color || null,
       template_id: workflow.template_id,
       template_name: workflow.content_templates?.name || null,
-      steps: workflow.steps,
-      steps_count: Array.isArray(workflow.steps) ? workflow.steps.length : 0,
-      content_count: workflow.content?.[0]?.count || 0,
+      steps_count: workflow.workflow_steps && workflow.workflow_steps.length > 0 ? workflow.workflow_steps[0].count : 0,
+      content_count: workflow.content && workflow.content.length > 0 ? workflow.content[0].count : 0,
       created_at: workflow.created_at,
       updated_at: workflow.updated_at
     }));
@@ -218,11 +217,9 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     const rpcParams = {
       p_name: body.name,
       p_brand_id: body.brand_id,
-      p_template_id: body.template_id || null,
-      p_steps: steps, // Use the processed steps (with assignee IDs if found)
+      p_steps_definition: steps, // Use the processed steps (with assignee IDs if found)
       p_created_by: user.id,
       p_invitation_items: invitationItems, // Array of items for users needing invites
-      p_description: workflowDescription // Add the generated description
     };
 
     // Call the database function to create workflow and log invitations atomically

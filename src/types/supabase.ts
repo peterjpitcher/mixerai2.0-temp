@@ -155,7 +155,7 @@ export type Database = {
           content_type_id: string | null
           created_at: string | null
           created_by: string | null
-          current_step: number | null
+          current_step: string | null
           id: string
           meta_description: string | null
           meta_title: string | null
@@ -175,7 +175,7 @@ export type Database = {
           content_type_id?: string | null
           created_at?: string | null
           created_by?: string | null
-          current_step?: number | null
+          current_step?: string | null
           id?: string
           meta_description?: string | null
           meta_title?: string | null
@@ -195,7 +195,7 @@ export type Database = {
           content_type_id?: string | null
           created_at?: string | null
           created_by?: string | null
-          current_step?: number | null
+          current_step?: string | null
           id?: string
           meta_description?: string | null
           meta_title?: string | null
@@ -248,6 +248,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_current_step_fkey"
+            columns: ["current_step"]
+            isOneToOne: false
+            referencedRelation: "workflow_steps"
             referencedColumns: ["id"]
           },
           {
@@ -871,6 +878,13 @@ export type Database = {
             referencedRelation: "workflows"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ut_workflow_step_id_fkey"
+            columns: ["workflow_step_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_steps"
+            referencedColumns: ["id"]
+          },
         ]
       }
       workflow_invitations: {
@@ -882,7 +896,7 @@ export type Database = {
           invite_token: string
           role: string
           status: string | null
-          step_id: number
+          step_id: string | null
           workflow_id: string | null
         }
         Insert: {
@@ -893,7 +907,7 @@ export type Database = {
           invite_token: string
           role: string
           status?: string | null
-          step_id: number
+          step_id?: string | null
           workflow_id?: string | null
         }
         Update: {
@@ -904,12 +918,72 @@ export type Database = {
           invite_token?: string
           role?: string
           status?: string | null
-          step_id?: number
+          step_id?: string | null
           workflow_id?: string | null
         }
         Relationships: [
           {
+            foreignKeyName: "workflow_invitations_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_steps"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "workflow_invitations_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_steps: {
+        Row: {
+          approval_required: boolean | null
+          assigned_user_ids: string[] | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_optional: boolean
+          name: string
+          role: string | null
+          step_id: string | null
+          step_order: number
+          updated_at: string | null
+          workflow_id: string
+        }
+        Insert: {
+          approval_required?: boolean | null
+          assigned_user_ids?: string[] | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_optional?: boolean
+          name: string
+          role?: string | null
+          step_id?: string | null
+          step_order: number
+          updated_at?: string | null
+          workflow_id: string
+        }
+        Update: {
+          approval_required?: boolean | null
+          assigned_user_ids?: string[] | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_optional?: boolean
+          name?: string
+          role?: string | null
+          step_id?: string | null
+          step_order?: number
+          updated_at?: string | null
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_steps_workflow_id_fkey"
             columns: ["workflow_id"]
             isOneToOne: false
             referencedRelation: "workflows"
@@ -921,7 +995,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
-          step_id: number
+          step_id: string
           updated_at: string | null
           user_id: string | null
           workflow_id: string | null
@@ -929,7 +1003,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
-          step_id: number
+          step_id: string
           updated_at?: string | null
           user_id?: string | null
           workflow_id?: string | null
@@ -937,7 +1011,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
-          step_id?: number
+          step_id?: string
           updated_at?: string | null
           user_id?: string | null
           workflow_id?: string | null
@@ -962,6 +1036,13 @@ export type Database = {
             columns: ["workflow_id"]
             isOneToOne: false
             referencedRelation: "workflows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wua_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_steps"
             referencedColumns: ["id"]
           },
         ]
@@ -1064,7 +1145,7 @@ export type Database = {
         Args: {
           p_name: string
           p_brand_id: string
-          p_steps: Json
+          p_steps_definition: Json
           p_created_by: string
           p_invitation_items: Json
         }
@@ -1081,6 +1162,10 @@ export type Database = {
       get_user_by_email: {
         Args: { user_email: string }
         Returns: unknown[]
+      }
+      integer_to_uuid: {
+        Args: { "": number }
+        Returns: string
       }
       set_user_role_for_all_assigned_brands: {
         Args: {

@@ -23,10 +23,15 @@ interface ContentItem {
   status: string;
   created_at: string;
   created_by_name: string | null;
+  creator_avatar_url?: string | null;
+  template_id?: string | null;
   template_name?: string | null;
   template_icon?: string | null;
-  current_step?: number | null;
   workflow_id?: string | null;
+  current_step_id?: string | null;
+  current_step_name?: string | null;
+  assigned_to_id?: string | null;
+  assigned_to_name?: string | null;
 }
 
 interface Assignee {
@@ -48,7 +53,6 @@ interface Workflow {
 // --- Component Logic Starts Here ---
 export default function ContentPageClient() { // Renamed component
   const [content, setContent] = useState<ContentItem[]>([]);
-  const [assigneeDetails, setAssigneeDetails] = useState<Record<string, { name: string, stepName: string }>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,99 +64,31 @@ export default function ContentPageClient() { // Renamed component
   useEffect(() => {
     async function fetchContentData() {
       setIsLoading(true);
-      setAssigneeDetails({});
       try {
         const apiUrl = debouncedSearchQuery 
           ? `/api/content?query=${encodeURIComponent(debouncedSearchQuery)}${brandId ? `&brandId=${brandId}` : ''}` 
           : `/api/content${brandId ? `?brandId=${brandId}` : ''}`;
         
         const response = await fetch(apiUrl);
-        if (!response.ok) throw new Error('Failed to fetch content');
+        if (!response.ok) throw new Error('Failed to fetch content data from API');
         const data = await response.json();
         if (data.success) {
           setContent(data.data || []);
         } else {
           setContent([]);
-          throw new Error(data.error || 'Failed to fetch content');
+          throw new Error(data.error || 'API returned error fetching content');
         }
       } catch (err) {
-        console.error('Error fetching content:', err);
-        setError((err as Error).message || 'Failed to load content');
+        console.error('Error in fetchContentData:', err);
+        setError((err as Error).message || 'Failed to load content data');
         setContent([]);
-        sonnerToast.error("Failed to load content", { description: "Please try again." });
+        sonnerToast.error("Failed to load content", { description: (err as Error).message || "Please try again." });
       } finally {
         setIsLoading(false);
       }
     }
     fetchContentData();
   }, [debouncedSearchQuery, brandId]);
-
-  useEffect(() => {
-    const fetchWorkflowAndAssigneeInfo = async () => {
-      if (content.length === 0) return;
-
-      const newAssigneeDetailsUpdates: Record<string, { name: string, stepName: string }> = {};
-
-      for (const item of content) {
-        if (item.workflow_id && item.current_step !== null && item.current_step !== undefined) {
-          try {
-            const workflowRes = await fetch(`/api/workflows/${item.workflow_id}`);
-            if (!workflowRes.ok) {
-              console.warn(`Failed to fetch workflow ${item.workflow_id} for content ${item.id}`);
-              newAssigneeDetailsUpdates[item.id] = { name: 'N/A (Workflow Error)', stepName: 'N/A (Workflow Error)' };
-              continue;
-            }
-            const workflowData = await workflowRes.json();
-
-            if (workflowData.success && workflowData.workflow) {
-              const workflow: Workflow = workflowData.workflow;
-              const currentStepDetails = workflow.steps?.find(step => step.id === item.current_step);
-
-              if (currentStepDetails) {
-                let assignedNames = 'N/A';
-                if (currentStepDetails.assignees && currentStepDetails.assignees.length > 0) {
-                  const userNamesToFetch = currentStepDetails.assignees.map(assignee => assignee.id).filter(id => !!id);
-                  
-                  if (userNamesToFetch.length > 0) {
-                    const userPromises = userNamesToFetch.map(userId =>
-                      fetch(`/api/users/${userId}`).then(res => res.ok ? res.json() : null)
-                    );
-                    const userResults = await Promise.all(userPromises);
-                    assignedNames = userResults
-                      .filter(ud => ud?.success && ud.user)
-                      .map(ud => ud.user.full_name || ud.user.email || 'Unknown')
-                      .join(', ') || 'N/A (No user name)'; // Provide fallback if names are empty after map
-                  }
-                }
-                newAssigneeDetailsUpdates[item.id] = {
-                  name: assignedNames,
-                  stepName: currentStepDetails.name || `Step ${item.current_step}`
-                };
-              } else {
-                newAssigneeDetailsUpdates[item.id] = { name: 'N/A', stepName: `Step ${item.current_step} not found` };
-              }
-            } else {
-              newAssigneeDetailsUpdates[item.id] = { name: 'N/A (Workflow Invalid)', stepName: 'N/A (Workflow Invalid)' };
-            }
-          } catch (err) {
-            console.error(`Failed to fetch workflow/assignee details for content ${item.id}:`, err);
-            newAssigneeDetailsUpdates[item.id] = { name: 'N/A (Fetch Error)', stepName: 'N/A (Fetch Error)' };
-          }
-        } else {
-          // Explicitly set N/A for items without a workflow_id or valid current_step
-          newAssigneeDetailsUpdates[item.id] = { name: 'N/A', stepName: 'N/A (No Workflow Active)' };
-        }
-      }
-      // Only update state if there are actual changes to avoid unnecessary re-renders
-      if (Object.keys(newAssigneeDetailsUpdates).length > 0) {
-        setAssigneeDetails(prev => ({ ...prev, ...newAssigneeDetailsUpdates }));
-      }
-    };
-
-    if (!isLoading && content.length > 0) {
-      fetchWorkflowAndAssigneeInfo();
-    }
-  }, [content, isLoading]);
 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
@@ -233,8 +169,8 @@ export default function ContentPageClient() { // Renamed component
                               {item.status ? item.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'N/A'}
                             </span>
                           </td>
-                          <td className="p-3">{assigneeDetails[item.id]?.stepName || (item.workflow_id ? 'Loading...' : 'N/A')}</td> 
-                          <td className="p-3">{assigneeDetails[item.id]?.name || (item.workflow_id ? 'Loading...' : 'N/A')}</td>
+                          <td className="p-3">{item.current_step_name || 'N/A'}</td> 
+                          <td className="p-3">{item.assigned_to_name || 'N/A'}</td>
                           <td className="p-3">
                             <div className="flex space-x-1">
                               <Button variant="ghost" size="sm" asChild><Link href={`/dashboard/content/${item.id}/edit`}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>Edit</Link></Button>

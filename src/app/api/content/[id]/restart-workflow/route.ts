@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
+import { TablesUpdate } from '@/types/supabase';
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export const POST = withAuth(async (request: NextRequest, user: User, context: {
     // 1. Fetch current content and its brand to check admin status
     const { data: currentContent, error: contentError } = await supabase
       .from('content')
-      .select('*, brand:brands!inner(brand_admin_id)') // Ensure brand is fetched and has brand_admin_id
+      .select('id, status, workflow_id, brand:brands!inner(brand_admin_id)')
       .eq('id', contentId)
       .single();
 
@@ -23,10 +24,11 @@ export const POST = withAuth(async (request: NextRequest, user: User, context: {
         if (contentError.code === 'PGRST116') { // Not found
             return NextResponse.json({ success: false, error: 'Content not found.' }, { status: 404 });
         }
+        console.error('Error fetching current content:', contentError);
         throw contentError;
     }
-    if (!currentContent) { // Should be caught by single() error, but as a safeguard
-      return NextResponse.json({ success: false, error: 'Content not found.' }, { status: 404 });
+    if (!currentContent) {
+      return NextResponse.json({ success: false, error: 'Content not found after fetch.' }, { status: 404 });
     }
     
     // Explicitly check if brand and brand_admin_id were loaded.
@@ -45,19 +47,58 @@ export const POST = withAuth(async (request: NextRequest, user: User, context: {
       return NextResponse.json({ success: false, error: 'Content must be in rejected status to restart workflow.' }, { status: 400 });
     }
 
-    // 4. Update content to restart workflow
+    if (!currentContent.workflow_id) {
+      return NextResponse.json({ success: false, error: 'Content is not associated with a workflow.' }, { status: 400 });
+    }
+
+    // Fetch the first step of the workflow
+    let firstStepId: string | null = null;
+    let firstStepAssigneeId: string | null = null;
+
+    const { data: firstWorkflowStep, error: stepError } = await supabase
+      .from('workflow_steps')
+      .select('id, assigned_user_ids')
+      .eq('workflow_id', currentContent.workflow_id)
+      .order('step_order', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (stepError) {
+      console.error('Error fetching first workflow step:', stepError);
+      throw stepError;
+    }
+
+    if (firstWorkflowStep) {
+      firstStepId = firstWorkflowStep.id;
+      if (firstWorkflowStep.assigned_user_ids && firstWorkflowStep.assigned_user_ids.length > 0) {
+        firstStepAssigneeId = firstWorkflowStep.assigned_user_ids[0];
+      }
+    } else {
+      // No steps in workflow, effectively means no place to restart to.
+      // Depending on desired logic, could error or set current_step to null.
+      // For now, let's assume a workflow should have steps if it's being restarted.
+      console.warn(`Workflow ${currentContent.workflow_id} has no steps defined.`);
+      // firstStepId will remain null, and assigned_to will be null.
+    }
+    
+    const updatePayload: TablesUpdate<'content'> = {
+      current_step: firstStepId, 
+      assigned_to: firstStepAssigneeId,
+      status: 'pending_review',
+      updated_at: new Date().toISOString(),
+    };
+
     const { data: updatedContent, error: updateError } = await supabase
       .from('content')
-      .update({
-        current_step: 0, // Reset to the first step (index 0)
-        status: 'pending_review',
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', contentId)
       .select()
       .single();
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error('Error updating content to restart workflow:', updateError);
+      throw updateError;
+    }
 
     // Optionally, create a content_version entry for this restart action.
     // Consider this for future enhancement if audit trail for restarts is needed.
