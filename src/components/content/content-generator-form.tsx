@@ -249,6 +249,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         template_id: template?.id,
         title,
         workflow_id: associatedWorkflowId,
+        ...(associatedWorkflowId && { current_step: 0 }),
         body: generatedContent,
         content_data: {
             templateInputValues: templateFieldValues,
