@@ -16,6 +16,7 @@ import { BrandIcon } from '@/components/brand-icon';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 import { Checkbox } from "@/components/checkbox";
 import { v4 as uuidv4 } from 'uuid';
+import { Badge } from "@/components/badge";
 
 // Metadata for a redirecting page might be minimal or not strictly necessary
 // as user shouldn't spend time here.
@@ -28,6 +29,15 @@ import { v4 as uuidv4 } from 'uuid';
  * NewBrandPage allows users to create a new brand profile.
  * TODO: Implement the full brand creation form here.
  */
+
+interface UserSearchResult {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  job_title?: string | null;
+}
+
 export default function NewBrandPage() {
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
@@ -46,6 +56,10 @@ export default function NewBrandPage() {
     guardrails: '',
     content_vetting_agencies: ''
   });
+
+  const [selectedAdmins, setSelectedAdmins] = useState<UserSearchResult[]>([]);
+  const [userSearchResults, setUserSearchResults] = useState<UserSearchResult[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -77,6 +91,44 @@ export default function NewBrandPage() {
         urlObj.id === id ? { ...urlObj, value } : urlObj
       )
     }));
+  };
+
+  const searchUsers = async (query: string) => {
+    if (!query.trim()) {
+      setUserSearchResults([]);
+      return;
+    }
+    try {
+      const response = await fetch(`/api/users/search?query=${encodeURIComponent(query)}`);
+      const data = await response.json();
+      if (data.success) {
+        setUserSearchResults(data.users);
+      } else {
+        setUserSearchResults([]);
+      }
+    } catch (error) {
+      console.error('Error searching users:', error);
+      setUserSearchResults([]);
+    }
+  };
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      searchUsers(searchQuery);
+    }, 300);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
+
+  const handleSelectAdmin = (user: UserSearchResult) => {
+    if (!selectedAdmins.find(admin => admin.id === user.id)) {
+      setSelectedAdmins(prevAdmins => [...prevAdmins, user]);
+    }
+    setSearchQuery('');
+    setUserSearchResults([]);
+  };
+
+  const handleRemoveAdmin = (adminId: string) => {
+    setSelectedAdmins(prevAdmins => prevAdmins.filter(admin => admin.id !== adminId));
   };
 
   const handleGenerateBrandIdentity = async () => {
@@ -143,13 +195,23 @@ export default function NewBrandPage() {
     }
     setIsSaving(true);
     try {
-      const payload = { ...formData };
-      // Ensure empty optional fields are sent as null or not at all if API prefers that
+      const payload: any = { 
+        ...formData,
+        brand_admin_ids: selectedAdmins.map(admin => admin.id)
+      };
+      
       Object.keys(payload).forEach(key => {
-        if (payload[key as keyof typeof payload] === '') {
-          payload[key as keyof typeof payload] = null as any; // Or delete payload[key as keyof typeof payload];
+        if (payload[key] === '') {
+          payload[key] = null;
         }
       });
+      if (payload.additional_website_urls && Array.isArray(payload.additional_website_urls)){
+        payload.additional_website_urls = payload.additional_website_urls.map((item: {id:string, value:string}) => item.value).filter(Boolean);
+        if(payload.additional_website_urls.length === 0) payload.additional_website_urls = null;
+      }
+      if (typeof payload.content_vetting_agencies === 'string' && payload.content_vetting_agencies.trim() === ''){
+          payload.content_vetting_agencies = null;
+      }
 
       const response = await fetch('/api/brands', {
         method: 'POST',
@@ -161,7 +223,7 @@ export default function NewBrandPage() {
         throw new Error(data.error || 'Failed to create brand');
       }
       toast.success('Brand created successfully!');
-      router.push(`/dashboard/brands/${data.data.id}`); // Corrected path to brand ID
+      router.push(`/dashboard/brands/${data.data.id}`);
     } catch (error) {
       toast.error((error as Error).message || 'Failed to create brand.');
     } finally {
@@ -209,6 +271,50 @@ export default function NewBrandPage() {
                 <div className="space-y-2"><Label htmlFor="language">Language</Label><Select value={formData.language} onValueChange={(v) => handleSelectChange('language', v)}><SelectTrigger><SelectValue placeholder="Select language" /></SelectTrigger><SelectContent>{LANGUAGES.map(l => (<SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>))}</SelectContent></Select></div>
               </div>
               <div className="space-y-2"><Label htmlFor="brand_color">Brand Colour</Label><div className="flex gap-2 items-center"><input type="color" id="brand_color" name="brand_color" value={formData.brand_color} onChange={handleInputChange} className="w-10 h-10 rounded cursor-pointer"/><Input value={formData.brand_color} onChange={handleInputChange} name="brand_color" placeholder="#HEX colour" className="w-32"/></div></div>
+              <div className="space-y-2">
+                <Label htmlFor="brand_admins_search">Brand Admins <span className="text-muted-foreground text-xs">(Optional)</span></Label>
+                {selectedAdmins.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2 p-2 border rounded-md bg-muted/50">
+                    {selectedAdmins.map(admin => (
+                      <Badge key={admin.id} variant="secondary" className="flex items-center gap-1">
+                        {admin.full_name || admin.email}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-4 w-4 rounded-full hover:bg-destructive/20"
+                          onClick={() => handleRemoveAdmin(admin.id)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <Input 
+                  id="brand_admins_search" 
+                  name="brand_admins_search" 
+                  value={searchQuery} 
+                  onChange={(e) => setSearchQuery(e.target.value)} 
+                  placeholder="Search and add admins by name or email" 
+                />
+                {userSearchResults.length > 0 && (
+                  <div className="border rounded-md mt-1 max-h-60 overflow-y-auto">
+                    {userSearchResults.map(user => (
+                      <div 
+                        key={user.id} 
+                        className="p-2 hover:bg-muted/50 cursor-pointer"
+                        onClick={() => handleSelectAdmin(user)}
+                      >
+                        {user.full_name || user.email}
+                        {user.job_title && <span className="text-xs text-muted-foreground ml-2">({user.job_title})</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {searchQuery && userSearchResults.length === 0 && (
+                  <p className="text-sm text-muted-foreground mt-1">No users found matching "{searchQuery}".</p>
+                )}
+              </div>
             </CardContent>
             <CardFooter className="flex justify-end"><Button onClick={handleCreateBrand} disabled={isSaving || isGenerating}>{isSaving ? 'Saving...' : 'Create Brand & Continue'}</Button></CardFooter>
           </Card>

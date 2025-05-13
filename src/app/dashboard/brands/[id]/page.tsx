@@ -249,7 +249,6 @@ export default function BrandDetails({ params }: BrandDetailsProps) {
               {[ { title: "Brand Identity", value: brand.brand_identity, placeholder: "No brand identity has been defined yet." },
                 { title: "Tone of Voice", value: brand.tone_of_voice, placeholder: "No tone of voice has been defined yet." },
                 { title: "Content Guardrails", value: brand.guardrails, placeholder: "No content guardrails have been defined yet." },
-                { title: "Content Vetting Agencies", value: brand.content_vetting_agencies, placeholder: "No content vetting agencies specified." }
               ].map(item => (
                 <div key={item.title}>
                   <Label className="text-xs font-semibold text-muted-foreground mb-1 block">{item.title}</Label>
@@ -262,6 +261,25 @@ export default function BrandDetails({ params }: BrandDetailsProps) {
                   </div>
                 </div>
               ))}
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground mb-1 block">Content Vetting Agencies</Label>
+                <div className="p-4 rounded-md bg-muted min-h-[60px]">
+                  {brand.selected_vetting_agencies && brand.selected_vetting_agencies.length > 0 ? (
+                    <ul className="list-disc list-inside space-y-1">
+                      {brand.selected_vetting_agencies.map((agency: { id: string; name: string; priority: number }) => (
+                        <li key={agency.id} className="text-sm">
+                          {agency.name}
+                          {agency.priority === 1 && <span className="ml-2 text-xs font-semibold text-red-600">(High Priority)</span>}
+                          {agency.priority === 2 && <span className="ml-2 text-xs font-semibold text-orange-500">(Medium Priority)</span>}
+                          {agency.priority === 3 && <span className="ml-2 text-xs font-semibold text-blue-600">(Low Priority)</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-muted-foreground italic text-sm">No content vetting agencies specified.</p>
+                  )}
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

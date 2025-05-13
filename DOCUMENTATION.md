@@ -1366,3 +1366,25 @@ MixerAI 2.0a includes a comprehensive suite of tools for testing and debugging t
 - **Advanced Testing Tools**: Specialized tools for testing different aspects of the AI integration
 
 For detailed information about these tools, see [OpenAI Test Tool Documentation](docs/OPENAI_TEST_TOOL.md).
+
+## User Invitation System Enhancements
+
+### Enhanced Error Handling
+
+The `inviteNewUserWithAppMetadata` function has been enhanced to handle metadata update failures more robustly. If the metadata update fails, the function now attempts to delete the user to maintain security. If the deletion also fails, it logs the error for manual review and returns a critical error message.
+
+### Testing Setup
+
+Jest has been set up as the testing framework for the project. Test cases have been written for the `inviteNewUserWithAppMetadata` function to verify its functionality. These tests cover:
+
+1. **Successful Invitation and Metadata Update:**
+   - Verifies that a new user is invited and their `app_metadata` is updated successfully.
+
+2. **Handling Metadata Update Failure:**
+   - Tests the scenario where the metadata update fails, ensuring the user is deleted to maintain security.
+
+The tests have been executed successfully, confirming the function's robustness.
+
+### Project Documentation
+
+The project documentation has been updated to reflect the current state of the user invitation system and related components. This includes details about the enhanced error handling and the testing setup.

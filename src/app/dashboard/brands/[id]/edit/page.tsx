@@ -78,28 +78,25 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   const [activeTab, setActiveTab] = useState('basic');
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // Form fields - Initialize with empty strings or appropriate defaults
   const [formData, setFormData] = useState({
     name: '',
     website_url: '',
     additional_website_urls: [] as { id: string; value: string }[],
     country: '',
     language: '',
-    brand_color: '#1982C4', // Default color, will be overwritten by fetched data
+    brand_color: '#1982C4',
     brand_identity: '',
     tone_of_voice: '',
     guardrails: '',
-    content_vetting_agencies: [] as string[] // Will store IDs of selected agencies
+    content_vetting_agencies: [] as string[]
   });
-  const [currentAdditionalUrl, setCurrentAdditionalUrl] = useState(''); // For new URL input
-  const [customAgencyInput, setCustomAgencyInput] = useState(''); // For new custom agency
+  const [currentAdditionalUrl, setCurrentAdditionalUrl] = useState('');
+  const [customAgencyInput, setCustomAgencyInput] = useState('');
 
   const [allVettingAgencies, setAllVettingAgencies] = useState<VettingAgency[]>([]);
 
-  // Add state for brand admin
-  const [brandAdmin, setBrandAdmin] = useState('');
-
-  // Add state for user search results with type
+  // UPDATED: State for selected brand admins
+  const [selectedAdmins, setSelectedAdmins] = useState<UserSearchResult[]>([]);
   const [userSearchResults, setUserSearchResults] = useState<UserSearchResult[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -166,6 +163,12 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                                       ? data.brand.selected_vetting_agencies.map((agency: VettingAgency) => agency.id) 
                                       : [],
         });
+
+        // Populate selectedAdmins from fetched brand data
+        if (data.brand.admins && Array.isArray(data.brand.admins)) {
+          setSelectedAdmins(data.brand.admins);
+        }
+
       } catch (error) {
         setError((error as Error).message);
         toast.error('Failed to load brand details. Please try again.');
@@ -358,6 +361,20 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     }
   };
   
+  // UPDATED: Handler for selecting an admin from search results
+  const handleSelectAdmin = (user: UserSearchResult) => {
+    if (!selectedAdmins.find(admin => admin.id === user.id)) {
+      setSelectedAdmins(prevAdmins => [...prevAdmins, user]);
+    }
+    setSearchQuery(''); // Clear search query
+    setUserSearchResults([]); // Clear search results
+  };
+
+  // NEW: Handler for removing a selected admin
+  const handleRemoveAdmin = (adminId: string) => {
+    setSelectedAdmins(prevAdmins => prevAdmins.filter(admin => admin.id !== adminId));
+  };
+  
   const handleSave = async () => {
     try {
       setIsSaving(true);
@@ -368,13 +385,13 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         return;
       }
       
-      // Destructure to omit content_vetting_agencies from formData before creating updateData
       const { content_vetting_agencies, ...restOfFormData } = formData;
       
       const updateData = {
         ...restOfFormData,
-        brand_admin_id: brandAdmin, 
-        selected_agency_ids: content_vetting_agencies, // This is now an array of IDs
+        // UPDATED: Send an array of admin IDs
+        brand_admin_ids: selectedAdmins.map(admin => admin.id), 
+        selected_agency_ids: content_vetting_agencies,
         updated_at: new Date().toISOString()
       };
       
@@ -385,7 +402,8 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       });
       
       if (!response.ok) {
-        throw new Error(`Failed to update brand: ${response.status}`);
+        const errorData = await response.json().catch(() => ({})); // Try to parse error
+        throw new Error(errorData.error || `Failed to update brand: ${response.status}`);
       }
       
       const data = await response.json();
@@ -395,10 +413,9 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       }
       
       toast.success('Brand updated successfully!');
-      router.push(`/dashboard/brands/${id}`);
+      router.push(`/dashboard/brands/${id}`); // Or router.refresh() if staying on page
     } catch (error) {
-      // console.error('Error saving brand:', error);
-      toast.error('Failed to save brand. Please try again.');
+      toast.error((error as Error).message || 'Failed to save brand. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -518,17 +535,48 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="brand_admin">Brand Admin</Label>
-                <Input id="brand_admin" name="brand_admin" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search or add a new admin" />
+                <Label htmlFor="brand_admins_search">Brand Admins</Label>
+                {/* Display selected admins */}
+                {selectedAdmins.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2 p-2 border rounded-md bg-muted/50">
+                    {selectedAdmins.map(admin => (
+                      <Badge key={admin.id} variant="secondary" className="flex items-center gap-1">
+                        {admin.full_name || admin.email}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-4 w-4 rounded-full hover:bg-destructive/20"
+                          onClick={() => handleRemoveAdmin(admin.id)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <Input 
+                  id="brand_admins_search" 
+                  name="brand_admins_search" 
+                  value={searchQuery} 
+                  onChange={(e) => setSearchQuery(e.target.value)} 
+                  placeholder="Search and add admins by name or email" 
+                />
                 {userSearchResults.length > 0 && (
-                  <Select onValueChange={(value) => setBrandAdmin(value)}>
-                    <SelectTrigger><SelectValue placeholder="Select an admin" /></SelectTrigger>
-                    <SelectContent>
-                      {userSearchResults.map(user => (
-                        <SelectItem key={user.id} value={user.id}>{user.full_name || user.email}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="border rounded-md mt-1 max-h-60 overflow-y-auto">
+                    {userSearchResults.map(user => (
+                      <div 
+                        key={user.id} 
+                        className="p-2 hover:bg-muted/50 cursor-pointer"
+                        onClick={() => handleSelectAdmin(user)}
+                      >
+                        {user.full_name || user.email}
+                        {user.job_title && <span className="text-xs text-muted-foreground ml-2">({user.job_title})</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {searchQuery && userSearchResults.length === 0 && (
+                  <p className="text-sm text-muted-foreground mt-1">No users found matching "{searchQuery}".</p>
                 )}
               </div>
             </CardContent>

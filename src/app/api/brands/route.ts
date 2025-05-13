@@ -3,6 +3,8 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { Pool } from 'pg'; // Import Pool for direct DB access
+import { getUserAuthByEmail, inviteNewUserWithAppMetadata } from '@/lib/auth/user-management';
+import { User } from '@supabase/supabase-js';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -214,14 +216,14 @@ export const GET = withAuth(async (req: NextRequest, user) => {
 // Authenticated POST handler for creating brands
 export const POST = withAuth(async (req: NextRequest, user) => {
   const supabase = createSupabaseAdminClient(); 
-  const dbClient = await pool.connect(); 
+  // const dbClient = await pool.connect(); // Temporarily comment out pg pool for focusing on Supabase client logic
   try {
-    await dbClient.query('BEGIN'); 
+    // await dbClient.query('BEGIN'); 
     const body = await req.json();
     
     if (!body.name) {
-      await dbClient.query('ROLLBACK');
-      dbClient.release();
+      // await dbClient.query('ROLLBACK');
+      // dbClient.release();
       return NextResponse.json(
         { success: false, error: 'Brand name is required' },
         { status: 400 }
@@ -273,96 +275,170 @@ export const POST = withAuth(async (req: NextRequest, user) => {
       throw new Error('Failed to create brand, no ID returned from function.');
     }
     
-    if (body.selected_agency_ids && Array.isArray(body.selected_agency_ids) && body.selected_agency_ids.length > 0) {
-      const agencyInsertQuery = 'INSERT INTO brand_selected_agencies (brand_id, agency_id) VALUES ($1, $2) ON CONFLICT (brand_id, agency_id) DO NOTHING';
-      for (const agencyId of body.selected_agency_ids) {
-        await dbClient.query(agencyInsertQuery, [newBrandId, agencyId]);
+    // --- Process Additional Brand Admins ---
+    const adminIdentifiers: string[] = body.brand_admin_ids || [];
+    const resolvedAdminUserIds: string[] = []; // To store IDs of existing or successfully invited new admins
+
+    for (const identifier of adminIdentifiers) {
+      if (identifier === user.id) continue; // Skip creator, already handled by RPC
+
+      let adminUser: User | null = null;
+      let isNewAdmin = false;
+
+      // Check if identifier is an email (for potential new user)
+      if (identifier.includes('@')) { 
+        adminUser = await getUserAuthByEmail(identifier, supabase);
+        if (!adminUser) {
+          // User does not exist, invite them
+          console.log(`[API /api/brands POST] Admin email ${identifier} not found. Inviting as new user for brand ${newBrandId}.`);
+          const appMetadata = { 
+            intended_role: 'admin', 
+            assigned_as_brand_admin_for_brand_id: newBrandId,
+            inviter_id: user.id, 
+            invite_type: 'brand_admin_invite' 
+          };
+          const userMetadata = { email_for_invite: identifier }; // Minimal user metadata
+
+          const { user: invitedAdmin, error: inviteError } = await inviteNewUserWithAppMetadata(
+            identifier, 
+            appMetadata, 
+            supabase,
+            userMetadata
+          );
+
+          if (inviteError || !invitedAdmin) {
+            console.warn(`[API /api/brands POST] Failed to invite new admin ${identifier} for brand ${newBrandId}. Error: ${inviteError?.message}`);
+            // Decide on error handling: skip this admin, or fail request? For now, skip.
+            continue;
+          }
+          adminUser = invitedAdmin;
+          isNewAdmin = true;
+          console.log(`[API /api/brands POST] Successfully invited new admin ${identifier} (ID: ${adminUser.id}) for brand ${newBrandId}.`);
+        }
+      } else {
+        // Identifier is assumed to be an existing user ID
+        // Fetch user to confirm existence (optional, but good practice if ID source isn't guaranteed)
+        // For now, assume valid ID if not email
+        adminUser = { id: identifier } as User; // Partial User object, sufficient if just using ID
+      }
+
+      if (adminUser && adminUser.id) {
+        if (!isNewAdmin) { // For existing users, add their ID directly for permission upsert
+          resolvedAdminUserIds.push(adminUser.id);
+        }
+        // For new admins, permissions will be set via complete-invite using app_metadata.
+        // No immediate permission upsert here for newly invited users.
       }
     }
 
-    const additionalAdminIds = (body.brand_admin_ids || []).filter((id: string) => id !== user.id);
-
-    if (Array.isArray(additionalAdminIds) && additionalAdminIds.length > 0) {
-      const permissionUpserts = additionalAdminIds.map((adminId: string) => ({
+    if (resolvedAdminUserIds.length > 0) {
+      const permissionUpserts = resolvedAdminUserIds.map((adminId: string) => ({
         user_id: adminId,
         brand_id: newBrandId as string,
         role: 'admin' as 'admin'
       }));
 
-      const { error: permissionError } = await supabase.from('user_brand_permissions').upsert(permissionUpserts);
+      const { error: permissionError } = await supabase.from('user_brand_permissions').upsert(permissionUpserts, { onConflict: 'user_id,brand_id' });
 
       if (permissionError) {
-        console.error('Error setting additional brand admin permissions:', permissionError);
+        console.error('[API /api/brands POST] Error setting brand admin permissions for existing users:', permissionError);
+        // Non-critical if some permissions fail for existing users? Or rollback?
+        // For now, log and continue.
+      }
+    }
+    // --- End Process Additional Brand Admins ---
+
+    if (body.selected_agency_ids && Array.isArray(body.selected_agency_ids) && body.selected_agency_ids.length > 0) {
+      // Fetch existing agency links for this brand to avoid duplicate inserts
+      const { data: existingLinks, error: fetchLinksError } = await supabase
+        .from('brand_selected_agencies')
+        .select('agency_id')
+        .eq('brand_id', newBrandId);
+
+      if (fetchLinksError) {
+        console.warn(`[API /api/brands POST] Error fetching existing agency links for brand ${newBrandId}:`, fetchLinksError);
+        // Decide if this is critical. For now, proceed cautiously.
+      }
+
+      const existingAgencyIds = existingLinks ? existingLinks.map(link => link.agency_id) : [];
+      const newAgencyIdsToInsert = body.selected_agency_ids.filter((agencyId: string) => !existingAgencyIds.includes(agencyId));
+
+      if (newAgencyIdsToInsert.length > 0) {
+        const agencyInserts = newAgencyIdsToInsert.map((agencyId: string) => ({
+          brand_id: newBrandId,
+          agency_id: agencyId
+        }));
+        
+        const { error: agencyError } = await supabase
+          .from('brand_selected_agencies')
+          .insert(agencyInserts);
+
+        if (agencyError) {
+          console.warn('[API /api/brands POST] Error linking new agencies to brand:', agencyError);
+          // Log and continue, as brand creation itself was successful.
+        }
       }
     }
 
-    await dbClient.query('COMMIT'); 
+    // Fetch the newly created brand data using Supabase client
+    const { data: newBrandDataFromDB, error: fetchBrandError } = await supabase
+      .from('brands')
+      .select('*')
+      .eq('id', newBrandId)
+      .single();
 
-    // Fetch the newly created brand data
-    const { rows: newBrandRows } = await dbClient.query(
-        `SELECT b.* 
-         FROM brands b 
-         WHERE b.id = $1`,
-        [newBrandId]
-    );
-    if (newBrandRows.length === 0) {
-        throw new Error('Failed to fetch newly created brand after commit.');
+    if (fetchBrandError || !newBrandDataFromDB) {
+      // await dbClient.query('ROLLBACK');
+      // dbClient.release();
+      throw new Error(fetchBrandError?.message || 'Failed to fetch newly created brand after commit.');
     }
-    // Cast to a base type, selected_vetting_agencies will be added/transformed
-    const newBrandDataFromDB = newBrandRows[0] as Omit<BrandFromSupabase, 'selected_vetting_agencies' | 'content_count'>;
 
+    // Fetch selected agencies with Supabase client
+    const { data: finalSelectedSupabaseAgencies, error: fetchAgenciesError } = await supabase
+      .from('brand_selected_agencies')
+      .select(`agency_id, content_vetting_agencies (id, name, description, country_code, priority)`)
+      .eq('brand_id', newBrandId);
+    
+    if (fetchAgenciesError) {
+        console.warn('[API /api/brands POST] Error fetching agencies for new brand:', fetchAgenciesError);
+    }
 
-    // Fetch selected agencies; their 'priority' will be string-based from the DB.
-    const { rows: finalSelectedSupabaseAgencies } = await dbClient.query(
-        `SELECT cva.id, cva.name, cva.description, cva.country_code, cva.priority
-         FROM content_vetting_agencies cva
-         JOIN brand_selected_agencies bsa ON cva.id = bsa.agency_id
-         WHERE bsa.brand_id = $1
-         ORDER BY cva.priority ASC, cva.name ASC`, // DB might sort by string priority; we'll re-sort after conversion
-        [newBrandId]
-    );
-    
-    // Convert fetched agencies to VettingAgency[] with numeric priority
-    const finalSelectedVettingAgencies: VettingAgency[] = (finalSelectedSupabaseAgencies as SupabaseVettingAgency[])
-        .map(sa => ({
-            id: sa.id,
-            name: sa.name,
-            description: sa.description,
-            country_code: sa.country_code,
-            priority: mapSupabasePriorityToNumber(sa.priority),
-        }))
-        .sort((a, b) => { // Ensure sorting by numeric priority
-            if (a.priority !== b.priority) {
-                return a.priority - b.priority;
-            }
-            return (a.name || '').localeCompare(b.name || '');
-        });
-    
+    const finalSelectedVettingAgencies: VettingAgency[] = (finalSelectedSupabaseAgencies || [])
+      .map((item: any) => {
+        const sa = item.content_vetting_agencies;
+        if (!sa) return null;
+        return {
+          id: sa.id,
+          name: sa.name,
+          description: sa.description,
+          country_code: sa.country_code,
+          priority: mapSupabasePriorityToNumber(sa.priority as SupabaseVettingAgencyPriority),
+        };
+      })
+      .filter((agency): agency is VettingAgency => agency !== null)
+      .sort((a, b) => {
+        if (a.priority !== b.priority) return a.priority - b.priority;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+
     const finalResponseData: FormattedBrand = {
-        id: newBrandDataFromDB.id!,
-        name: newBrandDataFromDB.name!,
-        website_url: newBrandDataFromDB.website_url,
-        country: newBrandDataFromDB.country,
-        language: newBrandDataFromDB.language,
-        brand_identity: newBrandDataFromDB.brand_identity,
-        tone_of_voice: newBrandDataFromDB.tone_of_voice,
-        brand_summary: newBrandDataFromDB.brand_summary,
-        brand_color: newBrandDataFromDB.brand_color,
-        approved_content_types: newBrandDataFromDB.approved_content_types,
-        created_at: newBrandDataFromDB.created_at,
-        updated_at: newBrandDataFromDB.updated_at,
-        content_count: 0, 
-        selected_vetting_agencies: finalSelectedVettingAgencies,
+      ...(newBrandDataFromDB as unknown as FormattedBrand), // Cast after ensuring all fields match
+      id: newBrandDataFromDB.id!,
+      name: newBrandDataFromDB.name!,
+      content_count: 0, 
+      selected_vetting_agencies: finalSelectedVettingAgencies,
     };
 
+    // await dbClient.query('COMMIT'); 
     return NextResponse.json({ 
       success: true, 
       data: finalResponseData 
     });
+
   } catch (error) {
-    await dbClient.query('ROLLBACK');
+    // await dbClient.query('ROLLBACK');
     return handleApiError(error, 'Error creating brand');
   } finally {
-    dbClient.release();
+    // dbClient.release();
   }
 }); 
