@@ -17,6 +17,7 @@ import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2 } from 'lucide-r
 import type { Metadata } from 'next';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { debounce } from 'lodash';
+import { cn } from '@/lib/utils';
 
 // export const metadata: Metadata = {
 //   title: 'Create New Workflow | MixerAI 2.0',
@@ -42,6 +43,48 @@ interface ContentTemplateSummary {
   name: string;
 }
 
+// --- New Role Card Selection Component ---
+const roles = [
+  { id: 'editor', name: 'Editor', description: 'Reviews and edits content for clarity, grammar, and style.' },
+  { id: 'seo', name: 'SEO', description: 'Optimises content for search engines, including keywords and metadata.' },
+  { id: 'legal', name: 'Legal', description: 'Ensures content complies with legal and regulatory requirements.' },
+  { id: 'culinary', name: 'Culinary', description: 'Verifies recipes, cooking instructions, and culinary accuracy.' },
+  { id: 'brand', name: 'Brand', description: 'Checks content for brand alignment, tone of voice, and messaging.' },
+  { id: 'publisher', name: 'Publisher', description: 'Manages the final publication and distribution of content.' }
+];
+
+interface RoleSelectionCardsProps {
+  selectedRole: string;
+  onRoleSelect: (roleId: string) => void;
+  stepIndex: number;
+}
+
+const RoleSelectionCards: React.FC<RoleSelectionCardsProps> = ({ selectedRole, onRoleSelect, stepIndex }) => {
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        {roles.map((role) => (
+          <button
+            key={role.id}
+            type="button"
+            onClick={() => onRoleSelect(role.id)}
+            className={cn(
+              'border rounded-lg p-3 text-left transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+              selectedRole === role.id
+                ? 'bg-primary/10 border-primary ring-1 ring-primary'
+                : 'hover:bg-accent hover:text-accent-foreground'
+            )}
+          >
+            <p className="font-medium text-sm">{role.name}</p>
+            <p className="text-xs text-muted-foreground mt-1">{role.description}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+// --- End Role Card Selection Component ---
+
 export default function NewWorkflowPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
@@ -54,6 +97,7 @@ export default function NewWorkflowPage() {
   const [assigneeInputs, setAssigneeInputs] = useState<string[]>([]);
   const [userSearchResults, setUserSearchResults] = useState<Record<number, any[]>>({});
   const [userSearchLoading, setUserSearchLoading] = useState<Record<number, boolean>>({});
+  const [stepDescLoading, setStepDescLoading] = useState<Record<number, boolean>>({}); // For step description AI generation
 
   const [workflow, setWorkflow] = useState<any>({
     name: '',
@@ -189,6 +233,51 @@ export default function NewWorkflowPage() {
         steps: updatedSteps
       };
     });
+  };
+
+  const handleGenerateStepDescription = async (index: number) => {
+    const step = workflow.steps[index];
+    if (!step || !step.name || !step.role) {
+      toast.error('Step name and role are required to generate a description.');
+      return;
+    }
+
+    setStepDescLoading(prev => ({ ...prev, [index]: true }));
+
+    try {
+      const currentBrand = brands.find(b => b.id === workflow.brand_id);
+      const currentTemplate = contentTemplates.find(ct => ct.id === selectedTemplateId);
+
+      const response = await fetch('/api/ai/generate-step-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workflowName: workflow.name,
+          brandName: currentBrand?.name,
+          templateName: currentTemplate?.name,
+          stepName: step.name,
+          role: step.role,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate description');
+      }
+
+      const result = await response.json();
+      if (result.success && result.description) {
+        handleUpdateStepDescription(index, result.description);
+        toast.success('Step description generated!');
+      } else {
+        throw new Error(result.error || 'AI service did not return a description.');
+      }
+    } catch (error: any) {
+      console.error('Error generating step description:', error);
+      toast.error(error.message || 'Could not generate step description.');
+    } finally {
+      setStepDescLoading(prev => ({ ...prev, [index]: false }));
+    }
   };
 
   // Debounced user search function (adapted from edit page)
@@ -510,18 +599,6 @@ export default function NewWorkflowPage() {
                 Optionally link this workflow to a specific content template.
               </p>
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={workflow.description}
-                onChange={handleUpdateWorkflowDetails}
-                placeholder="Enter workflow description"
-                rows={3}
-              />
-            </div>
           </CardContent>
         </Card>
         
@@ -552,11 +629,43 @@ export default function NewWorkflowPage() {
                   </div>
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2"><Label htmlFor={`step-name-${index}`}>Step Name <span className="text-destructive">*</span></Label><Input id={`step-name-${index}`} value={step.name || ''} onChange={(e) => handleUpdateStepName(index, e.target.value)} placeholder="Enter step name"/></div>
-                      <div className="space-y-2"><Label htmlFor={`step-role-${index}`}>Role</Label><Select value={step.role || 'editor'} onValueChange={(value) => handleUpdateStepRole(index, value)}><SelectTrigger id={`step-role-${index}`}><SelectValue placeholder="Select role" /></SelectTrigger><SelectContent><SelectItem value="admin">Admin</SelectItem><SelectItem value="editor">Editor</SelectItem><SelectItem value="seo">SEO Specialist</SelectItem><SelectItem value="viewer">Viewer</SelectItem></SelectContent></Select></div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`step-name-${index}`}>Step Name <span className="text-destructive">*</span></Label>
+                        <Input id={`step-name-${index}`} value={step.name || ''} onChange={(e) => handleUpdateStepName(index, e.target.value)} placeholder="Enter step name"/>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Role</Label>
+                        <RoleSelectionCards 
+                          stepIndex={index} 
+                          selectedRole={step.role || 'editor'} 
+                          onRoleSelect={(value) => handleUpdateStepRole(index, value)} 
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2"><Label htmlFor={`step-description-${index}`}>Description</Label><Textarea id={`step-description-${index}`} value={step.description || ''} onChange={(e) => handleUpdateStepDescription(index, e.target.value)} placeholder="Enter step description" rows={2}/></div>
-                    <div className="flex items-center space-x-2"><Switch id={`step-approval-${index}`} checked={!!step.approvalRequired} onCheckedChange={(value) => handleUpdateStepApprovalRequired(index, value)}/><Label htmlFor={`step-approval-${index}`}>Require approval for this step</Label></div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <Label htmlFor={`step-description-${index}`}>Step Description</Label>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleGenerateStepDescription(index)}
+                          disabled={stepDescLoading[index] || !workflow.steps[index]?.name || !workflow.steps[index]?.role}
+                        >
+                          {stepDescLoading[index] ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                          Auto-Generate
+                        </Button>
+                      </div>
+                      <Textarea id={`step-description-${index}`} value={step.description || ''} onChange={(e) => handleUpdateStepDescription(index, e.target.value)} placeholder="Enter step description" rows={2}/>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id={`step-approval-${index}`}
+                        checked={!step.approvalRequired}
+                        onCheckedChange={(value) => handleUpdateStepApprovalRequired(index, !value)}
+                      />
+                      <Label htmlFor={`step-approval-${index}`}>This step is optional</Label>
+                    </div>
                     
                     <div className="space-y-2">
                       <Label htmlFor={`step-assignees-${index}`}>Assignees</Label>

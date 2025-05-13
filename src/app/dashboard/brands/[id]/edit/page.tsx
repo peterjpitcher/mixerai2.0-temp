@@ -10,9 +10,12 @@ import { Label } from '@/components/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X, PlusCircle } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
+import { Checkbox } from "@/components/checkbox";
+import { Badge } from "@/components/badge";
+import { v4 as uuidv4 } from 'uuid';
 
 // export const metadata: Metadata = {
 //   title: 'Edit Brand | MixerAI 2.0',
@@ -41,22 +44,32 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
-  const [urlInput, setUrlInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // Form fields
+  // Form fields - Initialize with empty strings or appropriate defaults
   const [formData, setFormData] = useState({
     name: '',
     website_url: '',
+    additional_website_urls: [] as { id: string; value: string }[],
     country: '',
     language: '',
-    brand_color: '',
+    brand_color: '#1982C4', // Default color, will be overwritten by fetched data
     brand_identity: '',
     tone_of_voice: '',
     guardrails: '',
-    content_vetting_agencies: ''
+    content_vetting_agencies: [] as string[] // Store as array
   });
-  
+  const [currentAdditionalUrl, setCurrentAdditionalUrl] = useState(''); // For new URL input
+  const [customAgencyInput, setCustomAgencyInput] = useState(''); // For new custom agency
+
+  // Predefined agencies list (can be moved to constants if used elsewhere)
+  const predefinedAgencies = [
+    { id: 'internal-legal', label: 'Internal Legal Team' },
+    { id: 'internal-brand', label: 'Internal Brand Team' },
+    { id: 'external-fda', label: 'External FDA Specialist' },
+    { id: 'external-asa', label: 'External Advertising Standards Authority (ASA)' },
+  ];
+
   useEffect(() => {
     const fetchBrandData = async () => {
       try {
@@ -66,7 +79,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         }
         
         const data = await response.json();
-        if (!data.success) {
+        if (!data.success || !data.brand) {
           throw new Error(data.error || 'Failed to fetch brand data');
         }
         
@@ -76,13 +89,22 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         setFormData({
           name: data.brand.name || '',
           website_url: data.brand.website_url || '',
+          additional_website_urls: Array.isArray(data.brand.additional_website_urls)
+                                      ? data.brand.additional_website_urls.map((urlItem: string | { id?: string, value: string }) =>
+                                          typeof urlItem === 'string'
+                                              ? { id: uuidv4(), value: urlItem }
+                                              : { id: urlItem.id || uuidv4(), value: urlItem.value }
+                                        )
+                                      : [],
           country: data.brand.country || '',
           language: data.brand.language || '',
-          brand_color: data.brand.brand_color || '',
+          brand_color: data.brand.brand_color || '#1982C4',
           brand_identity: data.brand.brand_identity || '',
           tone_of_voice: data.brand.tone_of_voice || '',
           guardrails: data.brand.guardrails || '',
-          content_vetting_agencies: data.brand.content_vetting_agencies || ''
+          content_vetting_agencies: typeof data.brand.content_vetting_agencies === 'string' 
+                                      ? data.brand.content_vetting_agencies.split(',').map(s => s.trim()).filter(Boolean) 
+                                      : (Array.isArray(data.brand.content_vetting_agencies) ? data.brand.content_vetting_agencies : []),
         });
       } catch (error) {
         // console.error('Error loading brand data:', error);
@@ -111,27 +133,76 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     });
   };
   
+  // --- Handlers for Additional Website URLs ---
+  const handleAddAdditionalUrlField = () => {
+    setFormData(prev => ({
+      ...prev,
+      additional_website_urls: [...prev.additional_website_urls, { id: uuidv4(), value: '' }]
+    }));
+  };
+
+  const handleRemoveAdditionalUrl = (idToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      additional_website_urls: prev.additional_website_urls.filter(urlObj => urlObj.id !== idToRemove)
+    }));
+  };
+
+  const handleAdditionalUrlChange = (id: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      additional_website_urls: prev.additional_website_urls.map(urlObj => 
+        urlObj.id === id ? { ...urlObj, value } : urlObj
+      )
+    }));
+  };
+  // --- End Handlers for Additional Website URLs ---
+
+  // --- Handlers for Content Vetting Agencies ---
+  const handleAgencyCheckboxChange = (agencyName: string, checked: boolean) => {
+    setFormData(prev => {
+      const currentAgencies = Array.isArray(prev.content_vetting_agencies) ? prev.content_vetting_agencies : [];
+      if (checked) {
+        return { ...prev, content_vetting_agencies: [...currentAgencies, agencyName] };
+      } else {
+        return { ...prev, content_vetting_agencies: currentAgencies.filter(a => a !== agencyName) };
+      }
+    });
+  };
+
+  const handleAddCustomAgency = () => {
+    if (customAgencyInput && customAgencyInput.trim() !== '') {
+      const agencyToAdd = customAgencyInput.trim();
+      if (!formData.content_vetting_agencies.includes(agencyToAdd)) {
+        setFormData(prev => ({
+          ...prev,
+          content_vetting_agencies: [...prev.content_vetting_agencies, agencyToAdd]
+        }));
+      }
+      setCustomAgencyInput('');
+    } else {
+      toast.error('Please enter a custom agency name.');
+    }
+  };
+
+  const handleRemoveCustomAgency = (agencyName: string) => {
+    setFormData(prev => ({
+      ...prev,
+      content_vetting_agencies: prev.content_vetting_agencies.filter(a => a !== agencyName)
+    }));
+  };
+  // --- End Handlers for Content Vetting Agencies ---
+
   const handleGenerateBrandIdentity = async () => {
     if (!formData.name) {
       toast.error('Please enter a brand name before generating the brand identity.');
       return;
     }
     
-    // Validate URLs - must have at least one
-    if (!formData.website_url && !urlInput) {
-      toast.error('Please enter at least one website URL.');
-      return;
-    }
-    
-    const urls = [formData.website_url];
-    if (urlInput) {
-      urls.push(urlInput);
-    }
-    
-    // Validate URLs format
-    const validUrls = urls.filter(url => url && url.trim() !== '');
+    const validUrls = [formData.website_url, ...formData.additional_website_urls.map(u => u.value)].filter(url => url && url.trim() !== '');
+
     if (validUrls.length === 0) {
-      toast.error('Please enter at least one valid website URL.');
+      toast.error('Please enter at least one valid website URL (main or additional).');
       return;
     }
     
@@ -173,7 +244,9 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         brand_identity: data.data.brandIdentity || formData.brand_identity,
         tone_of_voice: data.data.toneOfVoice || formData.tone_of_voice,
         guardrails: data.data.guardrails || formData.guardrails,
-        content_vetting_agencies: data.data.agencies || formData.content_vetting_agencies,
+        content_vetting_agencies: Array.isArray(data.data.suggestedAgencies) 
+                                    ? Array.from(new Set([...formData.content_vetting_agencies, ...data.data.suggestedAgencies.map((a:any) => a.name)])) 
+                                    : formData.content_vetting_agencies,
         brand_color: data.data.brandColor || formData.brand_color
       });
       
@@ -202,6 +275,9 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       
       const updateData = {
         ...formData,
+        // Convert arrays to comma-separated strings for backend
+        content_vetting_agencies: formData.content_vetting_agencies.join(', '),
+        // additional_website_urls are not directly saved to the brand record, only used for generation
         updated_at: new Date().toISOString()
       };
       
@@ -297,311 +373,168 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         </div>
         
         <div className="flex space-x-2">
-          <Button variant="outline" onClick={() => router.push(`/dashboard/brands/${id}`)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              'Save Changes'
-            )}
+          <Button variant="outline" onClick={() => router.push(`/dashboard/brands`)}>Cancel</Button>
+          <Button onClick={handleSave} disabled={isSaving || isGenerating}>
+            {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
           </Button>
         </div>
       </div>
-      
-      <Tabs 
-        defaultValue="basic" 
-        value={activeTab} 
-        onValueChange={setActiveTab}
-        className="space-y-4"
-      >
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="basic">Basic Details</TabsTrigger>
           <TabsTrigger value="identity">Brand Identity</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="basic" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Basic Information</CardTitle>
-              <CardDescription>
-                Update the basic details for your brand.
-              </CardDescription>
-            </CardHeader>
+            <CardHeader><CardTitle>Basic Information</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Brand Name</Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    placeholder="Enter brand name"
-                  />
+                  <Label htmlFor="name">Brand Name <span className="text-destructive">*</span></Label>
+                  <Input id="name" name="name" value={formData.name} onChange={handleInputChange} />
                 </div>
-                
                 <div className="space-y-2">
-                  <Label htmlFor="website_url">Website URL</Label>
-                  <Input
-                    id="website_url"
-                    name="website_url"
-                    value={formData.website_url}
-                    onChange={handleInputChange}
-                    placeholder="https://example.com"
-                  />
+                  <Label htmlFor="website_url">Main Website URL</Label>
+                  <Input id="website_url" name="website_url" value={formData.website_url} onChange={handleInputChange} placeholder="https://example.com" />
                 </div>
               </div>
-              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="country">Country</Label>
-                  <Select 
-                    value={formData.country} 
-                    onValueChange={(value) => handleSelectChange('country', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select country" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COUNTRIES.map((country) => (
-                        <SelectItem key={country.value} value={country.value}>
-                          {country.label}
-                        </SelectItem>
-                      ))}
+                  <Select value={formData.country} onValueChange={(v) => handleSelectChange('country', v)}>
+                    <SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      {COUNTRIES.map(c => (<SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>))}
                     </SelectContent>
                   </Select>
                 </div>
-                
                 <div className="space-y-2">
                   <Label htmlFor="language">Language</Label>
-                  <Select 
-                    value={formData.language} 
-                    onValueChange={(value) => handleSelectChange('language', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select language" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LANGUAGES.map((language) => (
-                        <SelectItem key={language.value} value={language.value}>
-                          {language.label}
-                        </SelectItem>
-                      ))}
+                  <Select value={formData.language} onValueChange={(v) => handleSelectChange('language', v)}>
+                    <SelectTrigger><SelectValue placeholder="Select language" /></SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      {LANGUAGES.map(l => (<SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>))}
                     </SelectContent>
                   </Select>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="brand_color">Brand Colour</Label>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="color"
-                    id="brand_color"
-                    name="brand_color"
-                    value={formData.brand_color || '#1982C4'}
-                    onChange={handleInputChange}
-                    className="w-10 h-10 rounded cursor-pointer"
-                  />
-                  <Input
-                    value={formData.brand_color || '#1982C4'}
-                    onChange={handleInputChange}
-                    name="brand_color"
-                    placeholder="#HEX colour"
-                    className="w-32"
-                  />
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button 
-                variant="outline" 
-                onClick={() => router.push(`/dashboard/brands/${id}`)}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleSave} disabled={isSaving}>
-                {isSaving ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </CardFooter>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="identity" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Brand Identity</CardTitle>
-              <CardDescription>
-                Update or generate your brand identity profile.
-              </CardDescription>
-            </CardHeader>
+            <CardHeader><CardTitle>Brand Identity</CardTitle></CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
-                  {/* Generate section */}
-                  <div className="space-y-4">
+                  <div className="space-y-4 border-b pb-4">
                     <h3 className="text-lg font-semibold">Generate Brand Identity</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Generate a comprehensive brand identity profile based on your website content.
-                    </p>
-                    
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="website_urls">Website URLs</Label>
-                        <div className="text-xs text-muted-foreground mb-2">
-                          Add one or more URLs to generate your brand identity. The main website URL from basic details is already included.
-                        </div>
-                        <div className="flex space-x-2">
+                    <p className="text-sm text-muted-foreground">Add website URLs to auto-generate or enhance brand identity, tone, and guardrails. The main URL from Basic Details is included by default.</p>
+                    <div className="space-y-2">
+                      <Label>Additional Website URLs</Label>
+                      {formData.additional_website_urls.map((urlObj) => (
+                        <div key={urlObj.id} className="flex items-center gap-2">
                           <Input
-                            id="url_input"
-                            value={urlInput}
-                            onChange={(e) => setUrlInput(e.target.value)}
-                            placeholder="https://another-example.com"
-                            className="flex-1"
+                            value={urlObj.value}
+                            onChange={(e) => handleAdditionalUrlChange(urlObj.id, e.target.value)}
+                            placeholder="https://additional-example.com"
+                            className="flex-grow"
                           />
+                          <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveAdditionalUrl(urlObj.id)} className="h-8 w-8">
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <p className="text-xs text-muted-foreground">
-                          Content will be generated for {countryName} in {languageName}.
-                        </p>
-                        <Button 
-                          onClick={handleGenerateBrandIdentity} 
-                          disabled={isGenerating}
-                          className="w-full"
-                        >
-                          {isGenerating ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Generating...
-                            </>
-                          ) : (
-                            'Generate Brand Identity'
-                          )}
-                        </Button>
-                      </div>
+                      ))}
+                      <Button type="button" variant="outline" onClick={handleAddAdditionalUrlField} size="sm" className="mt-2 w-full">
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add another URL
+                      </Button>
+                    </div>
+                    <div className="space-y-2 pt-2">
+                      <p className="text-xs text-muted-foreground">Identity will be generated for {countryName} in {languageName} (if set).</p>
+                      <Button onClick={handleGenerateBrandIdentity} disabled={isGenerating} className="w-full">
+                        {isGenerating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</> : 'Generate Brand Identity'}
+                      </Button>
                     </div>
                   </div>
-                  
-                  {/* Brand identity fields */}
+
                   <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="brand_identity">Brand Identity</Label>
-                      <Textarea
-                        id="brand_identity"
-                        name="brand_identity"
-                        value={formData.brand_identity}
-                        onChange={handleInputChange}
-                        placeholder="Enter brand identity"
-                        rows={8}
-                      />
-                    </div>
+                    <div className="space-y-2"><Label htmlFor="brand_identity">Brand Identity</Label><Textarea id="brand_identity" name="brand_identity" value={formData.brand_identity} onChange={handleInputChange} rows={6}/></div>
+                    <div className="space-y-2"><Label htmlFor="tone_of_voice">Tone of Voice</Label><Textarea id="tone_of_voice" name="tone_of_voice" value={formData.tone_of_voice} onChange={handleInputChange} rows={4}/></div>
+                    <div className="space-y-2"><Label htmlFor="guardrails">Content Guardrails</Label><Textarea id="guardrails" name="guardrails" value={formData.guardrails} onChange={handleInputChange} rows={4}/></div>
                     
-                    <div className="space-y-2">
-                      <Label htmlFor="tone_of_voice">Tone of Voice</Label>
-                      <Textarea
-                        id="tone_of_voice"
-                        name="tone_of_voice"
-                        value={formData.tone_of_voice}
-                        onChange={handleInputChange}
-                        placeholder="Enter tone of voice"
-                        rows={6}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="guardrails">Content Guardrails</Label>
-                      <Textarea
-                        id="guardrails"
-                        name="guardrails"
-                        value={formData.guardrails}
-                        onChange={handleInputChange}
-                        placeholder="Enter guardrails"
-                        rows={6}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="content_vetting_agencies">Content Vetting Agencies</Label>
-                      <Textarea
-                        id="content_vetting_agencies"
-                        name="content_vetting_agencies"
-                        value={formData.content_vetting_agencies}
-                        onChange={handleInputChange}
-                        placeholder="Enter agency names, separated by commas."
-                        rows={3}
-                      />
+                    <div className="space-y-4">
+                      <Label>Content Vetting Agencies</Label>
+                      <div className="space-y-2">
+                        {predefinedAgencies.map(agency => (
+                          <div key={agency.id} className="flex items-center space-x-2">
+                            <Checkbox 
+                              id={`edit-${agency.id}`} 
+                              checked={formData.content_vetting_agencies.includes(agency.label)}
+                              onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.label, !!checked)}
+                            />
+                            <Label htmlFor={`edit-${agency.id}`} className="font-normal">{agency.label}</Label>
+                          </div>
+                        ))}
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_custom_agency_input">Add Custom Agency</Label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Input id="edit_custom_agency_input" value={customAgencyInput} onChange={(e) => setCustomAgencyInput(e.target.value)} placeholder="Enter custom agency name" className="flex-grow" />
+                          <Button type="button" variant="outline" onClick={handleAddCustomAgency} size="sm">Add</Button>
+                        </div>
+                      </div>
+                      {formData.content_vetting_agencies.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground">Selected/Added Agencies:</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {formData.content_vetting_agencies.map((agency, index) => (
+                              <Badge key={`${agency}-${index}`} variant="secondary" className="flex items-center">
+                                {agency}
+                                <Button type="button" variant="ghost" size="icon" className="ml-1 h-5 w-5 p-0.5 hover:bg-destructive/20 rounded-full" onClick={() => handleRemoveCustomAgency(agency)}>
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="lg:col-span-1">
                   <div className="bg-muted rounded-lg p-4 space-y-6 sticky top-4">
                     <div className="space-y-2">
-                      <h4 className="font-semibold">Quick Preview</h4>
+                      <Label className="font-semibold">Quick Preview</Label>
                       <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/30">
                         <BrandIcon name={formData.name || 'Brand Name'} color={formData.brand_color || '#1982C4'} />
-                        <span>{formData.name || 'Your Brand Name'}</span>
+                        <span className="truncate">{formData.name || 'Your Brand Name'}</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        This is a preview of how your brand colour and icon might appear.
-                      </p>
                     </div>
-                    
                     <div className="space-y-2">
-                      <h4 className="font-medium">Brand Color</h4>
-                      <div 
-                        className="w-full h-12 rounded-md"
-                        style={{ backgroundColor: formData.brand_color || '#1982C4' }}
-                      />
-                      <p className="text-xs text-center text-muted-foreground">
-                        {formData.brand_color || '#1982C4'}
-                      </p>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <h4 className="font-medium">Recommendations</h4>
-                      <ul className="text-xs space-y-1 text-muted-foreground">
-                        <li>• Add website URLs to generate accurate brand identity</li>
-                        <li>• Provide your brand's country and language for localized content</li>
-                        <li>• Review and edit the generated content before saving</li>
-                        <li>• Add specific guardrails to guide content creation</li>
-                      </ul>
+                      <Label htmlFor="brand_color_identity_tab">Brand Colour</Label>
+                      <div className="flex gap-2 items-center">
+                        <input type="color" id="brand_color_identity_tab" name="brand_color" value={formData.brand_color || '#1982C4'} onChange={handleInputChange} className="w-10 h-10 rounded cursor-pointer" />
+                        <Input value={formData.brand_color || '#1982C4'} onChange={handleInputChange} name="brand_color" placeholder="#HEX colour" className="w-32" />
+                      </div>
+                      <div className="w-full h-12 rounded-md mt-2" style={{ backgroundColor: formData.brand_color || '#1982C4' }} />
+                      <p className="text-xs text-center text-muted-foreground">{formData.brand_color || '#1982C4'}</p>
                     </div>
                   </div>
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button 
-                variant="outline" 
-                onClick={() => setActiveTab('basic')}
-              >
-                Back to Basic Details
-              </Button>
-              <Button 
-                onClick={handleSave} 
-                disabled={isSaving}
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  'Save Changes'
-                )}
-              </Button>
-            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>
+      <CardFooter className="flex justify-end pt-6">
+        <Button onClick={handleSave} disabled={isSaving || isGenerating}>
+            {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
+        </Button>
+      </CardFooter>
     </div>
   );
-} 
+}

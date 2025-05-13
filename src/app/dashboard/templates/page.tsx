@@ -20,6 +20,7 @@ interface Template {
     inputFields: any[];
     outputFields: any[];
   };
+  usageCount?: number;
   created_at?: string;
   created_by?: string;
 }
@@ -90,7 +91,7 @@ export default function TemplatesPage() {
                 <div className="flex justify-between items-start">
                   <div>
                     <CardTitle className="text-lg font-medium">{template.name}</CardTitle>
-                    <CardDescription className="line-clamp-2 mt-1">{template.description}</CardDescription>
+                    <CardDescription className="mt-1">{template.description}</CardDescription>
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -122,10 +123,12 @@ export default function TemplatesPage() {
               </CardContent>
               <CardFooter className="border-t pt-4 text-sm text-muted-foreground">
                 <div className="w-full flex justify-between">
-                  <span>{template.created_at ? new Date(template.created_at).toLocaleDateString() : 'Custom Template'}</span>
-                  <Link href={`/dashboard/templates/${template.id}`} className="text-primary hover:underline">
-                    Edit Template
-                  </Link>
+                  <span>
+                    Created: {template.created_at 
+                      ? new Date(template.created_at).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' }) 
+                      : 'Date unavailable'}
+                  </span>
+                  <span>Used: {template.usageCount !== undefined ? template.usageCount : 'N/A'} time{template.usageCount !== 1 ? 's' : ''}</span>
                 </div>
               </CardFooter>
             </Card>

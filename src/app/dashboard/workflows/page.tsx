@@ -27,6 +27,7 @@ interface WorkflowFromAPI {
   content_count: number;
   created_at: string;
   updated_at: string;
+  description?: string;
 }
 
 interface GroupedWorkflows {
@@ -192,13 +193,7 @@ export default function WorkflowsPage() {
                       <div className="flex justify-between items-start">
                         <div>
                           <CardTitle className="text-xl">{workflow.name}</CardTitle>
-                          <CardDescription>
-                            {workflow.template_name 
-                              ? `For Template: ${workflow.template_name}` 
-                              : (workflow as any).content_type_name 
-                                ? `For Content Type: ${(workflow as any).content_type_name}`
-                                : 'Generic Workflow'}
-                          </CardDescription>
+                          <CardDescription>{workflow.description || 'No description provided'}</CardDescription>
                         </div>
                       </div>
                     </CardHeader>

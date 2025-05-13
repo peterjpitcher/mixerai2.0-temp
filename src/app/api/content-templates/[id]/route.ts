@@ -93,12 +93,47 @@ export const PUT = withAuth(async (
     
     const supabase = createSupabaseAdminClient();
     
+    // --- AI Description Generation for Template Update ---
+    let generatedDescription = data.description || ''; // Use provided desc or generate
+    // Regenerate if name or fields structure changes
+    const shouldRegenerateDescription = data.name !== undefined || data.fields !== undefined;
+
+    if (shouldRegenerateDescription) {
+      try {
+        const inputFieldNames = (data.fields.inputFields || []).map((f: any) => f.name).filter(Boolean);
+        const outputFieldNames = (data.fields.outputFields || []).map((f: any) => f.name).filter(Boolean);
+
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const aiDescriptionResponse = await fetch(`${baseUrl}/api/ai/generate-template-description`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            templateName: data.name,
+            inputFields: inputFieldNames,
+            outputFields: outputFieldNames,
+          }),
+        });
+
+        if (aiDescriptionResponse.ok) {
+          const aiData = await aiDescriptionResponse.json();
+          if (aiData.success && aiData.description) {
+            generatedDescription = aiData.description;
+          }
+        } else {
+          console.warn('Failed to generate AI description for template update.');
+        }
+      } catch (aiError) {
+        console.warn('Error calling AI template description generation service on update:', aiError);
+      }
+    }
+    // --- End AI Description Generation ---
+
     // Update the template
     const { data: updatedTemplate, error } = await supabase
       .from('content_templates')
       .update({
         name: data.name,
-        description: data.description || '',
+        description: generatedDescription, // Use AI generated or existing
         icon: data.icon || null,
         fields: data.fields,
         updated_at: new Date().toISOString()

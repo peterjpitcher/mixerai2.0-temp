@@ -139,16 +139,27 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     // Otherwise, fetch all templates
     const { data: templatesData, error } = await supabase
       .from('content_templates')
-      .select('*')
+      .select('*, content_count:content!template_id(count)')
       .order('name');
     
     if (error) {
       throw error;
     }
     
+    // Format data before sending
+    const formattedTemplates = templatesData.map(template => ({
+      ...template,
+      // Supabase returns count as an array like [{ count: N }], so extract it.
+      usageCount: template.content_count && Array.isArray(template.content_count) && template.content_count.length > 0 
+                  ? template.content_count[0].count 
+                  : 0,
+      // Remove the raw content_count array from the response if desired
+      content_count: undefined 
+    }));
+
     return NextResponse.json({ 
       success: true, 
-      templates: templatesData
+      templates: formattedTemplates
     });
   } catch (error) {
     return handleApiError(error, 'Failed to fetch content templates');
@@ -177,6 +188,36 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         { status: 400 }
       );
     }
+
+    // --- AI Description Generation for Template ---
+    let generatedDescription = data.description || ''; // Use provided desc or generate
+    try {
+      const inputFieldNames = (data.fields.inputFields || []).map((f: any) => f.name).filter(Boolean);
+      const outputFieldNames = (data.fields.outputFields || []).map((f: any) => f.name).filter(Boolean);
+
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const aiDescriptionResponse = await fetch(`${baseUrl}/api/ai/generate-template-description`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          templateName: data.name,
+          inputFields: inputFieldNames,
+          outputFields: outputFieldNames,
+        }),
+      });
+
+      if (aiDescriptionResponse.ok) {
+        const aiData = await aiDescriptionResponse.json();
+        if (aiData.success && aiData.description) {
+          generatedDescription = aiData.description;
+        }
+      } else {
+        console.warn('Failed to generate AI description for template.');
+      }
+    } catch (aiError) {
+      console.warn('Error calling AI template description generation service:', aiError);
+    }
+    // --- End AI Description Generation ---
     
     // Create the template in the database
     const supabase = createSupabaseAdminClient();
@@ -184,7 +225,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       .from('content_templates')
       .insert({
         name: data.name,
-        description: data.description || '',
+        description: generatedDescription,
         fields: data.fields,
         created_by: user.id
       })

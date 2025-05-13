@@ -115,6 +115,7 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
   const workflowSteps = Array.isArray(workflow.steps) ? workflow.steps : [];
   const createdByName = workflow.createdBy?.name || 'Unknown User';
   const contentCount = workflow.contentCount || 0;
+  const templateName = workflow.template_name || 'No Template Associated';
   
   return (
     <div className="space-y-6">
@@ -221,6 +222,11 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
                   />
                   <span>{brandName}</span>
                 </div>
+              </div>
+              
+              <div>
+                <p className="text-sm font-medium mb-1">Content Template</p>
+                <span>{templateName}</span>
               </div>
               
               <div>

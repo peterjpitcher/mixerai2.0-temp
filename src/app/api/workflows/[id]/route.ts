@@ -52,7 +52,8 @@ export const GET = withAuth(async (
       .from('workflows')
       .select(`
         *,
-        brands:brand_id(name, brand_color)
+        brands:brand_id(name, brand_color),
+        content_templates:template_id(name)
       `)
       .eq('id', id)
       .single();
@@ -123,6 +124,7 @@ export const GET = withAuth(async (
       brand_color: workflow.brands?.brand_color || null,
       steps: workflow.steps, // Return original steps structure which might have updated assignees
       steps_count: Array.isArray(workflow.steps) ? workflow.steps.length : 0,
+      template_name: workflow.content_templates?.name || null,
       created_at: workflow.created_at,
       updated_at: workflow.updated_at
     };
@@ -149,6 +151,78 @@ export const PUT = withAuth(async (
     const id = params.id;
     const body = await request.json();
     
+    let workflowDescriptionToUpdate: string | undefined = undefined;
+
+    // --- AI Description Generation on Update (if relevant fields change) ---
+    // We only regenerate the description if name, brand_id, template_id, or steps are changing,
+    // as these are the inputs to the description generation.
+    const shouldRegenerateDescription = body.name !== undefined || 
+                                    body.brand_id !== undefined || 
+                                    body.template_id !== undefined || 
+                                    body.steps !== undefined;
+
+    if (shouldRegenerateDescription) {
+      try {
+        // Fetch current workflow details to get all necessary data for description generation
+        const { data: currentWorkflowData, error: fetchError } = await supabase
+          .from('workflows')
+          .select('name, brand_id, template_id, steps, brands:brand_id(name), content_templates:template_id(name)')
+          .eq('id', id)
+          .single();
+
+        if (fetchError) {
+          console.warn('Could not fetch current workflow data for AI description regeneration:', fetchError.message);
+        } else if (currentWorkflowData) {
+          const wfName = body.name || currentWorkflowData.name;
+          const brandIdForDesc = body.brand_id || currentWorkflowData.brand_id;
+          const templateIdForDesc = body.template_id !== undefined ? body.template_id : currentWorkflowData.template_id;
+          const stepsForDesc = body.steps || currentWorkflowData.steps || [];
+
+          let brandNameForDesc = currentWorkflowData.brands?.name;
+          if (body.brand_id && body.brand_id !== currentWorkflowData.brand_id) {
+            const { data: brandData } = await supabase.from('brands').select('name').eq('id', body.brand_id).single();
+            brandNameForDesc = brandData?.name;
+          }
+
+          let resolvedTemplateNameForDesc: string | null | undefined = currentWorkflowData.content_templates?.name;
+          if (body.template_id !== undefined && body.template_id !== currentWorkflowData.template_id) {
+             if (body.template_id === null) { // template is being removed
+                resolvedTemplateNameForDesc = null;
+             } else {
+                const { data: templateData } = await supabase.from('content_templates').select('name').eq('id', body.template_id).single();
+                resolvedTemplateNameForDesc = templateData?.name;
+             }
+          }
+
+          const stepNamesForDesc = (Array.isArray(stepsForDesc) ? stepsForDesc.map((step: any) => step.name) : []).filter(Boolean);
+          
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+          const aiDescriptionResponse = await fetch(`${baseUrl}/api/ai/generate-workflow-description`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              workflowName: wfName,
+              brandName: brandNameForDesc,
+              templateName: resolvedTemplateNameForDesc,
+              stepNames: stepNamesForDesc,
+            }),
+          });
+
+          if (aiDescriptionResponse.ok) {
+            const aiData = await aiDescriptionResponse.json();
+            if (aiData.success && aiData.description) {
+              workflowDescriptionToUpdate = aiData.description;
+            }
+          } else {
+            console.warn('Failed to regenerate AI description on update.');
+          }
+        }
+      } catch (aiError) {
+        console.warn('Error calling AI description regeneration service during update:', aiError);
+      }
+    }
+    // --- End AI Description Generation ---
+
     if (body.steps && !Array.isArray(body.steps)) {
       return NextResponse.json(
         { success: false, error: 'Steps must be an array' },
@@ -199,12 +273,17 @@ export const PUT = withAuth(async (
     if (body.steps !== undefined) rpcParams.p_steps = steps;
     // Ensure template_id is passed as p_template_id, allowing null
     rpcParams.p_template_id = body.template_id !== undefined ? body.template_id : null;
+    // Add description to RPC params if it was generated
+    if (workflowDescriptionToUpdate !== undefined) {
+      rpcParams.p_description = workflowDescriptionToUpdate;
+    }
 
     const hasWorkflowChanges = (
       body.name !== undefined || 
       body.brand_id !== undefined || 
       body.steps !== undefined ||
-      body.template_id !== undefined
+      body.template_id !== undefined ||
+      workflowDescriptionToUpdate !== undefined // Count description update as a change
     );
 
     if (!hasWorkflowChanges && newInvitationsToCreate.length === 0) {
@@ -269,7 +348,12 @@ export const PUT = withAuth(async (
     
     const { data: finalWorkflowData, error: finalFetchError } = await supabase
       .from('workflows')
-      .select('*') 
+      .select(`
+        *,
+        description,
+        brands!inner(name, brand_color),
+        content_templates!left(name)
+      `)
       .eq('id', id)
       .single();
 

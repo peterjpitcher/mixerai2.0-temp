@@ -12,8 +12,9 @@ import { Textarea } from '@/components/textarea';
 import { Icons } from '@/components/icons';
 import { v4 as uuidv4 } from 'uuid';
 import { toast as sonnerToast } from 'sonner';
+import { Badge } from '@/components/badge';
 
-type FieldType = 'shortText' | 'longText' | 'richText' | 'select' | 'number' | 'date' | 'tags' | 'url' | 'fileUpload' | 'plainText' | 'html';
+type FieldType = 'shortText' | 'longText' | 'richText' | 'select' | 'number' | 'date' | 'tags' | 'url' | 'fileUpload' | 'plainText' | 'html' | 'image';
 
 interface Field {
   id: string;
@@ -33,11 +34,12 @@ interface FieldDesignerProps {
   isOpen: boolean;
   fieldType: 'input' | 'output';
   initialData: Field | null;
+  availableInputFields?: { id: string; name: string }[];
   onSave: (field: Field, isNew: boolean) => void;
   onCancel: () => void;
 }
 
-export function FieldDesigner({ isOpen, fieldType, initialData, onSave, onCancel }: FieldDesignerProps) {
+export function FieldDesigner({ isOpen, fieldType, initialData, availableInputFields = [], onSave, onCancel }: FieldDesignerProps) {
   const isNew = !initialData;
   const [fieldData, setFieldData] = useState<Field>(
     initialData || {
@@ -47,7 +49,6 @@ export function FieldDesigner({ isOpen, fieldType, initialData, onSave, onCancel
       required: false,
       options: {},
       ...(fieldType === 'output' && { 
-        aiAutoComplete: true,
         aiPrompt: '' 
       })
     }
@@ -67,7 +68,6 @@ export function FieldDesigner({ isOpen, fieldType, initialData, onSave, onCancel
         required: false,
         options: {},
         ...(fieldType === 'output' && { 
-          aiAutoComplete: true,
           aiPrompt: '' 
         })
       });
@@ -105,6 +105,15 @@ export function FieldDesigner({ isOpen, fieldType, initialData, onSave, onCancel
     });
   };
   
+  const handleCombinedBrandContextChange = (checked: boolean) => {
+    setFieldData(prev => ({
+      ...prev,
+      useBrandIdentity: checked,
+      useToneOfVoice: checked,
+      useGuardrails: checked,
+    }));
+  };
+  
   const handleAIPromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setFieldData(prev => ({
       ...prev,
@@ -136,6 +145,17 @@ export function FieldDesigner({ isOpen, fieldType, initialData, onSave, onCancel
       return false;
     }
 
+    // For output fields, if an AI prompt exists, consider aiAutoComplete true implicitly.
+    // This replaces the explicit checkbox for aiAutoComplete for output fields.
+    if (fieldType === 'output' && fieldData.aiPrompt && fieldData.aiPrompt.trim() !== '') {
+      // Ensure aiAutoComplete is true if not already set (though it's removed from direct user control for output)
+      // This is more for internal logic consistency if other parts of the system rely on it.
+      // If fieldData.aiAutoComplete doesn't exist or isn't managed for output, this line might not be needed.
+    } else if (fieldType === 'output' && (!fieldData.aiPrompt || fieldData.aiPrompt.trim() === '')) {
+      // If no prompt, then AI auto-complete is implicitly false.
+      // Again, this depends on how aiAutoComplete is used elsewhere.
+    }
+
     return true;
   };
 
@@ -161,6 +181,7 @@ export function FieldDesigner({ isOpen, fieldType, initialData, onSave, onCancel
     { value: 'plainText', label: 'Plain Text' },
     { value: 'richText', label: 'Rich Text' },
     { value: 'html', label: 'HTML' },
+    { value: 'image', label: 'Image' },
   ];
   
   const fieldTypeOptions = fieldType === 'input' ? inputFieldTypes : outputFieldTypes;
@@ -178,8 +199,8 @@ export function FieldDesigner({ isOpen, fieldType, initialData, onSave, onCancel
           <Tabs defaultValue="basic" value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="basic">Basic Info</TabsTrigger>
-              <TabsTrigger value="options">Field Options</TabsTrigger>
-              <TabsTrigger value="ai">AI Features {fieldType === 'output' && <span className="text-destructive ml-1">*</span>}</TabsTrigger>
+              {fieldType === 'input' && <TabsTrigger value="options">Field Options</TabsTrigger>}
+              <TabsTrigger value="ai">AI Features</TabsTrigger>
             </TabsList>
             
             {/* Basic Info Tab */}
@@ -215,137 +236,141 @@ export function FieldDesigner({ isOpen, fieldType, initialData, onSave, onCancel
                 </Select>
               </div>
               
-              <div className="flex items-center space-x-2 pt-2">
-                <Checkbox
-                  id="required"
-                  checked={fieldData.required}
-                  onCheckedChange={handleRequiredChange}
-                />
-                <Label htmlFor="required">Required field</Label>
-              </div>
+              {fieldType === 'input' && (
+                <div className="flex items-center space-x-2 pt-2">
+                  <Checkbox
+                    id="required"
+                    checked={fieldData.required || false}
+                    onCheckedChange={handleRequiredChange}
+                  />
+                  <Label htmlFor="required">Required field</Label>
+                </div>
+              )}
             </TabsContent>
             
             {/* Field Options Tab */}
-            <TabsContent value="options" className="space-y-4 py-4">
-              {fieldData.type === 'shortText' && (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="minLength">Minimum Length</Label>
-                      <Input
-                        id="minLength"
-                        type="number"
-                        min="0"
-                        placeholder="0"
-                        value={fieldData.options.minLength || ''}
-                        onChange={(e) => handleOptionsChange({ minLength: parseInt(e.target.value) || 0 })}
-                      />
+            {fieldType === 'input' && (
+              <TabsContent value="options" className="space-y-4 py-4">
+                {fieldData.type === 'shortText' && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="minLength">Minimum Length</Label>
+                        <Input
+                          id="minLength"
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={fieldData.options.minLength || ''}
+                          onChange={(e) => handleOptionsChange({ minLength: parseInt(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="maxLength">Maximum Length</Label>
+                        <Input
+                          id="maxLength"
+                          type="number"
+                          min="1"
+                          placeholder="100"
+                          value={fieldData.options.maxLength || ''}
+                          onChange={(e) => handleOptionsChange({ maxLength: parseInt(e.target.value) || 0 })}
+                        />
+                      </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="maxLength">Maximum Length</Label>
+                      <Label htmlFor="placeholder">Placeholder Text</Label>
                       <Input
-                        id="maxLength"
-                        type="number"
-                        min="1"
-                        placeholder="100"
-                        value={fieldData.options.maxLength || ''}
-                        onChange={(e) => handleOptionsChange({ maxLength: parseInt(e.target.value) || 0 })}
+                        id="placeholder"
+                        placeholder="Enter placeholder text"
+                        value={fieldData.options.placeholder || ''}
+                        onChange={(e) => handleOptionsChange({ placeholder: e.target.value })}
                       />
                     </div>
-                  </div>
+                  </>
+                )}
+                
+                {fieldData.type === 'longText' && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="minWords">Minimum Words</Label>
+                        <Input
+                          id="minWords"
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={fieldData.options.minWords || ''}
+                          onChange={(e) => handleOptionsChange({ minWords: parseInt(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="maxWords">Maximum Words</Label>
+                        <Input
+                          id="maxWords"
+                          type="number"
+                          min="1"
+                          placeholder="500"
+                          value={fieldData.options.maxWords || ''}
+                          onChange={(e) => handleOptionsChange({ maxWords: parseInt(e.target.value) || 0 })}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="placeholder">Placeholder Text</Label>
+                      <Input
+                        id="placeholder"
+                        placeholder="Enter placeholder text"
+                        value={fieldData.options.placeholder || ''}
+                        onChange={(e) => handleOptionsChange({ placeholder: e.target.value })}
+                      />
+                    </div>
+                  </>
+                )}
+                
+                {fieldData.type === 'tags' && (
                   <div className="space-y-2">
-                    <Label htmlFor="placeholder">Placeholder Text</Label>
+                    <Label htmlFor="maxTags">Maximum Number of Tags</Label>
                     <Input
-                      id="placeholder"
-                      placeholder="Enter placeholder text"
-                      value={fieldData.options.placeholder || ''}
-                      onChange={(e) => handleOptionsChange({ placeholder: e.target.value })}
+                      id="maxTags"
+                      type="number"
+                      min="1"
+                      placeholder="10"
+                      value={fieldData.options.maxTags || ''}
+                      onChange={(e) => handleOptionsChange({ maxTags: parseInt(e.target.value) || 0 })}
                     />
                   </div>
-                </>
-              )}
-              
-              {fieldData.type === 'longText' && (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="minWords">Minimum Words</Label>
-                      <Input
-                        id="minWords"
-                        type="number"
-                        min="0"
-                        placeholder="0"
-                        value={fieldData.options.minWords || ''}
-                        onChange={(e) => handleOptionsChange({ minWords: parseInt(e.target.value) || 0 })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="maxWords">Maximum Words</Label>
-                      <Input
-                        id="maxWords"
-                        type="number"
-                        min="1"
-                        placeholder="500"
-                        value={fieldData.options.maxWords || ''}
-                        onChange={(e) => handleOptionsChange({ maxWords: parseInt(e.target.value) || 0 })}
-                      />
-                    </div>
-                  </div>
+                )}
+                
+                {fieldData.type === 'select' && (
                   <div className="space-y-2">
-                    <Label htmlFor="placeholder">Placeholder Text</Label>
-                    <Input
-                      id="placeholder"
-                      placeholder="Enter placeholder text"
-                      value={fieldData.options.placeholder || ''}
-                      onChange={(e) => handleOptionsChange({ placeholder: e.target.value })}
+                    <Label htmlFor="choices">Options (one per line)</Label>
+                    <Textarea
+                      id="choices"
+                      placeholder="Option 1&#10;Option 2&#10;Option 3"
+                      value={Array.isArray(fieldData.options.choices) ? fieldData.options.choices.join('\n') : ''}
+                      onChange={(e) => handleOptionsChange({ choices: e.target.value.split('\n').filter(Boolean) })}
+                      rows={5}
                     />
                   </div>
-                </>
-              )}
-              
-              {fieldData.type === 'tags' && (
-                <div className="space-y-2">
-                  <Label htmlFor="maxTags">Maximum Number of Tags</Label>
-                  <Input
-                    id="maxTags"
-                    type="number"
-                    min="1"
-                    placeholder="10"
-                    value={fieldData.options.maxTags || ''}
-                    onChange={(e) => handleOptionsChange({ maxTags: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-              )}
-              
-              {fieldData.type === 'select' && (
-                <div className="space-y-2">
-                  <Label htmlFor="choices">Options (one per line)</Label>
-                  <Textarea
-                    id="choices"
-                    placeholder="Option 1&#10;Option 2&#10;Option 3"
-                    value={Array.isArray(fieldData.options.choices) ? fieldData.options.choices.join('\n') : ''}
-                    onChange={(e) => handleOptionsChange({ choices: e.target.value.split('\n').filter(Boolean) })}
-                    rows={5}
-                  />
-                </div>
-              )}
-              
-              {(fieldData.type === 'plainText' || fieldData.type === 'html') && (
-                <div className="space-y-2">
-                  <Label htmlFor="maxLength">Maximum Length</Label>
-                  <Input
-                    id="maxLength"
-                    type="number"
-                    min="1"
-                    placeholder="1000"
-                    value={fieldData.options.maxLength || ''}
-                    onChange={(e) => handleOptionsChange({ maxLength: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-              )}
-              
-              {/* Add more field-specific options here based on type */}
-            </TabsContent>
+                )}
+                
+                {(fieldData.type === 'plainText' || fieldData.type === 'html') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="maxLength">Maximum Length</Label>
+                    <Input
+                      id="maxLength"
+                      type="number"
+                      min="1"
+                      placeholder="1000"
+                      value={fieldData.options.maxLength || ''}
+                      onChange={(e) => handleOptionsChange({ maxLength: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
+                )}
+                
+                {/* Add more field-specific options here based on type */}
+              </TabsContent>
+            )}
             
             {/* AI Features Tab */}
             <TabsContent value="ai" className="space-y-4 py-4">
@@ -378,43 +403,16 @@ export function FieldDesigner({ isOpen, fieldType, initialData, onSave, onCancel
                 </>
               ) : (
                 <>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="aiAutoComplete"
-                      checked={fieldData.aiAutoComplete || false}
-                      onCheckedChange={(checked) => handleAIFeatureChange('aiAutoComplete', !!checked)}
-                    />
-                    <Label htmlFor="aiAutoComplete">AI Auto-Complete</Label>
-                  </div>
-                  
                   <div className="border-t my-4 pt-4">
                     <p className="text-sm font-medium mb-2">Brand Context Options</p>
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
                         <Checkbox
-                          id="useBrandIdentity"
-                          checked={fieldData.useBrandIdentity || false}
-                          onCheckedChange={(checked) => handleAIFeatureChange('useBrandIdentity', !!checked)}
+                          id="injectBrandIdentity"
+                          checked={fieldData.useBrandIdentity && fieldData.useToneOfVoice && fieldData.useGuardrails}
+                          onCheckedChange={handleCombinedBrandContextChange}
                         />
                         <Label htmlFor="useBrandIdentity">Inject Brand Identity</Label>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="useToneOfVoice"
-                          checked={fieldData.useToneOfVoice || false}
-                          onCheckedChange={(checked) => handleAIFeatureChange('useToneOfVoice', !!checked)}
-                        />
-                        <Label htmlFor="useToneOfVoice">Use Brand Tone of Voice</Label>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="useGuardrails"
-                          checked={fieldData.useGuardrails || false}
-                          onCheckedChange={(checked) => handleAIFeatureChange('useGuardrails', !!checked)}
-                        />
-                        <Label htmlFor="useGuardrails">Apply Brand Guardrails</Label>
                       </div>
                     </div>
                   </div>
@@ -432,8 +430,31 @@ export function FieldDesigner({ isOpen, fieldType, initialData, onSave, onCancel
                       className="min-h-[100px]"
                       required={true}
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Example: "Write a blog post about {'{{topic}}'} that is {'{{tone}}'} in tone."
+                    {availableInputFields && availableInputFields.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-xs text-muted-foreground">
+                          Available input field placeholders:
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {availableInputFields.map(inputField => (
+                            <Badge 
+                              key={inputField.id} 
+                              variant="secondary"
+                              className="text-xs cursor-pointer"
+                              onClick={() => {
+                                const currentPrompt = fieldData.aiPrompt || '';
+                                const newPrompt = currentPrompt + `{{${inputField.name}}}`;
+                                setFieldData(prev => ({...prev, aiPrompt: newPrompt }));
+                                // Focus the textarea might be good UX here
+                              }}>
+                              {`{{${inputField.name}}}`}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Example: "Generate an image of {'{{product_name}}'} in a {'{{style}}'} setting."
                     </p>
                   </div>
                 </>

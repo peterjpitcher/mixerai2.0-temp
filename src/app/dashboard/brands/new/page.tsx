@@ -11,9 +11,11 @@ import { Label } from '@/components/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X, PlusCircle } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
+import { Checkbox } from "@/components/checkbox";
+import { v4 as uuidv4 } from 'uuid';
 
 // Metadata for a redirecting page might be minimal or not strictly necessary
 // as user shouldn't spend time here.
@@ -30,19 +32,19 @@ export default function NewBrandPage() {
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
-  const [urlInput, setUrlInput] = useState(''); // For additional URLs for identity generation
   const [isGenerating, setIsGenerating] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
     website_url: '',
+    additional_website_urls: [] as { id: string, value: string }[],
     country: '',
     language: '',
-    brand_color: '#1982C4', // Default color
+    brand_color: '#1982C4',
     brand_identity: '',
     tone_of_voice: '',
     guardrails: '',
-    content_vetting_agencies: '' // Stored as comma-separated string or JSON string
+    content_vetting_agencies: ''
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -54,12 +56,35 @@ export default function NewBrandPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleAddAdditionalUrlField = () => {
+    setFormData(prev => ({
+      ...prev,
+      additional_website_urls: [...prev.additional_website_urls, { id: uuidv4(), value: '' }]
+    }));
+  };
+
+  const handleRemoveAdditionalUrl = (idToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      additional_website_urls: prev.additional_website_urls.filter(urlObj => urlObj.id !== idToRemove)
+    }));
+  };
+
+  const handleAdditionalUrlChange = (id: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      additional_website_urls: prev.additional_website_urls.map(urlObj => 
+        urlObj.id === id ? { ...urlObj, value } : urlObj
+      )
+    }));
+  };
+
   const handleGenerateBrandIdentity = async () => {
     if (!formData.name) {
       toast.error('Please enter a brand name first.');
       return;
     }
-    const urls = [formData.website_url, urlInput].filter(url => url && url.trim() !== '');
+    const urls = [formData.website_url, ...formData.additional_website_urls.map(u => u.value)].filter(url => url && url.trim() !== '');
     if (urls.length === 0) {
       toast.error('Please enter at least one website URL (main or additional) to generate identity.');
       return;
@@ -136,7 +161,7 @@ export default function NewBrandPage() {
         throw new Error(data.error || 'Failed to create brand');
       }
       toast.success('Brand created successfully!');
-      router.push(`/dashboard/brands/${data.brand.id}`); // Navigate to the new brand's edit page or detail page
+      router.push(`/dashboard/brands/${data.data.id}`); // Corrected path to brand ID
     } catch (error) {
       toast.error((error as Error).message || 'Failed to create brand.');
     } finally {
@@ -175,7 +200,6 @@ export default function NewBrandPage() {
           <Card>
             <CardHeader><CardTitle>Basic Information</CardTitle><CardDescription>Set the foundational details for your brand.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
-              {/* Form fields for name, website, country, language, brand_color - similar to edit page */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2"><Label htmlFor="name">Brand Name <span className="text-destructive">*</span></Label><Input id="name" name="name" value={formData.name} onChange={handleInputChange} placeholder="Enter brand name"/></div>
                 <div className="space-y-2"><Label htmlFor="website_url">Website URL</Label><Input id="website_url" name="website_url" value={formData.website_url} onChange={handleInputChange} placeholder="https://example.com"/></div>
@@ -198,9 +222,27 @@ export default function NewBrandPage() {
                 <div className="lg:col-span-2 space-y-6">
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold">Generate Brand Identity</h3>
-                    <p className="text-sm text-muted-foreground">Provide URLs to auto-generate brand identity, tone, guardrails, and more.</p>
-                    <div className="space-y-2"><Label htmlFor="url_input">Additional Website URL (Optional)</Label><Input id="url_input" value={urlInput} onChange={(e) => setUrlInput(e.target.value)} placeholder="https://another-example.com"/></div>
-                    <div className="space-y-2"><p className="text-xs text-muted-foreground">Identity will be generated for {countryName} in {languageName} (if set).</p><Button onClick={handleGenerateBrandIdentity} disabled={isGenerating} className="w-full">{isGenerating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</> : 'Generate Brand Identity'}</Button></div>
+                    <p className="text-sm text-muted-foreground">Provide URLs to auto-generate brand identity, tone, guardrails, and more. The main website URL from Basic Details will be used.</p>
+                    <div className="space-y-2">
+                      <Label>Additional Website URLs (Optional)</Label>
+                      {formData.additional_website_urls.map((urlObj, index) => (
+                        <div key={urlObj.id} className="flex items-center gap-2">
+                          <Input 
+                            value={urlObj.value} 
+                            onChange={(e) => handleAdditionalUrlChange(urlObj.id, e.target.value)} 
+                            placeholder="https://another-example.com"
+                            className="flex-grow"
+                          />
+                          <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveAdditionalUrl(urlObj.id)} className="h-8 w-8">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button type="button" variant="outline" onClick={handleAddAdditionalUrlField} size="sm" className="mt-2 w-full">
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add another URL
+                      </Button>
+                    </div>
                   </div>
                   <div className="space-y-4">
                     <div className="space-y-2"><Label htmlFor="brand_identity">Brand Identity</Label><Textarea id="brand_identity" name="brand_identity" value={formData.brand_identity} onChange={handleInputChange} placeholder="Describe your brand..." rows={6}/></div>

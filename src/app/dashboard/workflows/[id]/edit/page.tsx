@@ -19,6 +19,7 @@ import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2 } from 'lucide-r
 import type { Metadata } from 'next';
 import debounce from 'lodash.debounce';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { cn } from '@/lib/utils';
 
 // export const metadata: Metadata = {
 //   title: 'Edit Workflow | MixerAI 2.0',
@@ -58,6 +59,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [stepDescLoading, setStepDescLoading] = useState<Record<number, boolean>>({});
   
   useEffect(() => {
     const fetchData = async () => {
@@ -193,6 +195,20 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
       };
     });
   };
+
+  // Initialize/resize assigneeInputs when steps change (if workflow and steps are defined)
+  useEffect(() => {
+    if (workflow && workflow.steps) {
+        setAssigneeInputs(prevInputs => {
+            const newInputs = new Array(workflow.steps.length).fill('');
+            // Preserve existing inputs if an old step still exists at the same index
+            for (let i = 0; i < Math.min(prevInputs.length, newInputs.length); i++) {
+                newInputs[i] = prevInputs[i];
+            }
+            return newInputs;
+        });
+    }
+  }, [workflow?.steps?.length]); // Depend on the length of steps array
 
   // Debounced user search function
   const searchUsers = React.useCallback(
@@ -477,6 +493,98 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
   const workflowStatus = workflow.status || 'draft';
   const brandId = workflow.brand?.id || workflow.brand_id || '';
   
+  // --- Role Card Selection Component (Can be outside if props are sufficient) ---
+  const roles = [
+    { id: 'editor', name: 'Editor', description: 'Reviews and edits content for clarity, grammar, and style.' },
+    { id: 'seo', name: 'SEO', description: 'Optimises content for search engines, including keywords and metadata.' },
+    { id: 'legal', name: 'Legal', description: 'Ensures content complies with legal and regulatory requirements.' },
+    { id: 'culinary', name: 'Culinary', description: 'Verifies recipes, cooking instructions, and culinary accuracy.' },
+    { id: 'brand', name: 'Brand', description: 'Checks content for brand alignment, tone of voice, and messaging.' },
+    { id: 'publisher', name: 'Publisher', description: 'Manages the final publication and distribution of content.' }
+  ];
+
+  interface RoleSelectionCardsProps {
+    selectedRole: string;
+    onRoleSelect: (roleId: string) => void;
+    stepIndex: number;
+  }
+
+  const RoleSelectionCards: React.FC<RoleSelectionCardsProps> = ({ selectedRole, onRoleSelect, stepIndex }) => {
+    return (
+      <div className="space-y-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          {roles.map((role) => (
+            <button
+              key={role.id}
+              type="button"
+              onClick={() => onRoleSelect(role.id)}
+              className={cn(
+                'border rounded-lg p-3 text-left transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+                selectedRole === role.id
+                  ? 'bg-primary/10 border-primary ring-1 ring-primary'
+                  : 'hover:bg-accent hover:text-accent-foreground'
+              )}
+            >
+              <p className="font-medium text-sm">{role.name}</p>
+              <p className="text-xs text-muted-foreground mt-1">{role.description}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+  // --- End Role Card Selection Component ---
+
+  // Handler for AI Step Description (defined inside component scope)
+  const handleGenerateStepDescription = async (index: number) => {
+    if (!workflow || !workflow.steps || !workflow.steps[index]) {
+      toast.error('Step data not available.');
+      return;
+    }
+    const step = workflow.steps[index];
+    if (!step.name || !step.role) {
+      toast.error('Step name and role are required to generate a description.');
+      return;
+    }
+
+    setStepDescLoading(prev => ({ ...prev, [index]: true }));
+
+    try {
+      const currentBrand = brands.find(b => b.id === (workflow.brand_id || workflow.brand?.id));
+      const currentTemplate = contentTemplates.find(ct => ct.id === selectedTemplateId);
+
+      const response = await fetch('/api/ai/generate-step-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workflowName: workflow.name,
+          brandName: currentBrand?.name,
+          templateName: currentTemplate?.name,
+          stepName: step.name,
+          role: step.role,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate description');
+      }
+
+      const result = await response.json();
+      if (result.success && result.description) {
+        handleUpdateStepDescription(index, result.description);
+        toast.success('Step description generated!');
+      } else {
+        throw new Error(result.error || 'AI service did not return a description.');
+      }
+    } catch (error: any) {
+      console.error('Error generating step description:', error);
+      toast.error(error.message || 'Could not generate step description.');
+    } finally {
+      setStepDescLoading(prev => ({ ...prev, [index]: false }));
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -593,17 +701,6 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                 Link this workflow to a specific content template to automatically use it when new content is created from that template for the selected brand.
               </p>
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={workflow.description || ''}
-                onChange={handleUpdateWorkflowDetails}
-                rows={3}
-              />
-            </div>
           </CardContent>
         </Card>
         
@@ -667,35 +764,34 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor={`step-name-${index}`}>Step Name</Label>
-                          <Input
-                            id={`step-name-${index}`}
-                            value={step.name || ''}
-                            onChange={(e) => handleUpdateStepName(index, e.target.value)}
-                          />
+                          <Label htmlFor={`step-name-${index}`}>Step Name <span className="text-destructive">*</span></Label>
+                          <Input id={`step-name-${index}`} value={step.name || ''} onChange={(e) => handleUpdateStepName(index, e.target.value)} placeholder="Enter step name"/>
                         </div>
                         
                         <div className="space-y-2">
-                          <Label htmlFor={`step-role-${index}`}>Role</Label>
-                          <Select 
-                            defaultValue={step.role || 'editor'} 
-                            onValueChange={(value) => handleUpdateStepRole(index, value)}
-                          >
-                            <SelectTrigger id={`step-role-${index}`}>
-                              <SelectValue placeholder="Select role" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="admin">Admin</SelectItem>
-                              <SelectItem value="editor">Editor</SelectItem>
-                              <SelectItem value="seo">SEO Specialist</SelectItem>
-                              <SelectItem value="viewer">Viewer</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <Label>Role</Label>
+                          <RoleSelectionCards 
+                            stepIndex={index} 
+                            selectedRole={step.role || 'editor'} 
+                            onRoleSelect={(value) => handleUpdateStepRole(index, value)} 
+                          />
                         </div>
                       </div>
                       
                       <div className="space-y-2">
-                        <Label htmlFor={`step-description-${index}`}>Description</Label>
+                        <div className="flex justify-between items-center">
+                          <Label htmlFor={`step-description-${index}`}>Step Description</Label>
+                          <Button 
+                             type="button" 
+                             variant="outline" 
+                             size="sm" 
+                             onClick={() => handleGenerateStepDescription(index)}
+                             disabled={stepDescLoading[index] || !workflowSteps[index]?.name || !workflowSteps[index]?.role}
+                           >
+                            {stepDescLoading[index] ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                            Auto-Generate
+                          </Button>
+                        </div>
                         <Textarea
                           id={`step-description-${index}`}
                           value={step.description || ''}
@@ -707,12 +803,10 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                       <div className="flex items-center space-x-2">
                         <Switch
                           id={`step-approval-${index}`}
-                          checked={!!step.approvalRequired}
-                          onCheckedChange={(value) => handleUpdateStepApprovalRequired(index, value)}
+                          checked={!step.approvalRequired}
+                          onCheckedChange={(value) => handleUpdateStepApprovalRequired(index, !value)}
                         />
-                        <Label htmlFor={`step-approval-${index}`}>
-                          Require approval for this step
-                        </Label>
+                        <Label htmlFor={`step-approval-${index}`}>This step is optional</Label>
                       </div>
                       
                       <div className="space-y-2">

@@ -119,6 +119,63 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     }
     
     const steps = body.steps || [];
+    let workflowDescription = '';
+    
+    // --- AI Description Generation ---
+    try {
+      let brandNameForDesc;
+      if (body.brand_id) {
+        const { data: brandData } = await supabase
+          .from('brands')
+          .select('name')
+          .eq('id', body.brand_id)
+          .single();
+        brandNameForDesc = brandData?.name;
+      }
+
+      let templateNameForDesc;
+      if (body.template_id) {
+        const { data: templateData } = await supabase
+          .from('content_templates')
+          .select('name')
+          .eq('id', body.template_id)
+          .single();
+        templateNameForDesc = templateData?.name;
+      }
+      
+      const stepNamesForDesc = steps.map((step: any) => step.name).filter(Boolean);
+
+      // Use the absolute URL for the fetch call during server-side execution
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const aiDescriptionResponse = await fetch(`${baseUrl}/api/ai/generate-workflow-description`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workflowName: body.name,
+          brandName: brandNameForDesc,
+          templateName: templateNameForDesc,
+          stepNames: stepNamesForDesc,
+        }),
+      });
+
+      if (aiDescriptionResponse.ok) {
+        const aiData = await aiDescriptionResponse.json();
+        if (aiData.success && aiData.description) {
+          workflowDescription = aiData.description;
+        } else {
+          console.warn('AI description generation succeeded but no description was returned or success was false.');
+        }
+      } else {
+        const errorData = await aiDescriptionResponse.json();
+        console.warn('Failed to generate AI description:', errorData.error || aiDescriptionResponse.statusText);
+        // Do not fail the workflow creation, just log a warning. Description will be empty or a default.
+      }
+    } catch (aiError) {
+      console.warn('Error calling AI description generation service:', aiError);
+      // Do not fail the workflow creation if AI description fails
+    }
+    // --- End AI Description Generation ---
+    
     const invitationItems: {
       step_id: number;
       email: string;
@@ -161,9 +218,11 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     const rpcParams = {
       p_name: body.name,
       p_brand_id: body.brand_id,
+      p_template_id: body.template_id || null,
       p_steps: steps, // Use the processed steps (with assignee IDs if found)
       p_created_by: user.id,
-      p_invitation_items: invitationItems // Array of items for users needing invites
+      p_invitation_items: invitationItems, // Array of items for users needing invites
+      p_description: workflowDescription // Add the generated description
     };
 
     // Call the database function to create workflow and log invitations atomically
@@ -226,6 +285,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       .from('workflows')
       .select(`
         *,
+        description,
         brands:brand_id(name, brand_color)
       `)
       .eq('id', newWorkflowId)
@@ -244,6 +304,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       ...createdWorkflow,
       brand_name: createdWorkflow?.brands?.name || null,
       brand_color: createdWorkflow?.brands?.brand_color || null,
+      description: createdWorkflow?.description || '', // Ensure description is included
       steps_count: Array.isArray(createdWorkflow?.steps) ? createdWorkflow.steps.length : 0,
       content_count: 0 // Assuming new workflow has no content yet
     };

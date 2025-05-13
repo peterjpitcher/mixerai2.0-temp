@@ -238,13 +238,13 @@ export default function AccountPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-4 mb-6">
                   <div className="w-20 h-20 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-3xl">
                     {profileData.fullName ? profileData.fullName.split(' ').map(name => name[0]).join('').toUpperCase() : (profileData.email ? profileData.email[0]?.toUpperCase() : '?')}
                   </div>
                   <div>
-                    {/* Avatar change functionality to be implemented */}
-                    <Button variant="outline" type="button" disabled>Change Avatar (Coming Soon)</Button>
+                    <h2 className="text-xl font-semibold">{profileData.fullName || 'User'}</h2>
+                    <p className="text-sm text-muted-foreground">{profileData.email}</p>
                   </div>
                 </div>
                 

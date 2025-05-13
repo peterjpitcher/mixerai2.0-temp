@@ -73,7 +73,7 @@ export default function UsersPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortField, setSortField] = useState<'full_name' | 'role' | 'email' | 'company' | 'created_at'>('role');
+  const [sortField, setSortField] = useState<'full_name' | 'role' | 'email' | 'company' | 'last_sign_in_at'>('role');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -167,7 +167,7 @@ export default function UsersPage() {
   });
   
   // Handle sort change
-  const handleSort = (field: 'full_name' | 'role' | 'email' | 'company' | 'created_at') => {
+  const handleSort = (field: 'full_name' | 'role' | 'email' | 'company' | 'last_sign_in_at') => {
     if (field === sortField) {
       // Toggle direction if same field
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -334,10 +334,10 @@ export default function UsersPage() {
                   </div>
                 </TableHead>
                 <TableHead className="w-[100px]">Job Title</TableHead>
-                <TableHead className="w-[100px] cursor-pointer" onClick={() => handleSort('created_at')}>
+                <TableHead className="w-[100px] cursor-pointer" onClick={() => handleSort('last_sign_in_at')}>
                   <div className="flex items-center">
-                    Joined
-                    <SortIndicator field="created_at" />
+                    Last Login
+                    <SortIndicator field="last_sign_in_at" />
                   </div>
                 </TableHead>
                 <TableHead className="w-[120px] text-right">Actions</TableHead>
@@ -375,7 +375,7 @@ export default function UsersPage() {
                   <TableCell>{renderBrandIcons(user)}</TableCell>
                   <TableCell>{user.company || '-'}</TableCell>
                   <TableCell>{user.job_title || '-'}</TableCell>
-                  <TableCell>{formatDate(user.created_at)}</TableCell>
+                  <TableCell>{formatDate(user.last_sign_in_at)}</TableCell>
                   <TableCell className="text-right space-x-1">
                     <Button variant="ghost" size="icon" asChild>
                       <Link href={`/dashboard/users/${user.id}`} title="View User">
