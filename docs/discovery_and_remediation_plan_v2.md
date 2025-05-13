@@ -307,13 +307,13 @@ This revised plan incorporates detailed feedback from senior development staff, 
 *   **`extractCleanDomain` utility:** Instead of writing the URL cleaning logic in many places, we put it in one shared function. If we need to improve how we clean URLs, we only change it in one spot.
 *   **Response:** Instead of multiple flags, we send back either the brand's details (like `brand_id_used`, `brand_name_used`) or `null` for them. The frontend can easily check: "Is `brand_id_used` there? Yes? Okay, we used brand info. No? Show a warning."
 
-## 4. Initial Superadmin Seeding
+## 4. Initial Superadmin Seeding ✅ **DONE (Manual setup confirmed)**
 
 **Original Issue:** No automated way to create the first Superadmin.
 
 ### 4.1. Recommended Solution (Revised with Feedback)
 
-1.  **Idempotent Seed Script (Recommended):** (✅ **DONE** - Conceptual script `scripts/seed-superadmin.ts` created)
+1.  **Idempotent Seed Script (Recommended):** (✅ **DONE** - Conceptual script `scripts/seed-superadmin.ts` created. Manual setup of Superadmin `peter.pitcher@genmills.com` with `user_metadata.role = \'admin\'` confirmed, making script execution for this user unnecessary at this time.)
     Create a script (e.g., `scripts/seed-superadmin.ts` using Deno/Node with Supabase JS client, or a `.sql` file).
     ```typescript
     // Conceptual scripts/seed-superadmin.ts
@@ -358,10 +358,10 @@ This revised plan incorporates detailed feedback from senior development staff, 
     // }
     // seed().catch(console.error);
     ```
-    *Implementation Note: The created `scripts/seed-superadmin.ts` uses environment variables for credentials and attempts to be idempotent. The exact Supabase admin method for checking user existence by email (`getUserByEmail`) is based on the plan's conceptual example and will need verification against the specific `supabase-js` client library version when the script is executed.*
+    *Implementation Note: The created `scripts/seed-superadmin.ts` uses environment variables for credentials and attempts to be idempotent. The exact Supabase admin method for checking user existence by email (`getUserByEmail`) is based on the plan's conceptual example and will need verification against the specific `supabase-js` client library version if the script is to be executed in the future.*
 
-2.  **Secret Management:** The initial password **MUST** be loaded from an environment variable or a secure secret management system, not hardcoded in the script. (✅ **COVERED** by script design)
-3.  **Manual Procedure (Fallback):** Keep the documented manual steps as a fallback, but emphasize the script for consistency. (✅ **NOTED**)
+2.  **Secret Management:** The initial password **MUST** be loaded from an environment variable or a secure secret management system, not hardcoded in the script. (✅ **COVERED** by script design and manual setup approach ensures password was handled securely by user.)
+3.  **Manual Procedure (Fallback):** Keep the documented manual steps as a fallback, but emphasize the script for consistency. (✅ **DONE** - Manual setup was successfully used.)
 
 **Junior Developer Explanation for Seeding:**
 *   **What's idempotency?** It means you can run the script many times, and it will have the same result as running it once. If the Superadmin already exists, it won't try to create them again (which would cause an error). It might just check if they still have the Superadmin role.

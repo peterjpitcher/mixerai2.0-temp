@@ -92,6 +92,7 @@ export type Database = {
           id: string
           language: string | null
           name: string
+          normalized_website_domain: string | null
           tone_of_voice: string | null
           updated_at: string | null
           website_url: string | null
@@ -107,6 +108,7 @@ export type Database = {
           id?: string
           language?: string | null
           name: string
+          normalized_website_domain?: string | null
           tone_of_voice?: string | null
           updated_at?: string | null
           website_url?: string | null
@@ -122,6 +124,7 @@ export type Database = {
           id?: string
           language?: string | null
           name?: string
+          normalized_website_domain?: string | null
           tone_of_voice?: string | null
           updated_at?: string | null
           website_url?: string | null
