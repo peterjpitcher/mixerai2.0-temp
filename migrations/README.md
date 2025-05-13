@@ -1,37 +1,23 @@
-# MixerAI 2.0 Database Migrations
+# MixerAI 2.0 Database Migrations and Schema
 
-This directory contains the database migrations for the MixerAI 2.0 application.
+This directory primarily serves as a historical archive for past database migration scripts.
 
-## Consolidated Migrations
+## Authoritative Schema
 
-For simplicity and ease of deployment, we now use a single consolidated migration file that contains all necessary SQL statements:
+The single source of truth for the current database schema is the `supabase-schema.sql` file located in the project root.
 
-- [consolidated_migrations.sql](./consolidated_migrations.sql) - Complete database schema and base data
-
-This approach makes it easier to set up new environments and ensures consistency across deployments.
-
-## Running Migrations
-
-To apply the migrations, use the script:
+To set up a new database or reset an existing one, you should apply the `supabase-schema.sql` file using a PostgreSQL client tool (e.g., `psql`). For example:
 
 ```bash
-./scripts/run-migrations.sh
+psql -h <your_host> -U <your_user> -d <your_database> -f ../supabase-schema.sql
 ```
 
-You can specify custom database connection parameters:
-
-```bash
-./scripts/run-migrations.sh --host localhost --port 5432 --database mixerai --user postgres --password your_password
-```
-
-For a clean database reset, use the `--clean` flag:
-
-```bash
-./scripts/run-migrations.sh --clean
-```
+(Replace placeholders with your actual database connection details.)
 
 ## Archive
 
-Previous migration files are archived in the [archive](./archive) directory for reference purposes. These files are no longer used in the application.
+This `migrations/` directory contains an `archive/` subdirectory:
 
-Each archive includes a README.md file with descriptions of the archived migrations and when they were consolidated.
+- **[archive](./archive/)**: Contains previously used individual SQL migration scripts and older consolidated migration files. These have been superseded by the comprehensive `supabase-schema.sql` and are kept for historical reference only.
+
+Each archive subdirectory may include its own README.md file with descriptions of its contents.

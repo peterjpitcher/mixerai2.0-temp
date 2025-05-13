@@ -32,7 +32,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         content_type_id,
         content_types ( name ),
         created_by,
-        profiles ( full_name, avatar_url ),
+        profiles:profiles!content_created_by_fkey ( full_name, avatar_url ),
         template_id,
         content_templates ( name, icon ),
         current_step,

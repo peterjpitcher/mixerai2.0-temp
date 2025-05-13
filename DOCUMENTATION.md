@@ -1,3 +1,45 @@
+# MixerAI 2.0 Documentation
+
+## Project Overview
+
+MixerAI 2.0 is an application for creating AI-generated content with Azure OpenAI for digital marketing. The application allows users to create and manage content for different brands using customizable workflows.
+
+### Core Technology Stack
+
+- **Frontend**: Next.js 14 with App Router, React, Tailwind CSS, shadcn/ui
+- **Database**: PostgreSQL via Supabase. For details see [Database Documentation](./docs/database.md).
+- **Authentication**: Supabase Auth. For details see [Authentication and User Management](./docs/authentication.md).
+- **AI**: Azure OpenAI. For details see [Azure OpenAI Integration](./docs/azure_openai_integration.md).
+
+### Brand Colors
+- **Primary Colour**: #14599f
+- **Secondary Colour**: #cf0d2a
+
+## Core Features
+
+### 1. Brands Management
+Brands are central entities, with features for profile creation, AI-powered identity generation, content vetting agency management, and visual customization (colors, icons).
+For detailed information, see [Brand Management](./docs/brand_management.md).
+
+### 2. User Management with RBAC
+Users can access multiple brands with different permission levels (Admin, Editor, Viewer). Authentication is handled by Supabase.
+For detailed information on authentication, user management, roles, and permissions, see [Authentication and User Management](./docs/authentication.md).
+
+### 3. Workflow Management
+Custom configurable workflows for content approval with:
+- Multi-step processes
+- Role-based approvals
+- Content status tracking
+- Email notifications
+
+### 4. Content Generation
+AI-generated content using Azure OpenAI, supporting generation via customizable Content Templates.
+- Includes meta title and description (often defined within templates).
+- Structured to industry best practices (guided by template structure).
+For detailed information on Azure OpenAI integration, see [Azure OpenAI Integration](./docs/azure_openai_integration.md).
+
+## Recent Updates and Feature Details
+
 # MixerAI 2.0 - UI and Authentication Updates
 
 ## Changes Made
@@ -7,15 +49,8 @@
 - Simplified the tab interface to only include the Overview tab
 - Changed the TabsList grid from grid-cols-2 to grid-cols-1
 
-### 2. User Authentication Integration
-- Updated the users API route to connect directly to Supabase authentication data
-- Added integration with Supabase Auth Admin API to fetch real user data
-- Merged authentication user data with profile information from the profiles table
-- Enhanced the user data structure to include:
-  - User metadata from Supabase Auth
-  - Last sign-in timestamp
-  - Role information from user_brand_permissions
-  - Fallback avatar generation for users without profile images
+### 2. User Authentication & Management
+Details on user authentication, Supabase integration, user data structures, API updates for users, Row Level Security, user profiles, and the invitation system have been moved to [Authentication and User Management](./docs/authentication.md).
 
 ### 3. Missing Pages Documentation
 - Created comprehensive documentation for pages that have been removed or relocated
@@ -83,6 +118,10 @@ The `/api/users` route now:
 - Requires SUPABASE_SERVICE_ROLE_KEY to be set in environment variables
 - Needs the auth.admin.listUsers permission for the service role
 
+## Authentication & User Management
+
+For comprehensive details on user authentication, Supabase integration, API protection, Row Level Security, user roles, permissions, profile fields, and the user invitation system, please refer to the [Authentication and User Management](./docs/authentication.md) documentation.
+
 # MixerAI 2.0 Documentation
 
 ## Recent Updates
@@ -107,27 +146,8 @@ We've implemented a smart redirection from the root page to enhance user experie
    - Ensures proper authorization before accessing protected content
 
 ### Metadata Generator Simplification
-
-We've streamlined the Metadata Generator tool to improve its clarity and effectiveness:
-
-1. **URL-Only Focus**
-   - Removed the "From Content" tab and related functionality
-   - Simplified the interface to focus exclusively on URL-based metadata generation
-   - Enhanced the URL validation and error handling
-
-2. **Improved UI Experience**
-   - Clearer layout with direct brand selection
-   - Better visual feedback for character count validation
-   - Enhanced copy-to-clipboard functionality
-   - More intuitive empty and loading states
-
-3. **Azure OpenAI Integration**
-   - Ensured proper integration with Azure OpenAI services
-   - Follows best practices from the Azure OpenAI integration documentation
-   - Proper error handling for API failures
-   - Consistent brand context passing (language, country, identity, tone, guardrails)
-
-This streamlined approach makes the tool more focused and easier to use while maintaining all the essential functionality for SEO metadata generation.
+We've streamlined the Metadata Generator tool to improve its clarity and effectiveness. It now focuses exclusively on URL-based metadata generation, with an improved UI and robust Azure OpenAI integration.
+For more details on its AI integration, see [Azure OpenAI Integration](./docs/azure_openai_integration.md).
 
 ### Azure OpenAI Integration Fix
 
@@ -268,38 +288,13 @@ We've implemented significant UI improvements to the brand creation and editing 
    - Added website_urls column to brands table
    - Added user_added_agencies column to brands table
 
-## Running the Application
+## Running, Building, and Deploying the Application
 
-1. **Development Mode**
-   ```bash
-   npm run dev
-   ```
-   This starts the application in development mode with hot reloading.
+For details on how to run the application in development, build it for production, understand deployment optimizations (like dynamic API routes), and configure it for a custom domain, please refer to the [Deployment and Operations Guide](./docs/deployment.md).
 
-2. **Production Build**
-   ```bash
-   npm run build
-   npm start
-   ```
-   This builds and starts the application in production mode.
+## API Reference
 
-3. **Database Migration**
-   ```bash
-   ./scripts/apply-website-urls-migration.sh
-   ```
-   Applies the migration to add the new columns to the brands table.
-
-## API Routes
-
-The application uses the following API routes:
-
-- `GET /api/brands` - Get all brands
-- `GET /api/brands/:id` - Get a specific brand
-- `POST /api/brands` - Create a new brand
-- `PUT /api/brands/:id` - Update a brand
-- `DELETE /api/brands/:id` - Delete a brand
-- `POST /api/brands/identity` - Generate brand identity using AI
-- `POST /api/scrape-url` - Scrape content from a URL for AI processing
+For a detailed list of API endpoints, including those for user management, brands, content, workflows, and AI tools, please refer to the [API Reference](./docs/api_reference.md).
 
 ## Component Structure
 
@@ -339,122 +334,25 @@ Planned improvements include:
 3. Improved user management and permissions
 4. Additional content vetting features
 
-## Azure OpenAI Integration
+## Azure OpenAI Integration & AI Tools
 
-The MixerAI 2.0 application uses Azure OpenAI to generate brand identities, content, and other AI-powered features. The integration is managed through the `src/lib/azure/openai.ts` module.
+MixerAI 2.0 extensively uses Azure OpenAI for various features including brand identity generation, content creation through templates, workflow description auto-generation, and several technical tools like Metadata Generator, Alt Text Generator, and Content Trans-Creator.
 
-### Required Environment Variables
+For comprehensive details on the Azure OpenAI setup, core principles (including the strict "No Fallback Generation" policy), client configuration, error handling, brand context integration, specific AI tool functionalities, prompt strategies, and testing/debugging methods, please refer to the dedicated [Azure OpenAI Integration](./docs/azure_openai_integration.md) documentation.
 
-For Azure OpenAI integration to work correctly, you need to set up the following environment variables:
+### Technical Tools
 
-```
-AZURE_OPENAI_API_KEY=your_api_key
-AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com
-AZURE_OPENAI_DEPLOYMENT=your_deployment_name
-```
+MixerAI 2.0 includes several technical tools to enhance content creation workflows, primarily powered by Azure OpenAI:
 
-### Debugging and Troubleshooting
+-   **Metadata Generator**: Generates SEO-optimised meta titles and descriptions from webpage URLs.
+-   **Alt Text Generator**: Creates accessible alt text for images.
+-   **Content Trans-Creator**: Trans-creates content across languages and cultures.
 
-The MixerAI 2.0 application includes several tools and enhanced logging to help troubleshoot issues, particularly with AI content generation:
+Details on their AI integration and specific functionalities can be found in the [Azure OpenAI Integration](./docs/azure_openai_integration.md) document.
 
-### Diagnostic Scripts
+## Brand Management Features
 
-1. **API Services Debug Script**
-   - Located at `scripts/debug-api-services.js`
-   - Tests multiple API endpoints in one run
-   - Checks Azure OpenAI connectivity, workflow description generation, brand identity generation, and URL scraping
-   - Provides detailed logs and a summary report
-   - Usage: `node scripts/debug-api-services.js`
-
-2. **Brand Identity Test Script**
-   - Located at `scripts/test-brand-identity.js`
-   - Tests the `/api/brands/identity` endpoint specifically
-   - Creates a JSON file with the full results for inspection
-   - Usage: `node scripts/test-brand-identity.js`
-
-3. **Azure OpenAI Test Endpoint**
-   - API endpoint at `/api/test-azure-openai`
-   - Provides direct validation of Azure OpenAI connectivity
-   - Shows authentication status, deployment details, and response times
-   - Supports the `USE_LOCAL_GENERATION` environment variable for fallback testing
-
-### Enhanced Logging
-
-Critical areas of the application have been enhanced with detailed logging:
-
-1. **Brand Identity Generation**
-   - Input parameter logging (brandName, URLs, country, language)
-   - API response status and content logging
-   - Fallback mechanism detection 
-   - Agency selection and priority debugging
-
-2. **Workflow Description Generation**
-   - Step name and content logging
-   - Brand context validation
-   - API request/response inspection
-   - Error capture and detailed reporting
-
-3. **URL Scraping**
-   - Content extraction validation
-   - Error handling with detailed messages
-   - Build-time detection for Vercel deployments
-
-### Common Issues and Solutions
-
-#### Azure OpenAI Connection Issues
-
-If Azure OpenAI integration is not working:
-
-1. Check environment variables:
-   ```
-   AZURE_OPENAI_API_KEY=your_key_here
-   AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
-   AZURE_OPENAI_DEPLOYMENT=your_deployment_name
-   ```
-
-2. Enable local fallback if needed:
-   ```
-   USE_LOCAL_GENERATION=true
-   ```
-
-3. Verify the test endpoint is working:
-   ```
-   curl http://localhost:3001/api/test-azure-openai
-   ```
-
-#### Brand Identity Generation Issues
-
-Common issues with brand identity generation:
-
-1. **Missing parameters**: Ensure brandName and at least one URL are provided
-2. **Invalid URLs**: Check that URLs are properly formatted with http/https
-3. **Region-specific content**: Verify country and language parameters are correct
-4. **Agency display**: If agencies aren't showing up, check the mapping from API to UI
-
-#### API 404 Errors
-
-If you encounter 404 errors:
-
-1. Check that all API routes are properly implemented
-2. Verify that the `/api/scrape-url` endpoint exists and is working
-3. Try restarting the development server
-4. Check the browser console for specific request failures
-
-### Testing and Validation
-
-To comprehensively test the application:
-
-1. Run the debug scripts first to verify API functionality
-2. Test the workflow generation feature which is known to work correctly
-3. Check brand identity generation with the debug tools
-4. Examine the log files for any specific error messages
-5. Verify that country and language parameters are correctly passed
-
-For more detailed troubleshooting, refer to the [Azure OpenAI Troubleshooting Guide](docs/AZURE_OPENAI_TROUBLESHOOTING.md).
-
-## Brand Management
-
-The brand management features include:
+MixerAI 2.0 provides robust features for managing brands, including UI enhancements for brand creation/editing, AI-driven brand identity generation (utilizing URL analysis, regional adaptation, and multi-language support), management of content vetting agencies, and brand-specific visual elements like colors and icons.
 
 - Create and edit brands with basic information
 - Generate comprehensive brand identity using AI from website URLs
@@ -962,306 +860,17 @@ We've ensured consistency between the brand creation and editing experiences:
 - Clear validation messages for URL inputs
 - Type-safe handling of guardrails content (array vs string)
 
-## Authentication Implementation Updates
+## Application Structure: Routing and Navigation
 
-### Completed Work
+MixerAI 2.0 uses a unified routing structure centered around the `/dashboard` prefix for authenticated pages. A comprehensive navigation system, including a primary sidebar, facilitates user interaction within the dashboard.
 
-Following our authentication strategy, we've completed the following tasks:
+For detailed information on:
+- The current application route structure (including dashboard, auth, and API routes).
+- Handling of legacy routes via redirects.
+- The `UnifiedNavigation` component and overall navigation system (linking to `docs/NAVIGATION_SYSTEM.md`).
+- The history and technical details of the Route Cleanup and Consolidation Initiative (linking to relevant planning and report documents).
 
-1. **API Route Protection**
-   - Implemented `withAuth` and `withAuthAndMonitoring` wrappers for API routes
-   - Migrated these API routes to use the wrappers:
-     - `/api/brands` and related endpoints
-     - `/api/content` and related endpoints
-     - `/api/content-types`
-     - `/api/workflows` and related endpoints
-     - `/api/users` and related endpoints
-   - Added authenticated user info to API responses where appropriate
-
-2. **Database Security**
-   - Created Row Level Security (RLS) policies in `migrations/auth-rls-policies.sql`
-   - Added deployment script (`scripts/deploy-rls-policies.sh`) for applying policies
-   - Created test script (`scripts/test-rls-policies.sh`) to verify policies
-
-3. **User Permission Checks**
-   - Added role-based permission checks to sensitive operations
-   - Enhanced user invite API to check admin privileges
-   - Added tracking of who invited users and assigned permissions
-
-### Technical Implementation Details
-
-1. **Authentication Middleware**
-   The middleware in `src/middleware.ts` checks for user authentication on protected routes:
-   - Redirects unauthenticated requests to `/dashboard/*` routes to the login page
-   - Returns 401 responses for unauthenticated requests to `/api/*` routes
-
-2. **API Authentication Wrappers**
-   Two wrappers in `src/lib/auth/api-auth.ts` provide standardized auth for API routes:
-   - `withAuth`: Basic protection that ensures user is authenticated
-   - `withAuthAndMonitoring`: Adds timing and logging for resource-intensive operations
-
-3. **Row-Level Security Policies**
-   Database-level security implemented through policies:
-   - Brand editing limited to users with admin/editor roles for that brand
-   - Content visibility filtered by brand permissions
-   - Profile updates limited to the owner
-   - Permissions management limited to admins
-
-4. **Server Component Utilities**
-   Utilities in `src/lib/auth/server.ts` for server components:
-   - `requireAuth`: Server component authentication check with redirect
-   - `getCurrentUser`: Gets the current authenticated user
-
-### Next Steps
-
-1. **Complete Client Updates**
-   - Remove any remaining localStorage/sessionStorage token storage
-   - Update authentication context providers
-
-2. **RLS Policy Deployment**
-   - Execute the deployment script to apply RLS policies to the database
-   - Run the test script to verify RLS is working correctly
-
-3. **Security Review**
-   - Conduct a thorough review of authentication flows
-   - Review secure cookie settings
-   - Verify CSRF protection
-
-4. **Documentation**
-   - Create detailed technical documentation on authentication
-   - Document RLS policies and access control
-
-5. **Testing**
-   - Test all API routes with and without authentication
-   - Verify proper error handling for authentication failures
-   - Test session refresh functionality
-
-By implementing cookie-based authentication with Supabase and applying Row-Level Security at the database level, we've significantly improved the security posture of the application while maintaining a good user experience.
-
-## Domain Configuration
-
-The MixerAI 2.0 application is configured to run on the production domain `mixerai.orangejely.co.uk`. We've created detailed documentation for setting up and configuring the application with this domain:
-
-- See [`docs/domain-configuration.md`](docs/domain-configuration.md) for complete setup instructions
-
-Key configuration areas include:
-- Supabase authentication settings
-- Email templates for user invitations
-- Environment variables
-- DNS and SSL configuration
-
-When deploying to the production domain, ensure all authentication settings and invitation email templates are updated to reference the correct domain.
-
-## Build and Deployment Optimizations
-
-We've implemented several optimizations to ensure smooth building and deployment:
-
-### Dynamic API Routes
-
-API routes that use authentication require `cookies` and can't be rendered statically. We've added the `dynamic = "force-dynamic"` flag to these routes:
-
-```typescript
-// Force dynamic rendering for this route
-export const dynamic = "force-dynamic";
-```
-
-A utility script is available to automatically add this flag to all API routes:
-```bash
-./scripts/update-api-routes.sh
-```
-
-### Configuration Cleanup
-
-- Removed deprecated `experimental.serverActions` from next.config.js since this is now the default in Next.js 14+
-- Added proper component imports to fix TypeScript errors
-- Ensured all dependencies are correctly installed (e.g., class-variance-authority)
-
-### Domain Configuration Testing
-
-For the production domain (`mixerai.orangejely.co.uk`), we've added:
-
-- A warning component that displays in development mode when not configured
-- Client-side verification in the dashboard layout
-- Email template verification in the user invitation API
-
-The domain configuration system avoids hardcoded values by using environment variables throughout the application.
-
-# User Profile Fields
-
-The user profile contains the following fields:
-
-| Field Name | Description | Required | Location |
-|------------|-------------|----------|----------|
-| id | Unique identifier | Yes | auth.users, profiles |
-| email | User's email address | Yes | auth.users, profiles |
-| full_name | User's full name | Yes | auth.users (metadata), profiles |
-| job_title | User's job title or role | Yes | auth.users (metadata), profiles |
-| job_description | Description of user's job | No | auth.users (metadata), profiles |
-| company | User's company or organization | Yes | auth.users (metadata), profiles |
-| avatar_url | URL to user's profile picture | No | profiles |
-| role | System role (admin, editor, viewer) | Yes | user_brand_permissions |
-| created_at | Account creation timestamp | Yes | auth.users, profiles |
-
-# Company Field
-
-The company field has been added to the user profile to track organizational information. This field is:
-
-- Displayed in the users management table
-- Required during user signup/invitation acceptance
-- Automatically pre-filled with the domain name from the user's email address (without TLD)
-- Editable by admins through the user edit interface
-- Stored in both the user metadata and profiles table
-
-## Route Cleanup (2024-06-XX)
-
-### Problem
-The application had duplicate routes with nearly identical implementations: top-level routes (`/brands`, `/workflows`, etc.) and dashboard routes (`/dashboard/brands`, `/dashboard/workflows`, etc.). This caused code duplication, maintenance challenges, and inconsistent user experiences.
-
-### Solution Implemented
-We simplified the application architecture through a phased approach:
-
-#### Phase 1: Redirect Implementation (COMPLETED)
-1. **Framework-Level Redirects:** 
-   - Implemented catch-all patterns in `next.config.js` for efficient redirects
-   - Used the `:path*` pattern to handle all nested routes automatically
-   - Added special case redirect for `/dashboard/content` to `/dashboard/content/article`
-
-2. **Middleware Redirects:**
-   - Enhanced middleware with dynamic redirect logic
-   - Preserved query parameters during redirects
-   - Added detailed logging for debugging and monitoring
-
-3. **Placeholder Components:**
-   - Created minimal placeholder components for all non-dashboard routes
-   - Added clear documentation explaining their purpose
-   - Ensured they render safely if redirects fail
-
-#### Phase 2: Testing and Verification (IN PROGRESS)
-1. **Testing Tools Development:**
-   - Created automated redirect testing script (`scripts/test-redirects.js`)
-   - Developed bundle size analysis tool (`scripts/analyze-bundle-sizes.sh`)
-   - Prepared comprehensive test plan and report templates
-
-2. **Testing Strategy:**
-   - Route coverage testing with automated verification
-   - Query parameter preservation checks
-   - Browser navigation and history testing
-   - Authentication state preservation verification
-   - Bundle size and performance measurement
-
-#### Phase 3: Code Cleanup (PLANNED)
-After a successful testing period, we'll:
-1. Remove all placeholder files
-2. Update all documentation to reference only dashboard routes
-3. Final verification of all redirects
-
-### Technical Implementation Details
-
-#### Catch-all Redirect Patterns
-```javascript
-// next.config.js
-module.exports = {
-  async redirects() {
-    return [
-      {
-        source: '/brands/:path*',
-        destination: '/dashboard/brands/:path*',
-        permanent: false,
-      },
-      // ... similar patterns for workflows, content, users
-    ]
-  },
-}
-```
-
-#### Middleware Implementation
-```typescript
-// middleware.ts
-export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl
-  
-  if (['/brands', '/workflows', '/content', '/users']
-      .some(prefix => pathname.startsWith(prefix))) {
-    
-    const newPath = pathname.replace(
-      /^\/(brands|workflows|content|users)/, 
-      '/dashboard/$1'
-    )
-    
-    // Preserve query parameters
-    const url = new URL(newPath, req.url)
-    req.nextUrl.searchParams.forEach((value, key) => {
-      url.searchParams.set(key, value)
-    })
-    
-    return NextResponse.redirect(url)
-  }
-}
-```
-
-### Benefits Achieved
-- Eliminated code duplication across route structures
-- Simplified application architecture
-- Improved maintainability with single source of truth
-- Enhanced user navigation consistency
-- Expected performance improvements (pending final measurements)
-
-### Next Steps
-1. Complete the testing phase using the developed tools
-2. Document test results and performance measurements
-3. Proceed to Phase 3 for final cleanup after successful testing
-4. Update all references to use only dashboard routes
-
-Detailed documentation about the implementation can be found in:
-- [Duplicate Pages Removal Plan](./docs/DUPLICATE_PAGES_REMOVAL_PLAN.md)
-- [Route Cleanup Executive Summary](./docs/ROUTE_CLEANUP_EXECUTIVE_SUMMARY.md)
-- [Route Redirect Test Plan](./docs/ROUTE_REDIRECT_TEST_PLAN.md)
-
-## Application Route Structure
-
-MixerAI 2.0 uses a simplified route structure where all authenticated content is accessible through the `/dashboard` route prefix. All other top-level routes (like `/brands`, `/workflows`, `/content`, and `/users`) are automatically redirected to their `/dashboard` equivalents.
-
-### Main Route Groups
-
-1. **Authentication Routes**
-   - `/auth/login` - User login
-   - `/auth/register` - New user registration
-
-2. **Dashboard Routes**
-   - `/dashboard/brands` - Brand management
-   - `/dashboard/workflows` - Workflow management
-   - `/dashboard/content` - Content management (redirects to `/dashboard/content/article`)
-   - `/dashboard/users` - User management
-
-3. **API Routes**
-   - `/api/brands` - Brand data endpoints
-   - `/api/workflows` - Workflow endpoints
-   - `/api/content` - Content management endpoints
-   - `/api/users` - User management endpoints
-
-4. **Account Management**
-   - `/account` - User account settings
-
-### Redirect Handling
-
-For backward compatibility, all non-dashboard routes automatically redirect to their dashboard equivalents:
-
-- `/brands/*` → `/dashboard/brands/*`
-- `/workflows/*` → `/dashboard/workflows/*`
-- `/content/*` → `/dashboard/content/*`
-- `/users/*` → `/dashboard/users/*`
-
-All redirects maintain query parameters and are configured as permanent (301) redirects.
-
-## Navigation
-
-The application's main navigation is built around the dashboard structure. The primary navigation components are:
-
-1. **Sidebar Navigation** - Located on the left side of the dashboard, providing access to all main sections
-2. **User Menu** - Located in the top-right corner, providing access to account settings and logout
-3. **Breadcrumb Navigation** - Located at the top of each page, showing the current location in the navigation hierarchy
-
-For more details on the navigation structure, see `src/components/layout/Navigation.tsx`.
+Please refer to the main [Routing and Navigation Guide](./docs/routing_and_navigation.md).
 
 ## 🛠️ Technical Tools
 
@@ -1298,43 +907,14 @@ MixerAI 2.0 includes several technical tools to enhance content creation workflo
 - **API**: `POST /api/tools/content-transcreator`
 - **UI**: `/dashboard/tools/content-transcreator`
 
-## Content Template System
+## Content and Workflow Management
 
-MixerAI 2.0 includes a flexible Content Template System that replaces the previous static content types with customizable templates. This allows for creating diverse content types with configurable fields and AI integration.
+MixerAI 2.0 features a flexible Content Template System for creating diverse content types with AI assistance. Content then moves through configurable workflows for review and approval, with features like role-based assignments, user invitations for workflow steps, and AI-powered step description generation.
 
-### Key Features
-
-- **Template Management**: Create, edit, and delete content templates with custom fields
-- **Field Configuration**: Configure input fields for user entry and output fields for AI generation
-- **AI Integration**: Field-level AI suggestions and auto-complete generation
-- **Dynamic Content Creation**: Create content using any custom template
-
-### Default Templates
-
-The system includes two pre-configured templates:
-
-1. **Article Template**
-   - For creating blog posts, articles, and long-form content 
-   - AI features: Title suggestions, keyword recommendations, and content generation
-
-2. **Product Template**
-   - For creating product descriptions with features and benefits
-   - AI features: Target audience suggestions and product descriptions
-
-### Dynamic Navigation
-
-The Content section in the navigation menu dynamically displays:
-- All Templates (list page)
-- System Default Templates
-- Up to 5 recently created custom templates
-
-### Implementation
-
-The system is implemented with:
-
-- Database tables for template storage (`content_templates`) and content structure
-- API routes for template management and AI operations
-- React components for template design and field configuration
+For comprehensive details, see:
+- [Content Creation and Workflow Management Guide](./docs/content_and_workflows.md)
+- [Content Template System Documentation](./docs/CONTENT_TEMPLATE_SYSTEM.md)
+- [User Flows Documentation](./docs/user_flows.md)
 
 ## Navigation and Workflow Page Error Fix (YYYY-MM-DD)
 
@@ -1388,3 +968,82 @@ The tests have been executed successfully, confirming the function's robustness.
 ### Project Documentation
 
 The project documentation has been updated to reflect the current state of the user invitation system and related components. This includes details about the enhanced error handling and the testing setup.
+
+## Database and Migrations
+
+For comprehensive details on database connection methods, the full schema (including tables like `profiles`, `brands`, `content`, `workflows`, `user_brand_permissions`, `workflow_invitations`, etc.), Row Level Security (RLS) policies, and the migration strategy, please refer to the [Database Documentation](./docs/database.md).
+
+## Content Lifecycle & Workflow Management
+
+MixerAI 2.0 provides a comprehensive Content Lifecycle & Workflow Management system, enabling users to create, review, and publish content efficiently.
+
+### Key Features
+
+- **Content Templates**: Define the structure and fields for various content types (blog posts, social media updates, product descriptions, etc.)
+- **Workflow Templates**: Create customizable workflows for content approval, including multi-step processes, role-based approvals, and content status tracking
+- **Content Creation**: Utilize AI to generate content based on templates, with the ability to customize and refine the output
+- **Workflow Assignment**: Assign content to workflows, with each workflow step having a specific role (editor, admin, etc.) and optional approval requirement
+- **User Tasks**: Automatically create tasks for users assigned to workflow steps, allowing them to review and approve content
+- **Email Notifications**: Send email notifications to users for task assignments, approvals, and rejections
+- **Content Status Tracking**: Track the status of content throughout the workflow (draft, in review, approved, rejected, published)
+- **Version History**: Maintain a version history for content, allowing users to revert to previous versions if needed
+- **Content Archiving**: Archive content that is no longer needed, while keeping its version history for reference
+
+### Workflow Initialization for New Content
+
+When new content is created and associated with a workflow, its `current_step` is initialized to `0` (the index of the first step in the workflow's `steps` array) by the content creation UI.
+
+A database trigger (`handle_new_content_workflow_assignment` on the `content` table) automatically creates tasks in the `user_tasks` table for all users assigned to this initial step (index 0) of the workflow.
+
+(Actual content fields and lifecycle stages are defined by the `content` table, the chosen `content_template`, and the assigned `workflow`.)
+
+### Workflow Management & Key Features
+
+#### Improved Role Selection
+- **Role Checkboxes with Descriptions**: Replaced dropdown menu with visual checkbox cards
+- **Role Context**: Each role now displays a description of its responsibilities
+- **Visual Clarity**: Selected roles are highlighted with a border and background color
+
+#### Step Reordering
+- **Up/Down Controls**: Added buttons to move steps up or down in the workflow
+- **Step Numbering**: Clear visual indicators of step order with numbered badges
+- **Drag Handles**: Intuitive controls for adjusting workflow sequence
+
+#### Optional Steps
+- **Clearer Terminology**: Changed "Require approval" to "Optional step" for better clarity
+- **Enhanced Description**: Added explanation of what optional steps mean in the workflow
+- **Toggle Interface**: Simple checkbox toggle with descriptive label
+
+#### Assignee Management
+- **Improved Styling**: Assignee emails now use badges for better visibility
+- **Easier Removal**: One-click removal of assignees from workflow steps
+- **Simplified Addition**: Enter key support for quickly adding multiple assignees
+
+#### Auto-generate Description
+- **Brand Context Awareness**: Descriptions now consider brand language and geography
+- **Improved Error Handling**: Better feedback when description generation fails
+- **Optimized State Updates**: Prevents UI refreshes that could cause user position loss
+
+### Technical Improvements
+
+#### Azure OpenAI Integration
+- **Fixed Client Configuration**: Proper endpoint construction for Azure OpenAI
+- **Error Handling**: Detailed error information for troubleshooting
+- **API Versioning**: Updated to use the latest API version for better compatibility
+
+#### User Interface Enhancements
+- **Consistent Styling**: Harmonized UI elements across new and edit workflow pages
+- **Improved Layout**: Better spacing and visual hierarchy for workflow steps
+- **Responsive Design**: Layout adjustments for different screen sizes
+
+### Usage
+
+1. Create or edit a workflow
+2. Use the step reordering buttons to arrange workflow steps in the desired sequence
+3. Select the appropriate role for each step using the descriptive checkbox cards
+4. Toggle "Optional step" for steps that can be skipped in certain cases
+5. Use the "Auto-generate" button to quickly create professional step descriptions
+6. Add assignees by email to each step in the workflow
+7. Remove assignees with a single click if needed
+
+The enhanced workflow management provides a more intuitive, user-friendly interface that makes creating and managing complex content workflows simpler and more efficient.
