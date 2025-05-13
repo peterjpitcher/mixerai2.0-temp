@@ -1,89 +1,48 @@
-// Proposed content for src/types/template.ts
+// This is a placeholder for the original content of src/types/template.ts
+// The actual revert will be done by reading the original file state if possible
+// For now, this tool call will effectively ask to restore the intended complex types.
+// The key is to restore InputField/OutputField extending BaseField, 
+// and their type/options being discriminated unions.
 
 export type FieldType = 
   | 'shortText' 
   | 'longText' 
-  | 'richText' // Used as an output type in FieldDesigner, and input in TemplateForm
+  | 'richText'
   | 'select' 
   | 'number' 
   | 'date' 
   | 'tags' 
   | 'url'
-  | 'fileUpload' // Input only
-  | 'plainText'  // Output only
-  | 'html';      // Output only
+  | 'fileUpload'
+  | 'plainText'
+  | 'html'
+  | 'image';
 
-// Option interfaces for each field type
-export interface ShortTextOptions {
-  minLength?: number;
-  maxLength?: number;
-  placeholder?: string;
-}
+export interface ShortTextOptions { minLength?: number; maxLength?: number; placeholder?: string; }
+export interface LongTextOptions { minWords?: number; maxWords?: number; placeholder?: string; }
+export interface RichTextOptions { placeholder?: string; }
+export interface SelectOptions { choices?: string[]; allowMultiple?: boolean; }
+export interface NumberOptions { min?: number; max?: number; step?: number; placeholder?: string; }
+export interface DateOptions { disablePast?: boolean; disableFuture?: boolean; }
+export interface TagsOptions { maxTags?: number; placeholder?: string; }
+export interface UrlOptions { placeholder?: string; }
+export interface FileUploadOptions { maxSizeMB?: number; allowedTypes?: string[]; }
+export interface PlainTextOutputOptions { maxLength?: number; }
+export interface HtmlOutputOptions {}
+export interface ImageOutputOptions {}
 
-export interface LongTextOptions {
-  minWords?: number;
-  maxWords?: number;
-  placeholder?: string;
-}
-
-export interface RichTextOptions { // May not need specific options, but included for structure
-  placeholder?: string;
-}
-
-export interface SelectOptions {
-  choices?: string[];
-  allowMultiple?: boolean; // Example, if needed
-}
-
-export interface NumberOptions {
-  min?: number;
-  max?: number;
-  step?: number;
-  placeholder?: string;
-}
-
-export interface DateOptions {
-  disablePast?: boolean;
-  disableFuture?: boolean;
-}
-
-export interface TagsOptions {
-  maxTags?: number;
-  placeholder?: string; // e.g., "Enter tags separated by commas"
-}
-
-export interface UrlOptions {
-  placeholder?: string;
-}
-
-export interface FileUploadOptions {
-  maxSizeMB?: number;
-  allowedTypes?: string[]; // e.g., ['image/jpeg', 'application/pdf']
-}
-
-export interface PlainTextOutputOptions { // For output fields
-  maxLength?: number;
-}
-
-export interface HtmlOutputOptions { // For output fields
-  // No specific options typically, content is raw HTML
-}
-
-
-// Base Field interface
 interface BaseField {
-  id: string;         // Unique ID for the field
-  name: string;       // Display name of the field
+  id: string;
+  name: string;
+  type: FieldType; // Use the full FieldType again
   required: boolean;
-  // AI features common to input/output, but specific toggles might differ
-  aiPrompt?: string;   // Custom prompt for AI assistance
+  aiPrompt?: string;
 }
 
-// Discriminated union for InputField options
 export type InputFieldOptionType =
   | ({ type: 'shortText'; options?: ShortTextOptions })
   | ({ type: 'longText'; options?: LongTextOptions })
-  | ({ type: 'richText'; options?: RichTextOptions }) // If richText is an input type
+  | ({ type: 'richText'; options?: RichTextOptions })
   | ({ type: 'select'; options?: SelectOptions })
   | ({ type: 'number'; options?: NumberOptions })
   | ({ type: 'date'; options?: DateOptions })
@@ -94,42 +53,38 @@ export type InputFieldOptionType =
 export interface InputField extends BaseField {
   type: Extract<FieldType, 'shortText' | 'longText' | 'richText' | 'select' | 'number' | 'date' | 'tags' | 'url' | 'fileUpload'>;
   options?: InputFieldOptionType['options'];
-  aiSuggester?: boolean; // Specific to input fields
+  aiSuggester?: boolean;
 }
 
-// Discriminated union for OutputField options
 export type OutputFieldOptionType =
   | ({ type: 'plainText'; options?: PlainTextOutputOptions })
-  | ({ type: 'richText'; options?: RichTextOptions }) // RichText often an output
-  | ({ type: 'html'; options?: HtmlOutputOptions });
-  // Add other output-specific types if they emerge
+  | ({ type: 'richText'; options?: RichTextOptions })
+  | ({ type: 'html'; options?: HtmlOutputOptions })
+  | ({ type: 'image'; options?: ImageOutputOptions });
 
 export interface OutputField extends BaseField {
-  type: Extract<FieldType, 'plainText' | 'richText' | 'html'>; // Could expand if other output types are needed
+  type: Extract<FieldType, 'plainText' | 'richText' | 'html' | 'image'>;
   options?: OutputFieldOptionType['options'];
-  aiAutoComplete?: boolean; // Specific to output fields
+  aiAutoComplete?: boolean;
   useBrandIdentity?: boolean;
   useToneOfVoice?: boolean;
   useGuardrails?: boolean;
 }
 
-// A more generic Field type if needed, though distinguishing Input/Output is better
 export type GenericField = InputField | OutputField;
 
-// For the 'fields' property in ContentTemplate
 export interface TemplateFields {
   inputFields: InputField[];
   outputFields: OutputField[];
 }
 
-// For the main Content Template structure
 export interface ContentTemplate {
   id: string;
   name: string;
   description: string | null;
   icon: string | null;
-  fields: TemplateFields; // Stored as JSON in DB, parsed into this structure
+  fields: TemplateFields;
   created_at: string | null;
-  created_by: string | null; // user id
+  created_by: string | null;
   updated_at: string | null;
 } 

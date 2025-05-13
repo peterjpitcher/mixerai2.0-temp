@@ -14,22 +14,13 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import { Icons } from '@/components/icons';
 import { toast } from 'sonner';
 import { Menu } from 'lucide-react';
-
-type FieldType = 'shortText' | 'longText' | 'richText' | 'select' | 'number' | 'date' | 'tags' | 'url' | 'fileUpload' | 'plainText' | 'html';
-
-interface Field {
-  id: string;
-  name: string;
-  type: FieldType;
-  required: boolean;
-  options: any;
-  aiSuggester?: boolean;
-  aiAutoComplete?: boolean;
-  aiPrompt?: string;
-  useBrandIdentity?: boolean;
-  useToneOfVoice?: boolean;
-  useGuardrails?: boolean;
-}
+import { 
+  FieldType as GlobalFieldType,
+  GenericField as Field,
+  InputField, 
+  OutputField, 
+  ContentTemplate 
+} from '@/types/template';
 
 interface TemplateData {
   id?: string;
@@ -37,8 +28,8 @@ interface TemplateData {
   description: string;
   icon?: string;
   fields: {
-    inputFields: Field[];
-    outputFields: Field[];
+    inputFields: InputField[];
+    outputFields: OutputField[];
   };
 }
 
@@ -133,18 +124,29 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
     if (!result.destination) return;
     
     const { source, destination } = result;
-    const fieldsList = activeTab === 'input' ? 'inputFields' : 'outputFields';
-    const items = Array.from(templateData.fields[fieldsList]);
-    const [reorderedItem] = items.splice(source.index, 1);
-    items.splice(destination.index, 0, reorderedItem);
-    
-    setTemplateData(prev => ({
-      ...prev,
-      fields: {
-        ...prev.fields,
-        [fieldsList]: items
-      }
-    }));
+    if (activeTab === 'input') {
+      const items = Array.from(templateData.fields.inputFields);
+      const [reorderedItem] = items.splice(source.index, 1);
+      items.splice(destination.index, 0, reorderedItem as InputField);
+      setTemplateData(prev => ({
+        ...prev,
+        fields: {
+          ...prev.fields,
+          inputFields: items
+        }
+      }));
+    } else {
+      const items = Array.from(templateData.fields.outputFields);
+      const [reorderedItem] = items.splice(source.index, 1);
+      items.splice(destination.index, 0, reorderedItem as OutputField);
+      setTemplateData(prev => ({
+        ...prev,
+        fields: {
+          ...prev.fields,
+          outputFields: items
+        }
+      }));
+    }
   };
   
   const handleSubmit = async (e: React.FormEvent) => {

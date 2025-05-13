@@ -47,13 +47,45 @@ export type Database = {
           },
         ]
       }
+      brand_selected_agencies: {
+        Row: {
+          agency_id: string
+          brand_id: string
+          created_at: string | null
+        }
+        Insert: {
+          agency_id: string
+          brand_id: string
+          created_at?: string | null
+        }
+        Update: {
+          agency_id?: string
+          brand_id?: string
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_selected_agencies_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "content_vetting_agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brand_selected_agencies_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brands: {
         Row: {
           brand_admin_id: string | null
           brand_color: string | null
           brand_identity: string | null
           brand_summary: string | null
-          content_vetting_agencies: string | null
           country: string | null
           created_at: string | null
           guardrails: string | null
@@ -69,7 +101,6 @@ export type Database = {
           brand_color?: string | null
           brand_identity?: string | null
           brand_summary?: string | null
-          content_vetting_agencies?: string | null
           country?: string | null
           created_at?: string | null
           guardrails?: string | null
@@ -85,7 +116,6 @@ export type Database = {
           brand_color?: string | null
           brand_identity?: string | null
           brand_summary?: string | null
-          content_vetting_agencies?: string | null
           country?: string | null
           created_at?: string | null
           guardrails?: string | null
@@ -346,24 +376,24 @@ export type Database = {
       }
       content_types: {
         Row: {
+          created_at: string | null
+          description: string | null
           id: string
           name: string
-          description: string | null
-          created_at: string | null
           updated_at: string | null
         }
         Insert: {
+          created_at?: string | null
+          description?: string | null
           id?: string
           name: string
-          description?: string | null
-          created_at?: string | null
           updated_at?: string | null
         }
         Update: {
+          created_at?: string | null
+          description?: string | null
           id?: string
           name?: string
-          description?: string | null
-          created_at?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -428,6 +458,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      content_vetting_agencies: {
+        Row: {
+          country_code: string
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          priority:
+            | Database["public"]["Enums"]["vetting_agency_priority_level"]
+            | null
+          updated_at: string | null
+        }
+        Insert: {
+          country_code: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          priority?:
+            | Database["public"]["Enums"]["vetting_agency_priority_level"]
+            | null
+          updated_at?: string | null
+        }
+        Update: {
+          country_code?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          priority?:
+            | Database["public"]["Enums"]["vetting_agency_priority_level"]
+            | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       invitation_logs: {
         Row: {
@@ -817,6 +883,7 @@ export type Database = {
           brand_id: string | null
           created_at: string | null
           created_by: string | null
+          description: string | null
           id: string
           name: string
           steps: Json
@@ -827,6 +894,7 @@ export type Database = {
           brand_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          description?: string | null
           id?: string
           name: string
           steps?: Json
@@ -837,6 +905,7 @@ export type Database = {
           brand_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          description?: string | null
           id?: string
           name?: string
           steps?: Json
@@ -889,17 +958,55 @@ export type Database = {
       }
     }
     Functions: {
+      create_brand_and_set_admin: {
+        Args: {
+          creator_user_id: string
+          brand_name: string
+          brand_website_url?: string
+          brand_country?: string
+          brand_language?: string
+          brand_identity_text?: string
+          brand_tone_of_voice?: string
+          brand_guardrails?: string
+          brand_content_vetting_agencies?: string
+        }
+        Returns: string
+      }
+      create_workflow_and_log_invitations: {
+        Args: {
+          p_name: string
+          p_brand_id: string
+          p_steps: Json
+          p_created_by: string
+          p_invitation_items: Json
+        }
+        Returns: string
+      }
       delete_brand_and_dependents: {
-        Args: {
-          brand_id_to_delete: string
-        }
+        Args: { brand_id_to_delete: string }
         Returns: undefined
-      },
+      }
       delete_template_and_update_content: {
-        Args: {
-          template_id_to_delete: string
-        }
+        Args: { template_id_to_delete: string }
         Returns: undefined
+      }
+      set_user_role_for_all_assigned_brands: {
+        Args: {
+          target_user_id: string
+          new_role: Database["public"]["Enums"]["user_role"]
+        }
+        Returns: number
+      }
+      update_workflow_and_handle_invites: {
+        Args: {
+          p_workflow_id: string
+          p_name?: string
+          p_brand_id?: string
+          p_steps?: Json
+          p_template_id?: string
+          p_new_invitation_items?: Json
+        }
+        Returns: boolean
       }
     }
     Enums: {
@@ -909,7 +1016,9 @@ export type Database = {
         | "approved"
         | "published"
         | "rejected"
+        | "cancelled"
       user_role: "admin" | "editor" | "viewer"
+      vetting_agency_priority_level: "High" | "Medium" | "Low"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1031,8 +1140,10 @@ export const Constants = {
         "approved",
         "published",
         "rejected",
+        "cancelled",
       ],
       user_role: ["admin", "editor", "viewer"],
+      vetting_agency_priority_level: ["High", "Medium", "Low"],
     },
   },
 } as const

@@ -28,6 +28,38 @@ interface BrandEditPageProps {
   };
 }
 
+// Define the type for user search results
+interface UserSearchResult {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  job_title?: string | null;
+}
+
+// Define the type for content vetting agencies (can be refined based on API response)
+interface VettingAgency {
+  id: string;
+  name: string;
+  description?: string | null;
+  country_code?: string | null;
+  priority?: 'High' | 'Medium' | 'Low' | null;
+}
+
+// Helper function to get priority-based Tailwind CSS classes
+const getPriorityAgencyStyles = (priority: 'High' | 'Medium' | 'Low' | null | undefined): string => {
+  if (priority === 'High') {
+    return 'text-red-600 font-bold';
+  }
+  if (priority === 'Medium') {
+    return 'text-orange-500 font-semibold';
+  }
+  if (priority === 'Low') {
+    return 'text-blue-600 font-normal'; // Example for Low
+  }
+  return 'font-normal text-gray-700 dark:text-gray-300'; // Default for null/undefined or other values
+};
+
 /**
  * BrandEditPage allows users to modify the details of an existing brand.
  * It includes sections for basic information (name, website, country, language, brand colour)
@@ -57,19 +89,48 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     brand_identity: '',
     tone_of_voice: '',
     guardrails: '',
-    content_vetting_agencies: [] as string[] // Store as array
+    content_vetting_agencies: [] as string[] // Will store IDs of selected agencies
   });
   const [currentAdditionalUrl, setCurrentAdditionalUrl] = useState(''); // For new URL input
   const [customAgencyInput, setCustomAgencyInput] = useState(''); // For new custom agency
 
-  // Predefined agencies list (can be moved to constants if used elsewhere)
-  const predefinedAgencies = [
-    { id: 'internal-legal', label: 'Internal Legal Team' },
-    { id: 'internal-brand', label: 'Internal Brand Team' },
-    { id: 'external-fda', label: 'External FDA Specialist' },
-    { id: 'external-asa', label: 'External Advertising Standards Authority (ASA)' },
-  ];
+  const [allVettingAgencies, setAllVettingAgencies] = useState<VettingAgency[]>([]);
 
+  // Add state for brand admin
+  const [brandAdmin, setBrandAdmin] = useState('');
+
+  // Add state for user search results with type
+  const [userSearchResults, setUserSearchResults] = useState<UserSearchResult[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const priorityOrder: Array<'High' | 'Medium' | 'Low'> = ['High', 'Medium', 'Low'];
+
+  // Function to search users
+  const searchUsers = async (query) => {
+    if (!query) return;
+    try {
+      const response = await fetch(`/api/users/search?query=${query}`);
+      const data = await response.json();
+      if (data.success) {
+        setUserSearchResults(data.users);
+      } else {
+        setUserSearchResults([]);
+      }
+    } catch (error) {
+      console.error('Error searching users:', error);
+      setUserSearchResults([]);
+    }
+  };
+
+  // Effect to trigger user search
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      searchUsers(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
+  
   useEffect(() => {
     const fetchBrandData = async () => {
       try {
@@ -85,7 +146,6 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         
         setBrand(data.brand);
         
-        // Set form data from brand
         setFormData({
           name: data.brand.name || '',
           website_url: data.brand.website_url || '',
@@ -102,12 +162,11 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
           brand_identity: data.brand.brand_identity || '',
           tone_of_voice: data.brand.tone_of_voice || '',
           guardrails: data.brand.guardrails || '',
-          content_vetting_agencies: typeof data.brand.content_vetting_agencies === 'string' 
-                                      ? data.brand.content_vetting_agencies.split(',').map(s => s.trim()).filter(Boolean) 
-                                      : (Array.isArray(data.brand.content_vetting_agencies) ? data.brand.content_vetting_agencies : []),
+          content_vetting_agencies: Array.isArray(data.brand.selected_vetting_agencies) 
+                                      ? data.brand.selected_vetting_agencies.map((agency: VettingAgency) => agency.id) 
+                                      : [],
         });
       } catch (error) {
-        // console.error('Error loading brand data:', error);
         setError((error as Error).message);
         toast.error('Failed to load brand details. Please try again.');
       } finally {
@@ -117,6 +176,42 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     
     fetchBrandData();
   }, [id]);
+
+  // useEffect to fetch vetting agencies based on brand's country
+  useEffect(() => {
+    const fetchAllVettingAgencies = async () => {
+      // Only fetch if country is selected, or fetch all if no country specific logic desired when country is empty
+      // For now, let's assume we always want to try fetching, API will handle if country_code is undefined/empty
+      let apiUrl = '/api/content-vetting-agencies';
+      if (formData.country) {
+        apiUrl = `/api/content-vetting-agencies?country_code=${formData.country}`;
+      }
+
+      try {
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+          throw new Error('Failed to fetch vetting agencies');
+        }
+        const data = await response.json();
+        if (data.success && Array.isArray(data.data)) {
+          setAllVettingAgencies(data.data);
+        } else {
+          toast.error(data.error || 'Could not load vetting agencies for the selected country.');
+          setAllVettingAgencies([]); // Clear previous list if fetch fails or returns no data for country
+        }
+      } catch (err) {
+        toast.error('Failed to fetch vetting agencies list.');
+        console.error('Error fetching all vetting agencies:', err);
+        setAllVettingAgencies([]);
+      }
+    };
+
+    // We need formData.country to be populated before fetching agencies by country.
+    // Check if isLoading is false, which means fetchBrandData has likely completed and set formData.country.
+    if (!isLoading) { 
+      fetchAllVettingAgencies();
+    }
+  }, [formData.country, isLoading]); // Re-fetch when formData.country changes or when initial loading finishes
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -159,13 +254,13 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   // --- End Handlers for Additional Website URLs ---
 
   // --- Handlers for Content Vetting Agencies ---
-  const handleAgencyCheckboxChange = (agencyName: string, checked: boolean) => {
+  const handleAgencyCheckboxChange = (agencyId: string, checked: boolean) => {
     setFormData(prev => {
       const currentAgencies = Array.isArray(prev.content_vetting_agencies) ? prev.content_vetting_agencies : [];
       if (checked) {
-        return { ...prev, content_vetting_agencies: [...currentAgencies, agencyName] };
+        return { ...prev, content_vetting_agencies: Array.from(new Set([...currentAgencies, agencyId])) };
       } else {
-        return { ...prev, content_vetting_agencies: currentAgencies.filter(a => a !== agencyName) };
+        return { ...prev, content_vetting_agencies: currentAgencies.filter(id => id !== agencyId) };
       }
     });
   };
@@ -185,14 +280,15 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     }
   };
 
-  const handleRemoveCustomAgency = (agencyName: string) => {
+  const handleRemoveCustomAgency = (agencyIdToRemove: string) => {
     setFormData(prev => ({
       ...prev,
-      content_vetting_agencies: prev.content_vetting_agencies.filter(a => a !== agencyName)
+      // This assumes content_vetting_agencies is an array of IDs
+      content_vetting_agencies: prev.content_vetting_agencies.filter(id => id !== agencyIdToRemove)
     }));
   };
   // --- End Handlers for Content Vetting Agencies ---
-
+  
   const handleGenerateBrandIdentity = async () => {
     if (!formData.name) {
       toast.error('Please enter a brand name before generating the brand identity.');
@@ -266,18 +362,19 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     try {
       setIsSaving(true);
       
-      // Validate required fields
       if (!formData.name) {
         toast.error('Brand name is required.');
         setIsSaving(false);
         return;
       }
       
+      // Destructure to omit content_vetting_agencies from formData before creating updateData
+      const { content_vetting_agencies, ...restOfFormData } = formData;
+      
       const updateData = {
-        ...formData,
-        // Convert arrays to comma-separated strings for backend
-        content_vetting_agencies: formData.content_vetting_agencies.join(', '),
-        // additional_website_urls are not directly saved to the brand record, only used for generation
+        ...restOfFormData,
+        brand_admin_id: brandAdmin, 
+        selected_agency_ids: content_vetting_agencies, // This is now an array of IDs
         updated_at: new Date().toISOString()
       };
       
@@ -379,13 +476,13 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
           </Button>
         </div>
       </div>
-
+      
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="basic">Basic Details</TabsTrigger>
           <TabsTrigger value="identity">Brand Identity</TabsTrigger>
         </TabsList>
-
+        
         <TabsContent value="basic" className="space-y-4">
           <Card>
             <CardHeader><CardTitle>Basic Information</CardTitle></CardHeader>
@@ -420,10 +517,24 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                   </Select>
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="brand_admin">Brand Admin</Label>
+                <Input id="brand_admin" name="brand_admin" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search or add a new admin" />
+                {userSearchResults.length > 0 && (
+                  <Select onValueChange={(value) => setBrandAdmin(value)}>
+                    <SelectTrigger><SelectValue placeholder="Select an admin" /></SelectTrigger>
+                    <SelectContent>
+                      {userSearchResults.map(user => (
+                        <SelectItem key={user.id} value={user.id}>{user.full_name || user.email}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
-
+        
         <TabsContent value="identity" className="space-y-4">
           <Card>
             <CardHeader><CardTitle>Brand Identity</CardTitle></CardHeader>
@@ -433,7 +544,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                   <div className="space-y-4 border-b pb-4">
                     <h3 className="text-lg font-semibold">Generate Brand Identity</h3>
                     <p className="text-sm text-muted-foreground">Add website URLs to auto-generate or enhance brand identity, tone, and guardrails. The main URL from Basic Details is included by default.</p>
-                    <div className="space-y-2">
+                      <div className="space-y-2">
                       <Label>Additional Website URLs</Label>
                       {formData.additional_website_urls.map((urlObj) => (
                         <div key={urlObj.id} className="flex items-center gap-2">
@@ -450,8 +561,8 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                       ))}
                       <Button type="button" variant="outline" onClick={handleAddAdditionalUrlField} size="sm" className="mt-2 w-full">
                         <PlusCircle className="mr-2 h-4 w-4" /> Add another URL
-                      </Button>
-                    </div>
+                        </Button>
+                      </div>
                     <div className="space-y-2 pt-2">
                       <p className="text-xs text-muted-foreground">Identity will be generated for {countryName} in {languageName} (if set).</p>
                       <Button onClick={handleGenerateBrandIdentity} disabled={isGenerating} className="w-full">
@@ -459,7 +570,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                       </Button>
                     </div>
                   </div>
-
+                  
                   <div className="space-y-4">
                     <div className="space-y-2"><Label htmlFor="brand_identity">Brand Identity</Label><Textarea id="brand_identity" name="brand_identity" value={formData.brand_identity} onChange={handleInputChange} rows={6}/></div>
                     <div className="space-y-2"><Label htmlFor="tone_of_voice">Tone of Voice</Label><Textarea id="tone_of_voice" name="tone_of_voice" value={formData.tone_of_voice} onChange={handleInputChange} rows={4}/></div>
@@ -467,44 +578,91 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                     
                     <div className="space-y-4">
                       <Label>Content Vetting Agencies</Label>
-                      <div className="space-y-2">
-                        {predefinedAgencies.map(agency => (
-                          <div key={agency.id} className="flex items-center space-x-2">
-                            <Checkbox 
-                              id={`edit-${agency.id}`} 
-                              checked={formData.content_vetting_agencies.includes(agency.label)}
-                              onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.label, !!checked)}
-                            />
-                            <Label htmlFor={`edit-${agency.id}`} className="font-normal">{agency.label}</Label>
-                          </div>
-                        ))}
-                      </div>
-                      <div>
-                        <Label htmlFor="edit_custom_agency_input">Add Custom Agency</Label>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Input id="edit_custom_agency_input" value={customAgencyInput} onChange={(e) => setCustomAgencyInput(e.target.value)} placeholder="Enter custom agency name" className="flex-grow" />
-                          <Button type="button" variant="outline" onClick={handleAddCustomAgency} size="sm">Add</Button>
-                        </div>
-                      </div>
-                      {formData.content_vetting_agencies.length > 0 && (
-                        <div className="mt-2 space-y-1">
-                          <p className="text-xs font-medium text-muted-foreground">Selected/Added Agencies:</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {formData.content_vetting_agencies.map((agency, index) => (
-                              <Badge key={`${agency}-${index}`} variant="secondary" className="flex items-center">
-                                {agency}
-                                <Button type="button" variant="ghost" size="icon" className="ml-1 h-5 w-5 p-0.5 hover:bg-destructive/20 rounded-full" onClick={() => handleRemoveCustomAgency(agency)}>
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
+                      {/* START: Render checkboxes for allVettingAgencies grouped by priority */}
+                      {isLoading && <p className="text-sm text-muted-foreground">Loading agencies...</p>}
+                      {!isLoading && allVettingAgencies.length === 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          No vetting agencies available for the selected country.
+                        </p>
                       )}
+                      {!isLoading && allVettingAgencies.length > 0 && priorityOrder.map(priorityLevel => {
+                        const agenciesInGroup = allVettingAgencies.filter(agency => agency.priority === priorityLevel);
+                        if (agenciesInGroup.length === 0) {
+                          return null; 
+                        }
+                        return (
+                          <div key={priorityLevel} className="mt-3">
+                            <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(priorityLevel)}`}>{priorityLevel} Priority</h4>
+                            <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
+                              {agenciesInGroup.map(agency => (
+                                <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
+                                  <Checkbox 
+                                    id={`edit-agency-${agency.id}`} 
+                                    checked={formData.content_vetting_agencies.includes(agency.id)}
+                                    onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)}
+                                  />
+                                  <Label 
+                                    htmlFor={`edit-agency-${agency.id}`} 
+                                    className={getPriorityAgencyStyles(agency.priority)} // Apply dynamic styles to name as well
+                                  >
+                                    {agency.name}
+                                  </Label>
+                                </div>
+                              ))}
+                            </div>
+                    </div>
+                        );
+                      })}
+                      {/* Render agencies with other/null priorities last */}
+                      {!isLoading && allVettingAgencies.filter(a => !priorityOrder.includes(a.priority as any) && a.priority != null).length > 0 && (
+                         <div key="other-priority" className="mt-3">
+                            <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(null)}`}>Other Priority</h4>
+                            <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
+                              {allVettingAgencies.filter(a => !priorityOrder.includes(a.priority as any) && a.priority != null).map(agency => (
+                                <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`edit-agency-${agency.id}`}
+                                    checked={formData.content_vetting_agencies.includes(agency.id)}
+                                    onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)}
+                                  />
+                                  <Label
+                                    htmlFor={`edit-agency-${agency.id}`}
+                                    className={getPriorityAgencyStyles(agency.priority)}
+                                  >
+                                    {agency.name}
+                                  </Label>
+                                </div>
+                              ))}
+                            </div>
+                    </div>
+                      )}
+                      {!isLoading && allVettingAgencies.filter(a => a.priority == null).length > 0 && (
+                         <div key="no-priority" className="mt-3">
+                            <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(null)}`}>Uncategorized</h4>
+                            <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
+                              {allVettingAgencies.filter(a => a.priority == null).map(agency => (
+                                <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`edit-agency-${agency.id}`}
+                                    checked={formData.content_vetting_agencies.includes(agency.id)}
+                                    onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)}
+                                  />
+                                  <Label
+                                    htmlFor={`edit-agency-${agency.id}`}
+                                    className={getPriorityAgencyStyles(agency.priority)}
+                                  >
+                                    {agency.name}
+                                  </Label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                      )}
+                      {/* END: Render checkboxes grouped by priority */}
                     </div>
                   </div>
                 </div>
-
+                
                 <div className="lg:col-span-1">
                   <div className="bg-muted rounded-lg p-4 space-y-6 sticky top-4">
                     <div className="space-y-2">
@@ -519,7 +677,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                       <div className="flex gap-2 items-center">
                         <input type="color" id="brand_color_identity_tab" name="brand_color" value={formData.brand_color || '#1982C4'} onChange={handleInputChange} className="w-10 h-10 rounded cursor-pointer" />
                         <Input value={formData.brand_color || '#1982C4'} onChange={handleInputChange} name="brand_color" placeholder="#HEX colour" className="w-32" />
-                      </div>
+                    </div>
                       <div className="w-full h-12 rounded-md mt-2" style={{ backgroundColor: formData.brand_color || '#1982C4' }} />
                       <p className="text-xs text-center text-muted-foreground">{formData.brand_color || '#1982C4'}</p>
                     </div>
@@ -537,4 +695,4 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       </CardFooter>
     </div>
   );
-}
+} 

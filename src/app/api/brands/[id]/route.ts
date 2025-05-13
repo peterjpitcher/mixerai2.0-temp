@@ -1,11 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
+import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { isBrandAdmin } from '@/lib/auth/api-auth';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
+
+// Type for priority as it comes from Supabase (enum string values)
+// Define these types and helper here as well for this route file
+type SupabaseVettingAgencyPriority = "High" | "Medium" | "Low" | null;
+
+// Helper function to map Supabase priority strings to numbers
+function mapSupabasePriorityToNumber(priority: SupabaseVettingAgencyPriority): number {
+  switch (priority) {
+    case "High": return 1;
+    case "Medium": return 2;
+    case "Low": return 3;
+    default: return Number.MAX_SAFE_INTEGER; // Default for null or unexpected values
+  }
+}
+
+// Interface for vetting agency with numeric priority (for API response)
+interface VettingAgencyForResponse {
+  id: string;
+  name: string;
+  description: string | null;
+  country_code: string;
+  priority: number; // Numeric priority
+  // Add other fields if the original SupabaseVettingAgency had more that are needed.
+}
 
 // GET a single brand by ID
 export const GET = withAuth(async (
@@ -16,8 +40,8 @@ export const GET = withAuth(async (
   try {
     const supabase = createSupabaseAdminClient();
     const { id } = params;
-    
-    const { data: brand, error: brandFetchError } = await supabase
+
+    const { data: brandData, error: brandFetchError } = await supabase
       .from('brands')
       .select('*')
       .eq('id', id)
@@ -27,7 +51,7 @@ export const GET = withAuth(async (
         throw brandFetchError;
     }
     
-    if (!brand) {
+    if (!brandData) {
       return NextResponse.json(
         { success: false, error: 'Brand not found' },
         { 
@@ -36,6 +60,55 @@ export const GET = withAuth(async (
         }
       );
     }
+
+    const { data: selectedAgenciesData, error: selectedAgenciesError } = await supabase
+      .from('brand_selected_agencies')
+      .select(`
+        agency_id,
+        content_vetting_agencies (
+          id,
+          name,
+          description,
+          country_code,
+          priority
+        )
+      `)
+      .eq('brand_id', id);
+
+    if (selectedAgenciesError) {
+      console.error('Error fetching selected agencies with Supabase:', selectedAgenciesError);
+      throw selectedAgenciesError;
+    }
+
+    let processedAgencies: VettingAgencyForResponse[] = [];
+    if (selectedAgenciesData) {
+      processedAgencies = selectedAgenciesData
+        .map(item => {
+            const agencyFromDb = item.content_vetting_agencies;
+            if (agencyFromDb) {
+                return {
+                    id: agencyFromDb.id,
+                    name: agencyFromDb.name,
+                    description: agencyFromDb.description,
+                    country_code: agencyFromDb.country_code,
+                    priority: mapSupabasePriorityToNumber(agencyFromDb.priority as SupabaseVettingAgencyPriority),
+                    // Include other fields from agencyFromDb if they were part of its original type
+                    // and are expected in VettingAgencyForResponse
+                } as VettingAgencyForResponse;
+            }
+            return null;
+        })
+        .filter((agency): agency is VettingAgencyForResponse => agency !== null) // Filter out nulls and type guard
+        .sort((a, b) => { // Sort by numeric priority then name
+          if (a.priority !== b.priority) {
+            return a.priority - b.priority;
+          }
+          return (a.name || '').localeCompare(b.name || '');
+        });
+    }
+    
+    const brand: any = brandData;
+    brand.selected_vetting_agencies = processedAgencies; // Assign agencies with numeric priority
 
     const { count: contentCount, error: contentCountError } = await supabase
       .from('content')
@@ -53,11 +126,11 @@ export const GET = withAuth(async (
 
     return NextResponse.json({ 
       success: true, 
-      brand,
+      brand, // brand now contains selected_vetting_agencies with numeric priorities
       contentCount: contentCount || 0,
       workflowCount: workflowCount || 0,
       meta: {
-        source: 'database',
+        source: 'database (Supabase)',
         isFallback: false,
         requestId: crypto.randomUUID(),
         timestamp: new Date().toISOString()
@@ -66,7 +139,7 @@ export const GET = withAuth(async (
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'no-store',
-        'x-data-source': 'database'
+        'x-data-source': 'database (Supabase)'
       }
     });
   } catch (error: any) {
@@ -80,11 +153,10 @@ export const PUT = withAuth(async (
   user: any,
   context: { params: { id: string } }
 ) => {
+  const supabase = createSupabaseAdminClient();
   try {
-    const supabase = createSupabaseAdminClient();
     const brandIdToUpdate = context.params.id;
     
-    // Authorize: Check if the authenticated user is an admin for this specific brand
     const hasPermission = await isBrandAdmin(user.id, brandIdToUpdate, supabase);
     if (!hasPermission) {
       return NextResponse.json(
@@ -124,7 +196,7 @@ export const PUT = withAuth(async (
     if (body.guardrails !== undefined) {
       let formattedGuardrails = body.guardrails;
       if (Array.isArray(body.guardrails)) {
-        formattedGuardrails = body.guardrails.map((item:string) => `- ${item}`).join('\n');
+        formattedGuardrails = body.guardrails.map((item:string) => `- ${item}`).join('\\n');
       } 
       else if (typeof body.guardrails === 'string' && 
                body.guardrails.trim().startsWith('[') && 
@@ -132,16 +204,12 @@ export const PUT = withAuth(async (
         try {
           const guardrailsArray = JSON.parse(body.guardrails);
           if (Array.isArray(guardrailsArray)) {
-            formattedGuardrails = guardrailsArray.map((item:string) => `- ${item}`).join('\n');
+            formattedGuardrails = guardrailsArray.map((item:string) => `- ${item}`).join('\\n');
           }
-        } catch (e) {
-          // console.log removed
-        }
+        } catch (e) { /* ignore */ }
       }
       updateData.guardrails = formattedGuardrails;
     }
-    
-    if (body.content_vetting_agencies !== undefined) updateData.content_vetting_agencies = body.content_vetting_agencies;
     
     if (body.brand_admin_id) {
       const newBrandAdminId = body.brand_admin_id;
@@ -152,9 +220,8 @@ export const PUT = withAuth(async (
         .eq('brand_id', brandIdToUpdate)
         .maybeSingle();
       
-      if (permCheckError) {
-        throw permCheckError;
-      } 
+      if (permCheckError) throw permCheckError;
+      
       if (existingPermission && existingPermission.role !== 'admin') {
         const { error: updatePermError } = await supabase
           .from('user_brand_permissions')
@@ -169,41 +236,120 @@ export const PUT = withAuth(async (
       }
     }
     
-    if (Object.keys(updateData).length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'No valid fields to update' },
-        { status: 400 }
-      );
+    let updatedSupabaseBrandData: any = null;
+    if (Object.keys(updateData).length > 0) {
+        updateData.updated_at = new Date().toISOString();
+        const { data, error } = await supabase
+          .from('brands')
+          .update(updateData)
+          .eq('id', brandIdToUpdate)
+          .select()
+          .single();
+        if (error) throw error;
+        if (!data) {
+            return NextResponse.json(
+              { success: false, error: 'Brand not found after attempting update with Supabase' },
+              { status: 404 }
+            );
+        }
+        updatedSupabaseBrandData = data;
+    } else {
+      const { data, error } = await supabase
+        .from('brands')
+        .select('*')
+        .eq('id', brandIdToUpdate)
+        .single();
+      if (error) throw error;
+      if (!data) {
+        return NextResponse.json( { success: false, error: 'Brand not found' }, { status: 404 });
+      }
+      updatedSupabaseBrandData = data;
     }
     
-    updateData.updated_at = new Date().toISOString();
+    const { error: deleteAgenciesError } = await supabase
+      .from('brand_selected_agencies')
+      .delete()
+      .eq('brand_id', brandIdToUpdate);
 
-    const { data: updatedBrandData, error: updateErrorData } = await supabase
-      .from('brands')
-      .update(updateData)
-      .eq('id', brandIdToUpdate)
-      .select()
-      .single();
-    
-    if (updateErrorData) throw updateErrorData;
-    
-    if (!updatedBrandData) {
-      return NextResponse.json(
-        { success: false, error: 'Brand not found or no changes made' },
-        { status: 404 }
-      );
+    if (deleteAgenciesError) {
+      console.error('Error deleting old brand agencies:', deleteAgenciesError);
+      throw deleteAgenciesError;
+    }
+
+    if (body.selected_agency_ids && Array.isArray(body.selected_agency_ids) && body.selected_agency_ids.length > 0) {
+      const agenciesToInsert = body.selected_agency_ids.map((agencyId: string) => ({
+        brand_id: brandIdToUpdate,
+        agency_id: agencyId,
+      }));
+      const { error: insertAgenciesError } = await supabase
+        .from('brand_selected_agencies')
+        .upsert(agenciesToInsert, { onConflict: 'brand_id,agency_id' });
+      
+      if (insertAgenciesError) {
+        console.error('Error inserting new brand agencies:', insertAgenciesError);
+        throw insertAgenciesError;
+      }
     }
     
+    const { data: finalSelectedAgenciesData, error: finalAgenciesError } = await supabase
+      .from('brand_selected_agencies')
+      .select(`
+        agency_id,
+        content_vetting_agencies (
+          id,
+          name,
+          description,
+          country_code,
+          priority
+        )
+      `)
+      .eq('brand_id', brandIdToUpdate);
+
+    if (finalAgenciesError) {
+      console.error('Error fetching final selected agencies with Supabase:', finalAgenciesError);
+      throw finalAgenciesError;
+    }
+    
+    let finalProcessedAgencies: VettingAgencyForResponse[] = [];
+    if (finalSelectedAgenciesData) {
+      finalProcessedAgencies = finalSelectedAgenciesData
+        .map(item => {
+            const agencyFromDb = item.content_vetting_agencies;
+            if (agencyFromDb) {
+                return {
+                    id: agencyFromDb.id,
+                    name: agencyFromDb.name,
+                    description: agencyFromDb.description,
+                    country_code: agencyFromDb.country_code,
+                    priority: mapSupabasePriorityToNumber(agencyFromDb.priority as SupabaseVettingAgencyPriority),
+                } as VettingAgencyForResponse;
+            }
+            return null;
+        })
+        .filter((agency): agency is VettingAgencyForResponse => agency !== null)
+        .sort((a, b) => {
+          if (a.priority !== b.priority) {
+            return a.priority - b.priority;
+          }
+          return (a.name || '').localeCompare(b.name || '');
+        });
+    }
+
+    const finalBrandResponse: any = updatedSupabaseBrandData;
+    finalBrandResponse.selected_vetting_agencies = finalProcessedAgencies;
+
     return NextResponse.json({ 
       success: true, 
-      brand: updatedBrandData 
+      brand: finalBrandResponse
     });
+
   } catch (error) {
+    console.error('Error in PUT /api/brands/[id]:', error);
     return handleApiError(error, 'Error updating brand');
   }
 });
 
-// DELETE a brand by ID
+// DELETE a brand by ID (logic remains largely unchanged as it was already Supabase-centric)
 export const DELETE = withAuth(async (
   request: NextRequest,
   user: any,
@@ -213,7 +359,6 @@ export const DELETE = withAuth(async (
     const supabase = createSupabaseAdminClient();
     const brandIdToDelete = context.params.id;
     
-    // Authorize: Check if the authenticated user is an admin for this specific brand
     const hasPermission = await isBrandAdmin(user.id, brandIdToDelete, supabase);
     if (!hasPermission) {
       return NextResponse.json(
@@ -225,15 +370,13 @@ export const DELETE = withAuth(async (
     const url = new URL(request.url);
     const deleteCascade = url.searchParams.get('deleteCascade') === 'true';
     
-    // Check if brand exists before attempting to fetch dependents or delete
     const { data: brandToCheck, error: fetchError } = await supabase
       .from('brands')
       .select('id, name')
       .eq('id', brandIdToDelete)
       .maybeSingle();
     
-    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "Fetched template not found"
-        // An actual error occurred, not just not found
+    if (fetchError && fetchError.code !== 'PGRST116') { 
         throw fetchError;
     }
     if (!brandToCheck) {
@@ -243,7 +386,6 @@ export const DELETE = withAuth(async (
       );
     }
     
-    // If not cascading, check for dependents first
     if (!deleteCascade) {
       const { count: contentCount, error: contentCountErr } = await supabase
         .from('content')
@@ -269,35 +411,32 @@ export const DELETE = withAuth(async (
             workflowCount: workflowCountValue,
             requiresCascade: true
           },
-          { status: 400 } // Bad Request or 409 Conflict could also be used
+          { status: 400 } 
         );
       }
     }
     
-    // Call the database function to perform atomic delete
-    // This function (delete_brand_and_dependents) needs to be created in your PostgreSQL database.
-    // It should handle deleting related user_brand_permissions, workflows, and then the brand.
-    // Content associated with the brand should be handled by ON DELETE CASCADE on content.brand_id.
-    // Workflows associated with the brand will set content.workflow_id to NULL (ON DELETE SET NULL).
     const { error: rpcError } = await supabase.rpc('delete_brand_and_dependents', {
       brand_id_to_delete: brandIdToDelete
     });
 
     if (rpcError) {
       console.error('Error calling delete_brand_and_dependents RPC:', rpcError);
-      // Check for specific PostgreSQL error codes if the function indicates brand not found after attempting delete
-      if (rpcError.code === 'P0001' && rpcError.message.includes('Brand not found')) { // Example custom error from function
+      if (rpcError.code === 'P0001' && rpcError.message.includes('Brand not found')) { 
            return NextResponse.json({ success: false, error: 'Brand not found or already deleted.' }, { status: 404 });
       }
-      throw rpcError; // Re-throw for generic handling by handleApiError
+      const detailedError = new Error(`RPC Error: ${rpcError.message} (Code: ${rpcError.code}) Details: ${rpcError.details} Hint: ${rpcError.hint}`);
+      (detailedError as any).cause = rpcError;
+      throw detailedError;
     }
     
     return NextResponse.json({ 
       success: true, 
-      message: `Brand "${brandToCheck.name}" and its direct dependents (permissions, workflows) have been scheduled for deletion. Content will be cascade deleted.` 
+      message: `Brand "${brandToCheck.name}" and its direct dependents have been scheduled for deletion.` 
     });
 
   } catch (error) {
+    console.error('Full error in DELETE /api/brands/[id]:', error);
     return handleApiError(error, 'Error deleting brand');
   }
 }); 
