@@ -51,7 +51,6 @@
   "src/app/api/content/generate/route.ts",
   "src/app/api/content/route.ts",
   "src/app/auth/login/page.tsx",
-  "src/app/auth/register/page.tsx",
   "src/app/dashboard/account/page.tsx",
   "src/app/dashboard/brands/[id]/page.tsx",
   "src/app/dashboard/brands/new/page.tsx",

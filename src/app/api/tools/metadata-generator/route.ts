@@ -4,16 +4,21 @@ import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { fetchWebPageContent } from '@/lib/utils/web-scraper';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
+import { extractCleanDomain } from '@/lib/utils/url-utils';
+import { Tables } from '@/types/supabase';
 
 interface MetadataGenerationRequest {
   url: string;
-  brandId: string;
+  brandId?: string;
+  websiteUrlForBrandDetection?: string;
   brandLanguage?: string;
   brandCountry?: string;
   brandIdentity?: string;
   toneOfVoice?: string;
   guardrails?: string;
 }
+
+type BrandContextType = Tables<'brands'> | null;
 
 // Temporarily expose a direct handler for testing
 // export async function POST(request: NextRequest) { ... } // Content of this function is removed for brevity
@@ -30,9 +35,9 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       );
     }
 
-    if (!data.brandId) {
+    if (!data.brandId && !data.websiteUrlForBrandDetection) {
       return NextResponse.json(
-        { success: false, error: 'Brand ID is required' },
+        { success: false, error: 'Brand ID or website URL for brand detection is required' },
         { status: 400 }
       );
     }
@@ -46,37 +51,44 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       );
     }
     
-    let brandLanguage = data.brandLanguage;
-    let brandCountry = data.brandCountry;
-    let brandIdentity = data.brandIdentity;
-    let toneOfVoice = data.toneOfVoice;
-    let guardrails = data.guardrails;
-    
+    let brandContext: BrandContextType = null;
     const supabase = createSupabaseAdminClient();
     
-    if (!brandLanguage || !brandCountry || !brandIdentity || !toneOfVoice || !guardrails) {
+    if (data.brandId) {
       const { data: brandData, error: brandError } = await supabase
         .from('brands')
-        .select('name, country, language, brand_identity, tone_of_voice, guardrails')
+        .select('*')
         .eq('id', data.brandId)
         .single();
         
       if (brandError) {
-        return handleApiError(brandError, 'Failed to fetch brand information');
+        console.warn(`[MetadataGen] Brand ID ${data.brandId} provided but not found: ${brandError.message}`);
+      } else {
+        brandContext = brandData;
       }
-      if (!brandData) {
-        return NextResponse.json(
-            { success: false, error: 'Brand not found for the provided Brand ID' }, 
-            { status: 404 }
-        );
+    } else if (data.websiteUrlForBrandDetection) {
+      const cleanDomain = extractCleanDomain(data.websiteUrlForBrandDetection);
+      if (cleanDomain) {
+        const { data: brandData, error: brandError } = await supabase
+          .from('brands')
+          .select('*')
+          .eq('normalized_website_domain', cleanDomain)
+          .limit(1)
+          .single();
+        
+        if (brandError && brandError.code !== 'PGRST116') {
+          console.warn(`[MetadataGen] Error fetching brand by domain ${cleanDomain}: ${brandError.message}`);
+        } else if (brandData) {
+          brandContext = brandData;
+        }
       }
-      
-      brandLanguage = brandLanguage || brandData.language || 'en';
-      brandCountry = brandCountry || brandData.country || 'US';
-      brandIdentity = brandIdentity || brandData.brand_identity || '';
-      toneOfVoice = toneOfVoice || brandData.tone_of_voice || '';
-      guardrails = guardrails || brandData.guardrails || '';
     }
+    
+    const brandLanguage = data.brandLanguage || brandContext?.language || 'en';
+    const brandCountry = data.brandCountry || brandContext?.country || 'US';
+    const brandIdentity = data.brandIdentity || brandContext?.brand_identity || '';
+    const toneOfVoice = data.toneOfVoice || brandContext?.tone_of_voice || '';
+    const guardrails = data.guardrails || brandContext?.guardrails || '';
     
     let pageContent = '';
     try {
@@ -110,7 +122,9 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
           metaDescription: generatedMetadata.metaDescription,
           titleLength: validationResult.titleLength,
           descriptionLength: validationResult.descriptionLength,
-          validationDetails: validationResult
+          validationDetails: validationResult,
+          brand_id_used: brandContext?.id || null,
+          brand_name_used: brandContext?.name || null
         },
         { status: 422 }
       );
@@ -120,6 +134,9 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       success: true,
       userId: user.id,
       url: data.url,
+      brand_id_used: brandContext?.id || null,
+      brand_name_used: brandContext?.name || null,
+      detection_source: data.brandId ? 'brand_id' : (data.websiteUrlForBrandDetection && brandContext ? 'url_detection' : 'none'),
       ...generatedMetadata,
       keywords: [] // Retained for now as per note: "Maintain backwards compatibility"
     });

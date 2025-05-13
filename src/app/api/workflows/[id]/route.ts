@@ -323,19 +323,35 @@ export const PUT = withAuth(async (
         for (const email of newUsersToInviteByEmail) {
           try {
             let highestRole = 'viewer' as 'admin' | 'editor' | 'viewer';
+            let firstStepIdForAssignment: number | string | null = null;
+
             for (const item of newInvitationsToCreate) { 
               if (item.email === email) {
-                if (item.role === 'admin') { highestRole = 'admin'; break; }
-                else if (item.role === 'editor' && highestRole !== 'admin') { highestRole = 'editor'; }
+                if (firstStepIdForAssignment === null) {
+                  firstStepIdForAssignment = item.step_id;
+                }
+                if (item.role === 'admin') { 
+                  highestRole = 'admin'; 
+                  // No break here to ensure firstStepId is from the actual first item for this email
+                } else if (item.role === 'editor' && highestRole !== 'admin') { 
+                  highestRole = 'editor'; 
+                }
               }
             }
+
+            const appMetadataPayload: Record<string, any> = {
+              full_name: '', 
+              role: highestRole,
+              invited_by: inviterId || undefined, 
+              invited_from_workflow: id
+            };
+
+            if (firstStepIdForAssignment !== null) {
+              appMetadataPayload.step_id_for_assignment = firstStepIdForAssignment;
+            }
+
             await supabase.auth.admin.inviteUserByEmail(email, {
-              data: {
-                full_name: '', 
-                role: highestRole,
-                invited_by: inviterId || undefined, 
-                invited_from_workflow: id
-              }
+              data: appMetadataPayload
             });
           } catch (individualEmailInviteError: any) {
             console.error(`Failed to send invitation email to ${email} via Supabase Auth:`, individualEmailInviteError);

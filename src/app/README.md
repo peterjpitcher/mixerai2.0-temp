@@ -14,7 +14,7 @@ MixerAI 2.0 uses a simplified route structure where all authenticated content is
 
 2. **Authentication Routes** - User authentication
    - `/auth/login` - User login
-   - `/auth/register` - New user registration
+   // - `/auth/register` - New user registration (Removed - Invite-only system)
 
 3. **API Routes** - Application APIs
    - `/api/brands` - Brand data endpoints

@@ -145,6 +145,7 @@ export type Database = {
       }
       content: {
         Row: {
+          assigned_to: string | null
           body: string
           brand_id: string | null
           content_data: Json | null
@@ -164,6 +165,7 @@ export type Database = {
           workflow_id: string | null
         }
         Insert: {
+          assigned_to?: string | null
           body: string
           brand_id?: string | null
           content_data?: Json | null
@@ -183,6 +185,7 @@ export type Database = {
           workflow_id?: string | null
         }
         Update: {
+          assigned_to?: string | null
           body?: string
           brand_id?: string | null
           content_data?: Json | null
@@ -202,6 +205,20 @@ export type Database = {
           workflow_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "content_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles_view"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "content_brand_id_fkey"
             columns: ["brand_id"]
@@ -785,6 +802,74 @@ export type Database = {
           },
         ]
       }
+      user_tasks: {
+        Row: {
+          content_id: string
+          created_at: string | null
+          due_date: string | null
+          id: string
+          status: string | null
+          updated_at: string | null
+          user_id: string
+          workflow_id: string
+          workflow_step_id: string
+          workflow_step_name: string | null
+        }
+        Insert: {
+          content_id: string
+          created_at?: string | null
+          due_date?: string | null
+          id?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+          workflow_id: string
+          workflow_step_id: string
+          workflow_step_name?: string | null
+        }
+        Update: {
+          content_id?: string
+          created_at?: string | null
+          due_date?: string | null
+          id?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+          workflow_id?: string
+          workflow_step_id?: string
+          workflow_step_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_tasks_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "content"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_tasks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_tasks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_tasks_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workflow_invitations: {
         Row: {
           created_at: string | null
@@ -989,6 +1074,10 @@ export type Database = {
       delete_template_and_update_content: {
         Args: { template_id_to_delete: string }
         Returns: undefined
+      }
+      get_user_by_email: {
+        Args: { user_email: string }
+        Returns: unknown[]
       }
       set_user_role_for_all_assigned_brands: {
         Args: {

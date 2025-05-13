@@ -5,6 +5,7 @@ import { withAuth } from '@/lib/auth/api-auth';
 import { isBrandAdmin } from '@/lib/auth/api-auth';
 import { getUserAuthByEmail, inviteNewUserWithAppMetadata } from '@/lib/auth/user-management';
 import { User } from '@supabase/supabase-js'; // Ensure User type is available
+import { extractCleanDomain } from '@/lib/utils/url-utils'; // Added import
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -193,7 +194,16 @@ export const PUT = withAuth(async (
     
     const updateData: any = {};
     if (body.name !== undefined) updateData.name = body.name;
-    if (body.website_url !== undefined) updateData.website_url = body.website_url;
+    if (body.website_url !== undefined) {
+      updateData.website_url = body.website_url;
+      // Also update normalized_website_domain if website_url is changing
+      if (body.website_url === null || body.website_url.trim() === '') {
+        updateData.normalized_website_domain = null;
+      } else {
+        const normalizedDomain = extractCleanDomain(body.website_url);
+        updateData.normalized_website_domain = normalizedDomain;
+      }
+    }
     if (body.country !== undefined) updateData.country = body.country;
     if (body.language !== undefined) updateData.language = body.language;
     if (body.brand_identity !== undefined) updateData.brand_identity = body.brand_identity;

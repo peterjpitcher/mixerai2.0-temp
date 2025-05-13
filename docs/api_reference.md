@@ -15,7 +15,7 @@ This document provides a reference for the main API routes used in the MixerAI 2
 (These are standard Supabase Auth endpoints, often called by Supabase client libraries rather than direct fetch)
 
 -   `/auth/login` (Page for user login)
--   `/auth/register` (Page for new user registration)
+// -   `/auth/register` (Page for new user registration - Removed, invite-only system)
 -   `/auth/callback` (Supabase callback for OAuth, PKCE)
 -   `/auth/user` (Endpoint used by Supabase helpers to get user state)
 
@@ -63,38 +63,4 @@ This document provides a reference for the main API routes used in the MixerAI 2
 -   **`PUT /api/content-templates/[id]`**: Updates an existing content template.
 -   **`DELETE /api/content-templates/[id]`**: Deletes a content template.
 
-### Content Types (`/api/content-types` - Potentially legacy or for predefined types)
--   **`GET /api/content-types`**: Retrieves all predefined content types.
-
-## Workflow API (`/api/workflows`)
-
--   **`GET /api/workflows`**: Retrieves all workflows.
--   **`POST /api/workflows`**: Creates a new workflow definition.
--   **`GET /api/workflows/[id]`**: Retrieves a specific workflow definition by ID.
--   **`PUT /api/workflows/[id]`**: Updates a specific workflow definition.
--   **`DELETE /api/workflows/[id]`**: Deletes a specific workflow definition.
--   **`POST /api/workflows/generate-description`**: Uses AI to generate a description for a workflow or its steps.
--   **`GET /api/workflows/templates`**: Retrieves predefined workflow templates.
--   **`POST /api/workflows/[id]/invitations`**: (Mentioned in file structure) Manages invitations related to a workflow.
-
-## AI-Powered Technical Tool Endpoints (`/api/tools`)
-
-(Details on AI interaction in [Azure OpenAI Integration](./azure_openai_integration.md))
-
--   **`POST /api/tools/metadata-generator`**: Generates SEO meta title and description from a URL.
--   **`POST /api/tools/alt-text-generator`**: Generates alt text for an image URL.
--   **`POST /api/tools/content-transcreator`**: Trans-creates content between languages/cultures.
-
-## Other Utility & Test API Endpoints
-
--   **`POST /api/scrape-url`**: A utility endpoint to scrape content from a given URL. Used by AI tools like brand identity and metadata generation.
--   **`GET /api/me/tasks`**: (Mentioned in file structure) Retrieves tasks assigned to the current user.
--   **`GET /api/env-check`**: (Mentioned in file structure) Checks environment variable setup.
--   **`GET /api/test-azure-openai`**: Tests connectivity and configuration of the Azure OpenAI service.
--   **`GET /api/test-brand-identity`**: (Mentioned in file structure) Specific test endpoint for brand identity generation.
--   **`GET /api/test-connection`**: (Mentioned in file structure) General backend connection test.
--   **`GET /api/test-template-generation`**: (Mentioned in file structure) Tests content generation with templates.
--   **`GET /api/ai/suggest`**: (Mentioned in file structure) General AI suggestion endpoint.
--   **`GET /api/proxy`**: (Mentioned in file structure) A generic proxy endpoint, purpose to be clarified.
-
-*This list is based on information from `DOCUMENTATION.md` and observed file structures. It may not be exhaustive. Always refer to the route handler files in `src/app/api/` for the definitive implementation and request/response schemas.* 
+### Content Types (`

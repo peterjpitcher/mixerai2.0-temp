@@ -88,8 +88,6 @@ The following schema details provide an overview. For precise and complete defin
     -   `id` (uuid, PK), `user_id` (uuid, FK to `profiles`), `brand_id` (uuid, FK to `brands`), `role` (user_role enum, NOT NULL, default: 'viewer'), `created_at` (timestamptz), `updated_at` (timestamptz). Unique on (`user_id`, `brand_id`).
 -   **`user_invitations`**: Tracks user invitations.
     -   `id` (uuid, PK), `email` (text, NOT NULL), `invite_token` (text, NOT NULL, UNIQUE), `status` (text, NOT NULL, default: 'pending'), `invitation_source` (text, NOT NULL), `source_id` (uuid), `invited_by` (uuid, FK to `profiles`), `role` (text, NOT NULL), `last_reminder_at` (timestamptz), `reminder_count` (integer, default: 0), `expires_at` (timestamptz, NOT NULL), `created_at` (timestamptz), `updated_at` (timestamptz).
--   **`user_system_roles`**: Assigns system-wide roles to users.
-    -   `id` (uuid, PK), `user_id` (uuid, FK to `profiles`), `role` (text, NOT NULL), `created_at` (timestamptz), `updated_at` (timestamptz). Unique on (`user_id`, `role`).
 -   **`user_tasks`**: Tracks tasks assigned to users.
     -   `id` (uuid, PK), `user_id` (uuid, FK to `profiles`, NOT NULL), `content_id` (uuid, FK to `content`, NOT NULL), `workflow_id` (uuid, FK to `workflows`, NOT NULL), `workflow_step_id` (text, NOT NULL), `workflow_step_name` (text), `status` (text, default: 'pending'), `created_at` (timestamptz), `updated_at` (timestamptz), `due_date` (timestamptz). Unique on (`user_id`, `content_id`, `workflow_step_id`).
 -   **`workflow_invitations`**: Tracks invitations for external users to participate in workflow steps.
@@ -125,7 +123,6 @@ RLS is extensively used to control data access based on the authenticated user's
 -   **Public View, Restricted Modification**: Many tables allow broad `SELECT` access (e.g., `using_expression = true`) but restrict `INSERT`, `UPDATE`, `DELETE` based on user roles and ownership.
 -   **Ownership-Based Access**: Users can typically update their own `profiles` and related data like `notifications`.
 -   **Brand-Level Permissions**: Access to `brands`, `content`, and `workflows` is often governed by `user_brand_permissions`. For example, a user might need to be an 'admin' or 'editor' for a specific `brand_id` to modify related data.
--   **System Roles (`user_system_roles`)**: A 'superadmin' role (or similar) grants broader permissions for administrative tasks like managing `content_ownership_history` or all `user_invitations`.
 -   **`auth.uid()`**: This function is central to many RLS policies, dynamically filtering data based on the ID of the currently authenticated user.
 -   **Policy Application**: Policies often apply to a wide range of database roles (including `authenticated`, `service_role`), with the policy's expression (`USING` or `WITH CHECK` clause) performing the actual permission logic.
 

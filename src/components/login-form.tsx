@@ -104,10 +104,7 @@ export function LoginForm() {
       </CardContent>
       <CardFooter>
         <div className="text-center w-full text-sm">
-          Don't have an account?{" "}
-          <Link href="/auth/register" className="font-medium text-primary hover:underline">
-            Sign up
-          </Link>
+          Access to MixerAI is by invitation only.
         </div>
       </CardFooter>
     </Card>

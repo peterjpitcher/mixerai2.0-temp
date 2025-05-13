@@ -5,6 +5,7 @@ import { withAuth } from '@/lib/auth/api-auth';
 import { Pool } from 'pg'; // Import Pool for direct DB access
 import { getUserAuthByEmail, inviteNewUserWithAppMetadata } from '@/lib/auth/user-management';
 import { User } from '@supabase/supabase-js';
+import { extractCleanDomain } from '@/lib/utils/url-utils'; // Added import
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -273,6 +274,22 @@ export const POST = withAuth(async (req: NextRequest, user) => {
 
     if (!newBrandId) {
       throw new Error('Failed to create brand, no ID returned from function.');
+    }
+
+    // Populate normalized_website_domain
+    if (body.website_url) {
+      const normalizedDomain = extractCleanDomain(body.website_url);
+      if (normalizedDomain) {
+        const { error: updateDomainError } = await supabase
+          .from('brands')
+          .update({ normalized_website_domain: normalizedDomain })
+          .eq('id', newBrandId);
+        
+        if (updateDomainError) {
+          // Log the error but don't fail the brand creation, as the primary record is made
+          console.warn(`[API /api/brands POST] Failed to update normalized_website_domain for new brand ${newBrandId}: ${updateDomainError.message}`);
+        }
+      }
     }
     
     // --- Process Additional Brand Admins ---

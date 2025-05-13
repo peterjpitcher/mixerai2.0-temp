@@ -3,16 +3,21 @@ import { generateAltText } from '@/lib/azure/openai';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
+import { extractCleanDomain } from '@/lib/utils/url-utils';
+import { Tables } from '@/types/supabase';
 
 interface AltTextGenerationRequest {
   imageUrl: string;
-  brandId: string;
+  brandId?: string;
+  websiteUrlForBrandDetection?: string;
   brandLanguage?: string;
   brandCountry?: string;
   brandIdentity?: string;
   toneOfVoice?: string;
   guardrails?: string;
 }
+
+type BrandContextType = Tables<'brands'> | null;
 
 export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
   try {
@@ -25,13 +30,6 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       );
     }
     
-    if (!data.brandId) {
-      return NextResponse.json(
-        { success: false, error: 'Brand ID is required' },
-        { status: 400 }
-      );
-    }
-    
     try {
       new URL(data.imageUrl);
     } catch (error) {
@@ -40,37 +38,44 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
         { status: 400 }
       );
     }
-    
-    let brandLanguage = data.brandLanguage;
-    let brandCountry = data.brandCountry;
-    let brandIdentity = data.brandIdentity;
-    let toneOfVoice = data.toneOfVoice;
-    let guardrails = data.guardrails;
-    
-    if (!brandLanguage || !brandCountry || !brandIdentity || !toneOfVoice || !guardrails) {
-      const supabase = createSupabaseAdminClient();
+
+    let brandContext: BrandContextType = null;
+    const supabase = createSupabaseAdminClient();
+
+    if (data.brandId) {
       const { data: brandData, error: brandError } = await supabase
         .from('brands')
-        .select('name, country, language, brand_identity, tone_of_voice, guardrails')
+        .select('*')
         .eq('id', data.brandId)
         .single();
-        
       if (brandError) {
-        return handleApiError(brandError, 'Failed to fetch brand information');
+        console.warn(`[AltTextGen] Brand ID ${data.brandId} provided but not found: ${brandError.message}`);
+      } else {
+        brandContext = brandData;
       }
-      if (!brandData) {
-        return NextResponse.json(
-            { success: false, error: 'Brand not found for the provided Brand ID' }, 
-            { status: 404 }
-        );
+    } else if (data.websiteUrlForBrandDetection) {
+      const cleanDomain = extractCleanDomain(data.websiteUrlForBrandDetection);
+      if (cleanDomain) {
+        const { data: brandData, error: brandError } = await supabase
+          .from('brands')
+          .select('*')
+          .eq('normalized_website_domain', cleanDomain)
+          .limit(1)
+          .single();
+        
+        if (brandError && brandError.code !== 'PGRST116') {
+          console.warn(`[AltTextGen] Error fetching brand by domain ${cleanDomain}: ${brandError.message}`);
+        } else if (brandData) {
+          brandContext = brandData;
+        }
       }
-      
-      brandLanguage = brandLanguage || brandData.language || 'en';
-      brandCountry = brandCountry || brandData.country || 'US';
-      brandIdentity = brandIdentity || brandData.brand_identity || '';
-      toneOfVoice = toneOfVoice || brandData.tone_of_voice || '';
-      guardrails = guardrails || brandData.guardrails || '';
     }
+
+    const brandLanguage = data.brandLanguage || brandContext?.language || 'en';
+    const brandCountry = data.brandCountry || brandContext?.country || 'US';
+    const brandIdentity = data.brandIdentity || brandContext?.brand_identity || '';
+    const toneOfVoice = data.toneOfVoice || brandContext?.tone_of_voice || '';
+    const guardrails = data.guardrails || brandContext?.guardrails || '';
     
     const generatedAltText = await generateAltText(
       data.imageUrl,
@@ -87,24 +92,20 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       success: true,
       userId: user.id,
       imageUrl: data.imageUrl,
+      brand_id_used: brandContext?.id || null,
+      brand_name_used: brandContext?.name || null,
+      detection_source: data.brandId ? 'brand_id' : (data.websiteUrlForBrandDetection && brandContext ? 'url_detection' : 'none'),
       ...generatedAltText
     });
   } catch (error: any) {
     let errorMessage = 'Failed to generate alt text';
     let statusCode = 500;
     
-    if (error instanceof Error) {
-      if (error.message.includes('OpenAI') || error.message.includes('Azure') || error.message.includes('API') || (error as any).status === 429 || error.message.includes('AI service')) {
-        errorMessage = 'The AI service is currently busy or unavailable. Please try again later.';
-        statusCode = 503;
-      } else if (error.message.includes('Failed to fetch brand information') || error.message.includes('Brand not found')){
-        statusCode = (error as any).status || 404; 
-        errorMessage = error.message;
-      }else {
-        errorMessage = error.message || errorMessage;
-      }
-    } else if (typeof error === 'string') {
-      errorMessage = error;
+    if (error.message?.includes('OpenAI') || error.message?.includes('Azure') || error.message?.includes('AI service') || (error as any).status === 429) {
+      errorMessage = 'The AI service is currently busy or unavailable. Please try again later.';
+      statusCode = 503;
+    } else {
+      errorMessage = error.message || errorMessage;
     }
     return handleApiError(new Error(errorMessage), 'Alt Text Generation Error', statusCode);
   }

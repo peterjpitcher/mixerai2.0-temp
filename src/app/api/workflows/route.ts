@@ -246,26 +246,37 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         await verifyEmailTemplates(); // Ensure email templates are okay
         
         for (const email of pendingInvites) {
-          // Determine highest role for this email from the originally prepared items
+          // Determine highest role and first step_id for this email from the originally prepared items
           let highestRole = 'viewer' as 'admin' | 'editor' | 'viewer'; 
+          let firstStepIdForAssignment: number | string | null = null;
+
           for (const item of invitationItems) {
             if (item.email === email) {
+              if (firstStepIdForAssignment === null) {
+                firstStepIdForAssignment = item.step_id;
+              }
               if (item.role === 'admin') {
                 highestRole = 'admin';
-                break;
+                // No break here if we still want to ensure firstStepId is from the actual first item encountered
               } else if (item.role === 'editor' && highestRole !== 'admin') {
                 highestRole = 'editor';
               }
             }
           }
           
+          const appMetadataPayload: Record<string, any> = {
+            full_name: '', // Cannot determine name reliably here
+            role: highestRole,
+            invited_by: user.id,
+            invited_from_workflow: newWorkflowId // Use the returned ID
+          };
+
+          if (firstStepIdForAssignment !== null) {
+            appMetadataPayload.step_id_for_assignment = firstStepIdForAssignment;
+          }
+          
           const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
-            data: {
-              full_name: '', // Cannot determine name reliably here
-              role: highestRole,
-              invited_by: user.id,
-              invited_from_workflow: newWorkflowId // Use the returned ID
-            }
+            data: appMetadataPayload
           });
           
           if (inviteError) {
