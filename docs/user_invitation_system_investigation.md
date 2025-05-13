@@ -372,3 +372,39 @@ This plan outlines the steps to address the identified issues and incorporate se
 3.  **Refactor `/api/auth/complete-invite/route.ts` (Initial Pass - Feedback Point 1, 6):**
     *   **Task**:
         *   Modify to retrieve context *exclusively* from `user.app_metadata` (e.g., `intended_role`, `invited_to_brand_id`, `
+
+## Issue: 403 Forbidden Error on `/api/users/invite`
+
+### Investigation Findings
+
+1. **Authentication Requirement:**
+   - The endpoint uses `withAdminAuth`, which means only users with admin privileges can access this route. If the request is made by a non-admin user, it will result in a 403 error.
+
+2. **Role Verification:**
+   - The endpoint checks if the role provided in the request body is valid (`admin`, `editor`, `viewer`). If an invalid role is provided, it returns a 400 error, not a 403.
+
+3. **Supabase Client:**
+   - The endpoint uses a Supabase client initialized with admin privileges. Ensure that the Supabase client is correctly configured with the necessary permissions.
+
+4. **Error Handling:**
+   - The endpoint logs errors and uses a `handleApiError` function to return error responses. If the error is related to permissions, it should be logged.
+
+5. **Admin User Check:**
+   - The `adminUser` object is passed to the handler, which should contain the authenticated admin user's details. If this is not correctly set, it could lead to a 403 error.
+
+### Next Steps
+
+1. **Verify Admin Authentication:**
+   - Ensure that the user making the request has admin privileges. Check the authentication middleware and the `adminUser` object.
+
+2. **Check Supabase Configuration:**
+   - Verify that the Supabase client is correctly configured with the necessary admin permissions.
+
+3. **Review Client-Side Code:**
+   - Ensure that the client-side code is correctly setting up the request with the required authentication headers.
+
+4. **Server Logs:**
+   - Check the server logs for any additional error messages that might indicate why the request is being blocked.
+
+5. **Test with Admin Credentials:**
+   - Use a tool like Postman to test the endpoint with admin credentials to see if the issue persists.
