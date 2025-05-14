@@ -154,7 +154,13 @@ export default function ContentPageClient() { // Renamed component
               <AccordionContent className="p-0">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-muted/50"><tr className="border-b"><th className="text-left p-3 font-medium">Title</th><th className="text-left p-3 font-medium">Status</th><th className="text-left p-3 font-medium">Workflow Step</th><th className="text-left p-3 font-medium">Assigned To</th><th className="text-left p-3 font-medium">Actions</th></tr></thead>
+                    <thead className="bg-muted/50"><tr className="border-b">
+                      <th className="text-left p-3 font-medium">Title</th>
+                      <th className="text-left p-3 font-medium">Status</th>
+                      <th className="text-left p-3 font-medium">Content Template</th>
+                      <th className="text-left p-3 font-medium">Workflow Step</th>
+                      <th className="text-left p-3 font-medium">Assigned To</th>
+                      <th className="text-left p-3 font-medium">Actions</th></tr></thead>
                     <tbody>
                       {items.map((item) => (
                         <tr key={item.id} className="border-b last:border-b-0 hover:bg-muted/30">
@@ -169,6 +175,7 @@ export default function ContentPageClient() { // Renamed component
                               {item.status ? item.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'N/A'}
                             </span>
                           </td>
+                          <td className="p-3">{item.template_name || 'N/A'}</td>
                           <td className="p-3">{item.current_step_name || 'N/A'}</td> 
                           <td className="p-3">{item.assigned_to_name || 'N/A'}</td>
                           <td className="p-3">

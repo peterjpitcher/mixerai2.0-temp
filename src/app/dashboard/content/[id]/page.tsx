@@ -132,7 +132,14 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     return <p>Content could not be loaded or was not found.</p>; 
   }
 
-  const currentStepObject = content.workflow?.steps[content.current_step] as WorkflowStep | undefined;
+  // Find the current step object using the current_step ID
+  let currentStepObject: WorkflowStep | undefined = undefined;
+  if (content.workflow && content.workflow.steps && content.current_step) {
+    currentStepObject = content.workflow.steps.find(
+      (step: any) => step.id === content.current_step
+    ) as WorkflowStep | undefined;
+  }
+
   let isCurrentUserStepOwner = false;
   if (currentStepObject && currentUserId) {
     if (Array.isArray(currentStepObject.assignees)) {

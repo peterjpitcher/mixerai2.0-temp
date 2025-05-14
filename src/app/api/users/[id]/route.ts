@@ -11,22 +11,34 @@ interface Params {
 
 // GET a single user by ID
 export const GET = withRouteAuth(async (request: NextRequest, user: any, context: Params) => {
+  console.log(`[API /users/[id]] Request received for ID: ${context.params.id} at ${new Date().toISOString()}`); // VERY EARLY LOG
   const { params } = context;
   try {
     // Check if the user is trying to access their own profile or has admin permissions
-    if (user.id !== params.id) {
-      // Check if the user has admin permissions
+    let isViewingOwnProfile = user.id === params.id;
+    let canViewOtherUserProfile = false;
+
+    if (!isViewingOwnProfile) {
+      // Check if the authenticated user has admin permissions for ANY brand
       const supabaseInner = createSupabaseAdminClient();
-      const { data: userPermissions, error: permissionError } = await supabaseInner
+      console.log(`[API /users/[id]] Checking admin permissions for authenticated user: ${user.id}`);
+      const { data: adminPermissions, error: permissionError } = await supabaseInner
         .from('user_brand_permissions')
-        .select('role')
+        .select('role', { count: 'exact' }) // Select role and count
         .eq('user_id', user.id)
-        .eq('role', 'admin')
-        .maybeSingle();
+        .eq('role', 'admin');
       
-      if (permissionError) throw permissionError;
+      if (permissionError) {
+        console.error(`[API /users/[id]] Error checking admin permissions for ${user.id}:`, permissionError);
+        throw permissionError; 
+      }
       
-      if (!userPermissions) {
+      console.log(`[API /users/[id]] Admin permissions check for ${user.id} count:`, adminPermissions?.length);
+      if (adminPermissions && adminPermissions.length > 0) {
+        canViewOtherUserProfile = true;
+      }
+
+      if (!canViewOtherUserProfile) {
         return NextResponse.json(
           { success: false, error: 'Not authorized to view this user' },
           { status: 403 }
@@ -34,6 +46,7 @@ export const GET = withRouteAuth(async (request: NextRequest, user: any, context
       }
     }
     
+    console.log(`[API /users/[id]] Proceeding to fetch user details for ${params.id}. Viewer: ${user.id}, isViewingOwn: ${isViewingOwnProfile}, canViewOther: ${canViewOtherUserProfile}`);
     const supabase = createSupabaseAdminClient();
     
     // Get auth user
@@ -42,32 +55,79 @@ export const GET = withRouteAuth(async (request: NextRequest, user: any, context
     if (authError) throw authError;
     if (!authUserData || !authUserData.user) {
       return NextResponse.json(
-        { success: false, error: 'User not found' },
+        { success: false, error: 'User not found in auth' },
         { status: 404 }
       );
     }
     
-    // Get profile info
+    // EXTREMELY SIMPLIFIED TEST QUERY
+    const { data: profileTest, error: profileTestError } = await supabase
+      .from('profiles')
+      .select('id') // Test 1: Select only id
+      // .select('*') // Test 2: Select all direct profile fields
+      .eq('id', params.id)
+      .single();
+
+    if (profileTestError) {
+      console.error('Simplified profileTestError:', profileTestError);
+      return NextResponse.json(
+        { success: false, error: 'Error during simplified profile fetch', details: profileTestError.message, code: profileTestError.code }, 
+        { status: 500 }
+      );
+    }
+    if (!profileTest) {
+        return NextResponse.json(
+            { success: false, error: 'Simplified profile test returned no data (unexpected)' }, 
+            { status: 404 }
+        );
+    }
+    console.log("Simplified profile test successful:", profileTest);
+
+    // Step 1: Get profile info (without joining permissions directly in this query)
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select(`
-        *,
-        user_brand_permissions:user_brand_permissions(
-          id,
-          brand_id,
-          role,
-          brand:brands(id, name)
-        )
-      `)
+      .select('*')
       .eq('id', params.id)
-      .maybeSingle();
+      .single();
     
-    if (profileError) throw profileError;
+    if (profileError) {
+      if (profileError.code === 'PGRST116') {
+        return NextResponse.json(
+          { success: false, error: 'User profile not found in profiles table' },
+          { status: 404 }
+        );
+      }
+      throw profileError;
+    }
     
-    // Get the highest role (admin > editor > viewer)
+    if (!profile) {
+        return NextResponse.json(
+            { success: false, error: 'User profile data is null after query (unexpected)' },
+            { status: 404 }
+        );
+    }
+
+    // Step 2: Get user brand permissions separately
+    const { data: brandPermissionsData, error: permissionsError } = await supabase
+      .from('user_brand_permissions')
+      .select(`
+        id,
+        brand_id,
+        role,
+        brand:brands(id, name)
+      `)
+      .eq('user_id', params.id);
+
+    if (permissionsError) {
+      console.error(`Error fetching brand permissions for user ${params.id}:`, permissionsError);
+    }
+    
+    const userBrandPermissions = brandPermissionsData || [];
+
+    // Get the highest role (admin > editor > viewer) from the fetched permissions
     let highestRole = 'viewer';
-    if (profile?.user_brand_permissions) {
-      for (const permission of profile.user_brand_permissions) {
+    if (userBrandPermissions.length > 0) {
+      for (const permission of userBrandPermissions) {
         if (permission.role === 'admin') {
           highestRole = 'admin';
           break;
@@ -77,20 +137,17 @@ export const GET = withRouteAuth(async (request: NextRequest, user: any, context
       }
     }
     
-    // Cast profile to any to avoid TypeScript errors with potentially missing fields
-    const profileData = profile as any;
-    
     const userData = {
       id: authUserData.user.id,
       email: authUserData.user.email,
-      full_name: profileData?.full_name || authUserData.user.user_metadata?.full_name || null,
-      job_title: profileData?.job_title || authUserData.user.user_metadata?.job_title || null,
-      company: profileData?.company || authUserData.user.user_metadata?.company || null,
-      avatar_url: profileData?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUserData.user.id}`,
+      full_name: profile.full_name || authUserData.user.user_metadata?.full_name || null,
+      job_title: profile.job_title || authUserData.user.user_metadata?.job_title || null,
+      company: profile.company || authUserData.user.user_metadata?.company || null,
+      avatar_url: profile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUserData.user.id}`,
       role: highestRole,
       created_at: authUserData.user.created_at,
       last_sign_in_at: authUserData.user.last_sign_in_at,
-      brand_permissions: profileData?.user_brand_permissions || [],
+      brand_permissions: userBrandPermissions,
       is_current_user: authUserData.user.id === user.id
     };
     
