@@ -46,16 +46,16 @@ export const GET = withAuth(async (
 ) => {
   try {
     const supabase = createSupabaseAdminClient();
-    const id = params.id;
+    const workflowId = params.id; // Renamed id to workflowId for clarity
     
-    const { data: workflow, error: workflowErrorData } = await supabase
+    const { data: workflowData, error: workflowErrorData } = await supabase
       .from('workflows')
       .select(`
         *,
         brands:brand_id(name, brand_color),
         content_templates:template_id(name)
       `)
-      .eq('id', id)
+      .eq('id', workflowId)
       .single();
     
     if (workflowErrorData) {
@@ -65,68 +65,90 @@ export const GET = withAuth(async (
           { status: 404 }
         );
       }
+      console.error(`Error fetching workflow ${workflowId}:`, workflowErrorData);
       throw workflowErrorData;
     }
     
-    // Assuming workflow.steps is an array of objects that should conform to WorkflowStep
-    // We still need to be careful with the structure from JSONB
-    const stepsArray = (workflow.steps || []) as any[]; 
+    // Fetch actual steps from workflow_steps table
+    const { data: dbSteps, error: stepsError } = await supabase
+      .from('workflow_steps')
+      .select('id, name, description, role, approval_required, assigned_user_ids, step_order')
+      .eq('workflow_id', workflowId)
+      .order('step_order', { ascending: true });
 
-    if (stepsArray.length > 0) {
-      // Helper function to validate UUIDs
-      const isValidUUID = (id: string) => {
-        return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
-      };
-      const userIds = new Set<string>();
-      for (const step of stepsArray) {
-        if (step && step.assignees && Array.isArray(step.assignees)) {
-          for (const assignee of (step.assignees as WorkflowAssignee[])) {
-            if (assignee.id && isValidUUID(assignee.id)) {
-              userIds.add(assignee.id);
-            }
-          }
+    if (stepsError) {
+      console.error(`Error fetching steps for workflow ${workflowId}:`, stepsError);
+      throw stepsError; 
+    }
+
+    let processedSteps: any[] = [];
+    if (dbSteps && dbSteps.length > 0) {
+      const allUserIds = new Set<string>();
+      dbSteps.forEach(step => {
+        if (step.assigned_user_ids && Array.isArray(step.assigned_user_ids)) {
+          step.assigned_user_ids.forEach((userId: string | null) => { // Iterate over string | null
+            if (userId) allUserIds.add(userId);
+          });
+        }
+      });
+
+      let userProfilesMap = new Map<string, { id: string; email: string | null; full_name: string | null }>();
+      if (allUserIds.size > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, email, full_name')
+          .in('id', Array.from(allUserIds));
+
+        if (profilesError) {
+          console.warn(`Error fetching profiles for assignees of workflow ${workflowId}:`, profilesError.message);
+          // Continue, assignees might not have full names/emails populated
+        } else if (profilesData) {
+          profilesData.forEach(p => userProfilesMap.set(p.id, {id: p.id, email: p.email, full_name: p.full_name}));
         }
       }
-      
-      if (userIds.size > 0) {
-        const { data: usersData, error: usersError } = await supabase
-          .from('profiles') 
-          .select('id, full_name')
-          .in('id', Array.from(userIds));
-        
-        if (usersError) throw usersError;
-        if (!usersData) throw new Error('User profiles data not found for assignees');
-          
-        const userMap = new Map(usersData.map(user => [user.id, user]));
-        
-        for (const step of stepsArray) {
-          if (step && step.assignees && Array.isArray(step.assignees)) {
-            step.assignees = (step.assignees as WorkflowAssignee[]).map(assignee => {
-              if (assignee.id && isValidUUID(assignee.id) && userMap.has(assignee.id)) {
-                const userProfile = userMap.get(assignee.id)!;
-                return {
-                  ...assignee,
-                  name: userProfile.full_name,
-                };
-              }
-              return assignee;
-            });
-          }
+
+      processedSteps = dbSteps.map(step => {
+        let currentStepAssignees: WorkflowAssignee[] = [];
+        if (step.assigned_user_ids && Array.isArray(step.assigned_user_ids)) {
+          currentStepAssignees = step.assigned_user_ids.map((userId: string | null) => { // Iterate over string | null
+            if (!userId) return null; // Skip null user IDs
+            const profile = userProfilesMap.get(userId);
+            return {
+              id: userId,
+              email: profile?.email || 'N/A', // Provide a fallback
+              name: profile?.full_name || 'N/A'  // Provide a fallback
+            };
+          }).filter(assignee => assignee !== null) as WorkflowAssignee[]; // Filter out any nulls from skipped user IDs
         }
-      }
+        return {
+          id: step.id, // This is workflow_steps.id (the step's own UUID)
+          name: step.name,
+          description: step.description,
+          role: step.role,
+          approvalRequired: step.approval_required,
+          assignees: currentStepAssignees,
+          step_order: step.step_order 
+          // The frontend step object might not use step_order directly if relying on array index,
+          // but good to have it if backend mutations need it.
+        };
+      });
     }
     
     const formattedWorkflow = {
-      id: workflow.id,
-      name: workflow.name,
-      brand_id: workflow.brand_id,
-      brand_name: workflow.brands?.name || null,
-      brand_color: workflow.brands?.brand_color || null,
-      steps: workflow.steps, // Return original steps structure which might have updated assignees
-      steps_count: Array.isArray(workflow.steps) ? workflow.steps.length : 0,
-      template_name: workflow.content_templates?.name || null,
-      created_at: workflow.created_at,
-      updated_at: workflow.updated_at
+      id: workflowData.id,
+      name: workflowData.name,
+      description: (workflowData as any).description || null, // Cast to any for these potentially untyped fields
+      brand_id: workflowData.brand_id,
+      brand_name: workflowData.brands?.name || null,
+      brand_color: workflowData.brands?.brand_color || null,
+      template_id: (workflowData as any).template_id || null, 
+      status: (workflowData as any).status || null, 
+      steps: processedSteps, 
+      steps_count: processedSteps.length,
+      template_name: workflowData.content_templates?.name || null,
+      created_at: workflowData.created_at,
+      updated_at: workflowData.updated_at,
+      created_by: (workflowData as any).created_by || null 
     };
 
     return NextResponse.json({ 

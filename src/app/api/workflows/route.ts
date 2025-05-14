@@ -220,6 +220,8 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       p_steps_definition: steps, // Use the processed steps (with assignee IDs if found)
       p_created_by: user.id,
       p_invitation_items: invitationItems, // Array of items for users needing invites
+      p_template_id: body.template_id || null, // Add template_id here
+      p_description: workflowDescription // Add AI-generated or empty description
     };
 
     // Call the database function to create workflow and log invitations atomically
@@ -294,6 +296,8 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       .select(`
         *,
         description,
+        template_id,
+        content_templates:template_id ( name ),
         brands:brand_id(name, brand_color)
       `)
       .eq('id', newWorkflowId)
@@ -313,6 +317,8 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       brand_name: createdWorkflow?.brands?.name || null,
       brand_color: createdWorkflow?.brands?.brand_color || null,
       description: createdWorkflow?.description || '', // Ensure description is included
+      template_id: createdWorkflow?.template_id || null, // Ensure template_id is included
+      template_name: createdWorkflow?.content_templates?.name || null, // Ensure template_name is included
       steps_count: Array.isArray(createdWorkflow?.steps) ? createdWorkflow.steps.length : 0,
       content_count: 0 // Assuming new workflow has no content yet
     };

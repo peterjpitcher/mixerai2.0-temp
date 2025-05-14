@@ -1046,10 +1046,9 @@ export async function generateContentTitleFromContext(
     const responseData = await response.json();
     const title = responseData.choices?.[0]?.message?.content?.trim() || "Suggested Title (Error)";
     
-    // Remove any surrounding quotes from the title if present
-    const cleanedTitle = title.replace(/^[\"\'\\u2018\\u2019\\u201C\\u201D]+|[\"\'\\u2018\\u2019\\u201C\\u201D]+$/g, '');
-    console.log(`Generated title: "${cleanedTitle}"`);
-    return cleanedTitle;
+    // Return the raw title for debugging this issue
+    console.log(`Generated title (raw from AI): "${title}"`);
+    return title;
 
   } catch (error) {
     console.error('Error generating content title with Azure OpenAI:', error);

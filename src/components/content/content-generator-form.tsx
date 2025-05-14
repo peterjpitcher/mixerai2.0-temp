@@ -49,6 +49,7 @@ interface WorkflowSummary {
   id: string;
   name: string;
   template_id?: string | null;
+  brand_name: string;
 }
 
 interface ContentGeneratorFormProps {
@@ -67,7 +68,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
   const [template, setTemplate] = useState<Template | null>(null);
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
   const [templateFieldValues, setTemplateFieldValues] = useState<Record<string, string>>({});
-  const [associatedWorkflowId, setAssociatedWorkflowId] = useState<string | null>(null);
+  const [associatedWorkflowDetails, setAssociatedWorkflowDetails] = useState<WorkflowSummary | null>(null);
   const [isFetchingWorkflow, setIsFetchingWorkflow] = useState(false);
   
   const fetchTemplate = async (id: string) => {
@@ -118,14 +119,15 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     const fetchWorkflow = async () => {
       if (templateId && selectedBrand) {
         setIsFetchingWorkflow(true);
-        setAssociatedWorkflowId(null);
+        setAssociatedWorkflowDetails(null);
         try {
           const res = await fetch(`/api/workflows?brand_id=${selectedBrand}`);
           const data = await res.json();
           if (data.success && Array.isArray(data.data)) {
             const matchingWorkflow = (data.data as WorkflowSummary[]).find(wf => wf.template_id === templateId);
-            if (matchingWorkflow) setAssociatedWorkflowId(matchingWorkflow.id);
-            else toast.info("No specific workflow for this brand/template.");
+            if (matchingWorkflow) {
+              setAssociatedWorkflowDetails(matchingWorkflow);
+            }
           } else {
             toast.error('Could not determine workflow.');
           }
@@ -248,7 +250,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         brand_id: selectedBrand,
         template_id: template?.id,
         title,
-        workflow_id: associatedWorkflowId,
+        workflow_id: associatedWorkflowDetails?.id,
         body: generatedContent,
         content_data: {
             templateInputValues: templateFieldValues,
@@ -358,8 +360,9 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
               <div className="pt-2">
                 <p className="text-sm text-muted-foreground">
                   {isFetchingWorkflow ? "Determining workflow..." :
-                    associatedWorkflowId ? `Workflow: ${associatedWorkflowId} (Associated)` :
-                    "No specific workflow linked for this brand/template."
+                    associatedWorkflowDetails ? 
+                      `${associatedWorkflowDetails.brand_name || 'Brand'} / ${associatedWorkflowDetails.name || 'Workflow'} (Associated)` :
+                      "No specific workflow linked for this brand/template."
                   }
                 </p>
               </div>

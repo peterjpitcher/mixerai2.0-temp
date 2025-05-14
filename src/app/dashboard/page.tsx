@@ -16,17 +16,21 @@ interface WorkflowStepInfo {
 
 // Interface for a task item, ensuring workflow includes steps array
 interface TaskItem {
-  id: string;
-  title: string;
-  status: string;
-  updated_at: string;
-  brand?: { name: string; brand_color?: string };
-  workflow?: {
-    id: string;
-    name: string;
-    steps: WorkflowStepInfo[]; // Expecting steps to be an array on the workflow object
-  };
-  current_step?: number | null; // current_step is an index or step ID, ensure it matches step.id type
+  id: string; // This is the user_task.id
+  task_status: string | null;
+  due_date: string | null;
+  created_at: string; // API provides this, ensure it's not null if used directly
+  content_id: string;
+  content_title: string;
+  content_status: string; // This is content.status
+  brand_id?: string | null;
+  brand_name: string | null;
+  brand_color?: string | null;
+  workflow_id?: string | null;
+  workflow_name: string | null;
+  workflow_step_id?: string | null;
+  workflow_step_name: string | null;
+  workflow_step_order?: number | null;
 }
 
 // Interface for metrics
@@ -61,6 +65,8 @@ export default function DashboardPage() {
         if (data.success && Array.isArray(data.data)) {
           setTasks(data.data);
         } else {
+          // It's good practice to log the actual error structure if it's not what's expected
+          console.error('Failed to load tasks or data format incorrect:', data);
           toast.error(data.error || 'Failed to load your tasks.');
         }
       } catch (error) {
@@ -101,7 +107,7 @@ export default function DashboardPage() {
     fetchMetrics();
   }, []);
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string | null) => { // Allow null for status
     switch (status) {
       case 'pending_review': return <Clock className="h-4 w-4 text-yellow-500" />;
       case 'approved': return <CheckCircle2 className="h-4 w-4 text-green-500" />;
@@ -181,22 +187,24 @@ export default function DashboardPage() {
               {tasks.map(task => (
                 <li key={task.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 transition-colors">
                   <div className="flex items-center space-x-3">
-                    {getStatusIcon(task.status)}
+                    {getStatusIcon(task.content_status)} {/* Use content_status for the icon */}
                     <div>
-                      <Link href={`/dashboard/content/${task.id}/edit`} className="font-medium hover:underline">
-                        {task.title}
+                      {/* Make sure content_id is available and correct for the link */}
+                      <Link href={`/dashboard/content/${task.content_id}`} className="font-medium hover:underline">
+                        {task.content_title || 'Untitled Task'}
                       </Link>
                       <p className="text-xs text-muted-foreground">
-                        Brand: {task.brand?.name || 'N/A'} | Workflow: {task.workflow?.name || 'N/A'}
-                        {task.current_step !== null && task.current_step !== undefined && task.workflow?.steps && task.workflow.steps[task.current_step] ? 
-                           ` - Step: ${(task.workflow.steps[task.current_step] as any).name || `Step ${task.current_step + 1}`}` 
+                        Brand: {task.brand_name || 'N/A'} | Workflow: {task.workflow_name || 'N/A'}
+                        {task.workflow_step_name ?
+                           ` - Step: ${task.workflow_step_name}`
                            : ''}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-muted-foreground">Last updated</p>
-                    <p className="text-xs font-medium">{new Date(task.updated_at).toLocaleDateString()}</p>
+                    <p className="text-xs text-muted-foreground">Assigned</p>
+                    {/* Ensure created_at is a valid date string */}
+                    <p className="text-xs font-medium">{task.created_at ? new Date(task.created_at).toLocaleDateString('en-GB') : 'N/A'}</p>
                   </div>
                 </li>
               ))}

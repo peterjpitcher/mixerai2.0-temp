@@ -585,6 +585,12 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
     }
   };
 
+  console.log('[WorkflowEditPage] Rendering with state:');
+  console.log('- Workflow Data:', workflow);
+  console.log('- Selected Template ID:', selectedTemplateId);
+  console.log('- Content Templates List:', contentTemplates);
+  console.log('- isLoading:', isLoading, '- Error:', error);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">

@@ -198,6 +198,11 @@ export default function WorkflowsPage() {
                       </div>
                     </CardHeader>
                     <CardContent>
+                      {workflow.template_name && (
+                        <div className="mb-2 text-sm text-muted-foreground">
+                          Content Template: <span className="font-medium text-foreground">{workflow.template_name}</span>
+                        </div>
+                      )}
                       <div className="text-sm text-muted-foreground">
                         {workflow.steps_count} step{workflow.steps_count !== 1 ? 's' : ''}
                       </div>

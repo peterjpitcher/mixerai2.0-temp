@@ -699,21 +699,21 @@ export default function NewWorkflowPage() {
                         >
                           Add Email
                         </Button>
+                        {userSearchResults[index] && userSearchResults[index].length > 0 && (
+                          <div className="absolute left-0 right-0 top-full z-10 mt-1 w-full rounded-md border bg-popover p-1 text-popover-foreground shadow-lg outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2">
+                            {userSearchResults[index].map((user: any) => (
+                              <div
+                                key={user.id}
+                                className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                                onClick={() => handleAddAssignee(index, { id: user.id, email: user.email, name: user.full_name || user.email })}
+                              >
+                                {user.full_name ? `${user.full_name} (${user.email})` : user.email}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       {userSearchLoading[index] && <p className="text-xs text-muted-foreground mt-1">Searching users...</p>}
-                      {userSearchResults[index] && userSearchResults[index].length > 0 && (
-                        <div className="absolute left-0 right-0 top-full z-10 mt-1 w-full rounded-md border bg-popover p-1 text-popover-foreground shadow-lg outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2">
-                          {userSearchResults[index].map((user: any) => (
-                            <div
-                              key={user.id}
-                              className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
-                              onClick={() => handleAddAssignee(index, { id: user.id, email: user.email, name: user.full_name || user.email })}
-                            >
-                              {user.full_name ? `${user.full_name} (${user.email})` : user.email}
-                            </div>
-                          ))}
-                        </div>
-                      )}
                       <div className="flex flex-wrap gap-1 mt-2">
                         {(step.assignees || []).map((assignee: any) => (
                           <Badge key={assignee.id || assignee.email} variant="secondary" className="flex items-center gap-1 pl-2 pr-1 py-0.5">
