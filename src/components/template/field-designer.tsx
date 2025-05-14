@@ -10,9 +10,11 @@ import { Checkbox } from '@/components/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { Textarea } from '@/components/textarea';
 import { Icons } from '@/components/icons';
+import Link from 'next/link';
 import { v4 as uuidv4 } from 'uuid';
 import { toast as sonnerToast } from 'sonner';
 import { Badge } from '@/components/badge';
+import { Rocket } from 'lucide-react';
 import { 
   FieldType as GlobalFieldType,
   GenericField as Field,
@@ -32,6 +34,7 @@ interface FieldDesignerProps {
   fieldType: 'input' | 'output';
   initialData: Field | null;
   availableInputFields?: { id: string; name: string }[];
+  templateId?: string;
   onSave: (field: Field, isNew: boolean) => void;
   onCancel: () => void;
 }
@@ -62,7 +65,7 @@ const getDefaultField = (type: 'input' | 'output', id?: string): Field => {
   }
 };
 
-export function FieldDesigner({ isOpen, fieldType, initialData, availableInputFields = [], onSave, onCancel }: FieldDesignerProps) {
+export function FieldDesigner({ isOpen, fieldType, initialData, availableInputFields = [], templateId, onSave, onCancel }: FieldDesignerProps) {
   const isNew = !initialData;
   const [fieldData, setFieldData] = useState<Omit<Field, 'options'> & {options?: any}>(
     initialData ? 
@@ -70,6 +73,7 @@ export function FieldDesigner({ isOpen, fieldType, initialData, availableInputFi
       {...getDefaultField(fieldType), options: {}}
   );
   
+  // console.log('FieldDesigner - templateId:', templateId); // For debugging
   const [activeTab, setActiveTab] = useState('basic');
   
   useEffect(() => {
@@ -329,6 +333,19 @@ export function FieldDesigner({ isOpen, fieldType, initialData, availableInputFi
                       <Label htmlFor="aiPrompt">AI Prompt <span className="text-muted-foreground text-xs">(instructions for AI)</span></Label>
                       <Textarea id="aiPrompt" placeholder="Write instructions for the AI suggester, e.g. 'Suggest SEO keywords for this article about {{topic}}'" value={fieldData.aiPrompt || ''} onChange={handleAIPromptChange} className="h-24"/>
                       <p className="text-xs text-muted-foreground">Use {"{{placeholders}}"} to reference other input fields.</p>
+                      {templateId && (
+                        <div className="mt-3">
+                          <Link href={`/dashboard/content/new?template=${templateId}&field=${fieldData.id}&prompt=${encodeURIComponent(fieldData.aiPrompt || '')}`} passHref>
+                            <Button type="button" variant="outline" size="sm">
+                              <Rocket className="mr-2 h-4 w-4" />
+                              Generate Suggestions
+                            </Button>
+                          </Link>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            This will take you to the content generator using this template to get suggestions for this field based on your prompt.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </>

@@ -54,12 +54,6 @@ export function TopNavigation() {
         </div>
         
         <div className="flex items-center gap-4">
-          {/* Notifications */}
-          <Button variant="ghost" className="p-2 text-white hover:bg-opacity-80 rounded-full" style={{ backgroundColor: 'transparent' }}>
-            <Bell className="h-5 w-5" />
-            <span className="sr-only">Notifications</span>
-          </Button>
-          
           {/* User avatar */}
           <div className="flex items-center gap-2">
             <Avatar className="h-8 w-8">

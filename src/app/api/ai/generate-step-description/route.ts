@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { getModelName } from '@/lib/azure/openai';
 
 // Define the expected request body schema
 const StepContextSchema = z.object({
@@ -14,10 +15,60 @@ const StepContextSchema = z.object({
 
 // Placeholder for actual OpenAI client and call (can be shared or refactored)
 async function callOpenAI(prompt: string): Promise<string | null> {
-  // Mock response for now:
-  await new Promise(resolve => setTimeout(resolve, 200));
-  if (prompt.includes("fail_generation")) return null;
-  return `AI Step Description: "${prompt.substring(0, 150)}..." (Based on role and context provided).`;
+  try {
+    const deploymentName = getModelName();
+    const apiKey = process.env.AZURE_OPENAI_API_KEY;
+    const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
+
+    if (!apiKey || !azureEndpoint) {
+      console.error('[generate-step-description] Azure OpenAI API key or endpoint is missing from environment variables.');
+      throw new Error('Azure OpenAI API key or endpoint is missing.');
+    }
+
+    console.log(`[generate-step-description] Making DIRECT FETCH API call to Azure OpenAI. Deployment: ${deploymentName}`);
+
+    const requestBody = {
+      messages: [
+        { role: "user", content: prompt }
+      ],
+      max_tokens: 200,
+      temperature: 0.7,
+      top_p: 0.95,
+    };
+
+    const apiVersion = "2023-12-01-preview"; // Or your preferred stable version
+    const url = `${azureEndpoint}/openai/deployments/${deploymentName}/chat/completions?api-version=${apiVersion}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': apiKey
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[generate-step-description] Azure API request failed with status ${response.status}: ${errorText}`);
+      throw new Error(`Azure API request failed: ${response.status} - ${errorText}`);
+    }
+
+    const responseData = await response.json();
+    const description = responseData.choices?.[0]?.message?.content?.trim();
+
+    if (!description) {
+      console.error('[generate-step-description] AI returned no content for step description.');
+      return null;
+    }
+
+    console.log(`[generate-step-description] Successfully generated step description (via direct fetch): ${description.substring(0,100)}...`);
+    return description;
+
+  } catch (error) {
+    console.error('[generate-step-description] Error in callOpenAI (direct fetch):', error);
+    return null;
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -34,21 +85,35 @@ export async function POST(request: NextRequest) {
 
     const { workflowName, brandName, templateName, stepName, role, brandCountry, brandLanguage } = validationResult.data;
 
-    let prompt = `You are generating instructions for a user in a content workflow. Their role for the current step "${stepName}" is "${role}".`;
+    // Refined Prompt:
+    let prompt = `As an AI assistant, your task is to generate a clear and concise description for a step in a content workflow. This description will be read by a human user who is assigned to this step. The user needs to understand their specific responsibilities and expectations for this step based on their role.
+
+Context for the step "${stepName}":
+- Role: "${role}"
+`;
+
     if (workflowName) {
-      prompt += ` This step is part of the "${workflowName}" workflow`;
-      if (brandName) {
-        prompt += ` for the "${brandName}" brand`;
-      }
-      if (brandCountry && brandLanguage) {
-        prompt += `, targeting the ${brandCountry} market and using the ${brandLanguage} language`;
-      }
-      if (templateName) {
-        prompt += `, which may utilize the "${templateName}" content template`;
-      }
-      prompt += `.`;
+      prompt += `- Part of Workflow: "${workflowName}"\n`;
     }
-    prompt += ` Based on this context, provide clear and concise instructions for the "${role}" to perform their tasks for the "${stepName}" step. For example, if the role is 'Editor', explain what to review (e.g., clarity, grammar, style, brand alignment). If 'SEO', what to optimize. Be specific about the expected actions and outcomes for this step.`;
+    if (brandName) {
+      prompt += `- For Brand: "${brandName}"\n`;
+    }
+    if (templateName) {
+      prompt += `- Associated Content Template: "${templateName}"\n`;
+    }
+    if (brandCountry && brandLanguage) {
+      prompt += `- Target Market/Language: ${brandCountry} / ${brandLanguage}\n`;
+    }
+
+    prompt += `
+Instructions for the AI:
+Based on all the context above, generate a user-friendly description for the step "${stepName}". This description should clearly explain what the user in the "${role}" role is expected to do. 
+For example:
+- If the role is 'Editor' for a 'Review Draft' step, the description might be: "As the Editor for the '${brandName || 'brand'}' brand, review the content draft for clarity, grammar, style, and adherence to brand guidelines. Ensure all feedback is constructive and helps improve the quality of the content for the '${workflowName || 'workflow'}' workflow."
+- If the role is 'Legal' for an 'Approve Claims' step, it might be: "As the Legal reviewer for the '${brandName || 'brand'}' brand, verify all claims made in the content for legal compliance and accuracy, specifically for the ${brandCountry || 'target market'}. Ensure the content aligns with all regulatory requirements for the '${workflowName || 'workflow'}' workflow."
+
+Focus on the key actions and responsibilities for the user in this step. Be specific and practical. The description should be 1-3 sentences long. Output only the description text.
+`;
     
     const generatedDescription = await callOpenAI(prompt);
 

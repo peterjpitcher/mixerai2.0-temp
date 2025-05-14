@@ -7,6 +7,7 @@ module.exports = {
     './app/**/*.{ts,tsx}',
     './src/**/*.{ts,tsx}',
   ],
+  safelist: ['ql-editor', 'ql-snow', 'ql-section'],
   theme: {
     container: {
       center: true,
@@ -92,5 +93,47 @@ module.exports = {
     require("tailwindcss-animate"),
     require("@tailwindcss/typography"),
     require("@tailwindcss/forms"),
+    function({ addBase, theme }) {
+      addBase({
+        '.ql-editor': {
+          '@apply prose prose-lg prose-slate dark:prose-invert max-w-none': {},
+          padding: theme('spacing.6'),
+          fontFamily: (() => {
+            const sans = theme('fontFamily.sans');
+            if (Array.isArray(sans)) {
+              return sans.join(',');
+            }
+            if (typeof sans === 'string') {
+              return sans;
+            }
+            // Fallback if theme('fontFamily.sans') is not an array or string
+            return 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"';
+          })(),
+          minHeight: theme('spacing.72'), 
+        },
+        '.ql-editor p': {
+          '@apply mb-4 leading-relaxed': {},
+        },
+        '.ql-editor h1':  { '@apply text-4xl font-bold mt-12 mb-4': {} },
+        '.ql-editor h2':  { '@apply text-3xl font-semibold mt-10 mb-4': {} },
+        '.ql-editor h3':  { '@apply text-2xl font-semibold mt-8 mb-3': {} },
+        '.ql-editor ul, .ql-editor ol': {
+          '@apply my-6 pl-6': {},
+        },
+        '.ql-editor li': {
+          '@apply mb-2': {},
+        },
+        '.ql-editor blockquote': {
+          '@apply border-l-4 pl-4 italic mb-6 text-gray-600 dark:text-gray-400': {},
+          borderColor: theme('colors.neutral.300'),
+        },
+        '.ql-editor pre': {
+          '@apply bg-neutral-100 dark:bg-neutral-800 rounded-lg p-4 mb-6 overflow-auto': {},
+        },
+        '.ql-editor code': {
+          '@apply font-mono text-sm px-1 bg-neutral-100 dark:bg-neutral-800 rounded': {},
+        },
+      });
+    }
   ],
 } 

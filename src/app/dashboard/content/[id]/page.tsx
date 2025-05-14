@@ -160,11 +160,13 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
           </p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" asChild>
-            <Link href={`/dashboard/content/${id}/edit`}>
-              Edit
-            </Link>
-          </Button>
+          {isCurrentUserStepOwner && (
+            <Button variant="outline" asChild>
+              <Link href={`/dashboard/content/${id}/edit`}>
+                Edit
+              </Link>
+            </Button>
+          )}
           <Button variant="outline" asChild>
             <Link href="/dashboard/content">
               Back to Content
@@ -172,6 +174,18 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
           </Button>
         </div>
       </div>
+      
+      {/* Display Current Workflow Step Description */}
+      {currentStepObject && currentStepObject.description && (
+        <Card className="mb-6 bg-blue-50 border-blue-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg text-blue-700">Current Task: {currentStepObject.name || 'Review Current Step'}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-blue-600">{currentStepObject.description}</p>
+          </CardContent>
+        </Card>
+      )}
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
@@ -195,27 +209,51 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
               </div>
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue="content" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="content">Content</TabsTrigger>
-                  <TabsTrigger value="seo">SEO Metadata</TabsTrigger>
-                </TabsList>
-                <TabsContent value="content" className="mt-4">
-                  <div className="prose prose-sm max-w-none">
-                    <MarkdownDisplay markdown={content.body || (content.content_data?.contentBody || '')} />
-                  </div>
-                </TabsContent>
-                <TabsContent value="seo" className="space-y-4 mt-4">
-                  <div>
-                    <h3 className="text-sm font-medium mb-1">Meta Title</h3>
-                    <p className="border rounded p-2">{content.meta_title || (content.content_data?.metaTitle || 'Not set')}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium mb-1">Meta Description</h3>
-                    <p className="border rounded p-2">{content.meta_description || (content.content_data?.metaDescription || 'Not set')}</p>
-                  </div>
-                </TabsContent>
-              </Tabs>
+              {/* Tabs component removed, content will be displayed directly or fetched based on template */}
+              {/* Display main body (legacy or first output field) */}
+              <div className="prose prose-sm max-w-none mb-6">
+                <h3 className="text-sm font-medium mb-1 border-b pb-1">Main Content Body</h3>
+                <MarkdownDisplay markdown={content.body || (content.content_data?.contentBody || 'No main body content available.')} />
+              </div>
+
+              {/* Iterating through other potential output fields from content_data, assuming template defines order elsewhere or we fetch template */}
+              {/* This section needs to be more robust by fetching the template associated with content.template_id 
+                   and then iterating content.content_data based on template.outputFields order. 
+                   For now, a simpler display of non-body fields from content_data is shown. */}
+              <h3 className="text-sm font-medium mb-2 border-b pb-1 pt-4">Additional Generated Fields</h3>
+              {content.content_data && Object.keys(content.content_data).length > 0 ? (
+                Object.entries(content.content_data).map(([key, value]) => {
+                  // Avoid re-displaying the main contentBody if it was already handled by content.body
+                  if (key.toLowerCase() === 'contentbody' && content.body) return null;
+                  // Also avoid displaying templateInputValues if present
+                  if (key.toLowerCase() === 'templateinputvalues') return null;
+
+                  let displayValue = value;
+                  if (typeof value === 'object' && value !== null) {
+                    // Attempt to display simple objects, could be improved
+                    displayValue = Object.entries(value).map(([k,v]) => `${k}: ${v}`).join(', ') || 'Complex object data';
+                  } else if (typeof value !== 'string') {
+                    displayValue = String(value);
+                  }
+
+                  return (
+                    <div key={key} className="mb-4">
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</h4>
+                      {/* Render as Markdown if it seems like markdown, otherwise plain text */}
+                      {/* A more robust check or type field from template would be better */}
+                      {(typeof displayValue === 'string' && (displayValue.includes('\n') || displayValue.includes('#') || displayValue.includes('*'))) ? (
+                        <div className="prose prose-sm max-w-none border rounded p-2 bg-muted/20">
+                            <MarkdownDisplay markdown={displayValue} />
+                        </div>
+                      ) : (
+                        <p className="border rounded p-2 bg-muted/20 text-sm">{displayValue || 'Not set'}</p>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-sm text-muted-foreground">No additional output fields available or template structure not fully loaded.</p>
+              )}
             </CardContent>
           </Card>
 
@@ -250,7 +288,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
               contentId={content.id}
               contentTitle={content.title}
               currentStepObject={currentStepObject}
-              isCurrentUserStepOwner={isCurrentUserStepOwner}
+              isCurrentUserStepOwner={false}
               versions={versions}
               onActionComplete={handleWorkflowAction}
             />

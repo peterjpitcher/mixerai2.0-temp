@@ -260,7 +260,7 @@ export default function AccountPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="company">Company</Label>
-                    <Input id="company" value={profileData.company} onChange={handleProfileChange} placeholder="e.g. MixerAI Ltd"/>
+                    <Input id="company" value={profileData.company} onChange={handleProfileChange} placeholder="General Mills"/>
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="jobTitle">Job Title</Label>

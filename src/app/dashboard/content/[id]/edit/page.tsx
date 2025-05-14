@@ -13,6 +13,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import { RichTextEditor } from '@/components/content/rich-text-editor';
 import { toast } from 'sonner';
 import type { Metadata } from 'next';
+import { createBrowserClient } from '@supabase/ssr';
+import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
 
 // export const metadata: Metadata = {
 //   title: 'Edit Content | MixerAI 2.0',
@@ -35,9 +37,25 @@ interface ContentState {
   template_name?: string; // From joined content_templates table
   template_id?: string;
   content_data?: Record<string, any>; // For template-driven fields
+  workflow_id?: string | null;
+  current_step?: number | null;
+  workflow?: { id: string; name: string; steps: any[] };
   // Add other fields from your actual content structure as needed
   // Add fields for actual template output fields if they need to be directly editable
   // For example, if an outputField from template is 'summary', you might add: summary?: string;
+}
+
+// Add ContentVersion if it's not identical to the one in view page, or import if sharable
+interface ContentVersion {
+  id: string;
+  workflow_step_identifier: string;
+  step_name: string;
+  version_number: number;
+  action_status: string;
+  feedback?: string;
+  reviewer_id?: string;
+  reviewer?: { id: string; full_name?: string; avatar_url?: string };
+  created_at: string;
 }
 
 /**
@@ -60,48 +78,91 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     brand_name: '',
     template_name: '',
     template_id: '',
-    content_data: {}
+    content_data: {},
+    workflow_id: null,
+    current_step: null,
   });
+
+  const [versions, setVersions] = useState<ContentVersion[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
   
   useEffect(() => {
-    const fetchContentById = async () => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id || null);
+    };
+    getCurrentUser();
+  }, [supabase.auth]);
+
+  useEffect(() => {
+    const fetchAllData = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch(`/api/content/${id}`);
-        if (!response.ok) {
-          if (response.status === 404) {
-            notFound();
-            return;
-          }
-          throw new Error(`Failed to fetch content: ${response.statusText}`);
+        const [contentResponse, versionsResponse] = await Promise.all([
+          fetch(`/api/content/${id}`),
+          fetch(`/api/content/${id}/versions`)
+        ]);
+
+        if (!contentResponse.ok) {
+          if (contentResponse.status === 404) notFound();
+          throw new Error(`Failed to fetch content: ${contentResponse.statusText}`);
         }
-        const result = await response.json();
-        if (result.success && result.data) {
+        const contentResult = await contentResponse.json();
+        if (contentResult.success && contentResult.data) {
           setContent({
-            id: result.data.id,
-            title: result.data.title || '',
-            body: result.data.body || (result.data.content_data?.contentBody || ''),
-            status: result.data.status || 'draft',
-            brand_name: result.data.brand_name || result.data.brands?.name || 'N/A',
-            template_name: result.data.template_name || result.data.content_templates?.name || 'N/A',
-            template_id: result.data.template_id || '',
-            content_data: result.data.content_data || {}
+            id: contentResult.data.id,
+            title: contentResult.data.title || '',
+            body: contentResult.data.body || (contentResult.data.content_data?.contentBody || ''),
+            status: contentResult.data.status || 'draft',
+            brand_name: contentResult.data.brand_name || contentResult.data.brands?.name || 'N/A',
+            template_name: contentResult.data.template_name || contentResult.data.content_templates?.name || 'N/A',
+            template_id: contentResult.data.template_id || '',
+            content_data: contentResult.data.content_data || {},
+            workflow_id: contentResult.data.workflow_id || null,
+            current_step: contentResult.data.current_step || null,
+            workflow: contentResult.data.workflow || undefined
           });
+
+          if (contentResult.data.workflow_id && !contentResult.data.workflow?.steps) {
+            const wfResponse = await fetch(`/api/workflows/${contentResult.data.workflow_id}`);
+            if (wfResponse.ok) {
+              const wfData = await wfResponse.json();
+              if (wfData.success && wfData.workflow) {
+                setContent(prev => ({...prev, workflow: wfData.workflow }));
+              }
+            }
+          }
+
         } else {
-          throw new Error(result.error || 'Failed to load content data.');
+          throw new Error(contentResult.error || 'Failed to load content data.');
         }
+
+        if (versionsResponse.ok) {
+          const versionsResult = await versionsResponse.json();
+          if (versionsResult.success && versionsResult.data) {
+            setVersions(versionsResult.data);
+          }
+        } else {
+          console.warn('Could not load content versions for edit page.');
+        }
+
       } catch (error: any) {
-        console.error('Error fetching content:', error);
-        toast.error(error.message || 'Failed to load content. Please try again.');
+        console.error('Error fetching data for edit page:', error);
+        toast.error(error.message || 'Failed to load page data.');
       } finally {
         setIsLoading(false);
       }
     };
     
-    if (id) {
-      fetchContentById();
+    if (id && currentUserId) {
+      fetchAllData();
     }
-  }, [id]); // Removed notFound from dependencies as it's stable
+  }, [id, currentUserId, supabase.auth]); 
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -175,6 +236,43 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         .map(key => ({ id: key, name: key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) , type: 'text' /* Default type, ideally from template */ }))
     : [];
 
+  // Calculate currentStepObject and isCurrentUserStepOwner (similar to view page)
+  let currentStepObject: WorkflowStep | undefined = undefined;
+  if (content.workflow && content.workflow.steps && content.current_step) {
+    currentStepObject = content.workflow.steps.find(
+      (step: any) => step.id === content.current_step
+    ) as WorkflowStep | undefined;
+  }
+
+  let isCurrentUserStepOwner = false;
+  if (currentStepObject && currentUserId) {
+    if (Array.isArray(currentStepObject.assignees)) {
+      isCurrentUserStepOwner = currentStepObject.assignees.some((assignee: any) => assignee.id === currentUserId);
+    }
+  }
+  
+  const handleWorkflowAction = () => {
+    router.refresh();
+    const fetchContentAgain = async () => {
+      const response = await fetch(`/api/content/${id}`);
+      const result = await response.json();
+      if (result.success && result.data) {
+         setContent(prev => ({ 
+            ...prev, 
+            status: result.data.status,
+            current_step: result.data.current_step,
+            workflow: result.data.workflow || prev.workflow
+          }));
+      }
+       const versionsResponse = await fetch(`/api/content/${id}/versions`);
+       if (versionsResponse.ok) {
+          const versionsResult = await versionsResponse.json();
+          if (versionsResult.success && versionsResult.data) setVersions(versionsResult.data);
+        }
+    };
+    fetchContentAgain();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -186,7 +284,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         </div>
         <div className="flex space-x-2">
           <Button variant="outline" onClick={() => router.push(`/dashboard/content/${id}`)}>
-            Cancel
+            View Content
           </Button>
           <Button onClick={handleSave} disabled={isSaving}>
             {isSaving ? 'Saving...' : 'Save Changes'}
@@ -194,55 +292,76 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         </div>
       </div>
       
-      <Card>
-        <CardHeader>
-          <CardTitle>Content Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="title">Title</Label>
-            <Input id="title" name="title" value={content.title} onChange={handleInputChange}/>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div><Label>Content Template</Label><Input value={content.template_name || 'N/A'} disabled /></div>
-            <div><Label>Brand</Label><Input value={content.brand_name || 'N/A'} disabled /></div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader><CardTitle>Content Body</CardTitle></CardHeader>
-        <CardContent>
-          <RichTextEditor value={content.body} onChange={handleContentBodyChange} placeholder="Enter your content here..." className="min-h-[300px] border rounded-md"/>
-        </CardContent>
-      </Card>
-
-      {/* Card for Dynamic Output Fields from Template */}
-      {outputFieldsToDisplay.length > 0 && (
-        <Card>
-          <CardHeader><CardTitle>Generated Output Fields</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            {outputFieldsToDisplay.map(field => (
-              <div key={field.id}>
-                <Label htmlFor={field.id}>{field.name}</Label>
-                {/* Basic Textarea for all output fields for now. Could be enhanced based on field.type if available from template schema */}
-                <Textarea 
-                  id={field.id} 
-                  name={field.id} 
-                  value={content.content_data?.[field.id] || ''} 
-                  onChange={(e) => handleOutputFieldChange(field.id, e.target.value)}
-                  rows={3}
-                />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Content Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="title">Title</Label>
+                <Input id="title" name="title" value={content.title} onChange={handleInputChange}/>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><Label>Content Template</Label><Input value={content.template_name || 'N/A'} disabled /></div>
+                <div><Label>Brand</Label><Input value={content.brand_name || 'N/A'} disabled /></div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader><CardTitle>Content Body</CardTitle></CardHeader>
+            <CardContent>
+              <RichTextEditor 
+                value={content.body} 
+                onChange={handleContentBodyChange} 
+                placeholder="Enter your content here..." 
+                className="border rounded-md"
+                editorClassName="font-sans min-h-[18rem]"
+              />
+            </CardContent>
+          </Card>
+
+          {outputFieldsToDisplay.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle>Generated Output Fields</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                {outputFieldsToDisplay.map(field => (
+                  <div key={field.id}>
+                    <Label htmlFor={field.id}>{field.name}</Label>
+                    <Textarea 
+                      id={field.id} 
+                      name={field.id} 
+                      value={content.content_data?.[field.id] || ''} 
+                      onChange={(e) => handleOutputFieldChange(field.id, e.target.value)}
+                      rows={3}
+                    />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        <div className="lg:col-span-1 space-y-6">
+          {content.workflow && currentStepObject && (
+            <ContentApprovalWorkflow
+              contentId={content.id}
+              contentTitle={content.title}
+              currentStepObject={currentStepObject}
+              isCurrentUserStepOwner={isCurrentUserStepOwner}
+              versions={versions}
+              onActionComplete={handleWorkflowAction}
+            />
+          )}
+          {!content.workflow && <Card><CardContent><p className="text-muted-foreground py-4">No workflow associated with this content.</p></CardContent></Card>}
+        </div>
+      </div>
       
-      {/* Add a Save Changes button at the bottom of the page for better UX if SEO card was the only one with it */}
       <div className="flex justify-end space-x-2 pt-4 border-t">
         <Button variant="outline" onClick={() => router.push(`/dashboard/content/${id}`)}>
-            Cancel
+            Cancel & View
         </Button>
         <Button onClick={handleSave} disabled={isSaving}>
             {isSaving ? 'Saving...' : 'Save All Changes'}

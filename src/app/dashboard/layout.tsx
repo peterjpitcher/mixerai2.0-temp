@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@/components/button";
-import { NotificationCenter } from "@/components/dashboard/notification-center";
+// import { NotificationCenter } from "@/components/dashboard/notification-center";
 import { UnifiedNavigation } from "@/components/layout/unified-navigation";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
@@ -55,7 +55,7 @@ export default function DashboardLayout({
             </Link>
           </div>
           <div className="flex items-center space-x-2 sm:space-x-4">
-            <NotificationCenter />
+            {/* <NotificationCenter /> */}
             <Button 
               variant="ghost" 
               className="text-secondary-foreground hover:bg-black/10"

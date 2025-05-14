@@ -10,10 +10,12 @@ import { Textarea } from '@/components/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { Separator } from '@/components/separator';
 import { MarkdownDisplay } from './markdown-display';
+import { RichTextEditor } from './rich-text-editor';
 import { useRouter } from 'next/navigation';
 import { BrandIcon } from '@/components/brand-icon';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { marked } from 'marked';
 
 interface Brand {
   id: string;
@@ -186,11 +188,31 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
       const data = await response.json();
       
       if (data.success) {
-        generatedBodyContent = typeof data.content === 'string' ? data.content : data[template.fields.outputFields[0]?.id] || 'Error: Could not extract content body.';
-        setGeneratedContent(generatedBodyContent);
-        toast.success('Main content generated.');
+        const mainBodyField = template.fields.outputFields.find(f => f.type === 'richText');
+        const aiResponseData = data.data || data.content || data;
 
-        if (generatedBodyContent && generatedBodyContent !== 'Error: Could not extract content body.') {
+        if (typeof aiResponseData === 'string') {
+          generatedBodyContent = aiResponseData;
+        } else if (mainBodyField && typeof aiResponseData === 'object' && aiResponseData !== null && aiResponseData[mainBodyField.id]) {
+          generatedBodyContent = aiResponseData[mainBodyField.id];
+        } else if (template.fields.outputFields.length > 0 && typeof aiResponseData === 'object' && aiResponseData !== null && aiResponseData[template.fields.outputFields[0].id]) {
+          generatedBodyContent = aiResponseData[template.fields.outputFields[0].id];
+          if (template.fields.outputFields[0].type !== 'richText') {
+             toast.info("Primary output field is not rich text, AI might not have generated HTML as expected for body.");
+          }
+        } else {
+          generatedBodyContent = 'Error: Could not extract HTML content body.';
+        }
+        
+        setGeneratedContent(generatedBodyContent);
+        
+        if (generatedBodyContent && generatedBodyContent !== 'Error: Could not extract HTML content body.') {
+            toast.success('Main content HTML generated.');
+        } else {
+            toast.error('Main content body might be missing or in an unexpected format.');
+        }
+
+        if (generatedBodyContent && generatedBodyContent !== 'Error: Could not extract HTML content body.') {
           setIsGeneratingTitle(true);
           try {
             const topicField = template.fields.inputFields.find(f => f.id === 'topic' || f.name.toLowerCase().includes('topic'));
@@ -254,7 +276,9 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         body: generatedContent,
         content_data: {
             templateInputValues: templateFieldValues,
-            generatedOutput: generatedContent
+            generatedOutput: { 
+                [template?.fields?.outputFields?.find(f => f.type === 'richText')?.id || 'mainBodyHtml']: generatedContent 
+            }
         }
       };
       const response = await fetch('/api/content', { 
@@ -267,7 +291,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
 
       if (data.success && data.data?.id) {
         toast.success('Content saved.');
-        router.push(`/dashboard/content/${data.data.id}`);
+        router.push(`/dashboard/content`);
       } else {
         toast.error(data.error || 'Failed to save content.');
       }
@@ -385,11 +409,11 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
           </CardHeader>
           <CardContent className="space-y-4">
             <Label>Generated Body Content</Label>
-            <Textarea 
-                value={generatedContent} 
-                onChange={(e) => setGeneratedContent(e.target.value)} 
-                rows={10} 
-                placeholder="Generated content will appear here..."
+            <RichTextEditor
+              value={generatedContent}
+              onChange={setGeneratedContent}
+              placeholder="Generated content will appear here..."
+              className="min-h-[200px]"
             />
           </CardContent>
           <CardFooter className="flex justify-end">

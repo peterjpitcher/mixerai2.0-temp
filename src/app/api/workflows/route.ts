@@ -219,9 +219,9 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       p_brand_id: body.brand_id,
       p_steps_definition: steps, // Use the processed steps (with assignee IDs if found)
       p_created_by: user.id,
-      p_invitation_items: invitationItems, // Array of items for users needing invites
-      p_template_id: body.template_id || null, // Add template_id here
-      p_description: workflowDescription // Add AI-generated or empty description
+      p_invitation_items: invitationItems // Array of items for users needing invites
+      // p_template_id: body.template_id || null, // Removed as per error hint
+      // p_description: workflowDescription // Removed as per error hint
     };
 
     // Call the database function to create workflow and log invitations atomically
@@ -239,6 +239,25 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       throw new Error('Workflow creation failed, no ID returned from function.');
     }
     
+    // --- Update workflow with description and template_id ---
+    if (newWorkflowId) {
+      const { error: updateError } = await supabase
+        .from('workflows')
+        .update({
+          description: workflowDescription, // The AI-generated or empty description
+          template_id: body.template_id || null // The template_id from the request body
+        })
+        .eq('id', newWorkflowId);
+
+      if (updateError) {
+        console.error('Error updating workflow with description and template_id:', updateError);
+        // Not throwing error here, as the core workflow and invitations are created.
+        // The client will receive the workflow, potentially without these fields if update failed.
+        // Consider if this should be a hard error based on requirements.
+      }
+    }
+    // --- End update workflow ---
+
     // If invitations were logged, send auth invites
     if (pendingInvites.length > 0) {
       try {
