@@ -212,7 +212,7 @@ export default function InviteUserPage() {
                   name="company"
                   value={form.company}
                   onChange={handleInputChange}
-                  placeholder="Acme Inc."
+                  placeholder="General Mills"
                 />
               </div>
               

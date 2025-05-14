@@ -21,14 +21,12 @@ export const getAzureOpenAIClient = () => {
   console.log(`Initializing Azure OpenAI client with:
   - Endpoint: ${endpoint}
   - API Key: ${apiKey ? apiKey.substring(0, 5) + "..." : "undefined"}
-  - Deployment: ${deploymentName}
+  - (Note: Deployment name "${deploymentName}" will be passed as 'model' parameter in API calls)
   `);
   
-  // Create the OpenAI client with Azure configuration
-  // The baseURL needs to include /openai/deployments for Azure OpenAI
   return new OpenAI({
     apiKey: apiKey,
-    baseURL: `${endpoint}/openai/deployments`,
+    baseURL: endpoint,
     defaultQuery: { 
       "api-version": "2023-12-01-preview"
     },
@@ -166,7 +164,7 @@ export async function generateContentFromTemplate(
     systemPrompt += ` Content guardrails: ${brand.guardrails}.`;
   }
   
-  systemPrompt += `\nYou are using a template called "${template.name}" to generate content.`;
+  systemPrompt += `\nYou are using a template called "${template.name}" to generate content. For any fields that are intended for rich text display (like a main article body), generate the content directly as well-formed HTML using common semantic tags (e.g., <p>, <h1>-<h6>, <ul>, <ol>, <li>, <strong>, <em>,<blockquote>). Do not use Markdown for these rich text fields. For other fields, follow their specific aiPrompt or generate plain text.`;
   
   // Build the user prompt using template fields and prompts
   let userPrompt = `Create content according to this template: "${template.name}".\n\n`;
@@ -184,6 +182,11 @@ export async function generateContentFromTemplate(
   template.outputFields.forEach(field => {
     userPrompt += `- ${field.name}`;
     
+    let fieldSpecificInstruction = '';
+    if (field.type === 'richText') { // Check if the field is richText
+      fieldSpecificInstruction += ' (Output as well-formed HTML, not Markdown)';
+    }
+
     // Add field-specific brand context if enabled
     let fieldPrompt = '';
     
@@ -213,7 +216,9 @@ export async function generateContentFromTemplate(
     
     // Add the field prompt to the user prompt if it exists
     if (fieldPrompt) {
-      userPrompt += `: ${fieldPrompt}`;
+      userPrompt += `: ${fieldPrompt}${fieldSpecificInstruction}`;
+    } else if (fieldSpecificInstruction) {
+      userPrompt += `:${fieldSpecificInstruction}`;
     }
     
     userPrompt += `\n`;
@@ -264,8 +269,11 @@ export async function generateContentFromTemplate(
     const responseData = await response.json();
     console.log("API call successful");
     
-    const content = responseData.choices?.[0]?.message?.content || "";
+    let content = responseData.choices?.[0]?.message?.content || "";
     console.log(`Received response with content length: ${content.length}`);
+    
+    // Remove Markdown code block delimiters like ```html ... ``` or ``` ... ```
+    content = content.replace(/```[a-zA-Z]*\n?/g, "").replace(/\n?```/g, "");
     
     // Save full content for debugging and fallback
     const fullContent = content;
@@ -278,51 +286,23 @@ export async function generateContentFromTemplate(
     template.outputFields.forEach(field => {
       console.log(`Processing output field: ${field.name} (${field.id})`);
       
-      // Try several approaches to extract the field content
-      
-      // 1. First try exact field ID marker format
       const fieldRegex = new RegExp(`##FIELD_ID:${field.id}##\\s*([\\s\\S]*?)\\s*##END_FIELD_ID##`, 'i');
-      const match = content.match(fieldRegex);
+      let match = content.match(fieldRegex);
       
       if (match && match[1]) {
         result[field.id] = match[1].trim();
         fieldsParsed = true;
         console.log(`Successfully parsed field ${field.id} with length ${result[field.id].length}`);
       } else {
-        console.log(`No exact field ID markers found for ${field.id}, trying alternatives`);
-        
-        // 2. Try alternate field ID formats
-        const altRegex1 = new RegExp(`##FIELD_ID: *${field.id}##\\s*([\\s\\S]*?)\\s*##END_FIELD_ID##`, 'i');
-        const altRegex2 = new RegExp(`## *FIELD_ID: *${field.id} *##\\s*([\\s\\S]*?)\\s*## *END_FIELD_ID *##`, 'i');
-        
-        const altMatch1 = content.match(altRegex1);
-        const altMatch2 = content.match(altRegex2);
-        
-        if (altMatch1 && altMatch1[1]) {
-          result[field.id] = altMatch1[1].trim();
+        // Attempt to match field name if markers are not found, for simpler AI responses
+        // This is a fallback and might be less reliable for multiple fields.
+        const escapedFieldName = field.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const fieldNameRegex = new RegExp(`(?:${escapedFieldName}\s*:\s*|##${escapedFieldName}##\s*)([\s\S]*?)(?:\n##FIELD_ID:|\n##[A-Z_]+##|$)`, 'i');
+        match = content.match(fieldNameRegex);
+        if (match && match[1]) {
+          result[field.id] = match[1].trim();
           fieldsParsed = true;
-          console.log(`Parsed field ${field.id} with alternative format 1`);
-        } else if (altMatch2 && altMatch2[1]) {
-          result[field.id] = altMatch2[1].trim();
-          fieldsParsed = true;
-          console.log(`Parsed field ${field.id} with alternative format 2`);
-        } else {
-          console.log(`No field ID markers found for ${field.id}, trying field name format`);
-          
-          // 3. Try extracting by field name
-          // Escape any special regex characters in the field name
-          const escapedFieldName = field.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          
-          // Look for the field name followed by colon and capture all content
-          const fieldNameRegex = new RegExp(`${escapedFieldName}:\\s*([\\s\\S]*)`, 'i');
-          const fieldNameMatch = content.match(fieldNameRegex);
-          
-          if (fieldNameMatch && fieldNameMatch[1]) {
-            // Extract the content and trim whitespace
-            result[field.id] = fieldNameMatch[1].trim();
-            fieldsParsed = true;
-            console.log(`Parsed field ${field.id} using field name format, length: ${result[field.id].length}`);
-          }
+          console.log(`Parsed field ${field.id} using field name (fallback), length: ${result[field.id].length}`);
         }
       }
     });
@@ -1044,10 +1024,20 @@ export async function generateContentTitleFromContext(
     }
 
     const responseData = await response.json();
-    const title = responseData.choices?.[0]?.message?.content?.trim() || "Suggested Title (Error)";
+    let title = responseData.choices?.[0]?.message?.content?.trim() || "Suggested Title (Error)";
     
-    // Return the raw title for debugging this issue
-    console.log(`Generated title (raw from AI): "${title}"`);
+    // Explicitly remove leading/trailing quotes of common types
+    if (title.startsWith('"') && title.endsWith('"')) {
+      title = title.substring(1, title.length - 1);
+    }
+    if (title.startsWith('"') && title.endsWith('"')) {
+      title = title.substring(1, title.length - 1);
+    }
+    if (title.startsWith("'") && title.endsWith("'")) {
+        title = title.substring(1, title.length - 1);
+    }
+
+    console.log(`Generated title (cleaned): "${title}"`);
     return title;
 
   } catch (error) {

@@ -300,7 +300,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                   name="company"
                   value={form.company}
                   onChange={handleInputChange}
-                  placeholder="Acme Inc."
+                  placeholder="General Mills"
                 />
               </div>
             </div>

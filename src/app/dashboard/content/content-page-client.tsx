@@ -13,6 +13,7 @@ import { format as formatDateFns } from 'date-fns';
 import { useDebounce } from '@/lib/hooks/use-debounce';
 import { useSearchParams } from 'next/navigation';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/accordion";
+import { createBrowserClient } from '@supabase/ssr'; // Added for user session
 
 // --- Interfaces remain the same ---
 interface ContentItem {
@@ -39,6 +40,12 @@ interface Assignee {
   email?: string; // User email
 }
 
+interface User { // Added User interface
+  id: string;
+  email?: string;
+  // Add other user properties if needed
+}
+
 interface WorkflowStep {
   id: number; // Step number or ID
   name: string;
@@ -59,6 +66,27 @@ export default function ContentPageClient() { // Renamed component
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
   const searchParams = useSearchParams();
   const brandId = searchParams?.get('brandId');
+  const [currentUser, setCurrentUser] = useState<User | null>(null); // Added state for current user
+
+  const supabase = createBrowserClient( // Initialize Supabase client
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  );
+
+  useEffect(() => { // Fetch current user
+    const fetchCurrentUser = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error("Error fetching session:", error);
+        sonnerToast.error("Could not verify user session.");
+        return;
+      }
+      if (session?.user) {
+        setCurrentUser({ id: session.user.id, email: session.user.email });
+      }
+    };
+    fetchCurrentUser();
+  }, [supabase]); // Added supabase to dependency array
 
   // --- Effects and Helper Functions remain the same ---
   useEffect(() => {
@@ -105,6 +133,13 @@ export default function ContentPageClient() { // Renamed component
       return acc;
     }, {} as Record<string, ContentItem[]>);
   }, [content]);
+
+  const isUserAssigned = (item: ContentItem, userId: string | undefined): boolean => {
+    if (!userId) return false;
+    // Assuming direct assignment via assigned_to_id on the content item itself.
+    // If assignment is through workflow steps, this logic would need to access workflow data and check assignees for the current step.
+    return item.assigned_to_id === userId;
+  };
 
   const EmptyState = () => ( /* ... Existing EmptyState JSX ... */ 
       <div className="text-center py-12 px-4">
@@ -164,7 +199,11 @@ export default function ContentPageClient() { // Renamed component
                     <tbody>
                       {items.map((item) => (
                         <tr key={item.id} className="border-b last:border-b-0 hover:bg-muted/30">
-                          <td className="p-3">{item.title}</td>
+                          <td className="p-3">
+                            <Link href={`/dashboard/content/${item.id}`} className="hover:underline">
+                              {item.title}
+                            </Link>
+                          </td>
                           <td className="p-3">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium 
                               ${item.status === 'published' ? 'bg-green-100 text-green-800' : 
@@ -180,7 +219,22 @@ export default function ContentPageClient() { // Renamed component
                           <td className="p-3">{item.assigned_to_name || 'N/A'}</td>
                           <td className="p-3">
                             <div className="flex space-x-1">
-                              <Button variant="ghost" size="sm" asChild><Link href={`/dashboard/content/${item.id}/edit`}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>Edit</Link></Button>
+                              {currentUser && isUserAssigned(item, currentUser.id) && (
+                                <Button variant="ghost" size="sm" asChild>
+                                  <Link href={`/dashboard/content/${item.id}/edit`}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                                    Edit
+                                  </Link>
+                                </Button>
+                              )}
+                              {/* Optionally, add a View button if edit is not available or rely on clickable title */}
+                              {/* 
+                              {!currentUser || !isUserAssigned(item, currentUser.id) && (
+                                <Button variant="ghost" size="sm" asChild>
+                                  <Link href={`/dashboard/content/${item.id}`}>View</Link>
+                                </Button>
+                              )}
+                              */}
                             </div>
                           </td>
                         </tr>

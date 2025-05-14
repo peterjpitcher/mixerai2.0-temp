@@ -188,25 +188,31 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
       const data = await response.json();
       
       if (data.success) {
-        generatedBodyContent = typeof data.content === 'string' ? data.content : data[template.fields.outputFields[0]?.id] || 'Error: Could not extract content body.';
-        
-        // Convert Markdown to HTML if content is valid
-        if (generatedBodyContent && generatedBodyContent !== 'Error: Could not extract content body.') {
-          try {
-            const htmlContent = await marked(generatedBodyContent, { breaks: true });
-            setGeneratedContent(htmlContent);
-          } catch (error) {
-            console.error("Error converting markdown to HTML:", error);
-            setGeneratedContent(generatedBodyContent); // Fallback to raw content on conversion error
-            toast.error("Error displaying formatted content. Showing raw text.");
+        const mainBodyField = template.fields.outputFields.find(f => f.type === 'richText');
+        const aiResponseData = data.data || data.content || data;
+
+        if (typeof aiResponseData === 'string') {
+          generatedBodyContent = aiResponseData;
+        } else if (mainBodyField && typeof aiResponseData === 'object' && aiResponseData !== null && aiResponseData[mainBodyField.id]) {
+          generatedBodyContent = aiResponseData[mainBodyField.id];
+        } else if (template.fields.outputFields.length > 0 && typeof aiResponseData === 'object' && aiResponseData !== null && aiResponseData[template.fields.outputFields[0].id]) {
+          generatedBodyContent = aiResponseData[template.fields.outputFields[0].id];
+          if (template.fields.outputFields[0].type !== 'richText') {
+             toast.info("Primary output field is not rich text, AI might not have generated HTML as expected for body.");
           }
         } else {
-          setGeneratedContent(generatedBodyContent); // Set error or empty string as is
+          generatedBodyContent = 'Error: Could not extract HTML content body.';
         }
         
-        toast.success('Main content generated.');
+        setGeneratedContent(generatedBodyContent);
+        
+        if (generatedBodyContent && generatedBodyContent !== 'Error: Could not extract HTML content body.') {
+            toast.success('Main content HTML generated.');
+        } else {
+            toast.error('Main content body might be missing or in an unexpected format.');
+        }
 
-        if (generatedBodyContent && generatedBodyContent !== 'Error: Could not extract content body.') {
+        if (generatedBodyContent && generatedBodyContent !== 'Error: Could not extract HTML content body.') {
           setIsGeneratingTitle(true);
           try {
             const topicField = template.fields.inputFields.find(f => f.id === 'topic' || f.name.toLowerCase().includes('topic'));
@@ -270,7 +276,9 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         body: generatedContent,
         content_data: {
             templateInputValues: templateFieldValues,
-            generatedOutput: generatedContent
+            generatedOutput: { 
+                [template?.fields?.outputFields?.find(f => f.type === 'richText')?.id || 'mainBodyHtml']: generatedContent 
+            }
         }
       };
       const response = await fetch('/api/content', { 
@@ -283,7 +291,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
 
       if (data.success && data.data?.id) {
         toast.success('Content saved.');
-        router.push(`/dashboard/content/${data.data.id}`);
+        router.push(`/dashboard/content`);
       } else {
         toast.error(data.error || 'Failed to save content.');
       }

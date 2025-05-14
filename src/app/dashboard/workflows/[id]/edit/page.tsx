@@ -640,9 +640,9 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
             <CardTitle>Workflow Details</CardTitle>
             <CardDescription>Basic information about the workflow.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="space-y-2 lg:col-span-2">
                 <Label htmlFor="name">Workflow Name</Label>
                 <Input
                   id="name"
@@ -665,47 +665,47 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="brand">Brand</Label>
-              <Select defaultValue={brandId} onValueChange={handleUpdateBrand} value={brandId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select brand" />
-                </SelectTrigger>
-                <SelectContent>
-                  {brands.map((brand: any) => (
-                    <SelectItem key={brand.id} value={brand.id}>
-                      <div className="flex items-center">
-                        <div 
-                          className="w-3 h-3 rounded-full mr-2" 
-                          style={{ backgroundColor: brand.color || '#cccccc' }}
-                        />
-                        {brand.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="contentTemplate">Content Template (Optional)</Label>
-              <Select value={selectedTemplateId} onValueChange={handleUpdateTemplate}>
-                <SelectTrigger id="contentTemplate">
-                  <SelectValue placeholder="Select a content template" />
-                </SelectTrigger>
-                <SelectContent>
-                  {contentTemplates.map((template) => (
-                    <SelectItem key={template.id} value={template.id}>
-                      {template.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Link this workflow to a specific content template to automatically use it when new content is created from that template for the selected brand.
-              </p>
+              
+              <div className="space-y-2">
+                <Label htmlFor="brand">Brand</Label>
+                <Select defaultValue={brandId} onValueChange={handleUpdateBrand} value={brandId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select brand" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {brands.map((brand: any) => (
+                      <SelectItem key={brand.id} value={brand.id}>
+                        <div className="flex items-center">
+                          <div 
+                            className="w-3 h-3 rounded-full mr-2" 
+                            style={{ backgroundColor: brand.color || '#CCCCCC' }}
+                          />
+                          {brand.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="contentTemplate">Content Template (Optional)</Label>
+                <Select value={selectedTemplateId} onValueChange={handleUpdateTemplate}>
+                  <SelectTrigger id="contentTemplate">
+                    <SelectValue placeholder="Select a content template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {contentTemplates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Link this workflow to a specific content template to automatically use it when new content is created from that template for the selected brand.
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -768,7 +768,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                     </div>
                     
                     <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor={`step-name-${index}`}>Step Name <span className="text-destructive">*</span></Label>
                           <Input id={`step-name-${index}`} value={step.name || ''} onChange={(e) => handleUpdateStepName(index, e.target.value)} placeholder="Enter step name"/>

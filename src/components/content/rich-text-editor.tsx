@@ -2,7 +2,9 @@
 
 import React from 'react';
 import dynamic from 'next/dynamic';
-import 'react-quill/dist/quill.snow.css'; // Import Quill styles
+// Quill CSS is now imported globally in globals.css
+// import 'react-quill/dist/quill.core.css';   
+// import 'react-quill/dist/quill.snow.css';   
 
 // Dynamically import ReactQuill to avoid SSR issues
 const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
@@ -12,26 +14,23 @@ interface RichTextEditorProps {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
-  // Quill modules configuration (optional)
+  editorClassName?: string;
   modules?: Record<string, any>;
-  // Quill formats configuration (optional)
   formats?: string[];
 }
 
 const defaultModules = {
   toolbar: [
-    [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
-    ['bold', 'italic', 'underline', 'strike'], // toggled buttons
+    [{ 'header': [1, 2, 3, false] }],
+    ['bold', 'italic', 'underline', 'strike'],
     ['blockquote', 'code-block'],
     [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-    [{ 'script': 'sub'}, { 'script': 'super' }],      // superscript/subscript
-    [{ 'indent': '-1'}, { 'indent': '+1' }],          // outdent/indent
-    [{ 'direction': 'rtl' }],                         // text direction
-    [{ 'color': [] }, { 'background': [] }],          // dropdown with defaults from theme
+    [{ 'script': 'sub'}, { 'script': 'super' }],
+    [{ 'color': [] }, { 'background': [] }],
     [{ 'font': [] }],
     [{ 'align': [] }],
-    ['link', 'image', 'video'], // link, image, video
-    ['clean']                                         // remove formatting button
+    ['link', 'image'],
+    ['clean']
   ],
   clipboard: {
     // toggle to add extra line breaks when pasting HTML:
@@ -42,8 +41,8 @@ const defaultModules = {
 const defaultFormats = [
   'header', 'font', 'size',
   'bold', 'italic', 'underline', 'strike', 'blockquote', 'code-block',
-  'list', 'bullet', 'indent',
-  'link', 'image', 'video',
+  'list', 'bullet',
+  'link', 'image',
   'color', 'background', 'align',
   'script',
   'clean'
@@ -54,11 +53,12 @@ export function RichTextEditor({
   onChange,
   placeholder,
   className,
+  editorClassName,
   modules = defaultModules,
   formats = defaultFormats
 }: RichTextEditorProps) {
   return (
-    <div className={className}> {/* Apply className to a wrapper div if needed for custom styling of the container */}
+    <div className={className}>
       <ReactQuill 
         theme="snow"
         value={value}
@@ -66,7 +66,7 @@ export function RichTextEditor({
         modules={modules}
         formats={formats}
         placeholder={placeholder}
-        style={{ height: '300px', marginBottom: '42px' }} // Standard height, adjust as needed. Margin for toolbar spillover.
+        className={editorClassName}
       />
     </div>
   );
