@@ -170,7 +170,7 @@ export const PUT = withAuth(async (
 ) => {
   try {
     const supabase = createSupabaseAdminClient();
-    const id = params.id;
+    const workflowId = params.id; // Use workflowId for clarity
     const body = await request.json();
     
     let workflowDescriptionToUpdate: string | undefined = undefined;
@@ -189,7 +189,7 @@ export const PUT = withAuth(async (
         const { data: currentWorkflowData, error: fetchError } = await supabase
           .from('workflows')
           .select('name, brand_id, template_id, steps, brands:brand_id(name), content_templates:template_id(name)')
-          .eq('id', id)
+          .eq('id', workflowId)
           .single();
 
         if (fetchError) {
@@ -270,7 +270,7 @@ export const PUT = withAuth(async (
             assignee.id = existingUser.id;
           } else {
             newInvitationsToCreate.push({
-              workflow_id: id,
+              workflow_id: workflowId,
               step_id: step.id, 
               email: assignee.email,
               role: step.role || 'editor',
@@ -286,7 +286,7 @@ export const PUT = withAuth(async (
     }
     
     const rpcParams: any = {
-      p_workflow_id: id,
+      p_workflow_id: workflowId,
       p_new_invitation_items: newInvitationsToCreate.length > 0 ? newInvitationsToCreate : null // Pass null if empty, as some RPCs might expect JSONB or null
     };
 
@@ -324,18 +324,73 @@ export const PUT = withAuth(async (
 
     if (rpcError) {
       console.error('RPC Error updating workflow and invitations:', rpcError);
-      // Provide more specific error message if possible
       let errorMessage = `Failed to update workflow: ${rpcError.message}`;
       if (rpcError.details) errorMessage += ` Details: ${rpcError.details}`;
       if (rpcError.hint) errorMessage += ` Hint: ${rpcError.hint}`;
-      // Do not throw here, let handleApiError manage the response
       return handleApiError(rpcError, errorMessage);
     }
     if (!rpcSuccess) {
-        // This case might occur if RPC returns false explicitly for a handled failure
         console.error('RPC call update_workflow_and_handle_invites returned false or no data.');
         return handleApiError(new Error('RPC returned non-successful status'), 'Workflow update via RPC failed.');
     }
+    
+    // --- BEGIN: Sync workflow_user_assignments ---
+    if (rpcParams.p_steps && Array.isArray(rpcParams.p_steps)) {
+      for (const step of rpcParams.p_steps) {
+        if (step.id && step.assignees && Array.isArray(step.assignees)) {
+          const currentStepId = step.id;
+
+          const { data: existingAssignments, error: fetchAssignmentsError } = await supabase
+            .from('workflow_user_assignments')
+            .select('user_id')
+            .eq('workflow_id', workflowId)
+            .eq('step_id', currentStepId);
+
+          if (fetchAssignmentsError) {
+            console.warn(`[SyncAssignments] Error fetching existing assignments for step ${currentStepId}:`, fetchAssignmentsError.message);
+          }
+
+          const existingUserIds = existingAssignments ? existingAssignments.map(a => a.user_id) : [];
+          const newAssigneeUserIds = step.assignees.map((assignee: any) => assignee.id).filter(Boolean);
+
+          const assignmentsToUpsert = newAssigneeUserIds.map((userId: string) => ({
+            workflow_id: workflowId,
+            step_id: currentStepId,
+            user_id: userId,
+          }));
+
+          if (assignmentsToUpsert.length > 0) {
+            const { error: upsertError } = await supabase
+              .from('workflow_user_assignments')
+              .upsert(assignmentsToUpsert, { onConflict: 'workflow_id,step_id,user_id' });
+            if (upsertError) {
+              console.warn(`[SyncAssignments] Error upserting assignments for step ${currentStepId}:`, upsertError.message);
+            } else {
+              console.log(`[SyncAssignments] Successfully upserted assignments for workflow ${workflowId}, step ${currentStepId}`);
+            }
+          }
+
+          if (existingAssignments) {
+            const usersToRemove = existingUserIds
+              .filter((userId): userId is string => userId !== null && !newAssigneeUserIds.includes(userId));
+            if (usersToRemove.length > 0) {
+              const { error: deleteError } = await supabase
+                .from('workflow_user_assignments')
+                .delete()
+                .eq('workflow_id', workflowId)
+                .eq('step_id', currentStepId)
+                .in('user_id', usersToRemove);
+              if (deleteError) {
+                console.warn(`[SyncAssignments] Error deleting old assignments for step ${currentStepId}:`, deleteError.message);
+              } else {
+                console.log(`[SyncAssignments] Successfully deleted old assignments for workflow ${workflowId}, step ${currentStepId}`);
+              }
+            }
+          }
+        }
+      }
+    }
+    // --- END: Sync workflow_user_assignments ---
         
     if (newUsersToInviteByEmail.length > 0) {
       try {
@@ -365,7 +420,7 @@ export const PUT = withAuth(async (
               full_name: '', 
               role: highestRole,
               invited_by: inviterId || undefined, 
-              invited_from_workflow: id
+              invited_from_workflow: workflowId
             };
 
             if (firstStepIdForAssignment !== null) {
@@ -392,7 +447,7 @@ export const PUT = withAuth(async (
         brands!inner(name, brand_color),
         content_templates!left(name)
       `)
-      .eq('id', id)
+      .eq('id', workflowId)
       .single();
 
     if (finalFetchError) {
@@ -421,12 +476,12 @@ export const DELETE = withAuth(async (
 ) => {
   try {
     const supabase = createSupabaseAdminClient();
-    const id = params.id;
+    const workflowId = params.id; // Corrected from id to workflowId
     
-    const { data: contentCountResult, error: countError } = await supabase // Renamed data to contentCountResult
+    const { data: contentCountResult, error: countError } = await supabase
       .from('content')
       .select('id', { count: 'exact' })
-      .eq('workflow_id', id);
+      .eq('workflow_id', workflowId); // Corrected from id to workflowId
       
     if (countError) throw countError;
     
@@ -449,10 +504,10 @@ export const DELETE = withAuth(async (
     //   .eq('workflow_id', id);
     
     // Delete the workflow itself (cascade will handle invitations)
-    const { error: deleteErrorData, count } = await supabase // Renamed error to deleteErrorData
+    const { error: deleteErrorData, count } = await supabase
       .from('workflows')
       .delete()
-      .eq('id', id)
+      .eq('id', workflowId) // Corrected from id to workflowId
       .select(); 
     
     if (deleteErrorData) throw deleteErrorData;

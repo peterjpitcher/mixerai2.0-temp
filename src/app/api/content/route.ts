@@ -28,8 +28,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         content_types ( name ),
         creator_profile:profiles!created_by ( full_name, avatar_url ),
         content_templates ( name, icon ),
-        current_step_details:workflow_steps!current_step ( name ), 
-        assignee_profile:profiles!assigned_to ( full_name, avatar_url )
+        current_step_details:workflow_steps!current_step ( name )
       `)
       .order('updated_at', { ascending: false });
 
@@ -41,36 +40,111 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       queryBuilder = queryBuilder.eq('brand_id', brandId);
     }
 
-    const { data, error } = await queryBuilder;
+    const { data: contentItems, error: contentError } = await queryBuilder;
 
-    if (error) {
-      console.error('Error fetching content:', error);
-      throw error;
+    if (contentError) {
+      console.error('Error fetching content:', contentError);
+      throw contentError;
     }
 
-    const formattedContent = (data || []).map((item: any) => ({
-      id: item.id,
-      title: item.title,
-      status: item.status,
-      created_at: item.created_at,
-      updated_at: item.updated_at,
-      brand_id: item.brand_id,
-      brand_name: item.brands?.name || null,
-      brand_color: item.brands?.brand_color || null,
-      content_type_id: item.content_type_id,
-      content_type_name: item.content_types?.name || null,
-      created_by: item.created_by,
-      created_by_name: item.creator_profile?.full_name || null,
-      creator_avatar_url: item.creator_profile?.avatar_url || null,
-      template_id: item.template_id,
-      template_name: item.content_templates?.name || null,
-      template_icon: item.content_templates?.icon || null,
-      workflow_id: item.workflow_id,
-      current_step_id: item.current_step, 
-      current_step_name: item.current_step_details?.name || (item.current_step ? 'Step not found' : 'N/A'), 
-      assigned_to_id: item.assigned_to, 
-      assigned_to_name: item.assignee_profile?.full_name || (item.assigned_to ? 'Assignee not found' : 'N/A') 
-    }));
+    // Step 1: Collect all unique assignee IDs from all content items
+    const allAssigneeIds = new Set<string>();
+    (contentItems || []).forEach(item => {
+      if (item.assigned_to && Array.isArray(item.assigned_to)) {
+        item.assigned_to.forEach((id: string) => id && allAssigneeIds.add(id));
+      }
+    });
+
+    // Step 2: Fetch all relevant profiles in one go
+    let assigneeProfilesMap = new Map<string, { full_name: string | null, avatar_url: string | null }>();
+    if (allAssigneeIds.size > 0) {
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', Array.from(allAssigneeIds));
+
+      if (profilesError) {
+        console.error('Error fetching assignee profiles:', profilesError);
+        // Continue without assignee names if this fails, or throw error
+      } else if (profilesData) {
+        profilesData.forEach(profile => {
+          assigneeProfilesMap.set(profile.id, { full_name: profile.full_name, avatar_url: profile.avatar_url });
+        });
+      }
+    }
+
+    const workflowDataWithSteps = await Promise.all(
+      (contentItems || []).map(async (item) => {
+        if (item.workflow_id) {
+          const { data: workflow, error: workflowError } = await supabase
+            .from('workflows')
+            .select('id, name')
+            .eq('id', item.workflow_id)
+            .single();
+
+          if (workflowError) {
+            console.error(`Error fetching workflow ${item.workflow_id} for content ${item.id}:`, workflowError);
+            return null;
+          }
+
+          const { data: steps, error: stepsError } = await supabase
+            .from('workflow_steps')
+            .select('id, name, description, step_order, role, approval_required, assigned_user_ids')
+            .eq('workflow_id', item.workflow_id)
+            .order('step_order', { ascending: true });
+
+          if (stepsError) {
+            console.error(`Error fetching steps for workflow ${item.workflow_id}:`, stepsError);
+            return { ...workflow, steps: [] }; // Return workflow data even if steps fail
+          }
+          return { ...workflow, steps };
+        }
+        return null;
+      })
+    );
+
+    const formattedContent = (contentItems || []).map((item, index) => {
+      let firstAssignedId: string | null = null;
+      const assigneeNames: string[] = [];
+      if (item.assigned_to && Array.isArray(item.assigned_to) && item.assigned_to.length > 0) {
+        firstAssignedId = (item.assigned_to as string[])[0]; // Keep for assigned_to_id if needed
+        item.assigned_to.forEach((id: string) => {
+          if (id) {
+            const profile = assigneeProfilesMap.get(id);
+            if (profile && profile.full_name) {
+              assigneeNames.push(profile.full_name);
+            }
+          }
+        });
+      }
+
+      return {
+        id: item.id,
+        title: item.title,
+        status: item.status,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        brand_id: item.brand_id,
+        brand_name: item.brands?.name || null,
+        brand_color: item.brands?.brand_color || null,
+        content_type_id: item.content_type_id,
+        content_type_name: item.content_types?.name || null,
+        created_by: item.created_by,
+        created_by_name: item.creator_profile?.full_name || null,
+        creator_avatar_url: item.creator_profile?.avatar_url || null,
+        template_id: item.template_id,
+        template_name: item.content_templates?.name || null,
+        template_icon: item.content_templates?.icon || null,
+        workflow_id: item.workflow_id,
+        current_step_id: item.current_step,
+        current_step_name: item.current_step_details?.name || (item.current_step ? 'Step not found' : 'N/A'),
+        assigned_to_id: firstAssignedId, // This still shows the first ID
+        assigned_to_name: assigneeNames.length > 0 ? assigneeNames.join(', ') : 'N/A',
+        // Optionally, include the full assignee profiles array if needed by UI
+        // assignees: (item.assigned_to || []).map(id => assigneeProfilesMap.get(id)).filter(Boolean),
+        workflow: workflowDataWithSteps[index]
+      };
+    });
 
     return NextResponse.json({
       success: true,
@@ -95,7 +169,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     
     const supabase = createSupabaseAdminClient();
 
-    let assignedToUserId: string | null = null;
+    let assignedToUsersForContent: string[] | null = null;
     let currentWorkflowStepId: string | null = null;
 
     if (data.workflow_id) {
@@ -114,8 +188,8 @@ export const POST = withAuth(async (request: NextRequest, user) => {
 
       if (workflowFirstStep) {
         currentWorkflowStepId = workflowFirstStep.id;
-        if (workflowFirstStep.assigned_user_ids && workflowFirstStep.assigned_user_ids.length > 0) {
-          assignedToUserId = workflowFirstStep.assigned_user_ids[0];
+        if (workflowFirstStep.assigned_user_ids && Array.isArray(workflowFirstStep.assigned_user_ids) && workflowFirstStep.assigned_user_ids.length > 0) {
+          assignedToUsersForContent = workflowFirstStep.assigned_user_ids;
         }
       }
     }
@@ -131,7 +205,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       created_by: user.id,
       workflow_id: data.workflow_id || null,
       current_step: currentWorkflowStepId,
-      assigned_to: assignedToUserId,
+      assigned_to: assignedToUsersForContent,
       status: data.status || 'draft'
     };
 

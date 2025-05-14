@@ -53,7 +53,7 @@ export const POST = withAuth(async (request: NextRequest, user: User, context: {
 
     // Fetch the first step of the workflow
     let firstStepId: string | null = null;
-    let firstStepAssigneeId: string | null = null;
+    let firstStepAssignees: string[] | null = null;
 
     const { data: firstWorkflowStep, error: stepError } = await supabase
       .from('workflow_steps')
@@ -71,19 +71,15 @@ export const POST = withAuth(async (request: NextRequest, user: User, context: {
     if (firstWorkflowStep) {
       firstStepId = firstWorkflowStep.id;
       if (firstWorkflowStep.assigned_user_ids && firstWorkflowStep.assigned_user_ids.length > 0) {
-        firstStepAssigneeId = firstWorkflowStep.assigned_user_ids[0];
+        firstStepAssignees = firstWorkflowStep.assigned_user_ids;
       }
     } else {
-      // No steps in workflow, effectively means no place to restart to.
-      // Depending on desired logic, could error or set current_step to null.
-      // For now, let's assume a workflow should have steps if it's being restarted.
       console.warn(`Workflow ${currentContent.workflow_id} has no steps defined.`);
-      // firstStepId will remain null, and assigned_to will be null.
     }
     
     const updatePayload: TablesUpdate<'content'> = {
       current_step: firstStepId, 
-      assigned_to: firstStepAssigneeId,
+      assigned_to: firstStepAssignees,
       status: 'pending_review',
       updated_at: new Date().toISOString(),
     };

@@ -114,9 +114,10 @@ export const POST = withAuth(async (request: NextRequest, user: User, context: {
     let updatePayload: TablesUpdate<'content'> = {
         updated_at: new Date().toISOString(),
     };
+    
+    let newAssignmentsForNextStep: TablesInsert<'workflow_user_assignments'>[] = [];
 
     if (action === 'approve') {
-      // Find the next step in the workflow based on step_order
       const { data: nextDbStep, error: nextStepError } = await supabase
         .from('workflow_steps')
         .select('id, assigned_user_ids')
@@ -134,16 +135,26 @@ export const POST = withAuth(async (request: NextRequest, user: User, context: {
       if (nextDbStep) {
         updatePayload.current_step = nextDbStep.id;
         updatePayload.status = 'pending_review';
-        updatePayload.assigned_to = (nextDbStep.assigned_user_ids && nextDbStep.assigned_user_ids.length > 0) ? nextDbStep.assigned_user_ids[0] : null;
+        updatePayload.assigned_to = (nextDbStep.assigned_user_ids && nextDbStep.assigned_user_ids.length > 0) 
+                                      ? nextDbStep.assigned_user_ids 
+                                      : null;
+        
+        // Prepare workflow_user_assignments for the next step
+        if (currentContent.workflow_id && nextDbStep.id && nextDbStep.assigned_user_ids && nextDbStep.assigned_user_ids.length > 0) {
+          newAssignmentsForNextStep = nextDbStep.assigned_user_ids.map((assigneeId: string) => ({
+            workflow_id: currentContent.workflow_id!,
+            step_id: nextDbStep.id!,
+            user_id: assigneeId,
+          }));
+        }
+
       } else {
-        // This was the last step
         updatePayload.status = 'approved';
-        // updatePayload.current_step = null; // Or keep it as the last step ID
-        // updatePayload.assigned_to = null;
+        updatePayload.current_step = null;
+        updatePayload.assigned_to = null;
       }
     } else { // action === 'reject'
       updatePayload.status = 'rejected';
-      // current_step and assigned_to remain the same for rejection
     }
 
     const { data: updatedContent, error: updateContentError } = await supabase
@@ -156,6 +167,19 @@ export const POST = withAuth(async (request: NextRequest, user: User, context: {
     if (updateContentError) {
         console.error("Error updating content after action:", updateContentError);
         throw updateContentError;
+    }
+
+    // If there are new assignments for the next step, upsert them
+    if (newAssignmentsForNextStep.length > 0) {
+      const { error: assignmentError } = await supabase
+        .from('workflow_user_assignments')
+        .upsert(newAssignmentsForNextStep, { onConflict: 'workflow_id,step_id,user_id' });
+
+      if (assignmentError) {
+        console.error("Error upserting new workflow_user_assignments:", assignmentError);
+        // Decide if this error should be critical. For now, log and continue.
+        // If this fails, user_tasks might not be created for the next step.
+      }
     }
 
     return NextResponse.json({ success: true, message: `Content ${action}d successfully.`, data: updatedContent });

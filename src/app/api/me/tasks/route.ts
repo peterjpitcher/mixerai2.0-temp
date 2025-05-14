@@ -15,47 +15,54 @@ export const GET = withAuth(async (request: NextRequest, user) => {
   const supabase = createSupabaseAdminClient();
 
   try {
-    const { data: tasks, error } = await supabase
-      .from('user_tasks')
+    // Query directly from the 'content' table
+    const { data: contentItems, error } = await supabase
+      .from('content')
       .select(`
-        *,
-        content:content!content_id (
-          id,
-          title,
-          status,
-          brand:brands!brand_id (id, name, brand_color),
-          workflow:workflows!workflow_id (id, name)
-        ),
-        workflow_step_details:workflow_steps!workflow_step_id (id, name, step_order)
+        id,
+        title,
+        status,
+        created_at, 
+        updated_at,
+        current_step, 
+        assigned_to,
+        brand:brands!brand_id (id, name, brand_color),
+        workflow:workflows!workflow_id (id, name),
+        workflow_step_details:workflow_steps!current_step (id, name, step_order)
       `)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      // Filter for content assigned to the current user
+      // The string interpolation for user.id needs to be handled carefully for array contains
+      .filter('assigned_to', 'cs', `{"${user.id}"}`)
+      // Filter for actionable content statuses
+      .in('status', ['pending_review', 'rejected']) // 'rejected' tasks might also be considered actionable
+      .order('updated_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching user tasks:', error);
+      console.error('Error fetching user tasks from content:', error);
       throw error;
     }
 
-    if (!tasks) {
+    if (!contentItems) {
       return NextResponse.json({ success: true, data: [] });
     }
 
-    const formattedTasks = tasks.map((task: any) => ({
-      id: task.id,
-      task_status: task.status,
-      due_date: task.due_date,
-      created_at: task.created_at,
-      content_id: task.content?.id,
-      content_title: task.content?.title,
-      content_status: task.content?.status,
-      brand_id: task.content?.brand?.id,
-      brand_name: task.content?.brand?.name,
-      brand_color: task.content?.brand?.brand_color,
-      workflow_id: task.content?.workflow?.id,
-      workflow_name: task.content?.workflow?.name,
-      workflow_step_id: task.workflow_step_details?.id, 
-      workflow_step_name: task.workflow_step_details?.name || task.workflow_step_name || 'N/A',
-      workflow_step_order: task.workflow_step_details?.step_order
+    // Adapt the mapping to the TaskItem interface from my-tasks/page.tsx
+    const formattedTasks = contentItems.map((item: any) => ({
+      id: item.id, // Use content.id as the task identifier
+      task_status: item.status === 'pending_review' ? 'pending' : item.status, // Map content status to task status
+      due_date: null, // No direct due_date on content table
+      created_at: item.created_at, // content.created_at could serve as task creation time contextually
+      content_id: item.id,
+      content_title: item.title,
+      content_status: item.status,
+      brand_id: item.brand?.id,
+      brand_name: item.brand?.name,
+      brand_color: item.brand?.brand_color,
+      workflow_id: item.workflow?.id,
+      workflow_name: item.workflow?.name,
+      workflow_step_id: item.workflow_step_details?.id, 
+      workflow_step_name: item.workflow_step_details?.name || 'N/A',
+      workflow_step_order: item.workflow_step_details?.step_order
     }));
 
     return NextResponse.json({ success: true, data: formattedTasks });

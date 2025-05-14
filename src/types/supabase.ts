@@ -148,7 +148,7 @@ export type Database = {
       }
       content: {
         Row: {
-          assigned_to: string | null
+          assigned_to: string[] | null
           body: string
           brand_id: string | null
           content_data: Json | null
@@ -168,7 +168,7 @@ export type Database = {
           workflow_id: string | null
         }
         Insert: {
-          assigned_to?: string | null
+          assigned_to?: string[] | null
           body: string
           brand_id?: string | null
           content_data?: Json | null
@@ -188,7 +188,7 @@ export type Database = {
           workflow_id?: string | null
         }
         Update: {
-          assigned_to?: string | null
+          assigned_to?: string[] | null
           body?: string
           brand_id?: string | null
           content_data?: Json | null
@@ -208,20 +208,6 @@ export type Database = {
           workflow_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "content_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "content_brand_id_fkey"
             columns: ["brand_id"]
