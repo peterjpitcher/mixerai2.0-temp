@@ -140,8 +140,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         current_step_name: item.current_step_details?.name || (item.current_step ? 'Step not found' : 'N/A'),
         assigned_to_id: firstAssignedId, // This still shows the first ID
         assigned_to_name: assigneeNames.length > 0 ? assigneeNames.join(', ') : 'N/A',
-        // Optionally, include the full assignee profiles array if needed by UI
-        // assignees: (item.assigned_to || []).map(id => assigneeProfilesMap.get(id)).filter(Boolean),
+        assigned_to: item.assigned_to || null, // Ensure the raw assigned_to array is included
         workflow: workflowDataWithSteps[index]
       };
     });

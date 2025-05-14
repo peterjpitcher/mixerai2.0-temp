@@ -6,10 +6,50 @@ import { Button } from '@/components/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/card';
 import { Eye, Edit, AlertCircle, ListChecks } from 'lucide-react';
 import { toast } from 'sonner';
+import { createSupabaseClient } from '@/lib/supabase/client'; // Corrected import
 
-// Updated TaskItem interface to match the new API response from /api/me/tasks
+// Interface for the data structure from /api/content
+interface ContentItemFromApi {
+  id: string;
+  title: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  brand_id: string | null;
+  brand_name: string | null;
+  brand_color: string | null;
+  content_type_id: string | null;
+  content_type_name: string | null;
+  created_by: string | null;
+  created_by_name: string | null;
+  creator_avatar_url: string | null;
+  template_id: string | null;
+  template_name: string | null;
+  template_icon: string | null;
+  workflow_id: string | null;
+  current_step_id: string | null; 
+  current_step_name: string | null;
+  assigned_to_id: string | null; // First assignee ID, from /api/content
+  assigned_to_name: string | null; // Comma-separated names, from /api/content
+  assigned_to?: string[] | null; // Actual array of assignee UUIDs
+  workflow?: { // Workflow object from /api/content
+    id: string;
+    name: string;
+    steps: Array<{
+      id: string;
+      name: string;
+      description?: string;
+      step_order: number;
+      role?: string;
+      approval_required?: boolean;
+      assigned_user_ids?: string[];
+    }>;
+  };
+}
+
+// TaskItem interface for the page
 interface TaskItem {
-  id: string; // This is user_tasks.id
+  id: string; // Using content_id as the task unique key
   task_status: string | null;
   due_date: string | null;
   created_at: string | null;
@@ -30,33 +70,70 @@ export default function MyTasksPage() {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchTasks() {
+    async function initializePage() {
       setIsLoading(true);
       setError(null);
+      const supabase = createSupabaseClient(); // Corrected function call
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        console.error('Error fetching user or user not logged in:', userError);
+        setError('You must be logged in to view your tasks.');
+        toast.error('Authentication Error', { description: 'Could not retrieve user information.' });
+        setIsLoading(false);
+        return;
+      }
+      setCurrentUserId(user.id);
+
       try {
-        const response = await fetch('/api/me/tasks');
+        const response = await fetch('/api/content'); // Fetch from /api/content
         if (!response.ok) {
-          throw new Error('Failed to fetch tasks');
+          throw new Error('Failed to fetch content data');
         }
-        const data = await response.json();
-        if (data.success) {
-          setTasks(data.data || []);
+        const apiData = await response.json();
+        if (apiData.success && Array.isArray(apiData.data)) {
+          const allContentItems: ContentItemFromApi[] = apiData.data;
+          
+          const filteredAndMappedTasks = allContentItems
+            .filter(item => 
+              (item.status === 'pending_review' || item.status === 'rejected' || item.status === 'draft') &&
+              item.assigned_to && Array.isArray(item.assigned_to) && item.assigned_to.includes(user.id)
+            )
+            .map((item): TaskItem => ({
+              id: item.id, // Use content_id as task key
+              task_status: item.status === 'pending_review' ? 'pending' : item.status,
+              due_date: null, // Not available from /api/content
+              created_at: item.created_at,
+              content_id: item.id,
+              content_title: item.title,
+              content_status: item.status,
+              brand_id: item.brand_id,
+              brand_name: item.brand_name || 'N/A',
+              brand_color: item.brand_color,
+              workflow_id: item.workflow_id,
+              workflow_name: item.workflow?.name || 'N/A',
+              workflow_step_id: item.current_step_id,
+              workflow_step_name: item.current_step_name || 'N/A',
+              workflow_step_order: item.workflow?.steps?.find(s => s.id === item.current_step_id)?.step_order || undefined,
+            }));
+          setTasks(filteredAndMappedTasks);
         } else {
-          throw new Error(data.error || 'Failed to process tasks data');
+          throw new Error(apiData.error || 'Failed to process content data');
         }
       } catch (err: any) {
-        console.error('Error fetching tasks:', err);
+        console.error('Error fetching or processing tasks:', err);
         setError(err.message || 'Failed to load tasks');
         toast.error("Failed to load your tasks. Please try again.", {
-          description: err.message || "Unknown error", // Provide fallback for description
+          description: err.message || "Unknown error",
         });
       } finally {
         setIsLoading(false);
       }
     }
-    fetchTasks();
+    initializePage();
   }, []);
 
   const formatDate = (dateString: string | null) => {
@@ -65,8 +142,6 @@ export default function MyTasksPage() {
       day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
     });
   };
-
-  // getStepName function is no longer needed as workflow_step_name is directly available.
 
   if (isLoading) {
     return (
@@ -105,7 +180,7 @@ export default function MyTasksPage() {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Pending Your Action</CardTitle> {/* Updated Title */}
+            <CardTitle>Pending Your Action</CardTitle>
             <CardDescription>{tasks.length} item(s) requiring your attention.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -114,12 +189,10 @@ export default function MyTasksPage() {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left p-3 font-medium">Content Title</th>
-                    {/* <th className="text-left p-3 font-medium">Template</th> */}{/* Template removed for now */}
                     <th className="text-left p-3 font-medium">Brand</th>
                     <th className="text-left p-3 font-medium">Workflow Step</th>
                     <th className="text-left p-3 font-medium">Task Status</th>
                     <th className="text-left p-3 font-medium">Due Date</th>
-                    {/* <th className="text-left p-3 font-medium">Last Updated</th> */}{/* Replaced by Due Date or Task Creation */}
                     <th className="text-left p-3 font-medium">Actions</th>
                   </tr>
                 </thead>
@@ -127,7 +200,6 @@ export default function MyTasksPage() {
                   {tasks.map((task) => (
                     <tr key={task.id} className="border-b hover:bg-muted/50">
                       <td className="p-3 font-medium">{task.content_title || 'N/A'}</td>
-                      {/* <td className="p-3">{task.template_name || 'N/A'}</td> */}{/* Template removed for now */}
                       <td className="p-3">{task.brand_name || 'N/A'}</td>
                       <td className="p-3">{task.workflow_step_name || 'N/A'}</td>
                       <td className="p-3">
@@ -139,10 +211,8 @@ export default function MyTasksPage() {
                         </span>
                       </td>
                       <td className="p-3 text-muted-foreground">{formatDate(task.due_date)}</td>
-                      {/* <td className="p-3 text-muted-foreground">{formatDate(task.created_at)}</td> */}
                       <td className="p-3">
                         <Button variant="outline" size="sm" asChild>
-                          {/* Ensure task.content_id is used for the link if task.id is user_task.id */}
                           <Link href={`/dashboard/content/${task.content_id}`}>
                             <Eye className="h-4 w-4 mr-1.5" /> Review Content
                           </Link>

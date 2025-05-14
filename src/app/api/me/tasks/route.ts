@@ -34,7 +34,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       // The string interpolation for user.id needs to be handled carefully for array contains
       .filter('assigned_to', 'cs', `{"${user.id}"}`)
       // Filter for actionable content statuses
-      .in('status', ['pending_review', 'rejected']) // 'rejected' tasks might also be considered actionable
+      .in('status', ['pending_review', 'rejected', 'draft'])
       .order('updated_at', { ascending: false });
 
     if (error) {
