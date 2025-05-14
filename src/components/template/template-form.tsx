@@ -259,6 +259,7 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
                     fieldType={activeTab === 'input' ? 'input' : 'output'}
                     availableInputFields={templateData.fields.inputFields.map(f => ({ id: f.id, name: f.name }))}
                     initialData={editingField}
+                    templateId={templateData.id}
                     onSave={handleFieldSave}
                     onCancel={handleFieldCancel}
                   />

@@ -10,10 +10,12 @@ import { Textarea } from '@/components/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { Separator } from '@/components/separator';
 import { MarkdownDisplay } from './markdown-display';
+import { RichTextEditor } from './rich-text-editor';
 import { useRouter } from 'next/navigation';
 import { BrandIcon } from '@/components/brand-icon';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { marked } from 'marked';
 
 interface Brand {
   id: string;
@@ -187,7 +189,21 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
       
       if (data.success) {
         generatedBodyContent = typeof data.content === 'string' ? data.content : data[template.fields.outputFields[0]?.id] || 'Error: Could not extract content body.';
-        setGeneratedContent(generatedBodyContent);
+        
+        // Convert Markdown to HTML if content is valid
+        if (generatedBodyContent && generatedBodyContent !== 'Error: Could not extract content body.') {
+          try {
+            const htmlContent = await marked(generatedBodyContent, { breaks: true });
+            setGeneratedContent(htmlContent);
+          } catch (error) {
+            console.error("Error converting markdown to HTML:", error);
+            setGeneratedContent(generatedBodyContent); // Fallback to raw content on conversion error
+            toast.error("Error displaying formatted content. Showing raw text.");
+          }
+        } else {
+          setGeneratedContent(generatedBodyContent); // Set error or empty string as is
+        }
+        
         toast.success('Main content generated.');
 
         if (generatedBodyContent && generatedBodyContent !== 'Error: Could not extract content body.') {
@@ -385,11 +401,11 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
           </CardHeader>
           <CardContent className="space-y-4">
             <Label>Generated Body Content</Label>
-            <Textarea 
-                value={generatedContent} 
-                onChange={(e) => setGeneratedContent(e.target.value)} 
-                rows={10} 
-                placeholder="Generated content will appear here..."
+            <RichTextEditor
+              value={generatedContent}
+              onChange={setGeneratedContent}
+              placeholder="Generated content will appear here..."
+              className="min-h-[200px]"
             />
           </CardContent>
           <CardFooter className="flex justify-end">

@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/dashboard/page-header';
 import { Badge } from '@/components/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/dropdown-menu';
 import { toast } from 'sonner';
-import { Loader2, PlusCircle, LayoutTemplate } from 'lucide-react';
+import { Loader2, PlusCircle, LayoutTemplate, Edit3 } from 'lucide-react';
 import type { Metadata } from 'next';
 
 interface Template {
@@ -122,13 +122,21 @@ export default function TemplatesPage() {
                 </div>
               </CardContent>
               <CardFooter className="border-t pt-4 text-sm text-muted-foreground">
-                <div className="w-full flex justify-between">
-                  <span>
-                    Created: {template.created_at 
-                      ? new Date(template.created_at).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' }) 
-                      : 'Date unavailable'}
-                  </span>
-                  <span>Used: {template.usageCount !== undefined ? template.usageCount : 'N/A'} time{template.usageCount !== 1 ? 's' : ''}</span>
+                <div className="w-full flex justify-between items-center">
+                  <div>
+                    <span>
+                      Created: {template.created_at 
+                        ? new Date(template.created_at).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' }) 
+                        : 'Date unavailable'}
+                    </span>
+                    <span className="ml-4">Used: {template.usageCount !== undefined ? template.usageCount : 'N/A'} time{template.usageCount !== 1 ? 's' : ''}</span>
+                  </div>
+                  <Link href={`/dashboard/templates/${template.id}`} passHref>
+                    <Button variant="outline" size="sm">
+                      <Edit3 className="mr-2 h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                  </Link>
                 </div>
               </CardFooter>
             </Card>
