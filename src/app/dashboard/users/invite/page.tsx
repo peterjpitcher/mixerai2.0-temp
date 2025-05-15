@@ -8,6 +8,7 @@ import { Input } from '@/components/input';
 import { Label } from '@/components/label';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from '@/components/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
+import { Checkbox } from '@/components/checkbox';
 import { 
   ArrowLeft, 
   Send, 
@@ -35,7 +36,7 @@ export default function InviteUserPage() {
     job_title: '',
     company: '',
     role: 'Viewer',
-    brand_id: ''
+    brand_ids: [] as string[]
   });
   const [brands, setBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -50,7 +51,7 @@ export default function InviteUserPage() {
         const data = await response.json();
         
         if (data.success) {
-          setBrands(data.brands || []);
+          setBrands(data.data || []);
         } else {
           throw new Error(data.error || 'Failed to fetch brands');
         }
@@ -76,8 +77,15 @@ export default function InviteUserPage() {
   };
   
   // Handle brand change
-  const handleBrandChange = (value: string) => {
-    setForm(prev => ({ ...prev, brand_id: value === 'none' ? '' : value }));
+  const handleBrandCheckboxChange = (brandId: string, isChecked: boolean) => {
+    setForm(prev => {
+      const currentBrandIds = prev.brand_ids || [];
+      if (isChecked) {
+        return { ...prev, brand_ids: [...currentBrandIds, brandId] };
+      } else {
+        return { ...prev, brand_ids: currentBrandIds.filter(id => id !== brandId) };
+      }
+    });
   };
   
   // Handle form submission
@@ -264,20 +272,24 @@ export default function InviteUserPage() {
                 <Label htmlFor="brand_id" className="text-right">
                   Assign to Brand
                 </Label>
-                <Select
-                  value={form.brand_id || 'none'}
-                  onValueChange={handleBrandChange}
-                >
-                  <SelectTrigger id="brand_id">
-                    <SelectValue placeholder="Select a brand" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No Brand</SelectItem>
+                {isLoading && <p className="text-sm text-muted-foreground">Loading brands...</p>}
+                {!isLoading && brands.length === 0 && <p className="text-sm text-muted-foreground">No brands available to assign.</p>}
+                {!isLoading && brands.length > 0 && (
+                  <div className="space-y-2 rounded-md border p-4 max-h-60 overflow-y-auto">
                     {brands.map(brand => (
-                      <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
+                      <div key={brand.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`brand-${brand.id}`}
+                          checked={form.brand_ids.includes(brand.id)}
+                          onCheckedChange={(checked) => handleBrandCheckboxChange(brand.id, !!checked)}
+                        />
+                        <Label htmlFor={`brand-${brand.id}`} className="font-normal cursor-pointer">
+                          {brand.name}
+                        </Label>
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground mt-1">
                   You can assign this user to additional brands later.
                 </p>

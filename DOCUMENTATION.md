@@ -412,6 +412,19 @@ export function BrandIcon({
 
 This component enhances visual recognition and consistency throughout the application, making it easier for users to quickly identify and work with different brands.
 
+### User Invitation Page - Brand Assignment Update
+
+The user invitation page (`/dashboard/users/invite`) has been updated to improve flexibility in assigning new users to brands.
+
+- **Previous Behaviour**: Users could be assigned to a single brand via a dropdown menu during the invitation process.
+- **New Behaviour**: The brand assignment UI has been changed from a single-select dropdown to a list of checkboxes. This allows administrators to assign a new user to multiple brands simultaneously when sending an invitation.
+- **Technical Changes**:
+    - The frontend state management in `src/app/dashboard/users/invite/page.tsx` was updated to handle an array of `brand_ids` instead of a single `brand_id`.
+    - The UI now renders checkboxes for each available brand.
+    - The API endpoint `/api/users/invite` will need to be (or has been) updated to accept an array of `brand_ids` in the request payload to support this multi-brand assignment.
+
+This change streamlines the onboarding process for users who need access to several brands from the outset.
+
 ## Future Improvements
 
 Potential future improvements include:
@@ -931,6 +944,13 @@ MixerAI 2.0a includes a comprehensive suite of tools for testing and debugging t
 - **Advanced Testing Tools**: Specialized tools for testing different aspects of the AI integration
 
 For detailed information about these tools, see [OpenAI Test Tool Documentation](docs/OPENAI_TEST_TOOL.md).
+
+Key features:
+- AI versus template detection through heuristic analysis
+- Timing information for performance monitoring
+- Raw API response inspection
+- Direct API testing for any endpoint
+- Environment configuration display 
 
 ## User Invitation System Enhancements
 

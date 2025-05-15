@@ -21,10 +21,27 @@ import {
   Globe,
   MoreVertical,
   Folder,
-  ListChecks
+  ListChecks,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect, useRef } from 'react';
+
+interface UserSessionData {
+  id: string;
+  email?: string;
+  user_metadata?: {
+    role?: string;
+    full_name?: string;
+    // other metadata fields
+  };
+  brand_permissions?: Array<{
+    brand_id: string;
+    role: string; // role within that brand
+    // other permission fields
+  }>;
+  // Add other fields that your session endpoint might return
+}
 
 interface NavItem {
   href: string;
@@ -51,6 +68,9 @@ export function UnifiedNavigation() {
   const layoutSegments = useSelectedLayoutSegments();
   const segments = layoutSegments || [];
   
+  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
+  
   // Track expanded state for collapsible sections
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     content: true, // Content section expanded by default
@@ -63,6 +83,33 @@ export function UnifiedNavigation() {
   
   // Flag to track if templates have been fetched already
   const templatesFetched = useRef(false);
+
+  // Fetch current user data
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      setIsLoadingUser(true);
+      try {
+        const response = await fetch('/api/me'); 
+        if (!response.ok) {
+          throw new Error('Failed to fetch user session');
+        }
+        const data = await response.json();
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+          console.log('[UnifiedNavigation] Current User Loaded:', data.user); // Log loaded user
+        } else {
+          setCurrentUser(null);
+          console.error('[UnifiedNavigation] Failed to get user data from /api/me:', data.error);
+        }
+      } catch (error) {
+        console.error('[UnifiedNavigation] Error fetching current user:', error);
+        setCurrentUser(null);
+      } finally {
+        setIsLoadingUser(false);
+      }
+    };
+    fetchCurrentUser();
+  }, []);
 
   // Fetch templates from the API only once when the component mounts or content section is expanded
   useEffect(() => {
@@ -127,13 +174,25 @@ export function UnifiedNavigation() {
     segment: template.id
   }));
   
-  // Primary nav items
-  const navItems: (NavItem | NavGroupItem)[] = [
+  // Define permission helper functions based on currentUser
+  const userRole = currentUser?.user_metadata?.role;
+  const userBrandPermissions = currentUser?.brand_permissions || [];
+
+  const isViewer = userRole === 'viewer';
+  const isEditor = userRole === 'editor';
+  const isAdmin = userRole === 'admin';
+  const isPlatformAdmin = isAdmin && userBrandPermissions.length === 0;
+  const isScopedAdmin = isAdmin && userBrandPermissions.length > 0;
+
+  console.log('[UnifiedNavigation] Role Check:', { userRole, isViewer, isEditor, isAdmin, isPlatformAdmin, isScopedAdmin }); // Log role booleans
+
+  // Primary nav items - base structure
+  let navItemsDefinition: (NavItem | NavGroupItem)[] = [
     {
       href: '/dashboard',
       label: 'Dashboard',
       icon: <Home className="h-5 w-5" />,
-      segment: ''
+      segment: '' // Dashboard is active when segments are empty
     },
     {
       href: '/dashboard/my-tasks',
@@ -141,11 +200,23 @@ export function UnifiedNavigation() {
       icon: <ListChecks className="h-5 w-5" />,
       segment: 'my-tasks'
     },
+    // Conditional "All Content" link
+    // Viewers/Editors see this, filtered by brand at page level
+    // Admins see this, potentially filtered if Scoped Admin
     {
       href: '/dashboard/content',
       label: 'All Content',
       icon: <Folder className="h-5 w-5" />,
-      segment: 'content'
+      segment: 'content' // Main segment for /dashboard/content/* routes
+    },
+    // Conditional "Content" group for creating new content from templates
+    // This section will be dynamically filtered later for brand-specific templates
+    {
+      label: 'Content',
+      icon: <BookOpen className="h-5 w-5" />,
+      items: contentItems, // These will be filtered based on brand permissions
+      segment: 'content-new', // A made-up segment, ensure isActive handles it or direct paths
+      defaultOpen: true
     },
     {
       href: '/dashboard/workflows',
@@ -159,22 +230,12 @@ export function UnifiedNavigation() {
       icon: <Building2 className="h-5 w-5" />,
       segment: 'brands'
     },
-    // Content Templates as a separate top-level item
     {
       href: '/dashboard/templates',
       label: 'Content Templates',
-      icon: <Folder className="h-5 w-5" />,
+      icon: <Folder className="h-5 w-5" />, // Using Folder, BookOpen is used for "Create Content" group
       segment: 'templates'
     },
-    // Content with submenu for creating new content using templates from database
-    {
-      label: 'Content',
-      icon: <BookOpen className="h-5 w-5" />,
-      items: [...contentItems],
-      segment: 'content-new',
-      defaultOpen: true
-    },
-    // New Tools section with submenu
     {
       label: 'Tools',
       icon: <Wrench className="h-5 w-5" />,
@@ -209,7 +270,61 @@ export function UnifiedNavigation() {
     }
   ];
   
-  // Bottom nav items (settings, help)
+  // Filter navItems based on role
+  let filteredNavItems = navItemsDefinition;
+
+  if (isLoadingUser) {
+    // Optionally show a loading state for navigation or return null
+    return (
+      <nav className="bg-card w-64 p-4 h-[calc(100vh-4rem)] overflow-y-auto border-r border-border sticky top-16 hidden lg:block">
+        <div className="flex justify-center items-center h-full">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </nav>
+    );
+  }
+
+  if (!currentUser) {
+    // User not logged in or session error, perhaps show minimal nav or nothing
+    // This case should ideally be handled by a higher-order component or redirect
+    return null; 
+  }
+
+  if (isViewer) {
+    filteredNavItems = navItemsDefinition.filter(item => 
+      item.label === 'Dashboard' ||
+      item.label === 'My Tasks' ||
+      item.label === 'All Content' || // Viewers see this link, page content is filtered
+      item.label === 'Content' || // Content creation group, items within will be filtered
+      item.label === 'Tools'
+    );
+    console.log('[UnifiedNavigation] Viewer Items:', filteredNavItems.map(i => i.label)); // Log viewer items
+  } else if (isEditor) {
+    filteredNavItems = navItemsDefinition.filter(item => 
+      item.label === 'Dashboard' ||
+      item.label === 'My Tasks' ||
+      item.label === 'All Content' || 
+      item.label === 'Content' || 
+      item.label === 'Tools'
+    );
+    console.log('[UnifiedNavigation] Editor Items:', filteredNavItems.map(i => i.label)); // Log editor items
+  } else if (isScopedAdmin) {
+    // Scoped Admins see more, but brand-related items are conceptually filtered at page/API level.
+    // For nav links, they see the sections, but "Create New Brand" for example might be nuanced.
+    // Based on NAVIGATION_PERMISSIONS.md, User Management is global.
+    // Create New Brand/Workflow/Template might need to be global actions or hidden if strictly scoped.
+    // For now, showing them; their actual capability is enforced by API / page.
+    filteredNavItems = navItemsDefinition.filter(item => 
+      item.label !== 'Users' // Show all except explicit global User Management, which is handled separately for Scoped Admin in docs
+    );
+     // Add Users back if it was filtered out, as Scoped Admins can manage users globally
+    if (!filteredNavItems.find(item => item.label === 'Users')) {
+      const usersItem = navItemsDefinition.find(item => item.label === 'Users');
+      if (usersItem) filteredNavItems.push(usersItem);
+    }
+  } // PlatformAdmin sees all, so no filtering needed for navItemsDefinition by default.
+
+  // Bottom nav items (settings, help) - always visible for logged-in users
   const bottomNavItems: NavItem[] = [
     {
       href: '/dashboard/account',
@@ -230,16 +345,28 @@ export function UnifiedNavigation() {
     // For simple nav items
     if ('href' in item) {
       // Exact match for dashboard root
-      if (item.href === '/dashboard' && segments.length === 0) {
+      if (item.href === '/dashboard' && segments.length === 0 && pathname === '/dashboard') {
         return true;
       }
-      
-      // For other items, check if the segment matches
-      if (item.segment && segments.includes(item.segment)) {
-        return true;
+      // Check if the current path starts with the item's href, for non-root items
+      // and ensure it's not just a partial match for a longer path unless it's a group segment
+      if (item.segment && segments[0] === item.segment) {
+         // If item.segment is 'content', active if segments[0] is 'content'
+         // and potentially segments[1] for sub-routes like /content/[id] or /content/new
+        if(item.segment === 'content' && segments[0] === 'content'){
+            return true;
+        }
+        // For items like /dashboard/users, /dashboard/brands, it's a direct segment match
+        if (segments.length === 1 && segments[0] === item.segment) {
+            return true;
+        }
+         // For /dashboard/templates specifically
+        if (item.segment === 'templates' && segments[0] === 'templates') {
+            return true;
+        }
+        return false; // Fallback for basic segment check
       }
-      
-      return false;
+      return pathname.startsWith(item.href) && item.href !== '/dashboard';
     }
     
     // For group items, check if any child item is active
@@ -257,7 +384,7 @@ export function UnifiedNavigation() {
     <nav className="bg-card w-64 p-4 h-[calc(100vh-4rem)] overflow-y-auto border-r border-border sticky top-16 hidden lg:block">
       <div className="space-y-8">
         <div className="space-y-1">
-          {navItems.map((item, index) => (
+          {filteredNavItems.map((item, index) => (
             'items' in item ? (
               // Group with submenu
               <div key={index} className="space-y-1">
@@ -323,7 +450,7 @@ export function UnifiedNavigation() {
         
         {/* Bottom navigation items */}
         <div className="pt-4 border-t border-border">
-          {bottomNavItems.map((item) => (
+          {currentUser && bottomNavItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}

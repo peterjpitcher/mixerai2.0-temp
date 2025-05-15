@@ -11,42 +11,26 @@ interface Params {
 
 // GET a single user by ID
 export const GET = withRouteAuth(async (request: NextRequest, user: any, context: Params) => {
-  console.log(`[API /users/[id]] Request received for ID: ${context.params.id} at ${new Date().toISOString()}`); // VERY EARLY LOG
+  console.log(`[API /users/[id]] GET Request for ID: ${context.params.id} by user: ${user.id} (${user.email || 'No email in user object'}) at ${new Date().toISOString()}`);
   const { params } = context;
   try {
-    // Check if the user is trying to access their own profile or has admin permissions
-    let isViewingOwnProfile = user.id === params.id;
-    let canViewOtherUserProfile = false;
+    const isViewingOwnProfile = user.id === params.id;
+    // Check global admin role from user metadata, ensuring user_metadata exists
+    const isGlobalAdmin = user.user_metadata && user.user_metadata.role === 'admin';
 
-    if (!isViewingOwnProfile) {
-      // Check if the authenticated user has admin permissions for ANY brand
-      const supabaseInner = createSupabaseAdminClient();
-      console.log(`[API /users/[id]] Checking admin permissions for authenticated user: ${user.id}`);
-      const { data: adminPermissions, error: permissionError } = await supabaseInner
-        .from('user_brand_permissions')
-        .select('role', { count: 'exact' }) // Select role and count
-        .eq('user_id', user.id)
-        .eq('role', 'admin');
-      
-      if (permissionError) {
-        console.error(`[API /users/[id]] Error checking admin permissions for ${user.id}:`, permissionError);
-        throw permissionError; 
-      }
-      
-      console.log(`[API /users/[id]] Admin permissions check for ${user.id} count:`, adminPermissions?.length);
-      if (adminPermissions && adminPermissions.length > 0) {
-        canViewOtherUserProfile = true;
-      }
+    console.log(`[API /users/[id]] Auth check: User ${user.id} (GlobalAdmin: ${isGlobalAdmin}) attempting to view profile ${params.id} (IsOwn: ${isViewingOwnProfile})`);
 
-      if (!canViewOtherUserProfile) {
-        return NextResponse.json(
-          { success: false, error: 'Not authorized to view this user' },
-          { status: 403 }
-        );
-      }
+    // If not viewing their own profile AND not a global admin, then deny access.
+    if (!isViewingOwnProfile && !isGlobalAdmin) {
+      console.warn(`[API /users/[id]] Authorization DENIED for user ${user.id} to view profile ${params.id}.`);
+      return NextResponse.json(
+        { success: false, error: 'Not authorized to view this user profile.' },
+        { status: 403 }
+      );
     }
+
+    console.log(`[API /users/[id]] Authorization GRANTED for user ${user.id} to view profile ${params.id}. Proceeding to fetch details.`);
     
-    console.log(`[API /users/[id]] Proceeding to fetch user details for ${params.id}. Viewer: ${user.id}, isViewingOwn: ${isViewingOwnProfile}, canViewOther: ${canViewOtherUserProfile}`);
     const supabase = createSupabaseAdminClient();
     
     // Get auth user
@@ -226,12 +210,25 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: any, context
       });
       
       // Prepare permissions to update or insert
-      const permissionsToUpsert = body.brand_permissions.map(permission => ({
-        id: permission.id || existingPermissionsMap.get(permission.brand_id)?.id,
-        user_id: params.id,
-        brand_id: permission.brand_id,
-        role: permission.role
-      }));
+      const permissionsToUpsert = body.brand_permissions.map(permission => {
+        const existingPermission = existingPermissionsMap.get(permission.brand_id);
+        const record: {
+          user_id: string;
+          brand_id: string;
+          role: string;
+          id?: string; // id is optional, for new records Supabase will generate it
+        } = {
+          user_id: params.id,
+          brand_id: permission.brand_id,
+          role: permission.role,
+        };
+
+        if (existingPermission) {
+          record.id = existingPermission.id; // Only add ID if it's an existing record being updated
+        }
+        // For new permissions, record.id remains undefined, and Supabase/PostgreSQL will generate the UUID.
+        return record;
+      });
       
       // Identify permissions to delete (brands that are in existing but not in the update)
       const brandIdsToKeep = new Set(body.brand_permissions.map(p => p.brand_id));
