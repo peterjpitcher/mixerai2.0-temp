@@ -11,6 +11,10 @@ import { MarkdownDisplay } from '@/components/content/markdown-display';
 import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
 import { toast } from 'sonner';
 import { createBrowserClient } from '@supabase/ssr';
+import { PageHeader } from "@/components/dashboard/page-header";
+import { BrandIcon, BrandIconProps } from '@/components/brand-icon';
+import { ArrowLeft, Edit3 } from 'lucide-react';
+import { format as formatDateFns } from 'date-fns';
 
 interface ContentData {
   id: string;
@@ -19,17 +23,19 @@ interface ContentData {
   meta_title: string;
   meta_description: string;
   status: string;
+  brand_id?: string;
   brand_name?: string;
-  brands?: any; // Simplified for now
+  brand_color?: string;
+  brand_avatar_url?: string;
+  brands?: any;
   template_name?: string;
-  content_templates?: any; // Simplified for now
+  content_templates?: any;
   template_id?: string;
   content_data?: Record<string, any>;
   created_at: string;
   workflow_id?: string;
-  workflow?: { id: string; name: string; steps: any[] }; // Steps from JSONB
-  current_step: number; 
-  // other fields...
+  workflow?: { id: string; name: string; steps: any[] };
+  current_step: number;
 }
 
 interface ContentVersion {
@@ -50,12 +56,32 @@ interface ContentDetailPageProps {
   };
 }
 
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
+
 export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   const { id } = params;
   const [content, setContent] = useState<ContentData | null>(null);
   const [versions, setVersions] = useState<ContentVersion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [activeBrandData, setActiveBrandData] = useState<any>(null);
   const router = useRouter();
 
   const supabase = createBrowserClient(
@@ -87,6 +113,17 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
         const contentResult = await contentResponse.json();
         if (contentResult.success && contentResult.data) {
           setContent(contentResult.data);
+          if (contentResult.data.brand_id) {
+            fetch(`/api/brands/${contentResult.data.brand_id}`)
+              .then(res => res.json())
+              .then(brandRes => {
+                if (brandRes.success && brandRes.brand) {
+                  setActiveBrandData(brandRes.brand);
+                }
+              });
+          } else if (contentResult.data.brands) {
+             setActiveBrandData(contentResult.data.brands);
+          }
         } else {
           throw new Error(contentResult.error || 'Failed to load content data.');
         }
@@ -132,7 +169,6 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     return <p>Content could not be loaded or was not found.</p>; 
   }
 
-  // Find the current step object using the current_step ID
   let currentStepObject: WorkflowStep | undefined = undefined;
   if (content.workflow && content.workflow.steps && content.current_step) {
     currentStepObject = content.workflow.steps.find(
@@ -147,35 +183,72 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     }
   }
 
+  const getFormattedDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      return formatDateFns(new Date(dateString), 'dd MMMM yyyy');
+    } catch (e) {
+      console.error("Error formatting date:", dateString, e);
+      return "Invalid Date";
+    }
+  };
+  const getFormattedDateTime = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      return formatDateFns(new Date(dateString), 'dd MMMM yyyy, HH:mm');
+    } catch (e) {
+      console.error("Error formatting date/time:", dateString, e);
+      return "Invalid Date/Time";
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{content.title}</h1>
-          <p className="text-muted-foreground mt-1">
-            View details, content body, SEO metadata, and manage the approval workflow.
-          </p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Template: {content.template_name || content.content_templates?.name || 'N/A'} • Brand: {content.brand_name || content.brands?.name || 'N/A'} • Created: {new Date(content.created_at).toLocaleDateString('en-GB')}
-          </p>
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" },
+        ...(activeBrandData ? 
+          [
+            { label: "Brands", href: "/dashboard/brands" },
+            { label: activeBrandData.name || "Brand", href: `/dashboard/brands/${content?.brand_id}` },
+            { label: "Content", href: `/dashboard/content?brandId=${content?.brand_id}` }
+          ] : 
+          [{ label: "Content", href: "/dashboard/content" }]),
+        { label: content.title || "View Content" }
+      ]} />
+
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/content')} aria-label="Back to Content List">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight flex items-center">
+              {activeBrandData && 
+                <BrandIcon name={activeBrandData.name} color={activeBrandData.brand_color} size="md" className="mr-3" />
+              }
+              {content.title}
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              View details, content body, SEO metadata, and manage the approval workflow.
+            </p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Template: {content.template_name || content.content_templates?.name || 'N/A'} 
+              {activeBrandData && `• Brand: ${activeBrandData.name}`} 
+              • Created: {getFormattedDate(content.created_at)}
+            </p>
+          </div>
         </div>
         <div className="flex space-x-2">
           {isCurrentUserStepOwner && (
-            <Button variant="outline" asChild>
-              <Link href={`/dashboard/content/${id}/edit`}>
-                Edit
+            <Button variant="default" asChild>
+              <Link href={`/dashboard/content/${id}/edit`} className="flex items-center">
+                <Edit3 className="mr-2 h-4 w-4" /> Edit
               </Link>
             </Button>
           )}
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/content">
-              Back to Content
-            </Link>
-          </Button>
         </div>
       </div>
       
-      {/* Display Current Workflow Step Description */}
       {currentStepObject && currentStepObject.description && (
         <Card className="mb-6 bg-blue-50 border-blue-200">
           <CardHeader className="pb-3">
@@ -209,28 +282,19 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
               </div>
             </CardHeader>
             <CardContent>
-              {/* Tabs component removed, content will be displayed directly or fetched based on template */}
-              {/* Display main body (legacy or first output field) */}
               <div className="prose prose-sm max-w-none mb-6">
                 <h3 className="text-sm font-medium mb-1 border-b pb-1">Main Content Body</h3>
                 <MarkdownDisplay markdown={content.body || (content.content_data?.contentBody || 'No main body content available.')} />
               </div>
 
-              {/* Iterating through other potential output fields from content_data, assuming template defines order elsewhere or we fetch template */}
-              {/* This section needs to be more robust by fetching the template associated with content.template_id 
-                   and then iterating content.content_data based on template.outputFields order. 
-                   For now, a simpler display of non-body fields from content_data is shown. */}
               <h3 className="text-sm font-medium mb-2 border-b pb-1 pt-4">Additional Generated Fields</h3>
               {content.content_data && Object.keys(content.content_data).length > 0 ? (
                 Object.entries(content.content_data).map(([key, value]) => {
-                  // Avoid re-displaying the main contentBody if it was already handled by content.body
                   if (key.toLowerCase() === 'contentbody' && content.body) return null;
-                  // Also avoid displaying templateInputValues if present
                   if (key.toLowerCase() === 'templateinputvalues') return null;
 
                   let displayValue = value;
                   if (typeof value === 'object' && value !== null) {
-                    // Attempt to display simple objects, could be improved
                     displayValue = Object.entries(value).map(([k,v]) => `${k}: ${v}`).join(', ') || 'Complex object data';
                   } else if (typeof value !== 'string') {
                     displayValue = String(value);
@@ -239,8 +303,6 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
                   return (
                     <div key={key} className="mb-4">
                       <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</h4>
-                      {/* Render as Markdown if it seems like markdown, otherwise plain text */}
-                      {/* A more robust check or type field from template would be better */}
                       {(typeof displayValue === 'string' && (displayValue.includes('\n') || displayValue.includes('#') || displayValue.includes('*'))) ? (
                         <div className="prose prose-sm max-w-none border rounded p-2 bg-muted/20">
                             <MarkdownDisplay markdown={displayValue} />
@@ -270,7 +332,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
                       <span className="text-xs text-muted-foreground">v{version.version_number}</span>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      By: {version.reviewer?.full_name || 'N/A'} on {new Date(version.created_at).toLocaleString('en-GB')}
+                      By: {version.reviewer?.full_name || 'N/A'} on {getFormattedDateTime(version.created_at)}
                     </p>
                     {version.feedback && (
                       <p className="mt-2 text-sm italic border-l-2 pl-2 border-border">{version.feedback}</p>
