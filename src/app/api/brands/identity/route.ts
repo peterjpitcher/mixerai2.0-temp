@@ -50,6 +50,8 @@ function getLanguageName(languageCode: string): string {
   const languageMap: Record<string, string> = {
     'en-GB': 'British English',
     'en-US': 'American English',
+    'en-AU': 'Australian English',
+    'en-CA': 'Canadian English',
     'fr-FR': 'French',
     'de-DE': 'German',
     'es-ES': 'Spanish',
@@ -84,10 +86,7 @@ async function scrapeWebsiteContent(url: string): Promise<string> {
       .replace(/\s+/g, ' ')
       .trim();
     
-    // Get a reasonable chunk of content
-    const truncatedContent = textContent.substring(0, 5000);
-    
-    return truncatedContent;
+    return textContent;
   } catch (error: any) {
     // Log scraping errors to a secure server-side log in production.
     // Return an empty string or a specific marker if content extraction fails, rather than error string in content.
@@ -165,38 +164,55 @@ export const POST = withAuthAndMonitoring(async (req: NextRequest, user) => {
     // Prepare prompt for OpenAI
     const countryInfo = COUNTRIES.find(c => c.value === country);
     const countryName = countryInfo ? countryInfo.label : country;
-    const languageName = getLanguageName(language);
     
+    // Determine specific language name for prompts
+    let specificLanguageName = getLanguageName(language); // Default to mapped name or code
+    if (language.toLowerCase() === 'en' && country === 'AU') {
+      specificLanguageName = 'Australian English';
+    } else if (language.toLowerCase() === 'en' && country === 'GB') {
+      specificLanguageName = 'British English';
+    } else if (language.toLowerCase() === 'en' && country === 'US') {
+      specificLanguageName = 'American English';
+    } else if (language.toLowerCase() === 'en' && country === 'CA') {
+      specificLanguageName = 'Canadian English';
+    }
+    // Add more specific English variations if needed, or rely on getLanguageName for codes like 'en-AU'
+
     const systemMessage = `You are an expert brand analyst who creates comprehensive brand identity profiles. 
 Your analysis is clear, professional, and tailored to the specific brand and region.
-CRITICAL: Your entire response MUST be in the language specified by the user (${languageName}).
-Do not include any content in English unless the specified language is English.`;
+CRITICAL: Your entire response MUST be in the language specified by the user (${specificLanguageName}).
+Do not include any content in English unless the specified language is ${specificLanguageName} or a variant of English.`;
     
     const userMessage = `Create a comprehensive brand identity profile for "${name}" based on the following website content:
     
-${contents.map((content, i) => `URL ${i+1}: ${validUrls[i]}\n${content.substring(0, 500)}...\n`).join('\n')}
+${contents.map((content, i) => `URL ${i+1}: ${validUrls[i]}\n${content}\n`).join('\n')}
 
-The brand operates in ${countryName} and communicates in ${languageName}.
+The brand operates in ${countryName} and communicates in ${specificLanguageName}.
 
-IMPORTANT: Generate ALL content in ${languageName}. The entire response must be written in this language, appropriate for the market in ${countryName}. 
-DO NOT use English for any part of your response unless the requested language is English.
+IMPORTANT:
+- Generate ALL content in ${specificLanguageName}. The entire response must be written in this language, appropriate for the market in ${countryName}.
+- DO NOT use any other language for any part of your response unless the requested language is ${specificLanguageName}.
+- CRITICAL: Do NOT explicitly mention the country "${countryName}" or its derived nationality/adjective (e.g., Australian, British) in any of the generated text for Brand Identity, Tone of Voice, or Content Guardrails, unless it's part of an official name (like an agency or a law). The content should be culturally adapted for ${countryName} without explicitly stating the country or nationality.
 
 Please provide the following elements:
 
-1. BRAND IDENTITY: A detailed paragraph describing the brand's personality, values, and mission as they would be perceived in ${countryName}. (100-150 words)
+1. BRAND IDENTITY: A detailed paragraph describing the brand's personality, values, and mission. (100-150 words)
 
-2. TONE OF VOICE: A description of how the brand communicates in ${languageName} - formal/casual, technical/accessible, etc. Consider cultural norms and communication styles in ${countryName}. (50-75 words)
+2. TONE OF VOICE: A description of how the brand communicates in ${specificLanguageName} - formal/casual, technical/accessible, etc. (50-75 words)
 
-3. CONTENT GUARDRAILS: 5 specific guidelines that content creators must follow when creating content for this brand in ${countryName}. Format as bullet points.
+3. CONTENT GUARDRAILS: 5 specific guidelines that content creators must follow when creating content for this brand. Format as bullet points.
 
-4. SUGGESTED AGENCIES: 10 regulatory bodies or vetting agencies relevant to this brand in ${countryName}. Include a mix of general and industry-specific organizations. For each agency, include their name, a brief description, and priority level (high/medium/low).
+4. SUGGESTED AGENCIES: 10 regulatory bodies or vetting agencies relevant to this brand in ${countryName}. For these agencies, it is acceptable to mention the country if it is part of their official name.
 
-5. BRAND COLOR: Analyze the visual identity and content from the provided URLs. Based on this analysis, the brand's described identity, its values, and considering its industry and target audience in ${countryName}, suggest a primary brand color that would best represent this brand. Provide the color in hex format (e.g., #FF5733). The color should be suitable for use in marketing materials and digital presence.
+5. BRAND COLOR: From the provided website content and URLs, identify the brand's primary, official color. This is likely the main color used in their logo, headers, buttons, or defined in their CSS as a primary brand color. Do not invent a color or suggest one that "would be appropriate". Identify the most dominant and consistently used color that represents their core visual identity. Provide this color in hex format (e.g., #FF5733). If multiple prominent colors are used, identify the one that appears to be the most central to their official branding.
 
 Format your response as a structured JSON object with these keys: brandIdentity, toneOfVoice, guardrails, suggestedAgencies (as an array of objects with name, description, and priority), and brandColor.
-Remember that ALL text fields must be written in ${languageName}, not English.`;
+Remember that ALL text fields (except potentially within agency names) must be written in ${specificLanguageName}, and should avoid mentioning "${countryName}" or its nationality.`;
     
     try {
+      console.log("---- [Brand Identity API] System Message ----\n", systemMessage);
+      console.log("---- [Brand Identity API] User Message ----\n", userMessage);
+
       const modelToUse = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
       const completionResponse = await openai.chat.completions.create({
         model: modelToUse,

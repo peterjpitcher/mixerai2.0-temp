@@ -252,193 +252,92 @@ export const PUT = withAuth(async (
       );
     }
     
-    const steps = body.steps || [];
-    const newInvitationsToCreate: WorkflowInvitation[] = [];
-    const newUsersToInviteByEmail: string[] = [];
+    const stepsFromClient = body.steps || [];
+    const processedStepsForRpc: any[] = [];
 
-    for (const step of steps) {
+    for (const step of stepsFromClient) {
+      const validAssigneesForStep: { id: string; email?: string; name?: string }[] = [];
       if (step.assignees && Array.isArray(step.assignees)) {
         for (const assignee of step.assignees) {
-          if (assignee.id) continue;
-          const { data: existingUser /*, error: userFetchError*/ } = await supabase
-            .from('profiles') 
-            .select('id')
-            .eq('email', assignee.email)
-            .maybeSingle();
-          // if (userFetchError) { console.error('User fetch error for assignee:', userFetchError); /* Consider how to handle */ }
-          if (existingUser) {
-            assignee.id = existingUser.id;
-          } else {
-            newInvitationsToCreate.push({
-              workflow_id: workflowId,
-              step_id: step.id, 
-              email: assignee.email,
-              role: step.role || 'editor',
-              invite_token: uuidv4(),
-              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-            });
-            if (!newUsersToInviteByEmail.includes(assignee.email)) {
-              newUsersToInviteByEmail.push(assignee.email);
+          let userIdToAssign: string | null = null;
+
+          if (assignee.id && !assignee.id.startsWith('temp-')) {
+            // Assume it's a valid existing UUID if not starting with temp-
+            userIdToAssign = assignee.id;
+          } else if (assignee.email) {
+            // ID is temporary or missing, try to find user by email
+            const normalizedEmail = assignee.email.trim().toLowerCase(); // Normalize email
+            console.log(`Attempting to find user by normalized email: '${normalizedEmail}' (original: '${assignee.email}') for step '${step.name}'`);
+            const { data: existingUser } = await supabase
+              .from('profiles') 
+              .select('id')
+              .eq('email', normalizedEmail) // Use normalized email for lookup
+              .maybeSingle();
+            
+            if (existingUser) {
+              userIdToAssign = existingUser.id;
+            } else {
+              console.warn(`Assignee with email ${assignee.email} not found for step '${step.name}'. Skipping, as auto-invitation is disabled.`);
             }
+          } else {
+            console.warn('Skipping assignee without a valid ID or email for step:', step.name, assignee);
+          }
+
+          if (userIdToAssign) {
+            validAssigneesForStep.push({ 
+              id: userIdToAssign,
+              // Include email/name if available, though RPC might only need ID
+              email: assignee.email,
+              name: assignee.name 
+            });
           }
         }
       }
+      processedStepsForRpc.push({
+        id: step.id, // This is the step's own UUID (primary key of workflow_steps)
+        name: step.name,
+        description: step.description,
+        role: step.role,
+        approvalRequired: step.approvalRequired,
+        // IMPORTANT: Ensure the RPC 'p_steps' expects assignees as an array of UUID strings.
+        // This change makes it an array of strings: ['uuid1', 'uuid2']
+        assignees: validAssigneesForStep.map(a => a.id), 
+        step_order: step.step_order
+      });
     }
-    
-    const rpcParams: any = {
+
+    // Since we are not inviting new users, p_new_invitation_items is always null
+    const newInvitationItemsForRpc = null;
+
+    const paramsToPass = {
       p_workflow_id: workflowId,
-      p_new_invitation_items: newInvitationsToCreate.length > 0 ? newInvitationsToCreate : null // Pass null if empty, as some RPCs might expect JSONB or null
+      p_name: body.name,
+      p_brand_id: body.brand_id,
+      p_steps: processedStepsForRpc, // Use the processed steps with resolved assignee IDs
+      p_template_id: body.template_id !== undefined ? body.template_id : null, 
+      p_description: body.description ?? workflowDescriptionToUpdate ?? null,
+      p_new_invitation_items: newInvitationItemsForRpc // This will be null
     };
 
-    if (body.name !== undefined) rpcParams.p_name = body.name;
-    if (body.brand_id !== undefined) rpcParams.p_brand_id = body.brand_id;
-    if (body.steps !== undefined) rpcParams.p_steps = steps;
-    // Ensure template_id is passed as p_template_id, allowing null
-    rpcParams.p_template_id = body.template_id !== undefined ? body.template_id : null;
-    // Add description to RPC params if it was generated
-    if (workflowDescriptionToUpdate !== undefined) {
-      rpcParams.p_description = workflowDescriptionToUpdate;
-    }
+    console.log('Calling RPC update_workflow_and_handle_invites with params:', JSON.stringify(paramsToPass, null, 2));
 
-    const hasWorkflowChanges = (
-      body.name !== undefined || 
-      body.brand_id !== undefined || 
-      body.steps !== undefined ||
-      body.template_id !== undefined ||
-      workflowDescriptionToUpdate !== undefined // Count description update as a change
-    );
-
-    if (!hasWorkflowChanges && newInvitationsToCreate.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'No valid fields to update or new invitations to create' },
-        { status: 400 }
-      );
-    }
-    
-    console.log('Calling RPC update_workflow_and_handle_invites with params:', rpcParams);
-
-    const { data: rpcSuccess, error: rpcError } = await supabase.rpc(
-      'update_workflow_and_handle_invites' as any, 
-      rpcParams
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
+      'update_workflow_and_handle_invites',
+      paramsToPass
     );
 
     if (rpcError) {
       console.error('RPC Error updating workflow and invitations:', rpcError);
-      let errorMessage = `Failed to update workflow: ${rpcError.message}`;
-      if (rpcError.details) errorMessage += ` Details: ${rpcError.details}`;
-      if (rpcError.hint) errorMessage += ` Hint: ${rpcError.hint}`;
-      return handleApiError(rpcError, errorMessage);
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: `Failed to update workflow: ${rpcError.message} Hint: ${rpcError.hint}`,
+          details: rpcError
+        },
+        { status: 500 }
+      );
     }
-    if (!rpcSuccess) {
-        console.error('RPC call update_workflow_and_handle_invites returned false or no data.');
-        return handleApiError(new Error('RPC returned non-successful status'), 'Workflow update via RPC failed.');
-    }
-    
-    // --- BEGIN: Sync workflow_user_assignments ---
-    if (rpcParams.p_steps && Array.isArray(rpcParams.p_steps)) {
-      for (const step of rpcParams.p_steps) {
-        if (step.id && step.assignees && Array.isArray(step.assignees)) {
-          const currentStepId = step.id;
 
-          const { data: existingAssignments, error: fetchAssignmentsError } = await supabase
-            .from('workflow_user_assignments')
-            .select('user_id')
-            .eq('workflow_id', workflowId)
-            .eq('step_id', currentStepId);
-
-          if (fetchAssignmentsError) {
-            console.warn(`[SyncAssignments] Error fetching existing assignments for step ${currentStepId}:`, fetchAssignmentsError.message);
-          }
-
-          const existingUserIds = existingAssignments ? existingAssignments.map(a => a.user_id) : [];
-          const newAssigneeUserIds = step.assignees.map((assignee: any) => assignee.id).filter(Boolean);
-
-          const assignmentsToUpsert = newAssigneeUserIds.map((userId: string) => ({
-            workflow_id: workflowId,
-            step_id: currentStepId,
-            user_id: userId,
-          }));
-
-          if (assignmentsToUpsert.length > 0) {
-            const { error: upsertError } = await supabase
-              .from('workflow_user_assignments')
-              .upsert(assignmentsToUpsert, { onConflict: 'workflow_id,step_id,user_id' });
-            if (upsertError) {
-              console.warn(`[SyncAssignments] Error upserting assignments for step ${currentStepId}:`, upsertError.message);
-            } else {
-              console.log(`[SyncAssignments] Successfully upserted assignments for workflow ${workflowId}, step ${currentStepId}`);
-            }
-          }
-
-          if (existingAssignments) {
-            const usersToRemove = existingUserIds
-              .filter((userId): userId is string => userId !== null && !newAssigneeUserIds.includes(userId));
-            if (usersToRemove.length > 0) {
-              const { error: deleteError } = await supabase
-                .from('workflow_user_assignments')
-                .delete()
-                .eq('workflow_id', workflowId)
-                .eq('step_id', currentStepId)
-                .in('user_id', usersToRemove);
-              if (deleteError) {
-                console.warn(`[SyncAssignments] Error deleting old assignments for step ${currentStepId}:`, deleteError.message);
-              } else {
-                console.log(`[SyncAssignments] Successfully deleted old assignments for workflow ${workflowId}, step ${currentStepId}`);
-              }
-            }
-          }
-        }
-      }
-    }
-    // --- END: Sync workflow_user_assignments ---
-        
-    if (newUsersToInviteByEmail.length > 0) {
-      try {
-        await verifyEmailTemplates();
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        const inviterId = user?.id || currentUser?.id;
-        for (const email of newUsersToInviteByEmail) {
-          try {
-            let highestRole = 'viewer' as 'admin' | 'editor' | 'viewer';
-            let firstStepIdForAssignment: number | string | null = null;
-
-            for (const item of newInvitationsToCreate) { 
-              if (item.email === email) {
-                if (firstStepIdForAssignment === null) {
-                  firstStepIdForAssignment = item.step_id;
-                }
-                if (item.role === 'admin') { 
-                  highestRole = 'admin'; 
-                  // No break here to ensure firstStepId is from the actual first item for this email
-                } else if (item.role === 'editor' && highestRole !== 'admin') { 
-                  highestRole = 'editor'; 
-                }
-              }
-            }
-
-            const appMetadataPayload: Record<string, any> = {
-              full_name: '', 
-              role: highestRole,
-              invited_by: inviterId || undefined, 
-              invited_from_workflow: workflowId
-            };
-
-            if (firstStepIdForAssignment !== null) {
-              appMetadataPayload.step_id_for_assignment = firstStepIdForAssignment;
-            }
-
-            await supabase.auth.admin.inviteUserByEmail(email, {
-              data: appMetadataPayload
-            });
-          } catch (individualEmailInviteError: any) {
-            console.error(`Failed to send invitation email to ${email} via Supabase Auth:`, individualEmailInviteError);
-          }
-        } 
-      } catch (setupEmailError: any) {
-        console.error('Error during email invitation setup:', setupEmailError);
-      }
-    } 
-    
     const { data: finalWorkflowData, error: finalFetchError } = await supabase
       .from('workflows')
       .select(`

@@ -174,14 +174,21 @@ export const PUT = withAuth(async (
   const supabase = createSupabaseAdminClient();
   try {
     const brandIdToUpdate = context.params.id;
-    
-    const hasPermission = await isBrandAdmin(authenticatedUser.id, brandIdToUpdate, supabase);
-    if (!hasPermission) {
-      return NextResponse.json(
-        { success: false, error: 'Forbidden: You do not have admin rights for this brand.' },
-        { status: 403 }
-      );
+
+    // Check if the authenticated user is a global admin
+    const isGlobalAdmin = authenticatedUser.user_metadata?.role === 'admin';
+
+    if (!isGlobalAdmin) {
+      // If not a global admin, check for specific brand admin rights
+      const hasBrandAdminPermission = await isBrandAdmin(authenticatedUser.id, brandIdToUpdate, supabase);
+      if (!hasBrandAdminPermission) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden: You do not have admin rights for this brand.' },
+          { status: 403 }
+        );
+      }
     }
+    // If the user is a global admin, or has specific brand admin rights, proceed.
 
     const body = await request.json();
     

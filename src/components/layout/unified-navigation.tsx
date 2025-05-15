@@ -196,22 +196,17 @@ export function UnifiedNavigation() {
       icon: <ListChecks className="h-5 w-5" />,
       segment: 'my-tasks'
     },
-    // Conditional "All Content" link
-    // Viewers/Editors see this, filtered by brand at page level
-    // Admins see this, potentially filtered if Scoped Admin
     {
       href: '/dashboard/content',
       label: 'All Content',
       icon: <Folder className="h-5 w-5" />,
-      segment: 'content' // Main segment for /dashboard/content/* routes
+      segment: 'content'
     },
-    // Conditional "Content" group for creating new content from templates
-    // This section will be dynamically filtered later for brand-specific templates
     {
       label: 'Content',
       icon: <BookOpen className="h-5 w-5" />,
-      items: contentItems, // These will be filtered based on brand permissions
-      segment: 'content-new', // A made-up segment, ensure isActive handles it or direct paths
+      items: contentItems, 
+      segment: 'content-new', 
       defaultOpen: true
     },
     {
@@ -229,7 +224,7 @@ export function UnifiedNavigation() {
     {
       href: '/dashboard/templates',
       label: 'Content Templates',
-      icon: <Folder className="h-5 w-5" />, // Using Folder, BookOpen is used for "Create Content" group
+      icon: <Folder className="h-5 w-5" />,
       segment: 'templates'
     },
     {
@@ -252,12 +247,13 @@ export function UnifiedNavigation() {
         },
         {
           href: '/dashboard/tools/content-transcreator',
-          label: 'Content Trans-Creator',
+          label: 'Content Transcreator',
           icon: <Globe className="h-4 w-4" />,
           segment: 'content-transcreator'
         }
       ]
     },
+    // Users link - will be filtered by role later
     {
       href: '/dashboard/users',
       label: 'Users',
@@ -265,61 +261,42 @@ export function UnifiedNavigation() {
       segment: 'users'
     }
   ];
-  
-  // Filter navItems based on role
-  let filteredNavItems = navItemsDefinition;
+
+  // Filter nav items based on user role
+  let filteredNavItems = [...navItemsDefinition]; // Start with a copy
 
   if (isLoadingUser) {
-    // Optionally show a loading state for navigation or return null
-    return (
-      <nav className="bg-card w-64 p-4 h-[calc(100vh-4rem)] overflow-y-auto border-r border-border sticky top-16 hidden lg:block">
-        <div className="flex justify-center items-center h-full">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      </nav>
+    filteredNavItems = []; // Show nothing or a loader while user is loading
+  } else if (isViewer || isEditor) { // For Viewer and Editor roles
+    filteredNavItems = navItemsDefinition.filter(item => 
+      item.label !== 'Users' && 
+      item.label !== 'Content Templates' &&
+      // Ensure "Content" group (for creation) is not shown if it has no items (e.g. no templates for user)
+      !((item as NavGroupItem).label === 'Content' && (item as NavGroupItem).items.length === 0)
     );
+  } else if (isScopedAdmin) { 
+    // Scoped Admins see most things, user management is global.
+    // No specific top-level items removed by default for scoped admin, 
+    // specific access control is at page/API level.
+    filteredNavItems = navItemsDefinition.filter(item => 
+      !((item as NavGroupItem).label === 'Content' && (item as NavGroupItem).items.length === 0)
+    );
+  } else if (isPlatformAdmin) {
+    // Platform Admins see all items defined in navItemsDefinition
+    filteredNavItems = navItemsDefinition.filter(item => 
+      !((item as NavGroupItem).label === 'Content' && (item as NavGroupItem).items.length === 0)
+    );
+  } else if (!currentUser) {
+    // Not logged in or user data failed to load - show minimal or no nav
+    filteredNavItems = navItemsDefinition.filter(item => 
+      item.label === 'Dashboard' // Example: only allow dashboard, or empty array
+    ); 
+    // Or filteredNavItems = [];
   }
-
-  if (!currentUser) {
-    // User not logged in or session error, perhaps show minimal nav or nothing
-    // This case should ideally be handled by a higher-order component or redirect
-    return null; 
-  }
-
-  if (isViewer) {
-    filteredNavItems = navItemsDefinition.filter(item => 
-      item.label === 'Dashboard' ||
-      item.label === 'My Tasks' ||
-      item.label === 'All Content' || // Viewers see this link, page content is filtered
-      item.label === 'Content' || // Content creation group, items within will be filtered
-      item.label === 'Tools'
-    );
-  } else if (isEditor) {
-    filteredNavItems = navItemsDefinition.filter(item => 
-      item.label === 'Dashboard' ||
-      item.label === 'My Tasks' ||
-      item.label === 'All Content' || 
-      item.label === 'Content' || 
-      item.label === 'Tools'
-    );
-  } else if (isScopedAdmin) {
-    // Scoped Admins see more, but brand-related items are conceptually filtered at page/API level.
-    // For nav links, they see the sections, but "Create New Brand" for example might be nuanced.
-    // Based on NAVIGATION_PERMISSIONS.md, User Management is global.
-    // Create New Brand/Workflow/Template might need to be global actions or hidden if strictly scoped.
-    // For now, showing them; their actual capability is enforced by API / page.
-    filteredNavItems = navItemsDefinition.filter(item => 
-      item.label !== 'Users' // Show all except explicit global User Management, which is handled separately for Scoped Admin in docs
-    );
-     // Add Users back if it was filtered out, as Scoped Admins can manage users globally
-    if (!filteredNavItems.find(item => item.label === 'Users')) {
-      const usersItem = navItemsDefinition.find(item => item.label === 'Users');
-      if (usersItem) filteredNavItems.push(usersItem);
-    }
-  } // PlatformAdmin sees all, so no filtering needed for navItemsDefinition by default.
 
   // Bottom nav items (settings, help) - always visible for logged-in users
-  const bottomNavItems: NavItem[] = [
+  // Ensure these are defined correctly here
+  const bottomNavItems: NavItem[] = currentUser && !isLoadingUser ? [
     {
       href: '/dashboard/account',
       label: 'Account',
@@ -332,7 +309,7 @@ export function UnifiedNavigation() {
       icon: <HelpCircle className="h-5 w-5" />,
       segment: 'help'
     }
-  ];
+  ] : [];
   
   // Check if a navigation item is active based on the current URL path and segments
   const isActive = (item: NavItem | NavGroupItem) => {
@@ -508,95 +485,80 @@ export function UnifiedNavigation() {
   });
 
   return (
-    <nav className="bg-card w-64 p-4 h-[calc(100vh-4rem)] overflow-y-auto border-r border-border sticky top-16 hidden lg:block">
-      <div className="space-y-8">
-        <div className="space-y-1">
-          {finalNavItems.map((item, index) => {
-            if ('type' in item && item.type === 'divider') {
-              return <hr key={index} className="my-2 border-t border-border" />;
-            }
-            if ('items' in item) {
-              return (
-                <div key={index} className="space-y-1">
-                  <button 
-                    onClick={() => toggleSection(item.label.toLowerCase())}
+    <div className="flex flex-col h-full">
+      <nav className="bg-card w-64 p-4 h-[calc(100vh-4rem)] overflow-y-auto border-r border-border sticky top-16 hidden lg:block">
+        <div className="space-y-8">
+          <div className="space-y-1">
+            {finalNavItems.map((item, index) => {
+              if ('type' in item && item.type === 'divider') {
+                return <hr key={index} className="my-2 border-t border-border" />;
+              }
+              if ('items' in item) {
+                return (
+                  <div key={index} className="space-y-1">
+                    <button 
+                      onClick={() => toggleSection(item.label.toLowerCase())}
+                      className={cn(
+                        "flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                        isActive(item)
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:bg-muted hover:text-primary"
+                      )}
+                    >
+                      <span className="flex items-center gap-3">
+                        {item.icon}
+                        {item.label}
+                      </span>
+                      {expandedSections[item.label.toLowerCase()] 
+                        ? <ChevronDown className="h-4 w-4" /> 
+                        : <ChevronRight className="h-4 w-4" />
+                      }
+                    </button>
+                    {expandedSections[item.label.toLowerCase()] && (
+                      <div className="pl-6 space-y-1">
+                        {item.items.map((subItem) => (
+                          <Link
+                            key={subItem.href}
+                            href={subItem.href}
+                            className={cn(
+                              'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors',
+                              (segments.includes(subItem.segment || '') || pathname === subItem.href)
+                                ? "bg-primary text-primary-foreground"
+                                : "text-muted-foreground hover:bg-muted hover:text-primary"
+                            )}
+                          >
+                            {subItem.icon}
+                            {subItem.label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              if ('href' in item) {
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
                     className={cn(
-                      "flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                      'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
                       isActive(item)
                         ? "bg-primary text-primary-foreground"
                         : "text-muted-foreground hover:bg-muted hover:text-primary"
                     )}
                   >
-                    <span className="flex items-center gap-3">
-                      {item.icon}
-                      {item.label}
-                    </span>
-                    {expandedSections[item.label.toLowerCase()] 
-                      ? <ChevronDown className="h-4 w-4" /> 
-                      : <ChevronRight className="h-4 w-4" />
-                    }
-                  </button>
-                  {expandedSections[item.label.toLowerCase()] && (
-                    <div className="pl-6 space-y-1">
-                      {item.items.map((subItem) => (
-                        <Link
-                          key={subItem.href}
-                          href={subItem.href}
-                          className={cn(
-                            'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors',
-                            (segments.includes(subItem.segment || '') || pathname === subItem.href)
-                              ? "bg-primary text-primary-foreground"
-                              : "text-muted-foreground hover:bg-muted hover:text-primary"
-                          )}
-                        >
-                          {subItem.icon}
-                          {subItem.label}
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            }
-            if ('href' in item) {
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                    isActive(item)
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-primary"
-                  )}
-                >
-                  {item.icon}
-                  {item.label}
-                </Link>
-              );
-            }
-            return null;
-          })}
+                    {item.icon}
+                    {item.label}
+                  </Link>
+                );
+              }
+              return null;
+            })}
+          </div>
         </div>
-        <div className="pt-4 border-t border-border">
-          {currentUser && bottomNavItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors mt-1',
-                (segments.includes(item.segment || '') || pathname === item.href)
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-primary"
-              )}
-            >
-              {item.icon}
-              {item.label}
-            </Link>
-          ))}
-        </div>
-      </div>
-    </nav>
+      </nav>
+    </div>
   );
 }
 

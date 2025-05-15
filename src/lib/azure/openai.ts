@@ -368,21 +368,25 @@ export async function generateBrandIdentityFromUrls(
       console.log("Sending request to Azure OpenAI API");
       console.log(`Using deployment: ${deploymentName}`);
       
-        const completion = await client.chat.completions.create({
-          model: deploymentName,
-          messages: [
-            { role: "system", content: "You are a brand strategy expert that helps analyze and create detailed brand identities." },
-            { role: "user", content: prompt }
-          ],
-          temperature: 0.7,
-          max_tokens: 1000,
-          response_format: { type: "json_object" }
-        });
-        
-        console.log("Received response from Azure OpenAI API");
-        const responseContent = completion.choices[0]?.message?.content || "{}";
-        console.log("Raw API response:", responseContent.substring(0, 100) + "...");
-        
+      const systemMessageContent = "You are a brand strategy expert that helps analyze and create detailed brand identities.";
+      console.log("---- System Prompt ----\n", systemMessageContent);
+      console.log("---- User Prompt for Brand Identity ----\n", prompt);
+
+      const completion = await client.chat.completions.create({
+        model: deploymentName,
+        messages: [
+          { role: "system", content: systemMessageContent },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+        response_format: { type: "json_object" }
+      });
+      
+      console.log("Received response from Azure OpenAI API");
+      const responseContent = completion.choices[0]?.message?.content || "{}";
+      console.log("Raw API response:", responseContent.substring(0, 100) + "...");
+      
     const parsedResponse = JSON.parse(responseContent);
           
           // Ensure guardrails are formatted properly

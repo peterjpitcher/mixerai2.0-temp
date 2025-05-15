@@ -185,7 +185,7 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
               View the details, steps, and configuration for this content workflow.
             </p>
             <p className="text-sm text-muted-foreground mt-2">
-              Brand: {brandName} • Created on: {getFormattedDate(workflow.createdAt || Date.now().toString())}
+              Brand: {brandName} • Created on: {getFormattedDate(workflow.created_at || Date.now().toString())}
             </p>
           </div>
         </div>
@@ -265,9 +265,26 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
         <div>
           <Card>
             <CardHeader>
-              <CardTitle>Workflow Details</CardTitle>
+              <CardTitle>Workflow Information</CardTitle>
+              <CardDescription>Details and metadata about this workflow.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <span className="text-muted-foreground">Created By:</span>
+                <span>{createdByName}</span>
+                
+                <span className="text-muted-foreground">Date Created:</span>
+                <span>{getFormattedDateTime(workflow.created_at || Date.now().toString())}</span>
+                
+                <span className="text-muted-foreground">Last Updated:</span>
+                <span>{getFormattedDateTime(workflow.updated_at || Date.now().toString())}</span>
+                
+                <span className="text-muted-foreground">Content Template:</span>
+                <span>{templateName}</span>
+              </div>
+              
+              <Separator />
+              
               <div>
                 <p className="text-sm font-medium mb-1">Brand</p>
                 <div className="flex items-center">
@@ -280,33 +297,11 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
               </div>
               
               <div>
-                <p className="text-sm font-medium mb-1">Content Template</p>
-                <span>{templateName}</span>
-              </div>
-              
-              <div>
                 <p className="text-sm font-medium mb-1">Status</p>
                 <Badge className={`${workflowStatus === 'active' ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'}`}>
                   {workflowStatus.charAt(0).toUpperCase() + workflowStatus.slice(1)}
                 </Badge>
               </div>
-              
-              <div>
-                <p className="text-sm font-medium mb-1">Creator</p>
-                <span>{createdByName}</span>
-              </div>
-              
-              <div>
-                <p className="text-sm font-medium mb-1">Created At</p>
-                <span>{getFormattedDateTime(workflow.createdAt || Date.now().toString())}</span>
-              </div>
-              
-              <div>
-                <p className="text-sm font-medium mb-1">Last Updated</p>
-                <span>{getFormattedDateTime(workflow.updatedAt || workflow.createdAt || Date.now().toString())}</span>
-              </div>
-              
-              <Separator />
               
               <div>
                 <p className="text-sm font-medium mb-1">Content Using This Workflow</p>
