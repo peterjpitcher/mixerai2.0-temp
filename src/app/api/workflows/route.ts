@@ -117,9 +117,10 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       );
     }
     
-    const steps = body.steps || [];
+    // workflowDescription must be declared here to be available for the update later
     let workflowDescription = '';
-    
+    const stepsForAIDescription = body.steps || []; // Use a distinct variable for AI description if body.steps is modified
+
     // --- AI Description Generation ---
     try {
       let brandNameForDesc;
@@ -142,9 +143,8 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         templateNameForDesc = templateData?.name;
       }
       
-      const stepNamesForDesc = steps.map((step: any) => step.name).filter(Boolean);
+      const stepNamesForDesc = stepsForAIDescription.map((step: any) => step.name).filter(Boolean);
 
-      // Use the absolute URL for the fetch call during server-side execution
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
       const aiDescriptionResponse = await fetch(`${baseUrl}/api/ai/generate-workflow-description`, {
         method: 'POST',
@@ -167,66 +167,101 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       } else {
         const errorData = await aiDescriptionResponse.json();
         console.warn('Failed to generate AI description:', errorData.error || aiDescriptionResponse.statusText);
-        // Do not fail the workflow creation, just log a warning. Description will be empty or a default.
       }
     } catch (aiError) {
       console.warn('Error calling AI description generation service:', aiError);
-      // Do not fail the workflow creation if AI description fails
     }
     // --- End AI Description Generation ---
     
-    const invitationItems: {
+    // Define the structure for items being passed to the RPC for logging invitations
+    interface RpcInvitationItem {
       step_id: number;
       email: string;
-      role: string;
+      role: string; // Sanitised role
       invite_token: string;
       expires_at: string;
-    }[] = [];
-    
-    const pendingInvites: string[] = [];
-    
-    for (const step of steps) {
-      if (step.assignees && Array.isArray(step.assignees)) {
-        for (const assignee of step.assignees) {
-          const { data: existingUser } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('email', assignee.email)
-            .maybeSingle();
-            
-          if (existingUser) {
-            assignee.id = existingUser.id;
-          } else {
-            invitationItems.push({
-              step_id: step.id,
-              email: assignee.email,
-              role: step.role || 'editor',
-              invite_token: uuidv4(),
-              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-            });
-            
-            if (!pendingInvites.includes(assignee.email)) {
-              pendingInvites.push(assignee.email);
-            }
-          }
-        }
-      }
     }
     
-    // Prepare data for RPC call
+    const rawSteps = body.steps || [];
+    
+    const processedStepsForRPC: any[] = [];
+    const invitationItems: RpcInvitationItem[] = []; 
+    const pendingInvites: string[] = [];
+
+    for (const rawStep of rawSteps) {
+        const stepRole = ['admin', 'editor', 'viewer'].includes(rawStep.role) ? rawStep.role : 'editor';
+        const processedAssigneesForStep: any[] = [];
+
+        let stepId = NaN;
+        if (typeof rawStep.id === 'number') {
+            stepId = rawStep.id;
+        } else if (typeof rawStep.id === 'string' && rawStep.id.trim() !== '') {
+            stepId = parseInt(rawStep.id, 10);
+        } else if (rawStep.id !== null && rawStep.id !== undefined) {
+            const idStr = String(rawStep.id);
+            if (idStr.trim() !== '') stepId = parseInt(idStr, 10);
+        }
+
+        if (rawStep.assignees && Array.isArray(rawStep.assignees)) {
+            for (const assignee of rawStep.assignees) {
+                if (!assignee.email || typeof assignee.email !== 'string') {
+                    console.warn('Skipping assignee due to missing or invalid email:', assignee);
+                    continue; 
+                }
+
+                const { data: existingUser, error: userFetchError } = await supabase
+                    .from('profiles')
+                    .select('id')
+                    .eq('email', assignee.email)
+                    .maybeSingle();
+
+                if (userFetchError) {
+                    console.error(`Error fetching profile for ${assignee.email}:`, userFetchError);
+                    continue;
+                }
+                
+                const processedAssignee = { ...assignee }; 
+                if (existingUser) {
+                    processedAssignee.id = existingUser.id;
+                } else {
+                    if (!isNaN(stepId)) { 
+                        invitationItems.push({
+                            step_id: stepId,
+                            email: assignee.email,
+                            role: stepRole, 
+                            invite_token: uuidv4(),
+                            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                        });
+                        if (!pendingInvites.includes(assignee.email)) {
+                            pendingInvites.push(assignee.email);
+                        }
+                    } else {
+                        console.warn(`Skipping invitation for assignee ${assignee.email} because of an invalid or unparseable stepId for step:`, rawStep);
+                    }
+                }
+                processedAssigneesForStep.push(processedAssignee);
+            }
+        }
+
+        const baseStepData = (typeof rawStep === 'object' && rawStep !== null) ? rawStep : {};
+        processedStepsForRPC.push({
+            ...baseStepData, 
+            id: !isNaN(stepId) ? stepId : null,
+            role: stepRole, 
+            assignees: processedAssigneesForStep 
+        });
+    }
+    
     const rpcParams = {
       p_name: body.name,
       p_brand_id: body.brand_id,
-      p_steps_definition: steps, // Use the processed steps (with assignee IDs if found)
+      p_steps_definition: processedStepsForRPC,
       p_created_by: user.id,
-      p_invitation_items: invitationItems // Array of items for users needing invites
-      // p_template_id: body.template_id || null, // Removed as per error hint
-      // p_description: workflowDescription // Removed as per error hint
+      p_invitation_items: invitationItems
     };
 
-    // Call the database function to create workflow and log invitations atomically
     const { data: newWorkflowId, error: rpcError } = await supabase.rpc(
-      'create_workflow_and_log_invitations' as any, // TODO: Regenerate types
+      'create_workflow_and_log_invitations' as any,
       rpcParams
     );
 
@@ -239,54 +274,48 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       throw new Error('Workflow creation failed, no ID returned from function.');
     }
     
-    // --- Update workflow with description and template_id ---
     if (newWorkflowId) {
       const { error: updateError } = await supabase
         .from('workflows')
         .update({
-          description: workflowDescription, // The AI-generated or empty description
-          template_id: body.template_id || null // The template_id from the request body
+          description: workflowDescription, // This requires workflowDescription to be in scope
+          template_id: body.template_id || null
         })
         .eq('id', newWorkflowId);
 
       if (updateError) {
         console.error('Error updating workflow with description and template_id:', updateError);
-        // Not throwing error here, as the core workflow and invitations are created.
-        // The client will receive the workflow, potentially without these fields if update failed.
-        // Consider if this should be a hard error based on requirements.
       }
     }
-    // --- End update workflow ---
 
-    // If invitations were logged, send auth invites
     if (pendingInvites.length > 0) {
       try {
-        await verifyEmailTemplates(); // Ensure email templates are okay
+        await verifyEmailTemplates();
         
         for (const email of pendingInvites) {
-          // Determine highest role and first step_id for this email from the originally prepared items
-          let highestRole = 'viewer' as 'admin' | 'editor' | 'viewer'; 
+          let highestRole: 'admin' | 'editor' | 'viewer' = 'viewer'; 
           let firstStepIdForAssignment: number | string | null = null;
 
-          for (const item of invitationItems) {
+          for (const item of invitationItems) { // RpcInvitationItem
             if (item.email === email) {
-              if (firstStepIdForAssignment === null) {
+              if (firstStepIdForAssignment === null && typeof item.step_id === 'number') { // Ensure step_id is number
                 firstStepIdForAssignment = item.step_id;
               }
-              if (item.role === 'admin') {
+              // Type assertion for item.role as it's string in RpcInvitationItem
+              const currentRole = item.role as 'admin' | 'editor' | 'viewer';
+              if (currentRole === 'admin') {
                 highestRole = 'admin';
-                // No break here if we still want to ensure firstStepId is from the actual first item encountered
-              } else if (item.role === 'editor' && highestRole !== 'admin') {
+              } else if (currentRole === 'editor' && highestRole !== 'admin') {
                 highestRole = 'editor';
               }
             }
           }
           
           const appMetadataPayload: Record<string, any> = {
-            full_name: '', // Cannot determine name reliably here
+            full_name: '',
             role: highestRole,
             invited_by: user.id,
-            invited_from_workflow: newWorkflowId // Use the returned ID
+            invited_from_workflow: newWorkflowId
           };
 
           if (firstStepIdForAssignment !== null) {
@@ -298,10 +327,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
           });
           
           if (inviteError) {
-            // Log error, but don't fail the whole request as workflow/logs are created
             console.error(`Failed to send auth invite to ${email}:`, inviteError);
-          } else {
-            // console.log(`Successfully sent auth invite to ${email}`);
           }
         }
       } catch (inviteProcessError) {
@@ -309,7 +335,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       }
     }
     
-    // Fetch the created workflow details to return in the response
     const { data: createdWorkflow, error: fetchError } = await supabase
       .from('workflows')
       .select(`
@@ -332,14 +357,14 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     }
 
     const formattedWorkflow = {
-      ...createdWorkflow,
+      ...(createdWorkflow || {}), // Handle null createdWorkflow
       brand_name: createdWorkflow?.brands?.name || null,
       brand_color: createdWorkflow?.brands?.brand_color || null,
-      description: createdWorkflow?.description || '', // Ensure description is included
-      template_id: createdWorkflow?.template_id || null, // Ensure template_id is included
-      template_name: createdWorkflow?.content_templates?.name || null, // Ensure template_name is included
+      description: createdWorkflow?.description || '',
+      template_id: createdWorkflow?.template_id || null,
+      template_name: createdWorkflow?.content_templates?.name || null,
       steps_count: Array.isArray(createdWorkflow?.steps) ? createdWorkflow.steps.length : 0,
-      content_count: 0 // Assuming new workflow has no content yet
+      content_count: 0
     };
     
     return NextResponse.json({
@@ -347,7 +372,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       workflow: formattedWorkflow
     });
   } catch (error) {
-    // Logged error removed
     return handleApiError(error, 'Error creating workflow');
   }
 }); 

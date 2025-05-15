@@ -13,13 +13,7 @@ import {
   Send, 
   Loader2
 } from 'lucide-react';
-import type { Metadata } from 'next';
 import { toast } from 'sonner';
-
-export const metadata: Metadata = {
-  title: 'Invite User | MixerAI 2.0',
-  description: 'Invite a new user to join your MixerAI workspace and assign their role.',
-};
 
 interface Brand {
   id: string;

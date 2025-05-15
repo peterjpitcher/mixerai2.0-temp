@@ -560,46 +560,31 @@ The workflow management in MixerAI 2.0 has been enhanced with several usability 
 6. Add assignees by email to each step in the workflow
 7. Remove assignees with a single click if needed
 
-The enhanced workflow management provides a more intuitive, user-friendly interface that makes creating and managing complex content workflows simpler and more efficient. 
+The enhanced workflow management provides a more intuitive, user-friendly interface that makes creating and managing complex content workflows simpler and more efficient.
 
-## Azure OpenAI Integration Fixes
+## Workflow API `user_role` Enum Fix (YYYY-MM-DD)
 
-The workflow description auto-generation feature has been enhanced with improved Azure OpenAI integration:
+An error was identified in the `POST /api/workflows` endpoint when creating new workflows with step assignees.
 
-### Key Improvements
+### Problem
+- The API endpoint was attempting to use the role "brand" when creating workflow invitations for step assignees.
+- The `user_role` enum in the database is defined as `('admin', 'editor', 'viewer')` and does not include "brand".
+- This mismatch caused a PostgreSQL error: `invalid input value for enum user_role: "brand"` when the `create_workflow_and_log_invitations` RPC function was called.
 
-- **Simplified API Configuration**: Removed complex client setup in favor of direct fetch calls to Azure OpenAI
-- **Comprehensive Error Handling**: Added detailed error handling with informative error messages
-- **Diagnostic Tools**: Created testing endpoints and scripts to validate Azure OpenAI configuration
-- **Troubleshooting Guide**: Added detailed documentation for common Azure OpenAI issues
-
-### Implementation Changes
-
-1. **Azure OpenAI Client Configuration**:
-   - Updated the Azure OpenAI client to use the correct API endpoint format
-   - Fixed authentication header setup
-   - Added environment variable validation
-
-2. **Frontend Error Handling**:
-   - Added pre-flight checks to verify Azure OpenAI configuration
-   - Improved error message display
-   - Added detailed logging for troubleshooting
-
-3. **Testing and Diagnostics**:
-   - Created `/api/test-azure-openai` endpoint for quick configuration testing
-   - Added `scripts/test-azure-openai.js` for command-line testing
-   - Enhanced error reporting with specific troubleshooting steps
-
-### Technical Considerations
-
-When using the Azure OpenAI API, these points are critical:
-
-1. The endpoint URL format must be: `https://your-resource-name.openai.azure.com`
-2. Authentication requires the `api-key` header (not `Authorization`)
-3. API calls need to specify the deployment name in the URL path
-4. The API version (`2023-05-15`) must be included as a query parameter
-
-For detailed troubleshooting information, refer to the [Azure OpenAI Troubleshooting Guide](docs/AZURE_OPENAI_TROUBLESHOOTING.md). 
+### Solution Implemented
+- Modified `src/app/api/workflows/route.ts` in the `POST` handler.
+- The logic for populating `invitationItems` for the RPC call was updated.
+- The `role` assigned to an invitation item is now explicitly checked against the valid enum values (`'admin'`, `'editor'`, `'viewer'`).
+  ```typescript
+  // In src/app/api/workflows/route.ts, inside the POST handler:
+  invitationItems.push({
+    // ... other properties
+    role: ['admin', 'editor', 'viewer'].includes(step.role) ? step.role : 'editor',
+    // ... other properties
+  });
+  ```
+- If `step.role` (coming from the frontend request) is one of the valid roles, it is used. Otherwise, it defaults to `'editor'`.
+- This ensures that only valid roles are passed to the database function, preventing the enum error.
 
 ## Testing and Debugging Tools
 

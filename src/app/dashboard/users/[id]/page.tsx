@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   Edit,
   Loader2,
+  UserCircle2
 } from 'lucide-react';
 import {
   Dialog,
@@ -40,6 +41,7 @@ import { Badge } from '@/components/badge';
 import { BrandIcon } from '@/components/brand-icon';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { Label } from '@/components/label';
+import { format as formatDateFns } from 'date-fns';
 
 // export const metadata: Metadata = {
 //   title: 'User Details | MixerAI 2.0',
@@ -69,6 +71,26 @@ interface User {
   job_title?: string;
   company?: string;
 }
+
+// Placeholder Breadcrumbs component
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
 
 /**
  * UserDetailPage displays comprehensive details for a specific user account.
@@ -178,19 +200,22 @@ export default function UserDetailPage() {
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Never';
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', { 
-      day: 'numeric', 
-      month: 'long', 
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    // Standard 4.6: Use dd MMMM yyyy format
+    return formatDateFns(date, 'dd MMMM yyyy'); 
   };
   
   if (isLoading) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
-        <PageHeader title="User Details" actions={null} />
+        {/* Minimal header for loading state */}
+        <div className="flex items-center mb-4">
+            <Button variant="outline" size="icon" asChild className="mr-3">
+                 <Link href="/dashboard/users" aria-label="Back to Users">
+                    <ArrowLeft className="h-4 w-4" />
+                </Link>
+            </Button>
+            <h1 className="text-2xl font-bold tracking-tight">Loading User Details...</h1>
+        </div>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
@@ -201,17 +226,27 @@ export default function UserDetailPage() {
   if (!user) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
-        <PageHeader title="User Not Found" actions={
-          <Link href="/dashboard/users">
-            <Button variant="outline">
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Back to Users
+        <Breadcrumbs items={[
+            { label: "Dashboard", href: "/dashboard" }, 
+            { label: "Users", href: "/dashboard/users" }, 
+            { label: "User Not Found" }
+        ]} />
+        <div className="flex items-center mb-4">
+            <Button variant="outline" size="icon" asChild className="mr-3">
+                 <Link href="/dashboard/users" aria-label="Back to Users">
+                    <ArrowLeft className="h-4 w-4" />
+                </Link>
             </Button>
-          </Link>
-        } />
+            <h1 className="text-2xl font-bold tracking-tight">User Not Found</h1>
+        </div>
         <Card>
-          <CardContent className="pt-6">
-            <p>The requested user could not be found or loaded.</p>
+          <CardContent className="pt-6 flex flex-col items-center text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+            <p className="text-lg font-semibold">User Not Found</p>
+            <p className="text-muted-foreground mb-4">The requested user could not be found or loaded.</p>
+            <Button asChild variant="outline">
+                <Link href="/dashboard/users">Back to Users List</Link>
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -222,49 +257,65 @@ export default function UserDetailPage() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
-      <PageHeader 
-        title={user.full_name || 'User Details'}
-        description={`Details for ${user.email}`}
-        actions={
-          <div className="flex space-x-2">
-            <Link href="/dashboard/users">
-              <Button variant="outline">
-                <ChevronLeft className="mr-2 h-4 w-4" />
-                Back to Users
-              </Button>
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" }, 
+        { label: "Users", href: "/dashboard/users" }, 
+        { label: user.full_name || user.email || "User Details" }
+      ]} />
+
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" asChild>
+            <Link href="/dashboard/users" aria-label="Back to Users List">
+              <ArrowLeft className="h-4 w-4" />
             </Link>
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">{user.full_name || user.email}</h1>
+            <p className="text-muted-foreground mt-1">
+              Details for {user.email}.
+            </p>
+          </div>
+        </div>
+        <div className="flex space-x-2">
             {userId && (
               <>
-                <Link href={`/dashboard/users/${userId}/edit`}>
-                  <Button>
+                <Button asChild>
+                  <Link href={`/dashboard/users/${userId}/edit`} className="flex items-center">
                     <Edit className="mr-2 h-4 w-4" />
                     Edit User
-                  </Button>
-                </Link>
-                <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+                  </Link>
+                </Button>
+                <Button variant="destructive" onClick={() => setShowDeleteDialog(true)} title="Delete this user">
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete User
                 </Button>
               </>
             )}
-          </div>
-        }
-      />
+        </div>
+      </div>
 
+      {/* User Info Card */}
       <Card>
         <CardHeader>
-          <CardTitle>User Information</CardTitle>
+          <CardTitle className="flex items-center">
+            <UserCircle2 className="mr-2 h-5 w-5 text-primary" /> Profile Information
+            </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div><Label>Full Name</Label><p>{user.full_name || '-'}</p></div>
-            <div><Label>Email</Label><p>{user.email}</p></div>
-            <div><Label>Role</Label><Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>{user.role || 'member'}</Badge></div>
-            <div><Label>Joined</Label><p>{new Date(user.created_at).toLocaleDateString()}</p></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+            <div><Label className="text-sm text-muted-foreground">Full Name</Label><p className="font-medium">{user.full_name || '-'}</p></div>
+            <div><Label className="text-sm text-muted-foreground">Email</Label><p className="font-medium">{user.email}</p></div>
+            <div><Label className="text-sm text-muted-foreground">System Role</Label><Badge variant={user.role?.toLowerCase().includes('admin') ? 'default' : 'secondary'}>{user.role || 'member'}</Badge></div>
+            <div><Label className="text-sm text-muted-foreground">Joined</Label><p className="font-medium">{formatDate(user.created_at)}</p></div>
+            <div><Label className="text-sm text-muted-foreground">Last Sign In</Label><p className="font-medium">{formatDate(user.last_sign_in_at)}</p></div>
+            {user.company && <div><Label className="text-sm text-muted-foreground">Company</Label><p className="font-medium">{user.company}</p></div>}
+            {user.job_title && <div><Label className="text-sm text-muted-foreground">Job Title</Label><p className="font-medium">{user.job_title}</p></div>}
           </div>
         </CardContent>
       </Card>
 
+      {/* Brand Permissions Card */}
       <Card>
         <CardHeader>
           <CardTitle>Brand Permissions</CardTitle>
@@ -276,7 +327,7 @@ export default function UserDetailPage() {
               {user.brand_permissions.map(perm => (
                 <li key={perm.brand_id} className="flex items-center justify-between p-3 border rounded-md">
                   <div className="flex items-center space-x-3">
-                    <BrandIcon name={perm.brand?.name || 'Unknown Brand'} color={perm.brand?.brand_color || '#cbd5e1'} size="sm" />
+                    <BrandIcon name={perm.brand?.name || 'Unknown Brand'} color={perm.brand?.brand_color ?? undefined} size="sm" />
                     <span>{perm.brand?.name || 'Unknown Brand'}</span>
                   </div>
                   <Badge variant={perm.role === 'admin' ? 'outline' : 'secondary'}>{perm.role}</Badge>
