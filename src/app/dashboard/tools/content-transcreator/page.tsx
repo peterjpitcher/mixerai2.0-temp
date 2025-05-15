@@ -7,9 +7,11 @@ import { Label } from '@/components/label';
 import { Textarea } from '@/components/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Loader2, ClipboardCopy, Globe } from 'lucide-react';
+import { Loader2, ClipboardCopy, Globe, ArrowLeft } from 'lucide-react';
 import type { Metadata } from 'next';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 // export const metadata: Metadata = {
 //   title: 'Content Trans-Creator | MixerAI 2.0',
@@ -61,6 +63,26 @@ const countryOptions = [
   { value: 'RU', label: 'Russia', language: 'ru' },
 ];
 
+// Placeholder Breadcrumbs component
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
+
 /**
  * ContentTransCreatorPage provides a tool for trans-creating content across different
  * languages and cultural contexts. Users can input original content, specify source
@@ -75,6 +97,7 @@ export default function ContentTransCreatorPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<{ transCreatedContent: string } | null>(null);
   const [characterCount, setCharacterCount] = useState(0);
+  const router = useRouter();
 
   // Filter country options based on selected target language
   const filteredCountryOptions = countryOptions.filter(
@@ -162,16 +185,32 @@ export default function ContentTransCreatorPage() {
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6">
-      <h1 className="text-3xl font-bold mb-6">Content Trans-Creator</h1>
-      <p className="text-muted-foreground mb-2">
-        Transform content across languages and cultures with our AI-powered trans-creation tool.
-      </p>
-      <p className="text-muted-foreground mb-2">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+       <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" }, 
+        // { label: "Tools", href: "/dashboard/tools" }, // Uncomment if/when a Tools overview page exists
+        { label: "Content Trans-Creator" }
+      ]} />
+
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/tools')} aria-label="Back to Tools">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Content Trans-Creator</h1>
+            <p className="text-muted-foreground mt-1">
+              Transform content across languages and cultures with our AI-powered trans-creation tool.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <p className="text-muted-foreground text-sm">
         <strong>Why trans-creation matters:</strong> Unlike direct translation, trans-creation preserves 
         the intent, emotion, and impact of your original content while adapting it for cultural nuances.
       </p>
-      <p className="text-muted-foreground mb-8">
+      <p className="text-muted-foreground text-sm mb-4">
         This ensures your message resonates authentically with native speakers, maintaining brand voice 
         while avoiding cultural missteps and translation awkwardness.
       </p>
@@ -258,7 +297,7 @@ export default function ContentTransCreatorPage() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="content">Content</Label>
+                <Label htmlFor="content">Content <span className="text-destructive">*</span></Label>
                 <Textarea
                   id="content"
                   placeholder="Enter your content here..."
