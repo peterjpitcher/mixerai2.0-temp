@@ -426,10 +426,24 @@ export function UnifiedNavigation() {
   if (isPlatformAdmin || isAdmin || isEditor || isViewer) {
      finalNavItems.push({
       href: '/dashboard/content',
-      label: 'Content', // Changed from "All Content" to just "Content" as per reorder list
-      icon: <FileText className="h-5 w-5" />, // Using FileText, Folder is for Templates now
+      label: 'Content', // This is the link to the main content listing page
+      icon: <FileText className="h-5 w-5" />, 
       segment: 'content'
     });
+  }
+  
+  // "Create Content" NavGroupItem (the folder for templates)
+  // Visible if Platform Admin, Global Admin, or Global Editor (similar to who can manage templates or see tools)
+  if (isPlatformAdmin || isAdmin || isEditor) {
+    if (contentItems.length > 0) { // Only show if there are templates
+      finalNavItems.push({
+        label: 'Create Content', // New, distinct label
+        icon: <BookOpen className="h-5 w-5" />, // Original icon for this group
+        items: contentItems,
+        segment: 'content-new', // Keep original segment or choose a new one
+        defaultOpen: expandedSections.content !== undefined ? expandedSections.content : true
+      });
+    }
   }
   
   // Tools: Visible if Platform Admin, Global Admin, or Global Editor

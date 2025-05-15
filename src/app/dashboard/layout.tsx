@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/button";
 // import { NotificationCenter } from "@/components/dashboard/notification-center";
 import { UnifiedNavigation } from "@/components/layout/unified-navigation";
+import { BottomMobileNavigation } from "@/components/layout/BottomMobileNavigation";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { toast as sonnerToast } from "sonner";
@@ -160,7 +161,7 @@ export default function DashboardLayout({
 
       <div className="flex flex-1">
         <UnifiedNavigation />
-        <main className="flex-1 p-4 sm:p-6 overflow-auto">
+        <main className="flex-1 p-4 sm:p-6 overflow-auto lg:pb-0 pb-20">
           {process.env.NODE_ENV === 'development' && (
             <div id="domain-verification-container" className="mb-4">
               {/* This will be populated client-side */}
@@ -169,6 +170,7 @@ export default function DashboardLayout({
           {children}
         </main>
       </div>
+      <BottomMobileNavigation />
     </div>
   );
 } 
