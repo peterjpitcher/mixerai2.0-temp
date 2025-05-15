@@ -8,14 +8,38 @@ import { Label } from '@/components/label';
 import { Textarea } from "@/components/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/select";
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Loader2, ClipboardCopy, Globe } from 'lucide-react';
+import { Loader2, ClipboardCopy, Globe, ArrowLeft } from 'lucide-react';
 import type { Metadata } from 'next';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { BrandIcon } from '@/components/brand-icon';
+import Link from 'next/link';
 
 // export const metadata: Metadata = {
 //   title: 'Metadata Generator | MixerAI 2.0',
 //   description: 'Generate SEO-optimised meta titles, descriptions, and keywords for your web pages.',
 // };
+
+// Placeholder Breadcrumbs component
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
 
 interface Brand {
   id: string;
@@ -25,6 +49,7 @@ interface Brand {
   brand_identity?: string | null;
   tone_of_voice?: string | null;
   guardrails?: string | null;
+  brand_color?: string | null;
 }
 
 /**
@@ -40,6 +65,7 @@ export default function MetadataGeneratorPage() {
   const [isFetchingBrands, setIsFetchingBrands] = useState(true);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [results, setResults] = useState<{ metaTitle: string; metaDescription: string; keywords?: string[] } | null>(null);
+  const router = useRouter();
 
   // Fetch brands on component mount
   useEffect(() => {
@@ -155,11 +181,38 @@ export default function MetadataGeneratorPage() {
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6">
-      <h1 className="text-3xl font-bold mb-6">Metadata Generator</h1>
-      <p className="text-muted-foreground mb-8">
-        Generate SEO-optimised meta titles, descriptions, and keywords using your brand's voice and style.
-      </p>
+    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" }, 
+        // { label: "Tools", href: "/dashboard/tools" }, // Uncomment if/when a Tools overview page exists
+        { label: "Metadata Generator" }
+      ]} />
+
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/tools')} aria-label="Back to Tools">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Metadata Generator</h1>
+            <p className="text-muted-foreground mt-1">
+              Generate SEO-optimised meta titles, descriptions, and keywords using your brand's voice and style.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {selectedBrand && (
+        <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/50 mb-6">
+          <BrandIcon name={selectedBrand.name} color={selectedBrand.brand_color ?? undefined} size="md" />
+          <div>
+            <p className="font-semibold">Using Brand: {selectedBrand.name}</p>
+            <p className="text-xs text-muted-foreground">
+              Country: {selectedBrand.country || 'Not specified'} • Language: {selectedBrand.language || 'Not specified'}
+            </p>
+          </div>
+        </div>
+      )}
       
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
@@ -172,7 +225,7 @@ export default function MetadataGeneratorPage() {
           <CardContent>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="brand">Brand</Label>
+                <Label htmlFor="brand">Brand <span className="text-destructive">*</span></Label>
                 <Select
                   value={selectedBrandId}
                   onValueChange={(value) => {
@@ -193,16 +246,9 @@ export default function MetadataGeneratorPage() {
                 </Select>
               </div>
               
-              {selectedBrand && (
-                <div className="text-xs text-muted-foreground rounded-md bg-muted p-3">
-                  <p><strong>Country:</strong> {selectedBrand.country || 'Not specified'}</p>
-                  <p><strong>Language:</strong> {selectedBrand.language || 'Not specified'}</p>
-                </div>
-              )}
-              
               <form onSubmit={handleSubmitUrl} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="url">Web Page URL</Label>
+                  <Label htmlFor="url">Web Page URL <span className="text-destructive">*</span></Label>
                   <Input
                     id="url"
                     placeholder="https://example.com/page"
