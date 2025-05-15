@@ -14,8 +14,9 @@ import { RichTextEditor } from './rich-text-editor';
 import { useRouter } from 'next/navigation';
 import { BrandIcon } from '@/components/brand-icon';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ArrowLeft, PlusCircle } from 'lucide-react';
 import { marked } from 'marked';
+import Link from 'next/link';
 
 interface Brand {
   id: string;
@@ -58,6 +59,25 @@ interface ContentGeneratorFormProps {
   templateId?: string | null;
 }
 
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
+
 export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -73,6 +93,8 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
   const [associatedWorkflowDetails, setAssociatedWorkflowDetails] = useState<WorkflowSummary | null>(null);
   const [isFetchingWorkflow, setIsFetchingWorkflow] = useState(false);
   
+  const currentBrand = brands.find(b => b.id === selectedBrand);
+
   const fetchTemplate = async (id: string) => {
     setIsLoadingTemplate(true);
     try {
@@ -301,14 +323,31 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
   
   return (
     <div className="space-y-8">
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" }, 
+        { label: "Templates", href: "/dashboard/templates" }, 
+        { label: template ? template.name : (templateId ? "Loading Template..." : "Select Template"), 
+          href: templateId ? `/dashboard/templates/${templateId}` : "/dashboard/templates" 
+        },
+        { label: "Create Content" }
+      ]} />
+
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Content Generator</h1>
-          <p className="text-muted-foreground mt-1">
-            {template ? `Using template: ${template.name}` : 'Generate content using AI-powered templates.'}
-          </p>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" onClick={() => router.back()} aria-label="Back">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          {currentBrand && 
+            <BrandIcon name={currentBrand.name} color={currentBrand.brand_color} size="lg" />
+          }
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Content Generator</h1>
+            <p className="text-muted-foreground mt-1">
+              {template ? `Using template: ${template.name}` : 'Generate content using AI-powered templates.'}
+              {currentBrand && <span className="block text-xs">For brand: {currentBrand.name}</span>}
+            </p>
+          </div>
         </div>
-        <Button variant="outline" onClick={() => router.back()}>Back</Button>
       </div>
       
       <Card>
@@ -393,12 +432,6 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
             )}
           </div>
         </CardContent>
-        <CardFooter className="flex justify-end">
-          <Button onClick={handleGenerate} disabled={isLoading || isLoadingTemplate || isFetchingWorkflow || isGeneratingTitle} className="flex items-center gap-2">
-            {(isLoading || isLoadingTemplate || isFetchingWorkflow || isGeneratingTitle) && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isLoading ? 'Generating Body...' : (isLoadingTemplate ? 'Loading Template...' : (isFetchingWorkflow ? 'Loading Workflow...' : (isGeneratingTitle ? 'Generating Title...' : 'Generate Content & Title')))}
-          </Button>
-        </CardFooter>
       </Card>
       
       {generatedContent && (
@@ -416,14 +449,38 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
               className="min-h-[200px]"
             />
           </CardContent>
-          <CardFooter className="flex justify-end">
-            <Button onClick={handleSave} disabled={isSaving || isFetchingWorkflow || isGeneratingTitle} className="flex items-center gap-2">
-              {(isSaving || isFetchingWorkflow || isGeneratingTitle) && <Loader2 className="h-4 w-4 animate-spin" />}
-              {isSaving ? 'Saving...' : (isFetchingWorkflow ? 'Checking Workflow...' : (isGeneratingTitle ? 'Generating Title...': 'Save Content'))}
-            </Button>
-          </CardFooter>
         </Card>
       )}
+
+      <div className="flex justify-end space-x-2 pt-4 mt-4 border-t">
+        <Button 
+          variant="outline" 
+          onClick={() => router.back()} 
+          disabled={isLoading || isLoadingTemplate || isGeneratingTitle || isSaving || isFetchingWorkflow}
+        >
+          Cancel
+        </Button>
+        {!generatedContent && (
+          <Button 
+            onClick={handleGenerate} 
+            disabled={isLoading || isLoadingTemplate || isFetchingWorkflow || isGeneratingTitle || !selectedBrand || !template}
+            className="flex items-center gap-2"
+          >
+            {(isLoading || isLoadingTemplate || isFetchingWorkflow || isGeneratingTitle) && <Loader2 className="h-4 w-4 animate-spin" />}
+            {isLoading ? 'Generating Body...' : (isLoadingTemplate ? 'Loading Template...' : (isFetchingWorkflow ? 'Loading Workflow...' : (isGeneratingTitle ? 'Generating Title...' : 'Generate Content & Title')))}
+          </Button>
+        )}
+        {generatedContent && (
+          <Button 
+            onClick={handleSave} 
+            disabled={isSaving || isFetchingWorkflow || isGeneratingTitle || !title}
+            className="flex items-center gap-2"
+          >
+            {(isSaving || isFetchingWorkflow || isGeneratingTitle) && <Loader2 className="h-4 w-4 animate-spin" />}
+            {isSaving ? 'Saving...' : (isFetchingWorkflow ? 'Checking Workflow...' : (isGeneratingTitle ? 'Generating Title...': 'Save Content'))}
+          </Button>
+        )}
+      </div>
     </div>
   );
 } 
