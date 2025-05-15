@@ -13,10 +13,25 @@ export const GET = withAuth(async (request: NextRequest, user) => {
   }
 
   const supabase = createSupabaseAdminClient();
+  const globalRole = user?.user_metadata?.role;
+  let permittedBrandIds: string[] | null = null;
+
+  if (globalRole !== 'admin') {
+    const brandPermissions = user?.user_metadata?.brand_permissions as Array<{ brand_id: string, role: string }> | undefined;
+    if (!brandPermissions || brandPermissions.length === 0) {
+      console.log('[API Tasks GET] Non-admin user has no brand permissions. Returning empty array for tasks.');
+      return NextResponse.json({ success: true, data: [] });
+    }
+    permittedBrandIds = brandPermissions.map(p => p.brand_id).filter(id => id != null);
+    if (permittedBrandIds.length === 0) {
+      console.log('[API Tasks GET] Non-admin user has no valid brand IDs in permissions. Returning empty array for tasks.');
+      return NextResponse.json({ success: true, data: [] });
+    }
+  }
 
   try {
     // Query directly from the 'content' table
-    const { data: contentItems, error } = await supabase
+    let contentQuery = supabase
       .from('content')
       .select(`
         id,
@@ -31,11 +46,18 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         workflow_step_details:workflow_steps!current_step (id, name, step_order)
       `)
       // Filter for content assigned to the current user
-      // The string interpolation for user.id needs to be handled carefully for array contains
       .filter('assigned_to', 'cs', `{"${user.id}"}`)
       // Filter for actionable content statuses
-      .in('status', ['pending_review', 'rejected', 'draft'])
-      .order('updated_at', { ascending: false });
+      .in('status', ['pending_review', 'rejected', 'draft']);
+
+    if (globalRole !== 'admin' && permittedBrandIds) {
+      console.log(`[API Tasks GET] Non-admin user. Filtering tasks by permitted brand IDs: ${permittedBrandIds.join(', ')}`);
+      contentQuery = contentQuery.in('brand_id', permittedBrandIds);
+    } else if (globalRole === 'admin') {
+      console.log('[API Tasks GET] Admin user. Fetching tasks from all brands.');
+    }
+
+    const { data: contentItems, error } = await contentQuery.order('updated_at', { ascending: false });
 
     if (error) {
       console.error('Error fetching user tasks from content:', error);

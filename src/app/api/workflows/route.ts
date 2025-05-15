@@ -33,9 +33,23 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     // if (isBuildPhase()) { ... }
     
     const supabase = createSupabaseAdminClient();
-    
     const url = new URL(request.url);
-    const brandId = url.searchParams.get('brand_id');
+    const requestedBrandId = url.searchParams.get('brand_id'); // Renamed for clarity
+    const globalRole = user?.user_metadata?.role;
+    let permittedBrandIds: string[] | null = null;
+
+    if (globalRole !== 'admin') {
+      const brandPermissions = user?.user_metadata?.brand_permissions as Array<{ brand_id: string, role: string }> | undefined;
+      if (!brandPermissions || brandPermissions.length === 0) {
+        console.log('[API Workflows GET] Non-admin user has no brand permissions. Returning empty array.');
+        return NextResponse.json({ success: true, data: [] });
+      }
+      permittedBrandIds = brandPermissions.map(p => p.brand_id).filter(id => id != null);
+      if (permittedBrandIds.length === 0) {
+        console.log('[API Workflows GET] Non-admin user has no valid brand IDs in permissions. Returning empty array.');
+        return NextResponse.json({ success: true, data: [] });
+      }
+    }
     
     let query = supabase
       .from('workflows')
@@ -53,8 +67,20 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       `)
       .order('created_at', { ascending: false });
     
-    if (brandId) {
-      query = query.eq('brand_id', brandId);
+    if (requestedBrandId) {
+      if (globalRole !== 'admin' && permittedBrandIds && !permittedBrandIds.includes(requestedBrandId)) {
+        console.log(`[API Workflows GET] Non-admin user access denied for requested brand_id: ${requestedBrandId}`);
+        return NextResponse.json({ success: true, data: [] }); // Or return 403 error
+      }
+      console.log(`[API Workflows GET] Filtering by requested brand_id: ${requestedBrandId}`);
+      query = query.eq('brand_id', requestedBrandId);
+    } else if (globalRole !== 'admin' && permittedBrandIds) {
+      // If no specific brand requested, and user is not admin, filter by their permitted brands
+      console.log(`[API Workflows GET] Non-admin user. Filtering workflows by permitted brand IDs: ${permittedBrandIds.join(', ')}`);
+      query = query.in('brand_id', permittedBrandIds);
+    } else if (globalRole === 'admin') {
+      console.log('[API Workflows GET] Admin user. Fetching all workflows (or specific brand if requestedBrandId set).');
+      // Admins can see all, or specific if requestedBrandId is set (handled by the first if block)
     }
     
     const { data: workflows, error } = await query;
