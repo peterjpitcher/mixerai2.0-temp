@@ -10,7 +10,7 @@ import { Label } from '@/components/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { toast } from 'sonner';
-import { Loader2, X, PlusCircle, ArrowLeft, Trash2 } from 'lucide-react';
+import { Loader2, X, PlusCircle, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 import { Checkbox } from "@/components/checkbox";
@@ -442,13 +442,41 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     }
   };
   
+  // Error state component from BrandsPage, adapted for this page
+  const ErrorDisplay = ({ message }: { message: string | null }) => (
+    <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
+      <div className="mb-4 text-red-500">
+        <AlertTriangle size={64} strokeWidth={1.5} />
+      </div>
+      <h3 className="text-xl font-bold mb-2">Error Loading Brand</h3>
+      <p className="text-muted-foreground mb-4 text-center max-w-md">{message}</p>
+      <Button onClick={() => window.location.reload()}>Try Again</Button>
+    </div>
+  );
+
+  // Not found state component from BrandsPage, adapted for this page
+  const NotFoundDisplay = () => (
+    <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
+       <div className="mb-4 text-yellow-500"> {/* Changed color for not found */}
+        <AlertTriangle size={64} strokeWidth={1.5} /> {/* Or a different icon like SearchX */}
+      </div>
+      <h3 className="text-xl font-bold mb-2">Brand Not Found</h3>
+      <p className="text-muted-foreground mb-4 text-center max-w-md">
+        The brand you are looking for does not exist or has been deleted.
+      </p>
+      <Button onClick={() => router.push('/dashboard/brands')}>Back to Brands</Button>
+    </div>
+  );
+
   // Loading state
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-[50vh]">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <p>Loading brand details...</p>
+      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6"> {/* Added standard padding */}
+        <div className="flex justify-center items-center h-[50vh]">
+          <div className="flex flex-col items-center space-y-4">
+            <Loader2 className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" /> {/* Matched BrandsPage loader style */}
+            <p className="text-muted-foreground">Loading brand details...</p>
+          </div>
         </div>
       </div>
     );
@@ -457,36 +485,28 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   // Error state
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[300px]">
-        <div className="text-destructive mb-4">
-          <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
+        <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6"> {/* Added standard padding */}
+            <Breadcrumbs items={[
+                { label: "Dashboard", href: "/dashboard" }, 
+                { label: "Brands", href: "/dashboard/brands" }, 
+                { label: "Error" }
+            ]} />
+            <ErrorDisplay message={error} />
         </div>
-        <h3 className="text-xl font-bold mb-2">Error Loading Brand</h3>
-        <p className="text-muted-foreground mb-4 text-center max-w-md">{error}</p>
-        <Button onClick={() => window.location.reload()}>Try Again</Button>
-      </div>
     );
   }
   
   // Not found state
-  if (!brand) {
+  if (!brand) { // This check should be after isLoading and error, and if brand is still null
     return (
-      <div className="flex flex-col items-center justify-center min-h-[300px]">
-        <div className="text-warning mb-4">
-          <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
+        <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6"> {/* Added standard padding */}
+            <Breadcrumbs items={[
+                { label: "Dashboard", href: "/dashboard" }, 
+                { label: "Brands", href: "/dashboard/brands" }, 
+                { label: "Not Found" }
+            ]} />
+            <NotFoundDisplay />
         </div>
-        <h3 className="text-xl font-bold mb-2">Brand Not Found</h3>
-        <p className="text-muted-foreground mb-4 text-center max-w-md">The brand for which you are looking does not exist or has been deleted.</p>
-        <Button onClick={() => router.push('/dashboard/brands')}>Back to Brands</Button>
-      </div>
     );
   }
   
@@ -495,7 +515,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   const languageName = LANGUAGES.find(l => l.value === formData.language)?.label || formData.language || 'Select language';
   
   return (
-    <div className="space-y-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6"> {/* Standard 0.4: Consistent Page Padding & root spacing */}
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" }, 
         { label: "Brands", href: "/dashboard/brands" }, 
@@ -505,10 +525,10 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {/* Standard 1.3: Back Button - Top Left */}
-          <Button variant="outline" size="icon" onClick={() => router.push(`/dashboard/brands/${id}`)} aria-label="Back to Brand view">
+          <Button variant="outline" size="icon" onClick={() => router.push(id ? `/dashboard/brands/${id}` : '/dashboard/brands')} aria-label="Back to Brand">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <BrandIcon name={formData.name} color={formData.brand_color} size="lg" />
+          <BrandIcon name={formData.name} color={formData.brand_color ?? undefined} size="lg" /> {/* Ensured color prop safety */}
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Edit: {formData.name || 'Brand'}</h1>
             <p className="text-muted-foreground">
@@ -756,13 +776,23 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="brand_color_identity_tab">Brand Colour</Label>
+                      <Label htmlFor="brand_color">Brand Colour</Label>
                       <div className="flex gap-2 items-center">
-                        <input type="color" id="brand_color_identity_tab" name="brand_color" value={formData.brand_color || '#1982C4'} onChange={handleInputChange} className="w-10 h-10 rounded cursor-pointer" />
-                        <Input value={formData.brand_color || '#1982C4'} onChange={handleInputChange} name="brand_color" placeholder="#HEX colour" className="w-32" />
-                    </div>
-                      <div className="w-full h-12 rounded-md mt-2" style={{ backgroundColor: formData.brand_color || '#1982C4' }} />
-                      <p className="text-xs text-center text-muted-foreground">{formData.brand_color || '#1982C4'}</p>
+                        <input 
+                          type="color" 
+                          id="brand_color" 
+                          name="brand_color" 
+                          value={formData.brand_color} 
+                          onChange={handleInputChange} 
+                          className="w-10 h-10 rounded cursor-pointer border"
+                        />
+                        <Input 
+                          value={formData.brand_color} 
+                          onChange={handleInputChange} 
+                          name="brand_color" 
+                          placeholder="#HEX colour" 
+                          className="w-32" />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -773,7 +803,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       </Tabs>
       {/* Standard 3.1: Consolidated Form Actions - Bottom Right, sticky if form is long */}
       <div className="flex justify-end space-x-2 pt-4 mt-4 border-t">
-        <Button variant="outline" onClick={() => router.push(`/dashboard/brands/${id}`)} disabled={isSaving || isGenerating}>
+        <Button variant="outline" onClick={() => router.push(id ? `/dashboard/brands/${id}` : '/dashboard/brands')} disabled={isSaving || isGenerating}>
             Cancel
         </Button>
         <Button onClick={handleSave} disabled={isSaving || isGenerating}>
