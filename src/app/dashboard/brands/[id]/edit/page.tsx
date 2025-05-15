@@ -10,12 +10,13 @@ import { Label } from '@/components/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { toast } from 'sonner';
-import { Loader2, X, PlusCircle } from 'lucide-react';
+import { Loader2, X, PlusCircle, ArrowLeft, Trash2 } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 import { Checkbox } from "@/components/checkbox";
 import { Badge } from "@/components/badge";
 import { v4 as uuidv4 } from 'uuid';
+import Link from 'next/link';
 
 // export const metadata: Metadata = {
 //   title: 'Edit Brand | MixerAI 2.0',
@@ -59,6 +60,26 @@ const getPriorityAgencyStyles = (priority: 'High' | 'Medium' | 'Low' | null | un
   }
   return 'font-normal text-gray-700 dark:text-gray-300'; // Default for null/undefined or other values
 };
+
+// Placeholder Breadcrumbs component - replace with actual implementation later
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
 
 /**
  * BrandEditPage allows users to modify the details of an existing brand.
@@ -475,23 +496,37 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   
   return (
     <div className="space-y-6">
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" }, 
+        { label: "Brands", href: "/dashboard/brands" }, 
+        { label: formData.name || "Loading...", href: `/dashboard/brands/${id}` }, // Display current name, link to view page
+        { label: "Edit" }
+      ]} />
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
+          {/* Standard 1.3: Back Button - Top Left */}
+          <Button variant="outline" size="icon" onClick={() => router.push(`/dashboard/brands/${id}`)} aria-label="Back to Brand view">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           <BrandIcon name={formData.name} color={formData.brand_color} size="lg" />
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Edit: {brand?.name || 'Brand'}</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Edit: {formData.name || 'Brand'}</h1>
             <p className="text-muted-foreground">
               Update the name, identity, and other settings for this brand.
             </p>
           </div>
         </div>
         
-        <div className="flex space-x-2">
-          <Button variant="outline" onClick={() => router.push(`/dashboard/brands`)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={isSaving || isGenerating}>
-            {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
-          </Button>
-        </div>
+        {/* Standard: Page-level actions like Delete can be here */}
+        <Button 
+          variant="destructive" 
+          onClick={() => { /* Logic to show delete confirmation dialog */ }}
+          disabled={isSaving || isGenerating} // Consider if isGenerating applies here
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          Delete Brand
+        </Button>
+        {/* Top-right save/cancel removed from here, moved to bottom */}
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
@@ -736,11 +771,16 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
           </Card>
         </TabsContent>
       </Tabs>
-      <CardFooter className="flex justify-end pt-6">
+      {/* Standard 3.1: Consolidated Form Actions - Bottom Right, sticky if form is long */}
+      <div className="flex justify-end space-x-2 pt-4 mt-4 border-t">
+        <Button variant="outline" onClick={() => router.push(`/dashboard/brands/${id}`)} disabled={isSaving || isGenerating}>
+            Cancel
+        </Button>
         <Button onClick={handleSave} disabled={isSaving || isGenerating}>
             {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
         </Button>
-      </CardFooter>
+      </div>
+      {/* TODO: Ensure Delete Confirmation Dialog is correctly implemented and triggered by the new Delete Brand button */}
     </div>
   );
 } 
