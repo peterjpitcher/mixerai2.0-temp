@@ -4,12 +4,10 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
-import { Icons } from '@/components/icons';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { Badge } from '@/components/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/dropdown-menu';
 import { toast } from 'sonner';
-import { Loader2, PlusCircle, LayoutTemplate, Edit3, MoreVertical, FileTextIcon } from 'lucide-react';
+import { Loader2, PlusCircle, LayoutTemplate, Edit3, FileTextIcon, MoreVertical, FileCog } from 'lucide-react';
 import type { Metadata } from 'next';
 
 // Placeholder Breadcrumbs component - replace with actual implementation later
@@ -85,7 +83,7 @@ export default function TemplatesPage() {
   }, []);
 
   return (
-    <div className="container mx-auto px-4 py-6 space-y-8">
+    <div className="space-y-8">
       <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Content Templates" }]} />
       <PageHeader
         title="Content Templates"
@@ -108,57 +106,40 @@ export default function TemplatesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {templates.map(template => (
             <Card key={template.id} className="flex flex-col">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg font-medium">{template.name}</CardTitle>
-                    <CardDescription className="mt-1">{template.description}</CardDescription>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label="Open template actions menu">
-                        <span className="sr-only">Open menu</span>
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link href={`/dashboard/templates/${template.id}`} className="flex items-center">
-                          <Edit3 className="mr-2 h-4 w-4" /> Edit Template
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href={`/dashboard/content/new?template=${template.id}`} className="flex items-center">
-                          <PlusCircle className="mr-2 h-4 w-4" /> Create Content from Template
-                        </Link>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+              <CardHeader className="pb-3">
+                <div>
+                  <CardTitle className="text-xl">{template.name}</CardTitle>
+                  <CardDescription className="mt-1 h-10 overflow-hidden text-ellipsis">
+                    {template.description || 'No description provided.'}
+                  </CardDescription>
                 </div>
               </CardHeader>
-              <CardContent className="flex-grow">
-                <div className="flex flex-wrap gap-2 mt-2">
-                  <Badge variant="outline">
+              <CardContent className="flex-grow pt-2">
+                <div className="space-y-2">
+                  <Badge variant="outline" className="flex items-center w-fit">
                     <LayoutTemplate className="mr-1.5 h-3.5 w-3.5" />
                     {template.fields.inputFields.length} input field{template.fields.inputFields.length !== 1 ? 's' : ''}
                   </Badge>
-                  <Badge variant="outline">
+                  <Badge variant="outline" className="flex items-center w-fit">
                     <LayoutTemplate className="mr-1.5 h-3.5 w-3.5" />
                     {template.fields.outputFields.length} output field{template.fields.outputFields.length !== 1 ? 's' : ''}
                   </Badge>
-                </div>
-              </CardContent>
-              <CardFooter className="border-t pt-4 text-sm text-muted-foreground">
-                <div className="w-full flex justify-between items-center">
-                  <div>
-                    <span>
-                      Created: {template.created_at 
-                        ? new Date(template.created_at).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' }) 
-                        : 'Date unavailable'}
-                    </span>
-                    <span className="ml-4">Used: {template.usageCount !== undefined ? template.usageCount : 'N/A'} time{template.usageCount !== 1 ? 's' : ''}</span>
+                  <div className="text-sm text-muted-foreground pt-2">
+                    Used: {template.usageCount !== undefined ? template.usageCount : '0'} time{template.usageCount !== 1 ? 's' : ''}
                   </div>
                 </div>
+              </CardContent>
+              <CardFooter className="border-t pt-4 flex justify-start gap-2">
+                <Button variant="outline" size="sm" asChild title="Use this template to create content">
+                  <Link href={`/dashboard/content/new?template=${template.id}`} className="flex items-center">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Use Template
+                  </Link>
+                </Button>
+                <Button variant="ghost" size="sm" asChild title="Edit this template">
+                  <Link href={`/dashboard/templates/${template.id}`} className="flex items-center">
+                    <Edit3 className="mr-2 h-4 w-4" /> Edit
+                  </Link>
+                </Button>
               </CardFooter>
             </Card>
           ))}
