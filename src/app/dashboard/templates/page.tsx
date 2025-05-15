@@ -9,8 +9,28 @@ import { PageHeader } from '@/components/dashboard/page-header';
 import { Badge } from '@/components/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/dropdown-menu';
 import { toast } from 'sonner';
-import { Loader2, PlusCircle, LayoutTemplate, Edit3 } from 'lucide-react';
+import { Loader2, PlusCircle, LayoutTemplate, Edit3, MoreVertical, FileTextIcon } from 'lucide-react';
 import type { Metadata } from 'next';
+
+// Placeholder Breadcrumbs component - replace with actual implementation later
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
 
 interface Template {
   id: string;
@@ -66,13 +86,14 @@ export default function TemplatesPage() {
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-8">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Content Templates" }]} />
       <PageHeader
         title="Content Templates"
         description="Create and manage your content templates for AI-powered content generation"
         actions={
           <Link href="/dashboard/templates/new">
             <Button>
-              <Icons.plus className="mr-2 h-4 w-4" />
+              <PlusCircle className="mr-2 h-4 w-4" />
               Create Template
             </Button>
           </Link>
@@ -81,7 +102,7 @@ export default function TemplatesPage() {
       
       {loading ? (
         <div className="flex justify-center items-center py-8">
-          <Icons.spinner className="h-8 w-8 animate-spin text-primary" />
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -95,17 +116,21 @@ export default function TemplatesPage() {
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label="Open template actions menu">
                         <span className="sr-only">Open menu</span>
-                        <Icons.moreVertical className="h-4 w-4" />
+                        <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem asChild>
-                        <Link href={`/dashboard/templates/${template.id}`}>Edit template</Link>
+                        <Link href={`/dashboard/templates/${template.id}`} className="flex items-center">
+                          <Edit3 className="mr-2 h-4 w-4" /> Edit Template
+                        </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href={`/dashboard/content/new?template=${template.id}`}>Create content</Link>
+                        <Link href={`/dashboard/content/new?template=${template.id}`} className="flex items-center">
+                          <PlusCircle className="mr-2 h-4 w-4" /> Create Content from Template
+                        </Link>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -114,9 +139,11 @@ export default function TemplatesPage() {
               <CardContent className="flex-grow">
                 <div className="flex flex-wrap gap-2 mt-2">
                   <Badge variant="outline">
+                    <LayoutTemplate className="mr-1.5 h-3.5 w-3.5" />
                     {template.fields.inputFields.length} input field{template.fields.inputFields.length !== 1 ? 's' : ''}
                   </Badge>
                   <Badge variant="outline">
+                    <LayoutTemplate className="mr-1.5 h-3.5 w-3.5" />
                     {template.fields.outputFields.length} output field{template.fields.outputFields.length !== 1 ? 's' : ''}
                   </Badge>
                 </div>
@@ -131,12 +158,6 @@ export default function TemplatesPage() {
                     </span>
                     <span className="ml-4">Used: {template.usageCount !== undefined ? template.usageCount : 'N/A'} time{template.usageCount !== 1 ? 's' : ''}</span>
                   </div>
-                  <Link href={`/dashboard/templates/${template.id}`} passHref>
-                    <Button variant="outline" size="sm">
-                      <Edit3 className="mr-2 h-3.5 w-3.5" />
-                      Edit
-                    </Button>
-                  </Link>
                 </div>
               </CardFooter>
             </Card>
@@ -146,13 +167,13 @@ export default function TemplatesPage() {
           {templates.length === 0 && (
             <div className="col-span-3 text-center py-10">
               <div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-4">
-                <Icons.file className="w-12 h-12 text-muted-foreground" />
+                <FileTextIcon className="w-12 h-12 text-muted-foreground" />
               </div>
               <h3 className="text-xl font-medium mb-2">No templates found</h3>
               <p className="text-muted-foreground mb-4">Get started by creating your first template.</p>
               <Link href="/dashboard/templates/new">
                 <Button>
-                  <Icons.plus className="mr-2 h-4 w-4" />
+                  <PlusCircle className="mr-2 h-4 w-4" />
                   Create Template
                 </Button>
               </Link>
