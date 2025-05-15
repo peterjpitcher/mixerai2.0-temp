@@ -8,14 +8,38 @@ import { Label } from '@/components/label';
 import { Textarea } from "@/components/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/select";
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Loader2, ClipboardCopy, Image } from 'lucide-react';
+import { Loader2, ClipboardCopy, Image, ArrowLeft } from 'lucide-react';
 import type { Metadata } from 'next';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { BrandIcon } from '@/components/brand-icon';
+import Link from 'next/link';
 
 // export const metadata: Metadata = {
 //   title: 'Alt Text Generator | MixerAI 2.0',
 //   description: 'Generate accessible alt text for images using your brand guidelines.',
 // };
+
+// Placeholder Breadcrumbs component
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
 
 interface Brand {
   id: string;
@@ -25,6 +49,7 @@ interface Brand {
   brand_identity?: string | null;
   tone_of_voice?: string | null;
   guardrails?: string | null;
+  brand_color?: string | null;
 }
 
 /**
@@ -42,6 +67,7 @@ export default function AltTextGeneratorPage() {
   const [results, setResults] = useState<{ altText: string } | null>(null);
   const [previewError, setPreviewError] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   // Fetch brands on component mount
   useEffect(() => {
@@ -171,11 +197,38 @@ export default function AltTextGeneratorPage() {
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6">
-      <h1 className="text-3xl font-bold mb-6">Alt Text Generator</h1>
-      <p className="text-muted-foreground mb-8">
-        Generate accessible alt text for images to improve accessibility and SEO using your brand's voice and style.
-      </p>
+    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" }, 
+        // { label: "Tools", href: "/dashboard/tools" }, // Uncomment if/when a Tools overview page exists
+        { label: "Alt Text Generator" }
+      ]} />
+
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/tools')} aria-label="Back to Tools">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Alt Text Generator</h1>
+            <p className="text-muted-foreground mt-1">
+              Generate accessible alt text for images using your brand's voice and style.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {selectedBrand && (
+        <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/50 mb-6">
+          <BrandIcon name={selectedBrand.name} color={selectedBrand.brand_color ?? undefined} size="md" />
+          <div>
+            <p className="font-semibold">Using Brand: {selectedBrand.name}</p>
+            <p className="text-xs text-muted-foreground">
+              Country: {selectedBrand.country || 'Not specified'} • Language: {selectedBrand.language || 'Not specified'}
+            </p>
+          </div>
+        </div>
+      )}
       
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
@@ -188,7 +241,7 @@ export default function AltTextGeneratorPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="brand">Brand</Label>
+                <Label htmlFor="brand">Brand <span className="text-destructive">*</span></Label>
                 <Select
                   value={selectedBrandId}
                   onValueChange={setSelectedBrandId}
@@ -207,15 +260,8 @@ export default function AltTextGeneratorPage() {
                 </Select>
               </div>
               
-              {selectedBrand && (
-                <div className="text-xs text-muted-foreground rounded-md bg-muted p-3">
-                  <p><strong>Country:</strong> {selectedBrand.country || 'Not specified'}</p>
-                  <p><strong>Language:</strong> {selectedBrand.language || 'Not specified'}</p>
-                </div>
-              )}
-              
               <div className="space-y-2">
-                <Label htmlFor="imageUrl">Image URL</Label>
+                <Label htmlFor="imageUrl">Image URL <span className="text-destructive">*</span></Label>
                 <Input
                   id="imageUrl"
                   placeholder="https://example.com/image.jpg"
