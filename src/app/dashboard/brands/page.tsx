@@ -17,8 +17,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/alert-dialog";
-import { Trash2 } from "lucide-react";
+import { Trash2, PackageOpen, AlertTriangle, FileUp, FileDown, Eye, Edit3 } from "lucide-react";
 import { toast } from 'sonner';
+import { PageHeader } from "@/components/dashboard/page-header";
 
 interface Brand {
   id: string;
@@ -306,21 +307,13 @@ export default function BrandsPage() {
                     <CardFooter className="border-t pt-4 flex justify-between">
                       <div className="flex gap-2">
                         <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/dashboard/brands/${brand.id}`}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                              <circle cx="12" cy="12" r="3" />
-                            </svg>
-                            View
+                          <Link href={`/dashboard/brands/${brand.id}`} className="flex items-center">
+                            <Eye className="mr-2 h-4 w-4" /> View
                           </Link>
                         </Button>
                         <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/dashboard/brands/${brand.id}/edit`}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                              <path d="M12 20h9" />
-                              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                            </svg>
-                            Edit
+                          <Link href={`/dashboard/brands/${brand.id}/edit`} className="flex items-center">
+                            <Edit3 className="mr-2 h-4 w-4" /> Edit
                           </Link>
                         </Button>
                       </div>
