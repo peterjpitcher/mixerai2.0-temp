@@ -254,15 +254,13 @@ export default function NewBrandPage() {
       const data = await response.json();
       if (data.success && data.data) {
         const generatedAgencies = Array.isArray(data.data.suggestedAgencies) 
-                                    ? data.data.suggestedAgencies.map((a: any) => a.name) // Assuming API returns names, match logic to edit if it expects IDs
+                                    ? data.data.suggestedAgencies.map((a: any) => a.id || a.name) // Prefer ID if available
                                     : [];
         setFormData(prev => ({
           ...prev,
           brand_identity: data.data.brandIdentity || prev.brand_identity,
           tone_of_voice: data.data.toneOfVoice || prev.tone_of_voice,
           guardrails: data.data.guardrails || prev.guardrails,
-          // If generatedAgencies are names and content_vetting_agencies stores IDs, this needs reconciliation
-          // For now, assuming generated are names and we might need to find their IDs or store names if schema allows
           content_vetting_agencies: Array.from(new Set([...prev.content_vetting_agencies, ...generatedAgencies])),
           brand_color: data.data.brandColor || prev.brand_color
         }));
@@ -289,8 +287,6 @@ export default function NewBrandPage() {
       const payload: any = { 
         ...formData,
         brand_admin_ids: selectedAdmins.map(admin => admin.id),
-        // Ensure content_vetting_agencies sends IDs if that's what backend expects
-        // This currently sends an array of IDs/names based on checkbox/generation logic
         selected_agency_ids: formData.content_vetting_agencies 
       };
       
@@ -303,10 +299,6 @@ export default function NewBrandPage() {
         payload.additional_website_urls = payload.additional_website_urls.map((item: {id:string, value:string}) => item.value).filter(Boolean);
         if(payload.additional_website_urls.length === 0) payload.additional_website_urls = null;
       }
-      // No longer a simple string, it's an array of IDs
-      // if (typeof payload.content_vetting_agencies === 'string' && payload.content_vetting_agencies.trim() === ''){
-      //     payload.content_vetting_agencies = null;
-      // }
 
       const response = await fetch('/api/brands', {
         method: 'POST',
@@ -362,14 +354,6 @@ export default function NewBrandPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2"><Label htmlFor="country">Country</Label><Select value={formData.country} onValueChange={(v) => handleSelectChange('country', v)}><SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger><SelectContent className="max-h-[300px]">{COUNTRIES.map(c => (<SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>))}</SelectContent></Select></div>
                 <div className="space-y-2"><Label htmlFor="language">Language</Label><Select value={formData.language} onValueChange={(v) => handleSelectChange('language', v)}><SelectTrigger><SelectValue placeholder="Select language" /></SelectTrigger><SelectContent className="max-h-[300px]">{LANGUAGES.map(l => (<SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>))}</SelectContent></Select></div>
-              </div>
-              {/* Brand Colour Picker (from edit page) */}
-              <div className="space-y-2">
-                <Label htmlFor="brand_color">Brand Colour</Label>
-                <div className="flex gap-2 items-center">
-                  <input type="color" id="brand_color" name="brand_color" value={formData.brand_color} onChange={handleInputChange} className="w-10 h-10 rounded cursor-pointer border"/>
-                  <Input value={formData.brand_color} onChange={handleInputChange} name="brand_color" placeholder="#HEX" className="w-32"/>
-                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="brand_admins_search">Brand Admins <span className="text-muted-foreground text-xs">(Optional)</span></Label>
@@ -461,18 +445,17 @@ export default function NewBrandPage() {
                     <div className="space-y-2"><Label htmlFor="tone_of_voice">Tone of Voice</Label><Textarea id="tone_of_voice" name="tone_of_voice" value={formData.tone_of_voice} onChange={handleInputChange} placeholder="Describe your brand's tone..." rows={4}/></div>
                     <div className="space-y-2"><Label htmlFor="guardrails">Content Guardrails</Label><Textarea id="guardrails" name="guardrails" value={formData.guardrails} onChange={handleInputChange} placeholder="e.g., Do not mention competitors..." rows={4}/></div>
                     
-                    {/* Content Vetting Agencies - Copied from Edit Page */}
                     <div className="space-y-4">
                       <Label>Content Vetting Agencies (Optional)</Label>
                       {isLoading && <p className="text-sm text-muted-foreground">Loading agencies...</p>}
                       {!isLoading && allVettingAgencies.length === 0 && formData.country && (
                         <p className="text-sm text-muted-foreground">
-                          No specific vetting agencies found for the selected country. You can add custom ones below.
+                          No specific vetting agencies found for the selected country.
                         </p>
                       )}
                       {!isLoading && allVettingAgencies.length === 0 && !formData.country && (
                         <p className="text-sm text-muted-foreground">
-                          Select a country to see relevant vetting agencies, or add custom ones.
+                          Select a country to see relevant vetting agencies.
                         </p>
                       )}
                       {!isLoading && allVettingAgencies.length > 0 && priorityOrder.map(priorityLevel => {
@@ -548,7 +531,6 @@ export default function NewBrandPage() {
                     </div>
                   </div>
                 </div>
-                {/* Quick Preview Panel - Copied from Edit Page */}
                 <div className="lg:col-span-1">
                   <div className="bg-muted rounded-lg p-4 space-y-6 sticky top-4">
                     <div className="space-y-2">
@@ -559,21 +541,21 @@ export default function NewBrandPage() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="brand_color_preview">Brand Colour</Label>
+                      <Label htmlFor="brand_color_identity_tab">Brand Colour</Label>
                       <div className="flex gap-2 items-center">
                         <input 
                             type="color" 
-                            id="brand_color_preview" 
-                            name="brand_color" // Ensures it links to formData.brand_color
+                            id="brand_color_identity_tab"
+                            name="brand_color" 
                             value={formData.brand_color} 
                             onChange={handleInputChange} 
                             className="w-10 h-10 rounded cursor-pointer border"
                         />
                         <Input 
-                            id="brand_color_hex_preview" 
+                            id="brand_color_hex_identity_tab"
                             value={formData.brand_color} 
                             onChange={handleInputChange} 
-                            name="brand_color" // Ensures it links to formData.brand_color
+                            name="brand_color" 
                             placeholder="#HEX" 
                             className="w-32"
                         />
