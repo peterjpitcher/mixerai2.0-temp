@@ -13,11 +13,12 @@ import { Switch } from '@/components/switch';
 import { Badge } from '@/components/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { toast } from 'sonner';
-import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2, ArrowLeft } from 'lucide-react';
 import type { Metadata } from 'next';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { debounce } from 'lodash';
 import { cn } from '@/lib/utils';
+import { BrandIcon } from '@/components/brand-icon';
 
 // export const metadata: Metadata = {
 //   title: 'Create New Workflow | MixerAI 2.0',
@@ -85,6 +86,26 @@ const RoleSelectionCards: React.FC<RoleSelectionCardsProps> = ({ selectedRole, o
 };
 // --- End Role Card Selection Component ---
 
+// Placeholder Breadcrumbs component
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
+
 export default function NewWorkflowPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
@@ -130,6 +151,8 @@ export default function NewWorkflowPage() {
       });
     }
   }, [workflow?.steps?.length]);
+
+  const selectedBrandFull = brands.find(b => b.id === workflow.brand_id);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -490,36 +513,41 @@ export default function NewWorkflowPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
-        <div className="animate-spin rounded-full border-2 border-current border-t-transparent h-6 w-6"></div>
+        <Loader2 className="animate-spin rounded-full border-2 border-current border-t-transparent h-8 w-8" />
       </div>
     );
   }
   
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Create New Workflow</h1>
-          <p className="text-muted-foreground mt-1">
-            Define the name, brand, and steps for your new content approval process.
-          </p>
-        </div>
-        <div className="flex space-x-2">
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/workflows">Cancel</Link>
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" }, 
+        { label: "Workflows", href: "/dashboard/workflows" }, 
+        { label: "Create New Workflow" }
+      ]} />
+
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/workflows')} aria-label="Back to Workflows">
+            <ArrowLeft className="h-4 w-4" />
           </Button>
-          <Button onClick={handleCreateWorkflow} disabled={isSaving || isLoading || brands.length === 0}>
-            {isSaving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              'Create Workflow'
-            )}
-          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Create New Workflow</h1>
+            <p className="text-muted-foreground mt-1">
+              Define the name, brand, and steps for your new content approval process.
+            </p>
+          </div>
         </div>
       </div>
+
+      {selectedBrandFull && (
+        <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/50 mb-4">
+            <BrandIcon name={selectedBrandFull.name} color={selectedBrandFull.color ?? undefined} size="md" />
+            <div>
+                <p className="font-semibold">For Brand: {selectedBrandFull.name}</p>
+            </div>
+        </div>
+      )}
       
       <div className="grid grid-cols-1 gap-6">
         <Card>
@@ -742,6 +770,23 @@ export default function NewWorkflowPage() {
           </CardFooter>
         </Card>
       </div>
+
+      <div className="flex justify-end space-x-2 pt-4 mt-4 border-t">
+        <Button variant="outline" onClick={() => router.push('/dashboard/workflows')} disabled={isSaving || isLoading}>
+            Cancel
+        </Button>
+        <Button onClick={handleCreateWorkflow} disabled={isSaving || isLoading || brands.length === 0}>
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              'Create Workflow'
+            )}
+        </Button>
+      </div>
+
     </div>
   );
 } 
