@@ -13,6 +13,7 @@ import {
   Pencil, 
   Trash2, 
   AlertCircle,
+  Users2
 } from 'lucide-react';
 import {
   Table,
@@ -33,6 +34,8 @@ import {
 import type { Metadata } from 'next';
 import { toast } from 'sonner';
 import { Badge } from '@/components/badge';
+import { PageHeader } from "@/components/dashboard/page-header";
+import { format as formatDateFns } from 'date-fns';
 
 // export const metadata: Metadata = {
 //   title: 'Manage Users | MixerAI 2.0',
@@ -62,6 +65,26 @@ interface User {
   job_title?: string;
   company?: string;
 }
+
+// Placeholder Breadcrumbs component - replace with actual implementation later
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
 
 /**
  * UsersPage displays a list of all users in the system.
@@ -211,7 +234,7 @@ export default function UsersPage() {
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Never';
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    return formatDateFns(date, 'dd MMMM yyyy');
   };
 
   // Helper to render sort indicator
@@ -249,19 +272,18 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Users</h1>
-          <p className="text-muted-foreground mt-1">
-            View, search, sort, and manage users in your workspace.
-          </p>
-        </div>
-        <Button asChild>
-          <Link href="/dashboard/users/invite">
-            <Plus className="mr-2 h-4 w-4" /> Invite User
-          </Link>
-        </Button>
-      </div>
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Users" }]} />
+      <PageHeader
+        title="Users"
+        description="View, search, sort, and manage users in your workspace."
+        actions={
+          <Button asChild>
+            <Link href="/dashboard/users/invite">
+              <Plus className="mr-2 h-4 w-4" /> Invite User
+            </Link>
+          </Button>
+        }
+      />
       
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -283,12 +305,7 @@ export default function UsersPage() {
       ) : sortedUsers.length === 0 ? (
         <div className="text-center py-12 px-4">
           <div className="mx-auto w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-              <circle cx="9" cy="7" r="4"></circle>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>
+            <Users2 size={40} className="text-primary" strokeWidth={1.5} />
           </div>
           <h3 className="text-xl font-semibold mb-2">No Users Found</h3>
           <p className="text-muted-foreground mb-6 max-w-md mx-auto">
@@ -377,13 +394,13 @@ export default function UsersPage() {
                   <TableCell>{user.job_title || '-'}</TableCell>
                   <TableCell>{formatDate(user.last_sign_in_at)}</TableCell>
                   <TableCell className="text-right space-x-1">
-                    <Button variant="ghost" size="icon" asChild>
-                      <Link href={`/dashboard/users/${user.id}`} title="View User">
+                    <Button variant="ghost" size="icon" asChild title="View User Details">
+                      <Link href={`/dashboard/users/${user.id}`} >
                         <ExternalLink className="h-4 w-4" />
                       </Link>
                     </Button>
-                    <Button variant="ghost" size="icon" asChild>
-                      <Link href={`/dashboard/users/${user.id}/edit`} title="Edit User">
+                    <Button variant="ghost" size="icon" asChild title="Edit User">
+                      <Link href={`/dashboard/users/${user.id}/edit`} >
                         <Pencil className="h-4 w-4" />
                       </Link>
                     </Button>
