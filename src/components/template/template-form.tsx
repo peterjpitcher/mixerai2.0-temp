@@ -323,7 +323,7 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
             Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : 'Save Template'}
+            {isSubmitting ? 'Saving...' : (initialData ? 'Save Changes' : 'Create Template')}
           </Button>
         </div>
       </form>
