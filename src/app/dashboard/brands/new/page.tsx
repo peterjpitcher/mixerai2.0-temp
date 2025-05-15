@@ -11,7 +11,7 @@ import { Label } from '@/components/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { toast } from 'sonner';
-import { Loader2, X, PlusCircle } from 'lucide-react';
+import { Loader2, X, PlusCircle, ArrowLeft } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 import { Checkbox } from "@/components/checkbox";
@@ -37,6 +37,26 @@ interface UserSearchResult {
   avatar_url: string | null;
   job_title?: string | null;
 }
+
+// Placeholder Breadcrumbs component - replace with actual implementation later
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
 
 export default function NewBrandPage() {
   const router = useRouter();
@@ -236,20 +256,21 @@ export default function NewBrandPage() {
   
   return (
     <div className="space-y-6">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Brands", href: "/dashboard/brands" }, { label: "Create New Brand" }]} />
        <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
+          {/* Standard 1.3: Back Button - Top Left */}
+          <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/brands')} aria-label="Back to Brands">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           <BrandIcon name={formData.name || "New Brand"} color={formData.brand_color} size="lg" />
           <div>
-         <h1 className="text-3xl font-bold tracking-tight">Create New Brand</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Create New Brand</h1>
             <p className="text-muted-foreground">Define the details for your new brand.</p>
           </div>
         </div>
-        <div className="flex space-x-2">
-          <Button variant="outline" onClick={() => router.push('/dashboard/brands')}>Cancel</Button>
-          <Button onClick={handleCreateBrand} disabled={isSaving || isGenerating}>
-            {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Create Brand'}
-          </Button>
-        </div>
+        {/* Top-right actions removed as per audit recommendation D.2 (point 3 & 5a) 
+            Primary form actions will be at the bottom. */}
        </div>
        
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
@@ -316,7 +337,6 @@ export default function NewBrandPage() {
                 )}
               </div>
             </CardContent>
-            <CardFooter className="flex justify-end"><Button onClick={handleCreateBrand} disabled={isSaving || isGenerating}>{isSaving ? 'Saving...' : 'Create Brand & Continue'}</Button></CardFooter>
           </Card>
         </TabsContent>
 
@@ -360,10 +380,19 @@ export default function NewBrandPage() {
                 <div className="lg:col-span-1"><div className="bg-muted rounded-lg p-4 space-y-6 sticky top-4"><div className="space-y-2"><h4 className="font-semibold">Quick Preview</h4><div className="flex items-center gap-2 p-3 border rounded-md bg-muted/30"><BrandIcon name={formData.name || 'Brand'} color={formData.brand_color} /><span className="truncate">{formData.name || 'Your Brand Name'}</span></div></div><div className="space-y-2"><h4 className="font-medium">Brand Colour</h4><div className="w-full h-12 rounded-md" style={{ backgroundColor: formData.brand_color }} /><p className="text-xs text-center text-muted-foreground">{formData.brand_color}</p></div>{/* Recommendations can be added here */ }</div></div>
               </div>
          </CardContent>
-            <CardFooter className="flex justify-end"><Button onClick={handleCreateBrand} disabled={isSaving || isGenerating}>{isSaving ? 'Saving...' : 'Create Brand'}</Button></CardFooter>
        </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Standard 3.1: Consolidated Form Actions - Bottom Right */}
+      <div className="flex justify-end space-x-2 pt-4 mt-4 border-t">
+        <Button variant="outline" onClick={() => router.push('/dashboard/brands')} disabled={isSaving || isGenerating}>
+            Cancel
+        </Button>
+        <Button onClick={handleCreateBrand} disabled={isSaving || isGenerating}>
+            {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Create Brand'}
+        </Button>
+      </div>
     </div>
   );
 } 
