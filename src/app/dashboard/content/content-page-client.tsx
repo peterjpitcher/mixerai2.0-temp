@@ -220,10 +220,6 @@ export default function ContentPageClient() {
       
       <div className="flex items-center justify-between">
         <div className="max-w-sm w-full"><Input placeholder="Search content by title or body..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}/></div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm"><FileUp className="mr-2 h-4 w-4" />Export</Button>
-          <Button variant="outline" size="sm"><FileDown className="mr-2 h-4 w-4" />Import</Button>
-        </div>
       </div>
       {isLoading ? (
         <div className="py-10 flex justify-center items-center min-h-[300px]"><div className="flex flex-col items-center"><div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div><p className="text-muted-foreground">Loading content...</p></div></div>

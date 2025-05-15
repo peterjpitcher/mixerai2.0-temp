@@ -7,8 +7,18 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { PageHeader } from '@/components/dashboard/page-header';
 import { Badge } from '@/components/badge';
 import { toast } from 'sonner';
-import { Loader2, PlusCircle, LayoutTemplate, Edit3, FileTextIcon, MoreVertical, FileCog } from 'lucide-react';
+import { Loader2, PlusCircle, LayoutTemplate, Edit3, FileTextIcon, MoreVertical, FileCog, Eye, Trash2 } from 'lucide-react';
 import type { Metadata } from 'next';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/alert-dialog";
 
 // Placeholder Breadcrumbs component - replace with actual implementation later
 const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
@@ -52,6 +62,9 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [templateToDelete, setTemplateToDelete] = useState<Template | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -81,6 +94,31 @@ export default function TemplatesPage() {
 
     fetchTemplates();
   }, []);
+
+  const handleDeleteTemplate = async () => {
+    if (!templateToDelete) return;
+    setIsDeleting(true);
+    try {
+      // Note: System templates (article-template, product-template) are handled on their edit page.
+      // This delete is for user-created templates.
+      const response = await fetch(`/api/content-templates/${templateToDelete.id}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success(`Template "${templateToDelete.name}" deleted successfully.`);
+        setTemplates(prev => prev.filter(t => t.id !== templateToDelete.id));
+      } else {
+        toast.error(data.error || 'Failed to delete template.');
+      }
+    } catch (error) {
+      toast.error('An error occurred while deleting the template.');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+      setTemplateToDelete(null);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -129,16 +167,30 @@ export default function TemplatesPage() {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="border-t pt-4 flex justify-start gap-2">
-                <Button variant="outline" size="sm" asChild title="Use this template to create content">
-                  <Link href={`/dashboard/content/new?template=${template.id}`} className="flex items-center">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Use Template
-                  </Link>
-                </Button>
-                <Button variant="ghost" size="sm" asChild title="Edit this template">
-                  <Link href={`/dashboard/templates/${template.id}`} className="flex items-center">
-                    <Edit3 className="mr-2 h-4 w-4" /> Edit
-                  </Link>
+              <CardFooter className="border-t pt-4 flex justify-between items-center">
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" asChild title="View or Edit this template">
+                    <Link href={`/dashboard/templates/${template.id}`} className="flex items-center">
+                      <Eye className="mr-2 h-4 w-4" /> View
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" size="sm" asChild title="Edit this template">
+                    <Link href={`/dashboard/templates/${template.id}`} className="flex items-center">
+                      <Edit3 className="mr-2 h-4 w-4" /> Edit
+                    </Link>
+                  </Button>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className="text-destructive hover:text-destructive/90"
+                  title="Delete this template"
+                  onClick={() => {
+                    setTemplateToDelete(template);
+                    setShowDeleteDialog(true);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </CardFooter>
             </Card>
@@ -162,6 +214,31 @@ export default function TemplatesPage() {
           )}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete this template?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action will permanently delete the template "{templateToDelete?.name}". 
+              Any content items using this template may need to be updated. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTemplate}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 } 

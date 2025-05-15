@@ -219,25 +219,6 @@ export default function BrandsPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                <rect width="8" height="4" x="4" y="8" rx="1" />
-                <path d="M4 16v1a2 2 0 0 0 2 2h2" />
-                <path d="M16 4h1a2 2 0 0 1 2 2v2" />
-                <path d="M16 20h1a2 2 0 0 0 2-2v-2" />
-                <path d="M8 4H7a2 2 0 0 0-2 2v2" />
-                <rect width="8" height="4" x="12" y="12" rx="1" />
-              </svg>
-              Export
-            </Button>
-            <Button variant="outline" size="sm">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                <path d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-              </svg>
-              Import
-            </Button>
-          </div>
         </div>
       )}
 
