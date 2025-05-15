@@ -142,8 +142,33 @@ export async function processInviteCompletion(
     }
     
     try {
+        // Ensure the global role is set in user_metadata based on the invite
+        if (parsedMeta.intendedRole) {
+            const updatedUserMetadata = { 
+                ...existingUserMetadata, 
+                role: parsedMeta.intendedRole 
+            };
+            const { error: roleSetError } = await supabase.auth.admin.updateUserById(
+                userId,
+                { user_metadata: updatedUserMetadata }
+            );
+            if (roleSetError) {
+                console.error(`[InviteService] Failed to set global role '${parsedMeta.intendedRole}' in user_metadata for user ${userId}:`, roleSetError.message);
+                // Decide if this is a critical failure. For now, log and continue, 
+                // as permissions might still be assigned, but global role might be missing.
+                // throw new Error(`DB_GLOBAL_ROLE_SET_FAIL: ${roleSetError.message}`); 
+            }
+            console.log(`[InviteService] Global role '${parsedMeta.intendedRole}' set in user_metadata for user ${userId}.`);
+        }
+
         if (parsedMeta.source === 'direct_admin' && parsedMeta.intendedRole === 'admin' && !parsedMeta.brandIdForPermission) {
-            await assignSuperadminRole(userId, existingUserMetadata, supabase);
+            // The general role update above already handles setting the 'admin' role.
+            // assignSuperadminRole can be considered redundant if its only job is to set user_metadata.role = 'admin'.
+            // If assignSuperadminRole has other side effects, it should be kept and potentially refactored.
+            // For now, as it ONLY sets the role, we can comment it out or remove it if the general update is sufficient.
+            // await assignSuperadminRole(userId, existingUserMetadata, supabase); 
+            // No specific action needed here anymore if the role is set above.
+            console.log(`[InviteService] Processing direct_admin invite for superadmin role (already handled by general role update).`);
         } else if (parsedMeta.brandIdForPermission && parsedMeta.intendedRole) {
             // This handles 'direct_admin' to a brand, 'brand_assignment', and 'workflow_assignment'
             await assignBrandPermissions(userId, parsedMeta.brandIdForPermission, parsedMeta.intendedRole, supabase);

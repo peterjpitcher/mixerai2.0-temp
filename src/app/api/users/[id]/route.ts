@@ -129,6 +129,7 @@ export const GET = withRouteAuth(async (request: NextRequest, user: any, context
       company: profile.company || authUserData.user.user_metadata?.company || null,
       avatar_url: profile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUserData.user.id}`,
       role: highestRole,
+      globalRole: authUserData.user.user_metadata?.role || 'viewer',
       created_at: authUserData.user.created_at,
       last_sign_in_at: authUserData.user.last_sign_in_at,
       brand_permissions: userBrandPermissions,
@@ -176,6 +177,18 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: any, context
     if (body.full_name !== undefined) userMetadataUpdates.full_name = body.full_name;
     if (body.job_title !== undefined) userMetadataUpdates.job_title = body.job_title;
     if (body.company !== undefined) userMetadataUpdates.company = body.company;
+
+    // Add global role to user_metadata if provided and valid
+    if (body.role && typeof body.role === 'string') {
+      const validRoles = ['admin', 'editor', 'viewer']; // Define valid global roles
+      const requestedRole = body.role.toLowerCase();
+      if (validRoles.includes(requestedRole)) {
+        userMetadataUpdates.role = requestedRole;
+      } else {
+        // Optionally, handle invalid role here, e.g., by returning an error or logging
+        console.warn(`[API /users/[id]] PUT: Invalid global role '${body.role}' requested for user ${params.id}. Ignoring.`);
+      }
+    }
 
     if (Object.keys(userMetadataUpdates).length > 0) {
         const { error: authUpdateError } = await supabase.auth.admin.updateUserById(

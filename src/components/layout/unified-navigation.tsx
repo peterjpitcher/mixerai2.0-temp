@@ -69,6 +69,7 @@ export function UnifiedNavigation() {
   const segments = layoutSegments || [];
   
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
+  console.log('[UnifiedNavigation] Component rendering - Initial currentUser state from useState:', currentUser);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   
   // Track expanded state for collapsible sections
@@ -88,6 +89,7 @@ export function UnifiedNavigation() {
   useEffect(() => {
     const fetchCurrentUser = async () => {
       setIsLoadingUser(true);
+      console.log('[UnifiedNavigation] fetchCurrentUser - Starting to fetch');
       try {
         const response = await fetch('/api/me'); 
         if (!response.ok) {
@@ -96,7 +98,7 @@ export function UnifiedNavigation() {
         const data = await response.json();
         if (data.success && data.user) {
           setCurrentUser(data.user);
-          console.log('[UnifiedNavigation] Current User Loaded:', data.user); // Log loaded user
+          console.log('[UnifiedNavigation] fetchCurrentUser - setCurrentUser CALLED with:', data.user);
         } else {
           setCurrentUser(null);
           console.error('[UnifiedNavigation] Failed to get user data from /api/me:', data.error);
@@ -175,6 +177,8 @@ export function UnifiedNavigation() {
   }));
   
   // Define permission helper functions based on currentUser
+  console.log('[UnifiedNavigation] Deriving roles - currentUser value IS:', currentUser);
+  console.log('[UnifiedNavigation] Deriving roles - currentUser.user_metadata IS:', currentUser?.user_metadata);
   const userRole = currentUser?.user_metadata?.role;
   const userBrandPermissions = currentUser?.brand_permissions || [];
 

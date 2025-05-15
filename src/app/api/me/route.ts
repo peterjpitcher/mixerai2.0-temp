@@ -9,7 +9,10 @@ export const dynamic = "force-dynamic"; // Ensure fresh data on every request
 interface UserProfileResponse {
   id: string;
   email?: string;
-  user_metadata?: { [key: string]: any }; // Supabase user_metadata
+  user_metadata?: { 
+    role?: string; // Role is an optional property within user_metadata, expected from authUser
+    [key: string]: any; 
+  };
   brand_permissions?: Array<{
     brand_id: string; // Assuming brand_id will always be present if the permission exists
     role: string;
@@ -31,21 +34,23 @@ export const GET = withRouteAuth(async (request: NextRequest, authUser: any) => 
   try {
     const supabase = createSupabaseServerClient(); // Use admin or server client as appropriate
 
-    // 1. Get user's profile from the 'profiles' table (if you have one)
-    // This is useful if user_metadata in auth.users doesn't have everything or you have a separate profiles table.
-    let userProfileData: Partial<Pick<UserProfileResponse, 'full_name' | 'job_title' | 'company' | 'avatar_url'>> = {};
-    const { data: profile, error: profileError } = await supabase
+    let userProfileDataFromDb: { 
+      full_name?: string | null; 
+      job_title?: string | null; 
+      company?: string | null; 
+      avatar_url?: string | null; 
+    } | null = null;
+
+    const { data: profileResponse, error: profileError } = await supabase
       .from('profiles')
-      .select('full_name, job_title, company, avatar_url') // Select fields you need from profiles
+      .select('full_name, job_title, company, avatar_url') 
       .eq('id', authUser.id)
       .single();
 
-    if (profileError && profileError.code !== 'PGRST116') { // PGRST116 means no rows found, which is not an error here
+    if (profileError && profileError.code !== 'PGRST116') { // PGRST116 means no rows found
       console.error('[API /me] Error fetching profile:', profileError);
-      // Decide if this is critical. If profile is essential, throw error.
-    }
-    if (profile) {
-      userProfileData = profile; // Direct assignment is fine if types match (string | null)
+    } else if (profileResponse) { // Assign if no critical error and profileResponse is truthy
+        userProfileDataFromDb = profileResponse;
     }
 
     // 2. Get user's brand permissions from 'user_brand_permissions' table
@@ -77,11 +82,10 @@ export const GET = withRouteAuth(async (request: NextRequest, authUser: any) => 
       email: authUser.email,
       user_metadata: authUser.user_metadata || {},
       brand_permissions: typedBrandPermissions || [],
-      full_name: userProfileData.full_name,
-      job_title: userProfileData.job_title,
-      company: userProfileData.company,
-      // Ensure avatar_url has the DiceBear fallback if profile.avatar_url is null
-      avatar_url: userProfileData.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUser.id}`,
+      full_name: userProfileDataFromDb?.full_name,
+      job_title: userProfileDataFromDb?.job_title,
+      company: userProfileDataFromDb?.company,
+      avatar_url: userProfileDataFromDb?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUser.id}`,
     };
 
     return NextResponse.json({ success: true, user: finalUserResponse });

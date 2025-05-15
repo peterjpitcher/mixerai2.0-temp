@@ -75,8 +75,8 @@ export const POST = withAdminAuth(async (request: NextRequest, adminUser) => {
     const userMetadataPayload = {
       full_name: body.full_name || '',
       job_title: body.job_title || '',
-      company: body.company || ''
-      // Note: 'role' is now in appMetadata, not userMetadata for the initial invite options.data
+      company: body.company || '',
+      role: body.role.toLowerCase()
     };
 
     const { user: invitedUser, error: inviteError } = await inviteNewUserWithAppMetadata(

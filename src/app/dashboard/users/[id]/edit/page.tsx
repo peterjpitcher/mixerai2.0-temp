@@ -62,7 +62,8 @@ interface User {
   full_name: string;
   email: string;
   avatar_url: string;
-  role: string;
+  role: string; // This is the highest brand role, can be kept for display if needed
+  globalRole?: string; // For the actual global role from user_metadata
   created_at: string;
   last_sign_in_at?: string;
   brand_permissions?: BrandPermission[];
@@ -84,7 +85,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
     full_name: '',
     job_title: '',
     company: '',
-    role: ''
+    globalRole: '' // New state for the global role dropdown
   });
   const [selectedBrands, setSelectedBrands] = useState<{[key: string]: {selected: boolean, role: string}}>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -154,7 +155,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
           full_name: userData.user.full_name || '',
           job_title: userData.user.job_title || '',
           company: userData.user.company || '',
-          role: userData.user.role || 'Viewer'
+          globalRole: userData.user.globalRole || 'viewer' // Initialize globalRole
         });
       } catch (error) {
         // console.error('Error loading data:', error);
@@ -173,9 +174,9 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
     setForm(prev => ({ ...prev, [name]: value }));
   };
   
-  // Handle role change
-  const handleRoleChange = (value: string) => {
-    setForm(prev => ({ ...prev, role: value }));
+  // Handle global role change
+  const handleGlobalRoleChange = (value: string) => {
+    setForm(prev => ({ ...prev, globalRole: value }));
   };
   
   // Handle brand selection changes
@@ -228,7 +229,10 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          ...form,
+          full_name: form.full_name,
+          job_title: form.job_title,
+          company: form.company,
+          role: form.globalRole, // Send globalRole as 'role' in the payload
           brand_permissions: brandPermissions
         })
       });
@@ -264,7 +268,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" },
         { label: "Users", href: "/dashboard/users" },
-        { label: user?.full_name || "User", href: user ? `/dashboard/users/${user.id}` : undefined }, // Link to view page if exists
+        { label: user?.full_name || "User", href: user ? `/dashboard/users/${user.id}` : undefined },
         { label: "Edit" }
       ]} />
       <div className="flex items-center justify-between">
@@ -283,114 +287,109 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
         </div>
       </div>
       
-      <Card>
-        <CardHeader>
-          <CardTitle>User Information</CardTitle>
-          <CardDescription>Update user details and brand permissions.</CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>User Profile</CardTitle>
+            <CardDescription>Update the user's basic information and global system role.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="full_name" className="text-right">
-                  Full Name <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="full_name"
-                  name="full_name"
-                  value={form.full_name}
-                  onChange={handleInputChange}
-                  placeholder="John Doe"
-                />
+                <Label htmlFor="full_name">Full Name</Label>
+                <Input id="full_name" name="full_name" value={form.full_name} onChange={handleInputChange} />
               </div>
-              
               <div>
-                <Label htmlFor="job_title" className="text-right">
-                  Job Title
-                </Label>
-                <Input
-                  id="job_title"
-                  name="job_title"
-                  value={form.job_title}
-                  onChange={handleInputChange}
-                  placeholder="Marketing Manager"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="company" className="text-right">
-                  Company
-                </Label>
-                <Input
-                  id="company"
-                  name="company"
-                  value={form.company}
-                  onChange={handleInputChange}
-                  placeholder="General Mills"
-                />
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" name="email" type="email" value={user?.email || ''} disabled />
               </div>
             </div>
-            
-            {/* Brand Permissions Section */}
-            <Separator className="my-6" />
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Brand Permissions</h3>
-              <p className="text-sm text-muted-foreground">
-                Assign this user to specific brands and set their role for each.
-              </p>
-              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2"> 
-                {brands.map((brand) => (
-                  <div key={brand.id} className="flex items-center justify-between p-3 border rounded-md">
-                    <div className="flex items-center space-x-3">
-                      <Checkbox
-                        id={`brand-${brand.id}`}
-                        checked={selectedBrands[brand.id]?.selected || false}
-                        onCheckedChange={(checked) => 
-                          handleBrandSelectionChange(brand.id, checked as boolean)
-                        }
-                      />
-                      <label
-                        htmlFor={`brand-${brand.id}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        {brand.name}
-                      </label>
-                    </div>
-                    <Select
-                      value={selectedBrands[brand.id]?.role || 'viewer'}
-                      onValueChange={(value) => handleBrandRoleChange(brand.id, value)}
-                      disabled={!selectedBrands[brand.id]?.selected}
-                    >
-                      <SelectTrigger className="w-[120px]">
-                        <SelectValue placeholder="Select role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="editor">Editor</SelectItem>
-                        <SelectItem value="viewer">Viewer</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
-                {brands.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No brands available to assign.
-                  </p>
-                )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="job_title">Job Title</Label>
+                <Input id="job_title" name="job_title" value={form.job_title} onChange={handleInputChange} />
               </div>
+              <div>
+                <Label htmlFor="company">Company</Label>
+                <Input id="company" name="company" value={form.company} onChange={handleInputChange} />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="globalRole">Global Role</Label>
+              <Select name="globalRole" value={form.globalRole} onValueChange={handleGlobalRoleChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a global role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="editor">Editor</SelectItem>
+                  <SelectItem value="viewer">Viewer</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Determines the user's base level of access across the system.
+              </p>
             </div>
           </CardContent>
-          <CardFooter className="flex justify-end space-x-2">
-            <Button variant="outline" type="button" onClick={() => router.push(user ? `/dashboard/users/${user.id}` : '/dashboard/users')} disabled={isSaving}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSaving} className="flex items-center gap-2">
-              {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Brand Permissions</CardTitle>
+            <CardDescription>Assign this user to specific brands and set their role for each.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+            {brands.map((brand) => (
+              <div key={brand.id} className="flex items-center justify-between p-3 border rounded-md">
+                <div className="flex items-center space-x-3">
+                  <Checkbox
+                    id={`brand-${brand.id}`}
+                    checked={selectedBrands[brand.id]?.selected || false}
+                    onCheckedChange={(checked) => 
+                      handleBrandSelectionChange(brand.id, checked as boolean)
+                    }
+                  />
+                  <label
+                    htmlFor={`brand-${brand.id}`}
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    {brand.name}
+                  </label>
+                </div>
+                <Select
+                  value={selectedBrands[brand.id]?.role || 'viewer'}
+                  onValueChange={(value) => handleBrandRoleChange(brand.id, value)}
+                  disabled={!selectedBrands[brand.id]?.selected}
+                >
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="editor">Editor</SelectItem>
+                    <SelectItem value="viewer">Viewer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+            {brands.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No brands available to assign.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <CardFooter className="flex justify-end space-x-2">
+          <Button variant="outline" type="button" onClick={() => router.push(user ? `/dashboard/users/${user.id}` : '/dashboard/users')} disabled={isSaving}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isSaving} className="flex items-center gap-2">
+            {isSaving && <Loader2 className="h-4 w-4 animate-spin" />} 
+            {isSaving ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </CardFooter>
+      </form>
     </div>
   );
 } 
