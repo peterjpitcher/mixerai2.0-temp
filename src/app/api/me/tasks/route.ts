@@ -17,16 +17,29 @@ export const GET = withAuth(async (request: NextRequest, user) => {
   let permittedBrandIds: string[] | null = null;
 
   if (globalRole !== 'admin') {
-    const brandPermissions = user?.user_metadata?.brand_permissions as Array<{ brand_id: string, role: string }> | undefined;
-    if (!brandPermissions || brandPermissions.length === 0) {
-      console.log('[API Tasks GET] Non-admin user has no brand permissions. Returning empty array for tasks.');
+    // Fetch brand_permissions directly for the user
+    const { data: permissionsData, error: permissionsError } = await supabase
+      .from('user_brand_permissions')
+      .select('brand_id')
+      .eq('user_id', user.id);
+
+    if (permissionsError) {
+      console.error('[API Tasks GET] Error fetching brand permissions for user:', user.id, permissionsError);
+      return handleApiError(permissionsError, 'Failed to fetch user brand permissions');
+    }
+
+    if (!permissionsData || permissionsData.length === 0) {
+      console.log('[API Tasks GET] Non-admin user has no brand permissions in user_brand_permissions table. Returning empty array for tasks.');
       return NextResponse.json({ success: true, data: [] });
     }
-    permittedBrandIds = brandPermissions.map(p => p.brand_id).filter(id => id != null);
+    
+    permittedBrandIds = permissionsData.map(p => p.brand_id).filter(id => id != null);
+    
     if (permittedBrandIds.length === 0) {
-      console.log('[API Tasks GET] Non-admin user has no valid brand IDs in permissions. Returning empty array for tasks.');
+      console.log('[API Tasks GET] Non-admin user has no valid brand IDs after fetching permissions. Returning empty array for tasks.');
       return NextResponse.json({ success: true, data: [] });
     }
+    console.log(`[API Tasks GET] User ${user.id} (role: ${globalRole}) has permitted brand IDs: ${permittedBrandIds.join(', ')}`);
   }
 
   try {
