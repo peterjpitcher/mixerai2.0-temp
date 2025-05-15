@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/card';
 import { Input } from '@/components/input';
-import { Plus, Search, Trash2, Eye, Edit3 } from 'lucide-react';
+import { Plus, Search, Trash2, Eye, Edit3, AlertTriangle, WorkflowIcon } from 'lucide-react';
 import type { Metadata } from 'next';
 import { toast } from 'sonner';
+import { PageHeader } from "@/components/dashboard/page-header";
+import { BrandIcon } from '@/components/brand-icon';
 
 // export const metadata: Metadata = {
 //   title: 'Manage Workflows | MixerAI 2.0',
@@ -37,6 +39,26 @@ interface GroupedWorkflows {
     workflows: WorkflowFromAPI[];
   }
 }
+
+// Placeholder Breadcrumbs component
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
 
 /**
  * WorkflowsPage displays a list of all content approval workflows, grouped by brand.
@@ -104,7 +126,7 @@ export default function WorkflowsPage() {
   const ErrorState = () => (
     <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
       <div className="mb-4 text-destructive">
-        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+        <AlertTriangle size={64} strokeWidth={1.5} />
       </div>
       <h3 className="text-xl font-bold mb-2">Failed to Load Workflows</h3>
       <p className="text-muted-foreground mb-4 text-center max-w-md">{error}</p>
@@ -115,7 +137,7 @@ export default function WorkflowsPage() {
   const EmptyState = () => (
     <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
       <div className="mb-4 text-muted-foreground">
-         <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="8" height="8" x="2" y="2" rx="2" /><path d="M14 2c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2" /><path d="M20 2c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2" /><path d="M10 18H5c-1.7 0-3-1.3-3-3v-1" /><polyline points="7 21 10 18 7 15" /><rect width="8" height="8" x="14" y="14" rx="2" /></svg>
+        <WorkflowIcon size={64} strokeWidth={1.5} />
       </div>
       <h3 className="text-xl font-bold mb-2">No Workflows Yet</h3>
       <p className="text-muted-foreground mb-4 text-center max-w-md">
@@ -129,19 +151,18 @@ export default function WorkflowsPage() {
   
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Workflows</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage and create content approval workflows for your brands.
-          </p>
-        </div>
-        <Button asChild>
-          <Link href="/dashboard/workflows/new">
-            <Plus className="mr-2 h-4 w-4" /> Create Workflow
-          </Link>
-        </Button>
-      </div>
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Workflows" }]} />
+      <PageHeader
+        title="Workflows"
+        description="Manage and create content approval workflows for your brands."
+        actions={
+          <Button asChild>
+            <Link href="/dashboard/workflows/new">
+              <Plus className="mr-2 h-4 w-4" /> Create Workflow
+            </Link>
+          </Button>
+        }
+      />
       
       {(allWorkflows.length > 0 || isLoading || error) && (
          <div className="flex items-center justify-between">
@@ -179,6 +200,7 @@ export default function WorkflowsPage() {
           {displayedGroupedWorkflows.map(([brandKey, group]) => (
             <div key={brandKey} className="space-y-4">
               <div className="flex items-center">
+                <BrandIcon name={group.brand_name} color={group.brand_color ?? undefined} size="md" className="mr-3" />
                 <h2 className="text-xl font-semibold">{group.brand_name}</h2>
                 <div className="ml-3 px-2 py-1 bg-muted rounded-full text-xs font-medium">
                   {group.workflows.length} workflow{group.workflows.length !== 1 ? 's' : ''}
@@ -215,13 +237,13 @@ export default function WorkflowsPage() {
                     </CardContent>
                     <CardFooter className="border-t pt-4 flex justify-between">
                       <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/dashboard/workflows/${workflow.id}`}>
+                        <Button variant="ghost" size="sm" asChild title="View Workflow">
+                          <Link href={`/dashboard/workflows/${workflow.id}`} className="flex items-center">
                             <Eye className="mr-2 h-4 w-4" /> View
                           </Link>
                         </Button>
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/dashboard/workflows/${workflow.id}/edit`}>
+                        <Button variant="ghost" size="sm" asChild title="Edit Workflow">
+                          <Link href={`/dashboard/workflows/${workflow.id}/edit`} className="flex items-center">
                             <Edit3 className="mr-2 h-4 w-4" /> Edit
                           </Link>
                         </Button>
