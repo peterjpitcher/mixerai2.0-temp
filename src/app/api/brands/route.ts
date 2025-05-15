@@ -140,10 +140,35 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     console.log('Attempting to fetch brands from database');
     const supabase = createSupabaseAdminClient();
     
-    const { data: brandsData, error } = await supabase
+    const globalRole = user?.user_metadata?.role;
+    let brandsQuery = supabase
       .from('brands')
-      .select('*, content_count:content(count), selected_vetting_agencies:brand_selected_agencies(agency_id, content_vetting_agencies(id, name, description, country_code, priority))')
-      .order('name');
+      .select('*, content_count:content(count), selected_vetting_agencies:brand_selected_agencies(agency_id, content_vetting_agencies(id, name, description, country_code, priority))');
+
+    if (globalRole !== 'admin') {
+      const brandPermissions = user?.user_metadata?.brand_permissions as Array<{ brand_id: string, role: string }> | undefined;
+
+      if (!brandPermissions || brandPermissions.length === 0) {
+        console.log('Non-admin user has no brand permissions. Returning empty array.');
+        return NextResponse.json({ success: true, data: [] });
+      }
+
+      const permittedBrandIds = brandPermissions
+        .map(permission => permission.brand_id)
+        .filter(id => id != null);
+
+      if (permittedBrandIds.length === 0) {
+        console.log('Non-admin user has no valid brand IDs in permissions. Returning empty array.');
+        return NextResponse.json({ success: true, data: [] });
+      }
+      
+      console.log(`Non-admin user. Fetching brands for IDs: ${permittedBrandIds.join(', ')}`);
+      brandsQuery = brandsQuery.in('id', permittedBrandIds);
+    } else {
+      console.log('Admin user. Fetching all brands.');
+    }
+    
+    const { data: brandsData, error } = await brandsQuery.order('name');
     
     if (error) throw error;
     

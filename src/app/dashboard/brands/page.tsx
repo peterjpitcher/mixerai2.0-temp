@@ -190,12 +190,12 @@ export default function BrandsPage() {
           <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
         </svg>
       </div>
-      <h3 className="text-xl font-bold mb-2">No brands yet</h3>
+      <h3 className="text-xl font-bold mb-2">No Brands Available</h3>
       <p className="text-muted-foreground mb-4 text-center max-w-md">
-        Get started by creating your first brand to manage content for.
+        You currently do not have access to any brands, or no brands have been created in the system.
       </p>
       <Button asChild>
-        <Link href="/brands/new">Add Your First Brand</Link>
+        <Link href="/brands/new">Add Brand</Link>
       </Button>
     </div>
   );
