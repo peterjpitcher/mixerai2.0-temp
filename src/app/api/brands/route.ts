@@ -141,38 +141,55 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     const supabase = createSupabaseAdminClient();
     
     const globalRole = user?.user_metadata?.role;
+    console.log('User global role:', globalRole); 
+
     let brandsQuery = supabase
       .from('brands')
       .select('*, content_count:content(count), selected_vetting_agencies:brand_selected_agencies(agency_id, content_vetting_agencies(id, name, description, country_code, priority))');
 
     if (globalRole !== 'admin') {
-      const brandPermissions = user?.user_metadata?.brand_permissions as Array<{ brand_id: string, role: string }> | undefined;
+      // Fetch brand_permissions directly for the user if they are not a global admin
+      console.log(`User ${user.id} is not a global admin. Fetching specific brand permissions.`);
+      const { data: permissionsData, error: permissionsError } = await supabase
+        .from('user_brand_permissions')
+        .select('brand_id')
+        .eq('user_id', user.id);
 
-      if (!brandPermissions || brandPermissions.length === 0) {
-        console.log('Non-admin user has no brand permissions. Returning empty array.');
-        return NextResponse.json({ success: true, data: [] });
+      if (permissionsError) {
+        console.error(`[API Brands GET] Error fetching brand permissions for user ${user.id}:`, permissionsError);
+        // Potentially return error or handle appropriately, for now, let it fall through to an empty list if query fails this way
+        // but ideally, this should be a hard error.
+        return handleApiError(permissionsError, 'Failed to fetch user brand permissions');
       }
 
-      const permittedBrandIds = brandPermissions
-        .map(permission => permission.brand_id)
-        .filter(id => id != null);
-
-      if (permittedBrandIds.length === 0) {
-        console.log('Non-admin user has no valid brand IDs in permissions. Returning empty array.');
+      if (!permissionsData || permissionsData.length === 0) {
+        console.log(`[API Brands GET] Non-admin user ${user.id} has no brand permissions in user_brand_permissions table. Returning empty array.`);
         return NextResponse.json({ success: true, data: [] });
       }
       
-      console.log(`Non-admin user. Fetching brands for IDs: ${permittedBrandIds.join(', ')}`);
+      const permittedBrandIds = permissionsData.map(p => p.brand_id).filter(id => id != null);
+      
+      if (permittedBrandIds.length === 0) {
+        console.log(`[API Brands GET] Non-admin user ${user.id} has no valid brand IDs after fetching permissions. Returning empty array.`);
+        return NextResponse.json({ success: true, data: [] });
+      }
+      
+      console.log(`[API Brands GET] User ${user.id} (role: ${globalRole}) has permitted brand IDs: ${permittedBrandIds.join(', ')}. Applying filter.`);
       brandsQuery = brandsQuery.in('id', permittedBrandIds);
     } else {
-      console.log('Admin user. Fetching all brands.');
+      console.log(`User ${user.id} is a global admin. Fetching all brands.`);
     }
     
     const { data: brandsData, error } = await brandsQuery.order('name');
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error executing brands query:', error);
+      throw error;
+    }
     
-    const brandsDataCast = brandsData as BrandFromSupabase[] | null; // This cast should now be correct
+    console.log('Brands data fetched from database:', brandsData); // Log the raw data fetched
+    
+    const brandsDataCast = brandsData as BrandFromSupabase[] | null;
 
     const formattedBrands: FormattedBrand[] = (brandsDataCast || []).map((brand: BrandFromSupabase) => {
       let agencies: VettingAgency[] = []; 

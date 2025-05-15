@@ -11,15 +11,12 @@ import {
   Settings,
   HelpCircle,
   FileText,
-  ShoppingBag,
-  Store,
   ChevronDown,
   ChevronRight,
   Wrench,
   Code,
   Image,
   Globe,
-  MoreVertical,
   Folder,
   ListChecks,
   Loader2
@@ -69,7 +66,6 @@ export function UnifiedNavigation() {
   const segments = layoutSegments || [];
   
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
-  console.log('[UnifiedNavigation] Component rendering - Initial currentUser state from useState:', currentUser);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   
   // Track expanded state for collapsible sections
@@ -89,7 +85,6 @@ export function UnifiedNavigation() {
   useEffect(() => {
     const fetchCurrentUser = async () => {
       setIsLoadingUser(true);
-      console.log('[UnifiedNavigation] fetchCurrentUser - Starting to fetch');
       try {
         const response = await fetch('/api/me'); 
         if (!response.ok) {
@@ -98,10 +93,8 @@ export function UnifiedNavigation() {
         const data = await response.json();
         if (data.success && data.user) {
           setCurrentUser(data.user);
-          console.log('[UnifiedNavigation] fetchCurrentUser - setCurrentUser CALLED with:', data.user);
         } else {
           setCurrentUser(null);
-          console.error('[UnifiedNavigation] Failed to get user data from /api/me:', data.error);
         }
       } catch (error) {
         console.error('[UnifiedNavigation] Error fetching current user:', error);
@@ -127,8 +120,10 @@ export function UnifiedNavigation() {
           setUserTemplates(data.templates);
         } else {
           // Consider adding a toast notification for failure here
+          console.error('[UnifiedNavigation] Failed to fetch templates:', data.error);
         }
       } catch (error) {
+        console.error('[UnifiedNavigation] Error fetching templates:', error);
         // Consider adding a toast notification for failure here
       } finally {
         setIsLoadingTemplates(false);
@@ -177,18 +172,15 @@ export function UnifiedNavigation() {
   }));
   
   // Define permission helper functions based on currentUser
-  console.log('[UnifiedNavigation] Deriving roles - currentUser value IS:', currentUser);
-  console.log('[UnifiedNavigation] Deriving roles - currentUser.user_metadata IS:', currentUser?.user_metadata);
   const userRole = currentUser?.user_metadata?.role;
   const userBrandPermissions = currentUser?.brand_permissions || [];
+  const hasBrandAdminPermission = userBrandPermissions.some(bp => bp.role === 'admin');
 
   const isViewer = userRole === 'viewer';
   const isEditor = userRole === 'editor';
   const isAdmin = userRole === 'admin';
-  const isPlatformAdmin = isAdmin && userBrandPermissions.length === 0;
+  const isPlatformAdmin = userRole === 'admin' && userBrandPermissions.length === 0;
   const isScopedAdmin = isAdmin && userBrandPermissions.length > 0;
-
-  console.log('[UnifiedNavigation] Role Check:', { userRole, isViewer, isEditor, isAdmin, isPlatformAdmin, isScopedAdmin }); // Log role booleans
 
   // Primary nav items - base structure
   let navItemsDefinition: (NavItem | NavGroupItem)[] = [
@@ -302,7 +294,6 @@ export function UnifiedNavigation() {
       item.label === 'Content' || // Content creation group, items within will be filtered
       item.label === 'Tools'
     );
-    console.log('[UnifiedNavigation] Viewer Items:', filteredNavItems.map(i => i.label)); // Log viewer items
   } else if (isEditor) {
     filteredNavItems = navItemsDefinition.filter(item => 
       item.label === 'Dashboard' ||
@@ -311,7 +302,6 @@ export function UnifiedNavigation() {
       item.label === 'Content' || 
       item.label === 'Tools'
     );
-    console.log('[UnifiedNavigation] Editor Items:', filteredNavItems.map(i => i.label)); // Log editor items
   } else if (isScopedAdmin) {
     // Scoped Admins see more, but brand-related items are conceptually filtered at page/API level.
     // For nav links, they see the sections, but "Create New Brand" for example might be nuanced.
@@ -384,75 +374,196 @@ export function UnifiedNavigation() {
     return false;
   };
   
+  // Dynamically build navigation items based on roles and permissions
+  const finalNavItems: (NavItem | NavGroupItem | { type: 'divider' })[] = [];
+
+  // Always visible for authenticated users
+  finalNavItems.push({
+    href: '/dashboard',
+    label: 'Dashboard',
+    icon: <Home className="h-5 w-5" />,
+    segment: '' 
+  });
+  finalNavItems.push({
+    href: '/dashboard/my-tasks',
+    label: 'My Tasks',
+    icon: <ListChecks className="h-5 w-5" />,
+    segment: 'my-tasks'
+  });
+
+  // Brands: Visible if Platform Admin, Global Admin, or user has any brand permission
+  if (isPlatformAdmin || isAdmin || userBrandPermissions.length > 0) {
+    finalNavItems.push({
+      href: '/dashboard/brands',
+      label: 'Brands',
+      icon: <Building2 className="h-5 w-5" />,
+      segment: 'brands'
+    });
+  }
+  
+  // Content Templates: Visible if Platform Admin, Global Admin, or Global Editor
+  if (isPlatformAdmin || isAdmin || isEditor) {
+    finalNavItems.push({
+      href: '/dashboard/templates',
+      label: 'Content Templates',
+      icon: <Folder className="h-5 w-5" />, 
+      segment: 'templates'
+    });
+  }
+  
+  // Workflows: Visible if Platform Admin, Global Admin, OR (Global Editor AND Brand Admin for at least one brand)
+  if (isPlatformAdmin || isAdmin || (isEditor && hasBrandAdminPermission)) {
+    finalNavItems.push({
+      href: '/dashboard/workflows',
+      label: 'Workflows',
+      icon: <GitBranch className="h-5 w-5" />,
+      segment: 'workflows'
+    });
+  }
+
+  // Content (All Content page): Visible to all authenticated users who might have content access
+  // (API will filter actual content)
+  if (isPlatformAdmin || isAdmin || isEditor || isViewer) {
+     finalNavItems.push({
+      href: '/dashboard/content',
+      label: 'Content', // Changed from "All Content" to just "Content" as per reorder list
+      icon: <FileText className="h-5 w-5" />, // Using FileText, Folder is for Templates now
+      segment: 'content'
+    });
+  }
+  
+  // Tools: Visible if Platform Admin, Global Admin, or Global Editor
+  if (isPlatformAdmin || isAdmin || isEditor) {
+    const toolItems: NavItem[] = [
+      {
+        href: '/dashboard/tools/metadata-generator',
+        label: 'Metadata Generator',
+        icon: <Code className="h-4 w-4" />,
+        segment: 'metadata-generator'
+      },
+      {
+        href: '/dashboard/tools/alt-text-generator',
+        label: 'Alt Text Generator',
+        icon: <Image className="h-4 w-4" />,
+        segment: 'alt-text-generator'
+      },
+      {
+        href: '/dashboard/tools/content-transcreator',
+        label: 'Content Transcreator',
+        icon: <Globe className="h-4 w-4" />,
+        segment: 'content-transcreator'
+      },
+    ];
+    // Only add the Tools group if there are items to show (though these are static for now)
+    if (toolItems.length > 0) {
+        finalNavItems.push({
+            label: 'Tools',
+            icon: <Wrench className="h-5 w-5" />,
+            items: toolItems,
+            segment: 'tools',
+            defaultOpen: expandedSections.tools !== undefined ? expandedSections.tools : true
+        });
+    }
+  }
+
+  // Separator
+  finalNavItems.push({ type: 'divider' });
+
+  // Users: Visible if Platform Admin or Global Admin
+  if (isPlatformAdmin || isAdmin) {
+    finalNavItems.push({
+      href: '/dashboard/users',
+      label: 'Users',
+      icon: <Users className="h-5 w-5" />,
+      segment: 'users'
+    });
+  }
+  
+  // Account & Help: Always visible for authenticated users
+  finalNavItems.push({
+    href: '/dashboard/account',
+    label: 'Account',
+    icon: <Settings className="h-5 w-5" />,
+    segment: 'account'
+  });
+  finalNavItems.push({
+    href: '/dashboard/help',
+    label: 'Help',
+    icon: <HelpCircle className="h-5 w-5" />,
+    segment: 'help'
+  });
+
   return (
     <nav className="bg-card w-64 p-4 h-[calc(100vh-4rem)] overflow-y-auto border-r border-border sticky top-16 hidden lg:block">
       <div className="space-y-8">
         <div className="space-y-1">
-          {filteredNavItems.map((item, index) => (
-            'items' in item ? (
-              // Group with submenu
-              <div key={index} className="space-y-1">
-                {/* Group header - clickable to expand/collapse */}
-                <button 
-                  onClick={() => toggleSection(item.label.toLowerCase())}
+          {finalNavItems.map((item, index) => {
+            if ('type' in item && item.type === 'divider') {
+              return <hr key={index} className="my-2 border-t border-border" />;
+            }
+            if ('items' in item) {
+              return (
+                <div key={index} className="space-y-1">
+                  <button 
+                    onClick={() => toggleSection(item.label.toLowerCase())}
+                    className={cn(
+                      "flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                      isActive(item)
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-primary"
+                    )}
+                  >
+                    <span className="flex items-center gap-3">
+                      {item.icon}
+                      {item.label}
+                    </span>
+                    {expandedSections[item.label.toLowerCase()] 
+                      ? <ChevronDown className="h-4 w-4" /> 
+                      : <ChevronRight className="h-4 w-4" />
+                    }
+                  </button>
+                  {expandedSections[item.label.toLowerCase()] && (
+                    <div className="pl-6 space-y-1">
+                      {item.items.map((subItem) => (
+                        <Link
+                          key={subItem.href}
+                          href={subItem.href}
+                          className={cn(
+                            'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors',
+                            (segments.includes(subItem.segment || '') || pathname === subItem.href)
+                              ? "bg-primary text-primary-foreground"
+                              : "text-muted-foreground hover:bg-muted hover:text-primary"
+                          )}
+                        >
+                          {subItem.icon}
+                          {subItem.label}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            if ('href' in item) {
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
                   className={cn(
-                    "flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                    'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
                     isActive(item)
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:bg-muted hover:text-primary"
                   )}
                 >
-                  <span className="flex items-center gap-3">
-                    {item.icon}
-                    {item.label}
-                  </span>
-                  {expandedSections[item.label.toLowerCase()] 
-                    ? <ChevronDown className="h-4 w-4" /> 
-                    : <ChevronRight className="h-4 w-4" />
-                  }
-                </button>
-                
-                {/* Group items - indented, only show if expanded */}
-                {expandedSections[item.label.toLowerCase()] && (
-                  <div className="pl-6 space-y-1">
-                    {item.items.map((subItem) => (
-                      <Link
-                        key={subItem.href}
-                        href={subItem.href}
-                        className={cn(
-                          'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors',
-                          (segments.includes(subItem.segment || '') || pathname === subItem.href)
-                            ? "bg-primary text-primary-foreground"
-                            : "text-muted-foreground hover:bg-muted hover:text-primary"
-                        )}
-                      >
-                        {subItem.icon}
-                        {subItem.label}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              // Single nav item
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                  isActive(item)
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-primary"
-                )}
-              >
-                {item.icon}
-                {item.label}
-              </Link>
-            )
-          ))}
+                  {item.icon}
+                  {item.label}
+                </Link>
+              );
+            }
+            return null;
+          })}
         </div>
-        
-        {/* Bottom navigation items */}
         <div className="pt-4 border-t border-border">
           {currentUser && bottomNavItems.map((item) => (
             <Link

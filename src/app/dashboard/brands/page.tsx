@@ -58,6 +58,7 @@ export default function BrandsPage() {
         const data = await response.json();
         
         if (data.success) {
+          console.log('Fetched brands data:', data.data);
           setBrands(Array.isArray(data.data) ? data.data : []);
         } else {
           throw new Error(data.error || 'Failed to fetch brands');
