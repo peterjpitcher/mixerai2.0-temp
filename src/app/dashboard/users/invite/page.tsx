@@ -16,10 +16,10 @@ import {
 import type { Metadata } from 'next';
 import { toast } from 'sonner';
 
-// export const metadata: Metadata = {
-//   title: 'Invite User | MixerAI 2.0',
-//   description: 'Invite a new user to join your MixerAI workspace and assign their role.',
-// };
+export const metadata: Metadata = {
+  title: 'Invite User | MixerAI 2.0',
+  description: 'Invite a new user to join your MixerAI workspace and assign their role.',
+};
 
 interface Brand {
   id: string;
@@ -133,8 +133,33 @@ export default function InviteUserPage() {
     }
   };
   
+  // Placeholder Breadcrumbs component
+  const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+    <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+      <ol className="flex items-center space-x-1.5">
+        {items.map((item, index) => (
+          <li key={index} className="flex items-center">
+            {item.href ? (
+              <Link href={item.href} className="hover:underline">
+                {item.label}
+              </Link>
+            ) : (
+              <span>{item.label}</span>
+            )}
+            {index < items.length - 1 && <span className="mx-1.5">/</span>}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+  
   return (
     <div className="space-y-8">
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Users", href: "/dashboard/users" },
+        { label: "Invite User" }
+      ]} />
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" asChild>
@@ -265,7 +290,10 @@ export default function InviteUserPage() {
               </div>
             </div>
           </CardContent>
-          <CardFooter className="flex justify-end">
+          <CardFooter className="flex justify-end space-x-2">
+            <Button variant="outline" type="button" onClick={() => router.push('/dashboard/users')} disabled={isSending}>
+              Cancel
+            </Button>
             <Button type="submit" disabled={isSending} className="flex items-center gap-2">
               {isSending && <Loader2 className="h-4 w-4 animate-spin" />}
               {isSending ? 'Sending...' : 'Send Invitation'}
