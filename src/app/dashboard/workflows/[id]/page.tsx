@@ -11,6 +11,9 @@ import { toast } from 'sonner';
 import { Separator } from '@/components/separator';
 import { Badge } from '@/components/badge';
 import type { Metadata } from 'next';
+import { BrandIcon } from '@/components/brand-icon';
+import { ArrowLeft, Edit3, AlertTriangle, Loader2 } from 'lucide-react';
+import { format as formatDateFns } from 'date-fns';
 
 // export const metadata: Metadata = {
 //   title: 'Workflow Details | MixerAI 2.0',
@@ -34,6 +37,26 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
+  // Placeholder Breadcrumbs component
+  const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+    <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+      <ol className="flex items-center space-x-1.5">
+        {items.map((item, index) => (
+          <li key={index} className="flex items-center">
+            {item.href ? (
+              <Link href={item.href} className="hover:underline">
+                {item.label}
+              </Link>
+            ) : (
+              <span>{item.label}</span>
+            )}
+            {index < items.length - 1 && <span className="mx-1.5">/</span>}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+
   useEffect(() => {
     // Don't set state during render
     const fetchWorkflow = async () => {
@@ -80,7 +103,7 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
-        <div className="animate-spin rounded-full border-2 border-current border-t-transparent h-6 w-6"></div>
+        <Loader2 className="animate-spin rounded-full h-8 w-8 text-primary" />
       </div>
     );
   }
@@ -90,11 +113,7 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px]">
         <div className="text-destructive mb-4">
-          <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
+          <AlertTriangle size={64} strokeWidth={1.5} />
         </div>
         <h3 className="text-xl font-bold mb-2">Error Loading Workflow</h3>
         <p className="text-muted-foreground mb-4 text-center max-w-md">{error}</p>
@@ -117,27 +136,63 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
   const contentCount = workflow.contentCount || 0;
   const templateName = workflow.template_name || 'No Template Associated';
   
+  // Standard 4.6: Consistent Date Formatting
+  const getFormattedDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      return formatDateFns(new Date(dateString), 'dd MMMM yyyy');
+    } catch (e) {
+      console.error("Error formatting date:", dateString, e);
+      return "Invalid Date";
+    }
+  };
+  const getFormattedDateTime = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      return formatDateFns(new Date(dateString), 'dd MMMM yyyy, HH:mm');
+    } catch (e) {
+      console.error("Error formatting date/time:", dateString, e);
+      return "Invalid Date/Time";
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{workflow.name || 'Unnamed Workflow'}</h1>
-          <p className="text-muted-foreground mt-1">
-            View the details, steps, and configuration for this content workflow.
-          </p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Brand: {brandName} • Created on: {new Date(workflow.createdAt || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-          </p>
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" }, 
+        { label: "Workflows", href: "/dashboard/workflows" }, 
+        { label: workflow.name || "View Workflow" }
+      ]} />
+
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" onClick={() => window.location.href = '/dashboard/workflows'} aria-label="Back to Workflows">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight flex items-center">
+              {workflow.brand_id && 
+                <BrandIcon 
+                  name={brandName} 
+                  color={brandColor ?? undefined} 
+                  size="md" 
+                  className="mr-3" 
+                />
+              }
+              {workflow.name || 'Unnamed Workflow'}
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              View the details, steps, and configuration for this content workflow.
+            </p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Brand: {brandName} • Created on: {getFormattedDate(workflow.createdAt || Date.now().toString())}
+            </p>
+          </div>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" asChild>
-            <Link href={`/dashboard/workflows/${id}/edit`}>
-              Edit
-            </Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/workflows">
-              Back to Workflows
+          <Button variant="default" asChild>
+            <Link href={`/dashboard/workflows/${id}/edit`} className="flex items-center">
+              <Edit3 className="mr-2 h-4 w-4" /> Edit
             </Link>
           </Button>
         </div>
@@ -243,12 +298,12 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
               
               <div>
                 <p className="text-sm font-medium mb-1">Created At</p>
-                <span>{new Date(workflow.createdAt || Date.now()).toLocaleString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'})}</span>
+                <span>{getFormattedDateTime(workflow.createdAt || Date.now().toString())}</span>
               </div>
               
               <div>
                 <p className="text-sm font-medium mb-1">Last Updated</p>
-                <span>{new Date(workflow.updatedAt || workflow.createdAt || Date.now()).toLocaleString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'})}</span>
+                <span>{getFormattedDateTime(workflow.updatedAt || workflow.createdAt || Date.now().toString())}</span>
               </div>
               
               <Separator />
