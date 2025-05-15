@@ -19,6 +19,26 @@ import type { Metadata } from 'next';
 import { toast } from 'sonner';
 import { Separator } from '@/components/separator';
 
+// Placeholder Breadcrumbs component
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
+
 // export const metadata: Metadata = {
 //   title: 'Edit User | MixerAI 2.0',
 //   description: 'Modify user profile details, roles, and brand permissions.',
@@ -241,6 +261,12 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
   
   return (
     <div className="space-y-8">
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Users", href: "/dashboard/users" },
+        { label: user?.full_name || "User", href: user ? `/dashboard/users/${user.id}` : undefined }, // Link to view page if exists
+        { label: "Edit" }
+      ]} />
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" asChild>
@@ -267,7 +293,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
             <div className="space-y-4">
               <div>
                 <Label htmlFor="full_name" className="text-right">
-                  Full Name
+                  Full Name <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="full_name"
@@ -354,7 +380,10 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
               </div>
             </div>
           </CardContent>
-          <CardFooter className="flex justify-end">
+          <CardFooter className="flex justify-end space-x-2">
+            <Button variant="outline" type="button" onClick={() => router.push(user ? `/dashboard/users/${user.id}` : '/dashboard/users')} disabled={isSaving}>
+              Cancel
+            </Button>
             <Button type="submit" disabled={isSaving} className="flex items-center gap-2">
               {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
               {isSaving ? 'Saving...' : 'Save Changes'}
