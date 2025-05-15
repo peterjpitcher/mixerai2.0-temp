@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Eye, Edit, AlertCircle, ListChecks } from 'lucide-react';
 import { toast } from 'sonner';
 import { createSupabaseClient } from '@/lib/supabase/client'; // Corrected import
+import { format as formatDateFns } from 'date-fns'; // Added for date formatting
+import { BrandIcon } from '@/components/brand-icon'; // Added for Brand Avatars
 
 // Interface for the data structure from /api/content
 interface ContentItemFromApi {
@@ -45,6 +47,8 @@ interface ContentItemFromApi {
       assigned_user_ids?: string[];
     }>;
   };
+  workflow_step_order?: number | null;
+  brand_avatar_url?: string | null; // For BrandIcon
 }
 
 // TaskItem interface for the page
@@ -65,6 +69,26 @@ interface TaskItem {
   workflow_step_name: string | null;
   workflow_step_order?: number | null;
 }
+
+// Placeholder Breadcrumbs component
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
 
 export default function MyTasksPage() {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
@@ -138,9 +162,15 @@ export default function MyTasksPage() {
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-GB', {
-      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-    });
+    // Standard 4.6: Use dd MMMM yyyy or dd Mmmm for dates.
+    // Since Due Date might be time-sensitive, keeping HH:mm might be acceptable if specified, but for consistency with other date displays, let's use dd MMMM yyyy for now.
+    // If time is critical, a separate column or different formatting rule should apply.
+    try {
+      return formatDateFns(new Date(dateString), 'dd MMMM yyyy'); 
+    } catch (e) {
+      console.error("Error formatting date:", dateString, e);
+      return "Invalid Date";
+    }
   };
 
   if (isLoading) {
@@ -164,6 +194,7 @@ export default function MyTasksPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "My Tasks" }]} />
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">My Tasks</h1>
         <p className="text-muted-foreground">Content items awaiting your action</p>
@@ -200,7 +231,12 @@ export default function MyTasksPage() {
                   {tasks.map((task) => (
                     <tr key={task.id} className="border-b hover:bg-muted/50">
                       <td className="p-3 font-medium">{task.content_title || 'N/A'}</td>
-                      <td className="p-3">{task.brand_name || 'N/A'}</td>
+                      <td className="p-3">
+                        <div className="flex items-center">
+                          <BrandIcon name={task.brand_name || ''} color={task.brand_color ?? undefined} size="sm" className="mr-2" />
+                          {task.brand_name || 'N/A'}
+                        </div>
+                      </td>
                       <td className="p-3">{task.workflow_step_name || 'N/A'}</td>
                       <td className="p-3">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium 
@@ -212,7 +248,7 @@ export default function MyTasksPage() {
                       </td>
                       <td className="p-3 text-muted-foreground">{formatDate(task.due_date)}</td>
                       <td className="p-3">
-                        <Button variant="outline" size="sm" asChild>
+                        <Button variant="outline" size="sm" asChild title="Review this content item">
                           <Link href={`/dashboard/content/${task.content_id}`}>
                             <Eye className="h-4 w-4 mr-1.5" /> Review Content
                           </Link>
