@@ -60,8 +60,8 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       `)
       // Filter for content assigned to the current user
       .filter('assigned_to', 'cs', `{"${user.id}"}`)
-      // Filter for actionable content statuses
-      .in('status', ['pending_review', 'rejected', 'draft']);
+      // Filter for actionable content statuses (active content in review)
+      .in('status', ['draft', 'pending_review']);
 
     if (globalRole !== 'admin' && permittedBrandIds) {
       console.log(`[API Tasks GET] Non-admin user. Filtering tasks by permitted brand IDs: ${permittedBrandIds.join(', ')}`);

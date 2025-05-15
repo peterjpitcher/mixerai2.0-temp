@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { generateTextCompletion } from '@/lib/azure/openai';
 
 // Define the expected request body schema
 const WorkflowDetailsSchema = z.object({
@@ -10,23 +11,6 @@ const WorkflowDetailsSchema = z.object({
   brandCountry: z.string().optional(),
   brandLanguage: z.string().optional(),
 });
-
-// Placeholder for actual OpenAI client and call
-async function callOpenAI(prompt: string): Promise<string | null> {
-  // In a real scenario, you would use the OpenAI SDK here
-  // e.g., import OpenAI from 'openai';
-  // const openai = new OpenAI({ apiKey: process.env.AZURE_OPENAI_API_KEY });
-  // const completion = await openai.chat.completions.create({
-  //   model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME || 'gpt-3.5-turbo',
-  //   messages: [{ role: 'system', content: 'You are an expert marketing copywriter.' }, { role: 'user', content: prompt }],
-  // });
-  // return completion.choices[0].message.content;
-  
-  // Mock response for now:
-  await new Promise(resolve => setTimeout(resolve, 200)); // Simulate network delay
-  if (prompt.includes("fail_generation")) return null; // For testing failure
-  return `This is an AI-generated description based on the prompt: "${prompt.substring(0, 100)}..."`;
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -42,41 +26,52 @@ export async function POST(request: NextRequest) {
 
     const { workflowName, brandName, templateName, stepNames, brandCountry, brandLanguage } = validationResult.data;
 
-    let prompt = `Generate a concise and engaging marketing description for a workflow named "${workflowName}".`;
+    const systemPrompt = "You are an expert marketing copywriter. Your task is to generate a concise and engaging marketing description for a content workflow.";
+
+    let userPrompt = `Generate a concise and engaging marketing description for a workflow named \"${workflowName}\".`;
     if (brandName) {
-      prompt += ` This workflow is specifically designed for the brand "${brandName}".`;
+      userPrompt += ` This workflow is specifically designed for the brand \"${brandName}\".`;
     }
     if (brandCountry && brandLanguage) {
-      prompt += ` It targets the ${brandCountry} market and uses the ${brandLanguage} language.`;
+      userPrompt += ` It targets the ${brandCountry} market and uses the ${brandLanguage} language.`;
     }
     if (templateName) {
-      prompt += ` It often utilizes the "${templateName}" content template.`;
+      userPrompt += ` It often utilizes the \"${templateName}\" content template.`;
     }
     if (stepNames && stepNames.length > 0) {
-      prompt += ` The workflow involves the following key stages or steps: ${stepNames.join(', ')}.`;
+      userPrompt += ` The workflow involves the following key stages or steps: ${stepNames.join(', ')}.`;
     } else {
-      prompt += ` It is a flexible workflow, and specific steps can be defined as needed.`;
+      userPrompt += ` It is a flexible workflow, and specific steps can be defined as needed.`;
     }
-    prompt += ` Highlight its primary purpose and benefits in streamlining content creation and approval processes. The description should be suitable for a dashboard overview.`;
+    userPrompt += ` Highlight its primary purpose and benefits in streamlining content creation and approval processes. The description should be suitable for a dashboard overview and be around 2-3 sentences long.`;
 
-    const generatedDescription = await callOpenAI(prompt);
+    // Call the actual AI generation function
+    const generatedDescription = await generateTextCompletion(systemPrompt, userPrompt, 150); // Max 150 tokens for a description
 
     if (!generatedDescription) {
+      console.error('[API_GENERATE_WORKFLOW_DESCRIPTION] AI generation failed or returned null.');
       return NextResponse.json(
-        { success: false, error: 'AI failed to generate workflow description' },
-        { status: 500 }
+        { success: false, error: 'AI failed to generate workflow description. Please try again later.' },
+        { status: 503 } // Service Unavailable
       );
     }
 
     return NextResponse.json({ 
       success: true, 
-      description: generatedDescription 
+      description: generatedDescription.trim() 
     });
 
   } catch (error) {
-    console.error('[AI_GENERATE_WORKFLOW_DESCRIPTION_ERROR]', error);
+    console.error('[API_GENERATE_WORKFLOW_DESCRIPTION_ERROR]', error);
+    // Check if the error is a Zod validation error for more specific client feedback
+    if (error instanceof z.ZodError) {
+        return NextResponse.json(
+            { success: false, error: 'Invalid request payload.', details: error.format() },
+            { status: 400 }
+        );
+    }
     return NextResponse.json(
-      { success: false, error: 'Failed to generate workflow description' },
+      { success: false, error: 'An unexpected error occurred while generating the workflow description.' },
       { status: 500 }
     );
   }

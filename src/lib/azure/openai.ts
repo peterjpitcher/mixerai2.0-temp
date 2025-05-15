@@ -51,6 +51,49 @@ export function getModelName(): string {
   return "gpt-4o";
 }
 
+// New function for generic text completion
+export async function generateTextCompletion(
+  systemPrompt: string,
+  userPrompt: string,
+  maxTokens: number = 250, // Sensible default for descriptions
+  temperature: number = 0.7
+): Promise<string | null> {
+  try {
+    const client = getAzureOpenAIClient();
+    const deploymentName = getModelName(); // Use the centralized model/deployment name
+
+    console.log(`[generateTextCompletion] Making API call to Azure OpenAI deployment: ${deploymentName}`);
+    console.log(`[generateTextCompletion] System Prompt: ${systemPrompt.substring(0, 100)}...`);
+    console.log(`[generateTextCompletion] User Prompt: ${userPrompt.substring(0,100)}...`);
+
+
+    const completion = await client.chat.completions.create({
+      model: deploymentName, // Pass deployment name as model
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: maxTokens,
+      temperature: temperature,
+    });
+
+    if (completion.choices && completion.choices.length > 0 && completion.choices[0].message) {
+      const content = completion.choices[0].message.content;
+      console.log(`[generateTextCompletion] Successfully received content. Length: ${content?.length}`);
+      return content;
+    } else {
+      console.error("[generateTextCompletion] No content in completion choices or choices array is empty.");
+      return null;
+    }
+  } catch (error) {
+    console.error("[generateTextCompletion] Error calling Azure OpenAI:", error);
+    // Do not throw here to allow the caller to handle it, consistent with other functions like generateContentFromTemplate
+    // which catch and log but might return partial results or fallbacks.
+    // For this generic function, returning null indicates failure.
+    return null; 
+  }
+}
+
 // Content vetting agencies by country
 export const VETTING_AGENCIES_BY_COUNTRY: Record<string, Array<{name: string, description: string}>> = {
   "US": [

@@ -6,15 +6,20 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/input';
 import { Label } from '@/components/label';
 import { Textarea } from "@/components/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/select";
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Loader2, ClipboardCopy, Globe, ArrowLeft } from 'lucide-react';
-import type { Metadata } from 'next';
+import { Loader2, ClipboardCopy, Globe, ArrowLeft, Info, Download, AlertTriangle, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { PageHeader } from '@/components/dashboard/page-header';
-import { BrandIcon } from '@/components/brand-icon';
 import Link from 'next/link';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/table";
+import { Progress } from "@/components/ui/progress";
 
 // export const metadata: Metadata = {
 //   title: 'Metadata Generator | MixerAI 2.0',
@@ -41,15 +46,12 @@ const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) =
   </nav>
 );
 
-interface Brand {
-  id: string;
-  name: string;
-  country?: string;
-  language?: string;
-  brand_identity?: string | null;
-  tone_of_voice?: string | null;
-  guardrails?: string | null;
-  brand_color?: string | null;
+interface MetadataResultItem {
+  url: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  keywords?: string[];
+  error?: string;
 }
 
 /**
@@ -59,132 +61,141 @@ interface Brand {
  * Results can be copied to the clipboard.
  */
 export default function MetadataGeneratorPage() {
-  const [url, setUrl] = useState('');
-  const [selectedBrandId, setSelectedBrandId] = useState('');
+  const [urlsInput, setUrlsInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isFetchingBrands, setIsFetchingBrands] = useState(true);
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [results, setResults] = useState<{ metaTitle: string; metaDescription: string; keywords?: string[] } | null>(null);
+  const [results, setResults] = useState<MetadataResultItem[]>([]);
+  const [processedCount, setProcessedCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
   const router = useRouter();
 
-  // Fetch brands on component mount
-  useEffect(() => {
-    const fetchBrands = async () => {
-      try {
-        setIsFetchingBrands(true);
-        const response = await fetch('/api/brands');
-        const data = await response.json();
-        
-        if (data.success && Array.isArray(data.data)) {
-          setBrands(data.data);
-        } else {
-          // console.error('Failed to fetch brands:', data);
-          toast.error('Failed to fetch brands. Please try again later.');
-        }
-      } catch (error) {
-        // console.error('Error fetching brands:', error);
-        toast.error('Failed to fetch brands. Please try again later.');
-      } finally {
-        setIsFetchingBrands(false);
-      }
-    };
-    
-    fetchBrands();
-  }, []);
-
-  const selectedBrand = brands.find(brand => brand.id === selectedBrandId);
-
-  const handleSubmitUrl = async (e: React.FormEvent) => {
+  const handleSubmitUrls = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!url) {
-      toast.error('Please enter a URL for which to generate metadata.');
+    const urls = urlsInput.split(/\r?\n/).map(u => u.trim()).filter(u => u);
+
+    if (urls.length === 0) {
+      toast.error('Please enter at least one URL.');
       return;
     }
     
-    if (!selectedBrandId) {
-      toast.error('Please select a brand.');
-      return;
-    }
-    
-    // Validate URL format
-    try {
-      new URL(url);
-    } catch (error) {
-      toast.error('Please enter a valid URL (e.g., https://example.com).');
+    const invalidUrls = urls.filter(u => {
+      try {
+        new URL(u);
+        return false;
+      } catch {
+        return true;
+      }
+    });
+
+    if (invalidUrls.length > 0) {
+      toast.error(`Please correct the following invalid URLs: ${invalidUrls.join(', ')}`);
       return;
     }
     
     setIsLoading(true);
-    setResults(null);
-    
-    try {
-      const response = await fetch('/api/tools/metadata-generator', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url,
-          brandId: selectedBrandId,
-          brandLanguage: selectedBrand?.language || 'en',
-          brandCountry: selectedBrand?.country || 'US',
-          brandIdentity: selectedBrand?.brand_identity || '',
-          toneOfVoice: selectedBrand?.tone_of_voice || '',
-          guardrails: selectedBrand?.guardrails || '',
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate metadata.');
-      }
-      
-      if (data.success) {
-        setResults({
-          metaTitle: data.metaTitle,
-          metaDescription: data.metaDescription,
-          keywords: data.keywords,
+    setResults([]);
+    setTotalCount(urls.length);
+    setProcessedCount(0);
+    let overallSuccessCount = 0;
+    let overallErrorCount = 0;
+
+    for (let i = 0; i < urls.length; i++) {
+      const currentUrl = urls[i];
+      try {
+        const response = await fetch('/api/tools/metadata-generator', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            urls: [currentUrl], // Send one URL at a time
+          }),
         });
         
-        toast('SEO-optimised metadata has been generated successfully.');
-      } else {
-        throw new Error(data.error || 'Failed to generate metadata.');
+        const data = await response.json();
+        
+        if (!response.ok) {
+          const errorMsg = data.error || 'API request failed for this URL.';
+          setResults(prevResults => [...prevResults, { url: currentUrl, error: errorMsg }]);
+          overallErrorCount++;
+        } else if (data.success && Array.isArray(data.results) && data.results.length > 0) {
+          const resultItem = data.results[0]; // Assuming API returns array with one item for single URL request
+          setResults(prevResults => [...prevResults, resultItem]);
+          if (!resultItem.error && (resultItem.metaTitle || resultItem.metaDescription)) {
+            overallSuccessCount++;
+          } else {
+            // If there's an error field in the result item, or no data, count as error
+            overallErrorCount++;
+          }
+        } else {
+          setResults(prevResults => [...prevResults, { url: currentUrl, error: data.error || 'Unexpected server response for this URL.' }]);
+          overallErrorCount++;
+        }
+      } catch (error) {
+        setResults(prevResults => [...prevResults, { url: currentUrl, error: error instanceof Error ? error.message : 'Client-side error processing this URL.' }]);
+        overallErrorCount++;
+      } finally {
+        setProcessedCount(prevCount => prevCount + 1);
+        if (i < urls.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay
+        }
       }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'An unknown error occurred.');
-    } finally {
-      setIsLoading(false);
+    }
+
+    setIsLoading(false);
+    if (overallSuccessCount > 0) {
+        toast.success(`Metadata generation complete. ${overallSuccessCount} URL(s) processed successfully.`);
+    }
+    if (overallErrorCount > 0) {
+        toast.warning(`${overallErrorCount} URL(s) could not be processed or resulted in an error.`);
+    }
+     if (overallSuccessCount === 0 && overallErrorCount === 0 && urls.length > 0) {
+        toast.info("Processing completed, but no metadata was generated and no errors were reported.");
     }
   };
 
-  const handleCopyTitle = () => {
-    if (results?.metaTitle) {
-      copyToClipboard(results.metaTitle);
-      toast('The meta title has been copied to your clipboard.');
+  const handleCopyToClipboard = (text: string, type: string, url: string) => {
+    if (text) {
+      copyToClipboard(text);
+      toast.success(`${type} for ${url.length > 30 ? url.substring(0,27) + '...' : url} copied!`);
     }
   };
 
-  const handleCopyDescription = () => {
-    if (results?.metaDescription) {
-      copyToClipboard(results.metaDescription);
-      toast('The meta description has been copied to your clipboard.');
+  const successfulResults = results.filter(r => !r.error && (r.metaTitle || r.metaDescription));
+  const errorResults = results.filter(r => r.error);
+
+  const downloadCSV = () => {
+    if (successfulResults.length === 0) {
+      toast.error("No successful results to download.");
+      return;
     }
-  };
-  
-  const handleCopyKeywords = () => {
-    if (results?.keywords && results.keywords.length > 0) {
-      copyToClipboard(results.keywords.join(', '));
-      toast('The keywords have been copied to your clipboard.');
-    }
+    const headers = ["URL", "Meta Title", "Meta Description", "Keywords"];
+    const rows = successfulResults.map(res => [
+      `"${res.url?.replace(/"/g, '""') || ''}"`, 
+      `"${res.metaTitle?.replace(/"/g, '""') || ''}"`, 
+      `"${res.metaDescription?.replace(/"/g, '""') || ''}"`, 
+      `"${(res.keywords || []).join(', ').replace(/"/g, '""')}"`
+    ]);
+
+    let csvContent = "data:text/csv;charset=utf-8,"
+      + headers.join(",") + "\\n"
+      + rows.map(e => e.join(",")).join("\\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "metadata_results.csv");
+    document.body.appendChild(link); 
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Metadata CSV downloaded.");
   };
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" }, 
-        // { label: "Tools", href: "/dashboard/tools" }, // Uncomment if/when a Tools overview page exists
+        { label: "Tools", href: "/dashboard/tools" }, 
         { label: "Metadata Generator" }
       ]} />
 
@@ -196,190 +207,167 @@ export default function MetadataGeneratorPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Metadata Generator</h1>
             <p className="text-muted-foreground mt-1">
-              Generate SEO-optimised meta titles, descriptions, and keywords using your brand's voice and style.
+              Generate SEO-optimised meta titles and descriptions for a list of URLs.
             </p>
           </div>
         </div>
       </div>
-
-      {selectedBrand && (
-        <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/50 mb-6">
-          <BrandIcon name={selectedBrand.name} color={selectedBrand.brand_color ?? undefined} size="md" />
-          <div>
-            <p className="font-semibold">Using Brand: {selectedBrand.name}</p>
-            <p className="text-xs text-muted-foreground">
-              Country: {selectedBrand.country || 'Not specified'} • Language: {selectedBrand.language || 'Not specified'}
-            </p>
-          </div>
-        </div>
-      )}
       
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-1">
         <Card>
           <CardHeader>
-            <CardTitle>Generate Metadata</CardTitle>
+            <CardTitle>Enter URLs</CardTitle>
             <CardDescription>
-              Select a brand and enter a URL to generate SEO-optimised metadata.
+              Enter one URL per line to generate SEO-optimised metadata.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <form onSubmit={handleSubmitUrls} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="brand">Brand <span className="text-destructive">*</span></Label>
-                <Select
-                  value={selectedBrandId}
-                  onValueChange={(value) => {
-                    setSelectedBrandId(value);
-                  }}
-                  disabled={isLoading || isFetchingBrands}
-                >
-                  <SelectTrigger id="brand">
-                    <SelectValue placeholder="Select a brand" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {brands.map((brand) => (
-                      <SelectItem key={brand.id} value={brand.id}>
-                        {brand.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="urls">URLs <span className="text-destructive">*</span></Label>
+                <Textarea
+                  id="urls"
+                  placeholder="https://example.com/page1\\nhttps://another.com/article"
+                  value={urlsInput}
+                  onChange={(e) => setUrlsInput(e.target.value)}
+                  rows={5}
+                  required
+                  disabled={isLoading}
+                  className="min-h-[100px]"
+                />
               </div>
-              
-              <form onSubmit={handleSubmitUrl} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="url">Web Page URL <span className="text-destructive">*</span></Label>
-                  <Input
-                    id="url"
-                    placeholder="https://example.com/page"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    disabled={isLoading}
-                    required
-                  />
-                </div>
-                
-                <Button type="submit" className="w-full" disabled={isLoading || !selectedBrandId}>
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Globe className="mr-2 h-4 w-4" />
-                      Generate from URL
-                    </>
-                  )}
-                </Button>
-              </form>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Generated Metadata</CardTitle>
-            <CardDescription>
-              Copy the generated metadata to use in your content management system.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex justify-center items-center h-64">
-                <div className="text-center">
-                  <Loader2 className="h-10 w-10 animate-spin mx-auto mb-4 text-primary" />
-                  <p className="text-muted-foreground">Generating metadata...</p>
-                </div>
-              </div>
-            ) : results ? (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Label htmlFor="metaTitle">Meta Title</Label>
-                    <span className={`text-xs ${results.metaTitle.length >= 45 && results.metaTitle.length <= 60 ? 'text-success' : 'text-destructive'}`}>
-                      {results.metaTitle.length} characters
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <Textarea
-                      id="metaTitle"
-                      value={results.metaTitle}
-                      readOnly
-                      className="pr-10 text-sm"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-2 top-2"
-                      onClick={handleCopyTitle}
-                      title="Copy to clipboard"
-                    >
-                      <ClipboardCopy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Note: Most CMS systems will automatically append the brand name to the end of meta titles, 
-                    which will increase the character count. A slightly shorter meta title (45-50 characters) 
-                    allows room for this addition while staying within optimal SEO limits.
-                  </p>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Label htmlFor="metaDescription">Meta Description</Label>
-                    <span className={`text-xs ${results.metaDescription.length >= 150 && results.metaDescription.length <= 160 ? 'text-success' : 'text-destructive'}`}>
-                      {results.metaDescription.length} characters
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <Textarea
-                      id="metaDescription"
-                      value={results.metaDescription}
-                      readOnly
-                      className="pr-10 text-sm"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-2 top-2"
-                      onClick={handleCopyDescription}
-                      title="Copy to clipboard"
-                    >
-                      <ClipboardCopy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                
-                {results.keywords && results.keywords.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <Label>Suggested Keywords</Label>
-                      <Button variant="outline" size="sm" onClick={handleCopyKeywords}>
-                        <ClipboardCopy className="h-4 w-4 mr-2" />
-                        Copy
-                      </Button>
+              <div className="flex flex-col items-end">
+                {isLoading && totalCount > 0 && (
+                    <div className="w-full mb-2">
+                        <Progress value={(processedCount / totalCount) * 100} className="w-full h-2" />
+                        <p className="text-sm text-muted-foreground mt-1 text-right">
+                            Processing URL {processedCount} of {totalCount}...
+                        </p>
                     </div>
-                    <Textarea 
-                      readOnly 
-                      value={results.keywords.join(', ')}
-                      className="h-24"
-                    />
-                  </div>
                 )}
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Globe className="mr-2 h-4 w-4" />}
+                  {isLoading ? `Generating...` : `Generate Metadata`}
+                </Button>
               </div>
-            ) : (
-              <div className="flex justify-center items-center h-64 text-center">
-                <div className="max-w-sm">
-                  <Globe className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-                  <p className="text-muted-foreground">
-                    Select a brand and enter a URL to generate SEO-optimised metadata.
-                  </p>
-                </div>
-              </div>
-            )}
+            </form>
           </CardContent>
         </Card>
+
+        {(results.length > 0 || isLoading && totalCount > 0) && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Generated Metadata</CardTitle>
+                    <CardDescription>
+                        Review the generated metadata below. Successful results can be downloaded.
+                    </CardDescription>
+                </div>
+                {successfulResults.length > 0 && !isLoading && (
+                    <Button onClick={downloadCSV} variant="outline" size="sm">
+                        <Download className="mr-2 h-4 w-4" />
+                        Download CSV
+                    </Button>
+                )}
+            </CardHeader>
+            <CardContent>
+              {successfulResults.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-2">Successful Results</h3>
+                  <div className="overflow-x-auto rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[25%] min-w-[200px] whitespace-nowrap">URL</TableHead>
+                          <TableHead className="w-[25%] min-w-[200px]">Meta Title</TableHead>
+                          <TableHead className="w-[40%] min-w-[300px]">Meta Description</TableHead>
+                          {/* Keywords are not displayed in table, but included in CSV */}
+                          <TableHead className="w-[10%] min-w-[120px] text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {successfulResults.map((item, index) => (
+                          <TableRow key={`success-${index}-${item.url}`}>
+                            <TableCell className="py-2 align-top">
+                               <div className="flex items-center">
+                                <a 
+                                    href={item.url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="hover:underline truncate"
+                                    title={item.url}
+                                    style={{ maxWidth: '250px', display: 'inline-block' }}
+                                >
+                                    {item.url}
+                                </a>
+                                <ExternalLink className="ml-1 h-3 w-3 text-muted-foreground flex-shrink-0" />
+                               </div>
+                            </TableCell>
+                            <TableCell className="py-2 align-top whitespace-pre-wrap">
+                              {item.metaTitle}
+                              {item.metaTitle && 
+                                <Button variant="ghost" size="sm" onClick={() => handleCopyToClipboard(item.metaTitle!, 'Meta Title', item.url)} title="Copy Meta Title" className="ml-1 p-1 h-auto">
+                                  <ClipboardCopy className="h-3.5 w-3.5" />
+                                </Button>
+                              }
+                            </TableCell>
+                            <TableCell className="py-2 align-top whitespace-pre-wrap">
+                              {item.metaDescription}
+                              {item.metaDescription &&
+                                <Button variant="ghost" size="sm" onClick={() => handleCopyToClipboard(item.metaDescription!, 'Meta Description', item.url)} title="Copy Meta Description" className="ml-1 p-1 h-auto">
+                                  <ClipboardCopy className="h-3.5 w-3.5" />
+                                </Button>
+                              }
+                            </TableCell>
+                            <TableCell className="py-2 align-top text-right">
+                                {item.keywords && item.keywords.length > 0 && (
+                                    <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(item.keywords!.join(', '), 'Keywords', item.url)} title="Copy Keywords">
+                                        <ClipboardCopy className="h-3.5 w-3.5 mr-1" /> Keywords
+                                    </Button>
+                                )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+
+              {errorResults.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2 text-destructive flex items-center">
+                    <AlertTriangle className="mr-2 h-5 w-5" /> 
+                    Processing Errors
+                  </h3>
+                  <ul className="space-y-2 rounded-md border border-destructive/50 bg-destructive/5 p-4">
+                    {errorResults.map((item, index) => (
+                      <li key={`error-${index}-${item.url}`} className="text-sm">
+                        <p className="font-semibold truncate" title={item.url}>URL: {item.url}</p>
+                        <p className="text-destructive-foreground/80">Error: {item.error}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {results.length === 0 && !isLoading && (
+                 <div className="text-center text-muted-foreground py-8">
+                    <Info className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <p className="text-lg font-medium">No results to display yet.</p>
+                    <p>Enter URLs above and click "Generate Metadata" to see results here.</p>
+                </div>
+              )}
+               {isLoading && totalCount > 0 && processedCount < totalCount && results.length === 0 && (
+                <div className="text-center text-muted-foreground py-8">
+                  <Loader2 className="mx-auto h-12 w-12 text-primary animate-spin mb-4" />
+                  <p className="text-lg font-medium">Processing your request...</p>
+                  <p>Please wait while we generate metadata for your URLs.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

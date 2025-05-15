@@ -3,18 +3,22 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/card';
-import { Input } from '@/components/input';
 import { Label } from '@/components/label';
 import { Textarea } from "@/components/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/select";
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Loader2, ClipboardCopy, Image, ArrowLeft } from 'lucide-react';
-import type { Metadata } from 'next';
-import { toast } from 'sonner';
+import { Loader2, ClipboardCopy, Image as ImageIcon, ArrowLeft, Info, AlertTriangle, Download, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { PageHeader } from '@/components/dashboard/page-header';
-import { BrandIcon } from '@/components/brand-icon';
+import { toast } from 'sonner';
 import Link from 'next/link';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/table";
+import { Progress } from "@/components/ui/progress";
 
 // export const metadata: Metadata = {
 //   title: 'Alt Text Generator | MixerAI 2.0',
@@ -41,166 +45,153 @@ const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) =
   </nav>
 );
 
-interface Brand {
-  id: string;
-  name: string;
-  country?: string;
-  language?: string;
-  brand_identity?: string | null;
-  tone_of_voice?: string | null;
-  guardrails?: string | null;
-  brand_color?: string | null;
+interface AltTextResultItem {
+  imageUrl: string;
+  altText?: string;
+  error?: string;
 }
 
 /**
  * AltTextGeneratorPage provides a tool for generating accessible alt text for images.
- * Users can select a brand, provide an image URL, and the tool will generate alt text
- * based on the image content and the selected brand's voice and style.
+ * Users can provide a list of image URLs, and the tool will generate alt text
+ * for each based on image content.
  * It includes an image preview and options to copy the generated alt text.
  */
 export default function AltTextGeneratorPage() {
-  const [imageUrl, setImageUrl] = useState('');
-  const [selectedBrandId, setSelectedBrandId] = useState('');
+  const [imageUrlsInput, setImageUrlsInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isFetchingBrands, setIsFetchingBrands] = useState(true);
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [results, setResults] = useState<{ altText: string } | null>(null);
-  const [previewError, setPreviewError] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [results, setResults] = useState<AltTextResultItem[]>([]);
+  const [processedCount, setProcessedCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
   const router = useRouter();
-
-  // Fetch brands on component mount
-  useEffect(() => {
-    const fetchBrands = async () => {
-      try {
-        setIsFetchingBrands(true);
-        const response = await fetch('/api/brands');
-        const data = await response.json();
-        
-        if (data.success && Array.isArray(data.data)) {
-          setBrands(data.data);
-        } else {
-          // console.error('Failed to fetch brands:', data);
-          toast.error('Failed to fetch brands. Please try again later.');
-        }
-      } catch (error) {
-        // console.error('Error fetching brands:', error);
-        toast.error('Failed to fetch brands. Please try again later.');
-      } finally {
-        setIsFetchingBrands(false);
-      }
-    };
-    
-    fetchBrands();
-  }, []);
-
-  const selectedBrand = brands.find(brand => brand.id === selectedBrandId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Reset any previous error state
-    setError(null);
-    
-    if (!imageUrl) {
-      toast.error('Please enter an image URL for which to generate alt text.');
+    const urls = imageUrlsInput.split(/\r?\n/).map(u => u.trim()).filter(u => u);
+
+    if (urls.length === 0) {
+      toast.error('Please enter at least one image URL.');
       return;
     }
-    
-    if (!selectedBrandId) {
-      toast.error('Please select a brand.');
-      return;
-    }
-    
-    // Validate URL format
-    try {
-      new URL(imageUrl);
-    } catch (error) {
-      toast.error('Please enter a valid URL (e.g., https://example.com/image.jpg).');
+
+    const invalidUrls = urls.filter(u => {
+      try {
+        new URL(u);
+        return false;
+      } catch {
+        return true;
+      }
+    });
+
+    if (invalidUrls.length > 0) {
+      toast.error(`Please correct the following invalid image URLs: ${invalidUrls.join(', ')}`);
       return;
     }
     
     setIsLoading(true);
-    setResults(null);
-    
-    try {
-      const response = await fetch('/api/tools/alt-text-generator', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          imageUrl,
-          brandId: selectedBrandId,
-          brandLanguage: selectedBrand?.language || 'en',
-          brandCountry: selectedBrand?.country || 'US',
-          brandIdentity: selectedBrand?.brand_identity || '',
-          toneOfVoice: selectedBrand?.tone_of_voice || '',
-          guardrails: selectedBrand?.guardrails || '',
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        // Get detailed error information
-        let errorMessage = data.error || 'Failed to generate alt text.';
-        
-        // Customize message based on status code
-        if (response.status === 503) {
-          errorMessage = 'Azure OpenAI service is temporarily unavailable. Please try again later.';
-        } else if (response.status === 400 && errorMessage.includes('image')) {
-          errorMessage = 'The image could not be processed. Please try a different image URL or format.';
-        }
-        
-        setError(errorMessage);
-        throw new Error(errorMessage);
-      }
-      
-      if (data.success) {
-        setResults({
-          altText: data.altText,
+    setResults([]);
+    setTotalCount(urls.length);
+    setProcessedCount(0);
+    let overallSuccessCount = 0;
+    let overallErrorCount = 0;
+
+    for (let i = 0; i < urls.length; i++) {
+      const currentUrl = urls[i];
+      try {
+        const response = await fetch('/api/tools/alt-text-generator', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ imageUrls: [currentUrl] }), // Send one URL at a time
         });
         
-        toast('Accessible alt text has been generated successfully.');
-      } else {
-        throw new Error(data.error || 'Failed to generate alt text.');
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : 'An unknown error occurred whilst generating alt text.';
+        const data = await response.json();
         
-      setError(errorMessage);
-      
-      toast.error(errorMessage);
-      
-      // console.error('Alt text generation error:', error);
-    } finally {
-      setIsLoading(false);
+        if (!response.ok) {
+          const errorMsg = data.error || 'API request failed for this image.';
+          setResults(prevResults => [...prevResults, { imageUrl: currentUrl, error: errorMsg }]);
+          overallErrorCount++;
+        } else if (data.success && Array.isArray(data.results) && data.results.length > 0) {
+          // Assuming the backend returns an array with one result item
+          const resultItem = data.results[0];
+          setResults(prevResults => [...prevResults, resultItem]);
+          if (resultItem.altText && !resultItem.error) {
+            overallSuccessCount++;
+          } else {
+            overallErrorCount++;
+          }
+        } else {
+          // Handle cases where the response is OK but data is not as expected
+          setResults(prevResults => [...prevResults, { imageUrl: currentUrl, error: data.error || 'Unexpected server response for this image.' }]);
+          overallErrorCount++;
+        }
+      } catch (error) {
+        setResults(prevResults => [...prevResults, { imageUrl: currentUrl, error: error instanceof Error ? error.message : 'Client-side error processing this image.' }]);
+        overallErrorCount++;
+      } finally {
+        setProcessedCount(prevCount => prevCount + 1);
+        // Add a small delay between requests
+        if (i < urls.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay
+        }
+      }
+    }
+
+    setIsLoading(false);
+    if (overallSuccessCount > 0) {
+        toast.success(`Alt text generation complete. ${overallSuccessCount} image(s) processed successfully.`);
+    }
+    if (overallErrorCount > 0) {
+        toast.warning(`${overallErrorCount} image(s) could not be processed or resulted in an error.`);
+    }
+    if (overallSuccessCount === 0 && overallErrorCount === 0 && urls.length > 0) {
+        toast.info("Processing completed, but no alt text was generated and no errors were reported.");
     }
   };
 
-  const handleCopyAltText = () => {
-    if (results?.altText) {
-      copyToClipboard(results.altText);
-      toast('The alt text has been copied to your clipboard.');
+  const handleCopyText = (text: string | undefined, url: string) => {
+    if (text) {
+      copyToClipboard(text);
+      const imageName = url.substring(url.lastIndexOf('/') + 1) || "image";
+      toast.success(`Alt text for ${imageName} copied!`);
     }
   };
 
-  const handleImageError = () => {
-    setPreviewError(true);
-  };
+  const successfulResults = results.filter(r => !r.error && r.altText);
+  const errorResults = results.filter(r => r.error);
 
-  const handleImageLoad = () => {
-    setPreviewError(false);
+  const downloadCSV = () => {
+    if (successfulResults.length === 0) {
+      toast.error("No successful alt text results to download.");
+      return;
+    }
+    const headers = ["Image URL", "Alt Text"];
+    const rows = successfulResults.map(res => [
+      `"${res.imageUrl?.replace(/"/g, '""') || ''}"`, 
+      `"${res.altText?.replace(/"/g, '""') || ''}"`
+    ]);
+
+    let csvContent = "data:text/csv;charset=utf-8,"
+      + headers.join(",") + "\\n"
+      + rows.map(e => e.join(",")).join("\\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "alt_text_results.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Alt text CSV downloaded.");
   };
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       <Breadcrumbs items={[
-        { label: "Dashboard", href: "/dashboard" }, 
-        // { label: "Tools", href: "/dashboard/tools" }, // Uncomment if/when a Tools overview page exists
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Tools", href: "/dashboard/tools" }, 
         { label: "Alt Text Generator" }
       ]} />
 
@@ -212,152 +203,164 @@ export default function AltTextGeneratorPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Alt Text Generator</h1>
             <p className="text-muted-foreground mt-1">
-              Generate accessible alt text for images using your brand's voice and style.
+              Generate accessible alt text for a list of image URLs.
             </p>
           </div>
         </div>
       </div>
 
-      {selectedBrand && (
-        <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/50 mb-6">
-          <BrandIcon name={selectedBrand.name} color={selectedBrand.brand_color ?? undefined} size="md" />
-          <div>
-            <p className="font-semibold">Using Brand: {selectedBrand.name}</p>
-            <p className="text-xs text-muted-foreground">
-              Country: {selectedBrand.country || 'Not specified'} • Language: {selectedBrand.language || 'Not specified'}
-            </p>
-          </div>
-        </div>
-      )}
-      
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-1">
         <Card>
           <CardHeader>
-            <CardTitle>Generate Alt Text</CardTitle>
+            <CardTitle>Enter Image URLs</CardTitle>
             <CardDescription>
-              Select a brand and enter an image URL to generate accessible alt text.
+              Enter one image URL per line to generate accessible alt text.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="brand">Brand <span className="text-destructive">*</span></Label>
-                <Select
-                  value={selectedBrandId}
-                  onValueChange={setSelectedBrandId}
-                  disabled={isLoading || isFetchingBrands}
-                >
-                  <SelectTrigger id="brand">
-                    <SelectValue placeholder="Select a brand" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {brands.map((brand) => (
-                      <SelectItem key={brand.id} value={brand.id}>
-                        {brand.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="imageUrl">Image URL <span className="text-destructive">*</span></Label>
-                <Input
-                  id="imageUrl"
-                  placeholder="https://example.com/image.jpg"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  disabled={isLoading}
+                <Label htmlFor="imageUrls">Image URLs <span className="text-destructive">*</span></Label>
+                <Textarea
+                  id="imageUrls"
+                  value={imageUrlsInput}
+                  onChange={(e) => setImageUrlsInput(e.target.value)}
+                  placeholder="https://example.com/image1.jpg\\nhttps://example.com/image2.png"
+                  rows={5}
                   required
+                  disabled={isLoading} // Disable textarea when loading
+                  className="min-h-[100px]"
                 />
               </div>
-              
-              <Button type="submit" className="w-full" disabled={isLoading || !selectedBrandId}>
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Image className="mr-2 h-4 w-4" />
-                    Generate Alt Text
-                  </>
+              <div className="flex flex-col items-end">
+                {isLoading && totalCount > 0 && (
+                  <div className="w-full mb-2">
+                    <Progress value={(processedCount / totalCount) * 100} className="w-full h-2" />
+                    <p className="text-sm text-muted-foreground mt-1 text-right">
+                      Processing URL {processedCount} of {totalCount}...
+                    </p>
+                  </div>
                 )}
-              </Button>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImageIcon className="mr-2 h-4 w-4" />}
+                  {isLoading ? `Processing...` : `Generate Alt Text`}
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Generated Alt Text</CardTitle>
-            <CardDescription>
-              Accessible alt text for your image.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {imageUrl && (
-              <div className="mb-4 overflow-hidden rounded-md border border-border">
-                {previewError ? (
-                  <div className="flex h-48 items-center justify-center bg-muted text-muted-foreground">
-                    <p>Image preview not available.</p>
-                  </div>
-                ) : (
-                  <img
-                    src={imageUrl}
-                    alt="Preview of the image for alt text generation"
-                    className="aspect-video w-full object-cover"
-                    onError={handleImageError}
-                    onLoad={handleImageLoad}
-                  />
-                )}
+
+        {(results.length > 0 || isLoading && totalCount > 0) && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Generated Alt Text</CardTitle>
+                <CardDescription>
+                  Review the generated alt text below. Successful results can be downloaded.
+                </CardDescription>
               </div>
-            )}
-            
-            {error && (
-              <div className="p-4 mb-4 border border-destructive/50 bg-destructive/10 rounded-md">
-                <p className="text-destructive font-medium">Error</p>
-                <p className="text-destructive">{error}</p>
-                {error.includes('OpenAI') || error.includes('service') ? (
-                  <p className="text-destructive mt-2 text-sm">The AI service is currently unavailable. Please try again later.</p>
-                ) : error.includes('image') ? (
-                  <p className="text-destructive mt-2 text-sm">The image may be inaccessible or in an unsupported format. Try using a different image URL.</p>
-                ) : null}
-              </div>
-            )}
-            
-            <div className="space-y-2">
-              <Label htmlFor="alt-text">Alt Text</Label>
-              <div className="flex">
-                <Textarea
-                  id="alt-text"
-                  placeholder="Generated alt text will appear here"
-                  value={results?.altText || ''}
-                  readOnly
-                  className="flex-1 resize-none"
-                  rows={3}
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="ml-2"
-                  onClick={handleCopyAltText}
-                  disabled={!results?.altText}
-                  title="Copy to clipboard"
-                >
-                  <ClipboardCopy className="h-4 w-4" />
+              {successfulResults.length > 0 && !isLoading && (
+                <Button onClick={downloadCSV} variant="outline" size="sm">
+                  <Download className="mr-2 h-4 w-4" />
+                  Download CSV
                 </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {results?.altText?.length || 0}/125 characters recommended.
-              </p>
-              <p className="text-xs text-muted-foreground mt-4">
-                Good alt text should be concise but descriptive, focusing on key information conveyed by the image.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+              )}
+            </CardHeader>
+            <CardContent>
+              {successfulResults.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-2">Successful Results</h3>
+                  <div className="overflow-x-auto rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[40%] whitespace-nowrap">Image URL</TableHead>
+                          <TableHead>Generated Alt Text</TableHead>
+                          <TableHead className="w-[100px] text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {successfulResults.map((item, index) => (
+                          <TableRow key={`success-${index}-${item.imageUrl}`}>
+                            <TableCell className="py-2 align-top">
+                              <div className="flex items-center">
+                                <a
+                                  href={item.imageUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="truncate hover:underline"
+                                  title={item.imageUrl}
+                                  style={{ maxWidth: '300px', display: 'inline-block' }}
+                                >
+                                  {item.imageUrl}
+                                </a>
+                                <ExternalLink className="ml-1 h-3 w-3 text-muted-foreground" />
+                                <img 
+                                  src={item.imageUrl} 
+                                  alt="Preview" 
+                                  className="ml-2 h-10 w-10 object-cover rounded" 
+                                  onError={(e) => (e.currentTarget.style.display = 'none')}
+                                />
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-2 align-top whitespace-pre-wrap">{item.altText}</TableCell>
+                            <TableCell className="py-2 align-top text-right">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleCopyText(item.altText, item.imageUrl)}
+                                title="Copy alt text"
+                                disabled={isLoading}
+                              >
+                                <ClipboardCopy className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+
+              {errorResults.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2 text-destructive flex items-center">
+                    <AlertTriangle className="mr-2 h-5 w-5" />
+                    Processing Errors
+                  </h3>
+                  <ul className="space-y-2 rounded-md border border-destructive/50 bg-destructive/5 p-4">
+                    {errorResults.map((item, index) => (
+                      <li key={`error-${index}-${item.imageUrl}`} className="text-sm">
+                        <p className="font-semibold truncate" title={item.imageUrl}>
+                          URL: {item.imageUrl}
+                        </p>
+                        <p className="text-destructive-foreground/80">Error: {item.error}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {results.length === 0 && !isLoading && (
+                <div className="text-center text-muted-foreground py-8">
+                  <Info className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <p className="text-lg font-medium">No results to display yet.</p>
+                  <p>Enter image URLs above and click "Generate Alt Text" to see results here.</p>
+                </div>
+              )}
+
+              {isLoading && totalCount > 0 && processedCount < totalCount && results.length === 0 && (
+                <div className="text-center text-muted-foreground py-8">
+                  <Loader2 className="mx-auto h-12 w-12 text-primary animate-spin mb-4" />
+                  <p className="text-lg font-medium">Processing your request...</p>
+                  <p>Please wait while we generate alt text for your images.</p>
+                </div>
+              )}
+
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

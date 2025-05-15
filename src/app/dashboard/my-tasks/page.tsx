@@ -4,73 +4,31 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/card';
-import { Eye, Edit, AlertCircle, ListChecks } from 'lucide-react';
+import { Eye, Edit, AlertCircle, ListChecks, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { createSupabaseClient } from '@/lib/supabase/client'; // Corrected import
-import { format as formatDateFns } from 'date-fns'; // Added for date formatting
-import { BrandIcon } from '@/components/brand-icon'; // Added for Brand Avatars
+import { createSupabaseClient } from '@/lib/supabase/client';
+import { format as formatDateFns } from 'date-fns';
+import { BrandIcon } from '@/components/brand-icon';
 
-// Interface for the data structure from /api/content
-interface ContentItemFromApi {
-  id: string;
-  title: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  brand_id: string | null;
-  brand_name: string | null;
-  brand_color: string | null;
-  content_type_id: string | null;
-  content_type_name: string | null;
-  created_by: string | null;
-  created_by_name: string | null;
-  creator_avatar_url: string | null;
-  template_id: string | null;
-  template_name: string | null;
-  template_icon: string | null;
-  workflow_id: string | null;
-  current_step_id: string | null; 
-  current_step_name: string | null;
-  assigned_to_id: string | null; // First assignee ID, from /api/content
-  assigned_to_name: string | null; // Comma-separated names, from /api/content
-  assigned_to?: string[] | null; // Actual array of assignee UUIDs
-  workflow?: { // Workflow object from /api/content
-    id: string;
-    name: string;
-    steps: Array<{
-      id: string;
-      name: string;
-      description?: string;
-      step_order: number;
-      role?: string;
-      approval_required?: boolean;
-      assigned_user_ids?: string[];
-    }>;
-  };
-  workflow_step_order?: number | null;
-  brand_avatar_url?: string | null; // For BrandIcon
-}
-
-// TaskItem interface for the page
+// TaskItem interface for the page - this should match the output of /api/me/tasks
 interface TaskItem {
-  id: string; // Using content_id as the task unique key
-  task_status: string | null;
-  due_date: string | null;
-  created_at: string | null;
-  content_id: string | null;
+  id: string; // This is content.id, used as unique key for task list item
+  task_status: string | null; // Derived from content.status on API, e.g., 'pending' or 'draft'
+  due_date: string | null; // API currently returns null for this
+  created_at: string | null; // content.created_at
+  content_id: string; // content.id
   content_title: string | null;
-  content_status: string | null;
+  content_status: string | null; // content.status
   brand_id?: string | null;
   brand_name: string | null;
   brand_color?: string | null;
   workflow_id?: string | null;
-  workflow_name?: string | null;
+  workflow_name: string | null;
   workflow_step_id?: string | null;
   workflow_step_name: string | null;
   workflow_step_order?: number | null;
 }
 
-// Placeholder Breadcrumbs component
 const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
   <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
     <ol className="flex items-center space-x-1.5">
@@ -94,13 +52,15 @@ export default function MyTasksPage() {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  // currentUserId is not strictly needed anymore if API handles user-specific tasks,
+  // but keeping it doesn't harm and might be useful for other client-side checks if any.
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null); 
 
   useEffect(() => {
     async function initializePage() {
       setIsLoading(true);
       setError(null);
-      const supabase = createSupabaseClient(); // Corrected function call
+      const supabase = createSupabaseClient();
       const { data: { user }, error: userError } = await supabase.auth.getUser();
 
       if (userError || !user) {
@@ -113,39 +73,17 @@ export default function MyTasksPage() {
       setCurrentUserId(user.id);
 
       try {
-        const response = await fetch('/api/content'); // Fetch from /api/content
+        // Fetch tasks directly from the /api/me/tasks endpoint
+        const response = await fetch('/api/me/tasks'); 
         if (!response.ok) {
-          throw new Error('Failed to fetch content data');
+          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch tasks' }));
+          throw new Error(errorData.error || 'Failed to fetch tasks data');
         }
         const apiData = await response.json();
         if (apiData.success && Array.isArray(apiData.data)) {
-          const allContentItems: ContentItemFromApi[] = apiData.data;
-          
-          const filteredAndMappedTasks = allContentItems
-            .filter(item => 
-              (item.status === 'pending_review' || item.status === 'rejected' || item.status === 'draft') &&
-              item.assigned_to && Array.isArray(item.assigned_to) && item.assigned_to.includes(user.id)
-            )
-            .map((item): TaskItem => ({
-              id: item.id, // Use content_id as task key
-              task_status: item.status === 'pending_review' ? 'pending' : item.status,
-              due_date: null, // Not available from /api/content
-              created_at: item.created_at,
-              content_id: item.id,
-              content_title: item.title,
-              content_status: item.status,
-              brand_id: item.brand_id,
-              brand_name: item.brand_name || 'N/A',
-              brand_color: item.brand_color,
-              workflow_id: item.workflow_id,
-              workflow_name: item.workflow?.name || 'N/A',
-              workflow_step_id: item.current_step_id,
-              workflow_step_name: item.current_step_name || 'N/A',
-              workflow_step_order: item.workflow?.steps?.find(s => s.id === item.current_step_id)?.step_order || undefined,
-            }));
-          setTasks(filteredAndMappedTasks);
+          setTasks(apiData.data); // API now returns data in TaskItem format directly
         } else {
-          throw new Error(apiData.error || 'Failed to process content data');
+          throw new Error(apiData.error || 'Failed to process tasks data from API');
         }
       } catch (err: any) {
         console.error('Error fetching or processing tasks:', err);
@@ -158,13 +96,10 @@ export default function MyTasksPage() {
       }
     }
     initializePage();
-  }, []);
+  }, []); // Dependency array is empty, runs once on mount
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
-    // Standard 4.6: Use dd MMMM yyyy or dd Mmmm for dates.
-    // Since Due Date might be time-sensitive, keeping HH:mm might be acceptable if specified, but for consistency with other date displays, let's use dd MMMM yyyy for now.
-    // If time is critical, a separate column or different formatting rule should apply.
     try {
       return formatDateFns(new Date(dateString), 'dd MMMM yyyy'); 
     } catch (e) {
@@ -176,7 +111,8 @@ export default function MyTasksPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[300px]">
-        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        {/* Using Loader2 for consistency with other loading states */}
+        <Loader2 className="h-12 w-12 text-primary animate-spin" /> 
       </div>
     );
   }
@@ -196,8 +132,10 @@ export default function MyTasksPage() {
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "My Tasks" }]} />
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold tracking-tight">My Tasks</h1>
-        <p className="text-muted-foreground">Content items awaiting your action</p>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">My Tasks</h1>
+          <p className="text-muted-foreground">Content items assigned to you that are currently active and require your action.</p>
+        </div>
       </div>
 
       {tasks.length === 0 ? (
@@ -212,7 +150,7 @@ export default function MyTasksPage() {
         <Card>
           <CardHeader>
             <CardTitle>Pending Your Action</CardTitle>
-            <CardDescription>{tasks.length} item(s) requiring your attention.</CardDescription>
+            <CardDescription>{tasks.length} item(s) requiring your attention based on their current active status.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -222,15 +160,18 @@ export default function MyTasksPage() {
                     <th className="text-left p-3 font-medium">Content Title</th>
                     <th className="text-left p-3 font-medium">Brand</th>
                     <th className="text-left p-3 font-medium">Workflow Step</th>
-                    <th className="text-left p-3 font-medium">Task Status</th>
-                    <th className="text-left p-3 font-medium">Due Date</th>
+                    <th className="text-left p-3 font-medium">Assigned On</th>
                     <th className="text-left p-3 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tasks.map((task) => (
                     <tr key={task.id} className="border-b hover:bg-muted/50">
-                      <td className="p-3 font-medium">{task.content_title || 'N/A'}</td>
+                      <td className="p-3 font-medium">
+                        <Link href={`/dashboard/content/${task.content_id}`} className="hover:underline">
+                            {task.content_title || 'N/A'}
+                        </Link>
+                      </td>
                       <td className="p-3">
                         <div className="flex items-center">
                           <BrandIcon name={task.brand_name || ''} color={task.brand_color ?? undefined} size="sm" className="mr-2" />
@@ -238,20 +179,12 @@ export default function MyTasksPage() {
                         </div>
                       </td>
                       <td className="p-3">{task.workflow_step_name || 'N/A'}</td>
+                      <td className="p-3 text-muted-foreground">{formatDate(task.created_at)}</td>
                       <td className="p-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium 
-                          ${task.task_status === 'completed' ? 'bg-green-100 text-green-800' : 
-                            task.task_status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
-                            'bg-gray-100 text-gray-800'}`}>
-                          {task.task_status ? task.task_status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'N/A'}
-                        </span>
-                      </td>
-                      <td className="p-3 text-muted-foreground">{formatDate(task.due_date)}</td>
-                      <td className="p-3">
-                        <Button variant="outline" size="sm" asChild title="Review this content item">
-                          <Link href={`/dashboard/content/${task.content_id}/edit`}>
-                            <Eye className="h-4 w-4 mr-1.5" /> Review Content
-                          </Link>
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href={`/dashboard/content/${task.content_id}/edit`} className="flex items-center">
+                                <Edit className="mr-1 h-3.5 w-3.5" /> Edit Content
+                            </Link>
                         </Button>
                       </td>
                     </tr>

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import Link from "next/link";
 import { ListChecks, Package, Users, GitBranch, AlertTriangle, CheckCircle2, Clock, FileText, BarChart3, Loader2 } from "lucide-react";
 import { toast } from 'sonner';
+import { BrandIcon } from '@/components/brand-icon';
 
 // Interface for workflow step (simplified, based on what's needed for display)
 interface WorkflowStepInfo {
@@ -82,7 +83,7 @@ export default function DashboardPage() {
       try {
         const [brandsRes, contentRes, workflowsRes] = await Promise.all([
           fetch('/api/brands'),
-          fetch('/api/content'),
+          fetch('/api/content?status=active'),
           fetch('/api/workflows'),
         ]);
 
@@ -187,6 +188,7 @@ export default function DashboardPage() {
               {tasks.map(task => (
                 <li key={task.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 transition-colors">
                   <div className="flex items-center space-x-3">
+                    <BrandIcon name={task.brand_name || 'Default'} color={task.brand_color ?? undefined} size="sm" />
                     {getStatusIcon(task.content_status)} {/* Use content_status for the icon */}
                     <div>
                       {/* Make sure content_id is available and correct for the link */}

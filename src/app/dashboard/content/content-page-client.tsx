@@ -15,7 +15,10 @@ import { createBrowserClient } from '@supabase/ssr';
 // Added imports for PageHeader and lucide-react icons
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandIcon, BrandIconProps } from '@/components/brand-icon'; 
-import { FileText, AlertTriangle, PlusCircle, FileUp, FileDown, Edit3, RefreshCw } from 'lucide-react';
+import { FileText, AlertTriangle, PlusCircle, Edit3, RefreshCw, CheckCircle, XCircle, ListFilter, Archive } from 'lucide-react';
+
+// Define types
+type ContentFilterStatus = 'active' | 'approved' | 'rejected' | 'all';
 
 interface ContentItem {
   id: string;
@@ -26,6 +29,7 @@ interface ContentItem {
   brand_avatar_url?: string | null; // Retain for data structure, though BrandIcon doesn't use it yet
   status: string;
   created_at: string;
+  updated_at: string;
   created_by_name: string | null;
   creator_avatar_url?: string | null;
   template_id?: string | null;
@@ -36,6 +40,7 @@ interface ContentItem {
   current_step_name?: string | null;
   assigned_to_id?: string | null;
   assigned_to_name?: string | null;
+  assigned_to?: string[] | null;
 }
 
 interface User {
@@ -69,6 +74,7 @@ export default function ContentPageClient() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
+  const [statusFilter, setStatusFilter] = useState<ContentFilterStatus>('active');
   const searchParams = useSearchParams();
   const brandId = searchParams?.get('brandId');
   const [activeBrandData, setActiveBrandData] = useState<any>(null); 
@@ -98,15 +104,29 @@ export default function ContentPageClient() {
     async function fetchContentData() {
       setIsLoading(true);
       try {
-        const apiUrl = debouncedSearchQuery 
-          ? `/api/content?query=${encodeURIComponent(debouncedSearchQuery)}${brandId ? `&brandId=${brandId}` : ''}` 
-          : `/api/content${brandId ? `?brandId=${brandId}` : ''}`;
+        let apiUrl = '/api/content';
+        const params = new URLSearchParams();
+
+        if (debouncedSearchQuery) {
+          params.append('query', debouncedSearchQuery);
+        }
+        if (brandId) {
+          params.append('brandId', brandId);
+        }
+        if (statusFilter) {
+          params.append('status', statusFilter);
+        }
+
+        const queryString = params.toString();
+        if (queryString) {
+          apiUrl += `?${queryString}`;
+        }
         
         const response = await fetch(apiUrl);
         if (!response.ok) throw new Error('Failed to fetch content data from API');
         const data = await response.json();
         if (data.success) {
-          setContent(data.data || []);
+          setContent(data.data.map((item: any) => ({ ...item, assigned_to: item.assigned_to || null })) || []);
         } else {
           setContent([]);
           throw new Error(data.error || 'API returned error fetching content');
@@ -121,7 +141,7 @@ export default function ContentPageClient() {
       }
     }
     fetchContentData();
-  }, [debouncedSearchQuery, brandId]);
+  }, [debouncedSearchQuery, brandId, statusFilter, supabase]);
 
   useEffect(() => {
     const fetchActiveBrand = async () => {
@@ -165,7 +185,10 @@ export default function ContentPageClient() {
   }, [content]);
 
   const isUserAssigned = (item: ContentItem, userId: string | undefined): boolean => {
-    if (!userId) return false;
+    if (!userId || !item.assigned_to) return false;
+    if (Array.isArray(item.assigned_to)) {
+      return item.assigned_to.includes(userId);
+    }
     return item.assigned_to_id === userId;
   };
 
@@ -175,9 +198,14 @@ export default function ContentPageClient() {
           <FileText size={40} className="text-primary" strokeWidth={1.5}/>
         </div>
         <h3 className="text-xl font-semibold mb-2">No content found</h3>
-        <p className="text-muted-foreground mb-6 max-w-md mx-auto">You haven't created any content yet. Create your first piece of content by selecting a template.</p>
-        <Button size="lg" asChild><Link href="/dashboard/templates">
-          <PlusCircle size={16} className="mr-2" />Go to Templates</Link></Button>
+        <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+          No content matches the current filters. Try adjusting your search or filter selection.
+        </p>
+        {statusFilter !== 'all' && (
+          <Button variant="outline" onClick={() => setStatusFilter('all') }>
+            <ListFilter size={16} className="mr-2" /> Show All Content
+          </Button>
+        )}
       </div>
   );
   const ErrorState = () => ( 
@@ -192,6 +220,13 @@ export default function ContentPageClient() {
         </Button>
       </div>
   );
+
+  const filterOptions: { label: string; value: ContentFilterStatus; icon?: React.ElementType }[] = [
+    { label: 'Active', value: 'active', icon: ListFilter },
+    { label: 'Approved', value: 'approved', icon: CheckCircle },
+    { label: 'Rejected', value: 'rejected', icon: XCircle },
+    { label: 'All', value: 'all', icon: Archive },
+  ];
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
@@ -218,8 +253,22 @@ export default function ContentPageClient() {
         }
       />
       
-      <div className="flex items-center justify-between">
-        <div className="max-w-sm w-full"><Input placeholder="Search content by title or body..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}/></div>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="max-w-sm w-full sm:w-auto"><Input placeholder="Search content..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}/></div>
+        <div className="flex items-center space-x-2">
+          {filterOptions.map(option => (
+            <Button 
+              key={option.value} 
+              variant={statusFilter === option.value ? 'default' : 'outline'} 
+              size="sm"
+              onClick={() => setStatusFilter(option.value)}
+              className="flex items-center"
+            >
+              {option.icon && <option.icon className="mr-2 h-4 w-4" />}
+              {option.label}
+            </Button>
+          ))}
+        </div>
       </div>
       {isLoading ? (
         <div className="py-10 flex justify-center items-center min-h-[300px]"><div className="flex flex-col items-center"><div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div><p className="text-muted-foreground">Loading content...</p></div></div>
@@ -248,43 +297,34 @@ export default function ContentPageClient() {
                   <table className="w-full text-sm">
                     <thead className="bg-muted/50"><tr className="border-b">
                       <th className="text-left p-3 font-medium">Title</th>
-                      <th className="text-left p-3 font-medium">Status</th>
-                      <th className="text-left p-3 font-medium">Content Template</th>
-                      <th className="text-left p-3 font-medium">Workflow Step</th>
+                      <th className="text-left p-3 font-medium">Current Step</th>
                       <th className="text-left p-3 font-medium">Assigned To</th>
-                      <th className="text-left p-3 font-medium">Actions</th></tr></thead>
+                      <th className="text-left p-3 font-medium">Last Updated</th>
+                      <th className="text-right p-3 font-medium">Actions</th>
+                    </tr></thead>
                     <tbody>
                       {items.map((item) => (
-                        <tr key={item.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                        <tr key={item.id} className="border-b hover:bg-muted/50 transition-colors">
                           <td className="p-3">
-                            <Link href={`/dashboard/content/${item.id}`} className="hover:underline">
-                              {item.title}
+                            <Link href={`/dashboard/content/${item.id}`} className="font-medium hover:underline text-primary">
+                              {item.title || 'Untitled Content'}
                             </Link>
+                            {item.template_name && <p className="text-xs text-muted-foreground flex items-center mt-1">
+                                {item.template_icon && <FileText className="mr-1 h-3 w-3 text-muted-foreground" />} 
+                                {item.template_name}
+                            </p>}
                           </td>
-                          <td className="p-3">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium 
-                              ${item.status === 'published' ? 'bg-green-100 text-green-800' : 
-                                item.status === 'draft' ? 'bg-gray-100 text-gray-800' : 
-                                item.status === 'pending_review' ? 'bg-yellow-100 text-yellow-800' : 
-                                item.status === 'rejected' ? 'bg-red-100 text-red-800' : 
-                                'bg-blue-100 text-blue-800'}`}>
-                              {item.status ? item.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'N/A'}
-                            </span>
-                          </td>
-                          <td className="p-3">{item.template_name || 'N/A'}</td>
-                          <td className="p-3">{item.current_step_name || 'N/A'}</td> 
+                          <td className="p-3">{item.current_step_name || 'N/A'}</td>
                           <td className="p-3">{item.assigned_to_name || 'N/A'}</td>
-                          <td className="p-3">
-                            <div className="flex space-x-1">
-                              {currentUser && isUserAssigned(item, currentUser.id) && (
-                                <Button variant="ghost" size="sm" asChild>
-                                  <Link href={`/dashboard/content/${item.id}/edit`} className="flex items-center">
-                                    <Edit3 className="mr-1 h-4 w-4" />
-                                    Edit
+                          <td className="p-3 whitespace-nowrap">{formatDate(item.updated_at)}</td>
+                          <td className="p-3 text-right">
+                            {(currentUser && isUserAssigned(item, currentUser.id)) && (
+                              <Button variant="outline" size="sm" asChild>
+                                  <Link href={`/dashboard/content/${item.id}/edit`}> 
+                                      <Edit3 className="h-3.5 w-3.5 mr-1.5"/> Edit
                                   </Link>
-                                </Button>
-                              )}
-                            </div>
+                              </Button>
+                            )}
                           </td>
                         </tr>
                       ))}

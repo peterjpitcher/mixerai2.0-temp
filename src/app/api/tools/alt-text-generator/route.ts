@@ -1,104 +1,152 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateAltText } from '@/lib/azure/openai';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
-import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
-import { extractCleanDomain } from '@/lib/utils/url-utils';
-import { Tables } from '@/types/supabase';
 
 interface AltTextGenerationRequest {
-  imageUrl: string;
-  brandId?: string;
-  websiteUrlForBrandDetection?: string;
-  brandLanguage?: string;
-  brandCountry?: string;
-  brandIdentity?: string;
-  toneOfVoice?: string;
-  guardrails?: string;
+  imageUrls: string[];
 }
 
-type BrandContextType = Tables<'brands'> | null;
+interface AltTextResultItem {
+  imageUrl: string;
+  altText?: string;
+  error?: string;
+}
+
+const tldToLangCountry: { [key: string]: { language: string; country: string } } = {
+  '.fr': { language: 'fr', country: 'FR' },
+  '.de': { language: 'de', country: 'DE' },
+  '.es': { language: 'es', country: 'ES' },
+  '.it': { language: 'it', country: 'IT' },
+  '.co.uk': { language: 'en', country: 'GB' },
+  '.com.au': { language: 'en', country: 'AU' },
+  '.ca': { language: 'en', country: 'CA' }, // Could also be 'fr'
+  '.jp': { language: 'ja', country: 'JP' },
+  '.cn': { language: 'zh', country: 'CN' },
+  '.nl': { language: 'nl', country: 'NL' },
+  '.br': { language: 'pt', country: 'BR' },
+  '.ru': { language: 'ru', country: 'RU' },
+  '.in': { language: 'en', country: 'IN' },
+  // Add more mappings as needed
+};
+
+const getDefaultLangCountry = () => ({ language: 'en', country: 'US' });
+
+function getLangCountryFromUrl(imageUrl: string): { language: string; country: string } {
+  try {
+    const parsedUrl = new URL(imageUrl);
+    const hostname = parsedUrl.hostname;
+
+    // Check for multi-part TLDs first (e.g., .co.uk, .com.au)
+    for (const tld of Object.keys(tldToLangCountry)) {
+      if (hostname.endsWith(tld)) {
+        // Check if the part before the TLD is not empty (to avoid matching just .uk from .co.uk on a domain like example.uk)
+        const domainPart = hostname.substring(0, hostname.length - tld.length);
+        if (domainPart && domainPart.includes('.')) { // Ensure it's a valid subdomain or domain part
+            return tldToLangCountry[tld];
+        }
+      }
+    }
+    
+    // Check for single-part TLDs (e.g., .fr, .de)
+    const parts = hostname.split('.');
+    if (parts.length > 1) {
+      const singleTld = '.' + parts[parts.length - 1];
+      if (tldToLangCountry[singleTld]) {
+        return tldToLangCountry[singleTld];
+      }
+    }
+
+  } catch (e) {
+    console.warn(`[AltTextLang] Could not parse URL or determine TLD for ${imageUrl}:`, e);
+  }
+  return getDefaultLangCountry();
+}
 
 export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
   try {
     const data: AltTextGenerationRequest = await request.json();
     
-    if (!data.imageUrl) {
+    if (!data.imageUrls || !Array.isArray(data.imageUrls) || data.imageUrls.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'Image URL is required' },
-        { status: 400 }
-      );
-    }
-    
-    try {
-      new URL(data.imageUrl);
-    } catch (error) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid image URL format' },
+        { success: false, error: 'An array of image URLs is required' },
         { status: 400 }
       );
     }
 
-    let brandContext: BrandContextType = null;
-    const supabase = createSupabaseAdminClient();
+    const results: AltTextResultItem[] = [];
 
-    if (data.brandId) {
-      const { data: brandData, error: brandError } = await supabase
-        .from('brands')
-        .select('*')
-        .eq('id', data.brandId)
-        .single();
-      if (brandError) {
-        console.warn(`[AltTextGen] Brand ID ${data.brandId} provided but not found: ${brandError.message}`);
-      } else {
-        brandContext = brandData;
+    for (const imageUrl of data.imageUrls) {
+      let language = 'en';
+      let country = 'US';
+      let processingError: string | undefined = undefined;
+
+      try {
+        // Validate URL structure before attempting to parse for TLD
+        new URL(imageUrl); 
+        const langCountry = getLangCountryFromUrl(imageUrl);
+        language = langCountry.language;
+        country = langCountry.country;
+      } catch (e: any) {
+        // This catch is specifically for the `new URL(imageUrl)` validation itself.
+        // If it fails, we can't determine lang/country and should note the URL is invalid.
+        console.error(`[AltTextGen] Invalid image URL format: ${imageUrl}:`, e);
+        processingError = `Invalid image URL format.`;
+        // Use default language/country if URL is malformed but we still attempt generation for some reason
+        // Though, the AI call will likely fail too.
+        const defaultLangCountry = getDefaultLangCountry();
+        language = defaultLangCountry.language;
+        country = defaultLangCountry.country;
       }
-    } else if (data.websiteUrlForBrandDetection) {
-      const cleanDomain = extractCleanDomain(data.websiteUrlForBrandDetection);
-      if (cleanDomain) {
-        const { data: brandData, error: brandError } = await supabase
-          .from('brands')
-          .select('*')
-          .eq('normalized_website_domain', cleanDomain)
-          .limit(1)
-          .single();
+
+      if (processingError) {
+        results.push({
+          imageUrl,
+          error: processingError,
+        });
+        continue; // Skip to the next URL if the current one is invalid
+      }
+      
+      try {
+        // Brand context is currently empty, but kept for potential future use
+        const brandContext = {
+          brandIdentity: '',
+          toneOfVoice: '',
+          guardrails: ''
+        };
         
-        if (brandError && brandError.code !== 'PGRST116') {
-          console.warn(`[AltTextGen] Error fetching brand by domain ${cleanDomain}: ${brandError.message}`);
-        } else if (brandData) {
-          brandContext = brandData;
-        }
+        // console.log(`[AltTextGen] Generating for ${imageUrl} with lang: ${language}, country: ${country}`);
+        const generatedAltTextResult = await generateAltText(
+          imageUrl,
+          language,
+          country,
+          brandContext
+        );
+        
+        results.push({
+          imageUrl,
+          altText: generatedAltTextResult.altText, // Assuming altText is directly on the result
+          // error: generatedAltTextResult.error, // If your generateAltText can return partial errors
+        });
+
+      } catch (error: any) {
+        console.error(`[AltTextGen] Error calling generateAltText for ${imageUrl} (lang: ${language}, country: ${country}):`, error);
+        results.push({
+          imageUrl,
+          error: error.message || 'Failed to generate alt text for this image.',
+        });
       }
     }
-
-    const brandLanguage = data.brandLanguage || brandContext?.language || 'en';
-    const brandCountry = data.brandCountry || brandContext?.country || 'US';
-    const brandIdentity = data.brandIdentity || brandContext?.brand_identity || '';
-    const toneOfVoice = data.toneOfVoice || brandContext?.tone_of_voice || '';
-    const guardrails = data.guardrails || brandContext?.guardrails || '';
-    
-    const generatedAltText = await generateAltText(
-      data.imageUrl,
-      brandLanguage,
-      brandCountry,
-      {
-        brandIdentity,
-        toneOfVoice,
-        guardrails
-      }
-    );
     
     return NextResponse.json({
       success: true,
       userId: user.id,
-      imageUrl: data.imageUrl,
-      brand_id_used: brandContext?.id || null,
-      brand_name_used: brandContext?.name || null,
-      detection_source: data.brandId ? 'brand_id' : (data.websiteUrlForBrandDetection && brandContext ? 'url_detection' : 'none'),
-      ...generatedAltText
+      results,
     });
+
   } catch (error: any) {
-    let errorMessage = 'Failed to generate alt text';
+    // This outer catch handles errors like request.json() failing or other unexpected issues.
+    let errorMessage = 'Failed to process alt text generation request';
     let statusCode = 500;
     
     if (error.message?.includes('OpenAI') || error.message?.includes('Azure') || error.message?.includes('AI service') || (error as any).status === 429) {
@@ -107,6 +155,6 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
     } else {
       errorMessage = error.message || errorMessage;
     }
-    return handleApiError(new Error(errorMessage), 'Alt Text Generation Error', statusCode);
+    return handleApiError(new Error(errorMessage), 'Alt Text Generation Batch Error', statusCode);
   }
 }); 

@@ -6,8 +6,13 @@ export const dynamic = "force-dynamic";
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
-import { Database, TablesInsert } from '@/types/supabase';
+import { Database, TablesInsert, Enums } from '@/types/supabase';
 import { User } from '@supabase/supabase-js';
+
+// Define the specific type for content status using Enums if available, or define manually
+type ContentStatus = Enums<"content_status">;
+
+const VALID_STATUSES: ContentStatus[] = ['draft', 'pending_review', 'approved', 'published', 'rejected', 'cancelled'];
 
 /**
  * GET: Retrieve all content, optionally filtered by a search query.
@@ -19,6 +24,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     const url = new URL(request.url);
     const query = url.searchParams.get('query');
     const requestedBrandId = url.searchParams.get('brandId');
+    const requestedStatusParam = url.searchParams.get('status'); // 'active', 'approved', 'rejected', 'all', or a direct status value
     const globalRole = user?.user_metadata?.role;
     let permittedBrandIds: string[] | null = null;
 
@@ -79,6 +85,27 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     } else if (globalRole === 'admin') {
       console.log('[API Content GET] Admin user. Fetching all content (or specific brand if requestedBrandId set).');
       // Admins can see all, or specific if requestedBrandId is set (handled by the first if block)
+    }
+
+    // Status filtering logic
+    const activeStatuses: ContentStatus[] = ['draft', 'pending_review'];
+    
+    if (requestedStatusParam) {
+      const lowerCaseStatus = requestedStatusParam.toLowerCase();
+      if (lowerCaseStatus === 'active') {
+        queryBuilder = queryBuilder.in('status', activeStatuses);
+      } else if (lowerCaseStatus === 'all') {
+        // No status filter
+      } else if (VALID_STATUSES.includes(lowerCaseStatus as ContentStatus)) {
+        queryBuilder = queryBuilder.eq('status', lowerCaseStatus as ContentStatus);
+      } else {
+        // Invalid status parameter, default to active or return error
+        console.warn(`Invalid status parameter received: ${requestedStatusParam}. Defaulting to active content.`);
+        queryBuilder = queryBuilder.in('status', activeStatuses);
+      }
+    } else {
+      // Default to active statuses if no specific status is requested
+      queryBuilder = queryBuilder.in('status', activeStatuses);
     }
 
     const { data: contentItems, error: contentError } = await queryBuilder;
