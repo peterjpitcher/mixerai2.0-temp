@@ -25,6 +25,26 @@ import { toast } from 'sonner';
 //   description: 'Modify and configure an existing content template.',
 // };
 
+// Placeholder Breadcrumbs component - to be replaced with actual implementation
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
+
 // Default templates data for system templates
 const defaultTemplates = {
   'article-template': {
@@ -278,18 +298,13 @@ export default function TemplateEditPage() {
     // This is a fallback to prevent rendering with a null template
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
-        <PageHeader
-          title="Edit Template"
-          description="Modify your content template configuration."
-          actions={
-            <Link href="/dashboard/templates">
-              <Button variant="outline">
-                <ChevronLeft className="mr-2 h-4 w-4" />
-                Back to Templates
-              </Button>
-            </Link>
-          }
-        />
+        <Breadcrumbs items={[
+          { label: "Dashboard", href: "/dashboard" }, 
+          { label: "Content Templates", href: "/dashboard/templates" }, 
+          { label: template?.name || (id ? "Loading Template..." : "Edit Template"), href: id ? `/dashboard/templates/${id}` : undefined },
+          { label: "Edit" }
+        ]} />
+        
         <div className="p-4 border border-destructive bg-destructive/10 text-destructive rounded-md">
           <p>Error: Template data could not be loaded or template not found.</p>
         </div>
@@ -301,26 +316,32 @@ export default function TemplateEditPage() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
-      <PageHeader
-        title={`Edit ${template?.name || 'Template'}`}
-        description="Modify your content template configuration."
-        actions={
-          <div className="flex space-x-2">
-            <Link href="/dashboard/templates">
-              <Button variant="outline">
-                <ChevronLeft className="mr-2 h-4 w-4" />
-                Back to Templates
-              </Button>
-            </Link>
-            {!isSystemTemplate && (
-              <Button variant="destructive" onClick={handleOpenDeleteDialog}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Template
-              </Button>
-            )}
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" }, 
+        { label: "Content Templates", href: "/dashboard/templates" }, 
+        { label: template?.name || (id ? "Loading Template..." : "Edit Template"), href: id ? `/dashboard/templates/${id}` : undefined },
+        { label: "Edit" }
+      ]} />
+      
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard/templates" passHref>
+            <Button variant="outline" size="icon" aria-label="Back to Templates">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Edit: {template?.name || 'Template'}</h1>
+            <p className="text-muted-foreground mt-1">Modify your content template configuration.</p>
           </div>
-        }
-      />
+        </div>
+        {!isSystemTemplate && (
+          <Button variant="destructive" onClick={handleOpenDeleteDialog} disabled={isDeleting}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete Template
+          </Button>
+        )}
+      </div>
       
       {template && <TemplateForm initialData={template} />}
       {/* AlertDialog for delete confirmation */}
