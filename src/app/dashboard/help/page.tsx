@@ -38,7 +38,7 @@ export default async function HelpPage() {
   await requireAuth();
   
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
       <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Help & Support" }]} />
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Help & Support</h1>

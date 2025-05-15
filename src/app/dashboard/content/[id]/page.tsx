@@ -203,7 +203,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" },
         ...(activeBrandData ? 

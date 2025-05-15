@@ -319,7 +319,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" },
         { label: "Content", href: "/dashboard/content" },

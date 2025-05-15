@@ -201,7 +201,7 @@ export default function BrandsPage() {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">Brands</h1>
         <Button asChild>
