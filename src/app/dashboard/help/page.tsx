@@ -9,6 +9,26 @@ export const metadata = {
   description: 'Get help with using MixerAI. Find FAQs, documentation, tutorials, and contact support.',
 };
 
+// Placeholder Breadcrumbs component - replace with actual implementation later
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
+
 /**
  * HelpPage component.
  * Displays help and support information for MixerAI users, including links to documentation,
@@ -19,6 +39,7 @@ export default async function HelpPage() {
   
   return (
     <div className="container mx-auto py-6 space-y-6">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Help & Support" }]} />
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Help & Support</h1>
         <p className="text-muted-foreground">
