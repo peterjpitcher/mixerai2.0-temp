@@ -257,9 +257,9 @@ export const POST = withAuth(async (req: NextRequest, user) => {
       brand_identity_text: body.brand_identity || null,
       brand_tone_of_voice: body.tone_of_voice || null,
       brand_guardrails: formattedGuardrails,
-      brand_content_vetting_agencies: null, 
-      brand_color: body.brand_color || null, 
-      approved_content_types: body.approved_content_types || null 
+      brand_content_vetting_agencies_input: body.selected_agency_ids || null, 
+      brand_color_input: body.brand_color || null, 
+      approved_content_types_input: body.approved_content_types || null 
     };
 
     const { data: newBrandId, error: rpcError } = await supabase.rpc(
