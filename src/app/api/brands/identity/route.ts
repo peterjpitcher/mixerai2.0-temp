@@ -191,7 +191,7 @@ Please provide the following elements:
 
 4. SUGGESTED AGENCIES: 10 regulatory bodies or vetting agencies relevant to this brand in ${countryName}. Include a mix of general and industry-specific organizations. For each agency, include their name, a brief description, and priority level (high/medium/low).
 
-5. BRAND COLOR: Suggest a primary brand color in hex format (e.g., #FF5733) that would resonate well with consumers in ${countryName}.
+5. BRAND COLOR: Analyze the visual identity and content from the provided URLs. Based on this analysis, the brand's described identity, its values, and considering its industry and target audience in ${countryName}, suggest a primary brand color that would best represent this brand. Provide the color in hex format (e.g., #FF5733). The color should be suitable for use in marketing materials and digital presence.
 
 Format your response as a structured JSON object with these keys: brandIdentity, toneOfVoice, guardrails, suggestedAgencies (as an array of objects with name, description, and priority), and brandColor.
 Remember that ALL text fields must be written in ${languageName}, not English.`;

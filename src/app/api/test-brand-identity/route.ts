@@ -55,32 +55,27 @@ export const GET = withAdminAuth(async (request: NextRequest, user) => {
       });
     }
     
-    // Generate a sample brand identity
-    const result = await generateBrandIdentityFromUrls("Test Brand", ["https://example.com"]);
+    // This is a test route, so we'll use hardcoded values for simplicity
+    const testBrandName = "Test Brand";
+    const testUrls = ["https://www.mixerai.com"];
+    const testLanguage = "en";
+    const testCountry = "US";
+
+    console.log(`GET /api/test-brand-identity: Testing with Brand: ${testBrandName}, URL: ${testUrls[0]}, Lang: ${testLanguage}, Country: ${testCountry}`);
     
-    // Create the final response object that will be sent to the frontend
-    const apiResponse = {
-      success: true,
-      data: {
-        brandIdentity: result.brandIdentity || "",
-        toneOfVoice: result.toneOfVoice || "",
-        guardrails: result.guardrails || "",
-        vettingAgencies: result.suggestedAgencies || [],
-        brandColor: result.brandColor
-      }
-    };
+    const identityData = await generateBrandIdentityFromUrls(
+      testBrandName, 
+      testUrls,
+      testLanguage, 
+      testCountry
+    );
+    
+    console.log("Brand identity GET test successful:", identityData);
     
     return NextResponse.json({
       success: true,
-      original: result,
-      final: apiResponse,
-      mappingExplanation: {
-        "result.brandIdentity → apiResponse.data.brandIdentity": "Direct mapping",
-        "result.toneOfVoice → apiResponse.data.toneOfVoice": "Direct mapping",
-        "result.guardrails → apiResponse.data.guardrails": "Direct mapping",
-        "result.suggestedAgencies → apiResponse.data.vettingAgencies": "Important! Field name changes from suggestedAgencies to vettingAgencies",
-        "result.brandColor → apiResponse.data.brandColor": "Direct mapping"
-      }
+      message: "GET test successful. Fetched brand identity with hardcoded values.",
+      data: identityData
     });
   } catch (error: any) {
     return handleApiError(error, 'Test brand identity generation failed');

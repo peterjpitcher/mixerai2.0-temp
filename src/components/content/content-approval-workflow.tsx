@@ -36,6 +36,7 @@ interface ContentApprovalWorkflowProps {
   isCurrentUserStepOwner: boolean;
   versions?: ContentVersion[];
   onActionComplete: () => void;
+  performContentSave?: () => Promise<boolean>;
 }
 
 export function ContentApprovalWorkflow({
@@ -44,39 +45,71 @@ export function ContentApprovalWorkflow({
   currentStepObject,
   isCurrentUserStepOwner,
   versions,
-  onActionComplete
+  onActionComplete,
+  performContentSave
 }: ContentApprovalWorkflowProps) {
   const [feedback, setFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmitAction = async (action: 'approve' | 'reject') => {
+    console.log('[ContentApprovalWorkflow] handleSubmitAction called with action:', action);
     if (!isCurrentUserStepOwner) {
       toast.error('You are not authorized to perform this action.');
+      console.warn('[ContentApprovalWorkflow] User not authorized for action:', action);
       return;
     }
     if (action === 'reject' && !feedback.trim()) {
       toast.error('Feedback is required for rejection.');
+      console.warn('[ContentApprovalWorkflow] Feedback required for rejection.');
       return;
     }
 
     setIsSubmitting(true);
+    console.log('[ContentApprovalWorkflow] Attempting to save content before workflow action...');
+    
+    let saveSuccessful = true;
+    if (performContentSave) {
+      try {
+        saveSuccessful = await performContentSave();
+        if (saveSuccessful) {
+          console.log('[ContentApprovalWorkflow] Content saved successfully before workflow action.');
+        } else {
+          console.warn('[ContentApprovalWorkflow] Content save failed before workflow action. Aborting workflow action.');
+          toast.error('Failed to save pending changes. Please try saving manually and then approve/reject.');
+          setIsSubmitting(false);
+          return;
+        }
+      } catch (saveError: any) {
+        console.error('[ContentApprovalWorkflow] Error during pre-action save:', saveError);
+        toast.error('An error occurred while saving pending changes. Please try again.');
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    console.log('[ContentApprovalWorkflow] Submitting action:', action, 'with feedback:', feedback);
     try {
       const response = await fetch(`/api/content/${contentId}/workflow-action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, feedback }),
       });
+      console.log('[ContentApprovalWorkflow] API response status:', response.status);
       const result = await response.json();
+      console.log('[ContentApprovalWorkflow] API response result:', result);
       if (!response.ok || !result.success) {
+        console.error('[ContentApprovalWorkflow] API error:', result.error || `Failed to ${action} content.`);
         throw new Error(result.error || `Failed to ${action} content.`);
       }
       toast.success(`Content successfully ${action}d.`);
+      console.log('[ContentApprovalWorkflow] Action successful:', action);
       setFeedback('');
       onActionComplete();
     } catch (error: any) {
-      console.error(`Error ${action}ing content:`, error);
+      console.error(`[ContentApprovalWorkflow] Error ${action}ing content:`, error.message, error);
       toast.error(error.message || `Failed to ${action} content.`);
     } finally {
+      console.log('[ContentApprovalWorkflow] Finished submitting action:', action);
       setIsSubmitting(false);
     }
   };

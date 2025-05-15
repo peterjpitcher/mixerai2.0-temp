@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { transCreateContent } from '@/lib/azure/openai';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
 
 interface ContentTransCreationRequest {
   content: string;
   sourceLanguage?: string;
-  targetLanguage: string;
-  targetCountry: string;
+  brand_id: string;
 }
 
 export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
@@ -21,36 +21,51 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       );
     }
     
-    if (!data.targetLanguage) {
+    if (!data.brand_id) {
       return NextResponse.json(
-        { success: false, error: 'Target language is required' },
+        { success: false, error: 'Brand ID is required for trans-creation' },
         { status: 400 }
       );
     }
     
-    if (!data.targetCountry) {
+    const supabase = createSupabaseAdminClient();
+    const { data: brandData, error: brandError } = await supabase
+      .from('brands')
+      .select('language, country')
+      .eq('id', data.brand_id)
+      .single();
+
+    if (brandError || !brandData) {
+      console.error(`Failed to fetch brand details for brand_id ${data.brand_id}:`, brandError);
       return NextResponse.json(
-        { success: false, error: 'Target country is required' },
+        { success: false, error: 'Failed to fetch brand details or brand not found.' },
+        { status: 404 }
+      );
+    }
+
+    if (!brandData.language || !brandData.country) {
+      return NextResponse.json(
+        { success: false, error: 'Brand language and country are required for trans-creation and are missing for this brand.' },
         { status: 400 }
       );
     }
     
     const sourceLanguage = data.sourceLanguage || 'en';
     
-    const transCreatedContent = await transCreateContent(
+    const transCreatedResult = await transCreateContent(
       data.content,
       sourceLanguage,
-      data.targetLanguage,
-      data.targetCountry
+      brandData.language,
+      brandData.country
     );
     
     return NextResponse.json({
       success: true,
       userId: user.id,
       sourceLanguage,
-      targetLanguage: data.targetLanguage,
-      targetCountry: data.targetCountry,
-      ...transCreatedContent
+      targetLanguage: brandData.language,
+      targetCountry: brandData.country,
+      ...transCreatedResult
     });
   } catch (error: any) {
     let errorMessage = 'Failed to trans-create content. Please try again later.';
@@ -67,6 +82,7 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       errorMessage = error;
     }
     
+    console.error("Content Trans-creation Error (internal):", error);
     return handleApiError(new Error(errorMessage), 'Content Trans-creation Error', statusCode);
   }
 }); 

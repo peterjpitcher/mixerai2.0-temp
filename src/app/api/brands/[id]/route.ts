@@ -367,8 +367,6 @@ export const PUT = withAuth(async (
       updatedSupabaseBrandData = data;
     }
     
-    // ... (logic for updating selected_agency_ids - keep as is, ensuring it uses supabase client) ...
-    // This part assumes body.selected_agency_ids contains ALL desired agency IDs for the brand.
     // First, delete all existing links for this brand
     const { error: deleteAgenciesError } = await supabase
       .from('brand_selected_agencies')
@@ -377,29 +375,80 @@ export const PUT = withAuth(async (
 
     if (deleteAgenciesError) {
       console.error('[API /api/brands PUT] Error deleting old brand agencies:', deleteAgenciesError);
-      throw deleteAgenciesError; // Or handle more gracefully
+      throw deleteAgenciesError;
     }
 
     // Then, insert the new set of links
     if (body.selected_agency_ids && Array.isArray(body.selected_agency_ids) && body.selected_agency_ids.length > 0) {
-      const agenciesToInsert = body.selected_agency_ids.map((agencyId: string) => ({
-        brand_id: brandIdToUpdate,
-        agency_id: agencyId,
-      }));
-      // Using upsert with onConflict to handle potential re-adding, though delete-then-insert is also common.
-      // To truly "insert or ignore duplicates" if not primary key, an RPC or pre-check is better.
-      // Given we delete all first, a simple insert is also fine.
-      const { error: insertAgenciesError } = await supabase
-        .from('brand_selected_agencies')
-        .insert(agenciesToInsert); 
-      
-      if (insertAgenciesError) {
-        console.error('[API /api/brands PUT] Error inserting new brand agencies:', insertAgenciesError);
-        throw insertAgenciesError; // Or handle
+      let resolvedAgencyIds: string[] = [];
+      const submittedIds = body.selected_agency_ids as string[];
+      const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+      // Check if the first item looks like a UUID to determine input type
+      // This is a heuristic; a more robust way might be an explicit param from frontend
+      const firstItemIsLikelyUuid = uuidRegex.test(submittedIds[0]);
+
+      if (firstItemIsLikelyUuid) {
+        console.log("[API /api/brands PUT] Assuming selected_agency_ids are UUIDs.");
+        resolvedAgencyIds = submittedIds.filter(id => {
+          if (!uuidRegex.test(id)) {
+            console.warn(`[API /api/brands PUT] Invalid UUID format for agencyId: "${id}" in an array assumed to be UUIDs. Skipping.`);
+            return false;
+          }
+          return true;
+        });
+      } else {
+        console.log("[API /api/brands PUT] Assuming selected_agency_ids are names. Attempting to resolve to UUIDs.");
+        const agencyNamesToLookup = submittedIds;
+        const brandCountryForLookup = updatedSupabaseBrandData?.country || body.country;
+
+        if (agencyNamesToLookup.length > 0 && brandCountryForLookup) {
+          const { data: agenciesFromDb, error: fetchAgenciesError } = await supabase
+            .from('content_vetting_agencies')
+            .select('id, name')
+            .in('name', agencyNamesToLookup)
+            .eq('country_code', brandCountryForLookup); // Use brand's country for context
+
+          if (fetchAgenciesError) {
+            console.error('[API /api/brands PUT] Error fetching agencies by name:', fetchAgenciesError);
+            // Decide if to throw or proceed with successfully resolved ones
+          } else if (agenciesFromDb) {
+            const nameToIdMap = new Map(agenciesFromDb.map(a => [a.name, a.id]));
+            agencyNamesToLookup.forEach(name => {
+              const foundId = nameToIdMap.get(name);
+              if (foundId) {
+                resolvedAgencyIds.push(foundId);
+              } else {
+                console.warn(`[API /api/brands PUT] Agency name "${name}" for country ${brandCountryForLookup} not found in database. Skipping.`);
+              }
+            });
+          }
+        } else if (!brandCountryForLookup) {
+            console.warn("[API /api/brands PUT] Cannot resolve agency names to IDs because brand country is not available.");
+        }
+      }
+
+      if (resolvedAgencyIds.length > 0) {
+        const agenciesToInsert = resolvedAgencyIds.map(agencyId => ({
+          brand_id: brandIdToUpdate,
+          agency_id: agencyId, // This should now always be a UUID
+        }));
+
+        const { error: insertAgenciesError } = await supabase
+          .from('brand_selected_agencies')
+          .insert(agenciesToInsert);
+
+        if (insertAgenciesError) {
+          console.error('[API /api/brands PUT] Error inserting new brand agencies (with resolved IDs):', insertAgenciesError);
+          throw insertAgenciesError;
+        }
+        console.log(`[API /api/brands PUT] Successfully inserted/updated ${agenciesToInsert.length} agency links.`);
+      } else {
+        console.log("[API /api/brands PUT] No valid agency IDs to insert after resolution.");
       }
     }
     
-    // ... (logic for fetching final brand response including agencies - keep as is, ensuring it uses supabase client) ...
+    // Fetch final state of selected agencies to return in response
     const { data: finalSelectedAgenciesData, error: finalAgenciesError } = await supabase
       .from('brand_selected_agencies')
       .select(`

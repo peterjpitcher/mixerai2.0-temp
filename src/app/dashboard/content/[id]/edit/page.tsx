@@ -64,6 +64,25 @@ interface ContentVersion {
   created_at: string;
 }
 
+// Define Template related interfaces if not imported
+interface TemplateOutputField {
+  id: string;
+  name: string;
+  type: string; // e.g., 'plainText', 'richText', 'html'
+}
+
+interface TemplateFields {
+  inputFields: any[]; 
+  outputFields: TemplateOutputField[];
+}
+
+interface Template {
+  id: string;
+  name: string;
+  description?: string;
+  fields: TemplateFields;
+}
+
 // Placeholder Breadcrumbs component
 const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
   <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
@@ -115,6 +134,10 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   const [versions, setVersions] = useState<ContentVersion[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [activeBrandData, setActiveBrandData] = useState<any>(null);
+  const [template, setTemplate] = useState<Template | null>(null);
+
+  // For ContentApprovalWorkflow to trigger save
+  const contentSaveRef = React.useRef<() => Promise<boolean>>();
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -183,6 +206,24 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             }
           }
 
+          // Fetch template data if template_id exists
+          if (contentResult.data.template_id) {
+            fetch(`/api/content-templates/${contentResult.data.template_id}`)
+              .then(res => res.json())
+              .then(templateRes => {
+                if (templateRes.success && templateRes.template) {
+                  setTemplate(templateRes.template);
+                } else {
+                  console.error('Failed to fetch template for edit page:', templateRes.error);
+                  // toast.error('Could not load content template structure.'); // Avoid double toast if content load fails
+                }
+              })
+              .catch(err => {
+                console.error('Error fetching template for edit page:', err);
+                // toast.error('Error loading content template structure.');
+              });
+          }
+
         } else {
           throw new Error(contentResult.error || 'Failed to load content data.');
         }
@@ -214,32 +255,58 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     setContent(prev => ({ ...prev, [name]: value }));
   };
   
-  const handleContentBodyChange = (newBodyValue: string) => {
-    setContent(prev => ({ ...prev, body: newBodyValue }));
-  };
-
-  // Handler for dynamic output field changes (if we make them editable)
-  const handleOutputFieldChange = (fieldName: string, value: string) => {
+  // Handler for dynamic output field changes
+  const handleGeneratedOutputChange = (outputFieldId: string, value: string) => {
     setContent(prev => ({
       ...prev,
       content_data: {
-        ...prev.content_data,
-        [fieldName]: value,
+        ...(prev.content_data || {}), // Ensure content_data itself exists
+        generatedOutputs: {
+          ...(prev.content_data?.generatedOutputs || {}),
+          [outputFieldId]: value,
+        },
       },
     }));
   };
   
-  const handleSave = async () => {
+  const handleSave = async (): Promise<boolean> => {
     setIsSaving(true);
+    let success = false;
     try {
+      let primaryBodyFromOutputs = content.body; 
+      if (template && template.fields.outputFields.length > 0 && content.content_data?.generatedOutputs) {
+        const richTextOutputField = template.fields.outputFields.find(f => f.type === 'richText');
+        const firstOutputField = template.fields.outputFields[0];
+        let fieldToUseForBody = richTextOutputField || firstOutputField;
+
+        if (fieldToUseForBody && content.content_data.generatedOutputs[fieldToUseForBody.id]) {
+          primaryBodyFromOutputs = content.content_data.generatedOutputs[fieldToUseForBody.id];
+        } else if (firstOutputField && content.content_data.generatedOutputs[firstOutputField.id]){
+           primaryBodyFromOutputs = content.content_data.generatedOutputs[firstOutputField.id];
+        } 
+      }
+
       const payloadToSave = {
         title: content.title,
-        body: content.body,
+        body: primaryBodyFromOutputs, 
         status: content.status,
-        content_data: content.content_data 
+        content_data: {
+          ...(content.content_data || {}),
+          generatedOutputs: content.content_data?.generatedOutputs || {},
+        }
       };
       
-      console.log('Saving content with payload:', payloadToSave);
+      // Step 1: Verify Frontend State Just Before Save
+      console.log('--- In handleSave --- ContentEditPage ---');
+      console.log('Current content.title:', content.title);
+      console.log('Current content.body (before primaryBodyFromOutputs derivation):', content.body);
+      // console.log('Template output fields:', template?.fields.outputFields); // Can be verbose
+      console.log('Current content.content_data (raw object): ethnographicRecordIdentifier=AAA-001-BBB-ehl-GEN-001-v001-json ethnographicRecordIdentifier=AAA-001-BBB-ehl-GEN-001-v001-json ethnographicRecordIdentifier=AAA-001-BBB-ehl-GEN-001-v001-json', content.content_data);
+      console.log('Current content.content_data.generatedOutputs (stringified):', JSON.stringify(content.content_data?.generatedOutputs, null, 2));
+      console.log('Derived primaryBodyFromOutputs:', primaryBodyFromOutputs);
+      console.log('Payload being sent to API (stringified):', JSON.stringify(payloadToSave, null, 2));
+      console.log('--- End In handleSave --- ContentEditPage ---');
+
       const response = await fetch(`/api/content/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -251,19 +318,54 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       }
       toast.success('Content updated successfully!');
       if (result.data) {
-        setContent(prev => ({ 
-            ...prev, 
-            ...result.data, 
-        }));
+        // Step 4: Verify Frontend State After Successful Save
+        console.log('Data received from API after save (stringified):', JSON.stringify(result.data, null, 2));
+        setContent(prev => {
+          const newState = { ...prev, ...result.data };
+          console.log('New local content state after API success (content_data stringified):', JSON.stringify(newState.content_data, null, 2));
+          return newState;
+        });
       }
+      success = true;
     } catch (error: any) {
       console.error('Error updating content:', error);
       toast.error(error.message || 'Failed to update content. Please try again.');
+      success = false;
     } finally {
       setIsSaving(false);
     }
+    return success;
+  };
+
+  // Assign to ref so ContentApprovalWorkflow can call it if needed
+  useEffect(() => {
+    contentSaveRef.current = handleSave;
+  }, [handleSave]); // handleSave dependencies should be stable if defined with useCallback or if its deps are stable
+  
+  const handleWorkflowActionCompletion = () => {
+    console.log('[ContentEditPage] handleWorkflowActionCompletion called.');
+    // This function is called AFTER the workflow action in ContentApprovalWorkflow is successful.
+    // Now, redirect.
+    toast.info('Workflow action completed. Redirecting to My Tasks...');
+    router.push('/dashboard/my-tasks');
+    // Optionally, refresh data globally or for the My Tasks page if needed upon arrival.
   };
   
+  // Add a new function to handle adding a field
+  const handleAddField = (fieldId: string, value: string) => {
+    setContent(prev => ({
+      ...prev,
+      content_data: {
+        ...(prev.content_data || {}),
+        generatedOutputs: {
+          ...(prev.content_data?.generatedOutputs || {}),
+          [fieldId]: value,
+        },
+      },
+    }));
+    toast.success('Field added successfully!');
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
@@ -367,37 +469,32 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             </CardContent>
           </Card>
           
-          <Card>
-            <CardHeader><CardTitle>Content Body</CardTitle></CardHeader>
-            <CardContent>
-              <RichTextEditor 
-                value={content.body} 
-                onChange={handleContentBodyChange} 
-                placeholder="Enter your content here..." 
-                className="border rounded-md"
-                editorClassName="font-sans min-h-[18rem]"
-              />
-            </CardContent>
-          </Card>
-
-          {outputFieldsToDisplay.length > 0 && (
+          {/* Card for Generated Output Fields based on Template */}
+          {template && template.fields.outputFields.length > 0 && (
             <Card>
               <CardHeader><CardTitle>Generated Output Fields</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                {outputFieldsToDisplay.map(field => (
-                  <div key={field.id}>
-                    <Label htmlFor={field.id}>{field.name}</Label>
-                    <Textarea 
-                      id={field.id} 
-                      name={field.id} 
-                      value={content.content_data?.[field.id] || ''} 
-                      onChange={(e) => handleOutputFieldChange(field.id, e.target.value)}
-                      rows={3}
+                {template.fields.outputFields.map(outputField => (
+                  <div key={outputField.id}>
+                    <Label htmlFor={`output-${outputField.id}`} className="text-sm font-medium">{outputField.name}</Label>
+                    <RichTextEditor
+                      value={content.content_data?.generatedOutputs?.[outputField.id] || ''}
+                      onChange={(value) => handleGeneratedOutputChange(outputField.id, value)}
+                      placeholder={`Content for ${outputField.name}...`}
+                      className="mt-1 border rounded-md"
+                      editorClassName="font-sans min-h-[100px]"
                     />
                   </div>
                 ))}
               </CardContent>
             </Card>
+          )}
+          {/* Fallback if template is loading or has no output fields */}
+          {!template && content.template_id && (
+             <Card><CardContent><p className="text-muted-foreground py-4">Loading template structure for output fields...</p></CardContent></Card>
+          )}
+          {(template && template.fields.outputFields.length === 0) && (
+             <Card><CardContent><p className="text-muted-foreground py-4">No output fields defined in the template.</p></CardContent></Card>
           )}
         </div>
 
@@ -409,7 +506,8 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
               currentStepObject={currentStepObject}
               isCurrentUserStepOwner={isCurrentUserStepOwner}
               versions={versions}
-              onActionComplete={handleWorkflowAction}
+              onActionComplete={handleWorkflowActionCompletion}
+              performContentSave={handleSave}
             />
           )}
           {!content.workflow && <Card><CardContent><p className="text-muted-foreground py-4">No workflow associated with this content.</p></CardContent></Card>}

@@ -178,8 +178,11 @@ export const PUT = withAuth(async (request: NextRequest, user: User, context: { 
     const supabase = createSupabaseAdminClient();
     const body = await request.json();
 
+    // Log incoming body
+    console.log('[API PUT /api/content/[id]] Received body (stringified):', JSON.stringify(body, null, 2));
+
     // Define allowed fields for update
-    const allowedFields = ['title', 'body', 'meta_title', 'meta_description', 'status'];
+    const allowedFields = ['title', 'body', 'meta_title', 'meta_description', 'status', 'content_data'];
     const updateData: Record<string, any> = {};
 
     // Filter request body to include only allowed fields
@@ -209,6 +212,9 @@ export const PUT = withAuth(async (request: NextRequest, user: User, context: { 
     // Add updated_at timestamp
     updateData.updated_at = new Date().toISOString();
 
+    // Log data being sent to Supabase for update
+    console.log('[API PUT /api/content/[id]] Data for Supabase update (stringified):', JSON.stringify(updateData, null, 2));
+
     const { data: updatedContent, error } = await supabase
       .from('content')
       .update(updateData)
@@ -223,6 +229,9 @@ export const PUT = withAuth(async (request: NextRequest, user: User, context: { 
       console.error('Error updating content:', error);
       throw error;
     }
+
+    // Log content returned from Supabase after update
+    console.log('[API PUT /api/content/[id]] Content returned from Supabase after update (stringified):', JSON.stringify(updatedContent, null, 2));
 
     if (!updatedContent) {
         // Should ideally not happen if error is null, but good practice to check

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { getModelName } from '@/lib/azure/openai';
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -10,6 +11,7 @@ interface SuggestionRequest {
   prompt: string;
   fieldType: string;
   formValues: Record<string, any>;
+  brand_id?: string;
   options?: {
     maxLength?: number;
     format?: string;
@@ -42,8 +44,38 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       });
     }
     
+    let brandLanguage: string | undefined = undefined;
+    let brandCountry: string | undefined = undefined;
+    let brandName: string | undefined = undefined;
+
+    if (data.brand_id) {
+      const supabase = createSupabaseAdminClient();
+      const { data: brandData, error: brandError } = await supabase
+        .from('brands')
+        .select('name, language, country')
+        .eq('id', data.brand_id)
+        .single();
+      if (brandError) {
+        console.warn(`Failed to fetch brand details for brand_id ${data.brand_id}:`, brandError.message);
+        // Proceed without brand-specific context if fetching fails
+      } else if (brandData) {
+        brandName = brandData.name;
+        brandLanguage = brandData.language ?? undefined;
+        brandCountry = brandData.country ?? undefined;
+      }
+    }
+
     // Construct system message based on field type
     let systemMessage = 'You are a helpful assistant providing content suggestions.';
+    
+    if (brandName) {
+      systemMessage += ` You are generating suggestions for the brand "${brandName}".`;
+    }
+    if (brandLanguage && brandCountry) {
+      systemMessage += ` Generate suggestions in ${brandLanguage} targeted for an audience in ${brandCountry}.`;
+    } else if (brandLanguage) {
+      systemMessage += ` Generate suggestions in ${brandLanguage}.`;
+    }
     
     switch (data.fieldType) {
       case 'shortText':
@@ -107,9 +139,13 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         suggestion
       });
     } catch (error) {
+      // This catch is for errors specifically from the AI call
+      console.error('Error during AI suggestion API call:', error);
+      // Re-throw to be caught by the outer handler, which uses handleApiError
       throw error;
     }
   } catch (error) {
+    // This is the general error handler for the route
     return handleApiError(error, 'Failed to generate suggestion');
   }
 }); 

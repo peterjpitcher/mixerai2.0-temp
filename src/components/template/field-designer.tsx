@@ -180,10 +180,9 @@ export function FieldDesigner({ isOpen, fieldType, initialData, availableInputFi
     return true;
   };
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault(); // Prevent default form submission
+  const handleSave = () => {
     if (!validateField()) return;
-    onSave(fieldData, isNew);
+    onSave(fieldData as Field, isNew);
   };
   
   // Cast fieldData to InputField or OutputField for accessing specific AI properties in JSX
@@ -228,170 +227,168 @@ export function FieldDesigner({ isOpen, fieldType, initialData, availableInputFi
           <DialogTitle>{isNew ? 'Add' : 'Edit'} {fieldType === 'input' ? 'Input' : 'Output'} Field</DialogTitle>
         </DialogHeader>
         
-        <form onSubmit={handleSave}>
-          <Tabs defaultValue="basic" value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="basic">Basic Info</TabsTrigger>
-              {fieldType === 'input' && <TabsTrigger value="options">Field Options</TabsTrigger>}
-              <TabsTrigger value="ai">AI Features</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="basic" className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Field Name</Label>
-                <Input id="name" name="name" placeholder="e.g. Title, Description, Keywords" value={fieldData.name} onChange={handleBasicInfoChange} required />
+        <Tabs defaultValue="basic" value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="basic">Basic Info</TabsTrigger>
+            {fieldType === 'input' && <TabsTrigger value="options">Field Options</TabsTrigger>}
+            <TabsTrigger value="ai">AI Features</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="basic" className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Field Name</Label>
+              <Input id="name" name="name" placeholder="e.g. Title, Description, Keywords" value={fieldData.name} onChange={handleBasicInfoChange} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="type">Field Type</Label>
+              <Select value={fieldData.type} onValueChange={handleTypeChange}>
+                <SelectTrigger><SelectValue placeholder="Select field type" /></SelectTrigger>
+                <SelectContent>
+                  {fieldTypeOptions.map((typeOpt) => (
+                    <SelectItem key={typeOpt.value} value={typeOpt.value}>{typeOpt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {fieldType === 'input' && (
+              <div className="flex items-center space-x-2 pt-2">
+                <Checkbox id="required" checked={fieldData.required || false} onCheckedChange={handleRequiredChange} />
+                <Label htmlFor="required">Required field</Label>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="type">Field Type</Label>
-                <Select value={fieldData.type} onValueChange={handleTypeChange}>
-                  <SelectTrigger><SelectValue placeholder="Select field type" /></SelectTrigger>
-                  <SelectContent>
-                    {fieldTypeOptions.map((typeOpt) => (
-                      <SelectItem key={typeOpt.value} value={typeOpt.value}>{typeOpt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {fieldType === 'input' && (
-                <div className="flex items-center space-x-2 pt-2">
-                  <Checkbox id="required" checked={fieldData.required || false} onCheckedChange={handleRequiredChange} />
-                  <Label htmlFor="required">Required field</Label>
+            )}
+          </TabsContent>
+          
+          {fieldType === 'input' && (
+            <TabsContent value="options" className="space-y-4 py-4">
+              {fieldData.type === 'shortText' && fieldData.options && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="minLength">Minimum Length</Label>
+                      <Input id="minLength" type="number" min="0" placeholder="0" value={(fieldData.options as any)?.minLength || ''} onChange={(e) => handleOptionsChange({ minLength: parseInt(e.target.value) || 0 })}/>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="maxLength">Maximum Length</Label>
+                      <Input id="maxLength" type="number" min="1" placeholder="100" value={(fieldData.options as any)?.maxLength || ''} onChange={(e) => handleOptionsChange({ maxLength: parseInt(e.target.value) || 0 })}/>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="placeholder">Placeholder Text</Label>
+                    <Input id="placeholder" placeholder="Enter placeholder text" value={(fieldData.options as any)?.placeholder || ''} onChange={(e) => handleOptionsChange({ placeholder: e.target.value })}/>
+                  </div>
+                </>
+              )}
+              {fieldData.type === 'longText' && fieldData.options && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                          <Label htmlFor="minWords">Minimum Words</Label>
+                          <Input id="minWords" type="number" min="0" placeholder="0" value={(fieldData.options as any)?.minWords || ''} onChange={(e) => handleOptionsChange({ minWords: parseInt(e.target.value) || 0 })} />
+                      </div>
+                      <div className="space-y-2">
+                          <Label htmlFor="maxWords">Maximum Words</Label>
+                          <Input id="maxWords" type="number" min="1" placeholder="500" value={(fieldData.options as any)?.maxWords || ''} onChange={(e) => handleOptionsChange({ maxWords: parseInt(e.target.value) || 0 })} />
+                      </div>
+                  </div>
+                  <div className="space-y-2">
+                      <Label htmlFor="placeholder">Placeholder Text</Label>
+                      <Input id="placeholder" placeholder="Enter placeholder text" value={(fieldData.options as any)?.placeholder || ''} onChange={(e) => handleOptionsChange({ placeholder: e.target.value })} />
+                  </div>
+                </>
+              )}
+              {fieldData.type === 'tags' && fieldData.options && (
+                <div className="space-y-2">
+                  <Label htmlFor="maxTags">Maximum Number of Tags</Label>
+                  <Input id="maxTags" type="number" min="1" placeholder="10" value={(fieldData.options as any)?.maxTags || ''} onChange={(e) => handleOptionsChange({ maxTags: parseInt(e.target.value) || 0 })}/>
+                </div>
+              )}
+              {fieldData.type === 'select' && fieldData.options && (
+                <div className="space-y-2">
+                  <Label htmlFor="choices">Options (one per line)</Label>
+                  <Textarea id="choices" placeholder={"Option 1\\nOption 2\\nOption 3"} value={Array.isArray((fieldData.options as any)?.choices) ? (fieldData.options as any).choices.join('\\n') : ''} onChange={(e) => handleOptionsChange({ choices: e.target.value.split('\\n').filter(Boolean) })} rows={5}/>
                 </div>
               )}
             </TabsContent>
-            
-            {fieldType === 'input' && (
-              <TabsContent value="options" className="space-y-4 py-4">
-                {fieldData.type === 'shortText' && fieldData.options && (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="minLength">Minimum Length</Label>
-                        <Input id="minLength" type="number" min="0" placeholder="0" value={(fieldData.options as any)?.minLength || ''} onChange={(e) => handleOptionsChange({ minLength: parseInt(e.target.value) || 0 })}/>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="maxLength">Maximum Length</Label>
-                        <Input id="maxLength" type="number" min="1" placeholder="100" value={(fieldData.options as any)?.maxLength || ''} onChange={(e) => handleOptionsChange({ maxLength: parseInt(e.target.value) || 0 })}/>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="placeholder">Placeholder Text</Label>
-                      <Input id="placeholder" placeholder="Enter placeholder text" value={(fieldData.options as any)?.placeholder || ''} onChange={(e) => handleOptionsChange({ placeholder: e.target.value })}/>
-                    </div>
-                  </>
-                )}
-                {fieldData.type === 'longText' && fieldData.options && (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="minWords">Minimum Words</Label>
-                            <Input id="minWords" type="number" min="0" placeholder="0" value={(fieldData.options as any)?.minWords || ''} onChange={(e) => handleOptionsChange({ minWords: parseInt(e.target.value) || 0 })} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="maxWords">Maximum Words</Label>
-                            <Input id="maxWords" type="number" min="1" placeholder="500" value={(fieldData.options as any)?.maxWords || ''} onChange={(e) => handleOptionsChange({ maxWords: parseInt(e.target.value) || 0 })} />
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="placeholder">Placeholder Text</Label>
-                        <Input id="placeholder" placeholder="Enter placeholder text" value={(fieldData.options as any)?.placeholder || ''} onChange={(e) => handleOptionsChange({ placeholder: e.target.value })} />
-                    </div>
-                  </>
-                )}
-                {fieldData.type === 'tags' && fieldData.options && (
-                  <div className="space-y-2">
-                    <Label htmlFor="maxTags">Maximum Number of Tags</Label>
-                    <Input id="maxTags" type="number" min="1" placeholder="10" value={(fieldData.options as any)?.maxTags || ''} onChange={(e) => handleOptionsChange({ maxTags: parseInt(e.target.value) || 0 })}/>
+          )}
+          {(fieldData.type === 'plainText' || fieldData.type === 'html') && fieldData.options && fieldType === 'output' && (
+              <TabsContent value="options" className="space-y-4 py-4"> {/* This tab might need to be shown for output fields */}
+                   <div className="space-y-2">
+                      <Label htmlFor="maxLength">Maximum Length</Label>
+                      <Input id="maxLength" type="number" min="1" placeholder="1000" value={(fieldData.options as any)?.maxLength || ''} onChange={(e) => handleOptionsChange({ maxLength: parseInt(e.target.value) || 0 })}/>
                   </div>
-                )}
-                {fieldData.type === 'select' && fieldData.options && (
-                  <div className="space-y-2">
-                    <Label htmlFor="choices">Options (one per line)</Label>
-                    <Textarea id="choices" placeholder={"Option 1\\nOption 2\\nOption 3"} value={Array.isArray((fieldData.options as any)?.choices) ? (fieldData.options as any).choices.join('\\n') : ''} onChange={(e) => handleOptionsChange({ choices: e.target.value.split('\\n').filter(Boolean) })} rows={5}/>
-                  </div>
-                )}
               </TabsContent>
-            )}
-             {(fieldData.type === 'plainText' || fieldData.type === 'html') && fieldData.options && fieldType === 'output' && (
-                <TabsContent value="options" className="space-y-4 py-4"> {/* This tab might need to be shown for output fields */}
-                     <div className="space-y-2">
-                        <Label htmlFor="maxLength">Maximum Length</Label>
-                        <Input id="maxLength" type="number" min="1" placeholder="1000" value={(fieldData.options as any)?.maxLength || ''} onChange={(e) => handleOptionsChange({ maxLength: parseInt(e.target.value) || 0 })}/>
-                    </div>
-                </TabsContent>
-            )}
-            
-            <TabsContent value="ai" className="space-y-4 py-4">
-              {fieldType === 'input' && inputFieldData && (
-                <>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox id="aiSuggester" checked={inputFieldData.aiSuggester || false} onCheckedChange={(checked) => handleAIFeatureChange('aiSuggester', !!checked)}/>
-                    <Label htmlFor="aiSuggester">AI Suggestions</Label>
-                  </div>
-                  {inputFieldData.aiSuggester && (
-                    <div className="space-y-2 mt-4">
-                      <Label htmlFor="aiPrompt">AI Prompt <span className="text-muted-foreground text-xs">(instructions for AI)</span></Label>
-                      <Textarea id="aiPrompt" placeholder="Write instructions for the AI suggester, e.g. 'Suggest SEO keywords for this article about {{topic}}'" value={fieldData.aiPrompt || ''} onChange={handleAIPromptChange} className="h-24"/>
-                      <p className="text-xs text-muted-foreground">Use {"{{placeholders}}"} to reference other input fields.</p>
-                      {templateId && (
-                        <div className="mt-3">
-                          <Link href={`/dashboard/content/new?template=${templateId}&field=${fieldData.id}&prompt=${encodeURIComponent(fieldData.aiPrompt || '')}`} passHref>
-                            <Button type="button" variant="outline" size="sm">
-                              <Rocket className="mr-2 h-4 w-4" />
-                              Generate Suggestions
-                            </Button>
-                          </Link>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            This will take you to the content generator using this template to get suggestions for this field based on your prompt.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-              {fieldType === 'output' && outputFieldData && (
-                <>
-                  {/* aiAutoComplete removed from direct user control for output, implied by aiPrompt */}
-                  <div className="border-t my-4 pt-4">
-                    <p className="text-sm font-medium mb-2">Brand Context Options</p>
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox id="injectBrandIdentity" checked={!!(outputFieldData.useBrandIdentity && outputFieldData.useToneOfVoice && outputFieldData.useGuardrails)} onCheckedChange={handleCombinedBrandContextChange}/>
-                        <Label htmlFor="injectBrandIdentity">Inject Brand Identity, Tone of Voice & Guardrails</Label>
-                      </div>
-                    </div>
-                  </div>
+          )}
+          
+          <TabsContent value="ai" className="space-y-4 py-4">
+            {fieldType === 'input' && inputFieldData && (
+              <>
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="aiSuggester" checked={inputFieldData.aiSuggester || false} onCheckedChange={(checked) => handleAIFeatureChange('aiSuggester', !!checked)}/>
+                  <Label htmlFor="aiSuggester">AI Suggestions</Label>
+                </div>
+                {inputFieldData.aiSuggester && (
                   <div className="space-y-2 mt-4">
-                    <Label htmlFor="aiPrompt">AI Prompt <span className="text-destructive">*</span> <span className="text-muted-foreground text-xs ml-1">(instructions for AI generation)</span></Label>
-                    <Textarea id="aiPrompt" value={fieldData.aiPrompt || ''} onChange={handleAIPromptChange} placeholder="Write a prompt to guide the AI in generating this field content. Use {{input_field_name}} to reference input fields." className="min-h-[100px]" required={true}/>
-                    {availableInputFields && availableInputFields.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-xs text-muted-foreground">Available input field placeholders:</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {availableInputFields.map(inputField => (
-                            <Badge key={inputField.id} variant="secondary" className="text-xs cursor-pointer" onClick={() => {
-                                const currentPrompt = fieldData.aiPrompt || '';
-                                const newPrompt = currentPrompt + `{{${inputField.name}}}`;
-                                setFieldData(prev => ({...prev, aiPrompt: newPrompt } as Field));
-                              }}>{`{{${inputField.name}}}`}
-                            </Badge>
-                          ))}
-                        </div>
+                    <Label htmlFor="aiPrompt">AI Prompt <span className="text-muted-foreground text-xs">(instructions for AI)</span></Label>
+                    <Textarea id="aiPrompt" placeholder="Write instructions for the AI suggester, e.g. 'Suggest SEO keywords for this article about {{topic}}'" value={fieldData.aiPrompt || ''} onChange={handleAIPromptChange} className="h-24"/>
+                    <p className="text-xs text-muted-foreground">Use {"{{placeholders}}"} to reference other input fields.</p>
+                    {templateId && (
+                      <div className="mt-3">
+                        <Link href={`/dashboard/content/new?template=${templateId}&field=${fieldData.id}&prompt=${encodeURIComponent(fieldData.aiPrompt || '')}`} passHref>
+                          <Button type="button" variant="outline" size="sm">
+                            <Rocket className="mr-2 h-4 w-4" />
+                            Generate Suggestions
+                          </Button>
+                        </Link>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          This will take you to the content generator using this template to get suggestions for this field based on your prompt.
+                        </p>
                       </div>
                     )}
-                    <p className="text-xs text-muted-foreground mt-1">Example: "Generate an image of {'{{product_name}}'} in a {'{{style}}'} setting."</p>
                   </div>
-                </>
-              )}
-            </TabsContent>
-          </Tabs>
-          
-          <DialogFooter className="mt-6">
-            <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
-            <Button type="submit">{isNew ? 'Add' : 'Update'} Field</Button>
-          </DialogFooter>
-        </form>
+                )}
+              </>
+            )}
+            {fieldType === 'output' && outputFieldData && (
+              <>
+                {/* aiAutoComplete removed from direct user control for output, implied by aiPrompt */}
+                <div className="border-t my-4 pt-4">
+                  <p className="text-sm font-medium mb-2">Brand Context Options</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox id="injectBrandIdentity" checked={!!(outputFieldData.useBrandIdentity && outputFieldData.useToneOfVoice && outputFieldData.useGuardrails)} onCheckedChange={handleCombinedBrandContextChange}/>
+                      <Label htmlFor="injectBrandIdentity">Inject Brand Identity, Tone of Voice & Guardrails</Label>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2 mt-4">
+                  <Label htmlFor="aiPrompt">AI Prompt <span className="text-destructive">*</span> <span className="text-muted-foreground text-xs ml-1">(instructions for AI generation)</span></Label>
+                  <Textarea id="aiPrompt" value={fieldData.aiPrompt || ''} onChange={handleAIPromptChange} placeholder="Write a prompt to guide the AI in generating this field content. Use {{input_field_name}} to reference input fields." className="min-h-[100px]" required={true}/>
+                  {availableInputFields && availableInputFields.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs text-muted-foreground">Available input field placeholders:</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {availableInputFields.map(inputField => (
+                          <Badge key={inputField.id} variant="secondary" className="text-xs cursor-pointer" onClick={() => {
+                              const currentPrompt = fieldData.aiPrompt || '';
+                              const newPrompt = currentPrompt + `{{${inputField.name}}}`;
+                              setFieldData(prev => ({...prev, aiPrompt: newPrompt } as Field));
+                            }}>{`{{${inputField.name}}}`}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">Example: "Generate an image of {'{{product_name}}'} in a {'{{style}}'} setting."</p>
+                </div>
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
+        
+        <DialogFooter className="mt-6">
+          <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
+          <Button type="button" onClick={handleSave}>{isNew ? 'Add' : 'Update'} Field</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

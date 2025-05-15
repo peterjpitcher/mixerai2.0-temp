@@ -16,6 +16,24 @@ import { BrandIcon, BrandIconProps } from '@/components/brand-icon';
 import { ArrowLeft, Edit3 } from 'lucide-react';
 import { format as formatDateFns } from 'date-fns';
 
+interface TemplateOutputField {
+  id: string;
+  name: string;
+  type: string; // e.g., 'plainText', 'richText', 'html'
+}
+
+interface TemplateFields {
+  inputFields: any[]; // Not immediately needed for this change, can be kept simple
+  outputFields: TemplateOutputField[];
+}
+
+interface Template {
+  id: string;
+  name: string;
+  description?: string;
+  fields: TemplateFields;
+}
+
 interface ContentData {
   id: string;
   title: string;
@@ -82,6 +100,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [activeBrandData, setActiveBrandData] = useState<any>(null);
+  const [template, setTemplate] = useState<Template | null>(null);
   const router = useRouter();
 
   const supabase = createBrowserClient(
@@ -124,6 +143,24 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
           } else if (contentResult.data.brands) {
              setActiveBrandData(contentResult.data.brands);
           }
+
+          if (contentResult.data.template_id) {
+            fetch(`/api/content-templates/${contentResult.data.template_id}`)
+              .then(res => res.json())
+              .then(templateRes => {
+                if (templateRes.success && templateRes.template) {
+                  setTemplate(templateRes.template);
+                } else {
+                  console.error('Failed to fetch template:', templateRes.error);
+                  toast.error('Could not load content template structure.');
+                }
+              })
+              .catch(err => {
+                console.error('Error fetching template:', err);
+                toast.error('Error loading content template structure.');
+              });
+          }
+
         } else {
           throw new Error(contentResult.error || 'Failed to load content data.');
         }
@@ -151,7 +188,12 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     if (id) {
       fetchData();
     }
-  }, [id]);
+    // Add console.log for debugging content and template state
+    console.log("ContentDetailPage - Content State:", content);
+    console.log("ContentDetailPage - Template State:", template);
+    console.log("ContentDetailPage - Generated Outputs from Content:", content?.content_data?.generatedOutputs);
+
+  }, [id]); // Corrected dependency array: only run when `id` changes.
 
   const handleWorkflowAction = () => {
     router.refresh();
@@ -201,6 +243,11 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
       return "Invalid Date/Time";
     }
   };
+
+  // Add another log right before rendering to see final values
+  console.log("Final check before render - Content:", content);
+  console.log("Final check before render - Template:", template);
+  console.log("Final check before render - Generated Outputs:", content?.content_data?.generatedOutputs);
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
@@ -282,39 +329,45 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
               </div>
             </CardHeader>
             <CardContent>
+              {/* REMOVING Main Content Body section
               <div className="prose prose-sm max-w-none mb-6">
                 <h3 className="text-sm font-medium mb-1 border-b pb-1">Main Content Body</h3>
                 <MarkdownDisplay markdown={content.body || (content.content_data?.contentBody || 'No main body content available.')} />
               </div>
+              */}
 
-              <h3 className="text-sm font-medium mb-2 border-b pb-1 pt-4">Additional Generated Fields</h3>
-              {content.content_data && Object.keys(content.content_data).length > 0 ? (
-                Object.entries(content.content_data).map(([key, value]) => {
-                  if (key.toLowerCase() === 'contentbody' && content.body) return null;
-                  if (key.toLowerCase() === 'templateinputvalues') return null;
+              {/* New section for structured output fields based on template */}
+              {template && template.fields && template.fields.outputFields && content.content_data?.generatedOutputs && (
+                <>
+                  <h3 className="text-sm font-medium mb-2 border-b pb-1 pt-4">Generated Output Fields</h3>
+                  {template.fields.outputFields.length > 0 ? (
+                    template.fields.outputFields.map(outputField => {
+                      const outputValue = content.content_data?.generatedOutputs?.[outputField.id] || 'Not generated';
+                      // Avoid re-displaying if this output field's content is exactly what's in content.body
+                      // This is a simple check; a more robust check might involve comparing IDs if body is linked to a specific output field ID.
+                      if (outputValue === content.body && template.fields.outputFields.length > 1) {
+                        // If there are multiple output fields and this one is the same as main body, 
+                        // and it's not the *only* output field, we can optionally skip it to avoid redundancy.
+                        // For now, let's display all for clarity, or add a more sophisticated check if needed.
+                      }
 
-                  let displayValue = value;
-                  if (typeof value === 'object' && value !== null) {
-                    displayValue = Object.entries(value).map(([k,v]) => `${k}: ${v}`).join(', ') || 'Complex object data';
-                  } else if (typeof value !== 'string') {
-                    displayValue = String(value);
-                  }
-
-                  return (
-                    <div key={key} className="mb-4">
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</h4>
-                      {(typeof displayValue === 'string' && (displayValue.includes('\n') || displayValue.includes('#') || displayValue.includes('*'))) ? (
-                        <div className="prose prose-sm max-w-none border rounded p-2 bg-muted/20">
-                            <MarkdownDisplay markdown={displayValue} />
+                      return (
+                        <div key={outputField.id} className="mb-4">
+                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">{outputField.name}</h4>
+                          {/* Use MarkdownDisplay or a specific component based on outputField.type if available */}
+                          <div className="prose prose-sm max-w-none border rounded p-2 bg-muted/20">
+                            <MarkdownDisplay markdown={String(outputValue)} />
+                          </div>
                         </div>
-                      ) : (
-                        <p className="border rounded p-2 bg-muted/20 text-sm">{displayValue || 'Not set'}</p>
-                      )}
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="text-sm text-muted-foreground">No additional output fields available or template structure not fully loaded.</p>
+                      );
+                    })
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No output fields defined in the template.</p>
+                  )}
+                </>
+              )}
+              {!template && content.template_id && (
+                <p className="text-sm text-muted-foreground pt-4">Loading template structure for output fields...</p>
               )}
             </CardContent>
           </Card>

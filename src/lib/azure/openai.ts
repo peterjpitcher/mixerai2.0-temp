@@ -180,48 +180,38 @@ export async function generateContentFromTemplate(
   
   // Include output field requirements with their prompts
   template.outputFields.forEach(field => {
-    userPrompt += `- ${field.name}`;
+    userPrompt += `- For the field named \"${field.name}\" (with ID \"${field.id}\"):\n`;
+    userPrompt += `  BEGIN CONTENT FOR THIS FIELD HERE (ID: ${field.id}):\n`;
     
-    let fieldSpecificInstruction = '';
-    if (field.type === 'richText') { // Check if the field is richText
-      fieldSpecificInstruction += ' (Output as well-formed HTML, not Markdown)';
+    let fieldSpecificInstruction = "";
+    if (field.type === 'richText') {
+      fieldSpecificInstruction += 'Output as well-formed HTML, not Markdown. ';
     }
 
-    // Add field-specific brand context if enabled
-    let fieldPrompt = '';
-    
-    if (field.useBrandIdentity && brand.brand_identity) {
-      fieldPrompt += ` Use this brand identity: ${brand.brand_identity}.`;
-    }
-    
-    if (field.useToneOfVoice && brand.tone_of_voice) {
-      fieldPrompt += ` Use this tone of voice: ${brand.tone_of_voice}.`;
-    }
-    
-    if (field.useGuardrails && brand.guardrails) {
-      fieldPrompt += ` Apply these guardrails: ${brand.guardrails}.`;
-    }
-    
+    let fieldAIPrompt = "";
     if (field.aiPrompt) {
-      const processedPrompt = field.aiPrompt.replace(/\{\{(\w+)\}\}/g, (match, fieldId) => {
-        // Replace template variables with actual values
-        const inputField = template.inputFields.find(f => f.id === fieldId);
+      const processedPrompt = field.aiPrompt.replace(/\{\{(\w+)\}\}/g, (match, inputFieldIdOrName) => {
+        const inputField = template.inputFields.find(f => f.id === inputFieldIdOrName || f.name === inputFieldIdOrName);
         return inputField && inputField.value ? inputField.value : match;
       });
-      
-      // Add the processed prompt to field-specific prompt
-      fieldPrompt += fieldPrompt ? ` ${processedPrompt}` : processedPrompt;
-      console.log(`Using AI prompt for field ${field.name}: ${processedPrompt}`);
+      fieldAIPrompt = processedPrompt;
     }
     
-    // Add the field prompt to the user prompt if it exists
-    if (fieldPrompt) {
-      userPrompt += `: ${fieldPrompt}${fieldSpecificInstruction}`;
-    } else if (fieldSpecificInstruction) {
-      userPrompt += `:${fieldSpecificInstruction}`;
+    if (fieldAIPrompt || fieldSpecificInstruction) {
+        userPrompt += `  Instructions: ${fieldSpecificInstruction}${fieldAIPrompt}\n`;
     }
-    
-    userPrompt += `\n`;
+
+    if (field.useBrandIdentity && brand.brand_identity) {
+      userPrompt += `  Apply Brand Identity: ${brand.brand_identity}\n`;
+    }
+    if (field.useToneOfVoice && brand.tone_of_voice) {
+      userPrompt += `  Apply Tone of Voice: ${brand.tone_of_voice}\n`;
+    }
+    if (field.useGuardrails && brand.guardrails) {
+      userPrompt += `  Apply Guardrails: ${brand.guardrails}\n`;
+    }
+
+    userPrompt += `  WRAP THE ENTIRE GENERATED CONTENT FOR THIS SPECIFIC FIELD \"${field.name}\" (ID: ${field.id}) WITH THE MARKERS: ##FIELD_ID:${field.id}## ... ##END_FIELD_ID##\n\n`;
   });
   
   // Add additional instructions if provided
@@ -330,7 +320,9 @@ export async function generateContentFromTemplate(
  */
 export async function generateBrandIdentityFromUrls(
   brandName: string,
-  urls: string[]
+  urls: string[],
+  language: string,
+  country: string
 ): Promise<{
   brandIdentity: string;
   toneOfVoice: string;
@@ -338,7 +330,7 @@ export async function generateBrandIdentityFromUrls(
   suggestedAgencies: Array<{name: string, description: string, priority: 'high' | 'medium' | 'low'}>;
   brandColor: string;
 }> {
-    console.log(`Generating brand identity for ${brandName} from ${urls.length} URLs`);
+    console.log(`Generating brand identity for ${brandName} from ${urls.length} URLs, Language: ${language}, Country: ${country}`);
     
     // Debug environment variables
     console.log("Environment check:");
@@ -352,21 +344,22 @@ export async function generateBrandIdentityFromUrls(
       
       // Prepare the prompt
       const prompt = `
-      Please analyze the following URLs related to the brand "${brandName}":
-      ${urls.map(url => `- ${url}`).join('\n')}
+      Please analyze the following URLs related to the brand "${brandName}".
+      The brand operates in ${country} and its communications should be in ${language.toUpperCase()}.
+
+      Based on these URLs, generate a comprehensive brand identity profile IN ${language.toUpperCase()} with the following components, tailored for an audience in ${country}:
       
-      Based on these URLs, generate a comprehensive brand identity profile with the following components:
-      
-      1. BRAND IDENTITY: A detailed description of the brand's personality, values, target audience, and key messaging themes. This should be in plain text paragraphs, not markdown.
+      1. BRAND IDENTITY: A detailed description of the brand's personality, values, target audience, and key messaging themes. This should be in plain text paragraphs.
       
       2. TONE OF VOICE: A description of how the brand communicates - the style, language, and approach it uses. This should be a concise paragraph.
       
-      3. CONTENT GUARDRAILS: Provide 5 specific guidelines that content creators should follow when creating content for this brand. Format these as a bulleted list.
+      3. CONTENT GUARDRAILS: Provide 5 specific guidelines that content creators should follow when creating content for this brand. Format these as a bulleted list of strings.
       
-      4. SUGGESTED VETTING AGENCIES: Based on the industry and country (if known), recommend 3-5 regulatory or vetting agencies that might be relevant to this brand, with a brief description of each. Also assign each a priority level (high, medium, or low) based on how critical compliance with this agency is for the brand.
+      4. SUGGESTED VETTING AGENCIES: Based on the industry and ${country}, recommend 3-5 regulatory or vetting agencies relevant to this brand. Provide their name, a brief description, and assign a priority level (high, medium, or low) based on perceived criticality for this brand in ${country}.
       
       5. BRAND COLOR: Suggest a primary brand color that would best represent this brand's identity and values. Provide the color in hex format (e.g., #FF5733).
       
+      IMPORTANT: ALL textual content in your response (brandIdentity, toneOfVoice, guardrails items, and agency descriptions) MUST be in ${language.toUpperCase()}.
       Format your response as a JSON object with these keys: brandIdentity, toneOfVoice, guardrails (as an array of strings), suggestedAgencies (as an array of objects with name, description, and priority fields), and brandColor (as a hex color code).
       `;
       
@@ -724,13 +717,13 @@ export async function generateAltText(
  */
 export async function transCreateContent(
   content: string,
-  sourceLanguage: string = 'en',
-  targetLanguage: string = 'es',
-  targetCountry: string = 'ES'
+  sourceLanguage: string, // Source language, no default
+  brandLanguage: string,  // Renamed from targetLanguage, no default, expected from brand settings
+  brandCountry: string    // Renamed from targetCountry, no default, expected from brand settings
 ): Promise<{
   transCreatedContent: string;
 }> {
-  console.log(`Trans-creating content from ${sourceLanguage} to ${targetLanguage} for ${targetCountry}`);
+  console.log(`Trans-creating content from ${sourceLanguage} to ${brandLanguage} for ${brandCountry}`);
   
   const deploymentName = getModelName();
   console.log(`Using deployment name: "${deploymentName}"`);
@@ -747,29 +740,30 @@ export async function transCreateContent(
     'zh': 'Chinese',
     'ja': 'Japanese',
     'ko': 'Korean'
+    // Add more as needed
   };
   
   const sourceLangName = languageNames[sourceLanguage] || sourceLanguage;
-  const targetLangName = languageNames[targetLanguage] || targetLanguage;
+  const targetLangName = languageNames[brandLanguage] || brandLanguage; // Use brandLanguage
   
   // Prepare the prompt
-  const systemPrompt = `You are an expert localisation specialist who trans-creates content from ${sourceLangName} to ${targetLangName} for audiences in ${targetCountry}.
+  const systemPrompt = `You are an expert localisation specialist who trans-creates content from ${sourceLangName} to ${targetLangName} for audiences in ${brandCountry}.
   Trans-creation means adapting content culturally and linguistically, not just translating it.
   Consider cultural nuances, idioms, expressions, and preferences of the target audience.
   Maintain the original meaning, tone, and intent while making it feel natural to native ${targetLangName} speakers.
   
-  For Spanish content specifically:
-  - Adapt idioms and expressions to Spanish equivalents
-  - Consider cultural references relevant to Spanish-speaking audiences
+  For ${targetLangName} content specifically (if applicable, e.g. Spanish):
+  - Adapt idioms and expressions to ${targetLangName} equivalents
+  - Consider cultural references relevant to ${targetLangName}-speaking audiences in ${brandCountry}
   - Use language that feels natural and authentic to native speakers
   - Adapt humor appropriately for the culture
   - Pay attention to formal vs. informal tone based on context`;
   
-  const userPrompt = `Trans-create the following content from ${sourceLangName} to ${targetLangName} for audiences in ${targetCountry}:
+  const userPrompt = `Trans-create the following content from ${sourceLangName} to ${targetLangName} for audiences in ${brandCountry}:
   
   "${content}"
   
-  Don't just translate literally - adapt the content to feel authentic and natural to ${targetLangName} native speakers in ${targetCountry}.
+  Don't just translate literally - adapt the content to feel authentic and natural to ${targetLangName} native speakers in ${brandCountry}.
   Adjust cultural references, idioms, humor, and examples as needed while preserving the main message.
   
   Format your response as JSON with a transCreatedContent key containing ONLY the translated content.`;
@@ -836,14 +830,15 @@ export async function generateSuggestions(
       name?: string;
       brand_identity?: string | null;
       tone_of_voice?: string | null;
-      language?: string | null;
-      country?: string | null;
+      language: string; // Made required if brandContext is provided
+      country: string;  // Made required if brandContext is provided
     };
   }
 ): Promise<string[]> {
   console.log(`Generating suggestions of type: ${suggestionType}`);
-  if (context.brandContext?.language || context.brandContext?.country) {
-    console.log(`Targeting Language: ${context.brandContext.language || 'not specified'}, Country: ${context.brandContext.country || 'not specified'}`);
+  // Updated console log to reflect new required fields if brandContext exists
+  if (context.brandContext) {
+    console.log(`Targeting Language: ${context.brandContext.language}, Country: ${context.brandContext.country}`);
   }
 
   const client = getAzureOpenAIClient();

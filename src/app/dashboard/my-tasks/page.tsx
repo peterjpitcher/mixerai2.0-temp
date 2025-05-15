@@ -249,7 +249,7 @@ export default function MyTasksPage() {
                       <td className="p-3 text-muted-foreground">{formatDate(task.due_date)}</td>
                       <td className="p-3">
                         <Button variant="outline" size="sm" asChild title="Review this content item">
-                          <Link href={`/dashboard/content/${task.content_id}`}>
+                          <Link href={`/dashboard/content/${task.content_id}/edit`}>
                             <Eye className="h-4 w-4 mr-1.5" /> Review Content
                           </Link>
                         </Button>

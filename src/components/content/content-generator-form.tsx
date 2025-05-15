@@ -38,13 +38,19 @@ interface TemplateInputField {
   };
 }
 
+interface TemplateOutputField {
+  id: string;
+  name: string;
+  type: string;
+}
+
 interface Template {
   id: string;
   name: string;
   description: string;
   fields: {
     inputFields: TemplateInputField[];
-    outputFields: any[]; 
+    outputFields: TemplateOutputField[];
   };
 }
 
@@ -85,7 +91,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
   const [isSaving, setIsSaving] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [selectedBrand, setSelectedBrand] = useState('');
-  const [generatedContent, setGeneratedContent] = useState('');
+  const [generatedOutputs, setGeneratedOutputs] = useState<Record<string, string>>({});
   const [title, setTitle] = useState('');
   const [template, setTemplate] = useState<Template | null>(null);
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
@@ -180,9 +186,8 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     }
 
     setIsLoading(true);
-    setGeneratedContent('');
+    setGeneratedOutputs({});
     setTitle('');
-    let generatedBodyContent = '';
 
     try {
       const input_fields_with_values = template.fields.inputFields.map(field => ({
@@ -210,38 +215,44 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
       const data = await response.json();
       
       if (data.success) {
-        const mainBodyField = template.fields.outputFields.find(f => f.type === 'richText');
         const aiResponseData = data.data || data.content || data;
 
-        if (typeof aiResponseData === 'string') {
-          generatedBodyContent = aiResponseData;
-        } else if (mainBodyField && typeof aiResponseData === 'object' && aiResponseData !== null && aiResponseData[mainBodyField.id]) {
-          generatedBodyContent = aiResponseData[mainBodyField.id];
-        } else if (template.fields.outputFields.length > 0 && typeof aiResponseData === 'object' && aiResponseData !== null && aiResponseData[template.fields.outputFields[0].id]) {
-          generatedBodyContent = aiResponseData[template.fields.outputFields[0].id];
-          if (template.fields.outputFields[0].type !== 'richText') {
-             toast.info("Primary output field is not rich text, AI might not have generated HTML as expected for body.");
-          }
+        const outputsToSet = (aiResponseData && typeof aiResponseData.outputs === 'object') ? aiResponseData.outputs : 
+                             (typeof aiResponseData === 'object' && aiResponseData !== null) ? aiResponseData : 
+                             null;
+
+        if (outputsToSet) {
+          setGeneratedOutputs(outputsToSet);
+          toast.success('Content generated for output fields.');
+        } else if (typeof aiResponseData === 'string' && template.fields.outputFields.length === 1) {
+          setGeneratedOutputs({ [template.fields.outputFields[0].id]: aiResponseData });
+          toast.success('Content generated for the output field.');
         } else {
-          generatedBodyContent = 'Error: Could not extract HTML content body.';
+          toast.error('Generated content format is unexpected or not structured per output field.');
+          console.warn('Unexpected AI response format:', aiResponseData);
+          setGeneratedOutputs({});
         }
         
-        setGeneratedContent(generatedBodyContent);
-        
-        if (generatedBodyContent && generatedBodyContent !== 'Error: Could not extract HTML content body.') {
-            toast.success('Main content HTML generated.');
-        } else {
-            toast.error('Main content body might be missing or in an unexpected format.');
+        let contextForTitle = '';
+        if (outputsToSet && template.fields.outputFields.length > 0) {
+          const primaryOutputField = 
+            template.fields.outputFields.find(f => f.name.toLowerCase().includes('body') || f.name.toLowerCase().includes('content')) ||
+            template.fields.outputFields[0];
+          if (primaryOutputField && outputsToSet[primaryOutputField.id]) {
+            contextForTitle = outputsToSet[primaryOutputField.id];
+          } else if (Object.values(outputsToSet).length > 0) {
+            contextForTitle = Object.values(outputsToSet)[0] as string;
+          }
         }
 
-        if (generatedBodyContent && generatedBodyContent !== 'Error: Could not extract HTML content body.') {
+        if (contextForTitle) {
           setIsGeneratingTitle(true);
           try {
             const topicField = template.fields.inputFields.find(f => f.id === 'topic' || f.name.toLowerCase().includes('topic'));
             const keywordsField = template.fields.inputFields.find(f => f.id === 'keywords' || f.name.toLowerCase().includes('keyword'));
             
             const titleRequestContext = {
-              contentBody: generatedBodyContent,
+              contentBody: contextForTitle,
               brand_id: selectedBrand,
               topic: topicField ? templateFieldValues[topicField.id] : undefined,
               keywords: keywordsField ? (templateFieldValues[keywordsField.id] || '').split(',').map(k => k.trim()).filter(k => k) : undefined,
@@ -267,19 +278,24 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
           } finally {
             setIsGeneratingTitle(false);
           }
+        } else if (Object.keys(outputsToSet || {}).length > 0) {
+            setTitle('Content generated. Please set title manually.');
         }
       } else {
         toast.error(data.error || 'Failed to generate content.');
+        setGeneratedOutputs({});
       }
     } catch (error) { 
       toast.error('Error during content generation process.'); 
       console.error('Content generation process error:', error);
+      setGeneratedOutputs({});
     }
     finally { setIsLoading(false); }
   };
   
   const handleSave = async () => {
-    if (!generatedContent) { toast.error('No content to save.'); return; }
+    const hasGeneratedOutputs = Object.keys(generatedOutputs).length > 0;
+    if (!hasGeneratedOutputs) { toast.error('No content to save.'); return; }
     if (isFetchingWorkflow || isGeneratingTitle) { 
         toast.info(isGeneratingTitle ? 'Auto-generating title, please wait...' : 'Determining workflow, please wait...'); 
         return; 
@@ -290,17 +306,28 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     }
     setIsSaving(true);
     try {
+      let primaryBodyContent = '';
+      if (template && template.fields.outputFields.length > 0) {
+        const richTextOutput = template.fields.outputFields.find(f => f.type === 'richText' && generatedOutputs[f.id]);
+        if (richTextOutput) {
+          primaryBodyContent = generatedOutputs[richTextOutput.id];
+        } else {
+          const firstOutputField = template.fields.outputFields[0];
+          if (firstOutputField && generatedOutputs[firstOutputField.id]) {
+            primaryBodyContent = generatedOutputs[firstOutputField.id];
+          }
+        }
+      }
+
       const payload = {
         brand_id: selectedBrand,
         template_id: template?.id,
         title,
         workflow_id: associatedWorkflowDetails?.id,
-        body: generatedContent,
+        body: primaryBodyContent,
         content_data: {
             templateInputValues: templateFieldValues,
-            generatedOutput: { 
-                [template?.fields?.outputFields?.find(f => f.type === 'richText')?.id || 'mainBodyHtml']: generatedContent 
-            }
+            generatedOutputs: generatedOutputs
         }
       };
       const response = await fetch('/api/content', { 
@@ -434,20 +461,29 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         </CardContent>
       </Card>
       
-      {generatedContent && (
+      {Object.keys(generatedOutputs).length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Generated Content Review {isGeneratingTitle ? "(Generating Title...)" : (title ? `- \"${title}\"` : "")}</CardTitle>
             <CardDescription>Review and edit the generated content below.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Label>Generated Body Content</Label>
-            <RichTextEditor
-              value={generatedContent}
-              onChange={setGeneratedContent}
-              placeholder="Generated content will appear here..."
-              className="min-h-[200px]"
-            />
+            {template?.fields.outputFields.map(outputField => (
+              <div key={outputField.id} className="pt-2">
+                <Label htmlFor={`output-${outputField.id}`} className="text-base font-semibold">{outputField.name}</Label>
+                <RichTextEditor
+                  value={generatedOutputs[outputField.id] || ''}
+                  onChange={(value) => {
+                    setGeneratedOutputs(prev => ({...prev, [outputField.id]: value}));
+                  }}
+                  placeholder={`Generated content for ${outputField.name}...`}
+                  className="min-h-[100px] mt-1 border rounded-md p-2"
+                />
+              </div>
+            ))}
+            {Object.keys(generatedOutputs).length === 0 && (
+              <p className="text-muted-foreground">Generated content will appear here for each output field once generated.</p>
+            )}
           </CardContent>
         </Card>
       )}
@@ -460,7 +496,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         >
           Cancel
         </Button>
-        {!generatedContent && (
+        {Object.keys(generatedOutputs).length === 0 && (
           <Button 
             onClick={handleGenerate} 
             disabled={isLoading || isLoadingTemplate || isFetchingWorkflow || isGeneratingTitle || !selectedBrand || !template}
@@ -470,7 +506,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
             {isLoading ? 'Generating Body...' : (isLoadingTemplate ? 'Loading Template...' : (isFetchingWorkflow ? 'Loading Workflow...' : (isGeneratingTitle ? 'Generating Title...' : 'Generate Content & Title')))}
           </Button>
         )}
-        {generatedContent && (
+        {Object.keys(generatedOutputs).length > 0 && (
           <Button 
             onClick={handleSave} 
             disabled={isSaving || isFetchingWorkflow || isGeneratingTitle || !title}
