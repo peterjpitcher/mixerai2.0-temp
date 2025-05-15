@@ -15,11 +15,12 @@ import { Switch } from '@/components/switch';
 import { Badge } from '@/components/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { toast } from 'sonner';
-import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2, ArrowLeft } from 'lucide-react';
 import type { Metadata } from 'next';
 import debounce from 'lodash.debounce';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { cn } from '@/lib/utils';
+import { BrandIcon } from '@/components/brand-icon';
 
 // export const metadata: Metadata = {
 //   title: 'Edit Workflow | MixerAI 2.0',
@@ -36,6 +37,26 @@ interface ContentTemplateSummary {
   id: string;
   name: string;
 }
+
+// Placeholder Breadcrumbs component
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
 
 /**
  * WorkflowEditPage allows users to modify an existing content approval workflow.
@@ -61,6 +82,8 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [stepDescLoading, setStepDescLoading] = useState<Record<number, boolean>>({});
   
+  const currentBrandForDisplay = brands.find(b => b.id === (workflow?.brand_id || workflow?.brand?.id));
+
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -593,44 +616,43 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Edit: {workflow?.name || 'Workflow'}</h1>
-          <p className="text-muted-foreground mt-1">
-            Modify the details, steps, assignees, and other settings for this workflow.
-          </p>
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" }, 
+        { label: "Workflows", href: "/dashboard/workflows" }, 
+        { label: workflow?.name || "Loading...", href: `/dashboard/workflows/${id}` },
+        { label: "Edit" }
+      ]} />
+
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-3">
+           <Button variant="outline" size="icon" onClick={() => router.push(`/dashboard/workflows/${id}`)} aria-label="Back to Workflow view">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          {currentBrandForDisplay && 
+            <BrandIcon name={currentBrandForDisplay.name} color={currentBrandForDisplay.color ?? undefined} size="md" className="mr-1" />
+          }
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Edit: {workflow?.name || 'Workflow'}</h1>
+            <p className="text-muted-foreground mt-1">
+              Modify the details, steps, assignees, and other settings for this workflow.
+              {currentBrandForDisplay && <span className="block text-xs">For Brand: {currentBrandForDisplay.name}</span>}
+            </p>
+          </div>
         </div>
         <div className="flex space-x-2">
           <Button 
             variant="destructive"
             onClick={() => setShowDeleteConfirm(true)}
             disabled={isDeleting || isSaving}
+            title="Delete this workflow"
           >
             {isDeleting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Deleting...
-              </>
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting...</>
             ) : (
-              <>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Workflow
-              </>
+              <><Trash2 className="mr-2 h-4 w-4" /> Delete Workflow</>
             )}
           </Button>
-          <Button variant="outline" asChild>
-            <Link href={`/dashboard/workflows/${id}`}>Cancel</Link>
-          </Button>
-          <Button onClick={handleSaveWorkflow} disabled={isSaving || isDeleting}>
-            {isSaving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              'Save Changes'
-            )}
-          </Button>
+          {/* Save and Cancel (to view) moved to bottom of form */}
         </div>
       </div>
       
@@ -897,6 +919,23 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
         confirmText="Delete"
         onConfirm={handleDeleteWorkflow}
       />
+
+      {/* Standard 3.1: Consolidated Form Actions - Bottom Right */}
+      <div className="flex justify-end space-x-2 pt-4 mt-4 border-t">
+        <Button variant="outline" asChild disabled={isSaving || isDeleting}>
+            <Link href={`/dashboard/workflows/${id}`}>Cancel</Link>
+        </Button>
+        <Button onClick={handleSaveWorkflow} disabled={isSaving || isDeleting}>
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              'Save Changes'
+            )}
+        </Button>
+      </div>
     </div>
   );
 } 
