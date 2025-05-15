@@ -15,6 +15,9 @@ import { toast } from 'sonner';
 import type { Metadata } from 'next';
 import { createBrowserClient } from '@supabase/ssr';
 import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
+import { PageHeader } from "@/components/dashboard/page-header";
+import { BrandIcon, BrandIconProps } from '@/components/brand-icon';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 
 // export const metadata: Metadata = {
 //   title: 'Edit Content | MixerAI 2.0',
@@ -33,10 +36,13 @@ interface ContentState {
   title: string;
   body: string;
   status: string;
-  brand_name?: string; // From joined brands table
-  template_name?: string; // From joined content_templates table
+  brand_id?: string;
+  brand_name?: string;
+  brand_color?: string;
+  brand_avatar_url?: string;
+  template_name?: string;
   template_id?: string;
-  content_data?: Record<string, any>; // For template-driven fields
+  content_data?: Record<string, any>;
   workflow_id?: string | null;
   current_step?: number | null;
   workflow?: { id: string; name: string; steps: any[] };
@@ -58,6 +64,26 @@ interface ContentVersion {
   created_at: string;
 }
 
+// Placeholder Breadcrumbs component
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
+
 /**
  * ContentEditPage allows users to modify an existing piece of content.
  * It provides fields for editing the title, body (using Markdown with a live preview), 
@@ -75,7 +101,10 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     title: '',
     body: '',
     status: 'draft',
+    brand_id: '',
     brand_name: '',
+    brand_color: '',
+    brand_avatar_url: '',
     template_name: '',
     template_id: '',
     content_data: {},
@@ -85,6 +114,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
 
   const [versions, setVersions] = useState<ContentVersion[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [activeBrandData, setActiveBrandData] = useState<any>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -119,7 +149,10 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             title: contentResult.data.title || '',
             body: contentResult.data.body || (contentResult.data.content_data?.contentBody || ''),
             status: contentResult.data.status || 'draft',
+            brand_id: contentResult.data.brand_id || contentResult.data.brands?.id,
             brand_name: contentResult.data.brand_name || contentResult.data.brands?.name || 'N/A',
+            brand_color: contentResult.data.brands?.brand_color,
+            brand_avatar_url: contentResult.data.brands?.avatar_url,
             template_name: contentResult.data.template_name || contentResult.data.content_templates?.name || 'N/A',
             template_id: contentResult.data.template_id || '',
             content_data: contentResult.data.content_data || {},
@@ -127,6 +160,18 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             current_step: contentResult.data.current_step || null,
             workflow: contentResult.data.workflow || undefined
           });
+
+          if (contentResult.data.brand_id && !activeBrandData) {
+            fetch(`/api/brands/${contentResult.data.brand_id}`)
+              .then(res => res.json())
+              .then(brandRes => {
+                if (brandRes.success && brandRes.brand) {
+                  setActiveBrandData(brandRes.brand);
+                }
+              });
+          } else if (contentResult.data.brands) {
+            setActiveBrandData(contentResult.data.brands);
+          }
 
           if (contentResult.data.workflow_id && !contentResult.data.workflow?.steps) {
             const wfResponse = await fetch(`/api/workflows/${contentResult.data.workflow_id}`);
@@ -275,22 +320,34 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Edit: {content.title || 'Content'}</h1>
-          <p className="text-muted-foreground">
-            Modify the title, body, and other generated fields for this piece of content.
-          </p>
-        </div>
-        <div className="flex space-x-2">
-          <Button variant="outline" onClick={() => router.push(`/dashboard/content/${id}`)}>
-            View Content
-          </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? 'Saving...' : 'Save Changes'}
-          </Button>
-        </div>
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Content", href: "/dashboard/content" },
+        { label: content.title || "Loading Content...", href: `/dashboard/content/${id}` },
+        { label: "Edit" }
+      ]} />
+
+      <div className="flex items-center mb-4">
+        <Button variant="outline" size="icon" onClick={() => router.push(`/dashboard/content/${id}`)} aria-label="View Content">
+            <ArrowLeft className="h-4 w-4" />
+        </Button>
+        {activeBrandData && (
+          <div className="ml-4 flex items-center">
+            <BrandIcon name={activeBrandData.name} color={activeBrandData.brand_color} size="sm" />
+            <span className="ml-2 text-sm font-medium text-muted-foreground">Brand: {activeBrandData.name}</span>
+          </div>
+        )}
       </div>
+
+      <PageHeader
+        title={`Edit: ${content.title || 'Content'}`}
+        description="Modify the title, body, and other generated fields for this piece of content."
+        actions={
+          <Button variant="outline" onClick={() => router.push(`/dashboard/content/${id}`)}>
+            View Content (Read-only)
+          </Button>
+        }
+      />
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -359,12 +416,12 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         </div>
       </div>
       
-      <div className="flex justify-end space-x-2 pt-4 border-t">
-        <Button variant="outline" onClick={() => router.push(`/dashboard/content/${id}`)}>
-            Cancel & View
+      <div className="flex justify-end space-x-2 pt-4 mt-4 border-t">
+        <Button variant="outline" onClick={() => router.push(`/dashboard/content/${id}`)} disabled={isSaving}>
+            Cancel
         </Button>
         <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? 'Saving...' : 'Save All Changes'}
+            {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
         </Button>
       </div>
     </div>
