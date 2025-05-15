@@ -11,6 +11,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { Spinner } from '@/components/spinner';
 import type { Metadata } from 'next';
 import { toast } from 'sonner';
+import Link from 'next/link';
 
 // Page metadata should ideally be exported from a server component or the page file if it's RSC.
 // For client components, this is more of a placeholder for what should be set.
@@ -18,6 +19,26 @@ import { toast } from 'sonner';
 //   title: 'Account Settings | MixerAI 2.0',
 //   description: 'Manage your MixerAI profile, password, and notification settings.',
 // };
+
+// Placeholder Breadcrumbs component
+const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
+  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
+    <ol className="flex items-center space-x-1.5">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-center">
+          {item.href ? (
+            <Link href={item.href} className="hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span>{item.label}</span>
+          )}
+          {index < items.length - 1 && <span className="mx-1.5">/</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
 
 /**
  * AccountPage component.
@@ -214,6 +235,7 @@ export default function AccountPage() {
 
   return (
     <div className="space-y-8">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Account Settings" }]} />
       <header>
         <h1 className="text-3xl font-bold tracking-tight">Account Settings</h1>
         <p className="text-muted-foreground">
@@ -288,17 +310,17 @@ export default function AccountPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="current-password">Current Password</Label>
+                  <Label htmlFor="current-password">Current Password <span className="text-destructive">*</span></Label>
                   <Input id="current-password" name="current-password" type="password" required />
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-1.5">
-                    <Label htmlFor="new-password">New Password</Label>
+                    <Label htmlFor="new-password">New Password <span className="text-destructive">*</span></Label>
                     <Input id="new-password" name="new-password" type="password" required minLength={6} placeholder="Minimum 6 characters"/>
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="confirm-password">Confirm New Password</Label>
+                    <Label htmlFor="confirm-password">Confirm New Password <span className="text-destructive">*</span></Label>
                     <Input id="confirm-password" name="confirm-password" type="password" required minLength={6} />
                   </div>
                 </div>
