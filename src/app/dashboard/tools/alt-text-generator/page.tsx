@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/label';
 import { Textarea } from "@/components/textarea";
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Loader2, ClipboardCopy, Image as ImageIcon, ArrowLeft, Info, AlertTriangle, Download, ExternalLink } from 'lucide-react';
+import { Loader2, ClipboardCopy, Image as ImageIcon, ArrowLeft, Info, AlertTriangle, Download, ExternalLink, Languages } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -19,6 +19,13 @@ import {
   TableRow,
 } from "@/components/table";
 import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // export const metadata: Metadata = {
 //   title: 'Alt Text Generator | MixerAI 2.0',
@@ -51,10 +58,54 @@ interface AltTextResultItem {
   error?: string;
 }
 
+// Re-usable definitions (could be moved to a shared utils file)
+const supportedLanguages = [
+  { code: 'en', name: 'English' },
+  { code: 'fr', name: 'French (Français)' },
+  { code: 'es', name: 'Spanish (Español)' },
+  { code: 'de', name: 'German (Deutsch)' },
+  { code: 'it', name: 'Italian (Italiano)' },
+  { code: 'nl', name: 'Dutch (Nederlands)' },
+  { code: 'pt', name: 'Portuguese (Português)' },
+  // Add more languages as needed
+];
+
+const getLanguageFromDomain = (url: string): string => {
+  const domainSuffixToLanguage: Record<string, string> = {
+    'co.uk': 'en',
+    'com.au': 'en',
+    'fr': 'fr',
+    'de': 'de',
+    'es': 'es',
+    'it': 'it',
+    'nl': 'nl',
+    'pt': 'pt',
+  };
+  try {
+    // Check if it's a data URL, if so, can't get domain
+    if (url.startsWith('data:')) return 'en'; 
+    const hostname = new URL(url).hostname;
+    const parts = hostname.split('.');
+    if (parts.length >= 2) {
+      const twoPartTld = parts.slice(-2).join('.');
+      if (domainSuffixToLanguage[twoPartTld]) {
+        return domainSuffixToLanguage[twoPartTld];
+      }
+      const singlePartTld = parts.slice(-1)[0];
+      if (domainSuffixToLanguage[singlePartTld]) {
+        return domainSuffixToLanguage[singlePartTld];
+      }
+    }
+    return 'en';
+  } catch (error) {
+    return 'en'; 
+  }
+};
+
 /**
  * AltTextGeneratorPage provides a tool for generating accessible alt text for images.
  * Users can provide a list of image URLs, and the tool will generate alt text
- * for each based on image content.
+ * for each based on image content and selected language.
  * It includes an image preview and options to copy the generated alt text.
  */
 export default function AltTextGeneratorPage() {
@@ -63,12 +114,30 @@ export default function AltTextGeneratorPage() {
   const [results, setResults] = useState<AltTextResultItem[]>([]);
   const [processedCount, setProcessedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
   const router = useRouter();
+
+  useEffect(() => {
+    const firstUrl = imageUrlsInput.split(/\\r?\\n/).map(u => u.trim()).find(u => {
+      try {
+        new URL(u);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    if (firstUrl && !firstUrl.startsWith('data:')) {
+      const detectedLang = getLanguageFromDomain(firstUrl);
+      setSelectedLanguage(detectedLang);
+    } else if (!imageUrlsInput.trim()) {
+        setSelectedLanguage('en');
+    }
+  }, [imageUrlsInput]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const urls = imageUrlsInput.split(/\r?\n/).map(u => u.trim()).filter(u => u);
+    const urls = imageUrlsInput.split(/\\r?\\n/).map(u => u.trim()).filter(u => u);
 
     if (urls.length === 0) {
       toast.error('Please enter at least one image URL.');
@@ -76,6 +145,8 @@ export default function AltTextGeneratorPage() {
     }
 
     const invalidUrls = urls.filter(u => {
+      // Basic check, data URLs are complex to validate fully here but are accepted by the backend
+      if (u.startsWith('data:image/')) return false;
       try {
         new URL(u);
         return false;
@@ -104,7 +175,10 @@ export default function AltTextGeneratorPage() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ imageUrls: [currentUrl] }), // Send one URL at a time
+          body: JSON.stringify({ 
+            imageUrls: [currentUrl], // Send one URL at a time
+            language: selectedLanguage, // Pass selected language
+          }), 
         });
         
         const data = await response.json();
@@ -114,7 +188,6 @@ export default function AltTextGeneratorPage() {
           setResults(prevResults => [...prevResults, { imageUrl: currentUrl, error: errorMsg }]);
           overallErrorCount++;
         } else if (data.success && Array.isArray(data.results) && data.results.length > 0) {
-          // Assuming the backend returns an array with one result item
           const resultItem = data.results[0];
           setResults(prevResults => [...prevResults, resultItem]);
           if (resultItem.altText && !resultItem.error) {
@@ -123,7 +196,6 @@ export default function AltTextGeneratorPage() {
             overallErrorCount++;
           }
         } else {
-          // Handle cases where the response is OK but data is not as expected
           setResults(prevResults => [...prevResults, { imageUrl: currentUrl, error: data.error || 'Unexpected server response for this image.' }]);
           overallErrorCount++;
         }
@@ -132,9 +204,8 @@ export default function AltTextGeneratorPage() {
         overallErrorCount++;
       } finally {
         setProcessedCount(prevCount => prevCount + 1);
-        // Add a small delay between requests
         if (i < urls.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay
+          await new Promise(resolve => setTimeout(resolve, 500)); 
         }
       }
     }
@@ -154,13 +225,22 @@ export default function AltTextGeneratorPage() {
   const handleCopyText = (text: string | undefined, url: string) => {
     if (text) {
       copyToClipboard(text);
-      const imageName = url.substring(url.lastIndexOf('/') + 1) || "image";
-      toast.success(`Alt text for ${imageName} copied!`);
+      let imageName = "image";
+      if (!url.startsWith('data:')) {
+        try {
+          imageName = new URL(url).pathname.split('/').pop() || "image";
+        } catch {
+          // keep default "image"
+        }
+      } else {
+        imageName = "uploaded image";
+      }
+      toast.success(`Alt text for ${imageName.length > 30 ? imageName.substring(0,27) + '...' : imageName} copied!`);
     }
   };
 
   const successfulResults = results.filter(r => !r.error && r.altText);
-  const errorResults = results.filter(r => r.error);
+  // const errorResults = results.filter(r => r.error); // This variable is not used
 
   const downloadCSV = () => {
     if (successfulResults.length === 0) {
@@ -212,9 +292,9 @@ export default function AltTextGeneratorPage() {
       <div className="grid gap-6 md:grid-cols-1">
         <Card>
           <CardHeader>
-            <CardTitle>Enter Image URLs</CardTitle>
+            <CardTitle>Enter Image URLs & Select Language</CardTitle>
             <CardDescription>
-              Enter one image URL per line to generate accessible alt text.
+              Enter one image URL per line. Language for generation will be auto-detected from the first valid URL if possible, or you can select it manually.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -225,13 +305,40 @@ export default function AltTextGeneratorPage() {
                   id="imageUrls"
                   value={imageUrlsInput}
                   onChange={(e) => setImageUrlsInput(e.target.value)}
-                  placeholder="https://example.com/image1.jpg\\nhttps://example.com/image2.png"
+                  placeholder="https://example.com/image1.jpg\\nhttps://example.fr/image2.png\\ndata:image/png;base64,iVBORw0KG..."
                   rows={5}
                   required
-                  disabled={isLoading} // Disable textarea when loading
+                  disabled={isLoading}
                   className="min-h-[100px]"
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="language-select-alt-text">Output Language</Label>
+                <Select 
+                  value={selectedLanguage} 
+                  onValueChange={setSelectedLanguage}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger id="language-select-alt-text" className="w-full md:w-[280px]">
+                    <div className="flex items-center gap-2">
+                      <Languages className="h-4 w-4 text-muted-foreground" />
+                      <SelectValue placeholder="Select language..." />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {supportedLanguages.map(lang => (
+                      <SelectItem key={lang.code} value={lang.code}>
+                        {lang.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Language is auto-detected from the first URL (if not a data URL). You can override it here.
+                </p>
+              </div>
+
               <div className="flex flex-col items-end">
                 {isLoading && totalCount > 0 && (
                   <div className="w-full mb-2">
@@ -250,37 +357,67 @@ export default function AltTextGeneratorPage() {
           </CardContent>
         </Card>
 
-        {(results.length > 0 || (isLoading && totalCount > 0)) && (
+        {(results.length > 0 || isLoading && totalCount > 0) && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Generated Results</CardTitle>
-                <CardDescription>
-                  Review the generated alt text or errors for each image URL.
-                </CardDescription>
-              </div>
-              {results.some(r => !r.error && r.altText) && !isLoading && (
-                <Button variant="outline" onClick={downloadCSV} size="sm">
-                  <Download className="mr-2 h-4 w-4" />
-                  Download CSV
-                </Button>
-              )}
+                <div>
+                    <CardTitle>Generated Alt Text</CardTitle>
+                    <CardDescription>
+                        Review the generated alt text or errors for each image URL.
+                    </CardDescription>
+                </div>
+                {successfulResults.length > 0 && !isLoading && (
+                    <Button variant="outline" onClick={downloadCSV} size="sm">
+                        <Download className="mr-2 h-4 w-4" />
+                        Download CSV
+                    </Button>
+                )}
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[40%]">Image URL</TableHead>
-                      <TableHead className="w-[35%]">Generated Alt Text / Error</TableHead>
-                      <TableHead className="w-[25%] text-center">Preview</TableHead>
+                      <TableHead className="w-[40%]">Image URL / Preview</TableHead>
+                      <TableHead className="w-[60%]">Generated Alt Text / Error</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {results.map((item, index) => (
                       <TableRow key={`${index}-${item.imageUrl}`} className={item.error ? "bg-destructive/10 hover:bg-destructive/20" : ""}>
                         <TableCell className="py-2 align-top font-medium break-all">
-                          {item.imageUrl}
+                            <div className="flex flex-col gap-2">
+                                <span className="text-xs text-muted-foreground truncate" title={item.imageUrl}>{item.imageUrl}</span>
+                                {item.imageUrl && !item.imageUrl.startsWith('data:') && (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img 
+                                        src={item.imageUrl} 
+                                        alt="Preview" 
+                                        className="max-w-full h-auto max-h-32 rounded-md border object-contain hover:object-scale-down transition-all duration-300 ease-in-out cursor-pointer" 
+                                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                                        onClick={() => { const newWindow = window.open(); if(newWindow) newWindow.location.href = item.imageUrl; }}
+                                    />
+                                )}
+                                {item.imageUrl && item.imageUrl.startsWith('data:') && (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img 
+                                        src={item.imageUrl} 
+                                        alt="Uploaded Preview" 
+                                        className="max-w-full h-auto max-h-32 rounded-md border object-contain hover:object-scale-down transition-all duration-300 ease-in-out cursor-pointer" 
+                                        onClick={(e) => {
+                                            // Basic zoom effect or open in modal could be added here if needed
+                                            const target = e.currentTarget as HTMLImageElement;
+                                            if (target.classList.contains('max-h-32')) {
+                                                target.classList.remove('max-h-32');
+                                                target.classList.add('max-h-96');
+                                            } else {
+                                                target.classList.remove('max-h-96');
+                                                target.classList.add('max-h-32');
+                                            }
+                                        }}
+                                    />
+                                )}
+                            </div>
                         </TableCell>
                         <TableCell className="py-2 align-top whitespace-pre-wrap">
                           {item.error ? (
@@ -289,32 +426,15 @@ export default function AltTextGeneratorPage() {
                               <span className="text-sm">{item.error}</span>
                             </div>
                           ) : (
-                            <span className="text-sm">{item.altText}</span>
+                            <div className="flex flex-col gap-2">
+                                <span className="text-sm">{item.altText || "N/A"}</span>
+                                {item.altText && (
+                                    <Button variant="ghost" size="sm" onClick={() => handleCopyText(item.altText, item.imageUrl)} className="w-fit h-auto p-1 text-xs">
+                                        <ClipboardCopy className="h-3 w-3 mr-1" /> Copy Text
+                                    </Button>
+                                )}
+                            </div>
                           )}
-                        </TableCell>
-                        <TableCell className="py-2 align-top text-center">
-                          {!item.error && item.imageUrl && (
-                            <img
-                              src={item.imageUrl}
-                              alt="Preview"
-                              className="h-16 w-16 object-contain mx-auto rounded border"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.style.display = 'none';
-                                const parentCell = target.closest('td');
-                                if (parentCell) {
-                                  let errorSpan = parentCell.querySelector('.preview-error-text') as HTMLSpanElement;
-                                  if (!errorSpan) {
-                                    errorSpan = document.createElement('span');
-                                    errorSpan.className = 'text-xs text-muted-foreground preview-error-text';
-                                    errorSpan.textContent = 'Preview N/A';
-                                    parentCell.appendChild(errorSpan);
-                                  }
-                                }
-                              }}
-                            />
-                          )}
-                          {(item.error) && <span className="text-xs text-muted-foreground">Preview N/A</span>}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -324,15 +444,15 @@ export default function AltTextGeneratorPage() {
               {results.length === 0 && !isLoading && (
                 <div className="text-center text-muted-foreground py-8">
                   <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                  <p className="text-lg font-medium">No results to display yet.</p>
+                  <p className="text-lg font-medium">No alt text generated yet.</p>
                   <p>Enter image URLs above and click "Generate Alt Text" to see results here.</p>
                 </div>
               )}
               {isLoading && totalCount > 0 && results.length === 0 && (
                 <div className="text-center text-muted-foreground py-8">
                   <Loader2 className="mx-auto h-12 w-12 text-primary animate-spin mb-4" />
-                  <p className="text-lg font-medium">Processing your request...</p>
-                  <p>Please wait while we generate alt text for your images.</p>
+                  <p className="text-lg font-medium">Generating alt text...</p>
+                  <p>Please wait while we process your image URLs.</p>
                 </div>
               )}
             </CardContent>

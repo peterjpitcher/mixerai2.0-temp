@@ -10,6 +10,7 @@ const MAX_REQUESTS_PER_MINUTE = 10; // Allow 10 requests per minute per IP
 
 interface AltTextGenerationRequest {
   imageUrls: string[];
+  language?: string; // Add language field from request
 }
 
 interface AltTextResultItem {
@@ -39,6 +40,10 @@ const getDefaultLangCountry = () => ({ language: 'en', country: 'US' });
 
 function getLangCountryFromUrl(imageUrl: string): { language: string; country: string } {
   try {
+    // Do not attempt to parse TLD from data URLs
+    if (imageUrl.startsWith('data:')) {
+      return getDefaultLangCountry();
+    }
     const parsedUrl = new URL(imageUrl);
     const hostname = parsedUrl.hostname;
 
@@ -105,25 +110,40 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
     const results: AltTextResultItem[] = [];
 
     for (const imageUrl of data.imageUrls) {
+      let requestedLanguage = data.language; // Get language from request if provided
       let language = 'en';
       let country = 'US';
       let processingError: string | undefined = undefined;
 
       try {
         // Validate URL structure before attempting to parse for TLD
-        new URL(imageUrl); 
-        const langCountry = getLangCountryFromUrl(imageUrl);
-        language = langCountry.language;
-        country = langCountry.country;
+        // Data URLs are valid but won't have a TLD for language detection
+        if (!imageUrl.startsWith('data:')) {
+            new URL(imageUrl);
+        }
+        
+        if (requestedLanguage) {
+          language = requestedLanguage;
+          // Attempt to map language to a default country, or keep default US
+          const langMap = Object.values(tldToLangCountry).find(lc => lc.language === language);
+          country = langMap ? langMap.country : 'US'; 
+        } else if (!imageUrl.startsWith('data:')) {
+          // Fallback to TLD detection if no language explicitly passed and not a data URL
+          const langCountry = getLangCountryFromUrl(imageUrl);
+          language = langCountry.language;
+          country = langCountry.country;
+        } else {
+          // For data URLs with no language passed, use default
+          const defaultLangCountry = getDefaultLangCountry();
+          language = defaultLangCountry.language;
+          country = defaultLangCountry.country;
+        }
+
       } catch (e: any) {
-        // This catch is specifically for the `new URL(imageUrl)` validation itself.
-        // If it fails, we can't determine lang/country and should note the URL is invalid.
-        console.error(`[AltTextGen] Invalid image URL format: ${imageUrl}:`, e);
+        console.error(`[AltTextGen] Invalid image URL format for TLD processing: ${imageUrl}:`, e);
         processingError = `Invalid image URL format.`;
-        // Use default language/country if URL is malformed but we still attempt generation for some reason
-        // Though, the AI call will likely fail too.
         const defaultLangCountry = getDefaultLangCountry();
-        language = defaultLangCountry.language;
+        language = requestedLanguage || defaultLangCountry.language; // Still prioritize requested lang if URL is bad
         country = defaultLangCountry.country;
       }
 
