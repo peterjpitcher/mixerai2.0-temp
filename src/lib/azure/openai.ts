@@ -475,8 +475,7 @@ export async function generateMetadata(
     const deploymentName = getModelName();
     
     // Prepare the prompt
-    let systemPrompt = `You are an expert SEO specialist who creates compelling, optimized metadata for webpages.
-    You're analyzing content in ${brandLanguage} for users in ${brandCountry}.
+    let systemPrompt = `You are an expert SEO specialist. Your task is to create compelling, optimized metadata (meta title and meta description) for webpages. ALL METADATA YOU GENERATE MUST BE IN THE ${brandLanguage} LANGUAGE. You're analyzing content for users in ${brandCountry}.
     
     You MUST follow these STRICT requirements:
     1. Meta title MUST be EXACTLY between 45-60 characters (NOT LESS THAN 45, NOT MORE THAN 60)
@@ -618,144 +617,138 @@ export async function generateMetadata(
 }
 
 /**
- * Generates accessible alt text for an image
+ * Generate alt text for an image URL.
+ * Uses Azure OpenAI to analyze the image and produce a concise, descriptive alt text.
+ * The response is expected to be a JSON object containing the alt text.
  */
 export async function generateAltText(
   imageUrl: string,
   brandLanguage: string = 'en',
-  brandCountry: string = 'US',
+  brandCountry: string = 'US', // Added for consistency, though less critical for alt text
   brandContext?: {
     brandIdentity?: string;
     toneOfVoice?: string;
-    guardrails?: string;
+    guardrails?: string; // e.g. "Avoid mentioning competitors", "Focus on sustainability"
   }
-): Promise<{
+): Promise<{ // Return type updated to match expected JSON structure
   altText: string;
 }> {
-  console.log(`Generating alt text for ${imageUrl}`);
-  
-  const client = getAzureOpenAIClient();
-  const deploymentName = getModelName();
-  
-  // Prepare the prompt with best practices
-  let systemPrompt = `You are an accessibility expert who creates clear and descriptive alt text for images.
-  You're writing alt text in ${brandLanguage} for users in ${brandCountry}.
-  
-  Follow these STRICT requirements for creating alt text:
-  
-  ✅ MUST DO:
-  - Be descriptive and specific about essential image details
-  - Keep it EXACTLY between 20-125 characters (including spaces)
-  - Describe function if the image is a functional element
-  - Include important text visible in the image
-  - Consider the image's context on the page
-  - Use keywords thoughtfully if they naturally fit
-  
-  ❌ NEVER DO:
-  - NEVER start with "Image of..." or "Picture of..."
-  - Never use overly vague descriptions
-  - Never use keyword stuffing
-  - Never have fewer than 20 characters
-  - Never exceed 125 characters
-  
-  Create alt text that clearly communicates what a user would miss if they couldn't see the image.`;
-  
-  // Add brand context if available
-  if (brandContext?.brandIdentity) {
-    systemPrompt += `\n\nBrand identity: ${brandContext.brandIdentity}`;
+  const deploymentName = getModelName(); // Get the deployment/model name
+
+  console.log(`[generateAltText] Generating alt text for: ${imageUrl} in ${brandLanguage} using deployment: ${deploymentName}`);
+  if (brandContext) {
+    console.log(`[generateAltText] Using brand context:`, { 
+      identity: !!brandContext.brandIdentity, 
+      tone: !!brandContext.toneOfVoice,
+      guardrails: !!brandContext.guardrails
+    });
   }
-  
+
+  let systemPrompt = `You are an AI assistant specialized in generating concise and accurate alternative text for images.
+Analyze the provided image and generate a descriptive alt text in ${brandLanguage}.
+Focus on the main subject, context, and any relevant text visible in the image.
+Be factual and avoid subjective interpretations.
+If the image is decorative and doesn't convey information, you can indicate that, but prefer descriptive text if possible.`;
+
   if (brandContext?.toneOfVoice) {
-    systemPrompt += `\n\nTone of voice: ${brandContext.toneOfVoice}`;
+    systemPrompt += `\nAdhere to the following tone of voice: ${brandContext.toneOfVoice}.`;
   }
-  
+  if (brandContext?.brandIdentity) { // Less common for alt text, but possible
+    systemPrompt += `\nReflect the brand identity: ${brandContext.brandIdentity}.`;
+  }
   if (brandContext?.guardrails) {
-    systemPrompt += `\n\nContent guardrails: ${brandContext.guardrails}`;
+    systemPrompt += `\nFollow these content guardrails: ${brandContext.guardrails}.`;
   }
   
-  const userPromptText = `Generate accessible alt text for this image:
+  systemPrompt += `\nYour response MUST be a JSON object with a single key "altText" containing the generated alt text string. For example: {"altText": "A descriptive alt text goes here."}. Do NOT include any other text, explanations, or the original URL in your response.`;
+
+  const userTextMessage = "Generate alt text for the provided image based on the system instructions.";
   
-  Examples of good alt text:
-  - "Woman holding a protest sign reading 'Equality for All' during a march in central London" (91 chars)
-  - "Mountain range at sunset with orange-pink sky reflected in a still lake" (73 chars)
-  - "Chef demonstrating how to knead bread dough on a flour-dusted countertop" (72 chars)
+  console.log(`[generateAltText] System Prompt (first 200 chars): ${systemPrompt.substring(0,200)}...`);
+  // console.log(`[generateAltText] Full System Prompt: ${systemPrompt}`); // Uncomment for full prompt debugging
+  console.log(`[generateAltText] User Text Message for AI: ${userTextMessage}`);
+  console.log(`[generateAltText] Image URL for AI: ${imageUrl}`);
+
+  const completionRequest = {
+    model: deploymentName, // This is often ignored when deployment is in URL, but good practice
+    messages: [
+      { role: 'system', content: systemPrompt },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: userTextMessage },
+          {
+            type: 'image_url',
+            image_url: {
+              url: imageUrl,
+            },
+          },
+        ],
+      },
+    ],
+    response_format: { type: "json_object" }, // Request JSON output
+    max_tokens: 150,
+    temperature: 0.5,
+  };
+
+  const azureOpenAIEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
+  const apiKey = process.env.AZURE_OPENAI_API_KEY;
+
+  if (!azureOpenAIEndpoint || !apiKey) {
+    console.error("[generateAltText] Azure OpenAI endpoint or API key is missing.");
+    throw new Error("Azure OpenAI endpoint or API key is missing for direct fetch.");
+  }
   
-  Examples to avoid:
-  - "Image of a nice scenery" (too vague and starts with 'image of')
-  - "Picture showing a person at an event" (starts with 'picture' and is vague)
-  - "Beautiful product photo of our newest spring collection item perfect for your wardrobe essential must-have fashion trend 2023" (keyword stuffed)
-  
-  CRITICAL REQUIREMENTS:
-  - Keep it EXACTLY between 20-125 characters. Count carefully.
-  - NEVER start with "Image of..." or "Picture of..."
-  - Focus on the most important visual details
-  - If there's text in the image, include it
-  - Before submitting, count the exact number of characters to verify length
-  
-  Format your response as JSON with an altText key, and include the character count in your reasoning.`;
-  
+  // Construct the endpoint URL with the deployment name
+  const endpointUrl = `${azureOpenAIEndpoint}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
+  console.log(`[generateAltText] Using direct fetch endpoint URL: ${endpointUrl}`);
+
   try {
-    console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
-    
-    // Prepare the request body with properly formatted image content
-    const completionRequest = {
-      model: deploymentName,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { 
-          role: "user", 
-          content: [
-            { type: "text", text: userPromptText },
-            { 
-              type: "image_url", 
-              image_url: { 
-                url: imageUrl 
-              } 
-            }
-          ]
-        }
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 300,
-      temperature: 0.7
-    };
-    
-    // Specify the deployment in the URL path
-    const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
-    console.log(`Using direct endpoint URL: ${endpoint}`);
-    
-    // Make a direct fetch call
-    const response = await fetch(endpoint, {
+    const response = await fetch(endpointUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'api-key': process.env.AZURE_OPENAI_API_KEY || ''
+        'api-key': apiKey,
       },
-      body: JSON.stringify(completionRequest)
+      body: JSON.stringify(completionRequest),
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`[generateAltText] API request failed with status ${response.status}: ${errorText}`, { imageUrl });
       throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
-    
+
     const responseData = await response.json();
-    console.log("API call successful");
-    
-    const content = responseData.choices?.[0]?.message?.content || "{}";
-    console.log(`Received response with content length: ${content.length}`);
-    
-    const parsedResponse = JSON.parse(content);
-    
-    // Remove any character count that might have been included in the response
-    const altText = (parsedResponse.altText || "").replace(/\s*\(\d+\s*chars?\)$/i, "");
-    
-    return {
-      altText
-    };
+    const content = responseData.choices?.[0]?.message?.content;
+
+    if (!content) {
+      console.error('[generateAltText] Azure OpenAI API call succeeded but returned no content.', { imageUrl, brandLanguage });
+      throw new Error('AI returned no content for alt text.');
+    }
+
+    console.log(`[generateAltText] Received raw content from AI: ${content}`);
+
+    try {
+      const parsedJson = JSON.parse(content.trim());
+      if (typeof parsedJson.altText === 'string') {
+        console.log(`[generateAltText] Successfully parsed alt text: ${parsedJson.altText}`);
+        return { altText: parsedJson.altText.trim() };
+      } else {
+        console.error('[generateAltText] Parsed JSON does not contain a valid "altText" string field.', { parsedJson });
+        throw new Error('AI response was valid JSON but missing "altText" field or it was not a string.');
+      }
+    } catch (parseError) {
+      console.error('[generateAltText] Failed to parse AI response as JSON.', { content, parseError });
+      throw new Error('AI response was not valid JSON as expected for alt text.');
+    }
+
   } catch (error) {
-    console.error("Error generating alt text with Azure OpenAI:", error);
-    throw new Error(`Failed to generate alt text: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error(`[generateAltText] Error generating alt text for ${imageUrl}:`, error);
+    if (error instanceof Error) {
+        throw error;
+    }
+    throw new Error(`Failed to generate alt text: ${String(error)}`);
   }
 }
 

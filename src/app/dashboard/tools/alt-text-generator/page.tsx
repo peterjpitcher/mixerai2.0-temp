@@ -118,7 +118,7 @@ export default function AltTextGeneratorPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const firstUrl = imageUrlsInput.split(/\\r?\\n/).map(u => u.trim()).find(u => {
+    const firstUrl = imageUrlsInput.split(/\s+/).map(u => u.trim()).find(u => {
       try {
         new URL(u);
         return true;
@@ -137,7 +137,8 @@ export default function AltTextGeneratorPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const urls = imageUrlsInput.split(/\\r?\\n/).map(u => u.trim()).filter(u => u);
+    // Split by any whitespace (newlines, spaces, tabs etc.) to handle various input formats
+    const urls = imageUrlsInput.split(/\s+/).map(u => u.trim()).filter(u => u);
 
     if (urls.length === 0) {
       toast.error('Please enter at least one image URL.');
@@ -248,14 +249,22 @@ export default function AltTextGeneratorPage() {
       return;
     }
     const headers = ["Image URL", "Alt Text"];
+    // Ensure that any quotes within the data are properly escaped for CSV
+    const escapeCSV = (text: string | undefined) => {
+      if (text === undefined || text === null) return '""'; // Return empty quoted string for undefined/null
+      // Replace " with "" and wrap in "
+      return `"${String(text).replace(/"/g, '""')}"`;
+    };
+
     const rows = successfulResults.map(res => [
-      `"${res.imageUrl?.replace(/"/g, '""') || ''}"`, 
-      `"${res.altText?.replace(/"/g, '""') || ''}"`
+      escapeCSV(res.imageUrl),
+      escapeCSV(res.altText)
     ]);
 
+    // Use \r\n for newlines for better compatibility
     let csvContent = "data:text/csv;charset=utf-8,"
-      + headers.join(",") + "\\n"
-      + rows.map(e => e.join(",")).join("\\n");
+      + headers.join(",") + "\r\n"
+      + rows.map(e => e.join(",")).join("\r\n");
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -378,46 +387,16 @@ export default function AltTextGeneratorPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[40%]">Image URL / Preview</TableHead>
-                      <TableHead className="w-[60%]">Generated Alt Text / Error</TableHead>
+                      <TableHead className="w-[30%]">Image URL</TableHead>
+                      <TableHead className="w-[40%]">Generated Alt Text / Error</TableHead>
+                      <TableHead className="w-[30%] text-center">Preview</TableHead> 
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {results.map((item, index) => (
                       <TableRow key={`${index}-${item.imageUrl}`} className={item.error ? "bg-destructive/10 hover:bg-destructive/20" : ""}>
                         <TableCell className="py-2 align-top font-medium break-all">
-                            <div className="flex flex-col gap-2">
-                                <span className="text-xs text-muted-foreground truncate" title={item.imageUrl}>{item.imageUrl}</span>
-                                {item.imageUrl && !item.imageUrl.startsWith('data:') && (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img 
-                                        src={item.imageUrl} 
-                                        alt="Preview" 
-                                        className="max-w-full h-auto max-h-32 rounded-md border object-contain hover:object-scale-down transition-all duration-300 ease-in-out cursor-pointer" 
-                                        onError={(e) => (e.currentTarget.style.display = 'none')}
-                                        onClick={() => { const newWindow = window.open(); if(newWindow) newWindow.location.href = item.imageUrl; }}
-                                    />
-                                )}
-                                {item.imageUrl && item.imageUrl.startsWith('data:') && (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img 
-                                        src={item.imageUrl} 
-                                        alt="Uploaded Preview" 
-                                        className="max-w-full h-auto max-h-32 rounded-md border object-contain hover:object-scale-down transition-all duration-300 ease-in-out cursor-pointer" 
-                                        onClick={(e) => {
-                                            // Basic zoom effect or open in modal could be added here if needed
-                                            const target = e.currentTarget as HTMLImageElement;
-                                            if (target.classList.contains('max-h-32')) {
-                                                target.classList.remove('max-h-32');
-                                                target.classList.add('max-h-96');
-                                            } else {
-                                                target.classList.remove('max-h-96');
-                                                target.classList.add('max-h-32');
-                                            }
-                                        }}
-                                    />
-                                )}
-                            </div>
+                            <span className="text-xs text-muted-foreground truncate" title={item.imageUrl}>{item.imageUrl}</span>
                         </TableCell>
                         <TableCell className="py-2 align-top whitespace-pre-wrap">
                           {item.error ? (
@@ -435,6 +414,50 @@ export default function AltTextGeneratorPage() {
                                 )}
                             </div>
                           )}
+                        </TableCell>
+                        <TableCell className="py-2 align-top text-center">
+                            {item.imageUrl && !item.error && (
+                                <div className="flex justify-center items-center h-full">
+                                    {item.imageUrl.startsWith('data:') ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img 
+                                            src={item.imageUrl} 
+                                            alt="Uploaded Preview" 
+                                            className="max-w-full h-auto max-h-24 rounded-md border object-contain hover:object-scale-down transition-all duration-300 ease-in-out cursor-pointer"
+                                            onClick={(e) => {
+                                                const target = e.currentTarget as HTMLImageElement;
+                                                if (target.classList.contains('max-h-24')) {
+                                                    target.classList.remove('max-h-24');
+                                                    target.classList.add('max-h-48', 'md:max-h-64'); // Slightly larger zoom
+                                                } else {
+                                                    target.classList.remove('max-h-48', 'md:max-h-64');
+                                                    target.classList.add('max-h-24');
+                                                }
+                                            }}
+                                        />
+                                    ) : (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img 
+                                            src={item.imageUrl} 
+                                            alt="Preview" 
+                                            className="max-w-full h-auto max-h-24 rounded-md border object-contain hover:object-scale-down transition-all duration-300 ease-in-out cursor-pointer" 
+                                            onError={(e) => {
+                                                const target = e.currentTarget as HTMLImageElement;
+                                                target.style.display = 'none';
+                                                const parentCell = target.closest('td');
+                                                if (parentCell && !parentCell.querySelector('.preview-error-text')) {
+                                                    const errorSpan = document.createElement('span');
+                                                    errorSpan.className = 'text-xs text-muted-foreground preview-error-text';
+                                                    errorSpan.textContent = 'Preview N/A';
+                                                    parentCell.appendChild(errorSpan);
+                                                }
+                                            }}
+                                            onClick={() => { const newWindow = window.open(); if(newWindow) newWindow.location.href = item.imageUrl; }}
+                                        />
+                                    )}
+                                </div>
+                            )}
+                            {item.error && <span className="text-xs text-muted-foreground">Preview N/A</span>}
                         </TableCell>
                       </TableRow>
                     ))}

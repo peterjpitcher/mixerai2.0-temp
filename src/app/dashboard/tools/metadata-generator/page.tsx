@@ -122,7 +122,8 @@ export default function MetadataGeneratorPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const firstUrl = urlsInput.split(/\\r?\\n/).map(u => u.trim()).find(u => {
+    // Split by any whitespace to correctly find the first URL for language detection
+    const firstUrl = urlsInput.split(/\s+/).map(u => u.trim()).find(u => {
       try {
         new URL(u);
         return true;
@@ -141,7 +142,8 @@ export default function MetadataGeneratorPage() {
   const handleSubmitUrls = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const urls = urlsInput.split(/\\r?\\n/).map(u => u.trim()).filter(u => u);
+    // Split by any whitespace (newlines, spaces, tabs etc.) to handle various input formats
+    const urls = urlsInput.split(/\s+/).map(u => u.trim()).filter(u => u);
 
     if (urls.length === 0) {
       toast.error('Please enter at least one URL.');
@@ -235,20 +237,29 @@ export default function MetadataGeneratorPage() {
   const errorResults = results.filter(r => r.error);
 
   const downloadCSV = () => {
-    if (results.some(r => !r.error && (r.metaTitle || r.metaDescription)) === false) {
+    // Filter for successful results before download
+    const successfulResults = results.filter(r => !r.error && (r.metaTitle || r.metaDescription));
+
+    if (successfulResults.length === 0) {
       toast.error("No successful results to download.");
       return;
     }
     const headers = ["URL", "Meta Title", "Meta Description"];
-    const rows = results.map(res => [
-      `"${res.url?.replace(/"/g, '""') || ''}"`, 
-      `"${res.metaTitle?.replace(/"/g, '""') || ''}"`, 
-      `"${res.metaDescription?.replace(/"/g, '""') || ''}"`, 
+    
+    const escapeCSV = (text: string | undefined) => {
+      if (text === undefined || text === null) return '""';
+      return `"${String(text).replace(/"/g, '""')}"`;
+    };
+
+    const rows = successfulResults.map(res => [
+      escapeCSV(res.url),
+      escapeCSV(res.metaTitle),
+      escapeCSV(res.metaDescription),
     ]);
 
     let csvContent = "data:text/csv;charset=utf-8,"
-      + headers.join(",") + "\\n"
-      + rows.map(e => e.join(",")).join("\\n");
+      + headers.join(",") + "\r\n" // Use \r\n for newlines
+      + rows.map(e => e.join(",")).join("\r\n"); // Use \r\n for newlines
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
