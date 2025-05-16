@@ -11,6 +11,7 @@ const MAX_REQUESTS_PER_MINUTE = 10; // Allow 10 requests per minute per IP
 
 interface MetadataGenerationRequest {
   urls: string[];
+  language?: string;
 }
 
 // Define the result item type matching the frontend
@@ -61,12 +62,12 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
     }
 
     const results: MetadataResultItem[] = [];
+    const requestedLanguage = data.language || 'en';
 
     for (const url of data.urls) {
       try {
         new URL(url);
 
-        const brandLanguage = 'en';
         const brandCountry = 'US';
         const brandContext = {
           brandIdentity: '',
@@ -87,7 +88,7 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
 
         const generatedMetadata: any = await generateMetadata(
           url,
-          brandLanguage,
+          requestedLanguage,
           brandCountry,
           {
             ...brandContext,

@@ -7,7 +7,7 @@ import { Input } from '@/components/input';
 import { Label } from '@/components/label';
 import { Textarea } from "@/components/textarea";
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Loader2, ClipboardCopy, Globe, ArrowLeft, Info, Download, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Loader2, ClipboardCopy, Globe, ArrowLeft, Info, Download, AlertTriangle, ExternalLink, Languages } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -20,6 +20,13 @@ import {
   TableRow,
 } from "@/components/table";
 import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // export const metadata: Metadata = {
 //   title: 'Metadata Generator | MixerAI 2.0',
@@ -54,9 +61,54 @@ interface MetadataResultItem {
   error?: string;
 }
 
+const supportedLanguages = [
+  { code: 'en', name: 'English' },
+  { code: 'fr', name: 'French (Français)' },
+  { code: 'es', name: 'Spanish (Español)' },
+  { code: 'de', name: 'German (Deutsch)' },
+  { code: 'it', name: 'Italian (Italiano)' },
+  { code: 'nl', name: 'Dutch (Nederlands)' },
+  { code: 'pt', name: 'Portuguese (Português)' },
+  // Add more languages as needed
+];
+
+// Function to extract domain suffix and map to language code
+const getLanguageFromDomain = (url: string): string => {
+  const domainSuffixToLanguage: Record<string, string> = {
+    'co.uk': 'en',
+    'com.au': 'en',
+    'fr': 'fr',
+    'de': 'de',
+    'es': 'es',
+    'it': 'it',
+    'nl': 'nl',
+    'pt': 'pt',
+    // Add more mappings as needed
+  };
+
+  try {
+    const hostname = new URL(url).hostname;
+    const parts = hostname.split('.');
+    if (parts.length >= 2) {
+      const twoPartTld = parts.slice(-2).join('.');
+      if (domainSuffixToLanguage[twoPartTld]) {
+        return domainSuffixToLanguage[twoPartTld];
+      }
+      const singlePartTld = parts.slice(-1)[0];
+      if (domainSuffixToLanguage[singlePartTld]) {
+        return domainSuffixToLanguage[singlePartTld];
+      }
+    }
+    return 'en'; // Default to 'en'
+  } catch (error) {
+    console.error('Error extracting domain suffix:', error);
+    return 'en'; // Default to 'en' on error
+  }
+};
+
 /**
  * MetadataGeneratorPage provides a tool for users to generate SEO metadata
- * (meta title, meta description, keywords) for a given URL, tailored to a selected brand.
+ * (meta title, meta description, keywords) for a given URL, tailored to a selected brand and language.
  * It fetches available brands, allows URL input, and calls an API to get metadata suggestions.
  * Results can be copied to the clipboard.
  */
@@ -66,12 +118,30 @@ export default function MetadataGeneratorPage() {
   const [results, setResults] = useState<MetadataResultItem[]>([]);
   const [processedCount, setProcessedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
   const router = useRouter();
+
+  useEffect(() => {
+    const firstUrl = urlsInput.split(/\\r?\\n/).map(u => u.trim()).find(u => {
+      try {
+        new URL(u);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    if (firstUrl) {
+      const detectedLang = getLanguageFromDomain(firstUrl);
+      setSelectedLanguage(detectedLang);
+    } else if (!urlsInput.trim()) { // Reset to 'en' if input is cleared
+        setSelectedLanguage('en');
+    }
+  }, [urlsInput]);
 
   const handleSubmitUrls = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const urls = urlsInput.split(/\r?\n/).map(u => u.trim()).filter(u => u);
+    const urls = urlsInput.split(/\\r?\\n/).map(u => u.trim()).filter(u => u);
 
     if (urls.length === 0) {
       toast.error('Please enter at least one URL.');
@@ -109,6 +179,7 @@ export default function MetadataGeneratorPage() {
           },
           body: JSON.stringify({
             urls: [currentUrl], // Send one URL at a time
+            language: selectedLanguage, // Pass selected language
           }),
         });
         
@@ -119,7 +190,7 @@ export default function MetadataGeneratorPage() {
           setResults(prevResults => [...prevResults, { url: currentUrl, error: errorMsg }]);
           overallErrorCount++;
         } else if (data.success && Array.isArray(data.results) && data.results.length > 0) {
-          const resultItem = data.results[0]; // Assuming API returns array with one item for single URL request
+          const resultItem = data.results[0]; 
           setResults(prevResults => [...prevResults, resultItem]);
           if (!resultItem.error && (resultItem.metaTitle || resultItem.metaDescription)) {
             overallSuccessCount++;
@@ -168,12 +239,11 @@ export default function MetadataGeneratorPage() {
       toast.error("No successful results to download.");
       return;
     }
-    const headers = ["URL", "Meta Title", "Meta Description", "Keywords"];
+    const headers = ["URL", "Meta Title", "Meta Description"];
     const rows = results.map(res => [
       `"${res.url?.replace(/"/g, '""') || ''}"`, 
       `"${res.metaTitle?.replace(/"/g, '""') || ''}"`, 
       `"${res.metaDescription?.replace(/"/g, '""') || ''}"`, 
-      `"${(res.keywords || []).join(', ').replace(/"/g, '""')}"`
     ]);
 
     let csvContent = "data:text/csv;charset=utf-8,"
@@ -215,9 +285,9 @@ export default function MetadataGeneratorPage() {
       <div className="grid gap-6 md:grid-cols-1">
         <Card>
           <CardHeader>
-            <CardTitle>Enter URLs</CardTitle>
+            <CardTitle>Enter URLs & Select Language</CardTitle>
             <CardDescription>
-              Enter one URL per line to generate SEO-optimised metadata.
+              Enter one URL per line. Language for generation will be detected from the first valid URL, or you can select it manually.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -226,7 +296,7 @@ export default function MetadataGeneratorPage() {
                 <Label htmlFor="urls">URLs <span className="text-destructive">*</span></Label>
                 <Textarea
                   id="urls"
-                  placeholder="https://example.com/page1\\nhttps://another.com/article"
+                  placeholder="https://example.com/page1\\nhttps://example.fr/article-francais"
                   value={urlsInput}
                   onChange={(e) => setUrlsInput(e.target.value)}
                   rows={5}
@@ -235,6 +305,33 @@ export default function MetadataGeneratorPage() {
                   className="min-h-[100px]"
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="language-select">Output Language</Label>
+                <Select 
+                  value={selectedLanguage} 
+                  onValueChange={setSelectedLanguage}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger id="language-select" className="w-full md:w-[280px]">
+                    <div className="flex items-center gap-2">
+                      <Languages className="h-4 w-4 text-muted-foreground" />
+                      <SelectValue placeholder="Select language..." />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {supportedLanguages.map(lang => (
+                      <SelectItem key={lang.code} value={lang.code}>
+                        {lang.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                 <p className="text-xs text-muted-foreground">
+                  Language is auto-detected from the first URL. You can override it here.
+                </p>
+              </div>
+
               <div className="flex flex-col items-end">
                 {isLoading && totalCount > 0 && (
                     <div className="w-full mb-2">
@@ -274,10 +371,9 @@ export default function MetadataGeneratorPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[30%]">URL</TableHead>
+                      <TableHead className="w-[35%]">URL</TableHead>
                       <TableHead className="w-[30%]">Meta Title / Error</TableHead>
-                      <TableHead className="w-[30%]">Meta Description</TableHead>
-                      <TableHead className="w-[10%]">Keywords</TableHead>
+                      <TableHead className="w-[35%]">Meta Description</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -301,21 +397,6 @@ export default function MetadataGeneratorPage() {
                             <span className="text-sm text-muted-foreground">N/A</span>
                           ) : (
                             <span className="text-sm">{item.metaDescription || "N/A"}</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="py-2 align-top whitespace-pre-wrap">
-                          {item.error ? (
-                            <span className="text-sm text-muted-foreground">N/A</span>
-                          ) : (
-                            item.keywords && item.keywords.length > 0 ? (
-                              <ul className="list-disc list-inside pl-2">
-                                {item.keywords.map((keyword, kIndex) => (
-                                  <li key={kIndex} className="text-sm">{keyword}</li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">N/A</span>
-                            )
                           )}
                         </TableCell>
                       </TableRow>
