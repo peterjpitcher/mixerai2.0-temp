@@ -4,6 +4,11 @@ import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { fetchWebPageContent } from '@/lib/utils/web-scraper';
 import { handleApiError } from '@/lib/api-utils';
 
+// In-memory rate limiting
+const rateLimit = new Map<string, { count: number, timestamp: number }>();
+const RATE_LIMIT_PERIOD = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_MINUTE = 10; // Allow 10 requests per minute per IP
+
 interface MetadataGenerationRequest {
   urls: string[];
 }
@@ -22,6 +27,29 @@ interface MetadataResultItem {
 
 // Keep the original authenticated route - RENAMING to POST
 export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
+  // Rate limiting logic
+  const ip = request.headers.get('x-forwarded-for') || request.ip || 'unknown';
+  const now = Date.now();
+
+  if (rateLimit.has(ip)) {
+    const userRateLimit = rateLimit.get(ip)!;
+    if (now - userRateLimit.timestamp > RATE_LIMIT_PERIOD) {
+      // Reset count if period has passed
+      userRateLimit.count = 1;
+      userRateLimit.timestamp = now;
+    } else if (userRateLimit.count >= MAX_REQUESTS_PER_MINUTE) {
+      console.warn(`[RateLimit] Blocked ${ip} for metadata-generator. Count: ${userRateLimit.count}`);
+      return NextResponse.json(
+        { success: false, error: 'Rate limit exceeded. Please try again in a minute.' },
+        { status: 429 }
+      );
+    } else {
+      userRateLimit.count += 1;
+    }
+  } else {
+    rateLimit.set(ip, { count: 1, timestamp: now });
+  }
+
   try {
     const data: MetadataGenerationRequest = await request.json();
     
@@ -53,6 +81,10 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
           console.warn(`[MetadataGen] Failed to fetch content for URL ${url}: ${(fetchError as Error).message}`);
         }
         
+        console.log(`[Delay] Metadata Gen: Waiting 5 seconds before AI call for ${url}...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        console.log(`[Delay] Metadata Gen: Finished 5-second wait. Calling AI for ${url}...`);
+
         const generatedMetadata: any = await generateMetadata(
           url,
           brandLanguage,

@@ -161,16 +161,15 @@ export default function MetadataGeneratorPage() {
     }
   };
 
-  const successfulResults = results.filter(r => !r.error && (r.metaTitle || r.metaDescription));
   const errorResults = results.filter(r => r.error);
 
   const downloadCSV = () => {
-    if (successfulResults.length === 0) {
+    if (results.some(r => !r.error && (r.metaTitle || r.metaDescription)) === false) {
       toast.error("No successful results to download.");
       return;
     }
     const headers = ["URL", "Meta Title", "Meta Description", "Keywords"];
-    const rows = successfulResults.map(res => [
+    const rows = results.map(res => [
       `"${res.url?.replace(/"/g, '""') || ''}"`, 
       `"${res.metaTitle?.replace(/"/g, '""') || ''}"`, 
       `"${res.metaDescription?.replace(/"/g, '""') || ''}"`, 
@@ -258,107 +257,80 @@ export default function MetadataGeneratorPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                    <CardTitle>Generated Metadata</CardTitle>
+                    <CardTitle>Generated Results</CardTitle>
                     <CardDescription>
-                        Review the generated metadata below. Successful results can be downloaded.
+                        Review the generated metadata or errors for each URL.
                     </CardDescription>
                 </div>
-                {successfulResults.length > 0 && !isLoading && (
-                    <Button onClick={downloadCSV} variant="outline" size="sm">
+                {results.some(r => !r.error && (r.metaTitle || r.metaDescription)) && !isLoading && (
+                    <Button variant="outline" onClick={downloadCSV} size="sm">
                         <Download className="mr-2 h-4 w-4" />
                         Download CSV
                     </Button>
                 )}
             </CardHeader>
             <CardContent>
-              {successfulResults.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold mb-2">Successful Results</h3>
-                  <div className="overflow-x-auto rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[25%] min-w-[200px] whitespace-nowrap">URL</TableHead>
-                          <TableHead className="w-[25%] min-w-[200px]">Meta Title</TableHead>
-                          <TableHead className="w-[40%] min-w-[300px]">Meta Description</TableHead>
-                          {/* Keywords are not displayed in table, but included in CSV */}
-                          <TableHead className="w-[10%] min-w-[120px] text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {successfulResults.map((item, index) => (
-                          <TableRow key={`success-${index}-${item.url}`}>
-                            <TableCell className="py-2 align-top">
-                               <div className="flex items-center">
-                                <a 
-                                    href={item.url} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
-                                    className="hover:underline truncate"
-                                    title={item.url}
-                                    style={{ maxWidth: '250px', display: 'inline-block' }}
-                                >
-                                    {item.url}
-                                </a>
-                                <ExternalLink className="ml-1 h-3 w-3 text-muted-foreground flex-shrink-0" />
-                               </div>
-                            </TableCell>
-                            <TableCell className="py-2 align-top whitespace-pre-wrap">
-                              {item.metaTitle}
-                              {item.metaTitle && 
-                                <Button variant="ghost" size="sm" onClick={() => handleCopyToClipboard(item.metaTitle!, 'Meta Title', item.url)} title="Copy Meta Title" className="ml-1 p-1 h-auto">
-                                  <ClipboardCopy className="h-3.5 w-3.5" />
-                                </Button>
-                              }
-                            </TableCell>
-                            <TableCell className="py-2 align-top whitespace-pre-wrap">
-                              {item.metaDescription}
-                              {item.metaDescription &&
-                                <Button variant="ghost" size="sm" onClick={() => handleCopyToClipboard(item.metaDescription!, 'Meta Description', item.url)} title="Copy Meta Description" className="ml-1 p-1 h-auto">
-                                  <ClipboardCopy className="h-3.5 w-3.5" />
-                                </Button>
-                              }
-                            </TableCell>
-                            <TableCell className="py-2 align-top text-right">
-                                {item.keywords && item.keywords.length > 0 && (
-                                    <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(item.keywords!.join(', '), 'Keywords', item.url)} title="Copy Keywords">
-                                        <ClipboardCopy className="h-3.5 w-3.5 mr-1" /> Keywords
-                                    </Button>
-                                )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              )}
-
-              {errorResults.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-2 text-destructive flex items-center">
-                    <AlertTriangle className="mr-2 h-5 w-5" /> 
-                    Processing Errors
-                  </h3>
-                  <ul className="space-y-2 rounded-md border border-destructive/50 bg-destructive/5 p-4">
-                    {errorResults.map((item, index) => (
-                      <li key={`error-${index}-${item.url}`} className="text-sm">
-                        <p className="font-semibold truncate" title={item.url}>URL: {item.url}</p>
-                        <p className="text-destructive-foreground/80">Error: {item.error}</p>
-                      </li>
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[30%]">URL</TableHead>
+                      <TableHead className="w-[30%]">Meta Title / Error</TableHead>
+                      <TableHead className="w-[30%]">Meta Description</TableHead>
+                      <TableHead className="w-[10%]">Keywords</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {results.map((item, index) => (
+                      <TableRow key={`${index}-${item.url}`} className={item.error ? "bg-destructive/10 hover:bg-destructive/20" : ""}>
+                        <TableCell className="py-2 align-top font-medium break-all">
+                          {item.url}
+                        </TableCell>
+                        <TableCell className="py-2 align-top whitespace-pre-wrap">
+                          {item.error ? (
+                            <div className="text-destructive flex items-start">
+                              <AlertTriangle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+                              <span className="text-sm">{item.error}</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm">{item.metaTitle || "N/A"}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-2 align-top whitespace-pre-wrap">
+                          {item.error ? (
+                            <span className="text-sm text-muted-foreground">N/A</span>
+                          ) : (
+                            <span className="text-sm">{item.metaDescription || "N/A"}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-2 align-top whitespace-pre-wrap">
+                          {item.error ? (
+                            <span className="text-sm text-muted-foreground">N/A</span>
+                          ) : (
+                            item.keywords && item.keywords.length > 0 ? (
+                              <ul className="list-disc list-inside pl-2">
+                                {item.keywords.map((keyword, kIndex) => (
+                                  <li key={kIndex} className="text-sm">{keyword}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">N/A</span>
+                            )
+                          )}
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </ul>
-                </div>
-              )}
-
+                  </TableBody>
+                </Table>
+              </div>
               {results.length === 0 && !isLoading && (
-                 <div className="text-center text-muted-foreground py-8">
-                    <Info className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <p className="text-lg font-medium">No results to display yet.</p>
-                    <p>Enter URLs above and click "Generate Metadata" to see results here.</p>
+                <div className="text-center text-muted-foreground py-8">
+                  <Globe className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <p className="text-lg font-medium">No results to display yet.</p>
+                  <p>Enter URLs above and click "Generate Metadata" to see results here.</p>
                 </div>
               )}
-               {isLoading && totalCount > 0 && processedCount < totalCount && results.length === 0 && (
+               {isLoading && totalCount > 0 && results.length === 0 && (
                 <div className="text-center text-muted-foreground py-8">
                   <Loader2 className="mx-auto h-12 w-12 text-primary animate-spin mb-4" />
                   <p className="text-lg font-medium">Processing your request...</p>

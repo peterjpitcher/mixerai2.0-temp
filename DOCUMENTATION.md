@@ -1130,3 +1130,24 @@ This session addressed several key issues and feature enhancements within the Mi
             *   Wrapped the "Edit" button in a conditional check: `(currentUser && isUserAssigned(item, currentUser.id))`.
 
 This session successfully addressed multiple bugs and implemented requested feature enhancements, improving overall application stability and user experience.
+
+## API Rate Limiting
+
+To prevent abuse and ensure service stability, rate limiting has been implemented on certain AI-intensive API endpoints.
+
+### Implemented Rate Limits
+
+-   **Alt Text Generator**: `src/app/api/tools/alt-text-generator/route.ts`
+    -   Limit: 10 requests per IP address per minute.
+    -   Mechanism: In-memory counter.
+    -   Response on exceeding limit: HTTP 429 "Rate limit exceeded. Please try again in a minute."
+
+-   **Metadata Generator**: `src/app/api/tools/metadata-generator/route.ts`
+    -   Limit: 10 requests per IP address per minute.
+    -   Mechanism: In-memory counter.
+    -   Response on exceeding limit: HTTP 429 "Rate limit exceeded. Please try again in a minute."
+
+This in-memory approach is suitable for single-instance deployments. For scaled environments, a distributed rate-limiting solution (e.g., using Redis) would be recommended.
+
+### Per-URL AI Call Delay
+To help manage token consumption rates with the AI service and improve stability when processing batches of URLs, a 5-second delay has been introduced *before* each individual call to the AI generation functions (`generateAltText`, `generateMetadata`) within a single batch request. Console log messages indicate when these delays occur and when the AI call proceeds.

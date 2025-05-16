@@ -3,6 +3,11 @@ import { generateAltText } from '@/lib/azure/openai';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 
+// In-memory rate limiting
+const rateLimit = new Map<string, { count: number, timestamp: number }>();
+const RATE_LIMIT_PERIOD = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_MINUTE = 10; // Allow 10 requests per minute per IP
+
 interface AltTextGenerationRequest {
   imageUrls: string[];
 }
@@ -64,6 +69,29 @@ function getLangCountryFromUrl(imageUrl: string): { language: string; country: s
 }
 
 export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
+  // Rate limiting logic
+  const ip = request.headers.get('x-forwarded-for') || request.ip || 'unknown';
+  const now = Date.now();
+
+  if (rateLimit.has(ip)) {
+    const userRateLimit = rateLimit.get(ip)!;
+    if (now - userRateLimit.timestamp > RATE_LIMIT_PERIOD) {
+      // Reset count if period has passed
+      userRateLimit.count = 1;
+      userRateLimit.timestamp = now;
+    } else if (userRateLimit.count >= MAX_REQUESTS_PER_MINUTE) {
+      console.warn(`[RateLimit] Blocked ${ip} for alt-text-generator. Count: ${userRateLimit.count}`);
+      return NextResponse.json(
+        { success: false, error: 'Rate limit exceeded. Please try again in a minute.' },
+        { status: 429 }
+      );
+    } else {
+      userRateLimit.count += 1;
+    }
+  } else {
+    rateLimit.set(ip, { count: 1, timestamp: now });
+  }
+
   try {
     const data: AltTextGenerationRequest = await request.json();
     
@@ -115,6 +143,10 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
           guardrails: ''
         };
         
+        console.log(`[Delay] Alt-Text Gen: Waiting 5 seconds before AI call for ${imageUrl}...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        console.log(`[Delay] Alt-Text Gen: Finished 5-second wait. Calling AI for ${imageUrl}...`);
+
         // console.log(`[AltTextGen] Generating for ${imageUrl} with lang: ${language}, country: ${country}`);
         const generatedAltTextResult = await generateAltText(
           imageUrl,

@@ -250,114 +250,91 @@ export default function AltTextGeneratorPage() {
           </CardContent>
         </Card>
 
-        {(results.length > 0 || isLoading && totalCount > 0) && (
+        {(results.length > 0 || (isLoading && totalCount > 0)) && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Generated Alt Text</CardTitle>
+                <CardTitle>Generated Results</CardTitle>
                 <CardDescription>
-                  Review the generated alt text below. Successful results can be downloaded.
+                  Review the generated alt text or errors for each image URL.
                 </CardDescription>
               </div>
-              {successfulResults.length > 0 && !isLoading && (
-                <Button onClick={downloadCSV} variant="outline" size="sm">
+              {results.some(r => !r.error && r.altText) && !isLoading && (
+                <Button variant="outline" onClick={downloadCSV} size="sm">
                   <Download className="mr-2 h-4 w-4" />
                   Download CSV
                 </Button>
               )}
             </CardHeader>
             <CardContent>
-              {successfulResults.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold mb-2">Successful Results</h3>
-                  <div className="overflow-x-auto rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[40%] whitespace-nowrap">Image URL</TableHead>
-                          <TableHead>Generated Alt Text</TableHead>
-                          <TableHead className="w-[100px] text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {successfulResults.map((item, index) => (
-                          <TableRow key={`success-${index}-${item.imageUrl}`}>
-                            <TableCell className="py-2 align-top">
-                              <div className="flex items-center">
-                                <a
-                                  href={item.imageUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="truncate hover:underline"
-                                  title={item.imageUrl}
-                                  style={{ maxWidth: '300px', display: 'inline-block' }}
-                                >
-                                  {item.imageUrl}
-                                </a>
-                                <ExternalLink className="ml-1 h-3 w-3 text-muted-foreground" />
-                                <img 
-                                  src={item.imageUrl} 
-                                  alt="Preview" 
-                                  className="ml-2 h-10 w-10 object-cover rounded" 
-                                  onError={(e) => (e.currentTarget.style.display = 'none')}
-                                />
-                              </div>
-                            </TableCell>
-                            <TableCell className="py-2 align-top whitespace-pre-wrap">{item.altText}</TableCell>
-                            <TableCell className="py-2 align-top text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleCopyText(item.altText, item.imageUrl)}
-                                title="Copy alt text"
-                                disabled={isLoading}
-                              >
-                                <ClipboardCopy className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              )}
-
-              {errorResults.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-2 text-destructive flex items-center">
-                    <AlertTriangle className="mr-2 h-5 w-5" />
-                    Processing Errors
-                  </h3>
-                  <ul className="space-y-2 rounded-md border border-destructive/50 bg-destructive/5 p-4">
-                    {errorResults.map((item, index) => (
-                      <li key={`error-${index}-${item.imageUrl}`} className="text-sm">
-                        <p className="font-semibold truncate" title={item.imageUrl}>
-                          URL: {item.imageUrl}
-                        </p>
-                        <p className="text-destructive-foreground/80">Error: {item.error}</p>
-                      </li>
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[40%]">Image URL</TableHead>
+                      <TableHead className="w-[35%]">Generated Alt Text / Error</TableHead>
+                      <TableHead className="w-[25%] text-center">Preview</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {results.map((item, index) => (
+                      <TableRow key={`${index}-${item.imageUrl}`} className={item.error ? "bg-destructive/10 hover:bg-destructive/20" : ""}>
+                        <TableCell className="py-2 align-top font-medium break-all">
+                          {item.imageUrl}
+                        </TableCell>
+                        <TableCell className="py-2 align-top whitespace-pre-wrap">
+                          {item.error ? (
+                            <div className="text-destructive flex items-start">
+                              <AlertTriangle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+                              <span className="text-sm">{item.error}</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm">{item.altText}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-2 align-top text-center">
+                          {!item.error && item.imageUrl && (
+                            <img
+                              src={item.imageUrl}
+                              alt="Preview"
+                              className="h-16 w-16 object-contain mx-auto rounded border"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                const parentCell = target.closest('td');
+                                if (parentCell) {
+                                  let errorSpan = parentCell.querySelector('.preview-error-text') as HTMLSpanElement;
+                                  if (!errorSpan) {
+                                    errorSpan = document.createElement('span');
+                                    errorSpan.className = 'text-xs text-muted-foreground preview-error-text';
+                                    errorSpan.textContent = 'Preview N/A';
+                                    parentCell.appendChild(errorSpan);
+                                  }
+                                }
+                              }}
+                            />
+                          )}
+                          {(item.error) && <span className="text-xs text-muted-foreground">Preview N/A</span>}
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </ul>
-                </div>
-              )}
-              
+                  </TableBody>
+                </Table>
+              </div>
               {results.length === 0 && !isLoading && (
                 <div className="text-center text-muted-foreground py-8">
-                  <Info className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                   <p className="text-lg font-medium">No results to display yet.</p>
                   <p>Enter image URLs above and click "Generate Alt Text" to see results here.</p>
                 </div>
               )}
-
-              {isLoading && totalCount > 0 && processedCount < totalCount && results.length === 0 && (
+              {isLoading && totalCount > 0 && results.length === 0 && (
                 <div className="text-center text-muted-foreground py-8">
                   <Loader2 className="mx-auto h-12 w-12 text-primary animate-spin mb-4" />
                   <p className="text-lg font-medium">Processing your request...</p>
                   <p>Please wait while we generate alt text for your images.</p>
                 </div>
               )}
-
             </CardContent>
           </Card>
         )}
