@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/label';
 import { Textarea } from "@/components/textarea";
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Loader2, ClipboardCopy, Image as ImageIcon, ArrowLeft, Info, AlertTriangle, Download, ExternalLink, Languages } from 'lucide-react';
+import { Loader2, ClipboardCopy, Image as ImageIcon, ArrowLeft, Info, AlertTriangle, ExternalLink, Languages } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -243,39 +243,6 @@ export default function AltTextGeneratorPage() {
   const successfulResults = results.filter(r => !r.error && r.altText);
   // const errorResults = results.filter(r => r.error); // This variable is not used
 
-  const downloadCSV = () => {
-    if (successfulResults.length === 0) {
-      toast.error("No successful alt text results to download.");
-      return;
-    }
-    const headers = ["Image URL", "Alt Text"];
-    // Ensure that any quotes within the data are properly escaped for CSV
-    const escapeCSV = (text: string | undefined) => {
-      if (text === undefined || text === null) return '""'; // Return empty quoted string for undefined/null
-      // Replace " with "" and wrap in "
-      return `"${String(text).replace(/"/g, '""')}"`;
-    };
-
-    const rows = successfulResults.map(res => [
-      escapeCSV(res.imageUrl),
-      escapeCSV(res.altText)
-    ]);
-
-    // Use \r\n for newlines for better compatibility
-    let csvContent = "data:text/csv;charset=utf-8,"
-      + headers.join(",") + "\r\n"
-      + rows.map(e => e.join(",")).join("\r\n");
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "alt_text_results.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Alt text CSV downloaded.");
-  };
-
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       <Breadcrumbs items={[
@@ -375,12 +342,6 @@ export default function AltTextGeneratorPage() {
                         Review the generated alt text or errors for each image URL.
                     </CardDescription>
                 </div>
-                {successfulResults.length > 0 && !isLoading && (
-                    <Button variant="outline" onClick={downloadCSV} size="sm">
-                        <Download className="mr-2 h-4 w-4" />
-                        Download CSV
-                    </Button>
-                )}
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto rounded-md border">

@@ -7,7 +7,7 @@ import { Input } from '@/components/input';
 import { Label } from '@/components/label';
 import { Textarea } from "@/components/textarea";
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Loader2, ClipboardCopy, Globe, ArrowLeft, Info, Download, AlertTriangle, ExternalLink, Languages } from 'lucide-react';
+import { Loader2, ClipboardCopy, Globe, ArrowLeft, Info, AlertTriangle, ExternalLink, Languages } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -236,41 +236,6 @@ export default function MetadataGeneratorPage() {
 
   const errorResults = results.filter(r => r.error);
 
-  const downloadCSV = () => {
-    // Filter for successful results before download
-    const successfulResults = results.filter(r => !r.error && (r.metaTitle || r.metaDescription));
-
-    if (successfulResults.length === 0) {
-      toast.error("No successful results to download.");
-      return;
-    }
-    const headers = ["URL", "Meta Title", "Meta Description"];
-    
-    const escapeCSV = (text: string | undefined) => {
-      if (text === undefined || text === null) return '""';
-      return `"${String(text).replace(/"/g, '""')}"`;
-    };
-
-    const rows = successfulResults.map(res => [
-      escapeCSV(res.url),
-      escapeCSV(res.metaTitle),
-      escapeCSV(res.metaDescription),
-    ]);
-
-    let csvContent = "data:text/csv;charset=utf-8,"
-      + headers.join(",") + "\r\n" // Use \r\n for newlines
-      + rows.map(e => e.join(",")).join("\r\n"); // Use \r\n for newlines
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "metadata_results.csv");
-    document.body.appendChild(link); 
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Metadata CSV downloaded.");
-  };
-
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       <Breadcrumbs items={[
@@ -370,12 +335,6 @@ export default function MetadataGeneratorPage() {
                         Review the generated metadata or errors for each URL.
                     </CardDescription>
                 </div>
-                {results.some(r => !r.error && (r.metaTitle || r.metaDescription)) && !isLoading && (
-                    <Button variant="outline" onClick={downloadCSV} size="sm">
-                        <Download className="mr-2 h-4 w-4" />
-                        Download CSV
-                    </Button>
-                )}
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto rounded-md border">

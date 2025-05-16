@@ -82,10 +82,12 @@ export type Database = {
       }
       brands: {
         Row: {
+          approved_content_types: Json | null
           brand_admin_id: string | null
           brand_color: string | null
           brand_identity: string | null
           brand_summary: string | null
+          content_vetting_agencies: string[] | null
           country: string | null
           created_at: string | null
           guardrails: string | null
@@ -98,10 +100,12 @@ export type Database = {
           website_url: string | null
         }
         Insert: {
+          approved_content_types?: Json | null
           brand_admin_id?: string | null
           brand_color?: string | null
           brand_identity?: string | null
           brand_summary?: string | null
+          content_vetting_agencies?: string[] | null
           country?: string | null
           created_at?: string | null
           guardrails?: string | null
@@ -114,10 +118,12 @@ export type Database = {
           website_url?: string | null
         }
         Update: {
+          approved_content_types?: Json | null
           brand_admin_id?: string | null
           brand_color?: string | null
           brand_identity?: string | null
           brand_summary?: string | null
+          content_vetting_agencies?: string[] | null
           country?: string | null
           created_at?: string | null
           guardrails?: string | null
@@ -507,6 +513,75 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      feedback_items: {
+        Row: {
+          actual_behavior: string | null
+          affected_area: string | null
+          app_version: string | null
+          attachments_metadata: Json | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          expected_behavior: string | null
+          id: string
+          priority: Database["public"]["Enums"]["feedback_priority"]
+          status: Database["public"]["Enums"]["feedback_status"]
+          steps_to_reproduce: string | null
+          title: string | null
+          type: Database["public"]["Enums"]["feedback_type"]
+          user_impact_details: string | null
+        }
+        Insert: {
+          actual_behavior?: string | null
+          affected_area?: string | null
+          app_version?: string | null
+          attachments_metadata?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          expected_behavior?: string | null
+          id?: string
+          priority: Database["public"]["Enums"]["feedback_priority"]
+          status?: Database["public"]["Enums"]["feedback_status"]
+          steps_to_reproduce?: string | null
+          title?: string | null
+          type: Database["public"]["Enums"]["feedback_type"]
+          user_impact_details?: string | null
+        }
+        Update: {
+          actual_behavior?: string | null
+          affected_area?: string | null
+          app_version?: string | null
+          attachments_metadata?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          expected_behavior?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["feedback_priority"]
+          status?: Database["public"]["Enums"]["feedback_status"]
+          steps_to_reproduce?: string | null
+          title?: string | null
+          type?: Database["public"]["Enums"]["feedback_type"]
+          user_impact_details?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_feedback_created_by"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_feedback_created_by"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invitation_logs: {
         Row: {
@@ -1114,17 +1189,31 @@ export type Database = {
     }
     Functions: {
       create_brand_and_set_admin: {
-        Args: {
-          creator_user_id: string
-          brand_name: string
-          brand_website_url?: string
-          brand_country?: string
-          brand_language?: string
-          brand_identity_text?: string
-          brand_tone_of_voice?: string
-          brand_guardrails?: string
-          brand_content_vetting_agencies?: string
-        }
+        Args:
+          | {
+              creator_user_id: string
+              brand_name: string
+              brand_website_url?: string
+              brand_country?: string
+              brand_language?: string
+              brand_identity_text?: string
+              brand_tone_of_voice?: string
+              brand_guardrails?: string
+              brand_content_vetting_agencies?: string
+            }
+          | {
+              creator_user_id: string
+              brand_name: string
+              brand_website_url?: string
+              brand_country?: string
+              brand_language?: string
+              brand_identity_text?: string
+              brand_tone_of_voice?: string
+              brand_guardrails?: string
+              brand_content_vetting_agencies_input?: string[]
+              brand_color_input?: string
+              approved_content_types_input?: Json
+            }
         Returns: string
       }
       create_workflow_and_log_invitations: {
@@ -1160,13 +1249,39 @@ export type Database = {
         }
         Returns: number
       }
+      test_plpgsql_declare: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       update_workflow_and_handle_invites: {
+        Args:
+          | {
+              p_workflow_id: string
+              p_name: string
+              p_brand_id: string
+              p_steps: Json
+              p_template_id: string
+              p_description: string
+              p_new_invitation_items: Json
+            }
+          | {
+              p_workflow_id: string
+              p_name?: string
+              p_brand_id?: string
+              p_steps?: Json
+              p_template_id?: string
+              p_new_invitation_items?: Json
+            }
+        Returns: boolean
+      }
+      update_workflow_and_handle_invites_invoker_version_temp: {
         Args: {
           p_workflow_id: string
           p_name?: string
           p_brand_id?: string
           p_steps?: Json
           p_template_id?: string
+          p_description?: string
           p_new_invitation_items?: Json
         }
         Returns: boolean
@@ -1180,6 +1295,14 @@ export type Database = {
         | "published"
         | "rejected"
         | "cancelled"
+      feedback_priority: "low" | "medium" | "high" | "critical"
+      feedback_status:
+        | "open"
+        | "in_progress"
+        | "resolved"
+        | "closed"
+        | "wont_fix"
+      feedback_type: "bug" | "enhancement"
       user_role: "admin" | "editor" | "viewer"
       vetting_agency_priority_level: "High" | "Medium" | "Low"
     }
@@ -1305,6 +1428,15 @@ export const Constants = {
         "rejected",
         "cancelled",
       ],
+      feedback_priority: ["low", "medium", "high", "critical"],
+      feedback_status: [
+        "open",
+        "in_progress",
+        "resolved",
+        "closed",
+        "wont_fix",
+      ],
+      feedback_type: ["bug", "enhancement"],
       user_role: ["admin", "editor", "viewer"],
       vetting_agency_priority_level: ["High", "Medium", "Low"],
     },

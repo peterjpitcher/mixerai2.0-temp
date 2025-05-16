@@ -19,7 +19,9 @@ import {
   Globe,
   Folder,
   ListChecks,
-  Loader2
+  Loader2,
+  MessageSquareWarning,
+  Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect, useRef } from 'react';
@@ -68,10 +70,10 @@ export function UnifiedNavigation() {
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   
-  // Track expanded state for collapsible sections
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    content: true, // Content section expanded by default
-    tools: true    // Tools section expanded by default
+    content: true,
+    tools: true,
+    feedback: false
   });
 
   // State for user templates
@@ -150,10 +152,14 @@ export function UnifiedNavigation() {
       newExpandedState.content = true;
       changed = true;
     }
+    if ((pathname.includes('/feedback') || pathname.includes('/admin/feedback-log')) && !expandedSections.feedback) {
+      newExpandedState.feedback = true;
+      changed = true;
+    }
     if (changed) {
       setExpandedSections(newExpandedState);
     }
-  }, [pathname]); // Removed expandedSections from dependency array as it causes re-runs
+  }, [pathname]);
 
   // Toggle a section's expanded state
   const toggleSection = (section: string) => {
@@ -455,6 +461,26 @@ export function UnifiedNavigation() {
             defaultOpen: expandedSections.tools !== undefined ? expandedSections.tools : true
         });
     }
+  }
+
+  // Feedback Links - Placed before User Management and Account/Help for visibility
+  if (currentUser && !isLoadingUser) {
+    // View Feedback for all authenticated users
+    finalNavItems.push({
+        href: '/dashboard/feedback',
+        label: 'View Feedback',
+        icon: <Info className="h-5 w-5" />,
+        segment: 'feedback'
+    });
+
+    // Submit Feedback for all authenticated users
+    // The "isAdmin" check is removed, label is changed
+    finalNavItems.push({
+        href: '/dashboard/admin/feedback-log',
+        label: 'Submit Feedback',
+        icon: <MessageSquareWarning className="h-5 w-5" />,
+        segment: 'admin-feedback-log' // Unique segment
+    });
   }
 
   // Separator

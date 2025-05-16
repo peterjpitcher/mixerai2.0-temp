@@ -1151,3 +1151,41 @@ This in-memory approach is suitable for single-instance deployments. For scaled 
 
 ### Per-URL AI Call Delay
 To help manage token consumption rates with the AI service and improve stability when processing batches of URLs, a 5-second delay has been introduced *before* each individual call to the AI generation functions (`generateAltText`, `generateMetadata`) within a single batch request. Console log messages indicate when these delays occur and when the AI call proceeds.
+
+## Recent Updates
+
+### Removed CSV Download from Tools
+- Removed the "Download CSV" functionality from the Metadata Generator tool (`/dashboard/tools/metadata-generator`).
+- Removed the "Download CSV" functionality from the Alt-Text Generator tool (`/dashboard/tools/alt-text-generator`).
+- This change was made to simplify the UI for these tools, as the primary interaction is focused on generating and copying text directly.
+- The `downloadCSV` function, associated buttons, and `Download` icon imports were removed from the respective page components.
+
+### Feedback Logging and Viewing System
+- Implemented a new system for logging and viewing feedback items (bugs and enhancement requests).
+- **Database**:
+    - Created a new table `public.feedback_items` with columns for type, title, description, priority, status, affected area, steps to reproduce, expected/actual behavior, app version, and user impact.
+    - Added ENUM types: `feedback_type`, `feedback_priority`, `feedback_status`.
+    - Implemented Row Level Security:
+        - Any authenticated user can INSERT new feedback items.
+        - Admins have UPDATE and DELETE access.
+        - Authenticated users can read all feedback items.
+    - Migration script: `migrations/20250516000000_create_feedback_system.sql`.
+- **API Endpoint**:
+    - Created `src/app/api/feedback/route.ts`.
+    - `POST /api/feedback`: Allows authenticated users to create new feedback items. Validates for `type` and `priority`.
+    - `GET /api/feedback`: Allows authenticated users to retrieve feedback items with pagination and filtering (type, status, priority).
+- **Feedback Submission Page**:
+    - Path: `src/app/dashboard/admin/feedback-log/page.tsx` (Note: path contains "admin" for historical reasons).
+    - Authenticated users can submit new feedback items via a form.
+    - Users can view a table of all logged feedback items on this page as well (current implementation combines submission and viewing for the user who is submitting, though the primary view-only page is separate).
+    - Access is for all authenticated users.
+- **User View Page (Feedback List)**:
+    - Created `src/app/dashboard/feedback/page.tsx`.
+    - All authenticated users can view a table of logged feedback items.
+    - Includes filtering (type, priority, status) and client-side text search.
+    - Pagination is implemented for the list.
+- **Navigation**:
+    - Added "View Feedback" link to the sidebar for all authenticated users, linking to `/dashboard/feedback`.
+    - Added "Submit Feedback" link to the sidebar for all authenticated users, linking to `/dashboard/admin/feedback-log`.
+- **Documentation**:
+    - Detailed documentation for the feedback system is available at [docs/feedback_system.md](docs/feedback_system.md).
