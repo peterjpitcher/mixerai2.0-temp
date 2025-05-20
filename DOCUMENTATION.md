@@ -74,6 +74,7 @@ Details on user authentication, Supabase integration, user data structures, API 
   - Workflow validation
 - Implementation currently uses mock data, with planned API integration
 - Updated tracking documentation to reflect progress
+- **UI Alignment**: Ensured the "Workflow Steps" section in `/dashboard/workflows/new/page.tsx` now visually and functionally mirrors the corresponding section in `/dashboard/workflows/[id]/edit/page.tsx`. This includes consistent step card layout, header controls (step number, name input, move/delete buttons), role selection UI, step description textarea with AI generation, "optional step" switch, and assignee input/display logic.
 
 ## Implementation Details
 

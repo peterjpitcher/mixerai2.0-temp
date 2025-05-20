@@ -21,6 +21,7 @@ import debounce from 'lodash.debounce';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { cn } from '@/lib/utils';
 import { BrandIcon } from '@/components/brand-icon';
+import { MultiSelectUserCombobox, UserOption } from '@/components/ui/multi-select-user-combobox';
 
 // export const metadata: Metadata = {
 //   title: 'Edit Workflow | MixerAI 2.0',
@@ -97,7 +98,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
   
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
-  const [allFetchedBrands, setAllFetchedBrands] = useState<any[]>([]); // To store all brands before filtering
+  const [allFetchedBrands, setAllFetchedBrands] = useState<any[]>([]);
 
   const currentBrandForDisplay = brands.find(b => b.id === (workflow?.brand_id || workflow?.brand?.id));
 
@@ -954,7 +955,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                             variant="outline" 
                             size="sm"
                             onClick={() => handleAddAssignee(index)}
-                            disabled={!canEditThisWorkflow}
+                            disabled={!canEditThisWorkflow || !assigneeInputs[index]?.trim()}
                           >
                             Add
                           </Button>

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/button';
@@ -13,7 +13,7 @@ import { Switch } from '@/components/switch';
 import { Badge } from '@/components/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { toast } from 'sonner';
-import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2, ArrowLeft, ShieldAlert } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2, ArrowLeft, ShieldAlert, UserPlus, Search } from 'lucide-react';
 import type { Metadata } from 'next';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { debounce } from 'lodash';
@@ -55,6 +55,33 @@ interface Brand {
 interface ContentTemplateSummary {
   id: string;
   name: string;
+}
+
+// Define UserOption for assignee structures
+interface UserOption {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  avatar_url?: string | null; // Optional, typically used for display
+}
+
+// Define WorkflowStep interface for clarity
+interface WorkflowStep {
+  id: string; // Can be temp_step_id or actual UUID from DB
+  name: string;
+  description: string;
+  role: string;
+  approvalRequired: boolean;
+  assignees: UserOption[]; // Changed from string[] to UserOption[]
+}
+
+interface WorkflowData {
+  name: string;
+  description: string;
+  brand_id: string;
+  status: string;
+  template_id: string | null;
+  steps: WorkflowStep[];
 }
 
 // --- New Role Card Selection Component ---
@@ -126,14 +153,14 @@ export default function NewWorkflowPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [allFetchedBrands, setAllFetchedBrands] = useState<Brand[]>([]);
   const [contentTemplates, setContentTemplates] = useState<ContentTemplateSummary[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('NO_TEMPLATE_SELECTED');
 
   const [stepDescLoading, setStepDescLoading] = useState<Record<number, boolean>>({});
 
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
 
-  const [workflow, setWorkflow] = useState<any>({
+  const [workflow, setWorkflow] = useState<WorkflowData>(() => ({ // Use a function for initial state to avoid re-computing Date.now()
     name: '',
     description: '',
     brand_id: '',
@@ -141,7 +168,7 @@ export default function NewWorkflowPage() {
     template_id: null,
     steps: [
       {
-        id: `temp_step_${Date.now()}`,
+        id: `temp_step_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`,
         name: 'Review Step 1',
         description: 'Initial review of the content.',
         role: 'editor',
@@ -149,9 +176,13 @@ export default function NewWorkflowPage() {
         assignees: []
       }
     ]
-  });
+  }));
   
   const selectedBrandFull = brands.find(b => b.id === workflow.brand_id);
+
+  const [assigneeInputs, setAssigneeInputs] = useState<string[]>(() => new Array(workflow.steps.length).fill(''));
+  const [userSearchResults, setUserSearchResults] = useState<Record<number, UserOption[]>>({});
+  const [userSearchLoading, setUserSearchLoading] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -178,14 +209,19 @@ export default function NewWorkflowPage() {
   }, []);
 
   const isGlobalAdmin = currentUser?.user_metadata?.role === 'admin';
+  
   const hasAnyBrandAdminPermission = currentUser?.brand_permissions?.some(p => p.role === 'brand_admin');
+
   const canAccessPage = isGlobalAdmin || hasAnyBrandAdminPermission;
 
   useEffect(() => {
-    if (isLoadingUser) return; // Wait for user to be loaded
+    if (isLoadingUser) return; 
 
     if (!canAccessPage) {
-      setIsLoading(false); // Not loading initial data if no access
+      setIsLoading(false); 
+      // Redirect or show access denied message.
+      // router.push('/dashboard'); // Example redirect
+      // toast.error("You don't have permission to create workflows.");
       return;
     }
 
@@ -198,7 +234,6 @@ export default function NewWorkflowPage() {
         if (!brandsData.success) throw new Error(brandsData.error || 'Failed to process brands data');
         const fetchedBrandsFromApi = brandsData.data || [];
         setAllFetchedBrands(fetchedBrandsFromApi);
-        // Filtering and setting of `brands` and `workflow.brand_id` will be handled in another useEffect dependent on currentUser
 
         const templatesResponse = await fetch('/api/content-templates');
         if (!templatesResponse.ok) throw new Error(`Failed to fetch content templates: ${templatesResponse.status}`);
@@ -210,188 +245,299 @@ export default function NewWorkflowPage() {
         console.error('Error fetching initial data for new workflow page:', error);
         toast.error(error.message || 'Failed to load initial data.');
       } finally {
-        setIsLoading(false); // Still set to false after this initial fetch
+        setIsLoading(false); 
       }
     };
     fetchInitialData();
-  }, [isLoadingUser, canAccessPage]); // Depends on user loading and access rights
+  }, [isLoadingUser, canAccessPage, router]);
 
-  // New useEffect to filter brands and set default brand_id once allFetchedBrands and currentUser are available
+
   useEffect(() => {
-    if (isLoadingUser || !currentUser || allFetchedBrands.length === 0) return;
+    if (isLoadingUser || !currentUser) return;
 
-    let manageableBrands: Brand[] = [];
+    let userSpecificBrands: Brand[];
     if (isGlobalAdmin) {
-      manageableBrands = allFetchedBrands;
-    } else if (hasAnyBrandAdminPermission) {
-      const adminBrandIds = currentUser.brand_permissions
-        ?.filter(p => p.role === 'brand_admin')
-        .map(p => p.brand_id) || [];
-      manageableBrands = allFetchedBrands.filter(b => adminBrandIds.includes(b.id));
+      userSpecificBrands = allFetchedBrands;
+    } else {
+      const adminBrandIds = currentUser?.brand_permissions
+                              ?.filter(p => p.role === 'brand_admin')
+                              .map(p => p.brand_id) || [];
+      userSpecificBrands = allFetchedBrands.filter(brand => adminBrandIds.includes(brand.id));
     }
-    setBrands(manageableBrands);
-
-    if (manageableBrands.length > 0 && !workflow.brand_id) {
-      setWorkflow(prev => ({ ...prev, brand_id: manageableBrands[0].id }));
+    setBrands(userSpecificBrands);
+    
+    if (userSpecificBrands.length > 0 && !workflow.brand_id) {
+      setWorkflow(prev => ({ ...prev, brand_id: userSpecificBrands[0].id }));
+    } else if (userSpecificBrands.length === 0 && !isGlobalAdmin) {
+       toast.info("You are not an administrator for any brands. Please contact an administrator to gain access.", { duration: 5000 });
     }
-    // If no manageable brands, brand_id will remain empty, form validation should catch this
 
-  }, [isLoadingUser, currentUser, allFetchedBrands, isGlobalAdmin, hasAnyBrandAdminPermission, workflow.brand_id]);
+  }, [isLoadingUser, currentUser, allFetchedBrands, isGlobalAdmin, workflow.brand_id]);
+
+
+  const debouncedUserSearch = useCallback(
+    debounce(async (searchTerm: string, stepIndex: number) => {
+      if (searchTerm.trim().length < 2) {
+        setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
+        return;
+      }
+      setUserSearchLoading(prev => ({ ...prev, [stepIndex]: true }));
+      try {
+        const response = await fetch(`/api/users/search?query=${encodeURIComponent(searchTerm)}`);
+        const data = await response.json();
+        if (data.success) {
+          setUserSearchResults(prev => ({ ...prev, [stepIndex]: data.users }));
+        } else {
+          setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
+          // Optionally toast an error: toast.error(`Search failed: ${data.error}`);
+        }
+      } catch (error) {
+        console.error('User search error:', error);
+        setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
+        // Optionally toast an error: toast.error('Failed to search users.');
+      } finally {
+        setUserSearchLoading(prev => ({ ...prev, [stepIndex]: false }));
+      }
+    }, 300),
+    []
+  );
+
+  const handleAssigneeInputChange = (stepIndex: number, value: string) => {
+    setAssigneeInputs(prev => {
+      const newInputs = [...prev];
+      newInputs[stepIndex] = value;
+      return newInputs;
+    });
+    if (value.trim()) {
+      debouncedUserSearch(value, stepIndex);
+    } else {
+      setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] })); // Clear results if input is empty
+    }
+  };
+
+  const handleAddUserToStep = (stepIndex: number, user: UserOption) => {
+    setWorkflow(prevWorkflow => {
+      const newSteps = [...prevWorkflow.steps];
+      const currentStep = newSteps[stepIndex];
+      if (!currentStep.assignees.find(a => a.id === user.id)) {
+        currentStep.assignees = [...currentStep.assignees, user];
+      }
+      return { ...prevWorkflow, steps: newSteps };
+    });
+    // Clear input and search results for this step
+    setAssigneeInputs(prev => {
+      const newInputs = [...prev];
+      newInputs[stepIndex] = '';
+      return newInputs;
+    });
+    setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
+  };
+
+
+  // Function to add an email address as an assignee if it's not already in the list
+  // This is typically called when an "Add" button next to the email input is clicked
+  const handleAddEmailAsAssignee = (stepIndex: number) => {
+    const email = assigneeInputs[stepIndex]?.trim();
+    if (email) {
+      // Basic email validation
+      if (!/\S+@\S+\.\S+/.test(email)) {
+        toast.error("Please enter a valid email address.");
+        return;
+      }
+
+      setWorkflow(prevWorkflow => {
+        const newSteps = [...prevWorkflow.steps];
+        const currentStep = newSteps[stepIndex];
+        // Check if email already exists (case-insensitive check)
+        if (!currentStep.assignees.some(a => a.email?.toLowerCase() === email.toLowerCase())) {
+          // Add as a new assignee with a temporary ID, assuming email is the primary identifier here
+          currentStep.assignees = [...currentStep.assignees, { id: `email_${email}_${Date.now()}`, email: email, full_name: email }];
+        } else {
+          toast.info("This email is already an assignee for this step.");
+        }
+        return { ...prevWorkflow, steps: newSteps };
+      });
+      // Clear input and search results for this step
+      setAssigneeInputs(prev => {
+        const newInputs = [...prev];
+        newInputs[stepIndex] = '';
+        return newInputs;
+      });
+      setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
+    }
+  };
+
+  const handleRemoveUserFromStep = (stepIndex: number, userIdToRemove: string) => {
+    setWorkflow(prevWorkflow => {
+      const newSteps = [...prevWorkflow.steps];
+      newSteps[stepIndex].assignees = newSteps[stepIndex].assignees.filter(
+        user => user.id !== userIdToRemove
+      );
+      return { ...prevWorkflow, steps: newSteps };
+    });
+  };
 
   const handleUpdateWorkflowDetails = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setWorkflow((prev: any) => ({ ...prev, [name]: value }));
+    setWorkflow(prev => ({ ...prev, [name]: value }));
   };
 
   const handleUpdateWorkflowStatus = (value: string) => {
-    setWorkflow((prev: any) => ({ ...prev, status: value }));
+    setWorkflow(prev => ({ ...prev, status: value }));
   };
 
   const handleUpdateBrand = (value: string) => {
-    setWorkflow((prev: any) => ({ ...prev, brand_id: value }));
+    setWorkflow(prev => ({ ...prev, brand_id: value }));
   };
 
   const handleUpdateTemplate = (value: string) => {
     setSelectedTemplateId(value);
-    setWorkflow((prev: any) => ({ ...prev, template_id: value || null }));
+    setWorkflow(prev => ({ ...prev, template_id: value === 'NO_TEMPLATE_SELECTED' ? null : value }));
   };
 
   const handleUpdateStepName = (index: number, value: string) => {
-    setWorkflow((prev: any) => {
-      const updatedSteps = [...prev.steps];
-      updatedSteps[index] = {
-        ...updatedSteps[index],
-        name: value
-      };
-      return {
-        ...prev,
-        steps: updatedSteps
-      };
+    setWorkflow(prevWorkflow => {
+      const newSteps = [...prevWorkflow.steps];
+      newSteps[index].name = value;
+      return { ...prevWorkflow, steps: newSteps };
     });
   };
 
   const handleUpdateStepDescription = (index: number, value: string) => {
-    setWorkflow((prev: any) => {
-      const updatedSteps = [...prev.steps];
-      updatedSteps[index] = {
-        ...updatedSteps[index],
-        description: value
-      };
-      return {
-        ...prev,
-        steps: updatedSteps
-      };
+    setWorkflow(prevWorkflow => {
+      const newSteps = [...prevWorkflow.steps];
+      newSteps[index].description = value;
+      return { ...prevWorkflow, steps: newSteps };
     });
   };
 
   const handleUpdateStepRole = (index: number, value: string) => {
-    setWorkflow((prev: any) => {
-      const updatedSteps = [...prev.steps];
-      updatedSteps[index] = {
-        ...updatedSteps[index],
-        role: value
-      };
-      return {
-        ...prev,
-        steps: updatedSteps
-      };
+    setWorkflow(prevWorkflow => {
+      const newSteps = [...prevWorkflow.steps];
+      newSteps[index].role = value;
+      return { ...prevWorkflow, steps: newSteps };
     });
   };
 
   const handleUpdateStepApprovalRequired = (index: number, value: boolean) => {
-    setWorkflow((prev: any) => {
-      const updatedSteps = [...prev.steps];
-      updatedSteps[index] = {
-        ...updatedSteps[index],
-        approvalRequired: value
-      };
-      return {
-        ...prev,
-        steps: updatedSteps
-      };
+    setWorkflow(prevWorkflow => {
+      const newSteps = [...prevWorkflow.steps];
+      newSteps[index].approvalRequired = value;
+      return { ...prevWorkflow, steps: newSteps };
     });
   };
 
   const handleGenerateStepDescription = async (stepIndex: number) => {
-    const stepToUpdate = workflow.steps[stepIndex];
-    if (!stepToUpdate || !stepToUpdate.name) {
-      toast.error('Please provide a step name before generating a description.');
-      return;
-    }
-
     setStepDescLoading(prev => ({ ...prev, [stepIndex]: true }));
     try {
-      // Simulating API call for generating description
-      // Replace with actual API call: e.g., await fetch('/api/ai/generate-step-description', ...)
+      const step = workflow.steps[stepIndex];
       const response = await fetch('/api/ai/generate-step-description', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stepName: stepToUpdate.name, workflowName: workflow.name, brandName: selectedBrandFull?.name || 'the brand' })
+        body: JSON.stringify({
+          workflowName: workflow.name,
+          workflowDescription: workflow.description,
+          stepName: step.name,
+          role: step.role,
+          existingSteps: workflow.steps.slice(0, stepIndex).map(s => ({ name: s.name, description: s.description, role: s.role }))
+        }),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to generate description');
       }
-
       const data = await response.json();
       if (data.success && data.description) {
         handleUpdateStepDescription(stepIndex, data.description);
-        toast.success(`Description generated for "${stepToUpdate.name}"`);
+        toast.success('Step description generated!');
       } else {
-        throw new Error(data.error || 'No description was generated.');
+        throw new Error(data.error || 'No description returned from AI');
       }
     } catch (error: any) {
       console.error('Error generating step description:', error);
-      toast.error(`Error generating description: ${error.message}`);
+      toast.error(error.message || 'Could not generate step description.');
     } finally {
       setStepDescLoading(prev => ({ ...prev, [stepIndex]: false }));
     }
   };
 
   const handleAddStep = () => {
-    setWorkflow((prev: any) => ({
-      ...prev,
-      steps: [
-        ...prev.steps,
+    setWorkflow(prevWorkflow => {
+      const newStepId = `temp_step_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+      const newSteps = [
+        ...prevWorkflow.steps,
         {
-          id: `temp_step_${Date.now()}`,
-          name: `Review Step ${prev.steps.length + 1}`,
+          id: newStepId,
+          name: `Review Step ${prevWorkflow.steps.length + 1}`,
           description: '',
           role: 'editor',
           approvalRequired: true,
           assignees: []
         }
-      ]
-    }));
+      ];
+      setAssigneeInputs(prevInputs => [...prevInputs, '']); // Add input state for new step
+      setUserSearchResults(prevResults => ({...prevResults, [newSteps.length -1]: []})); // Init search results for new step
+      return { ...prevWorkflow, steps: newSteps };
+    });
   };
 
   const handleRemoveStep = (index: number) => {
-    setWorkflow((prev: any) => ({
-      ...prev,
-      steps: prev.steps.filter((_: any, i: number) => i !== index)
-    }));
-  };
-  
-  const handleMoveStepUp = (index: number) => {
-    if (index === 0) return;
-    setWorkflow((prev: any) => {
-      const newSteps = [...prev.steps];
-      const temp = newSteps[index];
-      newSteps[index] = newSteps[index - 1];
-      newSteps[index - 1] = temp;
-      return { ...prev, steps: newSteps };
+    setWorkflow(prevWorkflow => {
+      const newSteps = prevWorkflow.steps.filter((_, i) => i !== index);
+      setAssigneeInputs(prevInputs => prevInputs.filter((_, i) => i !== index));
+      setUserSearchResults(prevResults => {
+        const newResults = {...prevResults};
+        delete newResults[index];
+        // Adjust keys for subsequent steps if necessary, though usually direct key removal is fine
+        // if keys are simply step indices. If other logic relies on a contiguous sequence of keys,
+        // then re-indexing might be needed, but for this state structure, it's okay.
+        return newResults;
+      });
+      return { ...prevWorkflow, steps: newSteps };
     });
   };
-  
+
+  const handleMoveStepUp = (index: number) => {
+    if (index === 0) return;
+    setWorkflow(prevWorkflow => {
+      const newSteps = [...prevWorkflow.steps];
+      [newSteps[index - 1], newSteps[index]] = [newSteps[index], newSteps[index - 1]];
+      
+      setAssigneeInputs(prevInputs => {
+        const newInputs = [...prevInputs];
+        [newInputs[index - 1], newInputs[index]] = [newInputs[index], newInputs[index - 1]];
+        return newInputs;
+      });
+      setUserSearchResults(prevResults => {
+        const newResults = {...prevResults};
+        const temp = newResults[index-1];
+        newResults[index-1] = newResults[index];
+        newResults[index] = temp;
+        return newResults;
+      });
+      return { ...prevWorkflow, steps: newSteps };
+    });
+  };
+
   const handleMoveStepDown = (index: number) => {
     if (index === workflow.steps.length - 1) return;
-    setWorkflow((prev: any) => {
-      const newSteps = [...prev.steps];
-      const temp = newSteps[index];
-      newSteps[index] = newSteps[index + 1];
-      newSteps[index + 1] = temp;
-      return { ...prev, steps: newSteps };
+    setWorkflow(prevWorkflow => {
+      const newSteps = [...prevWorkflow.steps];
+      [newSteps[index + 1], newSteps[index]] = [newSteps[index], newSteps[index + 1]];
+
+      setAssigneeInputs(prevInputs => {
+        const newInputs = [...prevInputs];
+        [newInputs[index + 1], newInputs[index]] = [newInputs[index], newInputs[index + 1]];
+        return newInputs;
+      });
+      setUserSearchResults(prevResults => {
+        const newResults = {...prevResults};
+        const temp = newResults[index+1];
+        newResults[index+1] = newResults[index];
+        newResults[index] = temp;
+        return newResults;
+      });
+      return { ...prevWorkflow, steps: newSteps };
     });
   };
 
@@ -410,11 +556,11 @@ export default function NewWorkflowPage() {
     }
     for (const step of workflow.steps) {
       if (!step.name.trim()) {
-        toast.error(`Step "${step.name || 'Unnamed Step'}" needs a name.`);
+        toast.error('All steps must have a name.');
         return false;
       }
       if (!step.role) {
-        toast.error(`Step "${step.name}" needs a role assigned.`);
+        toast.error(`Step "${step.name}" must have an assigned role.`);
         return false;
       }
     }
@@ -423,244 +569,404 @@ export default function NewWorkflowPage() {
 
   const handleCreateWorkflow = async () => {
     if (!validateWorkflow()) return;
-
-    if (!canAccessPage) { // Re-check access before submission
-      toast.error("You don't have permission to create workflows.");
-      return;
-    }
-
     setIsSaving(true);
-    try {
-      const payload = {
-        ...workflow,
-        steps: workflow.steps.map((step: any) => ({
-          ...step,
-          // Ensure assignees are just an array of user IDs if your API expects that
-          // Or pass the full assignee objects if that's what the backend handles
-          // For now, assuming backend handles the structure as is in `workflow.steps`
-        }))
-      };
 
+    const workflowToSave = {
+      ...workflow,
+      steps: workflow.steps.map(step => ({
+        ...step,
+        // Ensure assignees are just an array of user IDs or emails if that's what backend expects.
+        // If backend expects UserOption[], then this map might not be needed for assignees.
+        // For now, assuming backend handles UserOption[] or that this structure is what's saved.
+        // Example: assignees: step.assignees.map(a => a.id) if only IDs are needed.
+      }))
+    };
+
+    try {
       const response = await fetch('/api/workflows', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(workflowToSave),
       });
       const data = await response.json();
-      if (data.success) {
-        toast.success('Workflow created successfully!');
-        router.push('/dashboard/workflows'); 
-      } else {
-        toast.error(data.error || 'Failed to create workflow.');
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to create workflow. Please try again.');
       }
-    } catch (error) {
-      toast.error('An unexpected error occurred.');
+      toast.success('Workflow created successfully!');
+      router.push(`/dashboard/workflows`); // Navigate to workflows list page
+    } catch (error: any) {
+      console.error('Error creating workflow:', error);
+      toast.error(error.message || 'An unexpected error occurred.');
     } finally {
       setIsSaving(false);
     }
   };
-  
-  if (isLoadingUser || (isLoading && canAccessPage)) { // Combined loading state
+
+
+  if (isLoadingUser) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,theme(spacing.16))-theme(spacing.12))] py-10">
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="text-muted-foreground mt-4">Loading...</p>
+        <p className="text-muted-foreground mt-4">Loading user data...</p>
       </div>
     );
   }
 
   if (!canAccessPage) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
+     return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
         <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
-        <h3 className="text-xl font-bold mb-2">Access Denied</h3>
-        <p className="text-muted-foreground">You do not have permission to create new Workflows.</p>
-        <Link href="/dashboard/workflows">
-          <Button variant="outline" className="mt-4">Back to Workflows</Button>
+        <h3 className="text-xl font-semibold mb-2">Access Denied</h3>
+        <p className="text-muted-foreground text-center mb-6">
+          You do not have permission to create new workflows.
+          <br />
+          Please contact an administrator if you believe this is an error.
+        </p>
+        <Link href="/dashboard" passHref>
+          <Button variant="outline">Back to Dashboard</Button>
         </Link>
       </div>
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground mt-4">Loading initial data...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" }, 
         { label: "Workflows", href: "/dashboard/workflows" }, 
-        { label: "Create New Workflow" }
+        { label: "New" }
       ]} />
 
-      <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-              <Link href="/dashboard/workflows" passHref>
-                  <Button variant="outline" size="icon" aria-label="Back to Workflows">
-                      <ArrowLeft className="h-4 w-4" />
-                  </Button>
-              </Link>
-              <div>
-                  <h1 className="text-2xl font-bold tracking-tight">Create New Workflow</h1>
-                  <p className="text-muted-foreground mt-1">Define the steps and reviewers for your content approval process.</p>
-              </div>
+      <div className="flex items-center justify-between mb-2">
+         <div className="flex items-center gap-3">
+           <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/workflows')} aria-label="Back to Workflows">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          {selectedBrandFull && 
+            <BrandIcon name={selectedBrandFull.name} color={selectedBrandFull.color ?? undefined} size="md" className="mr-1" />
+          }
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Create New Workflow</h1>
+            <p className="text-muted-foreground mt-1">
+              Design and configure a new content approval workflow.
+              {selectedBrandFull && <span className="block text-xs">For Brand: {selectedBrandFull.name}</span>}
+            </p>
           </div>
+        </div>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Workflow Details</CardTitle>
-          <CardDescription>Basic information for your new workflow.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="name">Workflow Name <span className="text-destructive">*</span></Label>
-              <Input id="name" name="name" value={workflow.name} onChange={handleUpdateWorkflowDetails} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="brand_id">Brand <span className="text-destructive">*</span></Label>
-              <Select value={workflow.brand_id} onValueChange={handleUpdateBrand}>
-                <SelectTrigger>
-                    <SelectValue placeholder={brands.length > 0 ? "Select a brand" : (isLoading ? "Loading brands..." : "No manageable brands")} >
-                        {selectedBrandFull ? 
-                            <span className="flex items-center">
-                                <BrandIcon name={selectedBrandFull.name} color={selectedBrandFull.color} className="mr-2 h-4 w-4" />
-                                {selectedBrandFull.name}
-                            </span> : (brands.length > 0 ? "Select a brand" : (isLoading ? "Loading brands..." : "No manageable brands"))
-                        }
-                    </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {brands.map(brand => (
-                    <SelectItem key={brand.id} value={brand.id}>
-                       <span className="flex items-center">
-                         <BrandIcon name={brand.name} color={brand.color} className="mr-2 h-4 w-4" />
-                         {brand.name}
-                       </span>
-                    </SelectItem>
-                  ))}
-                  {brands.length === 0 && !isLoading && <p className="p-2 text-sm text-muted-foreground">No brands available.</p>}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea id="description" name="description" value={workflow.description} onChange={handleUpdateWorkflowDetails} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="template_id">Associated Content Template (Optional)</Label>
-            <Select value={selectedTemplateId} onValueChange={handleUpdateTemplate}>
-                <SelectTrigger><SelectValue placeholder="Select a template (optional)" /></SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="">None</SelectItem>
-                    {contentTemplates.map(template => (
-                        <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">If selected, this workflow will be suggested for content created with this template.</p>
-          </div>
-           <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select value={workflow.status} onValueChange={handleUpdateWorkflowStatus}>
-                    <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Set status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Workflow Steps</CardTitle>
-          <CardDescription>Define the sequence of approval for this workflow. Add at least one step.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {workflow.steps.map((step: any, index: number) => (
-            <Card key={step.id || `step-${index}`} className="border p-4 space-y-4 bg-muted/30">
-              <div className="flex justify-between items-start">
-                <div className="flex-grow">
-                    <Label htmlFor={`step-name-${index}`}>Step Name <span className="text-destructive">*</span></Label>
-                    <Input 
-                        id={`step-name-${index}`} 
-                        value={step.name} 
-                        onChange={(e) => handleUpdateStepName(index, e.target.value)} 
-                        className="text-base font-semibold"/>
-                </div>
-                <div className="flex items-center ml-4 pt-1 space-x-1">
-                  <Button variant="ghost" size="icon" onClick={() => handleMoveStepUp(index)} disabled={index === 0} title="Move step up">
-                    <ChevronUp className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleMoveStepDown(index)} disabled={index === workflow.steps.length - 1} title="Move step down">
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                  {workflow.steps.length > 1 && (
-                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/90" onClick={() => handleRemoveStep(index)} title="Remove step">
-                      <XCircle className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
+      
+      <div className="grid grid-cols-1 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Workflow Details</CardTitle>
+            <CardDescription>Basic information about the workflow.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="space-y-2 lg:col-span-2">
+                <Label htmlFor="name">Workflow Name</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  value={workflow.name}
+                  onChange={handleUpdateWorkflowDetails}
+                  placeholder="e.g., Blog Post Approval"
+                />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor={`step-description-${index}`}>Step Description</Label>
-                <div className="relative">
-                    <Textarea 
-                        id={`step-description-${index}`} 
-                        value={step.description} 
-                        onChange={(e) => handleUpdateStepDescription(index, e.target.value)} 
-                        rows={2}/>
-                    <Button 
-                        type="button" 
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleGenerateStepDescription(index)}
-                        disabled={stepDescLoading[index] || !step.name.trim() || !workflow.brand_id}
-                        className="absolute bottom-2 right-2 text-xs"
-                    >
-                        {stepDescLoading[index] ? <Loader2 className="h-3 w-3 animate-spin mr-1"/> : null}
-                        AI Suggest
-                    </Button>
-                </div>
+                <Label htmlFor="status">Status</Label>
+                <Select value={workflow.status} onValueChange={handleUpdateWorkflowStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-
+              
               <div className="space-y-2">
-                <Label>Role for this step <span className="text-destructive">*</span></Label>
-                <RoleSelectionCards 
-                    stepIndex={index} 
-                    selectedRole={step.role} 
-                    onRoleSelect={(roleId) => handleUpdateStepRole(index, roleId)} 
-                />
+                <Label htmlFor="brand">Brand</Label>
+                <Select value={workflow.brand_id} onValueChange={handleUpdateBrand} disabled={brands.length === 0 && !isGlobalAdmin}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={brands.length === 0 && !isGlobalAdmin ? "No brands assigned" : "Select brand"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {brands.length === 0 && !isGlobalAdmin && (
+                      <div className="px-2 py-3 text-sm text-muted-foreground">
+                        You are not an admin for any brands.
+                      </div>
+                    )}
+                    {brands.map((brand) => (
+                      <SelectItem key={brand.id} value={brand.id}>
+                        <div className="flex items-center">
+                          <div 
+                            className="w-3 h-3 rounded-full mr-2" 
+                            style={{ backgroundColor: brand.color || '#CCCCCC' }}
+                          />
+                          {brand.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                 {brands.length === 0 && isGlobalAdmin && (
+                  <p className="text-xs text-muted-foreground">No brands found. <Link href="/dashboard/brands/new" className="underline">Create one?</Link></p>
+                )}
               </div>
-
-              <div className="flex items-center space-x-2">
-                <Switch 
-                    id={`approvalRequired-${index}`} 
-                    checked={step.approvalRequired} 
-                    onCheckedChange={(value) => handleUpdateStepApprovalRequired(index, value)} />
-                <Label htmlFor={`approvalRequired-${index}`}>Approval Required</Label>
+              
+              <div className="space-y-2">
+                <Label htmlFor="contentTemplate">Content Template (Optional)</Label>
+                <Select value={selectedTemplateId} onValueChange={handleUpdateTemplate}>
+                  <SelectTrigger id="contentTemplate">
+                    <SelectValue placeholder="Select a content template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NO_TEMPLATE_SELECTED">No Template</SelectItem>
+                    {contentTemplates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Link this workflow to a template to auto-apply it when new content is created from that template for the selected brand.
+                </p>
               </div>
-            </Card>
-          ))}
-          <Button variant="outline" onClick={handleAddStep} className="w-full">
-            <Plus className="mr-2 h-4 w-4" /> Add Step
-          </Button>
-        </CardContent>
-      </Card>
+            </div>
+            <div className="mt-4 space-y-2">
+              <Label htmlFor="description">Workflow Description (Optional)</Label>
+              <Textarea
+                id="description"
+                name="description"
+                value={workflow.description}
+                onChange={handleUpdateWorkflowDetails}
+                placeholder="Briefly describe what this workflow is for..."
+                rows={3}
+              />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Workflow Steps</CardTitle>
+                <CardDescription>Define the approval stages for this workflow.</CardDescription>
+              </div>
+              <Button onClick={handleAddStep} size="sm">
+                <Plus className="h-4 w-4 mr-1" />
+                Add Step
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {workflow.steps.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No steps defined for this workflow. Click "Add Step" to create your first workflow step.
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {workflow.steps.map((step, index) => (
+                  <div key={step.id} className="border rounded-lg p-4 bg-background">
+                    {/* Step Header: Number, Name Input, Action Buttons */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <span className="flex items-center justify-center w-6 h-6 bg-primary text-primary-foreground rounded-full text-xs font-medium">
+                          {index + 1}
+                        </span>
+                        <Input
+                          id={`step-name-${index}`}
+                          value={step.name}
+                          onChange={(e) => handleUpdateStepName(index, e.target.value)}
+                          placeholder={`Step ${index + 1} Name`}
+                          className="text-base font-medium flex-grow"
+                        />
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleMoveStepUp(index)}
+                          disabled={index === 0}
+                          aria-label="Move step up"
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleMoveStepDown(index)}
+                          disabled={index === workflow.steps.length - 1}
+                          aria-label="Move step down"
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveStep(index)}
+                          className="text-destructive hover:text-destructive/90"
+                          aria-label="Remove step"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
 
-      <div className="flex justify-end space-x-2">
+                    {/* Role Selection */}
+                    <div className="mb-4">
+                      <Label className="text-sm font-medium mb-2 block">Assigned Role</Label>
+                      <RoleSelectionCards
+                        selectedRole={step.role}
+                        onRoleSelect={(roleId) => handleUpdateStepRole(index, roleId)}
+                        stepIndex={index}
+                      />
+                    </div>
+
+                    {/* Step Description */}
+                    <div className="mb-4 space-y-2">
+                      <Label htmlFor={`step-description-${index}`} className="text-sm font-medium">Step Description</Label>
+                       <div className="relative">
+                        <Textarea
+                          id={`step-description-${index}`}
+                          value={step.description}
+                          onChange={(e) => handleUpdateStepDescription(index, e.target.value)}
+                          placeholder="Describe the purpose or actions for this step..."
+                          rows={3}
+                          className="pr-28" // Add padding to the right for the button
+                        />
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleGenerateStepDescription(index)}
+                            disabled={stepDescLoading[index]}
+                            className="absolute bottom-2 right-2"
+                        >
+                            {stepDescLoading[index] ? (
+                                <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Generating...</>
+                            ) : (
+                                <>✨ Auto-Generate</>
+                            )}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Optional Step Switch */}
+                    <div className="flex items-center space-x-2 mb-4">
+                      <Switch
+                        id={`approval-required-${index}`}
+                        checked={!step.approvalRequired} // UI shows "Optional", so invert logic
+                        onCheckedChange={(checked) => handleUpdateStepApprovalRequired(index, !checked)}
+                      />
+                      <Label htmlFor={`approval-required-${index}`} className="text-sm font-medium cursor-pointer">
+                        This step is optional (approval not strictly required)
+                      </Label>
+                    </div>
+                    
+                    {/* Assignees Section */}
+                    <div className="space-y-3">
+                        <Label htmlFor={`assignee-input-${index}`} className="text-sm font-medium">Assign Users (Optional)</Label>
+                        <div className="flex items-center gap-2">
+                            <Input
+                                id={`assignee-input-${index}`}
+                                type="text"
+                                placeholder="Enter email or search by name/email"
+                                value={assigneeInputs[index] || ''}
+                                onChange={(e) => handleAssigneeInputChange(index, e.target.value)}
+                                className="flex-grow"
+                            />
+                            <Button 
+                                type="button" 
+                                onClick={() => handleAddEmailAsAssignee(index)}
+                                disabled={!assigneeInputs[index]?.trim() || !assigneeInputs[index]?.includes('@')}
+                                variant="outline"
+                            >
+                                <UserPlus className="mr-2 h-4"/> Add Email
+                            </Button>
+                        </div>
+
+                        {/* User Search Results */}
+                        {userSearchLoading[index] && <div className="text-sm text-muted-foreground py-2"><Loader2 className="inline-block mr-2 h-4 w-4 animate-spin" />Searching users...</div>}
+                        {userSearchResults[index] && userSearchResults[index].length > 0 && (
+                            <Card className="mt-2 max-h-48 overflow-y-auto">
+                                <CardContent className="p-2 space-y-1">
+                                    {userSearchResults[index].map((user) => (
+                                        <button
+                                            key={user.id}
+                                            type="button"
+                                            onClick={() => handleAddUserToStep(index, user)}
+                                            className="w-full text-left p-2 hover:bg-accent rounded-md text-sm flex items-center justify-between"
+                                        >
+                                          <span>{user.full_name || user.email} {user.full_name && user.email && `(${user.email})`}</span>
+                                          <Plus className="h-4 w-4 text-muted-foreground" />
+                                        </button>
+                                    ))}
+                                </CardContent>
+                            </Card>
+                        )}
+                        {assigneeInputs[index] && userSearchResults[index]?.length === 0 && !userSearchLoading[index] && assigneeInputs[index].length >=2 && (
+                             <p className="text-sm text-muted-foreground py-2">No users found matching "{assigneeInputs[index]}". You can still add by full email address.</p>
+                        )}
+
+
+                        {/* Added Assignees Badges */}
+                        {step.assignees.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                                <p className="text-xs text-muted-foreground">Assigned:</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {step.assignees.map((assignee) => (
+                                        <Badge key={assignee.id} variant="secondary" className="pl-2 text-sm">
+                                            {assignee.full_name || assignee.email}
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveUserFromStep(index, assignee.id)}
+                                                className="ml-1.5 p-0.5 rounded-full hover:bg-destructive/20 text-destructive"
+                                                aria-label={`Remove ${assignee.full_name || assignee.email}`}
+                                            >
+                                                <XCircle className="h-3.5 w-3.5" />
+                                            </button>
+                                        </Badge>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex justify-end space-x-3 mt-8 sticky bottom-0 bg-background/95 py-4 z-10 border-t border-border">
         <Button variant="outline" onClick={() => router.push('/dashboard/workflows')} disabled={isSaving}>
-          Cancel
+            Cancel
         </Button>
-        <Button onClick={handleCreateWorkflow} disabled={isSaving || isLoading || isLoadingUser}>
-          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          Create Workflow
+        <Button onClick={handleCreateWorkflow} disabled={isSaving || isLoading}>
+          {isSaving ? (
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
+          ) : (
+            'Create Workflow'
+          )}
         </Button>
       </div>
+      
     </div>
   );
 } 
