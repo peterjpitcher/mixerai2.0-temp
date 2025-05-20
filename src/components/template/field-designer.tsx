@@ -173,8 +173,15 @@ export function FieldDesigner({ isOpen, fieldType, initialData, availableInputFi
       sonnerToast.error("Field name is required");
       return false;
     }
+    // Validation for Output field AI Auto-Complete
     if (fieldType === 'output' && (fieldData as OutputField).aiAutoComplete && (!fieldData.aiPrompt || !fieldData.aiPrompt.trim())) {
       sonnerToast.error("AI prompt is required for output fields when AI Auto-Complete is enabled.");
+      return false;
+    }
+    // New Validation for Input field AI Suggester
+    if (fieldType === 'input' && (fieldData as InputField).aiSuggester && (!fieldData.aiPrompt || !fieldData.aiPrompt.trim())) {
+      sonnerToast.error("AI prompt is required for input fields when AI Suggestions are enabled.");
+      setActiveTab('ai'); // Switch to AI tab to show the error
       return false;
     }
     return true;
@@ -330,7 +337,37 @@ export function FieldDesigner({ isOpen, fieldType, initialData, availableInputFi
                   <div className="space-y-2 mt-4">
                     <Label htmlFor="aiPrompt">AI Prompt <span className="text-muted-foreground text-xs">(instructions for AI)</span></Label>
                     <Textarea id="aiPrompt" placeholder="Write instructions for the AI suggester, e.g. 'Suggest SEO keywords for this article about {{topic}}'" value={fieldData.aiPrompt || ''} onChange={handleAIPromptChange} className="h-24"/>
-                    <p className="text-xs text-muted-foreground">Use {"{{placeholders}}"} to reference other input fields.</p>
+                    {availableInputFields && availableInputFields.length > 0 ? (
+                      <div className="mt-2">
+                        <p className="text-xs text-muted-foreground">Available input field placeholders (click to add):</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {availableInputFields.map(inputField => (
+                            // Exclude self-referencing placeholder if editing an existing field
+                            (initialData && initialData.id === inputField.id) ? null : (
+                              <Badge 
+                                key={inputField.id} 
+                                variant="secondary" 
+                                className="text-xs cursor-pointer"
+                                onClick={() => {
+                                  const currentPrompt = fieldData.aiPrompt || '';
+                                  // Add a space if currentPrompt is not empty and doesn't end with a space
+                                  const prefix = currentPrompt && !currentPrompt.endsWith(' ') ? ' ' : '';
+                                  const newPrompt = currentPrompt + prefix + `{{${inputField.name}}}`;
+                                  setFieldData(prev => ({...prev, aiPrompt: newPrompt } as Field));
+                                }}
+                              >
+                                {`{{${inputField.name}}}`}
+                              </Badge>
+                            )
+                          ))}
+                          {/* Also add a placeholder for {{article title}} if relevant, assuming 'title' is not an input field */} 
+                          {/* This might be better handled by a global placeholder list or specific context */} 
+                          {/* For now, let's assume only template input fields are primary placeholders here */} 
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Use {'{{input_field_name}}'} or {'{{article title}}'} to reference other fields.</p>
+                    )}
                   </div>
                 )}
               </>
