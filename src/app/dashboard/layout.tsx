@@ -107,6 +107,18 @@ export default function DashboardLayout({
             </Link>
           </div>
           <div className="flex items-center space-x-2 sm:space-x-4">
+            {/* Get Help Button - Links to Teams chat */}
+            <Button
+              size="sm"
+              asChild // To use Link properties
+              // Apply yellow-ish background with good contrast text and hover states
+              className="hidden sm:flex bg-yellow-400 text-neutral-800 hover:bg-yellow-500 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 dark:bg-yellow-500 dark:text-neutral-900 dark:hover:bg-yellow-600 dark:focus-visible:ring-yellow-500"
+            >
+              <Link href="https://teams.microsoft.com/l/chat/0/0?users=peter.pitcher@genmills.com" target="_blank" rel="noopener noreferrer">
+                Get Help
+              </Link>
+            </Button>
+
             {/* <NotificationCenter /> */}
             {isLoadingUser ? (
               <Loader2 className="h-5 w-5 animate-spin" />
