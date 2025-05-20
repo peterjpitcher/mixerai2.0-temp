@@ -20,7 +20,7 @@ interface HelpArticle {
 }
 
 async function getHelpArticles(): Promise<HelpArticle[]> {
-  const wikiDir = path.join(process.cwd(), 'docs', 'help-wiki');
+  const wikiDir = path.join(process.cwd(), 'src', 'content', 'help-wiki');
   try {
     const files = await fs.readdir(wikiDir);
     const markdownFiles = files.filter(file => file.endsWith('.md'));
@@ -49,7 +49,7 @@ async function getHelpArticleContent(slug: string): Promise<string | null> {
     console.error("Invalid slug provided for help article:", slug);
     return null;
   }
-  const filePath = path.join(process.cwd(), 'docs', 'help-wiki', `${slug}.md`);
+  const filePath = path.join(process.cwd(), 'src', 'content', 'help-wiki', `${slug}.md`);
   try {
     return await fs.readFile(filePath, 'utf-8');
   } catch (error) {
@@ -84,7 +84,7 @@ interface HelpPageProps {
 
 /**
  * HelpPage component - Renders a multi-page help wiki.
- * Articles are read from markdown files in the 'docs/help-wiki' directory.
+ * Articles are read from markdown files in the 'src/content/help-wiki' directory.
  * Navigation allows users to switch between articles.
  */
 export default async function HelpPage({ searchParams }: HelpPageProps) {
