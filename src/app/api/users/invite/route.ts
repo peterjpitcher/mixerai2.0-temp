@@ -89,6 +89,14 @@ export const POST = withAdminAuth(async (request: NextRequest, adminUser) => {
     if (inviteError || !invitedUser) {
       console.error(`[API /api/users/invite] Error inviting user ${emailToInvite} or setting app_metadata:`, inviteError);
       // inviteNewUserWithAppMetadata handles internal errors, but we check its return
+      
+      // Check for our custom rate limit error
+      if (inviteError && (inviteError as any).status === 429) {
+        return NextResponse.json(
+          { success: false, error: inviteError.message || 'Rate limit exceeded. Please try again shortly.' },
+          { status: 429 }
+        );
+      }
       return handleApiError(inviteError || new Error('Invitation process failed internally.'), 'Failed to invite user');
     }
 

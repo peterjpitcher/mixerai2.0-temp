@@ -83,6 +83,16 @@ export async function inviteNewUserWithAppMetadata(
 
     if (inviteError) {
       console.error(`[inviteNewUserWithAppMetadata] Error inviting user ${email}:`, inviteError);
+      // Check if this is a rate limit error from Supabase
+      // Supabase errors often have a 'status' property. 429 is 'Too Many Requests'.
+      // Specific error messages can also indicate rate limiting, e.g., "rate limit exceeded"
+      if ((inviteError as any).status === 429 || inviteError.message?.toLowerCase().includes('rate limit')) {
+        // Augment the error or create a new one to signify it's a rate limit issue
+        const rateLimitError = new Error('User invitation rate limit exceeded. Please try again later.');
+        (rateLimitError as any).status = 429; // Ensure status is set for downstream handlers
+        (rateLimitError as any).originalError = inviteError; // Keep original error for logging if needed
+        return { user: null, error: rateLimitError };
+      }
       // It's possible the user already exists. The calling function should have already checked this.
       // If inviteUserByEmail fails because user exists, it might return user data in error.details or similar.
       // However, this function assumes it's called for genuinely NEW users based on prior checks.
