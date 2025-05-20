@@ -55,24 +55,37 @@ export async function middleware(request: NextRequest) {
         request.nextUrl.pathname.startsWith('/api/') ||
         request.nextUrl.pathname.startsWith('/account')) {
       if (!refreshedSession) {
+        // Handle /dashboard/* and /account/* page routes: redirect to login
         if (request.nextUrl.pathname.startsWith('/dashboard') ||
             request.nextUrl.pathname.startsWith('/account')) {
           const redirectUrl = new URL('/auth/login', baseUrl);
           redirectUrl.searchParams.set('from', request.nextUrl.pathname);
+          // Preserve original security headers if any were set on the redirect
+          const existingHeaders = new Headers(response.headers);
           response = NextResponse.redirect(redirectUrl);
+          existingHeaders.forEach((val, key) => {
+            if (!response.headers.has(key)) response.headers.set(key, val);
+          });
+          // Ensure necessary security headers are always on the redirect
           response.headers.set('X-Content-Type-Options', 'nosniff');
           response.headers.set('X-Frame-Options', 'DENY');
           response.headers.set('X-XSS-Protection', '1; mode=block');
           response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+
+        // Handle /api/* routes: return 401 JSON if not a public API
+        } else if (request.nextUrl.pathname.startsWith('/api/')) {
           const publicApiPatterns = [
             'api/env-check', 
             'api/test-connection', 
             'api/test-metadata-generator', 
             'api/brands/identity'
+            // Add other public API patterns as needed
           ];
           const isPublicApi = publicApiPatterns.some(pattern => request.nextUrl.pathname.includes(pattern));
 
           if (!isPublicApi) {
+            // Preserve original security headers if any were set on the response
+            const existingHeaders = new Headers(response.headers);
             response = new NextResponse(
               JSON.stringify({ 
                 success: false, 
@@ -81,15 +94,17 @@ export async function middleware(request: NextRequest) {
               }),
               { 
                 status: 401, 
-                headers: { ...response.headers, 'content-type': 'application/json' }
+                headers: { 'content-type': 'application/json' } // Base headers for JSON response
               }
             );
+            // Apply existing headers to the new 401 response
+            existingHeaders.forEach((val, key) => {
+                if (!response.headers.has(key) && key.toLowerCase() !== 'content-type') { // Don't overwrite content-type
+                    response.headers.set(key, val);
+                }
+            });
           }
-        } else {
-          if (request.nextUrl.pathname === '/') {
-            const dashboardUrl = new URL('/dashboard', baseUrl);
-            response = NextResponse.redirect(dashboardUrl);
-          }
+          // If it IS a public API, response remains NextResponse.next(), allowing access
         }
       }
     } else if (request.nextUrl.pathname === '/') {
