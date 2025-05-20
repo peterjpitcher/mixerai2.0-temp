@@ -402,7 +402,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
       const permissionUpserts = resolvedAdminUserIds.map((adminId: string) => ({
         user_id: adminId,
         brand_id: newBrandId as string,
-        role: 'admin' as 'admin'
+        role: 'brand_admin' as const
       }));
 
       const { error: permissionError } = await supabase.from('user_brand_permissions').upsert(permissionUpserts, { onConflict: 'user_id,brand_id' });

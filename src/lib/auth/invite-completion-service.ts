@@ -55,11 +55,15 @@ async function assignSuperadminRole(userId: string, existingUserMetadata: any, s
 
 async function assignBrandPermissions(userId: string, brandId: string, role: UserRoles, supabase: SupabaseClient<Database>) {
   console.log(`[InviteService] Assigning role '${role}' to user ${userId} for brand ${brandId}`);
+  
+  // Map 'admin' (from UserRoles / global context) to 'brand_admin' for user_brand_permissions table
+  const brandPermissionRole = role === 'admin' ? 'brand_admin' : role;
+  
   const { error } = await supabase
     .from('user_brand_permissions')
-    .upsert({ user_id: userId, brand_id: brandId, role: role }, { onConflict: 'user_id,brand_id' });
+    .upsert({ user_id: userId, brand_id: brandId, role: brandPermissionRole }, { onConflict: 'user_id,brand_id' });
   if (error) throw new Error(`DB_BRAND_PERMISSION_FAIL: ${error.message}`);
-  console.log(`[InviteService] Successfully assigned brand permission for user ${userId}, brand ${brandId}.`);
+  console.log(`[InviteService] Successfully assigned brand permission (as '${brandPermissionRole}') for user ${userId}, brand ${brandId}.`);
 }
 
 async function finalizeWorkflowUser(

@@ -144,7 +144,7 @@ export const GET = withAuth(async (
       .from('user_brand_permissions')
       .select('user_id, profiles (id, full_name, email, avatar_url, job_title)') // Assuming profiles table exists and is linked
       .eq('brand_id', brandId)
-      .eq('role', 'admin');
+      .eq('role', 'brand_admin');
 
     if (adminPermissionsError) {
       console.error('Error fetching brand admins:', adminPermissionsError);
@@ -271,103 +271,99 @@ export const PUT = withAuth(async (
       updateData.guardrails = formattedGuardrails;
     }
     
-    // --- START: Updated Brand Admin Processing ---
-    const newAdminIdentifiersFromRequest: string[] = body.brand_admin_ids || [];
-    const existingAdminUserIdsToKeepOrAdd: string[] = [];
-    
-    // 1. Get current admins for this brand from DB
-    const { data: currentPermissions, error: currentPermissionsError } = await supabase
-      .from('user_brand_permissions')
-      .select('user_id')
-      .eq('brand_id', brandIdToUpdate)
-      .eq('role', 'admin');
+    // Handle brand admins updates
+    if (body.admins !== undefined && Array.isArray(body.admins)) {
+      const newAdminEmails = body.admins.map((admin: { email: string }) => admin.email.toLowerCase());
 
-    if (currentPermissionsError) {
-      console.error('[API /api/brands PUT] Error fetching current brand permissions:', currentPermissionsError);
-      throw currentPermissionsError;
-    }
-    const currentAdminDbIds = currentPermissions ? currentPermissions.map(p => p.user_id) : [];
-
-    // 2. Process identifiers from request (can be emails for new users, or IDs for existing)
-    for (const identifier of newAdminIdentifiersFromRequest) {
-      let adminUserToProcess: User | null = null;
-
-      if (identifier.includes('@')) { // Assumed to be an email
-        const existingAuthUser = await getUserAuthByEmail(identifier, supabase);
-        if (existingAuthUser) {
-          adminUserToProcess = existingAuthUser;
-        } else {
-          // New user: invite them
-          console.log(`[API /api/brands PUT] Admin email ${identifier} not found. Inviting as new user for brand ${brandIdToUpdate}.`);
-          const appMetadata = { 
-            intended_role: 'admin', 
-            assigned_as_brand_admin_for_brand_id: brandIdToUpdate,
-            inviter_id: authenticatedUser.id, 
-            invite_type: 'brand_admin_invite_on_update' 
-          };
-          const userMetadata = { email_for_invite: identifier };
-
-          const { user: invitedAdmin, error: inviteError } = await inviteNewUserWithAppMetadata(
-            identifier, 
-            appMetadata, 
-            supabase,
-            userMetadata
-          );
-
-          if (inviteError || !invitedAdmin) {
-            console.warn(`[API /api/brands PUT] Failed to invite new admin ${identifier} for brand ${brandIdToUpdate}. Error: ${inviteError?.message}. Skipping this admin.`);
-            continue; // Skip this problematic invite
-          }
-          // For newly invited users, their permissions will be set by complete-invite.
-          // We don't add them to existingAdminUserIdsToKeepOrAdd yet, as they need to accept invite.
-          console.log(`[API /api/brands PUT] Successfully invited new admin ${identifier} (ID: ${invitedAdmin.id}) for brand ${brandIdToUpdate}.`);
-          continue; // Move to next identifier
-        }
-      } else { // Assumed to be a user ID
-        // Here, we could fetch the user by ID to confirm they exist in auth.users
-        // For simplicity, if it's a UUID, assume it's a valid existing user ID for now.
-        // A more robust check would be `supabase.auth.admin.getUserById(identifier)`
-        adminUserToProcess = { id: identifier } as User; // Partial, but ID is what we need
-      }
-
-      if (adminUserToProcess && adminUserToProcess.id) {
-        existingAdminUserIdsToKeepOrAdd.push(adminUserToProcess.id);
-      }
-    }
-    
-    // 3. Determine admins to remove from permissions
-    // These are admins currently in DB but NOT in the list of existing users to keep/add from request
-    const adminsToRemoveFromDb = currentAdminDbIds.filter(id => id !== null && !existingAdminUserIdsToKeepOrAdd.includes(id));
-    if (adminsToRemoveFromDb.length > 0) {
-      const { error: deleteAdminsError } = await supabase
+      // Get current brand admins
+      const { data: currentBrandAdmins, error: currentAdminsError } = await supabase
         .from('user_brand_permissions')
-        .delete()
+        .select('user_id, users:profiles(email)') // Assuming 'profiles' table has email and is referenced as 'users' here
         .eq('brand_id', brandIdToUpdate)
-        .in('user_id', adminsToRemoveFromDb)
-        .eq('role', 'admin');
-      if (deleteAdminsError) {
-        console.error('[API /api/brands PUT] Error removing old brand admins:', deleteAdminsError);
-        // Log and continue, or throw depending on desired strictness
-      }
-    }
+        .eq('role', 'brand_admin');
 
-    // 4. Upsert permissions for existing users who should be admins
-    // (either they were already admin and are kept, or are existing users newly added as admin)
-    if (existingAdminUserIdsToKeepOrAdd.length > 0) {
-      const upsertOperations = existingAdminUserIdsToKeepOrAdd.map(adminId => ({
-        user_id: adminId,
-        // @ts-ignore - brandIdToUpdate is string due to route param & prior checks
-        brand_id: brandIdToUpdate as string, 
-        role: 'admin' as 'admin',
-      }));
-      const { error: upsertAdminsError } = await supabase
-        .from('user_brand_permissions')
-        .upsert(upsertOperations, { onConflict: 'user_id,brand_id' });
-      if (upsertAdminsError) {
-        console.error('[API /api/brands PUT] Error upserting brand admin permissions for existing users:', upsertAdminsError);
+      if (currentAdminsError) throw currentAdminsError;
+
+      const currentAdminEmails = currentBrandAdmins?.map((p: any) => p.users?.email?.toLowerCase()).filter(Boolean) || [];
+      
+      const emailsToAdd = newAdminEmails.filter(email => !currentAdminEmails.includes(email));
+      const userIdsToRemove = currentBrandAdmins
+                              ?.filter((p: any) => p.users?.email && !newAdminEmails.includes(p.users.email.toLowerCase()))
+                              .map((p: any) => p.user_id) || [];
+
+      // Remove admins
+      if (userIdsToRemove.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('user_brand_permissions')
+          .delete()
+          .in('user_id', userIdsToRemove)
+          .eq('brand_id', brandIdToUpdate)
+          .eq('role', 'brand_admin'); // Ensure we only delete 'brand_admin' roles
+        if (deleteError) throw deleteError;
+      }
+
+      // Add or invite new admins
+      const upsertOperations: Array<{ user_id: string; brand_id: string; role: 'brand_admin'; }> = [];
+      for (const email of emailsToAdd) {
+        let existingUser: User | null = null;
+        let userFetchError: Error | null = null;
+
+        try {
+          existingUser = await getUserAuthByEmail(email, supabase);
+        } catch (e: any) {
+          userFetchError = e;
+        }
+
+        if (existingUser) {
+          // If user exists, add permission
+          upsertOperations.push({
+            user_id: existingUser.id,
+            brand_id: brandIdToUpdate,
+            role: 'brand_admin' as const,
+          });
+        } else if (userFetchError) {
+          // Handle other errors during user fetch
+          console.error(`Error fetching user ${email} during getUserAuthByEmail:`, userFetchError);
+        } else {
+          // User not found (existingUser is null and no unexpected error from getUserAuthByEmail)
+          // Attempt to invite them
+          try {
+            const { user: invitedUserObject, error: inviteError } = await inviteNewUserWithAppMetadata(
+              email,
+              { role: 'editor', invited_to_brand: brandIdToUpdate, invited_as_brand_role: 'brand_admin' },
+              supabase
+            );
+
+            if (inviteError) {
+              console.error(`Failed to invite user ${email} (inviteNewUserWithAppMetadata error):`, inviteError);
+              // Decide if you want to throw, or collect errors and report them
+            } else if (invitedUserObject) {
+              upsertOperations.push({
+                user_id: invitedUserObject.id,
+                brand_id: brandIdToUpdate,
+                role: 'brand_admin' as const,
+              });
+            } else {
+              // This case (no error, no user object) should ideally not happen based on inviteNewUserWithAppMetadata signature if invite is successful
+              console.warn(`Invite for ${email} completed without error but no user object was returned.`);
+            }
+          } catch (inviteCatchError: any) {
+            // Catch any unexpected error during the invite process itself
+            console.error(`Unexpected error during invite process for ${email}:`, inviteCatchError);
+          }
+        }
+      }
+      
+      if (upsertOperations.length > 0) {
+        const { error: upsertError } = await supabase
+          .from('user_brand_permissions')
+          .upsert(upsertOperations, { onConflict: 'user_id,brand_id' });
+        if (upsertError) {
+          console.error('Error upserting brand admin permissions:', upsertError);
+          throw upsertError;
+        }
       }
     }
-    // --- END: Updated Brand Admin Processing ---
     
     let updatedSupabaseBrandData: any = null;
     if (Object.keys(updateData).length > 0) {
