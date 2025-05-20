@@ -249,6 +249,26 @@ We've implemented a comprehensive navigation system update to improve the user e
 
 For more details, see the full documentation in [docs/NAVIGATION_SYSTEM.md](docs/NAVIGATION_SYSTEM.md).
 
+### AI Suggestion Feature Update (Content Templates & Generator)
+
+We have updated the AI-powered suggestion feature for input fields within content templates and the content generator:
+
+1.  **Template Editor (`/dashboard/templates/[id]/edit`)**:
+    *   The button to directly test/generate suggestions from within the template field editor (FieldDesigner component) has been **removed**. This simplifies the template creation interface, focusing it on defining the structure and AI prompts rather than immediate testing of suggestions.
+
+2.  **Content Generator (`/dashboard/content/new?template=[templateId]`)**:
+    *   When using a template to generate content, input fields that are configured with "AI Suggestions" enabled and have an AI prompt will now display a **"Suggest" button** directly next to the input field.
+    *   Clicking this button will trigger an API call to get an AI-generated suggestion for that specific field, based on its configured prompt and any other relevant input field values (if the prompt uses placeholders).
+    *   The input field will be populated with the suggestion upon successful generation.
+
+3.  **New API Endpoint (`/api/ai/suggest`)**:
+    *   A new POST API endpoint has been created to handle these on-demand suggestions.
+    *   It accepts a `prompt` (and optionally `brand_id` for future context).
+    *   It utilizes the `generateTextCompletion` function from the Azure OpenAI library to generate a concise suggestion.
+    *   This provides a dedicated and streamlined way to get quick suggestions for individual fields without performing a full content generation pass.
+
+This change aims to improve the user workflow by providing AI assistance directly where it's needed during content creation, while keeping the template definition process focused.
+
 ## Side Navigation User-Specific Visibility
 
 As of the last review, the side navigation components (`src/components/layout/side-navigation.tsx` and `src/components/layout/side-navigation-v2.tsx`) **do not** implement any logic to hide or show navigation items based on user roles or permissions.

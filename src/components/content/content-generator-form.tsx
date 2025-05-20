@@ -14,9 +14,10 @@ import { RichTextEditor } from './rich-text-editor';
 import { useRouter } from 'next/navigation';
 import { BrandIcon } from '@/components/brand-icon';
 import { toast } from 'sonner';
-import { Loader2, ArrowLeft, PlusCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, PlusCircle, Sparkles } from 'lucide-react';
 import { marked } from 'marked';
 import Link from 'next/link';
+import type { InputField, OutputField, ContentTemplate as Template, SelectOptions } from '@/types/template';
 
 interface Brand {
   id: string;
@@ -25,33 +26,6 @@ interface Brand {
   brand_identity?: string | null;
   tone_of_voice?: string | null;
   guardrails?: string | null;
-}
-
-interface TemplateInputField {
-  id: string;
-  name: string;
-  type: 'shortText' | 'longText' | 'select' | 'tags' | string;
-  required?: boolean;
-  value?: string; 
-  options?: {
-    choices?: string[];
-  };
-}
-
-interface TemplateOutputField {
-  id: string;
-  name: string;
-  type: string;
-}
-
-interface Template {
-  id: string;
-  name: string;
-  description: string;
-  fields: {
-    inputFields: TemplateInputField[];
-    outputFields: TemplateOutputField[];
-  };
 }
 
 interface WorkflowSummary {
@@ -98,6 +72,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
   const [templateFieldValues, setTemplateFieldValues] = useState<Record<string, string>>({});
   const [associatedWorkflowDetails, setAssociatedWorkflowDetails] = useState<WorkflowSummary | null>(null);
   const [isFetchingWorkflow, setIsFetchingWorkflow] = useState(false);
+  const [isGeneratingSuggestionFor, setIsGeneratingSuggestionFor] = useState<string | null>(null);
   
   const currentBrand = brands.find(b => b.id === selectedBrand);
 
@@ -107,11 +82,11 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
       const response = await fetch(`/api/content-templates/${id}`);
       const data = await response.json();
       if (data.success && data.template) {
-        setTemplate(data.template);
+        setTemplate(data.template as Template);
         const initialValues: Record<string, string> = {};
         if (data.template.fields && data.template.fields.inputFields) {
-          (data.template.fields.inputFields as TemplateInputField[]).forEach(field => {
-            initialValues[field.id] = field.value || '';
+          (data.template.fields.inputFields as InputField[]).forEach(field => {
+            initialValues[field.id] = (field as any).value || '';
           });
         }
         setTemplateFieldValues(initialValues);
@@ -159,9 +134,9 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
               setAssociatedWorkflowDetails(matchingWorkflow);
             }
           } else {
-            toast.error('Could not determine workflow.');
+            // toast.error('Could not determine workflow.'); // Optional: less noisy
           }
-        } catch (error) { toast.error('Error determining workflow.'); }
+        } catch (error) { /* toast.error('Error determining workflow.'); */ } // Optional: less noisy
         finally { setIsFetchingWorkflow(false); }
       }
     };
@@ -170,6 +145,71 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
 
   const handleTemplateFieldChange = (fieldId: string, value: string) => {
     setTemplateFieldValues(prev => ({ ...prev, [fieldId]: value }));
+  };
+
+  const interpolatePrompt = (prompt: string): string => {
+    let interpolated = prompt;
+    if (template) {
+      template.fields.inputFields.forEach(inputField => {
+        const placeholderByName = `{{${inputField.name}}}`;
+        const placeholderById = `{{${inputField.id}}}`;
+        const value = templateFieldValues[inputField.id] || '';
+        // Escape special characters for regex, then replace globally
+        const regexByName = new RegExp(placeholderByName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        interpolated = interpolated.replace(regexByName, value);
+        const regexById = new RegExp(placeholderById.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        interpolated = interpolated.replace(regexById, value);
+      });
+    }
+
+    // Specifically replace {{article title}} with the main title state, case-insensitively
+    if (title) { // Ensure title is not empty
+      const articleTitlePlaceholder = /\{\{\s*article title\s*\}\}/gi; // Matches {{article title}}, {{ Article Title }}, etc.
+      interpolated = interpolated.replace(articleTitlePlaceholder, title);
+    }
+    
+    return interpolated;
+  };
+
+  const handleGenerateSuggestion = async (field: InputField) => {
+    if (!selectedBrand) {
+      toast.error("Please select a brand first.");
+      return;
+    }
+    if (!field.aiPrompt) {
+      toast.error("No AI prompt configured for this field.");
+      return;
+    }
+
+    setIsGeneratingSuggestionFor(field.id);
+    try {
+      const populatedPrompt = interpolatePrompt(field.aiPrompt);
+      
+      const requestBody = {
+        brand_id: selectedBrand,
+        prompt: populatedPrompt,
+      };
+
+      const response = await fetch('/api/ai/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.suggestion) {
+        setTemplateFieldValues(prev => ({ ...prev, [field.id]: data.suggestion }));
+        toast.success(`Suggestion generated for ${field.name}`);
+      } else {
+        toast.error(data.error || `Failed to generate suggestion for ${field.name}.`);
+      }
+    } catch (error) {
+      toast.error(`Error generating suggestion for ${field.name}.`);
+      console.error(`Error generating suggestion for ${field.name}:`, error);
+    } finally {
+      setIsGeneratingSuggestionFor(null);
+    }
   };
 
   const handleGenerate = async () => {
@@ -403,7 +443,26 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
                     <h3 className="text-lg font-medium pt-2">Template Fields</h3>
                     {template.fields.inputFields.map((field) => (
                     <div key={field.id} className="space-y-1.5">
-                        <Label htmlFor={field.id}>{field.name}{field.required && <span className="text-destructive">*</span>}</Label>
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor={field.id}>{field.name}{field.required && <span className="text-destructive">*</span>}</Label>
+                            {field.aiSuggester && field.aiPrompt && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleGenerateSuggestion(field)}
+                                disabled={isGeneratingSuggestionFor !== null || !selectedBrand}
+                                className="ml-2"
+                              >
+                                {isGeneratingSuggestionFor === field.id ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Sparkles className="mr-2 h-4 w-4" />
+                                )}
+                                {isGeneratingSuggestionFor === field.id ? 'Generating...' : 'Suggest'}
+                              </Button>
+                            )}
+                        </div>
                         {field.type === 'shortText' && (
                         <Input 
                             id={field.id} 
@@ -420,14 +479,14 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
                             placeholder={`Enter ${field.name}`}
                         />
                         )}
-                        {field.type === 'select' && field.options?.choices && (
+                        {field.type === 'select' && field.options && (field.options as SelectOptions).choices && (
                         <Select 
                             value={templateFieldValues[field.id] || ''} 
                             onValueChange={(value) => handleTemplateFieldChange(field.id, value)}
                         >
                             <SelectTrigger id={field.id}><SelectValue placeholder={`Select ${field.name}`} /></SelectTrigger>
                             <SelectContent>
-                            {field.options.choices.map(choice => (
+                            {((field.options as SelectOptions).choices!).map(choice => (
                                 <SelectItem key={choice} value={choice}>{choice}</SelectItem>
                             ))}
                             </SelectContent>

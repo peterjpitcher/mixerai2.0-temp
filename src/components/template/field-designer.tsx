@@ -331,19 +331,6 @@ export function FieldDesigner({ isOpen, fieldType, initialData, availableInputFi
                     <Label htmlFor="aiPrompt">AI Prompt <span className="text-muted-foreground text-xs">(instructions for AI)</span></Label>
                     <Textarea id="aiPrompt" placeholder="Write instructions for the AI suggester, e.g. 'Suggest SEO keywords for this article about {{topic}}'" value={fieldData.aiPrompt || ''} onChange={handleAIPromptChange} className="h-24"/>
                     <p className="text-xs text-muted-foreground">Use {"{{placeholders}}"} to reference other input fields.</p>
-                    {templateId && (
-                      <div className="mt-3">
-                        <Link href={`/dashboard/content/new?template=${templateId}&field=${fieldData.id}&prompt=${encodeURIComponent(fieldData.aiPrompt || '')}`} passHref>
-                          <Button type="button" variant="outline" size="sm">
-                            <Rocket className="mr-2 h-4 w-4" />
-                            Generate Suggestions
-                          </Button>
-                        </Link>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          This will take you to the content generator using this template to get suggestions for this field based on your prompt.
-                        </p>
-                      </div>
-                    )}
                   </div>
                 )}
               </>

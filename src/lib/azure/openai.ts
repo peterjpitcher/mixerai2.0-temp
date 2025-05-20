@@ -59,38 +59,64 @@ export async function generateTextCompletion(
   temperature: number = 0.7
 ): Promise<string | null> {
   try {
-    const client = getAzureOpenAIClient();
     const deploymentName = getModelName(); // Use the centralized model/deployment name
+    const azureOpenAIEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
+    const apiKey = process.env.AZURE_OPENAI_API_KEY;
+
+    if (!azureOpenAIEndpoint || !apiKey) {
+      console.error("[generateTextCompletion] Azure OpenAI endpoint or API key is missing.");
+      throw new Error("Azure OpenAI endpoint or API key is missing for direct fetch.");
+    }
 
     console.log(`[generateTextCompletion] Making API call to Azure OpenAI deployment: ${deploymentName}`);
     console.log(`[generateTextCompletion] System Prompt: ${systemPrompt.substring(0, 100)}...`);
     console.log(`[generateTextCompletion] User Prompt: ${userPrompt.substring(0,100)}...`);
 
-
-    const completion = await client.chat.completions.create({
-      model: deploymentName, // Pass deployment name as model
+    const completionRequest = {
+      model: deploymentName, // Though model is in path, SDKs often still expect it
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
       max_tokens: maxTokens,
       temperature: temperature,
+    };
+
+    const endpointUrl = `${azureOpenAIEndpoint}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
+    console.log(`[generateTextCompletion] Using direct fetch endpoint URL: ${endpointUrl}`);
+
+    const response = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': apiKey,
+      },
+      body: JSON.stringify(completionRequest),
     });
 
-    if (completion.choices && completion.choices.length > 0 && completion.choices[0].message) {
-      const content = completion.choices[0].message.content;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[generateTextCompletion] API request failed with status ${response.status}: ${errorText}`);
+      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+    }
+
+    const responseData = await response.json();
+
+    if (responseData.choices && responseData.choices.length > 0 && responseData.choices[0].message) {
+      const content = responseData.choices[0].message.content;
       console.log(`[generateTextCompletion] Successfully received content. Length: ${content?.length}`);
       return content;
     } else {
       console.error("[generateTextCompletion] No content in completion choices or choices array is empty.");
-      return null;
+      // Consistent with original logic, though an error was thrown above for !response.ok
+      // This case implies a 200 OK but unexpected payload.
+      return null; 
     }
   } catch (error) {
     console.error("[generateTextCompletion] Error calling Azure OpenAI:", error);
-    // Do not throw here to allow the caller to handle it, consistent with other functions like generateContentFromTemplate
-    // which catch and log but might return partial results or fallbacks.
-    // For this generic function, returning null indicates failure.
-    return null; 
+    // Re-throw the error so the caller (e.g., an API route) can handle it specifically
+    // and provide a more detailed response to the client.
+    throw error; 
   }
 }
 
