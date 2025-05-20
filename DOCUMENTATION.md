@@ -38,6 +38,29 @@ AI-generated content using Azure OpenAI, supporting generation via customizable 
 - Structured to industry best practices (guided by template structure).
 For detailed information on Azure OpenAI integration, see [Azure OpenAI Integration](./docs/azure_openai_integration.md).
 
+**New: Brand-Aware Template Prompts**
+- Content Templates can now be associated with a specific Brand via a `brand_id`.
+- When editing a template field's AI prompt (specifically for output fields with AI Auto-Complete), users can now insert placeholders for the associated brand's:
+    - Name (`{{brand.name}}`)
+    - Identity (`{{brand.identity}}`)
+    - Tone of Voice (`{{brand.tone_of_voice}}`)
+    - Guardrails (`{{brand.guardrails}}`)
+- This allows AI prompts to be more context-aware and aligned with specific brand guidelines.
+- **Database Change:** The `content_templates` table requires a new nullable `brand_id UUID` column that references `brands(id)`. A migration script should be run:
+  ```sql
+  ALTER TABLE content_templates
+  ADD COLUMN brand_id UUID REFERENCES brands(id) ON DELETE SET NULL;
+  
+  -- Optional: Add an index if you expect to query by brand_id frequently
+  -- CREATE INDEX idx_content_templates_brand_id ON content_templates(brand_id);
+  ```
+- **API Updates:**
+    - `POST /api/content-templates`: Now accepts and stores `brand_id`.
+    - `PUT /api/content-templates/{id}`: Now accepts and updates `brand_id`.
+- **Frontend Updates:**
+    - `TemplateForm` (`src/components/template/template-form.tsx`) now fetches and displays details of the associated brand if `brand_id` is present.
+    - `FieldDesigner` (`src/components/template/field-designer.tsx`) modal, when editing an output field's AI prompt, provides buttons to insert the above brand-specific placeholders if a brand is associated with the template.
+
 ## Recent Updates and Feature Details
 
 # MixerAI 2.0 - UI and Authentication Updates

@@ -84,6 +84,7 @@ export interface ContentTemplate {
   description: string | null;
   icon: string | null;
   fields: TemplateFields;
+  brand_id?: string | null;
   created_at: string | null;
   created_by: string | null;
   updated_at: string | null;

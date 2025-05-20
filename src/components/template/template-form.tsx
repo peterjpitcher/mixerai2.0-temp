@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
 import { Button } from '@/components/button';
@@ -22,15 +22,8 @@ import {
   ContentTemplate 
 } from '@/types/template';
 
-interface TemplateData {
-  id?: string;
-  name: string;
-  description: string;
-  icon?: string;
-  fields: {
-    inputFields: InputField[];
-    outputFields: OutputField[];
-  };
+interface TemplateData extends ContentTemplate {
+  // id, name, description, icon, fields, brand_id?, created_at, created_by, updated_at
 }
 
 interface TemplateFormProps {
@@ -43,17 +36,23 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
   const [activeTab, setActiveTab] = useState('input');
   const [templateData, setTemplateData] = useState<TemplateData>(
     initialData || {
+      id: '',
       name: '',
       description: '',
+      icon: null,
+      brand_id: null, // Keep brand_id for data model consistency, but don't use for UI logic here
       fields: {
         inputFields: [],
         outputFields: []
-      }
+      },
+      created_at: null,
+      created_by: null,
+      updated_at: null,
     }
   );
   const [isAddingField, setIsAddingField] = useState(false);
   const [editingField, setEditingField] = useState<Field | null>(null);
-  
+
   const handleBasicInfoChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setTemplateData(prev => ({
@@ -78,10 +77,8 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
       let updatedFields;
       
       if (isNew) {
-        // Add new field
         updatedFields = [...prev.fields[fieldsList], field];
       } else {
-        // Update existing field
         updatedFields = prev.fields[fieldsList].map(f => 
           f.id === field.id ? field : f
         );
@@ -122,8 +119,9 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
   
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
-    
+
     const { source, destination } = result;
+
     if (activeTab === 'input') {
       const items = Array.from(templateData.fields.inputFields);
       const [reorderedItem] = items.splice(source.index, 1);
@@ -135,7 +133,7 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
           inputFields: items
         }
       }));
-    } else {
+    } else if (activeTab === 'output') {
       const items = Array.from(templateData.fields.outputFields);
       const [reorderedItem] = items.splice(source.index, 1);
       items.splice(destination.index, 0, reorderedItem as OutputField);
@@ -152,7 +150,6 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate form
     if (!templateData.name) {
       toast.error('Template name is required');
       return;
@@ -171,18 +168,23 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
     try {
       setIsSubmitting(true);
       
-      const url = initialData 
+      const payload = { ...templateData }; 
+      if (payload.brand_id === undefined) {
+          payload.brand_id = null;
+      }
+
+      const url = initialData?.id && initialData.id !== 'new'
         ? `/api/content-templates/${initialData.id}` 
         : '/api/content-templates';
       
-      const method = initialData ? 'PUT' : 'POST';
+      const method = initialData?.id && initialData.id !== 'new' ? 'PUT' : 'POST';
       
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(templateData),
+        body: JSON.stringify(payload),
       });
       
       const data = await response.json();
@@ -191,142 +193,158 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
         throw new Error(data.error || 'Failed to save template');
       }
       
-      toast(initialData ? 'Template updated successfully' : 'Template created successfully');
+      toast.success(initialData?.id && initialData.id !== 'new' ? 'Template updated successfully' : 'Template created successfully');
       
       router.push('/dashboard/templates');
+      router.refresh();
     } catch (error: any) {
       console.error('Error saving template:', error);
-      
       toast.error(error.message || 'Failed to save template');
     } finally {
       setIsSubmitting(false);
     }
   };
-  
+
   return (
-    <div className="space-y-6">
-      <form onSubmit={handleSubmit}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Template Details</CardTitle>
-            <CardDescription>
-              Define your template's basic information
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Template Name</Label>
-              <Input
-                id="name"
-                name="name"
-                placeholder="e.g. Article Template"
-                value={templateData.name}
-                onChange={handleBasicInfoChange}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                placeholder="Briefly describe what this template is for"
-                value={templateData.description}
-                onChange={handleBasicInfoChange}
-              />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="input">Input Fields ({templateData.fields.inputFields.length})</TabsTrigger>
-            <TabsTrigger value="output">Output Fields ({templateData.fields.outputFields.length})</TabsTrigger>
-          </TabsList>
-          
-          {(activeTab === 'input' || activeTab === 'output') && (
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>{activeTab === 'input' ? 'Input' : 'Output'} Fields</CardTitle>
-                <CardDescription>
-                  Define the {activeTab === 'input' ? 'information needed to generate content' : 'content sections to be generated'}.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isAddingField ? (
-                  <FieldDesigner 
-                    isOpen={isAddingField}
-                    fieldType={activeTab === 'input' ? 'input' : 'output'}
-                    availableInputFields={templateData.fields.inputFields.map(f => ({ id: f.id, name: f.name }))}
-                    initialData={editingField}
-                    templateId={templateData.id}
-                    onSave={handleFieldSave}
-                    onCancel={handleFieldCancel}
-                  />
-                ) : (
-                  <>                  
-                    <DragDropContext onDragEnd={handleDragEnd}>
-                      <Droppable droppableId="fields">
-                        {(provided) => (
-                          <div
-                            {...provided.droppableProps}
-                            ref={provided.innerRef}
-                            className="space-y-4"
-                          >
-                            {(activeTab === 'input' ? templateData.fields.inputFields : templateData.fields.outputFields).map((field, index) => (
-                              <Draggable key={field.id} draggableId={field.id} index={index}>
-                                {(provided) => (
-                                  <div
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                    className="flex items-center justify-between p-4 border rounded-lg bg-card hover:bg-muted/50"
-                                  >
-                                    <div className="flex items-center space-x-3">
-                                      <Menu className="h-5 w-5 text-muted-foreground" />
-                                      <div>
-                                        <p className="font-medium">{field.name}</p>
-                                        <p className="text-sm text-muted-foreground">
-                                          Type: {field.type} {field.required ? ' (Required)' : ''}
-                                        </p>
-                                      </div>
-                                    </div>
-                                    <div className="space-x-2">
-                                      <Button variant="outline" size="sm" onClick={() => handleEditField(field)}>
-                                        Edit
-                                      </Button>
-                                      <Button variant="destructive" size="sm" onClick={() => handleFieldDelete(field.id)}>
-                                        Delete
-                                      </Button>
-                                    </div>
-                                  </div>
-                                )}
-                              </Draggable>
-                            ))}
-                            {provided.placeholder}
-                          </div>
-                        )}
-                      </Droppable>
-                    </DragDropContext>
-                    <Button variant="outline" className="mt-6 w-full" onClick={handleAddField}>
-                      <Icons.plus className="mr-2 h-4 w-4" /> Add Field
-                    </Button>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </Tabs>
-        
-        <div className="flex justify-end pt-6 space-x-4">
-          <Button variant="outline" type="button" onClick={() => router.push('/dashboard/templates')}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : (initialData ? 'Save Changes' : 'Create Template')}
-          </Button>
-        </div>
-      </form>
-    </div>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Basic Information</CardTitle>
+          <CardDescription>Set the name and description for your template.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="name">Template Name</Label>
+            <Input 
+              id="name" 
+              name="name" 
+              value={templateData.name} 
+              onChange={handleBasicInfoChange} 
+              placeholder="e.g., Blog Post Template"
+              required 
+            />
+          </div>
+          <div>
+            <Label htmlFor="description">Description</Label>
+            <Textarea 
+              id="description" 
+              name="description" 
+              value={templateData.description || ''} 
+              onChange={handleBasicInfoChange} 
+              placeholder="A brief description of what this template is for."
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Field Configuration</CardTitle>
+          <CardDescription>Define the input and output fields for this template.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="input">Input Fields</TabsTrigger>
+              <TabsTrigger value="output">Output Fields</TabsTrigger>
+            </TabsList>
+            <TabsContent value="input" className="mt-4">
+              <ScrollArea className="h-72 pr-4">
+                <DragDropContext onDragEnd={handleDragEnd}>
+                  <Droppable droppableId="inputFields">
+                    {(provided) => (
+                      <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-3">
+                        {templateData.fields.inputFields.map((field, index) => (
+                          <Draggable key={field.id} draggableId={field.id} index={index}>
+                            {(provided) => (
+                              <div 
+                                ref={provided.innerRef} 
+                                {...provided.draggableProps} 
+                                {...provided.dragHandleProps}
+                                className="p-3 border rounded-md flex justify-between items-center bg-card hover:bg-muted/50"
+                              >
+                                <div>
+                                  <p className="font-medium">{field.name || '(Untitled Field)'}</p>
+                                  <p className="text-xs text-muted-foreground">Type: {field.type} {field.required ? '| Required' : ''}</p>
+                                </div>
+                                <div className="space-x-2">
+                                  <Button type="button" variant="outline" size="sm" onClick={() => handleEditField(field)}>Edit</Button>
+                                  <Button type="button" variant="ghost" size="icon" onClick={() => handleFieldDelete(field.id)}>
+                                    <Icons.trash className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                </DragDropContext>
+              </ScrollArea>
+              <Button type="button" variant="outline" onClick={handleAddField} className="mt-4">Add Input Field</Button>
+            </TabsContent>
+            <TabsContent value="output" className="mt-4">
+              <ScrollArea className="h-72 pr-4">
+                <DragDropContext onDragEnd={handleDragEnd}>
+                  <Droppable droppableId="outputFields">
+                    {(provided) => (
+                      <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-3">
+                        {templateData.fields.outputFields.map((field, index) => (
+                           <Draggable key={field.id} draggableId={field.id} index={index}>
+                           {(provided) => (
+                             <div 
+                               ref={provided.innerRef} 
+                               {...provided.draggableProps} 
+                               {...provided.dragHandleProps}
+                               className="p-3 border rounded-md flex justify-between items-center bg-card hover:bg-muted/50"
+                             >
+                               <div>
+                                 <p className="font-medium">{field.name || '(Untitled Field)'}</p>
+                                 <p className="text-xs text-muted-foreground">Type: {field.type} {field.required ? '| Required' : ''}</p>
+                               </div>
+                               <div className="space-x-2">
+                                 <Button type="button" variant="outline" size="sm" onClick={() => handleEditField(field)}>Edit</Button>
+                                 <Button type="button" variant="ghost" size="icon" onClick={() => handleFieldDelete(field.id)}>
+                                   <Icons.trash className="h-4 w-4" />
+                                 </Button>
+                               </div>
+                             </div>
+                           )}
+                         </Draggable>
+                        ))}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                </DragDropContext>
+              </ScrollArea>
+              <Button type="button" variant="outline" onClick={handleAddField} className="mt-4">Add Output Field</Button>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+      
+      {isAddingField && (
+        <FieldDesigner 
+          isOpen={isAddingField} 
+          fieldType={activeTab as 'input' | 'output'}
+          initialData={editingField}
+          onSave={handleFieldSave}
+          onCancel={handleFieldCancel}
+          availableInputFields={templateData.fields.inputFields.map(f => ({ id: f.id, name: f.name }))}
+          templateId={templateData.id}
+        />
+      )}
+
+      <CardFooter className="flex justify-end space-x-2 pt-6">
+        <Button type="button" variant="outline" onClick={() => router.push('/dashboard/templates')}>Cancel</Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? <Icons.spinner className="mr-2 h-4 w-4 animate-spin" /> : null}
+          {initialData?.id && initialData.id !== 'new' ? 'Save Changes' : 'Create Template'}
+        </Button>
+      </CardFooter>
+    </form>
   );
 } 

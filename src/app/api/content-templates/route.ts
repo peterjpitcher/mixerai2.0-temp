@@ -205,10 +205,13 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         { status: 400 }
       );
     }
-
-    // --- AI Description Generation for Template ---
+    
+    const supabase = createSupabaseAdminClient();
+    
+    // --- AI Description Generation ---
     let generatedDescription = data.description || ''; // Use provided desc or generate
     try {
+      // Extract field names for a concise prompt
       const inputFieldNames = (data.fields.inputFields || []).map((f: any) => f.name).filter(Boolean);
       const outputFieldNames = (data.fields.outputFields || []).map((f: any) => f.name).filter(Boolean);
 
@@ -229,33 +232,39 @@ export const POST = withAuth(async (request: NextRequest, user) => {
           generatedDescription = aiData.description;
         }
       } else {
-        console.warn('Failed to generate AI description for template.');
+        // Log if AI description generation fails but don't block template creation
+        console.warn('Failed to generate AI description for new template.');
       }
     } catch (aiError) {
       console.warn('Error calling AI template description generation service:', aiError);
     }
     // --- End AI Description Generation ---
-    
-    // Create the template in the database
-    const supabase = createSupabaseAdminClient();
-    const { data: template, error } = await supabase
+
+    // Insert the new template
+    const { data: newTemplate, error } = await supabase
       .from('content_templates')
       .insert({
         name: data.name,
-        description: generatedDescription,
+        description: generatedDescription, // Use AI generated or existing
+        icon: data.icon || null,
         fields: data.fields,
-        created_by: user.id
+        brand_id: data.brand_id || null,
+        created_by: user.id,
       })
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error creating template:', error);
+      throw error;
+    }
     
     return NextResponse.json({
       success: true,
-      template
+      template: newTemplate
     });
   } catch (error) {
+    console.error('Error creating content template:', error);
     return handleApiError(error, 'Failed to create content template');
   }
 }); 

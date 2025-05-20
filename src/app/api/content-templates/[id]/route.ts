@@ -145,23 +145,43 @@ export const PUT = withAuth(async (
     // --- End AI Description Generation ---
 
     // Update the template
+    const updatePayload: any = {
+      name: data.name,
+      description: generatedDescription, // Use AI generated or existing
+      icon: data.icon || null,
+      fields: data.fields,
+      updated_at: new Date().toISOString()
+    };
+
+    if (data.brand_id !== undefined) { // Allow setting brand_id to null
+      updatePayload.brand_id = data.brand_id;
+    }
+
     const { data: updatedTemplate, error } = await supabase
       .from('content_templates')
-      .update({
-        name: data.name,
-        description: generatedDescription, // Use AI generated or existing
-        icon: data.icon || null,
-        fields: data.fields,
-        updated_at: new Date().toISOString()
-      })
+      .update(updatePayload)
       .eq('id', id)
-      .select();
+      .select(); // Fetches the updated record
     
     if (error) throw error;
     
+    // If select() returns an array, take the first element
+    const singleUpdatedTemplate = Array.isArray(updatedTemplate) && updatedTemplate.length > 0 
+                                    ? updatedTemplate[0] 
+                                    : null;
+
+    if (!singleUpdatedTemplate) {
+      // This case should ideally not happen if the update was successful and ID exists
+      console.error('API Route - Template not found after update, or update returned no data. ID:', id);
+      return NextResponse.json(
+        { success: false, error: 'Template not found after update.' },
+        { status: 404 } 
+      );
+    }
+
     return NextResponse.json({
       success: true,
-      template: updatedTemplate[0]
+      template: singleUpdatedTemplate
     });
   } catch (error) {
     console.error('Error updating content template:', error);
