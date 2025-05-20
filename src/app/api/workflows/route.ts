@@ -148,6 +148,36 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         { status: 400 }
       );
     }
+
+    // Permission Check:
+    const isGlobalAdmin = user.user_metadata?.role === 'admin';
+    let canCreateWorkflow = isGlobalAdmin;
+
+    if (!isGlobalAdmin) {
+      // If not a global admin, check if they are an admin for the specified brand_id
+      const { data: brandAdminPermission, error: permError } = await supabase
+        .from('user_brand_permissions')
+        .select('brand_id')
+        .eq('user_id', user.id)
+        .eq('brand_id', body.brand_id)
+        .eq('role', 'brand_admin')
+        .maybeSingle();
+
+      if (permError) {
+        console.error(`[API Workflows POST] Error checking brand admin permission for user ${user.id}, brand ${body.brand_id}:`, permError);
+        return handleApiError(permError, 'Error checking brand permissions');
+      }
+      if (brandAdminPermission) {
+        canCreateWorkflow = true;
+      }
+    }
+
+    if (!canCreateWorkflow) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: You do not have permission to create a workflow for this brand.' },
+        { status: 403 }
+      );
+    }
     
     if (body.steps && !Array.isArray(body.steps)) {
       return NextResponse.json(

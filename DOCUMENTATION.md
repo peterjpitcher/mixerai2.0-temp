@@ -248,24 +248,11 @@ We've implemented a comprehensive navigation system update to improve the user e
 
 For more details, see the full documentation in [docs/NAVIGATION_SYSTEM.md](docs/NAVIGATION_SYSTEM.md).
 
-### Global Admin Brand Editing Permissions
+## Side Navigation User-Specific Visibility
 
-We have updated the authorization logic for editing brand profiles to provide global administrators with more comprehensive control:
+As of the last review, the side navigation components (`src/components/layout/side-navigation.tsx` and `src/components/layout/side-navigation-v2.tsx`) **do not** implement any logic to hide or show navigation items based on user roles or permissions.
 
-1.  **Enhanced Admin Privileges**:
-    *   Users with the global 'admin' role (defined in `user.user_metadata.role`) can now edit any brand's profile information.
-    *   This change bypasses the need for explicit brand-specific administrator rights for these global admins.
-
-2.  **Standard Permission Model Unchanged**:
-    *   For users who are not global admins, the existing permission model remains in effect. They still require specific 'admin' rights for a particular brand to edit its profile.
-
-3. **Technical Implementation**:
-    *   The modification was made in the `PUT` handler of the `src/app/api/brands/[id]/route.ts` API endpoint.
-    *   A check for `authenticatedUser.user_metadata?.role === 'admin'` is now performed before the `isBrandAdmin()` function call. If true, the brand-specific check is skipped.
-
-4. **Impact**:
-    *   This streamlines brand management for global administrators, allowing them to make necessary changes across all brands without needing to be explicitly added as an admin to each one.
-    *   It maintains the security and integrity of brand-specific permissions for other user roles.
+All navigation links defined within these components are statically rendered and will be visible to all users who have access to the dashboard. There is no conditional rendering of navigation items based on user attributes. If user-specific navigation is a requirement, this functionality will need to be implemented.
 
 ## Brand UI Enhancements
 

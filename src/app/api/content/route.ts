@@ -235,6 +235,35 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     }
     
     const supabase = createSupabaseAdminClient();
+    const globalRole = user?.user_metadata?.role;
+    const targetBrandId = data.brand_id;
+
+    // Permission check for creating content
+    if (globalRole !== 'admin') {
+      const { data: permissionsData, error: permissionsError } = await supabase
+        .from('user_brand_permissions')
+        .select('brand_id, role')
+        .eq('user_id', user.id)
+        .eq('brand_id', targetBrandId);
+
+      if (permissionsError) {
+        console.error('[API Content POST] Error fetching brand permissions for user:', user.id, targetBrandId, permissionsError);
+        return handleApiError(permissionsError, 'Failed to verify user permissions');
+      }
+
+      const specificBrandPermission = permissionsData?.[0];
+
+      if (!specificBrandPermission || !['brand_admin', 'editor'].includes(specificBrandPermission.role)) {
+        console.warn(`[API Content POST] User ${user.id} (global role: ${globalRole}, brand role: ${specificBrandPermission?.role}) access denied to create content for brand ${targetBrandId}.`);
+        return NextResponse.json(
+          { success: false, error: 'You do not have permission to create content for this brand.' },
+          { status: 403 }
+        );
+      }
+      console.log(`[API Content POST] User ${user.id} (brand role: ${specificBrandPermission.role}) has permission to create content for brand ${targetBrandId}.`);
+    } else {
+      console.log(`[API Content POST] Global admin ${user.id} creating content for brand ${targetBrandId}.`);
+    }
 
     let assignedToUsersForContent: string[] | null = null;
     let currentWorkflowStepId: string | null = null;

@@ -114,6 +114,15 @@ const mockTemplates = [
  */
 export const GET = withAuth(async (request: NextRequest, user) => {
   try {
+    // Role check: Allow Global Admins and Editors to list/view content templates
+    const allowedRoles = ['admin', 'editor'];
+    if (!user.user_metadata?.role || !allowedRoles.includes(user.user_metadata.role)) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: You do not have permission to access this resource.' },
+        { status: 403 }
+      );
+    }
+
     const url = new URL(request.url);
     const id = url.searchParams.get('id');
     const supabase = createSupabaseAdminClient();
@@ -171,6 +180,14 @@ export const GET = withAuth(async (request: NextRequest, user) => {
  */
 export const POST = withAuth(async (request: NextRequest, user) => {
   try {
+    // Role check: Only Global Admins can create content templates
+    if (user.user_metadata?.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: You do not have permission to create this resource.' },
+        { status: 403 }
+      );
+    }
+
     const data = await request.json();
     
     // Validate required fields

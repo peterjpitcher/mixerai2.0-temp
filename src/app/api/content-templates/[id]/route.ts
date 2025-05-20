@@ -15,6 +15,14 @@ export const GET = withAuth(async (
   context: { params: { id: string } }
 ) => {
   try {
+    // Role check: Only Global Admins can access content templates
+    if (user.user_metadata?.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: You do not have permission to access this resource.' },
+        { status: 403 }
+      );
+    }
+
     console.log('API Route - GET template - Context:', context);
     const id = context.params.id;
     console.log('API Route - Template ID from params:', id);
@@ -61,6 +69,14 @@ export const PUT = withAuth(async (
   context: { params: { id: string } }
 ) => {
   try {
+    // Role check: Only Global Admins can update content templates
+    if (user.user_metadata?.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: You do not have permission to update this resource.' },
+        { status: 403 }
+      );
+    }
+
     console.log('API Route - PUT template - Context:', context);
     const id = context.params.id;
     console.log('API Route - Template ID from params:', id);
@@ -162,6 +178,14 @@ export const DELETE = withAuth(async (
   context: { params: { id: string } }
 ) => {
   try {
+    // Role check: Only Global Admins can delete content templates
+    if (user.user_metadata?.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: You do not have permission to delete this resource.' },
+        { status: 403 }
+      );
+    }
+
     const templateIdToDelete = context.params.id;
     console.log('API Route - DELETE template - Template ID from params:', templateIdToDelete);
     

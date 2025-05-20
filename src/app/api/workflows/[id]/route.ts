@@ -41,12 +41,12 @@ interface WorkflowStep {
  */
 export const GET = withAuth(async (
   request: NextRequest,
-  user: any, // Added user parameter from withAuth
+  user: any, // The authenticated user object from withAuth
   { params }: { params: { id: string } }
 ) => {
   try {
     const supabase = createSupabaseAdminClient();
-    const workflowId = params.id; // Renamed id to workflowId for clarity
+    const workflowId = params.id;
     
     const { data: workflowData, error: workflowErrorData } = await supabase
       .from('workflows')
@@ -68,6 +68,36 @@ export const GET = withAuth(async (
       console.error(`Error fetching workflow ${workflowId}:`, workflowErrorData);
       throw workflowErrorData;
     }
+
+    // Permission Check
+    const isGlobalAdmin = user.user_metadata?.role === 'admin';
+    if (!isGlobalAdmin) {
+      if (!workflowData || !workflowData.brand_id) {
+        // Should not happen if workflow was found, but as a safeguard
+        console.error(`[API Workflows GET /${workflowId}] Workflow data or brand_id missing for permission check.`);
+        return NextResponse.json({ success: false, error: 'Internal server error during permission check.' }, { status: 500 });
+      }
+
+      const { data: permission, error: permError } = await supabase
+        .from('user_brand_permissions')
+        .select('brand_id')
+        .eq('user_id', user.id)
+        .eq('brand_id', workflowData.brand_id)
+        .maybeSingle();
+
+      if (permError) {
+        console.error(`[API Workflows GET /${workflowId}] Error checking brand permissions for user ${user.id}, brand ${workflowData.brand_id}:`, permError);
+        return handleApiError(permError, 'Error checking brand permissions');
+      }
+
+      if (!permission) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden: You do not have permission to access this workflow\'s brand.' },
+          { status: 403 }
+        );
+      }
+    }
+    // If global admin or has permission for the workflow's brand, proceed.
     
     // Fetch actual steps from workflow_steps table
     const { data: dbSteps, error: stepsError } = await supabase
@@ -165,13 +195,58 @@ export const GET = withAuth(async (
  */
 export const PUT = withAuth(async (
   request: NextRequest,
-  user: any,
+  user: any, // The authenticated user object from withAuth
   { params }: { params: { id: string } }
 ) => {
   try {
     const supabase = createSupabaseAdminClient();
-    const workflowId = params.id; // Use workflowId for clarity
+    const workflowId = params.id;
     const body = await request.json();
+
+    // Permission Check
+    const isGlobalAdmin = user.user_metadata?.role === 'admin';
+    if (!isGlobalAdmin) {
+      // If not global admin, fetch workflow to get its brand_id for permission check
+      const { data: workflowForPermCheck, error: fetchPermError } = await supabase
+        .from('workflows')
+        .select('brand_id')
+        .eq('id', workflowId)
+        .single();
+
+      if (fetchPermError || !workflowForPermCheck) {
+        console.error(`[API Workflows PUT /${workflowId}] Error fetching workflow for permission check or workflow not found:`, fetchPermError);
+        return NextResponse.json({ success: false, error: 'Workflow not found or error fetching for permissions.' }, { status: 404 });
+      }
+
+      // If workflow has no brand_id, non-global admin cannot edit (no brand to check perm for)
+      if (!workflowForPermCheck.brand_id) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden: Workflow not associated with a brand cannot be edited by non-global admin.' },
+          { status: 403 }
+        );
+      }
+
+      const { data: brandAdminPermission, error: permError } = await supabase
+        .from('user_brand_permissions')
+        .select('brand_id')
+        .eq('user_id', user.id)
+        .eq('brand_id', workflowForPermCheck.brand_id) // Now brand_id is guaranteed to be non-null
+        .eq('role', 'brand_admin') // Must be brand_admin for the brand
+        .maybeSingle();
+
+      if (permError) {
+        console.error(`[API Workflows PUT /${workflowId}] Error checking brand admin permission:`, permError);
+        return handleApiError(permError, 'Error checking brand permissions');
+      }
+
+      if (!brandAdminPermission) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden: You do not have admin permission for this workflow\'s brand to update it.' },
+          { status: 403 }
+        );
+      }
+    }
+    // If global admin or brand admin for this workflow's brand, proceed.
     
     let workflowDescriptionToUpdate: string | undefined = undefined;
 
@@ -370,12 +445,65 @@ export const PUT = withAuth(async (
  */
 export const DELETE = withAuth(async (
   request: NextRequest,
-  user: any, // Added user parameter from withAuth
+  user: any, // The authenticated user object from withAuth
   { params }: { params: { id: string } }
 ) => {
   try {
     const supabase = createSupabaseAdminClient();
-    const workflowId = params.id; // Corrected from id to workflowId
+    const workflowId = params.id;
+
+    // Permission Check:
+    // First, fetch the workflow to get its brand_id
+    const { data: workflowForPermCheck, error: fetchPermError } = await supabase
+      .from('workflows')
+      .select('brand_id')
+      .eq('id', workflowId)
+      .single();
+
+    if (fetchPermError) {
+      // If error is because workflow not found, return 404
+      if (fetchPermError.code === 'PGRST116') {
+        return NextResponse.json({ success: false, error: 'Workflow not found.' }, { status: 404 });
+      }
+      console.error(`[API Workflows DELETE /${workflowId}] Error fetching workflow for permission check:`, fetchPermError);
+      return handleApiError(fetchPermError, 'Error fetching workflow for permissions.');
+    }
+
+    if (!workflowForPermCheck || !workflowForPermCheck.brand_id) {
+        return NextResponse.json(
+            { success: false, error: 'Forbidden: Workflow not found or not associated with a brand, cannot determine permissions.' }, 
+            { status: 404 } // Or 403, but 404 if brand_id is essential for existence/operation
+        );
+    }
+
+    const isGlobalAdmin = user.user_metadata?.role === 'admin';
+    let canDeleteWorkflow = isGlobalAdmin;
+
+    if (!isGlobalAdmin) {
+      const { data: brandAdminPermission, error: permError } = await supabase
+        .from('user_brand_permissions')
+        .select('brand_id')
+        .eq('user_id', user.id)
+        .eq('brand_id', workflowForPermCheck.brand_id)
+        .eq('role', 'brand_admin')
+        .maybeSingle();
+
+      if (permError) {
+        console.error(`[API Workflows DELETE /${workflowId}] Error checking brand admin permission:`, permError);
+        return handleApiError(permError, 'Error checking brand permissions');
+      }
+      if (brandAdminPermission) {
+        canDeleteWorkflow = true;
+      }
+    }
+
+    if (!canDeleteWorkflow) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: You do not have permission to delete this workflow.' },
+        { status: 403 }
+      );
+    }
+    // If we reach here, user is a Global Admin or Brand Admin for this workflow's brand
     
     const { data: contentCountResult, error: countError } = await supabase
       .from('content')

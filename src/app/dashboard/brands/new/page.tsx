@@ -18,6 +18,20 @@ import { Checkbox } from "@/components/checkbox";
 import { v4 as uuidv4 } from 'uuid';
 import { Badge } from "@/components/badge";
 
+// Define UserSessionData interface (can be moved to a shared types file later)
+interface UserSessionData {
+  id: string;
+  email?: string;
+  user_metadata?: {
+    role?: string;
+    full_name?: string;
+  };
+  brand_permissions?: Array<{
+    brand_id: string;
+    role: string;
+  }>;
+}
+
 // Metadata for a redirecting page might be minimal or not strictly necessary
 // as user shouldn't spend time here.
 // export const metadata: Metadata = {
@@ -77,10 +91,16 @@ const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) =
 
 export default function NewBrandPage() {
   const router = useRouter();
+  
+  // State definitions
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); // Added for consistency with edit page (e.g., fetching agencies)
+  const [isLoading, setIsLoading] = useState(false); 
+
+  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const [isForbidden, setIsForbidden] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -92,31 +112,59 @@ export default function NewBrandPage() {
     brand_identity: '',
     tone_of_voice: '',
     guardrails: '',
-    content_vetting_agencies: [] as string[] // Changed to array to match edit page for checkbox selection
+    content_vetting_agencies: [] as string[] 
   });
 
   const [selectedAdmins, setSelectedAdmins] = useState<UserSearchResult[]>([]);
   const [userSearchResults, setUserSearchResults] = useState<UserSearchResult[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-
-  // State for vetting agencies (copied from edit page)
   const [allVettingAgencies, setAllVettingAgencies] = useState<VettingAgency[]>([]);
-  const [customAgencyInput, setCustomAgencyInput] = useState(''); // if custom input is kept alongside checkboxes
+  const [customAgencyInput, setCustomAgencyInput] = useState('');
   const priorityOrder: Array<'High' | 'Medium' | 'Low'> = ['High', 'Medium', 'Low'];
 
-  // Fetch vetting agencies (copied and adapted from edit page)
+  // Effect for fetching current user data and checking permissions
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      setIsLoadingUser(true);
+      try {
+        const response = await fetch('/api/me');
+        if (!response.ok) throw new Error('Failed to fetch user session');
+        const data = await response.json();
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+          if (data.user.user_metadata?.role !== 'admin') {
+            setIsForbidden(true);
+          }
+        } else {
+          setCurrentUser(null);
+          setIsForbidden(true);
+        }
+      } catch (error) {
+        console.error('Error fetching current user:', error);
+        setCurrentUser(null);
+        setIsForbidden(true);
+        toast.error('Could not verify your permissions.');
+      } finally {
+        setIsLoadingUser(false);
+      }
+    };
+    fetchCurrentUser();
+  }, []);
+
+  // Effect for fetching vetting agencies
   useEffect(() => {
     const fetchAllVettingAgencies = async () => {
+      // Don't fetch if access is denied or user/form data isn't ready
+      if (isForbidden || isLoadingUser || !formData) return; 
+
       let apiUrl = '/api/content-vetting-agencies';
       if (formData.country) {
         apiUrl = `/api/content-vetting-agencies?country_code=${formData.country}`;
       }
-      setIsLoading(true); // Indicate loading agencies
+      setIsLoading(true);
       try {
         const response = await fetch(apiUrl);
-        if (!response.ok) {
-          throw new Error('Failed to fetch vetting agencies');
-        }
+        if (!response.ok) throw new Error('Failed to fetch vetting agencies');
         const data = await response.json();
         if (data.success && Array.isArray(data.data)) {
           setAllVettingAgencies(data.data);
@@ -132,9 +180,66 @@ export default function NewBrandPage() {
         setIsLoading(false);
       }
     };
-    fetchAllVettingAgencies(); // Fetch initially and when country changes
-  }, [formData.country]);
+    fetchAllVettingAgencies();
+  }, [formData.country, isForbidden, isLoadingUser, formData]); // Added formData to dependencies
 
+  // Effect for user search debounce
+  useEffect(() => {
+    // Don't run if forbidden, user loading, or search query is empty
+    if (isForbidden || isLoadingUser || !searchQuery.trim()) { 
+      if (!searchQuery.trim()) setUserSearchResults([]); // Clear results if query is empty
+      return;
+    }
+
+    const searchUsersInternal = async (query: string) => {
+      try {
+        const response = await fetch(`/api/users/search?query=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        if (data.success) {
+          setUserSearchResults(data.users);
+        } else {
+          setUserSearchResults([]);
+        }
+      } catch (error) {
+        console.error('Error searching users:', error);
+        setUserSearchResults([]);
+      }
+    };
+
+    const delayDebounceFn = setTimeout(() => {
+      searchUsersInternal(searchQuery);
+    }, 300);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery, isForbidden, isLoadingUser]);
+
+  // Conditional rendering for loading and forbidden states
+  // These MUST come AFTER all hook calls (useState, useEffect)
+  if (isLoadingUser) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg">Loading your details...</p>
+      </div>
+    );
+  }
+
+  if (isForbidden) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen p-8 text-center">
+        <X className="h-16 w-16 text-destructive mb-4" />
+        <h1 className="text-3xl font-bold mb-2">Access Denied</h1>
+        <p className="text-lg text-muted-foreground mb-6">
+          You do not have the necessary permissions to create a new brand. This action is restricted to Global Administrators.
+        </p>
+        <Button onClick={() => router.push('/dashboard')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Return to Dashboard
+        </Button>
+      </div>
+    );
+  }
+
+  // Handler functions (can be defined here, after hooks and conditional returns)
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -178,32 +283,6 @@ export default function NewBrandPage() {
       }
     });
   };
-
-  const searchUsers = async (query: string) => {
-    if (!query.trim()) {
-      setUserSearchResults([]);
-      return;
-    }
-    try {
-      const response = await fetch(`/api/users/search?query=${encodeURIComponent(query)}`);
-      const data = await response.json();
-      if (data.success) {
-        setUserSearchResults(data.users);
-      } else {
-        setUserSearchResults([]);
-      }
-    } catch (error) {
-      console.error('Error searching users:', error);
-      setUserSearchResults([]);
-    }
-  };
-
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      searchUsers(searchQuery);
-    }, 300);
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery]);
 
   const handleSelectAdmin = (user: UserSearchResult) => {
     if (!selectedAdmins.find(admin => admin.id === user.id)) {

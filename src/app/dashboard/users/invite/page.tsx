@@ -15,6 +15,8 @@ import {
   Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Skeleton } from "@/components/skeleton";
+import { AlertCircle } from 'lucide-react';
 
 interface Brand {
   id: string;
@@ -42,7 +44,67 @@ export default function InviteUserPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   
-  // Fetch brands data
+  // RBAC State
+  const [currentUserSession, setCurrentUserSession] = useState<UserSessionData | null>(null);
+  const [isLoadingUserSession, setIsLoadingUserSession] = useState(true);
+  const [userSessionError, setUserSessionError] = useState<string | null>(null);
+  const [isAllowedToAccess, setIsAllowedToAccess] = useState<boolean>(false);
+  const [isCheckingPermissions, setIsCheckingPermissions] = useState<boolean>(true);
+
+  // Define UserSessionData interface (minimal for this page's access check)
+  interface UserSessionData {
+    id: string;
+    user_metadata?: {
+      role?: string;
+    };
+  }
+
+  // Fetch current user for RBAC
+  useEffect(() => {
+    const fetchCurrentUserSession = async () => {
+      setIsLoadingUserSession(true);
+      setUserSessionError(null);
+      try {
+        const response = await fetch('/api/me');
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch user session' }));
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.success && data.user) {
+          setCurrentUserSession(data.user);
+        } else {
+          setCurrentUserSession(null);
+          setUserSessionError(data.error || 'User data not found in session.');
+        }
+      } catch (error: any) {
+        console.error('[InviteUserPage] Error fetching current user session:', error);
+        setCurrentUserSession(null);
+        setUserSessionError(error.message || 'An unexpected error occurred.');
+      } finally {
+        setIsLoadingUserSession(false);
+      }
+    };
+    fetchCurrentUserSession();
+  }, []);
+
+  // Check permissions
+  useEffect(() => {
+    if (!isLoadingUserSession && currentUserSession) {
+      setIsCheckingPermissions(true);
+      if (currentUserSession.user_metadata?.role === 'admin') {
+        setIsAllowedToAccess(true);
+      } else {
+        setIsAllowedToAccess(false);
+      }
+      setIsCheckingPermissions(false);
+    } else if (!isLoadingUserSession && !currentUserSession) {
+      setIsAllowedToAccess(false);
+      setIsCheckingPermissions(false);
+    }
+  }, [currentUserSession, isLoadingUserSession]);
+
+  // Fetch brands data - only if allowed
   useEffect(() => {
     const fetchBrands = async () => {
       try {
@@ -62,8 +124,12 @@ export default function InviteUserPage() {
       }
     };
     
-    fetchBrands();
-  }, []);
+    if (isAllowedToAccess && !isLoadingUserSession && !isCheckingPermissions) {
+      fetchBrands();
+    } else if (!isLoadingUserSession && !isCheckingPermissions && !isAllowedToAccess) {
+      setIsLoading(false);
+    }
+  }, [isAllowedToAccess, isLoadingUserSession, isCheckingPermissions]);
   
   // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -155,6 +221,55 @@ export default function InviteUserPage() {
     </nav>
   );
   
+  // --- Loading and Access Denied States ---
+  if (isLoadingUserSession || isCheckingPermissions) {
+    return (
+      <div className="space-y-8">
+        <Skeleton className="h-8 w-1/3 mb-4" />
+        <div className="flex items-center justify-between mb-6">
+          <Skeleton className="h-10 w-1/2" />
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-1/3 mb-2" />
+            <Skeleton className="h-4 w-2/3" />
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+          <CardFooter>
+            <Skeleton className="h-10 w-28" />
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  if (userSessionError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
+        <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+        <p className="text-destructive-foreground">Error loading your user session: {userSessionError}</p>
+        <Button variant="outline" onClick={() => window.location.reload()} className="mt-4">Try Again</Button>
+      </div>
+    );
+  }
+  
+  if (!isAllowedToAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
+        <AlertCircle className="h-16 w-16 text-destructive mb-4" />
+        <h3 className="text-xl font-semibold mb-2">Access Denied</h3>
+        <p className="text-muted-foreground text-center mb-6">You do not have permission to invite users.</p>
+        <Link href="/dashboard/users" passHref>
+          <Button variant="outline">Back to Users List</Button>
+        </Link>
+      </div>
+    );
+  }
+  // --- Main Page Content (shown if allowed) ---
   return (
     <div className="space-y-8">
       <Breadcrumbs items={[

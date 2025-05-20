@@ -36,6 +36,7 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/badge';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { format as formatDateFns } from 'date-fns';
+import { Skeleton } from "@/components/skeleton";
 
 // export const metadata: Metadata = {
 //   title: 'Manage Users | MixerAI 2.0',
@@ -64,6 +65,17 @@ interface User {
   }[];
   job_title?: string;
   company?: string;
+}
+
+// Define UserSessionData interface
+interface UserSessionData {
+  id: string;
+  email?: string;
+  user_metadata?: {
+    role?: string; 
+    full_name?: string;
+  };
+  // brand_permissions not strictly needed for this page's top-level access check, but good for consistency
 }
 
 // Placeholder Breadcrumbs component - replace with actual implementation later
@@ -101,7 +113,59 @@ export default function UsersPage() {
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Fetch users and brands data
+  // RBAC State
+  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true); // For user session loading
+  const [userSessionError, setUserSessionError] = useState<string | null>(null); // Renamed to avoid conflict with page-level error
+  const [isAllowedToAccess, setIsAllowedToAccess] = useState<boolean>(false);
+  const [isCheckingPermissions, setIsCheckingPermissions] = useState<boolean>(true);
+
+  // Fetch current user for RBAC
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      setIsLoadingUser(true);
+      setUserSessionError(null);
+      try {
+        const response = await fetch('/api/me');
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch user session' }));
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+        } else {
+          setCurrentUser(null);
+          setUserSessionError(data.error || 'User data not found in session.');
+        }
+      } catch (error: any) {
+        console.error('[UsersPage] Error fetching current user:', error);
+        setCurrentUser(null);
+        setUserSessionError(error.message || 'An unexpected error occurred.');
+      } finally {
+        setIsLoadingUser(false);
+      }
+    };
+    fetchCurrentUser();
+  }, []);
+
+  // Check permissions
+  useEffect(() => {
+    if (!isLoadingUser && currentUser) {
+      setIsCheckingPermissions(true);
+      if (currentUser.user_metadata?.role === 'admin') {
+        setIsAllowedToAccess(true);
+      } else {
+        setIsAllowedToAccess(false);
+      }
+      setIsCheckingPermissions(false);
+    } else if (!isLoadingUser && !currentUser) {
+      setIsAllowedToAccess(false);
+      setIsCheckingPermissions(false);
+    }
+  }, [currentUser, isLoadingUser]);
+
+  // Fetch users and brands data - only if allowed
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -150,8 +214,12 @@ export default function UsersPage() {
       }
     };
     
-    fetchData();
-  }, []);
+    if (isAllowedToAccess && !isLoadingUser && !isCheckingPermissions) {
+      fetchData();
+    } else if (!isLoadingUser && !isCheckingPermissions && !isAllowedToAccess) {
+      setIsLoading(false); // Stop main loading indicator if access is denied
+    }
+  }, [isAllowedToAccess, isLoadingUser, isCheckingPermissions]);
   
   // Filter users based on search term
   const filteredUsers = searchTerm.trim() === '' 
@@ -269,6 +337,46 @@ export default function UsersPage() {
       </div>
     );
   };
+
+  // --- Loading and Access Denied States ---
+  if (isLoadingUser || isCheckingPermissions) {
+    return (
+      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <Skeleton className="h-8 w-1/3 mb-4" /> {/* Breadcrumbs skeleton */}
+        <PageHeader
+          title="Manage Users"
+          description="Loading user management..."
+          actions={<Skeleton className="h-10 w-32" />}
+        />
+        <Skeleton className="h-10 w-full mb-4" /> {/* Search/Filter bar skeleton */}
+        <Skeleton className="h-64 w-full" /> {/* Table skeleton */}
+      </div>
+    );
+  }
+
+  if (userSessionError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
+        <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+        <p className="text-destructive-foreground">Error loading user data: {userSessionError}</p>
+        <Button variant="outline" onClick={() => window.location.reload()} className="mt-4">Try Again</Button>
+      </div>
+    );
+  }
+  
+  if (!isAllowedToAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
+        <AlertCircle className="h-16 w-16 text-destructive mb-4" /> {/* Changed icon to AlertTriangle for consistency */}
+        <h3 className="text-xl font-semibold mb-2">Access Denied</h3>
+        <p className="text-muted-foreground text-center mb-6">You do not have permission to manage users.</p>
+        <Link href="/dashboard" passHref>
+          <Button variant="outline">Go to Dashboard</Button>
+        </Link>
+      </div>
+    );
+  }
+  // --- Main Page Content (shown if allowed and not loading users/brands) ---
 
   return (
     <div className="space-y-8">

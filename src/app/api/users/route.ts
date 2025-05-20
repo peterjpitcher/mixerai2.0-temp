@@ -29,6 +29,14 @@ interface ProfileRecord {
  */
 export const GET = withAuth(async (req: NextRequest, user) => {
   try {
+    // Role check: Only Global Admins can list all users
+    if (user.user_metadata?.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: You do not have permission to access this resource.' },
+        { status: 403 }
+      );
+    }
+
     const supabase = createSupabaseAdminClient();
     
     const { data: authUsersData, error: authError } = await supabase.auth.admin.listUsers();

@@ -28,6 +28,20 @@ interface BrandDetailsProps {
   };
 }
 
+// Define UserSessionData interface (if not already defined or imported)
+interface UserSessionData {
+  id: string;
+  email?: string;
+  user_metadata?: {
+    role?: string; // Global role e.g., 'admin', 'editor'
+    full_name?: string;
+  };
+  brand_permissions?: Array<{ // Brand-specific permissions
+    brand_id: string;
+    role: string; // e.g., 'brand_admin', 'editor', 'viewer' for that brand
+  }>;
+}
+
 /**
  * BrandDetails page component.
  * Displays detailed information about a specific brand, including overview, brand identity,
@@ -42,20 +56,35 @@ export default function BrandDetails({ params }: BrandDetailsProps) {
   const [error, setError] = useState<string | null>(null);
   const [contentCount, setContentCount] = useState(0);
   const [workflowCount, setWorkflowCount] = useState(0);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null); // New state for full user object
+  const [isLoadingUser, setIsLoadingUser] = useState(true); // Added loading state for user
 
   useEffect(() => {
-    const getCurrentUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setCurrentUserId(user?.id || null);
+    const fetchCurrentUser = async () => {
+      setIsLoadingUser(true);
+      try {
+        const response = await fetch('/api/me');
+        if (!response.ok) {
+          throw new Error('Failed to fetch user session');
+        }
+        const data = await response.json();
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+        } else {
+          setCurrentUser(null);
+          // Optionally, handle error like redirecting to login if no user found
+          toast.error(data.error || 'Could not verify your session.');
+        }
+      } catch (err: any) {
+        console.error('Error fetching current user:', err);
+        setCurrentUser(null);
+        toast.error('Error fetching user data: ' + err.message);
+      } finally {
+        setIsLoadingUser(false);
+      }
     };
-    getCurrentUser();
-  }, [supabase.auth]);
+    fetchCurrentUser();
+  }, []); // Empty dependency array, runs once on mount
   
   useEffect(() => {
     const fetchBrandData = async () => {
@@ -96,7 +125,7 @@ export default function BrandDetails({ params }: BrandDetailsProps) {
     }
   }, [id]);
   
-  if (isLoading || (brand && brand.brand_admin_id && !currentUserId) ) {
+  if (isLoading || isLoadingUser) { // Check both brand and user loading
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,theme(spacing.16))-theme(spacing.12))] p-4">
         <Spinner className="h-12 w-12 text-primary" />
@@ -129,7 +158,14 @@ export default function BrandDetails({ params }: BrandDetailsProps) {
     );
   }
   
-  const isBrandAdmin = brand && brand.brand_admin_id && currentUserId === brand.brand_admin_id;
+  // Define role booleans after currentUser and brand are loaded and not null
+  const isGlobalAdmin = currentUser?.user_metadata?.role === 'admin';
+  const isSpecificBrandAdmin = currentUser?.brand_permissions?.some(
+    p => p.brand_id === id && p.role === 'brand_admin' // Assuming 'brand_admin' is the role name
+  );
+  const isEditorAssignedToThisBrand = 
+    currentUser?.user_metadata?.role === 'editor' && 
+    currentUser?.brand_permissions?.some(p => p.brand_id === id);
 
   const countryName = COUNTRIES.find(c => c.value === brand.country)?.label || brand.country || 'Not specified';
   const languageName = LANGUAGES.find(l => l.value === brand.language)?.label || brand.language || 'Not specified';
@@ -147,9 +183,11 @@ export default function BrandDetails({ params }: BrandDetailsProps) {
           </div>
         </div>
         <div className="flex space-x-2 self-start sm:self-auto">
-          <Button variant="outline" onClick={() => router.push(`/dashboard/brands/${id}/edit`)}>
-            Edit Brand
-          </Button>
+          {(isGlobalAdmin || isSpecificBrandAdmin) && (
+            <Button variant="outline" onClick={() => router.push(`/dashboard/brands/${id}/edit`)}>
+              Edit Brand
+            </Button>
+          )}
         </div>
       </header>
       
@@ -159,7 +197,7 @@ export default function BrandDetails({ params }: BrandDetailsProps) {
           <TabsTrigger value="identity">Brand Identity</TabsTrigger>
           <TabsTrigger value="content">Content ({contentCount})</TabsTrigger>
           <TabsTrigger value="workflows">Workflows ({workflowCount})</TabsTrigger>
-          {isBrandAdmin && (
+          {(isGlobalAdmin || isSpecificBrandAdmin) && (
             <TabsTrigger value="rejected">Rejected Content</TabsTrigger>
           )}
         </TabsList>
@@ -303,9 +341,11 @@ export default function BrandDetails({ params }: BrandDetailsProps) {
                   <ContentIcon className="mx-auto h-12 w-12 text-muted-foreground/70" /> 
                   <h3 className="mt-2 text-lg font-medium">No Content Yet</h3>
                   <p className="mt-1 text-sm text-muted-foreground mb-4">Get started by creating content for {brand.name}.</p>
-                  <Button onClick={() => router.push(`/dashboard/content/new?brandId=${id}`)}>
-                    Create First Content Item
-                  </Button>
+                  {(isGlobalAdmin || isEditorAssignedToThisBrand) && (
+                    <Button onClick={() => router.push(`/dashboard/content/new?brandId=${id}`)}>
+                      Create First Content Item
+                    </Button>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -331,16 +371,18 @@ export default function BrandDetails({ params }: BrandDetailsProps) {
                   <WorkflowIcon className="mx-auto h-12 w-12 text-muted-foreground/70" /> 
                   <h3 className="mt-2 text-lg font-medium">No Workflows Yet</h3>
                   <p className="mt-1 text-sm text-muted-foreground mb-4">Create workflows to manage content approval for {brand.name}.</p>
-                  <Button onClick={() => router.push(`/dashboard/workflows/new?brandId=${id}`)}>
-                    Create First Workflow
-                  </Button>
+                  {(isGlobalAdmin || isSpecificBrandAdmin) && (
+                    <Button onClick={() => router.push(`/dashboard/workflows/new?brandId=${id}`)}>
+                      Create First Workflow
+                    </Button>
+                  )}
                 </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {isBrandAdmin && (
+        {(isGlobalAdmin || isSpecificBrandAdmin) && (
           <TabsContent value="rejected">
             <RejectedContentList brandId={id} />
           </TabsContent>

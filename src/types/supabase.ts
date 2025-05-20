@@ -1,3 +1,6 @@
+Need to install the following packages:
+supabase@2.23.4
+Ok to proceed? (y) 
 export type Json =
   | string
   | number
@@ -727,7 +730,7 @@ export type Database = {
           brand_id: string | null
           created_at: string | null
           id: string
-          role: Database["public"]["Enums"]["user_role"]
+          role: Database["public"]["Enums"]["user_brand_role_enum"]
           updated_at: string | null
           user_id: string | null
         }
@@ -735,7 +738,7 @@ export type Database = {
           brand_id?: string | null
           created_at?: string | null
           id?: string
-          role?: Database["public"]["Enums"]["user_role"]
+          role?: Database["public"]["Enums"]["user_brand_role_enum"]
           updated_at?: string | null
           user_id?: string | null
         }
@@ -743,7 +746,7 @@ export type Database = {
           brand_id?: string | null
           created_at?: string | null
           id?: string
-          role?: Database["public"]["Enums"]["user_role"]
+          role?: Database["public"]["Enums"]["user_brand_role_enum"]
           updated_at?: string | null
           user_id?: string | null
         }
@@ -1303,6 +1306,7 @@ export type Database = {
         | "closed"
         | "wont_fix"
       feedback_type: "bug" | "enhancement"
+      user_brand_role_enum: "brand_admin" | "editor" | "viewer"
       user_role: "admin" | "editor" | "viewer"
       vetting_agency_priority_level: "High" | "Medium" | "Low"
     }
@@ -1437,6 +1441,7 @@ export const Constants = {
         "wont_fix",
       ],
       feedback_type: ["bug", "enhancement"],
+      user_brand_role_enum: ["brand_admin", "editor", "viewer"],
       user_role: ["admin", "editor", "viewer"],
       vetting_agency_priority_level: ["High", "Medium", "Low"],
     },

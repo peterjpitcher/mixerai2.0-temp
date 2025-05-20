@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/skeleton";
 
 // export const metadata: Metadata = {
 //   title: 'Alt Text Generator | MixerAI 2.0',
@@ -56,6 +57,20 @@ interface AltTextResultItem {
   imageUrl: string;
   altText?: string;
   error?: string;
+}
+
+// Define UserSessionData interface
+interface UserSessionData {
+  id: string;
+  email?: string;
+  user_metadata?: {
+    role?: string; 
+    full_name?: string;
+  };
+  brand_permissions?: Array<{
+    brand_id: string;
+    role: string; 
+  }>;
 }
 
 // Re-usable definitions (could be moved to a shared utils file)
@@ -116,6 +131,59 @@ export default function AltTextGeneratorPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
   const router = useRouter();
+
+  // RBAC State
+  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true); // For user session loading
+  const [userError, setUserError] = useState<string | null>(null);
+  const [isAllowedToAccess, setIsAllowedToAccess] = useState<boolean>(false);
+  const [isCheckingPermissions, setIsCheckingPermissions] = useState<boolean>(true);
+
+  // Fetch current user
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      setIsLoadingUser(true);
+      setUserError(null);
+      try {
+        const response = await fetch('/api/me');
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch user session' }));
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+        } else {
+          setCurrentUser(null);
+          setUserError(data.error || 'User data not found in session.');
+        }
+      } catch (error: any) {
+        console.error('[AltTextGeneratorPage] Error fetching current user:', error);
+        setCurrentUser(null);
+        setUserError(error.message || 'An unexpected error occurred while fetching user data.');
+      } finally {
+        setIsLoadingUser(false);
+      }
+    };
+    fetchCurrentUser();
+  }, []);
+
+  // Check permissions
+  useEffect(() => {
+    if (!isLoadingUser && currentUser) {
+      setIsCheckingPermissions(true);
+      const userRole = currentUser.user_metadata?.role;
+      if (userRole === 'admin' || userRole === 'editor') {
+        setIsAllowedToAccess(true);
+      } else {
+        setIsAllowedToAccess(false);
+      }
+      setIsCheckingPermissions(false);
+    } else if (!isLoadingUser && !currentUser) {
+      setIsAllowedToAccess(false);
+      setIsCheckingPermissions(false);
+    }
+  }, [currentUser, isLoadingUser]);
 
   useEffect(() => {
     const firstUrl = imageUrlsInput.split(/\s+/).map(u => u.trim()).find(u => {
@@ -243,6 +311,47 @@ export default function AltTextGeneratorPage() {
   const successfulResults = results.filter(r => !r.error && r.altText);
   // const errorResults = results.filter(r => r.error); // This variable is not used
 
+  // --- Loading and Access Denied States ---
+  if (isLoadingUser || isCheckingPermissions) {
+    return (
+      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <Skeleton className="h-8 w-1/3 mb-4" /> {/* Breadcrumbs skeleton */}
+        <Skeleton className="h-12 w-1/2 mb-2" /> {/* Page title skeleton */}
+        <Skeleton className="h-6 w-3/4 mb-6" /> {/* Page description skeleton */}
+        <Card>
+          <CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-10 w-1/3" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (userError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
+        <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+        <p className="text-destructive-foreground">Error loading user data: {userError}</p>
+        <Button variant="outline" onClick={() => router.push('/dashboard')} className="mt-4">Go to Dashboard</Button>
+      </div>
+    );
+  }
+  
+  if (!isAllowedToAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
+        <AlertTriangle className="h-16 w-16 text-destructive mb-4" /> {/* Changed icon to AlertTriangle for consistency */}
+        <h3 className="text-xl font-semibold mb-2">Access Denied</h3>
+        <p className="text-muted-foreground text-center mb-6">You do not have permission to access the Alt Text Generator.</p>
+        <Link href="/dashboard/tools" passHref>
+          <Button variant="outline">Back to Tools</Button>
+        </Link>
+      </div>
+    );
+  }
+  // --- Main Page Content ---
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       <Breadcrumbs items={[

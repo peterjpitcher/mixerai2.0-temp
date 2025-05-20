@@ -11,6 +11,15 @@ interface ContentTransCreationRequest {
 }
 
 export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
+  // Role check: Only Global Admins or Editors can access this tool
+  const userRole = user.user_metadata?.role;
+  if (!(userRole === 'admin' || userRole === 'editor')) {
+    return NextResponse.json(
+      { success: false, error: 'Forbidden: You do not have permission to access this tool.' },
+      { status: 403 }
+    );
+  }
+
   try {
     const data: ContentTransCreationRequest = await request.json();
     

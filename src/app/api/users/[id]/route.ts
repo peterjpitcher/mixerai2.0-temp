@@ -112,7 +112,7 @@ export const GET = withRouteAuth(async (request: NextRequest, user: any, context
     let highestRole = 'viewer';
     if (userBrandPermissions.length > 0) {
       for (const permission of userBrandPermissions) {
-        if (permission.role === 'admin') {
+        if (permission.role === 'brand_admin') {
           highestRole = 'admin';
           break;
         } else if (permission.role === 'editor' && highestRole !== 'admin') {
@@ -149,129 +149,162 @@ export const GET = withRouteAuth(async (request: NextRequest, user: any, context
 export const PUT = withRouteAuth(async (request: NextRequest, user: any, context: Params) => {
   const { params } = context;
   try {
-    // Authorization Check:
-    // Allow users to update themselves OR require global admin role.
-    const isSelf = user.id === params.id;
-    // Assume global admin role is stored in user_metadata.role for now (needs clarification - see Issue #97)
-    const isGlobalAdmin = user.user_metadata?.role === 'admin'; 
+    const supabase = createSupabaseAdminClient();
+    const body = await request.json();
 
-    if (!isSelf && !isGlobalAdmin) {
+    const isSelf = user.id === params.id;
+    const isGlobalAdmin = user.user_metadata?.role === 'admin';
+
+    // --- Profile Data Updates (full_name, job_title, company) ---
+    if (isSelf || isGlobalAdmin) {
+      const profileUpdates: { [key: string]: any } = {};
+      if (body.full_name !== undefined) profileUpdates.full_name = body.full_name;
+      if (body.job_title !== undefined) profileUpdates.job_title = body.job_title;
+      if (body.company !== undefined) profileUpdates.company = body.company;
+
+      if (Object.keys(profileUpdates).length > 0) {
+        profileUpdates.updated_at = new Date().toISOString();
+        const { error: profileUpdateError } = await supabase
+          .from('profiles')
+          .update(profileUpdates)
+          .eq('id', params.id);
+        if (profileUpdateError) throw profileUpdateError;
+
+        // Also update user_metadata for these common fields if profile updated successfully
+        const userMetadataProfileUpdates: { [key: string]: any } = {};
+        if (body.full_name !== undefined) userMetadataProfileUpdates.full_name = body.full_name;
+        if (body.job_title !== undefined) userMetadataProfileUpdates.job_title = body.job_title;
+        if (body.company !== undefined) userMetadataProfileUpdates.company = body.company;
+        
+        if (Object.keys(userMetadataProfileUpdates).length > 0) {
+            await supabase.auth.admin.updateUserById(params.id, { user_metadata: userMetadataProfileUpdates });
+            // Log error if any, but don't necessarily fail the whole request if profile saved.
+        }
+      }
+    } else if (body.full_name !== undefined || body.job_title !== undefined || body.company !== undefined) {
+      // If trying to update profile fields without permission
       return NextResponse.json(
-        { success: false, error: 'Not authorized to update this user' },
+        { success: false, error: 'Not authorized to update these profile details for this user.' },
         { status: 403 }
       );
     }
-    
-    const supabase = createSupabaseAdminClient();
-    const body = await request.json();
-    
-    const profileUpdates: { [key: string]: any } = {};
-    if (body.full_name !== undefined) profileUpdates.full_name = body.full_name;
-    if (body.job_title !== undefined) profileUpdates.job_title = body.job_title;
-    if (body.company !== undefined) profileUpdates.company = body.company;
-    if (Object.keys(profileUpdates).length > 0) {
-        profileUpdates.updated_at = new Date().toISOString();
-    }
 
-    const userMetadataUpdates: { [key: string]: any } = {};
-    if (body.full_name !== undefined) userMetadataUpdates.full_name = body.full_name;
-    if (body.job_title !== undefined) userMetadataUpdates.job_title = body.job_title;
-    if (body.company !== undefined) userMetadataUpdates.company = body.company;
-
-    // Add global role to user_metadata if provided and valid
-    if (body.role && typeof body.role === 'string') {
-      const validRoles = ['admin', 'editor', 'viewer']; // Define valid global roles
-      const requestedRole = body.role.toLowerCase();
-      if (validRoles.includes(requestedRole)) {
-        userMetadataUpdates.role = requestedRole;
-      } else {
-        // Optionally, handle invalid role here, e.g., by returning an error or logging
-        console.warn(`[API /users/[id]] PUT: Invalid global role '${body.role}' requested for user ${params.id}. Ignoring.`);
+    // --- Global Role and Brand Permissions Updates (Global Admin Only) ---
+    if (isGlobalAdmin) {
+      const userMetadataAdminUpdates: { [key: string]: any } = {};
+      // Global role update
+      if (body.role && typeof body.role === 'string') {
+        const validRoles = ['admin', 'editor', 'viewer'];
+        const requestedRole = body.role.toLowerCase();
+        if (validRoles.includes(requestedRole)) {
+          userMetadataAdminUpdates.role = requestedRole;
+        } else {
+          console.warn(`[API /users/[id]] PUT: Invalid global role '${body.role}' requested. Ignoring.`);
+        }
       }
-    }
 
-    if (Object.keys(userMetadataUpdates).length > 0) {
+      if (Object.keys(userMetadataAdminUpdates).length > 0) {
         const { error: authUpdateError } = await supabase.auth.admin.updateUserById(
-            params.id,
-            { user_metadata: userMetadataUpdates }
+          params.id,
+          { user_metadata: { ...userMetadataAdminUpdates } } // Spread to merge with existing if needed
         );
         if (authUpdateError) throw authUpdateError;
-    }
+      }
 
-    if (Object.keys(profileUpdates).length > 0) {
-        const { error: profileUpdateError } = await supabase
-            .from('profiles')
-            .update(profileUpdates)
-            .eq('id', params.id);
-        if (profileUpdateError) throw profileUpdateError;
-    }
-    
-    // Handle brand permissions if provided
-    if (body.brand_permissions && Array.isArray(body.brand_permissions)) {
-      // Get existing brand permissions for comparison
-      const { data: existingPermissions, error: permissionsError } = await supabase
-        .from('user_brand_permissions')
-        .select('id, brand_id, role')
-        .eq('user_id', params.id);
-      
-      if (permissionsError) throw permissionsError;
-      
-      // Create a map of existing permissions by brand_id for easier lookup
-      const existingPermissionsMap = new Map();
-      (existingPermissions || []).forEach(permission => {
-        existingPermissionsMap.set(permission.brand_id, permission);
-      });
-      
-      // Prepare permissions to update or insert
-      const permissionsToUpsert = body.brand_permissions.map(permission => {
-        const existingPermission = existingPermissionsMap.get(permission.brand_id);
-        const record: {
-          user_id: string;
-          brand_id: string;
-          role: string;
-          id?: string; // id is optional, for new records Supabase will generate it
-        } = {
-          user_id: params.id,
-          brand_id: permission.brand_id,
-          role: permission.role,
-        };
+      // Brand permissions update
+      if (body.brand_permissions && Array.isArray(body.brand_permissions)) {
+        const { data: existingPermissions, error: permissionsError } = await supabase
+          .from('user_brand_permissions')
+          .select('id, brand_id, role')
+          .eq('user_id', params.id);
+        if (permissionsError) throw permissionsError;
 
-        if (existingPermission) {
-          record.id = existingPermission.id; // Only add ID if it's an existing record being updated
+        const existingPermissionsMap = new Map();
+        (existingPermissions || []).forEach(p => existingPermissionsMap.set(p.brand_id, p));
+
+        const permissionsToUpsert = body.brand_permissions.map(permission => {
+          const existingPermission = existingPermissionsMap.get(permission.brand_id);
+          // Map role 'admin' to 'brand_admin' for user_brand_role_enum compatibility
+          const dbRole = permission.role === 'admin' ? 'brand_admin' : permission.role;
+
+          const record: { user_id: string; brand_id: string; role: string; id?: string; } = {
+            user_id: params.id,
+            brand_id: permission.brand_id,
+            role: dbRole, // Use the mapped role
+          };
+          if (existingPermission) record.id = existingPermission.id;
+          return record;
+        });
+
+        const brandIdsToKeep = new Set(body.brand_permissions.map(p => p.brand_id));
+        const permissionIdsToDelete = (existingPermissions || [])
+          .filter(p => !brandIdsToKeep.has(p.brand_id))
+          .map(p => p.id);
+
+        if (permissionIdsToDelete.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('user_brand_permissions')
+            .delete()
+            .in('id', permissionIdsToDelete);
+          if (deleteError) throw deleteError;
         }
-        // For new permissions, record.id remains undefined, and Supabase/PostgreSQL will generate the UUID.
-        return record;
-      });
-      
-      // Identify permissions to delete (brands that are in existing but not in the update)
-      const brandIdsToKeep = new Set(body.brand_permissions.map(p => p.brand_id));
-      const permissionIdsToDelete = (existingPermissions || [])
-        .filter(p => !brandIdsToKeep.has(p.brand_id))
-        .map(p => p.id);
-      
-      // Update or insert brand permissions
-      if (permissionsToUpsert.length > 0) {
-        const { error: upsertError } = await supabase
-          .from('user_brand_permissions')
-          .upsert(permissionsToUpsert);
-        
-        if (upsertError) throw upsertError;
+
+        if (permissionsToUpsert.length > 0) {
+          const { error: upsertError } = await supabase
+            .from('user_brand_permissions')
+            .upsert(permissionsToUpsert, { onConflict: 'user_id,brand_id' }); // Ensure onConflict is correctly handled based on your table
+          if (upsertError) throw upsertError;
+        }
       }
-      
-      // Delete removed brand permissions
-      if (permissionIdsToDelete.length > 0) {
-        const { error: deleteError } = await supabase
-          .from('user_brand_permissions')
-          .delete()
-          .in('id', permissionIdsToDelete);
-        
-        if (deleteError) throw deleteError;
+    } else {
+      // If trying to update role or brand_permissions without being Global Admin
+      if (body.role !== undefined || body.brand_permissions !== undefined) {
+        return NextResponse.json(
+          { success: false, error: 'Not authorized to update roles or brand permissions for this user.' },
+          { status: 403 }
+        );
       }
     }
     
+    // Refetch the user data to return the updated state
+    const { data: updatedAuthUser, error: fetchAuthError } = await supabase.auth.admin.getUserById(params.id);
+    if (fetchAuthError) throw fetchAuthError;
+    if (!updatedAuthUser || !updatedAuthUser.user) return NextResponse.json({ success: false, error: 'User not found after update' }, { status: 404 });
+
+    const { data: updatedProfile, error: fetchProfileError } = await supabase.from('profiles').select('*').eq('id', params.id).single();
+    // Handle profile not found or error minimally, as auth user is the primary concern
+    
+    const { data: finalBrandPermissions } = await supabase.from('user_brand_permissions').select('id, brand_id, role, brand:brands(id,name)').eq('user_id', params.id);
+
+    let highestRoleAfterUpdate = 'viewer'; // Recalculate highest role
+    if (finalBrandPermissions && finalBrandPermissions.length > 0) {
+      highestRoleAfterUpdate = finalBrandPermissions.reduce((acc, p) => {
+        if (p.role === 'brand_admin') return 'admin';
+        if (p.role === 'editor' && acc !== 'admin') return 'editor';
+        return acc;
+      }, 'viewer');
+    }
+    if (highestRoleAfterUpdate === 'viewer' && updatedAuthUser.user.user_metadata?.role) {
+        const metadataRole = String(updatedAuthUser.user.user_metadata.role).toLowerCase();
+        if (['admin', 'editor'].includes(metadataRole)) highestRoleAfterUpdate = metadataRole;
+    }
+
     return NextResponse.json({
       success: true,
-      message: 'User updated successfully'
+      user: {
+        id: updatedAuthUser.user.id,
+        email: updatedAuthUser.user.email,
+        full_name: updatedProfile?.full_name || updatedAuthUser.user.user_metadata?.full_name || null,
+        job_title: updatedProfile?.job_title || updatedAuthUser.user.user_metadata?.job_title || null,
+        company: updatedProfile?.company || updatedAuthUser.user.user_metadata?.company || null,
+        avatar_url: updatedProfile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${updatedAuthUser.user.id}`,
+        role: highestRoleAfterUpdate,
+        globalRole: updatedAuthUser.user.user_metadata?.role || 'viewer',
+        created_at: updatedAuthUser.user.created_at,
+        last_sign_in_at: updatedAuthUser.user.last_sign_in_at,
+        brand_permissions: finalBrandPermissions || [],
+        is_current_user: updatedAuthUser.user.id === user.id
+      }
     });
   } catch (error) {
     return handleApiError(error, 'Error updating user');
@@ -282,31 +315,24 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: any, context
 export const DELETE = withRouteAuth(async (request: NextRequest, user: any, context: Params) => {
   const { params } = context;
   try {
-    // Only allow admins to delete users
+    // Prevent self-deletion
     if (user.id === params.id) {
       return NextResponse.json(
-        { success: false, error: 'You cannot delete your own account' },
+        { success: false, error: 'You cannot delete your own account.' },
         { status: 403 }
       );
     }
     
-    // Check if the user has admin permissions
-    const supabase = createSupabaseAdminClient();
-    const { data: userPermissions, error: permissionError } = await supabase
-      .from('user_brand_permissions')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .maybeSingle();
-    
-    if (permissionError) throw permissionError;
-    
-    if (!userPermissions) {
+    // Role check: Only Global Admins can delete users
+    if (!user.user_metadata || user.user_metadata.role !== 'admin') {
       return NextResponse.json(
-        { success: false, error: 'Not authorized to delete users' },
+        { success: false, error: 'Forbidden: You do not have permission to delete users.' },
         { status: 403 }
       );
     }
+    
+    // If we reach here, user is a Global Admin and not deleting themselves.
+    const supabase = createSupabaseAdminClient();
     
     // Find all workflows where this user is an assignee
     const { data: workflowsToUpdate, error: workflowError } = await supabase
@@ -327,7 +353,7 @@ export const DELETE = withRouteAuth(async (request: NextRequest, user: any, cont
               .from('user_brand_permissions')
               .select('user_id')
               .eq('brand_id', workflow.brand_id)
-              .eq('role', 'admin')
+              .eq('role', 'brand_admin')
               .limit(1);
             
             if (brandAdminError) continue; // Skip this workflow if we can't find the brand admin

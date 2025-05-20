@@ -258,6 +258,14 @@ export const GET = withAuth(async (req: NextRequest, user) => {
 
 // Authenticated POST handler for creating brands
 export const POST = withAuth(async (req: NextRequest, user) => {
+  // Role check: Only Global Admins can create new brands
+  if (user.user_metadata?.role !== 'admin') {
+    return NextResponse.json(
+      { success: false, error: 'Forbidden: You do not have permission to create this resource.' },
+      { status: 403 }
+    );
+  }
+
   const supabase = createSupabaseAdminClient(); 
   // const dbClient = await pool.connect(); // Temporarily comment out pg pool for focusing on Supabase client logic
   try {

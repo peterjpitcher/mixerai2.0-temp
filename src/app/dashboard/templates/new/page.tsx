@@ -1,16 +1,33 @@
+'use client';
+
 import { Metadata } from 'next';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/button';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { TemplateForm } from '@/components/template/template-form';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Loader2, ShieldAlert } from 'lucide-react';
+import { toast } from 'sonner';
 
-export const metadata: Metadata = {
-  title: 'Create Template | MixerAI',
-  description: 'Create a new content template.',
-};
+// Define UserSessionData interface (copied for standalone use here)
+interface UserSessionData {
+  id: string;
+  email?: string;
+  user_metadata?: {
+    role?: string; 
+    full_name?: string;
+  };
+  brand_permissions?: Array<{
+    brand_id: string;
+    role: string;
+  }>;
+}
 
-// Placeholder Breadcrumbs component - replace with actual implementation later
+// export const metadata: Metadata = { // Metadata should be handled differently for client components if needed
+//   title: 'Create Template | MixerAI',
+//   description: 'Create a new content template.',
+// };
+
 const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
   <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
     <ol className="flex items-center space-x-1.5">
@@ -30,12 +47,59 @@ const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) =
   </nav>
 );
 
-/**
- * NewTemplatePage provides a user interface for creating new content templates.
- * It utilizes the `TemplateForm` component for the actual form fields and logic.
- * A `PageHeader` provides context and navigation back to the templates list.
- */
 export default function NewTemplatePage() {
+  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
+
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      setIsLoadingUser(true);
+      try {
+        const response = await fetch('/api/me');
+        if (!response.ok) throw new Error('Failed to fetch user session');
+        const data = await response.json();
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+        } else {
+          setCurrentUser(null);
+          toast.error(data.error || 'Could not verify your session.');
+        }
+      } catch (err: any) {
+        console.error('Error fetching current user:', err);
+        setCurrentUser(null);
+        toast.error('Error fetching user data: ' + err.message);
+      } finally {
+        setIsLoadingUser(false);
+      }
+    };
+    fetchCurrentUser();
+  }, []);
+
+  if (isLoadingUser) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground mt-4">Loading user data...</p>
+      </div>
+    );
+  }
+
+  const isGlobalAdmin = currentUser?.user_metadata?.role === 'admin';
+
+  if (!isGlobalAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
+        <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
+        <h3 className="text-xl font-bold mb-2">Access Denied</h3>
+        <p className="text-muted-foreground">You do not have permission to create new Content Templates.</p>
+        <Link href="/dashboard/templates">
+          <Button variant="outline" className="mt-4">Back to Templates</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  // Original page content for Global Admins
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
       <Breadcrumbs items={[

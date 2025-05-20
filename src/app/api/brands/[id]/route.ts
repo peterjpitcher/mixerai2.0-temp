@@ -42,12 +42,38 @@ export const GET = withAuth(async (
 ) => {
   try {
     const supabase = createSupabaseAdminClient();
-    const { id } = params;
+    const { id: brandId } = params;
+
+    // Role and Permission Check
+    const isGlobalAdmin = user.user_metadata?.role === 'admin';
+
+    if (!isGlobalAdmin) {
+      // If not a global admin, check if the user has any permission for this specific brand
+      const { data: permission, error: permError } = await supabase
+        .from('user_brand_permissions')
+        .select('brand_id')
+        .eq('user_id', user.id)
+        .eq('brand_id', brandId)
+        .maybeSingle(); // Use maybeSingle as we only need to know if at least one exists
+
+      if (permError) {
+        console.error(`[API Brands GET /${brandId}] Error checking brand permissions for user ${user.id}:`, permError);
+        return handleApiError(permError, 'Error checking brand permissions');
+      }
+
+      if (!permission) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden: You do not have permission to access this brand.' },
+          { status: 403 }
+        );
+      }
+    }
+    // If global admin or has specific permission, proceed to fetch brand details
 
     const { data: brandData, error: brandFetchError } = await supabase
       .from('brands')
       .select('*')
-      .eq('id', id)
+      .eq('id', brandId)
       .single();
     
     if (brandFetchError) {
@@ -76,7 +102,7 @@ export const GET = withAuth(async (
           priority
         )
       `)
-      .eq('brand_id', id);
+      .eq('brand_id', brandId);
 
     if (selectedAgenciesError) {
       console.error('Error fetching selected agencies with Supabase:', selectedAgenciesError);
@@ -117,7 +143,7 @@ export const GET = withAuth(async (
     const { data: adminPermissions, error: adminPermissionsError } = await supabase
       .from('user_brand_permissions')
       .select('user_id, profiles (id, full_name, email, avatar_url, job_title)') // Assuming profiles table exists and is linked
-      .eq('brand_id', id)
+      .eq('brand_id', brandId)
       .eq('role', 'admin');
 
     if (adminPermissionsError) {
@@ -131,14 +157,14 @@ export const GET = withAuth(async (
     const { count: contentCount, error: contentCountError } = await supabase
       .from('content')
       .select('id', { count: 'exact', head: true })
-      .eq('brand_id', id);
+      .eq('brand_id', brandId);
       
     if (contentCountError) throw contentCountError; 
     
     const { count: workflowCount, error: workflowCountError } = await supabase
       .from('workflows')
       .select('id', { count: 'exact', head: true })
-      .eq('brand_id', id);
+      .eq('brand_id', brandId);
       
     if (workflowCountError) throw workflowCountError;
 
@@ -527,13 +553,14 @@ export const DELETE = withAuth(async (
     const supabase = createSupabaseAdminClient();
     const brandIdToDelete = context.params.id;
     
-    const hasPermission = await isBrandAdmin(user.id, brandIdToDelete, supabase);
-    if (!hasPermission) {
+    // Role check: Only Global Admins can delete brands
+    if (user.user_metadata?.role !== 'admin') {
       return NextResponse.json(
-        { success: false, error: 'Forbidden: You do not have admin rights for this brand to delete it.' },
+        { success: false, error: 'Forbidden: You do not have permission to delete this resource.' },
         { status: 403 }
       );
     }
+    // If we reach here, user is a Global Admin
 
     const url = new URL(request.url);
     const deleteCascade = url.searchParams.get('deleteCascade') === 'true';

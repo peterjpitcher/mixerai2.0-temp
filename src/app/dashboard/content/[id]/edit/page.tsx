@@ -17,7 +17,8 @@ import { createBrowserClient } from '@supabase/ssr';
 import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandIcon, BrandIconProps } from '@/components/brand-icon';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, ShieldAlert, XCircle } from 'lucide-react';
+import { Skeleton } from '@/components/skeleton';
 
 // export const metadata: Metadata = {
 //   title: 'Edit Content | MixerAI 2.0',
@@ -49,6 +50,23 @@ interface ContentState {
   // Add other fields from your actual content structure as needed
   // Add fields for actual template output fields if they need to be directly editable
   // For example, if an outputField from template is 'summary', you might add: summary?: string;
+}
+
+// Define UserSessionData interface (mirroring what /api/me is expected to return)
+interface UserSessionData {
+  id: string;
+  email?: string;
+  user_metadata?: {
+    role?: string; 
+    full_name?: string;
+    avatar_url?: string;
+  };
+  brand_permissions?: Array<{
+    brand_id: string;
+    role: string; 
+  }>;
+  avatar_url?: string; 
+  full_name?: string; 
 }
 
 // Add ContentVersion if it's not identical to the one in view page, or import if sharable
@@ -115,6 +133,13 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   
+  // User and Permissions State
+  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const [userError, setUserError] = useState<string | null>(null);
+  const [isAllowedToEdit, setIsAllowedToEdit] = useState<boolean>(false);
+  const [isCheckingPermissions, setIsCheckingPermissions] = useState<boolean>(true);
+  
   const [content, setContent] = useState<ContentState>({
     id: '',
     title: '',
@@ -132,7 +157,6 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   });
 
   const [versions, setVersions] = useState<ContentVersion[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [activeBrandData, setActiveBrandData] = useState<any>(null);
   const [template, setTemplate] = useState<Template | null>(null);
 
@@ -145,12 +169,56 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   );
   
   useEffect(() => {
-    const getCurrentUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setCurrentUserId(user?.id || null);
+    const fetchCurrentUser = async () => {
+      setIsLoadingUser(true);
+      setUserError(null);
+      try {
+        const response = await fetch('/api/me');
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch user session' }));
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+        } else {
+          setCurrentUser(null);
+          setUserError(data.error || 'User data not found in session.');
+        }
+      } catch (error: any) {
+        console.error('[ContentEditPage] Error fetching current user:', error);
+        setCurrentUser(null);
+        setUserError(error.message || 'An unexpected error occurred while fetching user data.');
+      } finally {
+        setIsLoadingUser(false);
+      }
     };
-    getCurrentUser();
-  }, [supabase.auth]);
+    fetchCurrentUser();
+  }, []);
+
+  // Effect to check permissions once user and content (for brand_id) are loaded
+  useEffect(() => {
+    if (!isLoadingUser && currentUser && content.id && content.brand_id) {
+      setIsCheckingPermissions(true);
+      const userRole = currentUser.user_metadata?.role;
+      let allowed = false;
+      if (userRole === 'admin') {
+        allowed = true;
+      } else if (content.brand_id && currentUser.brand_permissions) {
+        const brandPerm = currentUser.brand_permissions.find(p => p.brand_id === content.brand_id);
+        if (brandPerm && (brandPerm.role === 'brand_admin' || brandPerm.role === 'editor')) {
+          allowed = true;
+        }
+      }
+      setIsAllowedToEdit(allowed);
+      setIsCheckingPermissions(false);
+    } else if (!isLoadingUser && (!currentUser || !content.id)) {
+      // If user is loaded but no user, or content not loaded yet (or no brand_id), deny permission until data is ready
+      setIsAllowedToEdit(false);
+      setIsCheckingPermissions(false); 
+    }
+    // Do not run if content.id or content.brand_id is not yet available from fetchAllData
+  }, [currentUser, isLoadingUser, content.id, content.brand_id]); 
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -245,10 +313,10 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       }
     };
     
-    if (id && currentUserId) {
+    if (id && currentUser?.id) {
       fetchAllData();
     }
-  }, [id, currentUserId, supabase.auth]); 
+  }, [id, currentUser?.id]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -366,59 +434,49 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     toast.success('Field added successfully!');
   };
 
-  if (isLoading) {
+  if (isLoadingUser || isLoading || isCheckingPermissions) {
     return (
-      <div className="flex items-center justify-center min-h-[300px]">
-        <div className="animate-spin rounded-full border-2 border-current border-t-transparent h-6 w-6"></div>
+      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-10 w-1/3" />
+          <Skeleton className="h-10 w-24" />
+        </div>
+        <Skeleton className="h-8 w-1/2 mb-4" /> 
+        <Card>
+          <CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-40 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+          <CardFooter><Skeleton className="h-10 w-32" /></CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  if (userError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
+        <XCircle className="h-12 w-12 text-destructive mb-4" />
+        <p className="text-destructive-foreground">Error loading user data: {userError}</p>
+        <Button variant="outline" onClick={() => router.push('/dashboard')} className="mt-4">Go to Dashboard</Button>
       </div>
     );
   }
   
-  // Logic to get output field definitions from template (needs template fetching if not already on content)
-  // This is a placeholder - actual template fetching/structure would be needed.
-  // For now, we assume content.content_data holds the output fields from generation.
-  const outputFieldsToDisplay = content.template_id && content.content_data 
-    ? Object.keys(content.content_data) // Simplistic: assumes all keys in content_data are output fields to display
-        .filter(key => key !== 'templateInputValues' && key !== 'generatedOutput' && key !== 'contentBody') // Filter out known non-output data
-        .map(key => ({ id: key, name: key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) , type: 'text' /* Default type, ideally from template */ }))
-    : [];
-
-  // Calculate currentStepObject and isCurrentUserStepOwner (similar to view page)
-  let currentStepObject: WorkflowStep | undefined = undefined;
-  if (content.workflow && content.workflow.steps && content.current_step) {
-    currentStepObject = content.workflow.steps.find(
-      (step: any) => step.id === content.current_step
-    ) as WorkflowStep | undefined;
+  if (!isAllowedToEdit) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
+        <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
+        <h3 className="text-xl font-semibold mb-2">Access Denied</h3>
+        <p className="text-muted-foreground text-center mb-6">You do not have permission to edit this content.</p>
+        <Link href={content.id ? `/dashboard/content/${content.id}` : '/dashboard/content'} passHref>
+          <Button variant="outline">Back to Content</Button>
+        </Link>
+      </div>
+    );
   }
-
-  let isCurrentUserStepOwner = false;
-  if (currentStepObject && currentUserId) {
-    if (Array.isArray(currentStepObject.assignees)) {
-      isCurrentUserStepOwner = currentStepObject.assignees.some((assignee: any) => assignee.id === currentUserId);
-    }
-  }
-  
-  const handleWorkflowAction = () => {
-    router.refresh();
-    const fetchContentAgain = async () => {
-      const response = await fetch(`/api/content/${id}`);
-      const result = await response.json();
-      if (result.success && result.data) {
-         setContent(prev => ({ 
-            ...prev, 
-            status: result.data.status,
-            current_step: result.data.current_step,
-            workflow: result.data.workflow || prev.workflow
-          }));
-      }
-       const versionsResponse = await fetch(`/api/content/${id}/versions`);
-       if (versionsResponse.ok) {
-          const versionsResult = await versionsResponse.json();
-          if (versionsResult.success && versionsResult.data) setVersions(versionsResult.data);
-        }
-    };
-    fetchContentAgain();
-  };
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
@@ -499,12 +557,14 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         </div>
 
         <div className="lg:col-span-1 space-y-6">
-          {content.workflow && currentStepObject && (
+          {content.workflow && content.workflow.steps && content.current_step && (
             <ContentApprovalWorkflow
               contentId={content.id}
               contentTitle={content.title}
-              currentStepObject={currentStepObject}
-              isCurrentUserStepOwner={isCurrentUserStepOwner}
+              currentStepObject={content.workflow.steps.find(
+                (step: any) => step.id === content.current_step
+              ) as WorkflowStep | undefined}
+              isCurrentUserStepOwner={content.workflow.steps.some((step: any) => step.id === content.current_step && step.assignees?.some((assignee: any) => assignee.id === currentUser?.id))}
               versions={versions}
               onActionComplete={handleWorkflowActionCompletion}
               performContentSave={handleSave}

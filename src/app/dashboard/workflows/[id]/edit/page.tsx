@@ -15,7 +15,7 @@ import { Switch } from '@/components/switch';
 import { Badge } from '@/components/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { toast } from 'sonner';
-import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2, ArrowLeft, ShieldAlert } from 'lucide-react';
 import type { Metadata } from 'next';
 import debounce from 'lodash.debounce';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -31,6 +31,19 @@ interface WorkflowEditPageProps {
   params: {
     id: string;
   };
+}
+
+interface UserSessionData {
+  id: string;
+  email?: string;
+  user_metadata?: {
+    role?: string;
+    full_name?: string;
+  };
+  brand_permissions?: Array<{
+    brand_id: string;
+    role: string;
+  }>;
 }
 
 interface ContentTemplateSummary {
@@ -82,7 +95,35 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [stepDescLoading, setStepDescLoading] = useState<Record<number, boolean>>({});
   
+  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const [allFetchedBrands, setAllFetchedBrands] = useState<any[]>([]); // To store all brands before filtering
+
   const currentBrandForDisplay = brands.find(b => b.id === (workflow?.brand_id || workflow?.brand?.id));
+
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      setIsLoadingUser(true);
+      try {
+        const response = await fetch('/api/me');
+        if (!response.ok) throw new Error('Failed to fetch user session');
+        const data = await response.json();
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+        } else {
+          setCurrentUser(null);
+          toast.error(data.error || 'Could not verify your session.');
+        }
+      } catch (err) {
+        console.error('Error fetching current user:', err);
+        setCurrentUser(null);
+        toast.error('Error fetching your user data.');
+      } finally {
+        setIsLoadingUser(false);
+      }
+    };
+    fetchCurrentUser();
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -102,6 +143,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
         const brandsData = await brandsResponse.json();
         if (!brandsData.success) throw new Error(brandsData.error || 'Failed to fetch brands data');
         setBrands(Array.isArray(brandsData.data) ? brandsData.data : []);
+        setAllFetchedBrands(Array.isArray(brandsData.data) ? brandsData.data : []); // Store all brands
 
         // Fetch content templates data
         const templatesResponse = await fetch('/api/content-templates');
@@ -119,6 +161,131 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
     };
     fetchData();
   }, [id]);
+
+  // Derived permissions and access control
+  const isGlobalAdmin = currentUser?.user_metadata?.role === 'admin';
+  const userBrandAdminPermissions = currentUser?.brand_permissions?.filter(p => p.role === 'brand_admin').map(p => p.brand_id) || [];
+  
+  const canEditThisWorkflow = workflow && (
+    isGlobalAdmin || 
+    (workflow.brand_id && userBrandAdminPermissions.includes(workflow.brand_id))
+  );
+
+  const canAccessPage = !isLoadingUser && !isLoading && workflow ? canEditThisWorkflow : false;
+  // More refined canAccessPage logic will be placed after data fetching completed check
+
+  // useEffect to filter brands based on user permissions AFTER all data is loaded
+  useEffect(() => {
+    if (isLoadingUser || isLoading || !currentUser || !workflow || allFetchedBrands.length === 0) {
+      return; // Wait for all necessary data
+    }
+
+    if (isGlobalAdmin) {
+      setBrands(allFetchedBrands);
+    } else if (userBrandAdminPermissions.length > 0) {
+      const manageableBrands = allFetchedBrands.filter(b => userBrandAdminPermissions.includes(b.id));
+      setBrands(manageableBrands);
+      // If current workflow's brand is not in manageable brands, it implies an issue,
+      // but canEditThisWorkflow check should handle overall page access.
+      // For brand dropdown, it will be correctly filtered.
+    } else {
+      setBrands([]); // No brands manageable if not global admin and no brand_admin permissions
+    }
+  }, [isLoadingUser, isLoading, currentUser, workflow, allFetchedBrands, isGlobalAdmin, userBrandAdminPermissions]);
+
+  // --- Role Card Selection Component ---
+  const roles = [
+    { id: 'editor', name: 'Editor', description: 'Reviews and edits content for clarity, grammar, and style.' },
+    { id: 'seo', name: 'SEO', description: 'Optimises content for search engines, including keywords and metadata.' },
+    { id: 'legal', name: 'Legal', description: 'Ensures content complies with legal and regulatory requirements.' },
+    { id: 'culinary', name: 'Culinary', description: 'Verifies recipes, cooking instructions, and culinary accuracy.' },
+    { id: 'brand', name: 'Brand', description: 'Checks content for brand alignment, tone of voice, and messaging.' },
+    { id: 'publisher', name: 'Publisher', description: 'Manages the final publication and distribution of content.' }
+  ];
+
+  interface RoleSelectionCardsProps {
+    selectedRole: string;
+    onRoleSelect: (roleId: string) => void;
+    stepIndex: number;
+    disabled?: boolean; // Added disabled prop
+  }
+
+  const RoleSelectionCards: React.FC<RoleSelectionCardsProps> = ({ selectedRole, onRoleSelect, stepIndex, disabled }) => {
+    return (
+      <div className="space-y-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          {roles.map((role) => (
+            <button
+              key={role.id}
+              type="button"
+              onClick={() => onRoleSelect(role.id)}
+              disabled={disabled} // Apply disabled prop
+              className={cn(
+                'border rounded-lg p-3 text-left transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+                selectedRole === role.id
+                  ? 'bg-primary/10 border-primary ring-1 ring-primary'
+                  : 'hover:bg-accent hover:text-accent-foreground',
+                disabled ? 'opacity-50 cursor-not-allowed' : '' // Style for disabled state
+              )}
+            >
+              <p className="font-medium text-sm">{role.name}</p>
+              <p className="text-xs text-muted-foreground mt-1">{role.description}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+  // --- End Role Card Selection Component ---
+
+  const handleGenerateStepDescription = async (index: number) => {
+    if (!workflow || !workflow.steps || !workflow.steps[index]) {
+      toast.error('Step data not available.');
+      return;
+    }
+    const step = workflow.steps[index];
+    if (!step.name || !step.role) {
+      toast.error('Step name and role are required to generate a description.');
+      return;
+    }
+
+    setStepDescLoading(prev => ({ ...prev, [index]: true }));
+
+    try {
+      const currentBrand = allFetchedBrands.find(b => b.id === (workflow.brand_id || workflow.brand?.id));
+      const currentTemplate = contentTemplates.find(ct => ct.id === selectedTemplateId);
+
+      const response = await fetch('/api/ai/generate-step-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workflowName: workflow.name,
+          brandName: currentBrand?.name,
+          templateName: currentTemplate?.name,
+          stepName: step.name,
+          role: step.role,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate description');
+      }
+
+      const result = await response.json();
+      if (result.success && result.description) {
+        handleUpdateStepDescription(index, result.description);
+        toast.success('Step description generated!');
+      } else {
+        throw new Error(result.error || 'AI service did not return a description.');
+      }
+    } catch (error: any) {
+      console.error('Error generating step description:', error);
+      toast.error(error.message || 'Could not generate step description.');
+    } finally {
+      setStepDescLoading(prev => ({ ...prev, [index]: false }));
+    }
+  };
 
   const handleUpdateWorkflowDetails = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -479,143 +646,61 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
     }
   };
   
-  // Loading state
-  if (isLoading) {
+  if (isLoadingUser || isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[300px]">
-        <div className="animate-spin rounded-full border-2 border-current border-t-transparent h-6 w-6"></div>
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground mt-4">Loading workflow details...</p>
       </div>
     );
   }
-  
-  // Error state
+
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[300px]">
-        <div className="text-destructive mb-4">
-          <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-        </div>
-        <h3 className="text-xl font-bold mb-2">Error Loading Workflow</h3>
-        <p className="text-muted-foreground mb-4 text-center max-w-md">{error}</p>
-        <Button onClick={() => window.location.reload()}>Try Again</Button>
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
+        <XCircle className="h-12 w-12 text-destructive" />
+        <p className="text-destructive-foreground mt-4">Error: {error}</p>
+        <p className="text-muted-foreground">Could not load workflow data. It might have been deleted or an error occurred.</p>
+        <Link href="/dashboard/workflows" passHref>
+          <Button variant="outline" className="mt-6">Back to Workflows</Button>
+        </Link>
       </div>
     );
   }
   
-  // If workflow doesn't exist, show 404 page
-  if (!workflow) {
-    notFound();
-  }
-  
-  // Extract safe values with fallbacks
-  const workflowSteps = Array.isArray(workflow.steps) ? workflow.steps : [];
-  const workflowStatus = workflow.status || 'draft';
-  const brandId = workflow.brand?.id || workflow.brand_id || '';
-  
-  // --- Role Card Selection Component (Can be outside if props are sufficient) ---
-  const roles = [
-    { id: 'editor', name: 'Editor', description: 'Reviews and edits content for clarity, grammar, and style.' },
-    { id: 'seo', name: 'SEO', description: 'Optimises content for search engines, including keywords and metadata.' },
-    { id: 'legal', name: 'Legal', description: 'Ensures content complies with legal and regulatory requirements.' },
-    { id: 'culinary', name: 'Culinary', description: 'Verifies recipes, cooking instructions, and culinary accuracy.' },
-    { id: 'brand', name: 'Brand', description: 'Checks content for brand alignment, tone of voice, and messaging.' },
-    { id: 'publisher', name: 'Publisher', description: 'Manages the final publication and distribution of content.' }
-  ];
-
-  interface RoleSelectionCardsProps {
-    selectedRole: string;
-    onRoleSelect: (roleId: string) => void;
-    stepIndex: number;
-  }
-
-  const RoleSelectionCards: React.FC<RoleSelectionCardsProps> = ({ selectedRole, onRoleSelect, stepIndex }) => {
+  if (!workflow) { // Workflow not found after loading, or initial error (redundant with error state but good check)
+    // This can also happen if initial fetch failed and error state was set, but as a fallback.
+    // Or if workflow ID is invalid and API returns no workflow without explicit error.
     return (
-      <div className="space-y-2">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-          {roles.map((role) => (
-            <button
-              key={role.id}
-              type="button"
-              onClick={() => onRoleSelect(role.id)}
-              className={cn(
-                'border rounded-lg p-3 text-left transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
-                selectedRole === role.id
-                  ? 'bg-primary/10 border-primary ring-1 ring-primary'
-                  : 'hover:bg-accent hover:text-accent-foreground'
-              )}
-            >
-              <p className="font-medium text-sm">{role.name}</p>
-              <p className="text-xs text-muted-foreground mt-1">{role.description}</p>
-            </button>
-          ))}
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
+        <XCircle className="h-12 w-12 text-destructive" />
+        <p className="text-destructive-foreground mt-4">Workflow not found.</p>
+        <p className="text-muted-foreground">The requested workflow does not exist or could not be loaded.</p>
+        <Link href="/dashboard/workflows" passHref>
+          <Button variant="outline" className="mt-6">Back to Workflows</Button>
+        </Link>
       </div>
     );
-  };
-  // --- End Role Card Selection Component ---
+  }
 
-  // Handler for AI Step Description (defined inside component scope)
-  const handleGenerateStepDescription = async (index: number) => {
-    if (!workflow || !workflow.steps || !workflow.steps[index]) {
-      toast.error('Step data not available.');
-      return;
-    }
-    const step = workflow.steps[index];
-    if (!step.name || !step.role) {
-      toast.error('Step name and role are required to generate a description.');
-      return;
-    }
+  // Access Denied Check (after user and workflow data are loaded)
+  if (!isLoadingUser && !isLoading && workflow && !canEditThisWorkflow) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
+        <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
+        <h3 className="text-xl font-semibold mb-2">Access Denied</h3>
+        <p className="text-muted-foreground text-center mb-6">You do not have permission to edit this workflow.</p>
+        <Link href="/dashboard/workflows" passHref>
+          <Button variant="outline">Back to Workflows</Button>
+        </Link>
+      </div>
+    );
+  }
 
-    setStepDescLoading(prev => ({ ...prev, [index]: true }));
-
-    try {
-      const currentBrand = brands.find(b => b.id === (workflow.brand_id || workflow.brand?.id));
-      const currentTemplate = contentTemplates.find(ct => ct.id === selectedTemplateId);
-
-      const response = await fetch('/api/ai/generate-step-description', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workflowName: workflow.name,
-          brandName: currentBrand?.name,
-          templateName: currentTemplate?.name,
-          stepName: step.name,
-          role: step.role,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate description');
-      }
-
-      const result = await response.json();
-      if (result.success && result.description) {
-        handleUpdateStepDescription(index, result.description);
-        toast.success('Step description generated!');
-      } else {
-        throw new Error(result.error || 'AI service did not return a description.');
-      }
-    } catch (error: any) {
-      console.error('Error generating step description:', error);
-      toast.error(error.message || 'Could not generate step description.');
-    } finally {
-      setStepDescLoading(prev => ({ ...prev, [index]: false }));
-    }
-  };
-
-  console.log('[WorkflowEditPage] Rendering with state:');
-  console.log('- Workflow Data:', workflow);
-  console.log('- Selected Template ID:', selectedTemplateId);
-  console.log('- Content Templates List:', contentTemplates);
-  console.log('- isLoading:', isLoading, '- Error:', error);
+  // If we reach here, user is loaded, workflow is loaded, and user has permission.
 
   return (
-    <div className="space-y-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" }, 
         { label: "Workflows", href: "/dashboard/workflows" }, 
@@ -676,7 +761,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
               
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select defaultValue={workflowStatus} onValueChange={handleUpdateWorkflowStatus}>
+                <Select defaultValue={workflow.status} onValueChange={handleUpdateWorkflowStatus} disabled={!canEditThisWorkflow}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
@@ -690,7 +775,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
               
               <div className="space-y-2">
                 <Label htmlFor="brand">Brand</Label>
-                <Select defaultValue={brandId} onValueChange={handleUpdateBrand} value={brandId}>
+                <Select defaultValue={workflow.brand?.id || workflow.brand_id || ''} onValueChange={handleUpdateBrand} value={workflow.brand?.id || workflow.brand_id || ''} disabled={!canEditThisWorkflow}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select brand" />
                   </SelectTrigger>
@@ -712,7 +797,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
               
               <div className="space-y-2">
                 <Label htmlFor="contentTemplate">Content Template (Optional)</Label>
-                <Select value={selectedTemplateId} onValueChange={handleUpdateTemplate}>
+                <Select value={selectedTemplateId} onValueChange={handleUpdateTemplate} disabled={!canEditThisWorkflow}>
                   <SelectTrigger id="contentTemplate">
                     <SelectValue placeholder="Select a content template" />
                   </SelectTrigger>
@@ -739,20 +824,20 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                 <CardTitle>Workflow Steps</CardTitle>
                 <CardDescription>Define the approval stages for this workflow.</CardDescription>
               </div>
-              <Button onClick={handleAddStep} size="sm">
+              <Button onClick={handleAddStep} size="sm" disabled={!canEditThisWorkflow}>
                 <Plus className="h-4 w-4 mr-1" />
                 Add Step
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            {workflowSteps.length === 0 ? (
+            {workflow.steps.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No steps defined for this workflow. Click "Add Step" to create your first workflow step.
               </div>
             ) : (
               <div className="space-y-6">
-                {workflowSteps.map((step: any, index: number) => (
+                {workflow.steps.map((step: any, index: number) => (
                   <div key={step.id || index} className="border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center">
@@ -774,7 +859,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleMoveStepDown(index)}
-                          disabled={index === workflowSteps.length - 1}
+                          disabled={index === workflow.steps.length - 1}
                         >
                           <ChevronDown className="h-4 w-4" />
                         </Button>
@@ -793,7 +878,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                       <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor={`step-name-${index}`}>Step Name <span className="text-destructive">*</span></Label>
-                          <Input id={`step-name-${index}`} value={step.name || ''} onChange={(e) => handleUpdateStepName(index, e.target.value)} placeholder="Enter step name"/>
+                          <Input id={`step-name-${index}`} value={step.name || ''} onChange={(e) => handleUpdateStepName(index, e.target.value)} placeholder="Enter step name" disabled={!canEditThisWorkflow}/>
                         </div>
                         
                         <div className="space-y-2">
@@ -802,6 +887,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                             stepIndex={index} 
                             selectedRole={step.role || 'editor'} 
                             onRoleSelect={(value) => handleUpdateStepRole(index, value)} 
+                            disabled={!canEditThisWorkflow}
                           />
                         </div>
                       </div>
@@ -814,7 +900,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                              variant="outline" 
                              size="sm" 
                              onClick={() => handleGenerateStepDescription(index)}
-                             disabled={stepDescLoading[index] || !workflowSteps[index]?.name || !workflowSteps[index]?.role}
+                             disabled={stepDescLoading[index] || !workflow.steps[index]?.name || !workflow.steps[index]?.role || !canEditThisWorkflow}
                            >
                             {stepDescLoading[index] ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
                             Auto-Generate
@@ -825,6 +911,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                           value={step.description || ''}
                           onChange={(e) => handleUpdateStepDescription(index, e.target.value)}
                           rows={2}
+                          disabled={!canEditThisWorkflow}
                         />
                       </div>
                       
@@ -833,6 +920,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                           id={`step-approval-${index}`}
                           checked={!step.approvalRequired}
                           onCheckedChange={(value) => handleUpdateStepApprovalRequired(index, !value)}
+                          disabled={!canEditThisWorkflow}
                         />
                         <Label htmlFor={`step-approval-${index}`}>This step is optional</Label>
                       </div>
@@ -860,11 +948,13 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                               }
                             }}
                             className="flex-grow mr-2"
+                            disabled={!canEditThisWorkflow}
                           />
                           <Button 
                             variant="outline" 
                             size="sm"
                             onClick={() => handleAddAssignee(index)}
+                            disabled={!canEditThisWorkflow}
                           >
                             Add
                           </Button>

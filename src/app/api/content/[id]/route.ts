@@ -166,7 +166,6 @@ export const GET = withAuth(async (request: NextRequest, user: User, context: { 
   }
 });
 
-// Placeholder for PUT (update) - to be implemented as needed
 export const PUT = withAuth(async (request: NextRequest, user: User, context: { params: { id: string } }) => {
   const id = context.params.id;
   
@@ -177,6 +176,66 @@ export const PUT = withAuth(async (request: NextRequest, user: User, context: { 
   try {
     const supabase = createSupabaseAdminClient();
     const body = await request.json();
+
+    // --- Permission Check Start ---
+    const globalRole = user?.user_metadata?.role;
+
+    // Fetch the content item to check its brand_id for permission validation
+    const { data: currentContent, error: fetchError } = await supabase
+      .from('content')
+      .select('brand_id')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      if (fetchError.code === 'PGRST116') {
+        return NextResponse.json({ success: false, error: 'Content not found' }, { status: 404 });
+      }
+      console.error('[API Content PUT] Error fetching content for permission check:', fetchError);
+      return handleApiError(fetchError, 'Failed to verify content existence');
+    }
+
+    if (!currentContent) {
+      return NextResponse.json({ success: false, error: 'Content not found' }, { status: 404 });
+    }
+
+    const targetBrandId = currentContent.brand_id;
+
+    // Ensure brand_id is present before proceeding with permission checks
+    if (!targetBrandId) {
+      console.error(`[API Content PUT] Content item ${id} is missing brand_id. This is an unexpected state.`);
+      return NextResponse.json(
+        { success: false, error: 'Cannot update content: Content is not associated with a brand.' },
+        { status: 500 } // Internal Server Error, as this indicates a data integrity issue
+      );
+    }
+
+    if (globalRole !== 'admin') {
+      const { data: permissionsData, error: permissionsError } = await supabase
+        .from('user_brand_permissions')
+        .select('brand_id, role')
+        .eq('user_id', user.id)
+        .eq('brand_id', targetBrandId);
+
+      if (permissionsError) {
+        console.error('[API Content PUT] Error fetching brand permissions for user:', user.id, targetBrandId, permissionsError);
+        return handleApiError(permissionsError, 'Failed to verify user permissions');
+      }
+
+      const specificBrandPermission = permissionsData?.[0];
+
+      if (!specificBrandPermission || !['brand_admin', 'editor'].includes(specificBrandPermission.role)) {
+        console.warn(`[API Content PUT] User ${user.id} (global role: ${globalRole}, brand role: ${specificBrandPermission?.role}) access denied to update content ${id} for brand ${targetBrandId}.`);
+        return NextResponse.json(
+          { success: false, error: 'You do not have permission to update this content.' },
+          { status: 403 }
+        );
+      }
+      console.log(`[API Content PUT] User ${user.id} (brand role: ${specificBrandPermission.role}) has permission to update content ${id} for brand ${targetBrandId}.`);
+    } else {
+      console.log(`[API Content PUT] Global admin ${user.id} updating content ${id} for brand ${targetBrandId}.`);
+    }
+    // --- Permission Check End ---
 
     // Log incoming body
     console.log('[API PUT /api/content/[id]] Received body (stringified):', JSON.stringify(body, null, 2));
@@ -245,6 +304,95 @@ export const PUT = withAuth(async (request: NextRequest, user: User, context: { 
 
   } catch (error: any) {
     return handleApiError(error, `Failed to update content with ID: ${id}`);
+  }
+});
+
+export const DELETE = withAuth(async (request: NextRequest, user: User, context: { params: { id: string } }) => {
+  const { id } = context.params;
+
+  if (!id) {
+    return NextResponse.json({ success: false, error: 'Content ID is required' }, { status: 400 });
+  }
+
+  try {
+    const supabase = createSupabaseAdminClient();
+    const globalRole = user?.user_metadata?.role;
+
+    // Fetch the content item to check its brand_id for permission validation
+    const { data: currentContent, error: fetchError } = await supabase
+      .from('content')
+      .select('id, brand_id') // Select id as well for logging or if needed
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      if (fetchError.code === 'PGRST116') {
+        return NextResponse.json({ success: false, error: 'Content not found' }, { status: 404 });
+      }
+      console.error('[API Content DELETE] Error fetching content for permission check:', fetchError);
+      return handleApiError(fetchError, 'Failed to verify content existence for deletion');
+    }
+
+    if (!currentContent) {
+      return NextResponse.json({ success: false, error: 'Content not found' }, { status: 404 });
+    }
+
+    const targetBrandId = currentContent.brand_id;
+
+    if (!targetBrandId) {
+      console.error(`[API Content DELETE] Content item ${id} is missing brand_id. Cannot perform delete operation.`);
+      return NextResponse.json(
+        { success: false, error: 'Cannot delete content: Content is not associated with a brand.' },
+        { status: 500 }
+      );
+    }
+
+    // Permission check
+    if (globalRole !== 'admin') {
+      const { data: permissionsData, error: permissionsError } = await supabase
+        .from('user_brand_permissions')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('brand_id', targetBrandId)
+        .single(); // Expecting one permission record or null
+
+      if (permissionsError && permissionsError.code !== 'PGRST116') { // PGRST116 means no rows, which is a valid permission check outcome
+        console.error('[API Content DELETE] Error fetching brand permissions for user:', user.id, targetBrandId, permissionsError);
+        return handleApiError(permissionsError, 'Failed to verify user permissions for deletion');
+      }
+
+      const brandRole = permissionsData?.role;
+
+      if (!brandRole || brandRole !== 'brand_admin') {
+        console.warn(`[API Content DELETE] User ${user.id} (global role: ${globalRole}, brand role: ${brandRole}) access denied to delete content ${id} for brand ${targetBrandId}.`);
+        return NextResponse.json(
+          { success: false, error: 'You do not have permission to delete this content.' },
+          { status: 403 }
+        );
+      }
+      console.log(`[API Content DELETE] User ${user.id} (brand role: ${brandRole}) has permission to delete content ${id} for brand ${targetBrandId}.`);
+    } else {
+      console.log(`[API Content DELETE] Global admin ${user.id} deleting content ${id} for brand ${targetBrandId}.`);
+    }
+
+    // Perform the delete operation
+    const { error: deleteError } = await supabase
+      .from('content')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) {
+      console.error('[API Content DELETE] Error deleting content:', deleteError);
+      return handleApiError(deleteError, `Failed to delete content with ID: ${id}`);
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Content deleted successfully' 
+    });
+
+  } catch (error: any) {
+    return handleApiError(error, `Failed to delete content with ID: ${id}`);
   }
 });
 

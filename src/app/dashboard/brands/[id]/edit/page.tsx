@@ -47,6 +47,20 @@ interface VettingAgency {
   priority?: 'High' | 'Medium' | 'Low' | null;
 }
 
+// Define UserSessionData interface (can be moved to a shared types file later)
+interface UserSessionData {
+  id: string;
+  email?: string;
+  user_metadata?: {
+    role?: string;
+    full_name?: string;
+  };
+  brand_permissions?: Array<{
+    brand_id: string;
+    role: string;
+  }>;
+}
+
 // Helper function to get priority-based Tailwind CSS classes
 const getPriorityAgencyStyles = (priority: 'High' | 'Medium' | 'Low' | null | undefined): string => {
   if (priority === 'High') {
@@ -81,6 +95,9 @@ const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) =
   </nav>
 );
 
+// Add a constant for the required role
+const REQUIRED_ROLE = 'brand_admin';
+
 /**
  * BrandEditPage allows users to modify the details of an existing brand.
  * It includes sections for basic information (name, website, country, language, brand colour)
@@ -92,12 +109,18 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   const router = useRouter();
   const { id } = params;
   
+  // States for data, loading, and errors
   const [brand, setBrand] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingBrand, setIsLoadingBrand] = useState(true); // Renamed for clarity
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // States for user session and permissions
+  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const [isForbidden, setIsForbidden] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -149,17 +172,53 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
   
+  // Modify the useEffect to check user role
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      setIsLoadingUser(true);
+      try {
+        const response = await fetch('/api/me');
+        if (!response.ok) throw new Error('Failed to fetch user session');
+        const data = await response.json();
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+          // PERMISSION CHECK REMOVED FROM HERE
+        } else {
+          setCurrentUser(null);
+          setIsForbidden(true); // No user implies forbidden
+          toast.error('Your session could not be verified.');
+        }
+      } catch (err) {
+        console.error('Error fetching current user:', err);
+        setCurrentUser(null);
+        setIsForbidden(true);
+        toast.error('Could not verify your permissions.');
+      } finally {
+        setIsLoadingUser(false);
+      }
+    };
+    fetchCurrentUser();
+  }, [id]);
+
+  // Effect to fetch brand data
   useEffect(() => {
     const fetchBrandData = async () => {
+      setIsLoadingBrand(true);
       try {
         const response = await fetch(`/api/brands/${id}`);
         if (!response.ok) {
-          throw new Error(`Failed to fetch brand: ${response.status}`);
+          if (response.status === 404) {
+            setError('Brand not found.'); // Specific error for 404
+            setIsForbidden(true); // Can't edit a non-existent brand
+          } else {
+            throw new Error(`Failed to fetch brand: ${response.status}`);
+          }
+          return; // Exit if response not ok
         }
         
         const data = await response.json();
         if (!data.success || !data.brand) {
-          throw new Error(data.error || 'Failed to fetch brand data');
+          throw new Error(data.error || 'Failed to fetch brand data structure');
         }
         
         setBrand(data.brand);
@@ -185,27 +244,53 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                                       : [],
         });
 
-        // Populate selectedAdmins from fetched brand data
         if (data.brand.admins && Array.isArray(data.brand.admins)) {
           setSelectedAdmins(data.brand.admins);
         }
 
-      } catch (error) {
-        setError((error as Error).message);
+      } catch (err) {
+        setError((err as Error).message);
         toast.error('Failed to load brand details. Please try again.');
+        // Potentially set isForbidden true here too if brand load fails critically
       } finally {
-        setIsLoading(false);
+        setIsLoadingBrand(false);
       }
     };
     
-    fetchBrandData();
+    if (id) fetchBrandData(); // Only fetch if ID is available
   }, [id]);
+
+  // Effect for permission check after user and brand data are loaded
+  useEffect(() => {
+    if (isLoadingUser || isLoadingBrand) {
+      return; // Wait until both user and brand data are loaded
+    }
+
+    if (!currentUser || !brand) {
+      // If either is null after loading (e.g., brand not found, user session error)
+      setIsForbidden(true);
+      return;
+    }
+
+    const isGlobalAdmin = currentUser.user_metadata?.role === 'admin';
+    const isBrandAdminForThisBrand = currentUser.brand_permissions?.some(
+      p => p.brand_id === id && p.role === REQUIRED_ROLE // USE REQUIRED_ROLE HERE
+    );
+
+    if (!isGlobalAdmin && !isBrandAdminForThisBrand) {
+      setIsForbidden(true);
+      setError('You do not have permission to edit this brand.'); // More specific error
+    } else {
+      setIsForbidden(false); // Explicitly set to false if user has permission
+      setError(null); // Clear any previous permission-related error
+    }
+  }, [currentUser, brand, isLoadingUser, isLoadingBrand, id, REQUIRED_ROLE]); // Add REQUIRED_ROLE to dependency array
 
   // useEffect to fetch vetting agencies based on brand's country
   useEffect(() => {
     const fetchAllVettingAgencies = async () => {
-      // Only fetch if country is selected, or fetch all if no country specific logic desired when country is empty
-      // For now, let's assume we always want to try fetching, API will handle if country_code is undefined/empty
+      if (isForbidden || isLoadingBrand || isLoadingUser || !formData) return;
+
       let apiUrl = '/api/content-vetting-agencies';
       if (formData.country) {
         apiUrl = `/api/content-vetting-agencies?country_code=${formData.country}`;
@@ -231,11 +316,11 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     };
 
     // We need formData.country to be populated before fetching agencies by country.
-    // Check if isLoading is false, which means fetchBrandData has likely completed and set formData.country.
-    if (!isLoading) { 
+    // Check if isLoadingBrand is false, which means fetchBrandData has likely completed and set formData.country.
+    if (!isLoadingBrand) { 
       fetchAllVettingAgencies();
     }
-  }, [formData.country, isLoading]); // Re-fetch when formData.country changes or when initial loading finishes
+  }, [formData.country, isLoadingBrand, isForbidden, isLoadingUser, formData]); // Added formData and more checks
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -468,48 +553,43 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     </div>
   );
 
-  // Loading state
-  if (isLoading) {
+  // Conditional rendering for loading and forbidden states
+  // These MUST come AFTER all hook calls
+  if (isLoadingUser || isLoadingBrand) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6"> {/* Added standard padding */}
-        <div className="flex justify-center items-center h-[50vh]">
-          <div className="flex flex-col items-center space-y-4">
-            <Loader2 className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" /> {/* Matched BrandsPage loader style */}
-            <p className="text-muted-foreground">Loading brand details...</p>
-          </div>
-        </div>
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg">Loading brand details...</p>
       </div>
     );
   }
-  
-  // Error state
-  if (error) {
+
+  if (isForbidden) {
     return (
-        <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6"> {/* Added standard padding */}
-            <Breadcrumbs items={[
-                { label: "Dashboard", href: "/dashboard" }, 
-                { label: "Brands", href: "/dashboard/brands" }, 
-                { label: "Error" }
-            ]} />
-            <ErrorDisplay message={error} />
-        </div>
+      <div className="flex flex-col items-center justify-center h-screen p-8 text-center">
+        <X className="h-16 w-16 text-destructive mb-4" />
+        <h1 className="text-3xl font-bold mb-2">Access Denied</h1>
+        <p className="text-lg text-muted-foreground mb-6">
+          {error || 'You do not have the necessary permissions to edit this brand.'}
+        </p>
+        <Button onClick={() => router.push('/dashboard/brands')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Return to Brands List
+        </Button>
+      </div>
     );
   }
-  
-  // Not found state
-  if (!brand) { // This check should be after isLoading and error, and if brand is still null
-    return (
-        <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6"> {/* Added standard padding */}
-            <Breadcrumbs items={[
-                { label: "Dashboard", href: "/dashboard" }, 
-                { label: "Brands", href: "/dashboard/brands" }, 
-                { label: "Not Found" }
-            ]} />
-            <NotFoundDisplay />
-        </div>
-    );
+
+  // Error display if brand loaded but other errors occurred (and not forbidden due to permissions)
+  if (error && !isForbidden) { // Show general error if not a permission-based forbidden state
+    return <ErrorDisplay message={error} />;
   }
-  
+
+  // Not found display if brand is null after loading and not specifically forbidden (edge case)
+  if (!brand && !isLoadingBrand && !isForbidden) {
+    return <NotFoundDisplay />;
+  }
+
   // Find the country and language labels for the selected values
   const countryName = COUNTRIES.find(c => c.value === formData.country)?.label || formData.country || 'Select country';
   const languageName = LANGUAGES.find(l => l.value === formData.language)?.label || formData.language || 'Select language';
@@ -682,16 +762,16 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                     <div className="space-y-4">
                       <Label>Content Vetting Agencies</Label>
                       {/* START: Render checkboxes for allVettingAgencies grouped by priority */}
-                      {isLoading && <p className="text-sm text-muted-foreground">Loading agencies...</p>}
-                      {!isLoading && allVettingAgencies.length === 0 && (
+                      {isLoadingBrand && <p className="text-sm text-muted-foreground">Loading agencies...</p>}
+                      {!isLoadingBrand && allVettingAgencies.length === 0 && (
                         <p className="text-sm text-muted-foreground">
                           No vetting agencies available for the selected country.
                         </p>
                       )}
-                      {!isLoading && allVettingAgencies.length > 0 && priorityOrder.map(priorityLevel => {
+                      {!isLoadingBrand && allVettingAgencies.length > 0 && priorityOrder.map(priorityLevel => {
                         const agenciesInGroup = allVettingAgencies.filter(agency => agency.priority === priorityLevel);
                         if (agenciesInGroup.length === 0) {
-                          return null; 
+                          return null; // Explicitly return null here
                         }
                         return (
                           <div key={priorityLevel} className="mt-3">
@@ -713,11 +793,11 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                                 </div>
                               ))}
                             </div>
-                    </div>
+                          </div>
                         );
                       })}
                       {/* Render agencies with other/null priorities last */}
-                      {!isLoading && allVettingAgencies.filter(a => !priorityOrder.includes(a.priority as any) && a.priority != null).length > 0 && (
+                      {!isLoadingBrand && allVettingAgencies.filter(a => !priorityOrder.includes(a.priority as any) && a.priority != null).length > 0 && (
                          <div key="other-priority" className="mt-3">
                             <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(null)}`}>Other Priority</h4>
                             <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
@@ -737,9 +817,9 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                                 </div>
                               ))}
                             </div>
-                    </div>
+                          </div>
                       )}
-                      {!isLoading && allVettingAgencies.filter(a => a.priority == null).length > 0 && (
+                      {!isLoadingBrand && allVettingAgencies.filter(a => a.priority == null).length > 0 && (
                          <div key="no-priority" className="mt-3">
                             <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(null)}`}>Uncategorized</h4>
                             <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">

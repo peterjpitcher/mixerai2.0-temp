@@ -15,7 +15,8 @@ import { createBrowserClient } from '@supabase/ssr';
 // Added imports for PageHeader and lucide-react icons
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandIcon, BrandIconProps } from '@/components/brand-icon'; 
-import { FileText, AlertTriangle, PlusCircle, Edit3, RefreshCw, CheckCircle, XCircle, ListFilter, Archive } from 'lucide-react';
+import { FileText, AlertTriangle, PlusCircle, Edit3, RefreshCw, CheckCircle, XCircle, ListFilter, Archive, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from "@/components/alert-dialog";
 
 // Define types
 type ContentFilterStatus = 'active' | 'approved' | 'rejected' | 'all';
@@ -43,9 +44,21 @@ interface ContentItem {
   assigned_to?: string[] | null;
 }
 
-interface User {
+// Define UserSessionData interface (mirroring what /api/me is expected to return)
+interface UserSessionData {
   id: string;
   email?: string;
+  user_metadata?: {
+    role?: string; 
+    full_name?: string;
+    avatar_url?: string;
+  };
+  brand_permissions?: Array<{
+    brand_id: string;
+    role: string; 
+  }>;
+  avatar_url?: string; 
+  full_name?: string; 
 }
 
 // Placeholder Breadcrumbs component
@@ -76,9 +89,16 @@ export default function ContentPageClient() {
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
   const [statusFilter, setStatusFilter] = useState<ContentFilterStatus>('active');
   const searchParams = useSearchParams();
-  const brandId = searchParams?.get('brandId');
+  const brandIdFromParams = searchParams?.get('brandId');
   const [activeBrandData, setActiveBrandData] = useState<any>(null); 
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const [userError, setUserError] = useState<string | null>(null);
+
+  // State for delete confirmation
+  const [itemToDelete, setItemToDelete] = useState<ContentItem | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -87,18 +107,33 @@ export default function ContentPageClient() {
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        console.error("Error fetching session:", sessionError);
-        sonnerToast.error("Could not verify user session.");
-        return;
-      }
-      if (session?.user) {
-        setCurrentUser({ id: session.user.id, email: session.user.email });
+      setIsLoadingUser(true);
+      setUserError(null);
+      try {
+        const response = await fetch('/api/me');
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch user session' }));
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+        } else {
+          setCurrentUser(null);
+          setUserError(data.error || 'User data not found in session.');
+          sonnerToast.error(data.error || 'Could not verify your session.');
+        }
+      } catch (error: any) {
+        console.error('[ContentPageClient] Error fetching current user:', error);
+        setCurrentUser(null);
+        setUserError(error.message || 'An unexpected error occurred while fetching user data.');
+        sonnerToast.error('Error fetching user data: ' + (error.message || 'Please try again.'));
+      } finally {
+        setIsLoadingUser(false);
       }
     };
     fetchCurrentUser();
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     async function fetchContentData() {
@@ -110,8 +145,8 @@ export default function ContentPageClient() {
         if (debouncedSearchQuery) {
           params.append('query', debouncedSearchQuery);
         }
-        if (brandId) {
-          params.append('brandId', brandId);
+        if (brandIdFromParams) {
+          params.append('brandId', brandIdFromParams);
         }
         if (statusFilter) {
           params.append('status', statusFilter);
@@ -141,13 +176,13 @@ export default function ContentPageClient() {
       }
     }
     fetchContentData();
-  }, [debouncedSearchQuery, brandId, statusFilter, supabase]);
+  }, [debouncedSearchQuery, brandIdFromParams, statusFilter, supabase]);
 
   useEffect(() => {
     const fetchActiveBrand = async () => {
-      if (brandId) {
+      if (brandIdFromParams) {
         try {
-          const res = await fetch(`/api/brands/${brandId}`);
+          const res = await fetch(`/api/brands/${brandIdFromParams}`);
           const data = await res.json();
           if (data.success && data.brand) {
             setActiveBrandData(data.brand);
@@ -164,7 +199,7 @@ export default function ContentPageClient() {
       }
     };
     fetchActiveBrand();
-  }, [brandId]);
+  }, [brandIdFromParams]);
 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
@@ -186,10 +221,62 @@ export default function ContentPageClient() {
 
   const isUserAssigned = (item: ContentItem, userId: string | undefined): boolean => {
     if (!userId || !item.assigned_to) return false;
+    const currentUserIdStr = String(userId);
     if (Array.isArray(item.assigned_to)) {
-      return item.assigned_to.includes(userId);
+      return item.assigned_to.map(String).includes(currentUserIdStr);
     }
-    return item.assigned_to_id === userId;
+    return String(item.assigned_to_id) === currentUserIdStr;
+  };
+
+  // Permission check for deleting content
+  const canDeleteContent = (item: ContentItem): boolean => {
+    if (!currentUser) return false;
+    if (currentUser.user_metadata?.role === 'admin') {
+      return true; // Global Admins can delete
+    }
+    if (currentUser.brand_permissions && item.brand_id) {
+      const brandPerm = currentUser.brand_permissions.find(p => p.brand_id === item.brand_id);
+      if (brandPerm && brandPerm.role === 'brand_admin') {
+        return true; // Brand Admins for this content's brand can delete
+      }
+    }
+    return false;
+  };
+
+  const handleDeleteClick = (item: ContentItem) => {
+    if (!canDeleteContent(item)) {
+      sonnerToast.error("You don't have permission to delete this content item.");
+      return;
+    }
+    setItemToDelete(item);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!itemToDelete || !canDeleteContent(itemToDelete)) {
+      sonnerToast.error("Deletion not allowed or item not specified.");
+      setShowDeleteDialog(false);
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/content/${itemToDelete.id}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+      if (response.ok && result.success) {
+        sonnerToast.success(`Content "${itemToDelete.title}" deleted successfully.`);
+        setContent(prev => prev.filter(c => c.id !== itemToDelete.id));
+      } else {
+        sonnerToast.error(result.error || 'Failed to delete content.');
+      }
+    } catch (err: any) {
+      sonnerToast.error('An error occurred during deletion: ' + err.message);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+      setItemToDelete(null);
+    }
   };
 
   const EmptyState = () => ( 
@@ -232,17 +319,17 @@ export default function ContentPageClient() {
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" }, 
-        ...(brandId && activeBrandData ? 
+        ...(brandIdFromParams && activeBrandData ? 
           [
             { label: "Brands", href: "/dashboard/brands" }, 
-            { label: activeBrandData.name || "Brand", href: `/dashboard/brands/${brandId}` },
+            { label: activeBrandData.name || "Brand", href: `/dashboard/brands/${brandIdFromParams}` },
             { label: "Content" }
           ] : 
           [{ label: "Content" }])
       ]} />
 
       <PageHeader
-        title={brandId && activeBrandData ? `Content for ${activeBrandData.name}` : "All Content"}
+        title={brandIdFromParams && activeBrandData ? `Content for ${activeBrandData.name}` : "All Content"}
         description="View, manage, and track all content items across your brands."
         actions={
           <Button asChild>
@@ -317,12 +404,24 @@ export default function ContentPageClient() {
                           <td className="p-3">{item.current_step_name || 'N/A'}</td>
                           <td className="p-3">{item.assigned_to_name || 'N/A'}</td>
                           <td className="p-3 whitespace-nowrap">{formatDate(item.updated_at)}</td>
-                          <td className="p-3 text-right">
+                          <td className="p-3 text-right space-x-2 whitespace-nowrap">
                             {(currentUser && isUserAssigned(item, currentUser.id)) && (
-                              <Button variant="outline" size="sm" asChild>
+                              <Button variant="outline" size="sm" asChild className="h-8 px-2.5 text-xs">
                                   <Link href={`/dashboard/content/${item.id}/edit`}> 
                                       <Edit3 className="h-3.5 w-3.5 mr-1.5"/> Edit
                                   </Link>
+                              </Button>
+                            )}
+                            {canDeleteContent(item) && (
+                              <Button 
+                                variant="destructive" 
+                                size="sm" 
+                                className="h-8 px-2.5 text-xs"
+                                onClick={() => handleDeleteClick(item)}
+                                disabled={isDeleting && itemToDelete?.id === item.id}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                                {isDeleting && itemToDelete?.id === item.id ? 'Deleting...' : 'Delete'}
                               </Button>
                             )}
                           </td>
@@ -335,6 +434,26 @@ export default function ContentPageClient() {
             </AccordionItem>
           ))}
         </Accordion>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {itemToDelete && (
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Content: "{itemToDelete.title}"?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this content item? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </div>
   );

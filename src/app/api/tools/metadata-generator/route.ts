@@ -28,6 +28,15 @@ interface MetadataResultItem {
 
 // Keep the original authenticated route - RENAMING to POST
 export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
+  // Role check: Only Global Admins or Editors can access this tool
+  const userRole = user.user_metadata?.role;
+  if (!(userRole === 'admin' || userRole === 'editor')) {
+    return NextResponse.json(
+      { success: false, error: 'Forbidden: You do not have permission to access this tool.' },
+      { status: 403 }
+    );
+  }
+
   // Rate limiting logic
   const ip = request.headers.get('x-forwarded-for') || request.ip || 'unknown';
   const now = Date.now();

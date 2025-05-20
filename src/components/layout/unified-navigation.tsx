@@ -42,6 +42,12 @@ interface UserSessionData {
   // Add other fields that your session endpoint might return
 }
 
+// Define a type for spacer items
+interface NavSpacer {
+  type: 'divider';
+  show?: () => boolean; // Optional show condition for spacers too
+}
+
 interface NavItem {
   href: string;
   label: string;
@@ -73,7 +79,8 @@ export function UnifiedNavigation() {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     content: true,
     tools: true,
-    feedback: false
+    feedback: false,
+    'create content': true
   });
 
   // State for user templates
@@ -188,51 +195,68 @@ export function UnifiedNavigation() {
   const isPlatformAdmin = userRole === 'admin' && userBrandPermissions.length === 0;
   const isScopedAdmin = isAdmin && userBrandPermissions.length > 0;
 
-  // Primary nav items - base structure
-  let navItemsDefinition: (NavItem | NavGroupItem)[] = [
+  // New role definitions based on the navigation permissions matrix
+  const isGlobalAdmin = userRole === 'admin';
+  const isBrandAdmin_NonGlobal = userRole !== 'admin' && hasBrandAdminPermission;
+  const isEditor_BrandAssigned_NonAdmin = userRole === 'editor' && !hasBrandAdminPermission;
+  const isViewer_BrandAssigned_NonAdmin = userRole === 'viewer' && !hasBrandAdminPermission;
+
+  // Simplified helper for general authenticated user access (adjust if more specific logic needed for base roles)
+  const isAuthenticatedUserWithBrandAccess = currentUser != null && (isGlobalAdmin || isBrandAdmin_NonGlobal || isEditor_BrandAssigned_NonAdmin || isViewer_BrandAssigned_NonAdmin);
+
+  // Primary nav items - base structure with 'show' conditions
+  let navItemsDefinition: (NavItem | NavGroupItem | NavSpacer & { show?: boolean | (() => boolean) })[] = [
     {
       href: '/dashboard',
       label: 'Dashboard',
       icon: <Home className="h-5 w-5" />,
-      segment: '' // Dashboard is active when segments are empty
+      segment: '', 
+      show: () => isAuthenticatedUserWithBrandAccess
     },
     {
       href: '/dashboard/my-tasks',
       label: 'My Tasks',
       icon: <ListChecks className="h-5 w-5" />,
-      segment: 'my-tasks'
+      segment: 'my-tasks',
+      show: () => isAuthenticatedUserWithBrandAccess
     },
     {
       href: '/dashboard/content',
       label: 'All Content',
       icon: <Folder className="h-5 w-5" />,
-      segment: 'content'
-    },
-    {
-      label: 'Content',
-      icon: <BookOpen className="h-5 w-5" />,
-      items: contentItems, 
-      segment: 'content-new', 
-      defaultOpen: true
-    },
-    {
-      href: '/dashboard/workflows',
-      label: 'Workflows',
-      icon: <GitBranch className="h-5 w-5" />,
-      segment: 'workflows'
+      segment: 'content',
+      show: () => isAuthenticatedUserWithBrandAccess
     },
     {
       href: '/dashboard/brands',
       label: 'Brands',
       icon: <Building2 className="h-5 w-5" />,
-      segment: 'brands'
+      segment: 'brands',
+      show: () => isGlobalAdmin || isBrandAdmin_NonGlobal
+    },
+    {
+      href: '/dashboard/workflows',
+      label: 'Workflows',
+      icon: <GitBranch className="h-5 w-5" />,
+      segment: 'workflows',
+      show: () => isGlobalAdmin || isBrandAdmin_NonGlobal
     },
     {
       href: '/dashboard/templates',
       label: 'Content Templates',
-      icon: <Folder className="h-5 w-5" />,
-      segment: 'templates'
+      icon: <Folder className="h-5 w-5" />, 
+      segment: 'templates',
+      show: () => isGlobalAdmin
     },
+    {
+      label: 'Create Content', 
+      icon: <BookOpen className="h-5 w-5" />,
+      items: contentItems, 
+      segment: 'content-new', 
+      defaultOpen: true,
+      show: () => (isGlobalAdmin || isEditor_BrandAssigned_NonAdmin) && contentItems.length > 0
+    },
+    { type: 'divider' as const, show: () => (isGlobalAdmin || isEditor_BrandAssigned_NonAdmin) }, // Divider after Create Content block
     {
       label: 'Tools',
       icon: <Wrench className="h-5 w-5" />,
@@ -256,66 +280,79 @@ export function UnifiedNavigation() {
           label: 'Content Transcreator',
           icon: <Globe className="h-4 w-4" />,
           segment: 'content-transcreator'
-        }
-      ]
+        },
+      ],
+      show: () => isGlobalAdmin || isEditor_BrandAssigned_NonAdmin
     },
-    // Users link - will be filtered by role later
+    { type: 'divider' as const, show: () => (isGlobalAdmin || isEditor_BrandAssigned_NonAdmin) }, // Divider after Tools block
+    {
+      label: 'Feedback',
+      icon: <MessageSquareWarning className="h-5 w-5" />,
+      segment: 'feedback',
+      defaultOpen: expandedSections.feedback,
+      items: [
+        {
+          href: '/dashboard/feedback',
+          label: 'View Feedback',
+          icon: <Info className="h-4 w-4" />,
+          segment: 'view' 
+        },
+        ...(isGlobalAdmin ? [{ 
+            href: '/dashboard/admin/feedback-log',
+            label: 'Feedback Log (Admin)',
+            icon: <ListChecks className="h-4 w-4" />,
+            segment: 'feedback-log'
+        }] : [])
+      ],
+      show: () => isAuthenticatedUserWithBrandAccess 
+    },
+    { type: 'divider' as const, show: () => isAuthenticatedUserWithBrandAccess }, // Divider after Feedback block
     {
       href: '/dashboard/users',
       label: 'Users',
       icon: <Users className="h-5 w-5" />,
-      segment: 'users'
-    }
-  ];
-
-  // Filter nav items based on user role
-  let filteredNavItems = [...navItemsDefinition]; // Start with a copy
-
-  if (isLoadingUser) {
-    filteredNavItems = []; // Show nothing or a loader while user is loading
-  } else if (isViewer || isEditor) { // For Viewer and Editor roles
-    filteredNavItems = navItemsDefinition.filter(item => 
-      item.label !== 'Users' && 
-      item.label !== 'Content Templates' &&
-      // Ensure "Content" group (for creation) is not shown if it has no items (e.g. no templates for user)
-      !((item as NavGroupItem).label === 'Content' && (item as NavGroupItem).items.length === 0)
-    );
-  } else if (isScopedAdmin) { 
-    // Scoped Admins see most things, user management is global.
-    // No specific top-level items removed by default for scoped admin, 
-    // specific access control is at page/API level.
-    filteredNavItems = navItemsDefinition.filter(item => 
-      !((item as NavGroupItem).label === 'Content' && (item as NavGroupItem).items.length === 0)
-    );
-  } else if (isPlatformAdmin) {
-    // Platform Admins see all items defined in navItemsDefinition
-    filteredNavItems = navItemsDefinition.filter(item => 
-      !((item as NavGroupItem).label === 'Content' && (item as NavGroupItem).items.length === 0)
-    );
-  } else if (!currentUser) {
-    // Not logged in or user data failed to load - show minimal or no nav
-    filteredNavItems = navItemsDefinition.filter(item => 
-      item.label === 'Dashboard' // Example: only allow dashboard, or empty array
-    ); 
-    // Or filteredNavItems = [];
-  }
-
-  // Bottom nav items (settings, help) - always visible for logged-in users
-  // Ensure these are defined correctly here
-  const bottomNavItems: NavItem[] = currentUser && !isLoadingUser ? [
+      segment: 'users', 
+      show: () => isGlobalAdmin
+    },
     {
       href: '/dashboard/account',
       label: 'Account',
-      icon: <Settings className="h-5 w-5" />,
-      segment: 'account'
+      icon: <Users className="h-5 w-5" />, 
+      segment: 'account',
+      show: () => currentUser != null 
     },
     {
       href: '/dashboard/help',
       label: 'Help',
       icon: <HelpCircle className="h-5 w-5" />,
-      segment: 'help'
+      segment: 'help',
+      show: () => currentUser != null
+    },
+    /* Commented out Settings item
+    {
+      href: '/dashboard/admin/settings', 
+      label: 'Settings',
+      icon: <Settings className="h-5 w-5" />,
+      segment: 'admin-settings',
+      show: () => isGlobalAdmin 
+    },
+    */
+  ];
+
+  // Filter nav items based on roles and conditions
+  const finalNavItems = navItemsDefinition.filter(item => {
+    if (isLoadingUser) return false; // Don't show anything until user data is loaded
+    
+    // Check if the 'show' property exists and evaluate it
+    if ('show' in item && item.show !== undefined) {
+      if (typeof item.show === 'boolean') return item.show;
+      if (typeof item.show === 'function') return item.show();
+      // If it's a divider, it might not have a show function, default to true or handle based on type
+      if ('type' in item && item.type === 'divider') return true; // Show dividers by default if no specific show fn
+      return true; // Should not happen if types are correct, but default to show
     }
-  ] : [];
+    return true; // Default to show if no 'show' condition or if it's undefined
+  });
   
   // Check if a navigation item is active based on the current URL path and segments
   const isActive = (item: NavItem | NavGroupItem) => {
@@ -357,159 +394,6 @@ export function UnifiedNavigation() {
     return false;
   };
   
-  // Dynamically build navigation items based on roles and permissions
-  const finalNavItems: (NavItem | NavGroupItem | { type: 'divider' })[] = [];
-
-  // Always visible for authenticated users
-  finalNavItems.push({
-    href: '/dashboard',
-    label: 'Dashboard',
-    icon: <Home className="h-5 w-5" />,
-    segment: '' 
-  });
-  finalNavItems.push({
-    href: '/dashboard/my-tasks',
-    label: 'My Tasks',
-    icon: <ListChecks className="h-5 w-5" />,
-    segment: 'my-tasks'
-  });
-
-  // Brands: Visible if Platform Admin, Global Admin, or user has any brand permission
-  if (isPlatformAdmin || isAdmin || userBrandPermissions.length > 0) {
-    finalNavItems.push({
-      href: '/dashboard/brands',
-      label: 'Brands',
-      icon: <Building2 className="h-5 w-5" />,
-      segment: 'brands'
-    });
-  }
-  
-  // Content Templates: Visible if Platform Admin, Global Admin, or Global Editor
-  if (isPlatformAdmin || isAdmin || isEditor) {
-    finalNavItems.push({
-      href: '/dashboard/templates',
-      label: 'Content Templates',
-      icon: <Folder className="h-5 w-5" />, 
-      segment: 'templates'
-    });
-  }
-  
-  // Workflows: Visible if Platform Admin, Global Admin, OR (Global Editor AND Brand Admin for at least one brand)
-  if (isPlatformAdmin || isAdmin || (isEditor && hasBrandAdminPermission)) {
-    finalNavItems.push({
-      href: '/dashboard/workflows',
-      label: 'Workflows',
-      icon: <GitBranch className="h-5 w-5" />,
-      segment: 'workflows'
-    });
-  }
-
-  // Content (All Content page): Visible to all authenticated users who might have content access
-  // (API will filter actual content)
-  if (isPlatformAdmin || isAdmin || isEditor || isViewer) {
-     finalNavItems.push({
-      href: '/dashboard/content',
-      label: 'Content', // This is the link to the main content listing page
-      icon: <FileText className="h-5 w-5" />, 
-      segment: 'content'
-    });
-  }
-  
-  // "Create Content" NavGroupItem (the folder for templates)
-  // Visible if Platform Admin, Global Admin, or Global Editor (similar to who can manage templates or see tools)
-  if (isPlatformAdmin || isAdmin || isEditor) {
-    if (contentItems.length > 0) { // Only show if there are templates
-      finalNavItems.push({
-        label: 'Create Content', // New, distinct label
-        icon: <BookOpen className="h-5 w-5" />, // Original icon for this group
-        items: contentItems,
-        segment: 'content-new', // Keep original segment or choose a new one
-        defaultOpen: expandedSections.content !== undefined ? expandedSections.content : true
-      });
-    }
-  }
-  
-  // Tools: Visible if Platform Admin, Global Admin, or Global Editor
-  if (isPlatformAdmin || isAdmin || isEditor) {
-    const toolItems: NavItem[] = [
-      {
-        href: '/dashboard/tools/metadata-generator',
-        label: 'Metadata Generator',
-        icon: <Code className="h-4 w-4" />,
-        segment: 'metadata-generator'
-      },
-      {
-        href: '/dashboard/tools/alt-text-generator',
-        label: 'Alt Text Generator',
-        icon: <Image className="h-4 w-4" />,
-        segment: 'alt-text-generator'
-      },
-      {
-        href: '/dashboard/tools/content-transcreator',
-        label: 'Content Transcreator',
-        icon: <Globe className="h-4 w-4" />,
-        segment: 'content-transcreator'
-      },
-    ];
-    // Only add the Tools group if there are items to show (though these are static for now)
-    if (toolItems.length > 0) {
-        finalNavItems.push({
-            label: 'Tools',
-            icon: <Wrench className="h-5 w-5" />,
-            items: toolItems,
-            segment: 'tools',
-            defaultOpen: expandedSections.tools !== undefined ? expandedSections.tools : true
-        });
-    }
-  }
-
-  // Feedback Links - Placed before User Management and Account/Help for visibility
-  if (currentUser && !isLoadingUser) {
-    // View Feedback for all authenticated users
-    finalNavItems.push({
-        href: '/dashboard/feedback',
-        label: 'View Feedback',
-        icon: <Info className="h-5 w-5" />,
-        segment: 'feedback'
-    });
-
-    // Submit Feedback for all authenticated users
-    // The "isAdmin" check is removed, label is changed
-    finalNavItems.push({
-        href: '/dashboard/admin/feedback-log',
-        label: 'Submit Feedback',
-        icon: <MessageSquareWarning className="h-5 w-5" />,
-        segment: 'admin-feedback-log' // Unique segment
-    });
-  }
-
-  // Separator
-  finalNavItems.push({ type: 'divider' });
-
-  // Users: Visible if Platform Admin or Global Admin
-  if (isPlatformAdmin || isAdmin) {
-    finalNavItems.push({
-      href: '/dashboard/users',
-      label: 'Users',
-      icon: <Users className="h-5 w-5" />,
-      segment: 'users'
-    });
-  }
-  
-  // Account & Help: Always visible for authenticated users
-  finalNavItems.push({
-    href: '/dashboard/account',
-    label: 'Account',
-    icon: <Settings className="h-5 w-5" />,
-    segment: 'account'
-  });
-  finalNavItems.push({
-    href: '/dashboard/help',
-    label: 'Help',
-    icon: <HelpCircle className="h-5 w-5" />,
-    segment: 'help'
-  });
-
   return (
     <div className="flex flex-col h-full">
       <nav className="bg-card w-64 p-4 h-[calc(100vh-4rem)] overflow-y-auto border-r border-border sticky top-16 hidden lg:block">
@@ -517,7 +401,18 @@ export function UnifiedNavigation() {
           <div className="space-y-1">
             {finalNavItems.map((item, index) => {
               if ('type' in item && item.type === 'divider') {
-                return <hr key={index} className="my-2 border-t border-border" />;
+                // Render a visible spacer if the item is a divider
+                // And ensure it's not the very first or last item to avoid leading/trailing spacers if items are filtered out
+                if (index > 0 && index < finalNavItems.length -1) { 
+                    // Check if previous and next items are not dividers to avoid double dividers
+                    const prevItem = finalNavItems[index-1];
+                    const nextItem = finalNavItems[index+1];
+                    if (!('type' in prevItem && prevItem.type === 'divider') && 
+                        !('type' in nextItem && nextItem.type === 'divider')) {
+                          return <hr key={`divider-${index}`} className="my-3 border-border/60" />;
+                    }
+                }
+                return null; // Don't render divider if it's at the start/end or adjacent to another
               }
               if ('items' in item) {
                 return (

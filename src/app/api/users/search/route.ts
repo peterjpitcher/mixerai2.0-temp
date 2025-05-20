@@ -21,6 +21,14 @@ interface UserSearchResult {
  */
 export const GET = withAuth(async (request: NextRequest, sessionUser: any) => {
   try {
+    // Role check: Only Global Admins can search users
+    if (!sessionUser.user_metadata || sessionUser.user_metadata.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: You do not have permission to access this resource.' },
+        { status: 403 }
+      );
+    }
+
     const searchQuery = request.nextUrl.searchParams.get('query') || '';
     const limitParam = request.nextUrl.searchParams.get('limit');
     const limit = limitParam ? parseInt(limitParam, 10) : 10;

@@ -12,12 +12,14 @@ import { Checkbox } from '@/components/checkbox';
 import { 
   ArrowLeft, 
   Save, 
-  Loader2
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import type { Metadata } from 'next';
 import { toast } from 'sonner';
 import { Separator } from '@/components/separator';
+import { Skeleton } from '@/components/skeleton';
 
 // Placeholder Breadcrumbs component
 const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
@@ -71,6 +73,16 @@ interface User {
   company?: string;
 }
 
+// Define UserSessionData interface
+interface UserSessionData {
+  id: string;
+  email?: string;
+  user_metadata?: {
+    role?: string; 
+    full_name?: string;
+  };
+}
+
 /**
  * EditUserPage allows administrators to modify details for an existing user.
  * This includes updating their full name, job title, company, and default system role.
@@ -91,6 +103,58 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   
+  // RBAC State
+  const [currentUserSession, setCurrentUserSession] = useState<UserSessionData | null>(null);
+  const [isLoadingUserSession, setIsLoadingUserSession] = useState(true);
+  const [userSessionError, setUserSessionError] = useState<string | null>(null);
+  const [isAllowedToAccess, setIsAllowedToAccess] = useState<boolean>(false);
+  const [isCheckingPermissions, setIsCheckingPermissions] = useState<boolean>(true);
+
+  // Fetch current user for RBAC
+  useEffect(() => {
+    const fetchCurrentUserSession = async () => {
+      setIsLoadingUserSession(true);
+      setUserSessionError(null);
+      try {
+        const response = await fetch('/api/me');
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch user session' }));
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.success && data.user) {
+          setCurrentUserSession(data.user);
+        } else {
+          setCurrentUserSession(null);
+          setUserSessionError(data.error || 'User data not found in session.');
+        }
+      } catch (error: any) {
+        console.error('[EditUserPage] Error fetching current user session:', error);
+        setCurrentUserSession(null);
+        setUserSessionError(error.message || 'An unexpected error occurred.');
+      } finally {
+        setIsLoadingUserSession(false);
+      }
+    };
+    fetchCurrentUserSession();
+  }, []);
+
+  // Check permissions
+  useEffect(() => {
+    if (!isLoadingUserSession && currentUserSession) {
+      setIsCheckingPermissions(true);
+      if (currentUserSession.user_metadata?.role === 'admin') {
+        setIsAllowedToAccess(true);
+      } else {
+        setIsAllowedToAccess(false);
+      }
+      setIsCheckingPermissions(false);
+    } else if (!isLoadingUserSession && !currentUserSession) {
+      setIsAllowedToAccess(false);
+      setIsCheckingPermissions(false);
+    }
+  }, [currentUserSession, isLoadingUserSession]);
+
   // Fetch user and brands data
   useEffect(() => {
     const fetchData = async () => {
@@ -165,8 +229,12 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
       }
     };
     
-    fetchData();
-  }, [params.id, router]);
+    if (isAllowedToAccess && !isLoadingUserSession && !isCheckingPermissions) {
+      fetchData();
+    } else if (!isLoadingUserSession && !isCheckingPermissions && !isAllowedToAccess) {
+      setIsLoading(false); // Stop main data loading if access denied
+    }
+  }, [params.id, router, isAllowedToAccess, isLoadingUserSession, isCheckingPermissions]);
   
   // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -255,7 +323,51 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
     }
   };
   
-  if (isLoading) {
+  // --- Loading and Access Denied States ---
+  if (isLoadingUserSession || isCheckingPermissions) {
+    return (
+      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <Skeleton className="h-8 w-1/3 mb-4" /> {/* Breadcrumbs skeleton */}
+        <div className="flex items-center justify-between mb-6">
+          <Skeleton className="h-10 w-1/2" /> {/* Page title skeleton */}
+          <Skeleton className="h-10 w-24" /> {/* Save button skeleton */}
+        </div>
+        <Skeleton className="h-12 w-full mb-4" /> {/* Tabs skeleton */}
+        <Card>
+          <CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  if (userSessionError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
+        <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+        <p className="text-destructive-foreground">Error loading your user session: {userSessionError}</p>
+        <Button variant="outline" onClick={() => window.location.reload()} className="mt-4">Try Again</Button>
+      </div>
+    );
+  }
+  
+  if (!isAllowedToAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
+        <AlertCircle className="h-16 w-16 text-destructive mb-4" />
+        <h3 className="text-xl font-semibold mb-2">Access Denied</h3>
+        <p className="text-muted-foreground text-center mb-6">You do not have permission to edit users.</p>
+        <Link href="/dashboard/users" passHref>
+          <Button variant="outline">Back to Users List</Button>
+        </Link>
+      </div>
+    );
+  }
+  // --- Main Page Content (shown if allowed and not loading user data) ---
+  if (isLoading) { // This is for the user (to edit) data loading
     return (
       <div className="flex justify-center items-center min-h-[300px]">
         <Loader2 className="h-8 w-8 animate-spin" />

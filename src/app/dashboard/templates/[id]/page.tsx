@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/button';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { TemplateForm } from '@/components/template/template-form';
-import { Loader2, ChevronLeft, Trash2 } from 'lucide-react';
+import { Loader2, ChevronLeft, Trash2, ShieldAlert } from 'lucide-react';
 import type { Metadata } from 'next';
 import {
   AlertDialog,
@@ -44,6 +44,20 @@ const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) =
     </ol>
   </nav>
 );
+
+// Define UserSessionData interface
+interface UserSessionData {
+  id: string;
+  email?: string;
+  user_metadata?: {
+    role?: string; 
+    full_name?: string;
+  };
+  brand_permissions?: Array<{
+    brand_id: string;
+    role: string;
+  }>;
+}
 
 // Default templates data for system templates
 const defaultTemplates = {
@@ -191,136 +205,159 @@ export default function TemplateEditPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Add debugging logs
-  // console.log('Template Edit Page - Params:', params);
-  // console.log('Template Edit Page - ID:', id);
+  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
 
   useEffect(() => {
-    const fetchTemplate = async () => {
-      // console.log('Starting to fetch template with ID:', id);
-      setLoading(true);
-      setDeleteError(null); // Clear delete error on load
-
-      // Check if this is a default template
-      if (id === 'article-template' || id === 'product-template') {
-        // console.log('Using default template:', id);
-        setTemplate(defaultTemplates[id as keyof typeof defaultTemplates]);
-        setLoading(false);
-        return;
-      }
-
-      // Otherwise, try to fetch from the API
+    const fetchCurrentUser = async () => {
+      setIsLoadingUser(true);
       try {
-        // console.log('Fetching template from API for ID:', id);
-        const response = await fetch(`/api/content-templates/${id}`);
+        const response = await fetch('/api/me');
+        if (!response.ok) throw new Error('Failed to fetch user session');
         const data = await response.json();
-        // console.log('API response:', data);
-
-        if (data.success) {
-          // console.log('Successfully fetched template:', data.template);
-          setTemplate(data.template);
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
         } else {
-          // console.error('Error from API:', data.error);
-          toast.error(data.error || 'Failed to load the template.');
-          // console.log('Redirecting to templates page due to API error');
-          router.push('/dashboard/templates');
+          setCurrentUser(null);
+          toast.error(data.error || 'Could not verify your session.');
         }
-      } catch (error) {
-        // console.error('Error fetching template:', error);
-        toast.error('Failed to load the template.');
-        // console.log('Redirecting to templates page due to fetch error');
-        router.push('/dashboard/templates');
+      } catch (err: any) {
+        console.error('Error fetching current user:', err);
+        setCurrentUser(null);
+        toast.error('Error fetching user data: ' + err.message);
       } finally {
-        setLoading(false);
+        setIsLoadingUser(false);
       }
     };
+    fetchCurrentUser();
+  }, []);
 
-    if (id) {
-      // console.log('Template ID is available, fetching template');
-      fetchTemplate();
-    } else {
-      // console.error('No template ID provided');
-      toast.error('Template ID is required.');
-      router.push('/dashboard/templates');
+  useEffect(() => {
+    if (!id) {
+      setLoading(false);
+      toast.error('Template ID is missing.');
+      // Optionally redirect if ID is crucial and missing from start
+      // router.push('/dashboard/templates'); 
+      return;
     }
-  }, [id, router]);
 
-  if (loading) {
+    // Wait for user to be loaded before deciding to fetch template data
+    if (isLoadingUser) return;
+
+    // If user is loaded and not an admin, don't fetch template, setLoading to false
+    if (!currentUser || currentUser.user_metadata?.role !== 'admin') {
+      setLoading(false);
+      return; 
+    }
+
+    const fetchTemplate = async () => {
+      setLoading(true);
+      if (defaultTemplates[id as keyof typeof defaultTemplates]) {
+        setTemplate(defaultTemplates[id as keyof typeof defaultTemplates]);
+        setLoading(false);
+      } else {
+        try {
+          const response = await fetch(`/api/content-templates/${id}`);
+          const data = await response.json();
+          if (data.success && data.template) {
+            setTemplate(data.template);
+          } else {
+            setTemplate(null); // Explicitly set to null if not found or error
+            toast.error(data.error || 'Template not found.');
+          }
+        } catch (error) {
+          console.error('Error fetching template:', error);
+          toast.error('Failed to load template details.');
+          setTemplate(null);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    fetchTemplate();
+  }, [id, isLoadingUser, currentUser, router]); // Added router to dependencies due to potential use
+
+  const isGlobalAdmin = currentUser?.user_metadata?.role === 'admin';
+  const isSystemTemplate = defaultTemplates[id as keyof typeof defaultTemplates];
+
+  if (isLoadingUser || loading) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground mt-4">Loading template data...</p>
+      </div>
+    );
+  }
+
+  if (!isGlobalAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
+        <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
+        <h3 className="text-xl font-bold mb-2">Access Denied</h3>
+        <p className="text-muted-foreground">You do not have permission to view or manage this Content Template.</p>
+        <Link href="/dashboard/templates">
+          <Button variant="outline" className="mt-4">Back to Templates</Button>
+        </Link>
+      </div>
+    );
+  }
+  
+  if (!template && !loading) { // If not loading and template is still null (e.g. API error, not found)
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
+        <ShieldAlert className="h-16 w-16 text-orange-500 mb-4" />
+        <h3 className="text-xl font-bold mb-2">Template Not Found</h3>
+        <p className="text-muted-foreground">The template you are looking for could not be found.</p>
+        <Link href="/dashboard/templates">
+          <Button variant="outline" className="mt-4">Back to Templates</Button>
+        </Link>
       </div>
     );
   }
 
   const handleOpenDeleteDialog = () => {
-    setDeleteError(null); // Clear previous errors
+    if (!isGlobalAdmin || isSystemTemplate) {
+        toast.error(isSystemTemplate ? "System templates cannot be deleted." : "You don't have permission to delete templates.");
+        return;
+    }
     setShowDeleteDialog(true);
   };
 
   const handleConfirmDelete = async () => {
-    if (!id || (id === 'article-template' || id === 'product-template')) {
+    if (!isGlobalAdmin || isSystemTemplate) {
+        toast.error(isSystemTemplate ? "System templates cannot be deleted." : "You don't have permission to delete templates.");
+        setIsDeleting(false);
+        setShowDeleteDialog(false);
+        return;
+    }
+    if (!template || template.id === 'article-template' || template.id === 'product-template') {
       toast.error('System templates cannot be deleted.');
-      setShowDeleteDialog(false);
       return;
     }
-
     setIsDeleting(true);
-    setDeleteError(null);
-
     try {
-      const response = await fetch(`/api/content-templates/${id}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(`/api/content-templates/${id}`, { method: 'DELETE' });
       const data = await response.json();
-
       if (data.success) {
-        toast('Template deleted successfully.');
+        toast.success(`Template "${template.name}" deleted successfully.`);
         router.push('/dashboard/templates');
-        setShowDeleteDialog(false);
       } else {
-        // Specific error from API (e.g., template in use)
-        setDeleteError(data.error || 'Failed to delete template.');
-        // Keep dialog open to show the error
+        toast.error(data.error || 'Failed to delete template.');
       }
     } catch (error) {
-      toast.error('An unexpected error occurred while deleting the template.');
-      setShowDeleteDialog(false); // Close dialog on unexpected error
+      toast.error('An error occurred during deletion.');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
     }
-    setIsDeleting(false);
   };
-
-  // Prevent rendering if template is null and not loading (error case handled by useEffect)
-  if (!loading && !template) {
-    // useEffect should have redirected if there was an error and template is still null
-    // This is a fallback to prevent rendering with a null template
-    return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
-        <Breadcrumbs items={[
-          { label: "Dashboard", href: "/dashboard" }, 
-          { label: "Content Templates", href: "/dashboard/templates" }, 
-          { label: template?.name || (id ? "Loading Template..." : "Edit Template"), href: id ? `/dashboard/templates/${id}` : undefined },
-          { label: "Edit" }
-        ]} />
-        
-        <div className="p-4 border border-destructive bg-destructive/10 text-destructive rounded-md">
-          <p>Error: Template data could not be loaded or template not found.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const isSystemTemplate = id === 'article-template' || id === 'product-template';
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" }, 
         { label: "Content Templates", href: "/dashboard/templates" }, 
-        { label: template?.name || (id ? "Loading Template..." : "Edit Template"), href: id ? `/dashboard/templates/${id}` : undefined },
-        { label: "Edit" }
+        { label: template?.name || id }
       ]} />
       
       <div className="flex items-center justify-between mb-6">
@@ -331,50 +368,47 @@ export default function TemplateEditPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Edit: {template?.name || 'Template'}</h1>
-            <p className="text-muted-foreground mt-1">Modify your content template configuration.</p>
+            <h1 className="text-2xl font-bold tracking-tight">{template?.name || 'Edit Template'}</h1>
+            <p className="text-muted-foreground mt-1">Modify the fields and settings for this template.</p>
           </div>
         </div>
-        {!isSystemTemplate && (
+        {isGlobalAdmin && !isSystemTemplate && (
           <Button variant="destructive" onClick={handleOpenDeleteDialog} disabled={isDeleting}>
             <Trash2 className="mr-2 h-4 w-4" />
             Delete Template
           </Button>
         )}
       </div>
-      
-      {template && <TemplateForm initialData={template} />}
-      {/* AlertDialog for delete confirmation */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {deleteError ? 'Cannot Delete Template' : 'Are you sure you want to delete this template?'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteError ? deleteError : 
-                `Are you sure you want to delete the template "${template?.name}"? Any content items currently using this template will have it unassigned and their status will be set to 'cancelled'. This action cannot be undone for the template itself.`
-              }
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            {!deleteError && (
-              <AlertDialogAction
-                onClick={handleConfirmDelete}
-                disabled={isDeleting}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {isDeleting ? 'Deleting...' : 'Delete'}
+
+      {/* Pass isReadOnly prop to TemplateForm if it's a system template and user is admin, 
+          or always if user is not admin (though they shouldn't reach here) 
+          Alternatively, TemplateForm needs its own internal permission checks or relies on API for saves
+      */}
+      <TemplateForm 
+        initialData={template} 
+        // If TemplateForm supports a readOnly prop for system templates, it would be like:
+        // isReadOnly={!!isSystemTemplate}
+      />
+
+      {isGlobalAdmin && !isSystemTemplate && (
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action will permanently delete the template "{template?.name}". This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive text-destructive-foreground">
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Delete
               </AlertDialogAction>
-            )}
-            {deleteError && (
-              <AlertDialogAction onClick={() => setShowDeleteDialog(false)}>OK</AlertDialogAction>
-            )}
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 } 

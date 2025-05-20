@@ -72,6 +72,14 @@ interface User {
   company?: string;
 }
 
+const formatBrandRole = (role: string): string => {
+  if (role === 'admin') return 'Admin';
+  if (role === 'editor') return 'Editor';
+  if (role === 'viewer') return 'Viewer';
+  // Capitalize first letter as a fallback for unknown roles
+  return role.charAt(0).toUpperCase() + role.slice(1);
+};
+
 // Placeholder Breadcrumbs component
 const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
   <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
@@ -324,13 +332,15 @@ export default function UserDetailPage() {
         <CardContent>
           {user.brand_permissions && user.brand_permissions.length > 0 ? (
             <ul className="space-y-3">
-              {user.brand_permissions.map(perm => (
-                <li key={perm.brand_id} className="flex items-center justify-between p-3 border rounded-md">
-                  <div className="flex items-center space-x-3">
-                    <BrandIcon name={perm.brand?.name || 'Unknown Brand'} color={perm.brand?.brand_color ?? undefined} size="sm" />
-                    <span>{perm.brand?.name || 'Unknown Brand'}</span>
+              {user.brand_permissions.map(permission => (
+                <li key={permission.id || permission.brand_id} className="flex items-center justify-between p-3 bg-muted/50 rounded-md">
+                  <div className="flex items-center gap-3">
+                    <BrandIcon name={permission.brand?.name || 'Unknown Brand'} color={permission.brand?.brand_color || '#cccccc'} />
+                    <span className="font-medium">{permission.brand?.name || 'Unknown Brand'}</span>
                   </div>
-                  <Badge variant={perm.role === 'admin' ? 'outline' : 'secondary'}>{perm.role}</Badge>
+                  <Badge variant={permission.role === 'admin' ? 'default' : 'secondary'}>
+                    {formatBrandRole(permission.role)}
+                  </Badge>
                 </li>
               ))}
             </ul>

@@ -9,10 +9,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { ArrowLeft, Loader2, AlertTriangle, Search, ListFilter, Info } from 'lucide-react';
-import type { Session, SupabaseClient } from '@supabase/supabase-js';
+import { ArrowLeft, Loader2, AlertTriangle, Search, ListFilter, Info, FilePlus2 } from 'lucide-react';
+import type { Session, SupabaseClient, User as SupabaseUser } from '@supabase/supabase-js';
 import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
+import { FeedbackSubmitForm } from '@/components/feedback/FeedbackSubmitForm'; // Import the new form
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/dialog"; // Import Dialog components
 
 // Matches ENUMs in DB (copied from admin page for consistency)
 const feedbackTypes = ['bug', 'enhancement'] as const;
@@ -58,6 +60,8 @@ export default function ViewFeedbackPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const itemsPerPage = 10;
+  const [showSubmitFormModal, setShowSubmitFormModal] = useState(false);
+  const [currentUserForForm, setCurrentUserForForm] = useState<SupabaseUser | null>(null); // To pass to the form
 
   useEffect(() => {
     const supabaseClient = createSupabaseClient();
@@ -66,12 +70,20 @@ export default function ViewFeedbackPage() {
     const fetchSession = async () => {
       const { data: { session: currentSession } } = await supabaseClient.auth.getSession();
       setSession(currentSession);
+      if (currentSession?.user) {
+        setCurrentUserForForm(currentSession.user);
+      }
       setIsLoadingUser(false);
     };
     fetchSession();
 
     const { data: authListener } = supabaseClient.auth.onAuthStateChange((event, currentSession) => {
       setSession(currentSession);
+      if (currentSession?.user) {
+        setCurrentUserForForm(currentSession.user);
+      } else {
+        setCurrentUserForForm(null);
+      }
     });
     return () => {
       authListener?.subscription.unsubscribe();
@@ -165,11 +177,40 @@ export default function ViewFeedbackPage() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      <div className="flex items-center gap-3 mb-4">
-        <Button variant="outline" size="icon" onClick={() => router.back()} aria-label="Go back">
-            <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h1 className="text-3xl font-bold tracking-tight">Feedback & Known Issues</h1>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" onClick={() => router.back()} aria-label="Go back">
+              <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-3xl font-bold tracking-tight">Feedback & Known Issues</h1>
+        </div>
+        {/* Button to trigger the modal for submitting new feedback */} 
+        {session && supabase && currentUserForForm && (
+          <Dialog open={showSubmitFormModal} onOpenChange={setShowSubmitFormModal}>
+            <DialogTrigger asChild>
+              <Button variant="default">
+                <FilePlus2 className="mr-2 h-4 w-4" /> Submit New Feedback
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Submit New Feedback</DialogTitle>
+                <DialogDescription>
+                  Report a bug or suggest an enhancement. Your input is valuable!
+                </DialogDescription>
+              </DialogHeader>
+              <FeedbackSubmitForm 
+                supabase={supabase} 
+                currentUser={currentUserForForm} 
+                onFeedbackSubmitted={() => {
+                  fetchFeedbackItems(1, filters); // Refresh list on the first page
+                  setShowSubmitFormModal(false); // Close modal
+                }}
+                cardMode={false} // Render form without its own card wrapper in modal
+              />
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
         <Card>
@@ -191,7 +232,7 @@ export default function ViewFeedbackPage() {
                         <Select value={filters.type} onValueChange={(v) => handleFilterChange('type', v)}>
                             <SelectTrigger id="filter-type"><SelectValue placeholder="All Types" /></SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">All Types</SelectItem>
+                                {/* <SelectItem value="">All Types</SelectItem> */}
                                 {feedbackTypes.map(t => <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>)}
                             </SelectContent>
                         </Select>
@@ -201,7 +242,7 @@ export default function ViewFeedbackPage() {
                         <Select value={filters.priority} onValueChange={(v) => handleFilterChange('priority', v)}>
                             <SelectTrigger id="filter-priority"><SelectValue placeholder="All Priorities" /></SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">All Priorities</SelectItem>
+                                {/* <SelectItem value="">All Priorities</SelectItem> */}
                                 {feedbackPriorities.map(p => <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>)}
                             </SelectContent>
                         </Select>
@@ -211,7 +252,7 @@ export default function ViewFeedbackPage() {
                         <Select value={filters.status} onValueChange={(v) => handleFilterChange('status', v)}>
                             <SelectTrigger id="filter-status"><SelectValue placeholder="All Statuses" /></SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">All Statuses</SelectItem>
+                                {/* <SelectItem value="">All Statuses</SelectItem> */}
                                 {feedbackStatuses.map(s => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}
                             </SelectContent>
                         </Select>
