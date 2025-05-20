@@ -18,6 +18,9 @@ node_modules/
 # Keep the following files
 !routes-manifest.json
 
+# Un-ignore the help-wiki directory specifically
+!docs/help-wiki/
+
 # Ignore docs, scripts, and other non-essential files
 README.md
 docs/
