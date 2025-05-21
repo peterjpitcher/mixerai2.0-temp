@@ -99,91 +99,116 @@ const BreadcrumbsComponent = ({ items }: { items: BreadcrumbItemDef[] }) => (
 export default function FeedbackDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const feedbackId = params.id as string;
+  const feedbackId = params?.id as string | undefined;
 
   const [feedbackItem, setFeedbackItem] = useState<FeedbackItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
 
   useEffect(() => {
     const supabaseClient = createSupabaseClient();
-    const fetchUserAndCheckAdmin = async () => {
-      setIsLoadingUser(true);
+    const fetchInitialData = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      if (!feedbackId) {
+        setError('Feedback ID is missing from the URL.');
+        toast.error('Feedback ID is missing.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Fetch user and check admin status
       const { data: { user } } = await supabaseClient.auth.getUser();
       if (user) {
         const userRole = (user.app_metadata as any)?.role || user.user_metadata?.role;
         if (userRole === 'admin') {
           setIsAdmin(true);
         }
+      } // No explicit else for isAdmin, default is false, access control handled by UI elements
+
+      // Fetch feedback item
+      try {
+        const response = await fetch(`/api/feedback/${feedbackId}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Error ${response.status}`);
+        }
+        const result = await response.json();
+        if (result.success && result.data) {
+          const {
+            // Destructure and rename as needed, ensure all fields for FeedbackItem are covered
+            id, created_at, created_by, created_by_profile, updated_at, 
+            assigned_to, assigned_to_profile, attachments_metadata, 
+            user_context,
+            ...displayData
+          } = result.data;
+          const finalDisplayData = {
+              ...displayData,
+              steps_to_reproduce: result.data.steps_to_reproduce || result.data.reproduction_steps,
+              affected_area: result.data.affected_area,
+              app_version: result.data.app_version,
+              user_impact_details: result.data.user_impact_details || result.data.user_context,
+          };
+          setFeedbackItem(finalDisplayData as FeedbackItem);
+        } else {
+          throw new Error(result.error || 'Failed to parse feedback item data');
+        }
+      } catch (err) {
+        console.error('Failed to fetch feedback item:', err);
+        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+        setError(errorMessage);
+        if (errorMessage.includes('not found') || errorMessage.includes('Error 404')){
+          toast.error('Feedback item not found.');
+        } else {
+          toast.error('Failed to load feedback details.');
+        }
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoadingUser(false);
     };
 
-    fetchUserAndCheckAdmin();
-  }, []);
+    fetchInitialData();
+  }, [feedbackId]); // Only re-run if feedbackId changes
 
-  useEffect(() => {
-    if (feedbackId) {
-      const fetchFeedbackItem = async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-          const response = await fetch(`/api/feedback/${feedbackId}`);
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Error ${response.status}`);
-          }
-          const result = await response.json();
-          if (result.success && result.data) {
-            const {
-              id, created_at, created_by, created_by_profile, updated_at, 
-              assigned_to, assigned_to_profile, attachments_metadata, 
-              user_context,
-              ...displayData
-            } = result.data;
-            const finalDisplayData = {
-                ...displayData,
-                steps_to_reproduce: result.data.steps_to_reproduce || result.data.reproduction_steps,
-                affected_area: result.data.affected_area,
-                app_version: result.data.app_version,
-                user_impact_details: result.data.user_impact_details || result.data.user_context,
-            };
-            setFeedbackItem(finalDisplayData as FeedbackItem);
-          } else {
-            throw new Error(result.error || 'Failed to parse feedback item data');
-          }
-        } catch (err) {
-          console.error('Failed to fetch feedback item:', err);
-          setError(err instanceof Error ? err.message : 'An unknown error occurred');
-          if ((err instanceof Error && err.message.includes('not found')) || (err instanceof Error && err.message.includes('Error 404'))){
-            toast.error('Feedback item not found.');
-          } else {
-            toast.error('Failed to load feedback details.');
-          }
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      fetchFeedbackItem();
-    }
-  }, [feedbackId]);
+  // Early return for missing feedbackId (already handled in useEffect, but as a safeguard for render)
+  if (!feedbackId && !isLoading) { // Check !isLoading to avoid flash of this if ID appears late
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <Card className="w-full max-w-md p-6 sm:p-8 text-center shadow-xl">
+          <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
+          <h1 className="text-xl font-semibold">Error Loading Feedback</h1>
+          <p className="mt-2 text-muted-foreground">
+            The feedback ID is missing. Unable to load the feedback item.
+          </p>
+          <Button onClick={() => router.push('/dashboard/admin/feedback-log')} className="mt-6 w-full">
+            Return to Feedback Log
+          </Button>
+        </Card>
+      </div>
+    );
+  }
 
-  if (isLoading || isLoadingUser) {
-    return <div className="flex justify-center items-center h-[calc(100vh-10rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-muted-foreground">Loading feedback details...</p>
+      </div>
+    );
   }
 
   if (error || !feedbackItem) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6"> 
+      <div className="px-4 sm:px-6 lg:px-8 py-6 bg-gray-50 min-h-screen">
          <BreadcrumbsComponent items={[{ name: 'Feedback', href: '/dashboard/admin/feedback-log' }, { name: 'Error' }]} />
         <div className="flex flex-col items-center justify-center h-[calc(100vh-15rem)] p-6 text-center">
             <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
             <h1 className="text-2xl font-bold text-destructive mb-2">Error Loading Feedback</h1>
             <p className="text-muted-foreground mb-6">{error || 'The feedback item could not be found or loaded.'}</p>
             <Button variant="outline" onClick={() => router.push('/dashboard/admin/feedback-log')} title="Return to feedback log">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
+                <ArrowLeft className="mr-2 h-4 w-4" /> Go Back to Log
             </Button>
         </div>
       </div>

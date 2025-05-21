@@ -1,0 +1,146 @@
+import React from 'react';
+import Head from 'next/head'; // Import Head for title and meta tags
+
+// Assuming your global styles including Tailwind base are in src/app/globals.css
+import '../../app/globals.css'; 
+
+const OverviewPage = () => {
+  return (
+    <>
+      <Head>
+        <title>MixerAI 2.0 | Revolutionise Your Global Content Strategy</title>
+        <meta name="description" content="Discover MixerAI 2.0 - Create authentic, culturally-attuned marketing that captivates audiences worldwide and streamlines your content workflows." />
+        {/* Add other relevant meta tags: Open Graph, Twitter Cards etc. */}
+      </Head>
+
+      <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
+        {/* Hero Section */}
+        <section 
+          className="min-h-[60vh] md:min-h-[70vh] bg-cover bg-center flex flex-col justify-center items-center text-white relative"
+          style={{ backgroundImage: "url('https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&dpr=2')" }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 opacity-75"></div>
+          <div className="relative z-10 text-center p-6 max-w-3xl">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-6 leading-tight">
+              MixerAI 2.0: Global Reach, Local Impact.
+            </h1>
+            <p className="text-lg sm:text-xl md:text-2xl mb-8">
+              Transform your content strategy to drive share of search and market. Create authentic, culturally-attuned marketing that captivates audiences worldwide, effortlessly.
+            </p>
+            <a 
+              href="#learn-more" 
+              className="bg-white text-blue-600 font-bold py-3 px-8 rounded-lg text-lg hover:bg-gray-100 transition duration-300 ease-in-out transform hover:scale-105"
+            >
+              Discover How
+            </a>
+          </div>
+        </section>
+
+        {/* Introduction Section */}
+        <section id="learn-more" className="py-16 md:py-24 bg-white">
+          <div className="container mx-auto px-6 text-center max-w-3xl">
+            <h2 className="text-3xl md:text-4xl font-bold mb-6 text-gray-900">Unlock the Power of True Localisation</h2>
+            <p className="text-lg md:text-xl text-gray-700 leading-relaxed">
+              Is your global content truly connecting, or just 'good enough'? MixerAI 2.0 empowers your Market Activation Teams (MATs) to craft messages that genuinely resonate with local cultures and values. This moves beyond simple translation, enabling you to build authentic connections that drive engagement and significantly boost market share. All this, while Brand Development Teams (BDTs) maintain centralised strategic oversight and brand consistency.
+            </p>
+          </div>
+        </section>
+
+        {/* Key Benefits Section */}
+        <section className="py-16 md:py-24 bg-gray-100">
+          <div className="container mx-auto px-6">
+            <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 md:mb-16 text-gray-900">Elevate Your Global Content Excellence</h2>
+            <div className="grid md:grid-cols-2 gap-8 md:gap-12">
+              {/* Benefit 1 */}
+              <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300 flex flex-col">
+                <div className="text-blue-500 text-4xl mb-4">🌍</div> 
+                <h3 className="text-xl font-semibold mb-3 text-gray-900">Authentic Cultural Resonance</h3>
+                <p className="text-gray-700 leading-relaxed flex-grow">
+                  Connect deeply to win in every market. Our AI crafts content that speaks authentically to each specific culture, boosting your share of search and making your brands a local favourite.
+                </p>
+                <a href="/deep-dive/cultural-resonance" className="text-blue-600 hover:text-blue-800 font-semibold mt-4 inline-block self-start">Learn more &rarr;</a>
+              </div>
+              {/* Benefit 2 */}
+              <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300 flex flex-col">
+                <div className="text-green-500 text-4xl mb-4">🛡️</div>
+                <h3 className="text-xl font-semibold mb-3 text-gray-900">Uncompromising Quality & Workflow</h3>
+                <p className="text-gray-700 leading-relaxed flex-grow">
+                  Our robust workflow and approval system ensures every piece of content meets the highest standards of quality and compliance. Empower your MATs with agility, while BDTs ensure global brand integrity.
+                </p>
+                <a href="/deep-dive/quality-workflow" className="text-blue-600 hover:text-blue-800 font-semibold mt-4 inline-block self-start">Learn more &rarr;</a>
+              </div>
+              {/* Benefit 3 */}
+              <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300 flex flex-col">
+                <div className="text-purple-500 text-4xl mb-4">⚙️</div>
+                <h3 className="text-xl font-semibold mb-3 text-gray-900">Content at Volume, Optimised ROI</h3>
+                <p className="text-gray-700 leading-relaxed flex-grow">
+                  Produce impactful content at scale, optimising your ROI on non-working media. BDTs can establish clear guidelines, empowering MATs to create and adapt content swiftly and efficiently.
+                </p>
+                <a href="/deep-dive/streamlined-operations" className="text-blue-600 hover:text-blue-800 font-semibold mt-4 inline-block self-start">Learn more &rarr;</a>
+              </div>
+              {/* Benefit 4 */}
+              <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300 flex flex-col">
+                <div className="text-red-500 text-4xl mb-4">📈</div>
+                <h3 className="text-xl font-semibold mb-3 text-gray-900">Drive Growth & Agility</h3>
+                <p className="text-gray-700 leading-relaxed flex-grow">
+                  Unlock new growth by keeping your brand messaging fresh and relevant. Effortlessly seasonalise your content across your diverse portfolio, at virtually zero incremental cost for creation, driving sustained engagement and market penetration.
+                </p>
+                <a href="/deep-dive/business-growth" className="text-blue-600 hover:text-blue-800 font-semibold mt-4 inline-block self-start">Learn more &rarr;</a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Who It's For Section */}
+        <section className="py-16 md:py-24 bg-white">
+          <div className="container mx-auto px-6 text-center">
+            <h2 className="text-3xl md:text-4xl font-bold mb-12 text-gray-900">Empowering Your Key Teams</h2>
+            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+              <div className="p-6 bg-gray-50 rounded-lg shadow-md">
+                <h3 className="text-2xl font-semibold mb-2 text-blue-600">BDTs</h3>
+                <p className="text-gray-700">Define global brand strategy and provide consistent guidelines, ensuring your core message resonates powerfully yet flexibly across all markets. Enable your teams to create content at volume while optimising the ROI of non-working media.</p>
+              </div>
+              <div className="p-6 bg-gray-50 rounded-lg shadow-md">
+                <h3 className="text-2xl font-semibold mb-2 text-green-600">MATs</h3>
+                <p className="text-gray-700">Rapidly create and adapt highly-localised, compliant content that drives engagement and wins share of market. Respond to local trends and seasonal opportunities with unprecedented speed and efficiency.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Call to Action Section */}
+        <section className="py-16 md:py-24 bg-blue-600 text-white">
+          <div className="container mx-auto px-6 text-center">
+            <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Elevate Your Global Content Game?</h2>
+            <p className="text-lg md:text-xl mb-8 max-w-2xl mx-auto">
+              Empower your BDTs and MATs to conquer new markets and deepen consumer connections. Discover how MixerAI 2.0 can help you create content at volume, drive share of market, and maximise your content ROI.
+            </p>
+            <div className="space-y-4 sm:space-y-0 sm:space-x-4">
+              <a 
+                href="mailto:peter.pitcher@genmills.com?subject=MixerAI%202.0%20Demo%20Request&body=Hello%20Peter%2C%0A%0AI'm%20interested%20in%20a%20demo%20of%20MixerAI%202.0%20after%20reviewing%20the%20overview%20page.%0APlease%20let%20me%20know%20the%20next%20steps.%0A%0AThanks%2C%0A[Your%20Name]"
+                className="bg-white text-blue-600 font-bold py-3 px-8 rounded-lg text-lg hover:bg-gray-100 transition duration-300 ease-in-out transform hover:scale-105 inline-block"
+              >
+                Request a Demo
+              </a>
+              <a 
+                href="/specifics" // Update to your actual features/specifics page
+                className="border-2 border-white text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-white hover:text-blue-600 transition duration-300 ease-in-out transform hover:scale-105 inline-block"
+              >
+                View Features
+              </a>
+            </div>
+          </div>
+        </section>
+
+        {/* Footer */}
+        <footer className="py-8 bg-gray-800 text-gray-400 text-center">
+          <div className="container mx-auto px-6">
+            <p>&copy; {new Date().getFullYear()} MixerAI. All rights reserved.</p>
+          </div>
+        </footer>
+    </div>
+    </>
+  );
+};
+
+export default OverviewPage; 

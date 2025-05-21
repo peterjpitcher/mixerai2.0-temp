@@ -62,7 +62,7 @@ const getDefaultField = (type: 'input' | 'output', id?: string): Field => {
     return {
       ...base,
       type: 'richText',
-      aiAutoComplete: false, 
+      aiAutoComplete: true,
       useBrandIdentity: false,
       useToneOfVoice: false,
       useGuardrails: false,
@@ -122,7 +122,7 @@ export function FieldDesigner({
       } else { 
         return {
           ...base,
-          aiAutoComplete: (prev as OutputField).aiAutoComplete || false,
+          aiAutoComplete: true,
           useBrandIdentity: (prev as OutputField).useBrandIdentity || false,
           useToneOfVoice: (prev as OutputField).useToneOfVoice || false,
           useGuardrails: (prev as OutputField).useGuardrails || false,
@@ -146,9 +146,11 @@ export function FieldDesigner({
       } else if (fieldType === 'input' && 'aiSuggester' in updatedField && feature === 'aiSuggester') {
         (updatedField as InputField).aiSuggester = value as boolean;
       } else if (fieldType === 'output') {
-        if ( (feature === 'aiAutoComplete' || feature === 'useBrandIdentity' || feature === 'useToneOfVoice' || feature === 'useGuardrails')) {
+        if (feature === 'aiAutoComplete') {
+          (updatedField as OutputField).aiAutoComplete = true;
+        } else if (feature === 'useBrandIdentity' || feature === 'useToneOfVoice' || feature === 'useGuardrails') {
           if (feature in updatedField) {
-            (updatedField as OutputField)[feature as 'aiAutoComplete' | 'useBrandIdentity' | 'useToneOfVoice' | 'useGuardrails'] = value as boolean;
+            (updatedField as OutputField)[feature as 'useBrandIdentity' | 'useToneOfVoice' | 'useGuardrails'] = value as boolean;
           }
         }
       }
@@ -229,8 +231,8 @@ export function FieldDesigner({
       sonnerToast.error("Field name is required");
       return false;
     }
-    if (fieldType === 'output' && (fieldData as OutputField).aiAutoComplete && (!fieldData.aiPrompt || !fieldData.aiPrompt.trim())) {
-      sonnerToast.error("AI prompt is required for output fields when AI Auto-Complete is enabled.");
+    if (fieldType === 'output' && (!fieldData.aiPrompt || !fieldData.aiPrompt.trim())) {
+      sonnerToast.error("AI prompt is required for output fields.");
       setActiveTab('ai');
       return false;
     }
@@ -461,24 +463,6 @@ export function FieldDesigner({
             )}
             {fieldType === 'output' && outputFieldData && (
               <>
-                  <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="aiAutoComplete" 
-                      checked={outputFieldData.aiAutoComplete || false} 
-                      onCheckedChange={(checked) => handleAIFeatureChange('aiAutoComplete', !!checked)} 
-                    />
-                    <Label htmlFor="aiAutoComplete">Enable AI Auto-Complete</Label>
-                  </div>
-                  {outputFieldData.aiAutoComplete && (
-                    <div className="pl-6 space-y-1">
-                      <p className="text-xs text-muted-foreground">
-                        Uses AI to automatically generate content for this field.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
                 <div className="pt-2">
                   <Label className="font-medium">Brand Context for AI (Output Fields)</Label>
                   <p className="text-xs text-muted-foreground pb-2">
@@ -527,7 +511,7 @@ export function FieldDesigner({
               </>
             )}
             
-            {(inputFieldData?.aiSuggester || outputFieldData?.aiAutoComplete) && (
+            {((fieldType === 'input' && inputFieldData?.aiSuggester) || fieldType === 'output') && (
               <div className="pt-3 space-y-4">
                 <div className="space-y-1">
                   <Label htmlFor="aiPrompt">AI Prompt</Label>

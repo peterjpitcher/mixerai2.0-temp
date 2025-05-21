@@ -10,6 +10,8 @@ import { Loader2, AlertTriangle, ArrowLeft, Info, FileText, PlayCircle, CheckCir
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/skeleton';
 import { Table, TableHeader, TableRow, TableCell, TableBody, TableHead } from "@/components/ui/table";
+import { createSupabaseClient } from '@/lib/supabase/client';
+import { toast } from 'sonner';
 
 // Define UserSessionData interface (can be shared if not already)
 interface UserSessionData {
@@ -367,137 +369,142 @@ const ContentTranscreatorHistoryDisplay = ({ inputs, outputs, status }: { inputs
 export default function ToolRunHistoryDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const historyId = params.historyId as string;
+  const historyId = params?.historyId as string | undefined;
 
   const [historyItem, setHistoryItem] = useState<ToolRunHistoryItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
-  const [userError, setUserError] = useState<string | null>(null);
-  const [isAllowedToAccess, setIsAllowedToAccess] = useState<boolean>(false); // For the page in general
 
   useEffect(() => {
-    const fetchCurrentUser = async () => {
-      setIsLoadingUser(true);
-      try {
-        const response = await fetch('/api/me');
-        if (!response.ok) throw new Error('Failed to fetch user session');
-        const data = await response.json();
-        if (data.success && data.user) {
-          setCurrentUser(data.user);
-          // Basic permission: any logged in user can try to view, API will enforce specific record access
-          setIsAllowedToAccess(true); 
-        } else {
-          setUserError(data.error || 'User not authenticated.');
-          setIsAllowedToAccess(false);
-        }
-      } catch (e: any) {
-        setUserError(e.message || 'Error fetching user.');
-        setIsAllowedToAccess(false);
-      } finally {
-        setIsLoadingUser(false);
-      }
-    };
-    fetchCurrentUser();
-  }, []);
-
-  useEffect(() => {
-    if (!historyId || !isAllowedToAccess || isLoadingUser) return; // Wait for user and permission
-
-    const fetchHistoryItem = async () => {
+    const supabaseClient = createSupabaseClient();
+    const fetchInitialData = async () => {
       setIsLoading(true);
+      setIsLoadingUser(true); // Explicitly set user loading
       setError(null);
+
+      // Fetch user first (can be done in parallel or sequence)
       try {
-        const response = await fetch(`/api/me/tool-run-history/${historyId}`);
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || `HTTP error! status: ${response.status}`);
-        }
-        if (data.success && data.historyItem) {
-          setHistoryItem(data.historyItem);
+        const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (session?.user) {
+          setCurrentUser({
+            id: session.user.id,
+            email: session.user.email,
+            user_metadata: session.user.user_metadata
+          });
         } else {
-          setError(data.error || 'History item not found.');
+          // No active session, or user is null
+          setCurrentUser(null);
+          // Optionally redirect if user is required to view this page, or handle in UI
+           setError("User not authenticated."); // Set error if user is required
+           toast.error("User not authenticated. Please login.");
+           setIsLoading(false); // Stop loading as we can't proceed
+           setIsLoadingUser(false);
+           // router.push('/auth/login'); // Example redirect
+           return;
         }
-      } catch (e: any) {
-        console.error('[HistoryDetailPage] Error fetching history item:', e);
-        setError(e.message || 'An unexpected error occurred.');
+      } catch (userError) {
+        console.error("Error fetching user session:", userError);
+        setError(userError instanceof Error ? userError.message : "Error fetching user data.");
+        setCurrentUser(null);
+        setIsLoading(false); // Stop general loading
+        setIsLoadingUser(false);
+        return;
+      }
+      setIsLoadingUser(false);
+
+      if (!historyId) {
+        setError('History ID is missing from the URL.');
+        toast.error('History ID is missing.');
+        setIsLoading(false); // Stop general loading
+        return;
+      }
+
+      // Fetch history item
+      try {
+        const { data, error: dbError } = await supabaseClient
+          .from('tool_run_history')
+          .select('*')
+          .eq('id', historyId)
+          .maybeSingle(); // Use maybeSingle to handle null if not found
+
+        if (dbError) throw dbError;
+        
+        if (data) {
+          setHistoryItem(data as ToolRunHistoryItem);
+        } else {
+          setError('Tool run history item not found.');
+          toast.error('History item not found.');
+        }
+      } catch (fetchError) {
+        console.error('Failed to fetch history item:', fetchError);
+        setError(fetchError instanceof Error ? fetchError.message : 'An unknown error occurred while fetching history.');
+        toast.error('Failed to load history details.');
       } finally {
-        setIsLoading(false);
+        setIsLoading(false); // General loading finished
       }
     };
 
-    fetchHistoryItem();
-  }, [historyId, isAllowedToAccess, isLoadingUser]);
+    fetchInitialData();
+  }, [historyId, router]); // Added router to deps if used for redirect
 
-  if (isLoadingUser || isLoading) {
+  // Order of checks: Missing ID, then overall loading, then specific error or no item
+  if (!historyId && !isLoading) { // If ID was missing and we stopped loading early
     return (
-      <div className="container mx-auto p-4 md:p-6 lg:p-8">
-        <Skeleton className="h-8 w-1/2 mb-6" /> {/* Breadcrumbs skeleton */}
-        <Skeleton className="h-10 w-1/3 mb-2" /> {/* Header skeleton */}
-        <Skeleton className="h-6 w-2/3 mb-10" /> {/* Description skeleton */}
-        <Card>
-          <CardHeader><Skeleton className="h-8 w-1/4" /></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
-              <Skeleton className="h-6 w-full" />
-              <Skeleton className="h-6 w-full" />
-              <Skeleton className="h-6 w-full col-span-2" />
-            </div>
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </CardContent>
+      <div className="flex items-center justify-center min-h-[calc(100vh-200px)] bg-gray-50">
+        <Card className="w-full max-w-lg p-6 sm:p-8 text-center shadow-xl">
+          <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
+          <CardTitle className="text-xl font-semibold">Error Loading History</CardTitle>
+          <CardDescription className="mt-2 text-muted-foreground">
+            {error || 'The History ID is missing. Unable to load the item.'}
+          </CardDescription>
+          <Button onClick={() => router.push('/dashboard/tools/history')} className="mt-6 w-full">
+            Return to Tool History Log
+          </Button>
         </Card>
       </div>
     );
   }
-
-  if (userError || !isAllowedToAccess && !isLoadingUser) {
+  
+  if (isLoading || isLoadingUser) { // Combined loading state
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6">
-        <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
-        <h2 className="text-2xl font-semibold text-destructive mb-2">Access Error</h2>
-        <p className="text-center text-muted-foreground mb-6">
-          {userError || 'You must be logged in to view this page.'}
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] bg-gray-50">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-muted-foreground">
+          {isLoadingUser ? 'Loading user data...' : (isLoading ? 'Loading history item...' : 'Loading...')}
         </p>
-        <Button onClick={() => router.push('/auth/login')}>Go to Login</Button>
       </div>
     );
   }
-  
-  if (error) {
+
+  if (error && !historyItem) { // If there was an error and no item was loaded
     return (
-      <div className="container mx-auto p-4 md:p-6 lg:p-8">
-        <Breadcrumbs items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Tools', href: '/dashboard/tools' }, {label: 'History'}]} />
-        <div className="flex flex-col items-center justify-center py-20">
-            <AlertTriangle className="h-16 w-16 text-destructive mb-6" />
-            <h2 className="text-3xl font-semibold text-destructive mb-3">Error Loading History</h2>
-            <p className="text-center text-muted-foreground mb-8 max-w-md">
-            {error === 'History item not found or access denied.'
-                ? 'The history item you are looking for could not be found, or you do not have permission to view it.'
-                : `An error occurred: ${error}`}
-            </p>
-            <Button onClick={() => router.back()} variant="outline">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
+      <div className="px-4 sm:px-6 lg:px-8 py-6 bg-gray-50 min-h-screen">
+        <Breadcrumbs items={[{label: 'Dashboard', href: '/dashboard'}, {label: 'Tool History', href: '/dashboard/tools/history'}, {label: 'Error'}]} />
+        <div className="flex flex-col items-center justify-center h-[calc(100vh-15rem)] p-6 text-center">
+            <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
+            <h1 className="text-2xl font-bold text-destructive mb-2">Error Loading History Item</h1>
+            <p className="text-muted-foreground mb-6">{error}</p>
+            <Button variant="outline" onClick={() => router.push('/dashboard/tools/history')} title="Return to Tool History Log">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Go Back to Log
             </Button>
         </div>
       </div>
     );
   }
 
-  if (!historyItem) {
-    return (
-      <div className="container mx-auto p-4 md:p-6 lg:p-8">
-         <Breadcrumbs items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Tools', href: '/dashboard/tools' }, {label: 'History'}]} />
-        <div className="flex flex-col items-center justify-center py-20">
-            <FileText className="h-16 w-16 text-muted-foreground mb-6" />
-            <h2 className="text-3xl font-semibold text-muted-foreground mb-3">History Item Not Found</h2>
-             <p className="text-center text-muted-foreground mb-8 max-w-md">
-                The requested tool run history could not be located.
-            </p>
-            <Button onClick={() => router.back()} variant="outline">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
+  if (!historyItem) { // If no error but item is still null (e.g., not found but no specific error thrown to UI)
+     return (
+      <div className="px-4 sm:px-6 lg:px-8 py-6 bg-gray-50 min-h-screen">
+        <Breadcrumbs items={[{label: 'Dashboard', href: '/dashboard'}, {label: 'Tool History', href: '/dashboard/tools/history'}, {label: 'Not Found'}]} />
+        <div className="flex flex-col items-center justify-center h-[calc(100vh-15rem)] p-6 text-center">
+            <AlertTriangle className="h-16 w-16 text-orange-500 mb-4" />
+            <h1 className="text-2xl font-bold text-orange-600 mb-2">History Item Not Found</h1>
+            <p className="text-muted-foreground mb-6">The requested tool run history could not be found.</p>
+            <Button variant="outline" onClick={() => router.push('/dashboard/tools/history')} title="Return to Tool History Log">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Go Back to Log
             </Button>
         </div>
       </div>
