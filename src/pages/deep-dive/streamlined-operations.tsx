@@ -7,8 +7,8 @@ const StreamlinedOperationsPage = () => {
   return (
     <>
       <Head>
-        <title>Streamlined Operations with MixerAI 2.0 | Deep Dive</title>
-        <meta name="description" content="Learn how MixerAI 2.0 enables content creation at volume, optimises non-working media ROI, and empowers BDTs and MATs for efficiency." />
+        <title>Streamlined Operations with MixerAI 2.0 | Deep Dive for Our Brands</title>
+        <meta name="description" content="Learn how MixerAI 2.0 enables content creation at volume, optimises our non-working media ROI, and empowers our BDT's and MAT's for efficiency." />
       </Head>
 
       <div className="min-h-screen bg-gray-100 font-sans flex flex-col">
@@ -21,9 +21,9 @@ const StreamlinedOperationsPage = () => {
         >
           <div className="absolute inset-0 bg-purple-600 opacity-70"></div> {/* Gradient overlay */}
           <div className="relative z-10">
-            <h2 className="text-4xl md:text-5xl font-extrabold mb-4">Deep Dive: Content at Volume, Optimised ROI</h2>
+            <h2 className="text-4xl md:text-5xl font-extrabold mb-4">Deep Dive: Content at Volume, Optimised ROI for Our Brands</h2>
             <p className="text-lg md:text-xl max-w-3xl mx-auto px-4">
-              Empowering BDTs to set strategy and MATs to execute efficiently. Produce high-quality, localised content at scale while maximising the return on your non-working media investment.
+              Empowering our BDT's to set strategy and our MAT's to execute efficiently. Produce high-quality, localised content at scale while maximising the return on our non-working media investment.
             </p>
           </div>
         </section>
@@ -33,16 +33,16 @@ const StreamlinedOperationsPage = () => {
           <div className="bg-white p-8 md:p-12 rounded-xl shadow-xl">
             <article className="prose prose-lg max-w-none text-gray-800">
               <p>
-                The demand for fresh, relevant, and localised content is ever-increasing. MixerAI 2.0 is designed to help your BDTs and MATs meet this demand by enabling the creation of high-impact content at scale, without sacrificing quality or busting budgets. This is key to optimising the ROI of your non-working media spend.
+                The demand for fresh, relevant, and localised content is ever-increasing. MixerAI 2.0 is designed to help our BDT's and MAT's meet this demand by enabling the creation of high-impact content at scale, without sacrificing quality or busting budgets. This is key to optimising the ROI of our non-working media spend.
               </p>
 
-              <h3>Strategic Frameworks by BDTs, Agile Execution by MATs</h3>
+              <h3>Strategic Frameworks by BDT's, Agile Execution by MAT's</h3>
               <p>
-                MixerAI 2.0 facilitates a powerful synergy between your central brand strategists and local market experts:
+                MixerAI 2.0 facilitates a powerful synergy between our central brand strategists and local market experts:
               </p>
               <ul>
-                <li><strong>BDTs Define the Blueprint:</strong> Brand Development Teams can establish core messaging pillars, brand voice guidelines, approved product claims, and campaign frameworks directly within the platform. This ensures global consistency and strategic alignment.</li>
-                <li><strong>MATs Activate with Speed & Precision:</strong> Market Activation Teams can then leverage these BDT-defined blueprints, using MixerAI 2.0's intelligent localisation capabilities to rapidly adapt and generate a high volume of market-specific content variations. This allows for targeted messaging across diverse consumer segments and channels.</li>
+                <li><strong>BDT's Define the Blueprint:</strong> Our Brand Development Teams can establish core messaging pillars, brand voice guidelines, approved product claims, and campaign frameworks directly within the platform. This ensures global consistency and strategic alignment for our brands.</li>
+                <li><strong>MAT's Activate with Speed & Precision:</strong> Our Market Activation Teams can then leverage these BDT-defined blueprints, using MixerAI 2.0's intelligent localisation capabilities to rapidly adapt and generate a high volume of market-specific content variations. This allows for targeted messaging across diverse consumer segments and channels for our brands.</li>
               </ul>
 
               {/* Placeholder for an impactful inline image */}
@@ -54,22 +54,22 @@ const StreamlinedOperationsPage = () => {
                   style={{ maxWidth: '450px' }}/>
               </div>
 
-              <h3>Maximising Your Non-Working Media ROI</h3>
+              <h3>Maximising Our Non-Working Media ROI</h3>
               <p>
-                'Non-working media' – the budget spent on the creation and production of advertising content – can be a significant investment. MixerAI 2.0 helps you maximise this ROI by:
+                'Non-working media' – the budget spent on the creation and production of advertising content – can be a significant investment. MixerAI 2.0 helps us maximise this ROI by:
               </p>
               <ul>
-                <li><strong>Reducing Redundant Creation:</strong> Instead of MATs creating content from scratch for every local need, they can adapt and build upon centrally provided assets and AI-generated localisations, drastically reducing duplicated effort.</li>
-                <li><strong>Accelerating Time-to-Market:</strong> The speed of AI-powered localisation and streamlined workflows means content gets to market faster, allowing you to capitalise on opportunities more quickly.</li>
-                <li><strong>Enabling Cost-Effective Versioning:</strong> Need slightly different versions of an ad for various demographics or A/B testing? MixerAI 2.0 makes this process highly efficient, allowing for more granular targeting without a linear increase in production costs.</li>
+                <li><strong>Reducing Redundant Creation:</strong> Instead of our MAT's creating content from scratch for every local need, they can adapt and build upon centrally provided assets and AI-generated localisations, drastically reducing duplicated effort.</li>
+                <li><strong>Accelerating Time-to-Market:</strong> The speed of AI-powered localisation and streamlined workflows means our content gets to market faster, allowing us to capitalise on opportunities more quickly.</li>
+                <li><strong>Enabling Cost-Effective Versioning:</strong> Need slightly different versions of an ad for various demographics or A/B testing? MixerAI 2.0 makes this process highly efficient, allowing for more granular targeting without a linear increase in production costs for our campaigns.</li>
               </ul>
 
-              <h3>Seasonal Content & Campaign Agility with Ease</h3>
+              <h3>Seasonal Content & Campaign Agility with Ease for Our Brands</h3>
               <p>
-                One of the standout benefits of MixerAI 2.0 is the ability to refresh and seasonalise content with unprecedented ease and minimal cost. Once initial localisations are established, creating new variations for seasonal campaigns, holidays, or local events becomes a significantly lighter lift. MATs can quickly adapt existing approved content, ensuring your brands remain relevant and timely throughout the year, boosting engagement and maintaining a fresh presence in the market.
+                One of the standout benefits of MixerAI 2.0 is the ability to refresh and seasonalise our content with unprecedented ease and minimal cost. Once initial localisations are established, creating new variations for seasonal campaigns, holidays, or local events becomes a significantly lighter lift. Our MAT's can quickly adapt existing approved content, ensuring our brands remain relevant and timely throughout the year, boosting engagement and maintaining a fresh presence in the market.
               </p>
               <p>
-                This agility allows your teams to be more responsive to market dynamics, competitor activities, and consumer trends, all while keeping content production costs under control. By empowering your MATs to generate content at volume efficiently, and enabling BDTs to maintain strategic control, MixerAI 2.0 transforms your content operations into a lean, powerful engine for global growth.
+                This agility allows our teams to be more responsive to market dynamics, competitor activities, and consumer trends, all while keeping content production costs under control. By empowering our MAT's to generate content at volume efficiently, and enabling our BDT's to maintain strategic control, MixerAI 2.0 transforms our content operations into a lean, powerful engine for global growth.
               </p>
 
               <div className="mt-12 text-center">

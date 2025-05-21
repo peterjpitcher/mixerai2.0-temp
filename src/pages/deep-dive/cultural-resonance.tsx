@@ -7,8 +7,8 @@ const CulturalResonancePage = () => {
   return (
     <>
       <Head>
-        <title>Cultural Resonance with MixerAI 2.0 | Deep Dive</title>
-        <meta name="description" content="Understand how MixerAI 2.0 drives authentic cultural resonance for deeper market penetration and brand loyalty." />
+        <title>Cultural Resonance with MixerAI 2.0 | Deep Dive for Our Brands</title>
+        <meta name="description" content="Understand how MixerAI 2.0 drives authentic cultural resonance for deeper market penetration and loyalty for our brands." />
       </Head>
 
       <div className="min-h-screen bg-gray-100 font-sans flex flex-col">
@@ -21,9 +21,9 @@ const CulturalResonancePage = () => {
         >
           <div className="absolute inset-0 bg-blue-600 opacity-70"></div> {/* Gradient overlay */}
           <div className="relative z-10">
-            <h2 className="text-4xl md:text-5xl font-extrabold mb-4">Deep Dive: Authentic Cultural Resonance</h2>
+            <h2 className="text-4xl md:text-5xl font-extrabold mb-4">Deep Dive: Authentic Cultural Resonance for Our Brands</h2>
             <p className="text-lg md:text-xl max-w-3xl mx-auto px-4">
-              Moving beyond translation to true local understanding. See how MixerAI 2.0 empowers your brands to connect authentically, driving share of search and market across diverse global audiences.
+              Moving beyond translation to true local understanding. See how MixerAI 2.0 empowers our brands to connect authentically, driving share of search and market across diverse global audiences.
             </p>
           </div>
         </section>
@@ -33,17 +33,17 @@ const CulturalResonancePage = () => {
           <div className="bg-white p-8 md:p-12 rounded-xl shadow-xl">
             <article className="prose prose-lg max-w-none text-gray-800">
               <p>
-                In today's global marketplace, simply translating your message isn't enough. Consumers expect brands to understand and respect their unique cultural nuances, traditions, and values. Failure to do so can lead to content that feels alienating, irrelevant, or worse, offensive. MixerAI 2.0 is engineered to address this critical challenge head-on.
+                In today's global marketplace, simply translating our message isn't enough. Consumers expect brands to understand and respect their unique cultural nuances, traditions, and values. Failure to do so can lead to content that feels alienating, irrelevant, or worse, offensive. MixerAI 2.0 is engineered to address this critical challenge head-on for our content strategy.
               </p>
 
               <h3>The Power of Speaking Like a Local</h3>
               <p>
-                MixerAI 2.0 leverages advanced AI to analyse and understand the specific cultural contexts of your target markets. This means your content isn't just linguistically accurate; it's infused with the local idiom, references, and sensitivities that make it feel genuinely native. For BDTs, this provides the confidence that global brand narratives are being adapted respectfully and effectively. For MATs, it means having the power to create content that truly speaks the language of their customers, leading to:
+                MixerAI 2.0 leverages advanced AI to analyse and understand the specific cultural contexts of our target markets. This means our content isn't just linguistically accurate; it's infused with the local idiom, references, and sensitivities that make it feel genuinely native. For our BDT's, this provides the confidence that global brand narratives are being adapted respectfully and effectively. For our MAT's, it means having the power to create content that truly speaks the language of their customers, leading to:
               </p>
               <ul>
-                <li><strong>Increased Share of Search:</strong> Content that uses locally relevant keywords and addresses local interests naturally performs better in search engines, making your brands more discoverable.</li>
-                <li><strong>Enhanced Consumer Engagement:</strong> When consumers feel understood, they are more likely to engage with your content, share it, and develop a positive perception of your brand.</li>
-                <li><strong>Boosted Market Share:</strong> Authentic connection builds trust and preference, directly contributing to increased market penetration and sales growth.</li>
+                <li><strong>Increased Share of Search:</strong> Content that uses locally relevant keywords and addresses local interests naturally performs better in search engines, making our brands more discoverable.</li>
+                <li><strong>Enhanced Consumer Engagement:</strong> When consumers feel understood, they are more likely to engage with our content, share it, and develop a positive perception of our brand.</li>
+                <li><strong>Boosted Market Share:</strong> Authentic connection builds trust and preference, directly contributing to increased market penetration and sales growth for our brands.</li>
               </ul>
 
               <div className="my-8 md:my-12 clearfix">
@@ -56,15 +56,15 @@ const CulturalResonancePage = () => {
 
               <h3>Beyond Words: Understanding Cultural Nuance</h3>
               <p>
-                Cultural resonance goes beyond just words. It involves understanding visual preferences, colour symbolism, humour, social etiquette, and even the unwritten rules of communication within a specific region. MixerAI 2.0 provides insights and guidance that help MATs navigate these complexities, ensuring that every aspect of the content – from tone of voice to imagery – is culturally appropriate and impactful.
+                Cultural resonance goes beyond just words. It involves understanding visual preferences, colour symbolism, humour, social etiquette, and even the unwritten rules of communication within a specific region. MixerAI 2.0 provides insights and guidance that help our MAT's navigate these complexities, ensuring that every aspect of our content – from tone of voice to imagery – is culturally appropriate and impactful.
               </p>
               <p>
-                BDTs can set the strategic framework and core brand values, and MixerAI 2.0 equips MATs with the intelligence to bring those values to life in a way that resonates deeply within each unique market. This collaborative approach ensures both global consistency and local relevance, a key factor in building strong, enduring global brands.
+                Our BDT's can set the strategic framework and core brand values, and MixerAI 2.0 equips our MAT's with the intelligence to bring those values to life in a way that resonates deeply within each unique market. This collaborative approach ensures both global consistency and local relevance, a key factor in building strong, enduring global brands.
               </p>
 
               <h3>Drive ROI with Content That Connects</h3>
               <p>
-                Investing in culturally resonant content isn't just about brand building; it's about smart business. By ensuring your messaging truly connects, you reduce wasted spend on campaigns that miss the mark. MixerAI 2.0 helps optimise your non-working media ROI by ensuring the content created is highly effective from the outset, leading to better campaign performance and a stronger bottom line.
+                Investing in culturally resonant content isn't just about brand building; it's about smart business. By ensuring our messaging truly connects, we reduce wasted spend on campaigns that miss the mark. MixerAI 2.0 helps optimise our non-working media ROI by ensuring the content created is highly effective from the outset, leading to better campaign performance and a stronger bottom line.
               </p>
 
               <div className="mt-12 text-center">

@@ -7,8 +7,8 @@ const SpecificsPage = () => {
   return (
     <>
       <Head>
-        <title>MixerAI 2.0 Features & Specifics | Deep Dive</title>
-        <meta name="description" content="Explore the detailed features and technical specifics of MixerAI 2.0, including AI capabilities, workflow management, and integration points." />
+        <title>MixerAI 2.0 Features & Specifics | Deep Dive for Our Teams</title>
+        <meta name="description" content="Explore the detailed features and technical specifics of MixerAI 2.0, including AI capabilities, workflow management, and integration points relevant to our teams." />
       </Head>
 
       <div className="min-h-screen bg-gray-100 font-sans flex flex-col">
@@ -19,9 +19,9 @@ const SpecificsPage = () => {
         >
           <div className="absolute inset-0 bg-indigo-600 opacity-70"></div> {/* Gradient overlay */}
           <div className="relative z-10">
-            <h2 className="text-4xl md:text-5xl font-extrabold mb-4">MixerAI 2.0: Key Features & Technical Specifics</h2>
+            <h2 className="text-4xl md:text-5xl font-extrabold mb-4">MixerAI 2.0: Key Features & Technical Specifics for Our Teams</h2>
             <p className="text-lg md:text-xl max-w-3xl mx-auto px-4">
-              Delve into the core functionalities that make MixerAI 2.0 a powerful solution for global content creation and management. (Further details to be populated based on technical documentation and specific feature sets).
+              Delve into the core functionalities that make MixerAI 2.0 a powerful solution for our global content creation and management. (Further details to be populated based on technical documentation and specific feature sets).
             </p>
           </div>
         </section>
@@ -31,13 +31,13 @@ const SpecificsPage = () => {
           <div className="bg-white p-8 md:p-12 rounded-xl shadow-xl">
             <article className="prose prose-lg max-w-none text-gray-800">
               <p className="text-center text-xl font-semibold">
-                This page will provide a detailed breakdown of MixerAI 2.0's features.
+                This page will provide a detailed breakdown of MixerAI 2.0's features for our teams.
               </p>
               <p className="text-center mt-4">
-                Content will be added here based on your specific questions from our previous discussion and the available technical documentation for the application.
+                Content will be added here based on our specific questions from previous discussions and the available technical documentation for the application.
               </p>
               
-              <h3 className="mt-10">Potential Areas to Detail:</h3>
+              <h3 className="mt-10">Potential Areas to Detail for Our BDT's and MAT's:</h3>
               <ul className="list-disc pl-5 space-y-2">
                 <li><strong>AI & Localisation Engine:</strong>
                   <ul className="list-circle pl-5 space-y-1 mt-1">
@@ -70,7 +70,7 @@ const SpecificsPage = () => {
                 </li>
                 <li><strong>Reporting & Analytics:</strong>
                   <ul className="list-circle pl-5 space-y-1 mt-1">
-                    <li>Overview of available dashboards for BDTs and MATs.</li>
+                    <li>Overview of available dashboards for our BDT's and MAT's.</li>
                     <li>Metrics tracked (e.g., content production time, approval rates, localisation effectiveness - if measurable).</li>
                   </ul>
                 </li>
@@ -91,7 +91,7 @@ const SpecificsPage = () => {
               </div>
               
               <p className="mt-8">
-                To populate this page effectively, please provide more details or ask specific questions about the features you'd like to highlight for your BDTs and MATs.
+                To populate this page effectively, please provide more details or ask specific questions about the features we'd like to highlight for our BDT's and MAT's.
               </p>
 
               <div className="mt-12 text-center">

@@ -7,8 +7,8 @@ const ContactPage = () => {
   return (
     <>
       <Head>
-        <title>Contact for MixerAI 2.0 | Enquiries & Demo Requests</title>
-        <meta name="description" content="Get in touch with Peter Pitcher for enquiries or to schedule a demo of MixerAI 2.0 and learn how it can revolutionise your global content strategy." />
+        <title>Contact for MixerAI 2.0 | Enquiries & Demo Requests for Our Teams</title>
+        <meta name="description" content="Get in touch with Peter Pitcher for enquiries or to schedule a demo of MixerAI 2.0 and learn how it can revolutionise our global content strategy." />
       </Head>
 
       <div className="min-h-screen bg-gray-100 font-sans flex flex-col items-center justify-center">
@@ -21,7 +21,7 @@ const ContactPage = () => {
           <div className="relative z-10">
             <h2 className="text-4xl md:text-5xl font-extrabold mb-4">Contact for MixerAI 2.0 Enquiries</h2>
             <p className="text-lg md:text-xl max-w-3xl mx-auto px-4">
-              Have questions or ready to see MixerAI 2.0 in action? Reach out directly to Peter Pitcher.
+              Have questions or ready to see MixerAI 2.0 in action? Reach out directly to Peter Pitcher for our teams.
             </p>
           </div>
         </section>
@@ -31,7 +31,7 @@ const ContactPage = () => {
           <div className="bg-white p-8 md:p-12 rounded-xl shadow-xl max-w-2xl mx-auto text-center">
             <h3 className="text-2xl md:text-3xl font-semibold text-gray-800 mb-6">Direct Contact Information</h3>
             <p className="text-gray-700 mb-4 text-lg">
-              For all MixerAI 2.0 enquiries, including demo requests, please email Peter Pitcher directly.
+              For all MixerAI 2.0 enquiries, including demo requests for our teams, please email Peter Pitcher directly.
             </p>
             <a 
               href="mailto:peter.pitcher@genmills.com?subject=MixerAI%202.0%20Enquiry&body=Hello%20Peter%2C%0A%0AI%20have%20a%20question%20about%20MixerAI%202.0%20and%20would%20like%20to%20learn%20more.%0A%0AThanks%2C%0A[Your%20Name]"
@@ -40,7 +40,7 @@ const ContactPage = () => {
               Email Peter Pitcher
             </a>
             <p className="text-gray-600 text-md">
-              He will be happy to assist you with your questions or schedule a personalised demonstration tailored to your BDT and MAT requirements.
+              He will be happy to assist you with your questions or schedule a personalised demonstration tailored to our BDT's and MAT's requirements.
             </p>
             
             <div className="mt-12">
