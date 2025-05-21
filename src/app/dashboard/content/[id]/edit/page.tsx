@@ -532,16 +532,29 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             <Card>
               <CardHeader><CardTitle>Generated Output Fields</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                {template.fields.outputFields.map(outputField => (
-                  <div key={outputField.id}>
-                    <Label htmlFor={`output-${outputField.id}`} className="text-sm font-medium">{outputField.name}</Label>
-                    <RichTextEditor
-                      value={content.content_data?.generatedOutputs?.[outputField.id] || ''}
-                      onChange={(value) => handleGeneratedOutputChange(outputField.id, value)}
-                      placeholder={`Content for ${outputField.name}...`}
-                      className="mt-1 border rounded-md"
-                      editorClassName="font-sans min-h-[100px]"
-                    />
+                {template.fields.outputFields.map(field => (
+                  <div key={field.id}>
+                    <Label htmlFor={`output_field_${field.id}`} className="text-base">
+                      {field.name || `Output Field (ID: ${field.id})`}
+                    </Label>
+                    {field.type === 'plainText' ? (
+                      <Textarea
+                        id={`output_field_${field.id}`}
+                        value={content.content_data?.generatedOutputs?.[field.id] || ''}
+                        onChange={(e) => handleGeneratedOutputChange(field.id, e.target.value)}
+                        placeholder={`Enter content for ${field.name}...`}
+                        className="min-h-[120px] border shadow-sm focus-visible:ring-1 focus-visible:ring-ring"
+                      />
+                    ) : (
+                      <RichTextEditor
+                        value={content.content_data?.generatedOutputs?.[field.id] || ''}
+                        onChange={(value) => handleGeneratedOutputChange(field.id, value)}
+                        placeholder={`Enter content for ${field.name}...`}
+                      />
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Field Type: <span className='font-semibold'>{field.type}</span>
+                    </p>
                   </div>
                 ))}
               </CardContent>

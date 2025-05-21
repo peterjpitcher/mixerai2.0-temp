@@ -3,6 +3,8 @@ import { generateMetadata } from '@/lib/azure/openai';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { fetchWebPageContent } from '@/lib/utils/web-scraper';
 import { handleApiError } from '@/lib/api-utils';
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { Database, Json } from '@/types/supabase';
 
 // In-memory rate limiting
 const rateLimit = new Map<string, { count: number, timestamp: number }>();
@@ -28,6 +30,12 @@ interface MetadataResultItem {
 
 // Keep the original authenticated route - RENAMING to POST
 export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
+  const supabaseAdmin = createSupabaseAdminClient();
+  let historyEntryStatus: 'success' | 'failure' = 'success';
+  let historyErrorMessage: string | undefined = undefined;
+  let apiInputs: MetadataGenerationRequest | null = null;
+  let apiOutputs: { results: MetadataResultItem[] } | null = null;
+
   // Role check: Only Global Admins or Editors can access this tool
   const userRole = user.user_metadata?.role;
   if (!(userRole === 'admin' || userRole === 'editor')) {
@@ -49,6 +57,21 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       userRateLimit.timestamp = now;
     } else if (userRateLimit.count >= MAX_REQUESTS_PER_MINUTE) {
       console.warn(`[RateLimit] Blocked ${ip} for metadata-generator. Count: ${userRateLimit.count}`);
+      historyEntryStatus = 'failure';
+      historyErrorMessage = 'Rate limit exceeded.';
+      try {
+        await supabaseAdmin.from('tool_run_history').insert({
+            user_id: user.id,
+            tool_name: 'metadata_generator',
+            inputs: { error: 'Rate limit exceeded for initial request' },
+            outputs: { error: 'Rate limit exceeded' },
+            status: historyEntryStatus,
+            error_message: historyErrorMessage,
+            brand_id: null
+        } as Database['public']['Tables']['tool_run_history']['Insert']);
+      } catch (logError) {
+        console.error('[HistoryLoggingError] Failed to log rate limit error for metadata-generator:', logError);
+      }
       return NextResponse.json(
         { success: false, error: 'Rate limit exceeded. Please try again in a minute.' },
         { status: 429 }
@@ -62,10 +85,13 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
 
   try {
     const data: MetadataGenerationRequest = await request.json();
+    apiInputs = data; // Capture inputs for logging
     
     if (!data.urls || !Array.isArray(data.urls) || data.urls.length === 0) {
+      historyEntryStatus = 'failure';
+      historyErrorMessage = 'An array of URLs is required';
       return NextResponse.json(
-        { success: false, error: 'An array of URLs is required' },
+        { success: false, error: historyErrorMessage },
         { status: 400 }
       );
     }
@@ -118,15 +144,65 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
           url,
           error: error.message || 'Failed to generate metadata for this URL.',
         });
+        historyEntryStatus = 'failure'; // Mark overall run as failure if any URL fails
+        if (!historyErrorMessage) historyErrorMessage = 'One or more URLs failed metadata generation.';
       }
     }
     
+    apiOutputs = { results }; // Capture outputs for logging
+
+    // Determine final history status based on individual URL results
+    if (results.some(r => r.error)) {
+        historyEntryStatus = 'failure';
+        if (!historyErrorMessage) historyErrorMessage = 'One or more URLs failed to generate metadata.';
+    } else {
+        historyEntryStatus = 'success';
+    }
+
     return NextResponse.json({
-      success: true,
+      success: historyEntryStatus === 'success', // Reflect overall success
       userId: user.id,
       results,
+      ...(historyEntryStatus === 'failure' && historyErrorMessage && { error: historyErrorMessage })
     });
+
   } catch (error: any) {
-    return handleApiError(error, 'Metadata Generation Error', 500);
+    console.error('[MetadataGen] Global error in POST handler:', error);
+    historyEntryStatus = 'failure';
+    historyErrorMessage = error.message || 'An unexpected error occurred.';
+    if (!apiInputs) apiInputs = { urls: [], language: 'unknown' };
+    apiOutputs = { results: [{ url: 'unknown', error: historyErrorMessage }] };
+    // Note: handleApiError already returns a NextResponse, so we don't return it directly here.
+    // The finally block will still execute.
+    return handleApiError(new Error(historyErrorMessage), 'Metadata Generation Error', 500);
+  } finally {
+    // Log to tool_run_history in all cases (success or failure)
+    try {
+      if (apiInputs) {
+        await supabaseAdmin.from('tool_run_history').insert({
+            user_id: user.id,
+            tool_name: 'metadata_generator',
+            inputs: apiInputs as unknown as Json,
+            outputs: apiOutputs as unknown as Json || { error: historyErrorMessage || 'Unknown error before output generation' },
+            status: historyEntryStatus,
+            error_message: historyErrorMessage,
+            brand_id: null
+        } as Database['public']['Tables']['tool_run_history']['Insert']);
+      } else {
+        if (historyEntryStatus === 'failure' && historyErrorMessage) {
+             await supabaseAdmin.from('tool_run_history').insert({
+                user_id: user.id,
+                tool_name: 'metadata_generator',
+                inputs: { error: 'Failed to parse request or early error' } as unknown as Json,
+                outputs: { error: historyErrorMessage } as unknown as Json,
+                status: 'failure',
+                error_message: historyErrorMessage,
+                brand_id: null
+            } as Database['public']['Tables']['tool_run_history']['Insert']);
+        }
+      }
+    } catch (logError) {
+      console.error('[HistoryLoggingError] Failed to log run for metadata-generator:', logError);
+    }
   }
 }); 

@@ -61,6 +61,17 @@ For detailed information on Azure OpenAI integration, see [Azure OpenAI Integrat
     - `TemplateForm` (`src/components/template/template-form.tsx`) now fetches and displays details of the associated brand if `brand_id` is present.
     - `FieldDesigner` (`src/components/template/field-designer.tsx`) modal, when editing an output field's AI prompt, provides buttons to insert the above brand-specific placeholders if a brand is associated with the template.
 
+### 5. Tool Run History
+Users can view a history of their past runs for AI-powered tools (Alt Text Generator, Metadata Generator, Content Trans-creator). This allows them to track usage, review previous inputs/outputs, and see the status of each run.
+- **Features:**
+    - History logged for each tool run, including inputs, outputs, status, and timestamp.
+    - Dedicated history list on each tool page showing recent runs.
+    - Detailed view for each history record.
+- **Technical Details:**
+    - Stored in the `tool_run_history` database table.
+    - Accessible via `/api/me/tool-run-history` API endpoints.
+- For detailed information, see [Tool Run History Feature Plan](./docs/tool_run_history_feature_plan.md).
+
 ## Recent Updates and Feature Details
 
 # MixerAI 2.0 - UI and Authentication Updates

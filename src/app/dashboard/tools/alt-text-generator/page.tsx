@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/card';
 import { Label } from '@/components/label';
 import { Textarea } from "@/components/textarea";
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Loader2, ClipboardCopy, Image as ImageIcon, ArrowLeft, Info, AlertTriangle, ExternalLink, Languages } from 'lucide-react';
+import { Loader2, ClipboardCopy, Image as ImageIcon, ArrowLeft, Info, AlertTriangle, ExternalLink, Languages, History } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -27,6 +27,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { format } from 'date-fns';
 
 // export const metadata: Metadata = {
 //   title: 'Alt Text Generator | MixerAI 2.0',
@@ -117,6 +119,19 @@ const getLanguageFromDomain = (url: string): string => {
   }
 };
 
+// Define ToolRunHistoryItem interface
+interface ToolRunHistoryItem {
+  id: string;
+  user_id: string;
+  tool_name: string;
+  brand_id?: string | null;
+  inputs: any; // Consider defining a more specific type if inputs structure is consistent
+  outputs: any; // Consider defining a more specific type if outputs structure is consistent
+  run_at: string; // Assuming TIMESTAMPTZ comes as string
+  status: 'success' | 'failure';
+  error_message?: string | null;
+}
+
 /**
  * AltTextGeneratorPage provides a tool for generating accessible alt text for images.
  * Users can provide a list of image URLs, and the tool will generate alt text
@@ -138,6 +153,11 @@ export default function AltTextGeneratorPage() {
   const [userError, setUserError] = useState<string | null>(null);
   const [isAllowedToAccess, setIsAllowedToAccess] = useState<boolean>(false);
   const [isCheckingPermissions, setIsCheckingPermissions] = useState<boolean>(true);
+
+  // History State
+  const [runHistory, setRunHistory] = useState<ToolRunHistoryItem[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   // Fetch current user
   useEffect(() => {
@@ -201,6 +221,38 @@ export default function AltTextGeneratorPage() {
         setSelectedLanguage('en');
     }
   }, [imageUrlsInput]);
+
+  // Fetch Run History
+  useEffect(() => {
+    const fetchHistory = async () => {
+      if (!currentUser || !isAllowedToAccess) return;
+
+      setIsLoadingHistory(true);
+      setHistoryError(null);
+      try {
+        const response = await fetch('/api/me/tool-run-history?tool_name=alt_text_generator');
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch history' }));
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.success && data.history) {
+          setRunHistory(data.history);
+        } else {
+          setRunHistory([]);
+          setHistoryError(data.error || 'History data not found.');
+        }
+      } catch (error: any) {
+        console.error('[AltTextGeneratorPage] Error fetching run history:', error);
+        setRunHistory([]);
+        setHistoryError(error.message || 'An unexpected error occurred while fetching history.');
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    fetchHistory();
+  }, [currentUser, isAllowedToAccess]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -288,6 +340,35 @@ export default function AltTextGeneratorPage() {
     }
     if (overallSuccessCount === 0 && overallErrorCount === 0 && urls.length > 0) {
         toast.info("Processing completed, but no alt text was generated and no errors were reported.");
+    }
+
+    // After successful or failed run, refetch history
+    if (currentUser && isAllowedToAccess) {
+        const fetchHistory = async () => {
+            setIsLoadingHistory(true);
+            setHistoryError(null);
+            try {
+                const response = await fetch('/api/me/tool-run-history?tool_name=alt_text_generator');
+                if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ error: 'Failed to fetch history' }));
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                if (data.success && data.history) {
+                setRunHistory(data.history);
+                } else {
+                setRunHistory([]);
+                setHistoryError(data.error || 'History data not found.');
+                }
+            } catch (error: any) {
+                console.error('[AltTextGeneratorPage] Error fetching run history post-submit:', error);
+                setRunHistory([]);
+                setHistoryError(error.message || 'An unexpected error occurred while fetching history.');
+            } finally {
+                setIsLoadingHistory(false);
+            }
+        };
+        fetchHistory();
     }
   };
 
@@ -551,6 +632,65 @@ export default function AltTextGeneratorPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Run History Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <History className="mr-2 h-5 w-5" />
+              Run History
+            </CardTitle>
+            <CardDescription>
+              Your recent alt text generation runs.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingHistory && (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="ml-3 text-muted-foreground">Loading history...</p>
+              </div>
+            )}
+            {historyError && (
+              <div className="text-red-500 py-4">
+                <AlertTriangle className="inline mr-2 h-5 w-5" /> Error loading history: {historyError}
+              </div>
+            )}
+            {!isLoadingHistory && !historyError && runHistory.length === 0 && (
+              <p className="text-muted-foreground py-4 text-center">No history available for this tool.</p>
+            )}
+            {!isLoadingHistory && !historyError && runHistory.length > 0 && (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Run Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {runHistory.map((run) => (
+                    <TableRow key={run.id}>
+                      <TableCell>{format(new Date(run.run_at), 'PPpp')}</TableCell>
+                      <TableCell>
+                        <Badge variant={run.status === 'success' ? 'default' : 'destructive'}>
+                          {run.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Link href={`/dashboard/tools/history/${run.id}`} passHref>
+                          <Button variant="outline" size="sm">
+                            View Details <ExternalLink className="ml-2 h-3 w-3" />
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

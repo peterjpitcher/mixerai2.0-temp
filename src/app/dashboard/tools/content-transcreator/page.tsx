@@ -2,18 +2,21 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/card';
 import { Label } from '@/components/label';
 import { Textarea } from '@/components/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Loader2, ClipboardCopy, Globe, ArrowLeft, AlertTriangle, Briefcase } from 'lucide-react';
+import { Loader2, ClipboardCopy, Globe, ArrowLeft, AlertTriangle, Briefcase, History, ExternalLink } from 'lucide-react';
 import type { Metadata } from 'next';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Skeleton } from "@/components/skeleton";
 import { BrandIcon } from '@/components/brand-icon';
+import { Badge } from "@/components/ui/badge";
+import { format } from 'date-fns';
+import { Table, TableHeader, TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table";
 
 // export const metadata: Metadata = {
 //   title: 'Content Trans-Creator | MixerAI 2.0',
@@ -78,6 +81,19 @@ interface Brand {
   color?: string;
 }
 
+// Define ToolRunHistoryItem interface
+interface ToolRunHistoryItem {
+  id: string;
+  user_id: string;
+  tool_name: string;
+  brand_id?: string | null;
+  inputs: any; 
+  outputs: any; 
+  run_at: string; 
+  status: 'success' | 'failure';
+  error_message?: string | null;
+}
+
 /**
  * ContentTransCreatorPage provides a tool for trans-creating content.
  * Users input original content, select a source language, and choose a target brand.
@@ -103,6 +119,11 @@ export default function ContentTransCreatorPage() {
   const [userError, setUserError] = useState<string | null>(null);
   const [isAllowedToAccess, setIsAllowedToAccess] = useState<boolean>(false);
   const [isCheckingPermissions, setIsCheckingPermissions] = useState<boolean>(true);
+
+  // History State
+  const [runHistory, setRunHistory] = useState<ToolRunHistoryItem[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCurrentUserAndBrands = async () => {
@@ -171,6 +192,39 @@ export default function ContentTransCreatorPage() {
     }
   }, [currentUser, isLoadingUser]);
 
+  // Fetch Run History
+  useEffect(() => {
+    const fetchHistory = async () => {
+      if (!currentUser || !isAllowedToAccess) return;
+
+      setIsLoadingHistory(true);
+      setHistoryError(null);
+      try {
+        const response = await fetch('/api/me/tool-run-history?tool_name=content_transcreator');
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch history' }));
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.success && data.history) {
+          setRunHistory(data.history);
+        } else {
+          setRunHistory([]);
+          setHistoryError(data.error || 'History data not found.');
+        }
+      } catch (error: any) {
+        console.error('[ContentTransCreatorPage] Error fetching run history:', error);
+        setRunHistory([]);
+        setHistoryError(error.message || 'An unexpected error occurred while fetching history.');
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    if (currentUser && isAllowedToAccess) { // Fetch only if user is loaded and allowed
+      fetchHistory();
+    }
+  }, [currentUser, isAllowedToAccess]);
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value);
@@ -232,6 +286,34 @@ export default function ContentTransCreatorPage() {
       toast.error(error instanceof Error ? error.message : 'An unknown error occurred.');
     } finally {
       setIsLoading(false);
+      // After successful or failed run, refetch history
+      if (currentUser && isAllowedToAccess) {
+        const fetchHistory = async () => {
+            setIsLoadingHistory(true);
+            setHistoryError(null);
+            try {
+                const response = await fetch('/api/me/tool-run-history?tool_name=content_transcreator');
+                if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ error: 'Failed to fetch history' }));
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                if (data.success && data.history) {
+                setRunHistory(data.history);
+                } else {
+                setRunHistory([]);
+                setHistoryError(data.error || 'History data not found.');
+                }
+            } catch (error: any) {
+                console.error('[ContentTransCreatorPage] Error fetching run history post-submit:', error);
+                setRunHistory([]);
+                setHistoryError(error.message || 'An unexpected error occurred while fetching history.');
+            } finally {
+                setIsLoadingHistory(false);
+            }
+        };
+        fetchHistory();
+    }
     }
   };
 
@@ -282,208 +364,194 @@ export default function ContentTransCreatorPage() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6">
-      <Breadcrumbs items={[
-        { label: "Dashboard", href: "/dashboard" },
-        { label: "Tools", href: "/dashboard/tools" },
-        { label: "Content Trans-Creator" }
-      ]} />
+    <div className="container mx-auto p-4 md:p-6 lg:p-8">
+      <Breadcrumbs 
+        items={[
+          { label: 'Dashboard', href: '/dashboard' },
+          { label: 'Tools', href: '/dashboard/tools' },
+          { label: 'Content Trans-Creator' }
+        ]}
+      />
+      <header className="mb-6">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center">
+          <Globe className="mr-3 h-8 w-8 text-primary" />
+          Content Trans-Creator
+        </h1>
+        <p className="mt-2 text-muted-foreground">
+          Adapt your content for different languages and cultural contexts using AI.
+        </p>
+      </header>
 
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-           <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/tools')} aria-label="Back to Tools">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Content Trans-Creator</h1>
-            <p className="text-muted-foreground mt-1">
-              Adapt your content for different languages and cultural contexts. 
-              The target language and country are determined by the selected brand's settings.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Input Content</CardTitle>
-            <CardDescription>Enter the original content you want to trans-create.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="content">Original Content (Max 5000 characters)</Label>
-                <Textarea
-                  id="content"
-                  value={content}
-                  onChange={handleContentChange}
-                  placeholder="Paste or type your content here..."
-                  rows={10}
-                  maxLength={5000}
-                  className="min-h-[200px]"
-                />
-                <p className="text-xs text-muted-foreground text-right">
-                  {characterCount} / 5000 characters
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="sourceLanguage">Source Language</Label>
-                  <Select value={sourceLanguage} onValueChange={setSourceLanguage}>
-                    <SelectTrigger id="sourceLanguage">
-                      <SelectValue placeholder="Select source language" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {languageOptions.map(option => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="selectedBrand">Target Brand</Label>
-                  {isLoadingBrands ? (
-                     <Skeleton className="h-10 w-full" />
-                  ) : brands.length > 0 ? (
-                    <Select value={selectedBrandId || ''} onValueChange={setSelectedBrandId}>
-                      <SelectTrigger id="selectedBrand">
-                        <SelectValue placeholder="Select target brand" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Input Content</CardTitle>
+              <CardDescription>Enter the content you want to trans-create and select the source language and target brand.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="source-language">Source Language</Label>
+                    <Select value={sourceLanguage} onValueChange={setSourceLanguage}>
+                      <SelectTrigger id="source-language">
+                        <SelectValue placeholder="Select source language" />
                       </SelectTrigger>
                       <SelectContent>
-                        {brands.map(brand => (
-                          <SelectItem key={brand.id} value={brand.id}>
-                            <div className="flex items-center">
-                              <BrandIcon name={brand.name} color={brand.color} className="mr-2 h-4 w-4"/>
-                              {brand.name} ({brand.language.toUpperCase()} - {brand.country.toUpperCase()})
-                            </div>
+                        {languageOptions.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  ) : (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground border rounded-md px-3 py-2.5"> 
-                        <AlertTriangle className="h-4 w-4 text-orange-500"/> 
-                        No brands configured for trans-creation.
-                    </div>
-                  )}
-                   <p className="text-xs text-muted-foreground">
-                    Target language/country set by brand. <Link href="/dashboard/brands" className="underline">Manage Brands</Link>
+                  </div>
+                  <div>
+                    <Label htmlFor="target-brand" className="flex items-center">
+                      <Briefcase className="mr-2 h-4 w-4 text-muted-foreground"/> Target Brand
+                    </Label>
+                    {isLoadingBrands ? (
+                      <Skeleton className="h-10 w-full" />
+                    ) : brands.length === 0 ? (
+                      <p className="text-sm text-muted-foreground mt-2">
+                        No brands with language/country configured. <Link href="/dashboard/brands/new" className="text-primary hover:underline">Create one?</Link>
+                      </p>
+                    ) : (
+                      <Select value={selectedBrandId || ''} onValueChange={setSelectedBrandId} disabled={brands.length === 0}>
+                        <SelectTrigger id="target-brand" disabled={brands.length === 0}>
+                          <SelectValue placeholder="Select target brand" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {brands.map(brand => (
+                            <SelectItem key={brand.id} value={brand.id}>
+                              <div className="flex items-center">
+                                <BrandIcon name={brand.name} color={brand.color} className="mr-2 h-4 w-4" />
+                                {brand.name} ({brand.language?.toUpperCase()}-{brand.country?.toUpperCase()})
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="content">Content to Trans-create (Max 5000 characters)</Label>
+                  <Textarea
+                    id="content"
+                    placeholder="Enter your original content here..."
+                    value={content}
+                    onChange={handleContentChange}
+                    rows={10}
+                    maxLength={5000}
+                    className="min-h-[200px]"
+                    disabled={isLoading || !selectedBrandId}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1 text-right">
+                    {characterCount} / 5000 characters
                   </p>
                 </div>
-              </div>
-              
-              {/* Target Language and Country are now derived from brand, so these are commented out or removed
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="targetLanguage">Target Language</Label>
-                  <Select value={targetLanguage} onValueChange={handleTargetLanguageChange}>
-                    <SelectTrigger id="targetLanguage">
-                      <SelectValue placeholder="Select target language" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {languageOptions.map(option => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="targetCountry">Target Country/Locale</Label>
-                  <Select value={targetCountry} onValueChange={setTargetCountry} disabled={filteredCountryOptions.length === 0}>
-                    <SelectTrigger id="targetCountry">
-                      <SelectValue placeholder={filteredCountryOptions.length === 0 ? "Select language first" : "Select target country/locale"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredCountryOptions.map(option => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                      {filteredCountryOptions.length === 0 && targetLanguage && (
-                        <div className="p-2 text-sm text-muted-foreground">No countries for selected language.</div>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              */}
+                <Button 
+                  type="submit" 
+                  disabled={isLoading || !content || !selectedBrandId || (brands.length === 0 && !isLoadingBrands)} 
+                  className="w-full sm:w-auto"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Trans-creating...
+                    </>
+                  ) : (
+                    'Trans-create Content'
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
-              <Button type="submit" disabled={isLoading || !selectedBrandId || brands.length === 0} className="w-full">
-                {isLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Globe className="mr-2 h-4 w-4" />
-                )}
-                Trans-create Content
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+          {results && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Trans-created Content</CardTitle>
+                <CardDescription>
+                  Content successfully trans-created for {selectedBrandDetails?.name} ({results.targetLanguage.toUpperCase()}-{results.targetCountry.toUpperCase()}).
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Textarea value={results.transCreatedContent} readOnly rows={10} className="min-h-[200px]" />
+              </CardContent>
+              <CardFooter>
+                <Button onClick={handleCopyContent} variant="outline">
+                  <ClipboardCopy className="mr-2 h-4 w-4" /> Copy Trans-created Content
+                </Button>
+              </CardFooter>
+            </Card>
+          )}
+        </div>
 
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Trans-created Content</CardTitle>
-            <CardDescription>
-              AI-powered adaptation of your content. 
-              {results && selectedBrandDetails && (
-                <span className="block text-xs mt-1">
-                  Targeted for: {selectedBrandDetails.name} ({results.targetLanguage.toUpperCase()} - {results.targetCountry.toUpperCase()})
-                </span>
+        <div className="lg:col-span-1 space-y-6">
+          {/* Run History Section - now in the second column for lg screens */} 
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <History className="mr-2 h-5 w-5" />
+                Run History
+              </CardTitle>
+              <CardDescription>
+                Your recent content trans-creation runs.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingHistory && (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="ml-3 text-muted-foreground">Loading history...</p>
+                </div>
               )}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading && (
-              <div className="space-y-2">
-                <Skeleton className="h-8 w-1/4" /> 
-                <Skeleton className="h-32 w-full" />
-                <Skeleton className="h-8 w-1/3 mt-2" />
-              </div>
-            )}
-            {!isLoading && results && (
-              <div className="space-y-4">
-                <div className="space-y-1">
-                   <div className="flex justify-between items-center">
-                    <h3 className="font-medium">Result:</h3>
-                    <Button variant="ghost" size="sm" onClick={handleCopyContent}>
-                      <ClipboardCopy className="mr-2 h-4 w-4" />
-                      Copy
-                    </Button>
-                  </div>
-                  <Textarea
-                    value={results.transCreatedContent}
-                    readOnly
-                    rows={12}
-                    className="min-h-[200px] bg-muted/30"
-                    aria-label="Trans-created content"
-                  />
+              {historyError && (
+                <div className="text-red-500 py-4">
+                  <AlertTriangle className="inline mr-2 h-5 w-5" /> Error loading history: {historyError}
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  <p><strong>Source Language:</strong> {languageOptions.find(l => l.value === sourceLanguage)?.label || sourceLanguage}</p>
-                  <p><strong>Target Language:</strong> {languageOptions.find(l => l.value === results.targetLanguage)?.label || results.targetLanguage.toUpperCase()}</p>
-                  <p><strong>Target Country:</strong> {selectedBrandDetails?.country ? selectedBrandDetails.country.toUpperCase() : results.targetCountry.toUpperCase()}</p>
-                </div>
-                <p className="text-xs text-muted-foreground italic">
-                  Review the trans-created content carefully. AI output may require adjustments for nuance and accuracy.
-                </p>
-              </div>
-            )}
-            {!isLoading && !results && (
-              <div className="text-center py-10 text-muted-foreground">
-                <Globe className="mx-auto h-10 w-10 mb-2" />
-                Your trans-created content will appear here.
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+              {!isLoadingHistory && !historyError && runHistory.length === 0 && (
+                <p className="text-muted-foreground py-4 text-center">No history available for this tool.</p>
+              )}
+              {!isLoadingHistory && !historyError && runHistory.length > 0 && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Run Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {runHistory.map((run) => (
+                      <TableRow key={run.id}>
+                        <TableCell>{format(new Date(run.run_at), 'PPpp')}</TableCell>
+                        <TableCell>
+                          <Badge variant={run.status === 'success' ? 'default' : 'destructive'}>
+                            {run.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Link href={`/dashboard/tools/history/${run.id}`} passHref>
+                            <Button variant="outline" size="sm">
+                              View Details <ExternalLink className="ml-2 h-3 w-3" />
+                            </Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
-} 
+}

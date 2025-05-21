@@ -529,15 +529,32 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
           <CardContent className="space-y-4">
             {template?.fields.outputFields.map(outputField => (
               <div key={outputField.id} className="pt-2">
-                <Label htmlFor={`output-${outputField.id}`} className="text-base font-semibold">{outputField.name}</Label>
-                <RichTextEditor
-                  value={generatedOutputs[outputField.id] || ''}
-                  onChange={(value) => {
-                    setGeneratedOutputs(prev => ({...prev, [outputField.id]: value}));
-                  }}
-                  placeholder={`Generated content for ${outputField.name}...`}
-                  className="min-h-[100px] mt-1 border rounded-md p-2"
-                />
+                <Label htmlFor={`output_field_${outputField.id}`} className="text-base font-medium">
+                  {outputField.name || `Output Field (ID: ${outputField.id})`}
+                </Label>
+                {outputField.type === 'plainText' ? (
+                  <Textarea
+                    id={`output_field_${outputField.id}`}
+                    value={generatedOutputs[outputField.id] || ''}
+                    onChange={(e) => {
+                      setGeneratedOutputs(prev => ({ ...prev, [outputField.id]: e.target.value }));
+                    }}
+                    placeholder={`Content for ${outputField.name}...`}
+                    className="min-h-[120px] border shadow-sm focus-visible:ring-1 focus-visible:ring-ring text-sm p-2"
+                  />
+                ) : (
+                  <RichTextEditor 
+                    value={generatedOutputs[outputField.id] || ''}
+                    onChange={(value) => {
+                      setGeneratedOutputs(prev => ({ ...prev, [outputField.id]: value }));
+                    }}
+                    placeholder={`Content for ${outputField.name}...`}
+                    editorClassName="min-h-[150px] text-sm"
+                  />
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Field Type: <span className='font-semibold'>{outputField.type}</span>
+                </p>
               </div>
             ))}
             {Object.keys(generatedOutputs).length === 0 && (

@@ -544,7 +544,7 @@ export function FieldDesigner({
                   />
                 </div>
                 
-                {availableInputFields && availableInputFields.length > 0 && (
+                  {availableInputFields && availableInputFields.length > 0 && (
                     <div className="space-y-1 pt-3">
                         <Label className="text-xs font-medium text-muted-foreground">Insert Input Field Placeholders:</Label>
                         <div className="flex flex-wrap gap-2 mt-1">
@@ -561,10 +561,10 @@ export function FieldDesigner({
                             >
                                 {`{{${inputField.name}}}`}
                             </Button>
-                            ))}
-                        </div>
+                        ))}
+                      </div>
                     </div>
-                )}
+                  )}
 
                 <p className="text-xs text-muted-foreground flex items-center">
                   <Info size={14} className="mr-1.5 text-blue-500" />

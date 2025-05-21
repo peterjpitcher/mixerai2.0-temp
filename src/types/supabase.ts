@@ -347,6 +347,7 @@ export type Database = {
       }
       content_templates: {
         Row: {
+          brand_id: string | null
           created_at: string | null
           created_by: string | null
           description: string | null
@@ -357,6 +358,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          brand_id?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
@@ -367,6 +369,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          brand_id?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
@@ -377,6 +380,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "content_templates_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "content_templates_created_by_fkey"
             columns: ["created_by"]
@@ -721,6 +731,50 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      tool_run_history: {
+        Row: {
+          brand_id: string | null
+          error_message: string | null
+          id: string
+          inputs: Json
+          outputs: Json
+          run_at: string
+          status: Database["public"]["Enums"]["tool_run_status"]
+          tool_name: string
+          user_id: string | null
+        }
+        Insert: {
+          brand_id?: string | null
+          error_message?: string | null
+          id?: string
+          inputs: Json
+          outputs: Json
+          run_at?: string
+          status?: Database["public"]["Enums"]["tool_run_status"]
+          tool_name: string
+          user_id?: string | null
+        }
+        Update: {
+          brand_id?: string | null
+          error_message?: string | null
+          id?: string
+          inputs?: Json
+          outputs?: Json
+          run_at?: string
+          status?: Database["public"]["Enums"]["tool_run_status"]
+          tool_name?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_run_history_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_brand_permissions: {
         Row: {
@@ -1189,31 +1243,19 @@ export type Database = {
     }
     Functions: {
       create_brand_and_set_admin: {
-        Args:
-          | {
-              creator_user_id: string
-              brand_name: string
-              brand_website_url?: string
-              brand_country?: string
-              brand_language?: string
-              brand_identity_text?: string
-              brand_tone_of_voice?: string
-              brand_guardrails?: string
-              brand_content_vetting_agencies?: string
-            }
-          | {
-              creator_user_id: string
-              brand_name: string
-              brand_website_url?: string
-              brand_country?: string
-              brand_language?: string
-              brand_identity_text?: string
-              brand_tone_of_voice?: string
-              brand_guardrails?: string
-              brand_content_vetting_agencies_input?: string[]
-              brand_color_input?: string
-              approved_content_types_input?: Json
-            }
+        Args: {
+          creator_user_id: string
+          brand_name: string
+          brand_website_url?: string
+          brand_country?: string
+          brand_language?: string
+          brand_identity_text?: string
+          brand_tone_of_voice?: string
+          brand_guardrails?: string
+          brand_content_vetting_agencies_input?: string[]
+          brand_color_input?: string
+          approved_content_types_input?: Json
+        }
         Returns: string
       }
       create_workflow_and_log_invitations: {
@@ -1233,6 +1275,10 @@ export type Database = {
       delete_template_and_update_content: {
         Args: { template_id_to_delete: string }
         Returns: undefined
+      }
+      get_current_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       get_user_by_email: {
         Args: { user_email: string }
@@ -1303,6 +1349,7 @@ export type Database = {
         | "closed"
         | "wont_fix"
       feedback_type: "bug" | "enhancement"
+      tool_run_status: "success" | "failure"
       user_brand_role_enum: "brand_admin" | "editor" | "viewer"
       user_role: "admin" | "editor" | "viewer"
       vetting_agency_priority_level: "High" | "Medium" | "Low"
@@ -1438,6 +1485,7 @@ export const Constants = {
         "wont_fix",
       ],
       feedback_type: ["bug", "enhancement"],
+      tool_run_status: ["success", "failure"],
       user_brand_role_enum: ["brand_admin", "editor", "viewer"],
       user_role: ["admin", "editor", "viewer"],
       vetting_agency_priority_level: ["High", "Medium", "Low"],

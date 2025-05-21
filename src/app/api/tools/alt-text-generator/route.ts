@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateAltText } from '@/lib/azure/openai';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { Database, Json } from '@/types/supabase';
 
 // In-memory rate limiting
 const rateLimit = new Map<string, { count: number, timestamp: number }>();
@@ -74,6 +76,13 @@ function getLangCountryFromUrl(imageUrl: string): { language: string; country: s
 }
 
 export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
+  const supabaseAdmin = createSupabaseAdminClient();
+  let historyEntryStatus: 'success' | 'failure' = 'success';
+  let historyErrorMessage: string | undefined = undefined;
+  const requestStartTime = Date.now(); // For logging overall request time if needed
+  let apiInputs: AltTextGenerationRequest | null = null;
+  let apiOutputs: { results: AltTextResultItem[] } | null = null;
+
   // Role check: Only Global Admins or Editors can access this tool
   const userRole = user.user_metadata?.role;
   if (!(userRole === 'admin' || userRole === 'editor')) {
@@ -95,6 +104,22 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       userRateLimit.timestamp = now;
     } else if (userRateLimit.count >= MAX_REQUESTS_PER_MINUTE) {
       console.warn(`[RateLimit] Blocked ${ip} for alt-text-generator. Count: ${userRateLimit.count}`);
+      historyEntryStatus = 'failure';
+      historyErrorMessage = 'Rate limit exceeded.';
+      // Log history before returning
+      try {
+        await supabaseAdmin.from('tool_run_history').insert({
+            user_id: user.id,
+            tool_name: 'alt_text_generator',
+            inputs: { error: 'Rate limit exceeded for initial request' }, // Or apiInputs if available
+            outputs: { error: 'Rate limit exceeded' },
+            status: historyEntryStatus,
+            error_message: historyErrorMessage,
+            brand_id: null // Alt text gen currently has no brand context
+        });
+      } catch (logError) {
+        console.error('[HistoryLoggingError] Failed to log rate limit error for alt-text-generator:', logError);
+      }
       return NextResponse.json(
         { success: false, error: 'Rate limit exceeded. Please try again in a minute.' },
         { status: 429 }
@@ -108,10 +133,13 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
 
   try {
     const data: AltTextGenerationRequest = await request.json();
+    apiInputs = data; // Capture inputs for logging
     
     if (!data.imageUrls || !Array.isArray(data.imageUrls) || data.imageUrls.length === 0) {
+      historyEntryStatus = 'failure';
+      historyErrorMessage = 'An array of image URLs is required';
       return NextResponse.json(
-        { success: false, error: 'An array of image URLs is required' },
+        { success: false, error: historyErrorMessage },
         { status: 400 }
       );
     }
@@ -161,6 +189,8 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
           imageUrl,
           error: processingError,
         });
+        historyEntryStatus = 'failure'; // Mark overall run as failure if any image fails
+        if (!historyErrorMessage) historyErrorMessage = 'One or more images failed processing.'; 
         continue; // Skip to the next URL if the current one is invalid
       }
       
@@ -196,26 +226,68 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
           imageUrl,
           error: error.message || 'Failed to generate alt text for this image.',
         });
+        historyEntryStatus = 'failure'; // Mark overall run as failure if any image fails
+        if (!historyErrorMessage) historyErrorMessage = 'One or more images failed AI generation.'; 
       }
     }
     
+    apiOutputs = { results }; // Capture outputs for logging
+
+    // Determine final history status based on individual image results
+    if (results.some(r => r.error)) {
+        historyEntryStatus = 'failure';
+        if (!historyErrorMessage) historyErrorMessage = 'One or more images failed to generate alt text.';
+    } else {
+        historyEntryStatus = 'success';
+    }
+
     return NextResponse.json({
-      success: true,
+      success: historyEntryStatus === 'success', // Reflect overall success
       userId: user.id,
       results,
+      // Add overall error message if the entire operation is considered a failure
+      ...(historyEntryStatus === 'failure' && historyErrorMessage && { error: historyErrorMessage })
     });
 
   } catch (error: any) {
-    // This outer catch handles errors like request.json() failing or other unexpected issues.
-    let errorMessage = 'Failed to process alt text generation request';
-    let statusCode = 500;
-    
-    if (error.message?.includes('OpenAI') || error.message?.includes('Azure') || error.message?.includes('AI service') || (error as any).status === 429) {
-      errorMessage = 'The AI service is currently busy or unavailable. Please try again later.';
-      statusCode = 503;
-    } else {
-      errorMessage = error.message || errorMessage;
+    console.error('[AltTextGen] Global error in POST handler:', error);
+    historyEntryStatus = 'failure';
+    historyErrorMessage = error.message || 'An unexpected error occurred.';
+    // Ensure apiInputs is at least an empty object if error happened before parsing request body
+    if (!apiInputs) apiInputs = {imageUrls: [], language: 'unknown'}; 
+    apiOutputs = { results: [{ imageUrl: 'unknown', error: historyErrorMessage }] };
+    return handleApiError(new Error(historyErrorMessage), 'Alt Text Generation Error', 500);
+  } finally {
+    // Log to tool_run_history in all cases (success or failure)
+    try {
+      if (apiInputs) { // Only log if inputs were parsed or an attempt was made
+        await supabaseAdmin.from('tool_run_history').insert({
+            user_id: user.id,
+            tool_name: 'alt_text_generator',
+            inputs: apiInputs as unknown as Json,
+            outputs: apiOutputs || { error: historyErrorMessage || 'Unknown error before output generation' } as unknown as Json,
+            status: historyEntryStatus,
+            error_message: historyErrorMessage,
+            brand_id: null // Alt text generator is not brand-specific for history
+        } as Database['public']['Tables']['tool_run_history']['Insert']);
+      } else {
+        // This case might happen if request.json() itself fails catastrophically before apiInputs is set
+        // Or if a rate limit error occurred very early before apiInputs could be determined
+        if (historyEntryStatus === 'failure' && historyErrorMessage) { // Only log if we have a specific error to log
+             await supabaseAdmin.from('tool_run_history').insert({
+                user_id: user.id,
+                tool_name: 'alt_text_generator',
+                inputs: { error: 'Failed to parse request or early error' },
+                outputs: { error: historyErrorMessage },
+                status: 'failure',
+                error_message: historyErrorMessage,
+                brand_id: null
+            });
+        }
+      }
+    } catch (logError) {
+      console.error('[HistoryLoggingError] Failed to log run for alt-text-generator:', logError);
+      // Do not let logging failure prevent the actual response from being sent
     }
-    return handleApiError(new Error(errorMessage), 'Alt Text Generation Batch Error', statusCode);
   }
 }); 
