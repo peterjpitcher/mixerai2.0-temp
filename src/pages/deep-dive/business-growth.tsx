@@ -39,11 +39,11 @@ const BusinessGrowthPage = () => {
 
               <h3>Culturally-Powered Market Penetration for Our Brands</h3>
               <p>
-                Entering a new market or increasing share in an existing one requires more than just presence; it demands relevance. MixerAI 2.0 facilitates this by:
+                Entering a new market or increasing share in an existing one requires more than just presence; it demands relevance. MixerAI 2.0 facilitates this by helping our teams deploy highly relevant content such as locally-optimised Product Detail Pages (PDPs) that convert, engaging articles that build trust, and culturally adapted recipes that drive trial and adoption of our food products. Specifically, this involves:
               </p>
               <ul>
-                <li><strong>Deep Consumer Understanding:</strong> Our AI-driven insights help our MAT's uncover what truly motivates consumers in each locality, enabling the creation of hyper-relevant campaigns that speak directly to their desires and needs.</li>
-                <li><strong>Overcoming Cultural Barriers:</strong> By ensuring our content is not just translated but culturally adapted, MixerAI 2.0 helps our brands avoid missteps and build trust, paving the way for smoother market entry and stronger consumer adoption.</li>
+                <li><strong>Deep Consumer Understanding:</strong> Our AI-driven insights help our MAT's uncover what truly motivates consumers in each locality, enabling the creation of hyper-relevant campaigns. For instance, understanding local preferences can shape the tone and focus of an email newsletter or the features highlighted on a PDP.</li>
+                <li><strong>Overcoming Cultural Barriers:</strong> By ensuring our content is not just translated but culturally adapted (e.g., recipes using local ingredients, articles referencing local customs), MixerAI 2.0 helps our brands avoid missteps and build trust, paving the way for smoother market entry and stronger consumer adoption.</li>
                 <li><strong>Boosting Share of Search & Voice:</strong> Locally optimised content naturally ranks higher and gets talked about more, increasing our brand's visibility and authority within target markets. This is crucial for capturing and growing market share for our brands.
                 </li>
               </ul>
@@ -62,9 +62,9 @@ const BusinessGrowthPage = () => {
                 The modern consumer landscape is dynamic. Trends shift, seasons change, and local events create unique engagement opportunities. MixerAI 2.0 provides the agility our MAT's need to respond effectively:
               </p>
               <ul>
-                <li><strong>Rapid Seasonal Adaptation:</strong> As highlighted previously, the ability to refresh our content for seasonal campaigns, holidays, or local festivities at virtually zero incremental creation cost is a game-changer. This keeps our brand perennially relevant and top-of-mind.</li>
-                <li><strong>Responsive Marketing:</strong> Quickly adapt messaging in response to competitor moves, emerging consumer conversations, or unexpected market opportunities, ensuring our brands remain part of the local dialogue.</li>
-                <li><strong>Efficient A/B Testing and Optimisation:</strong> The ease of creating content variations allows our MAT's to conduct more effective A/B testing, continuously refining messaging for optimal performance and conversion, leading to better ROI on our working media spend.
+                <li><strong>Rapid Seasonal Adaptation:</strong> As highlighted previously, the ability to refresh our content for seasonal campaigns, holidays, or local festivities at virtually zero incremental creation cost is a game-changer. This includes updating recipe suggestions in newsletters for seasonal ingredients or tweaking PDPs for holiday promotions, keeping our brand perennially relevant and top-of-mind.</li>
+                <li><strong>Responsive Marketing:</strong> Quickly adapt messaging in response to competitor moves, emerging consumer conversations, or unexpected market opportunities. This could mean swiftly updating online articles to reflect new trends or adjusting newsletter content based on current events, ensuring our brands remain part of the local dialogue.</li>
+                <li><strong>Efficient A/B Testing and Optimisation:</strong> The ease of creating content variations (e.g., different headlines for articles, varied promotional offers in newsletters, alternative benefit statements on PDPs) allows our MAT's to conduct more effective A/B testing, continuously refining messaging for optimal performance and conversion, leading to better ROI on our working media spend.
                 </li>
               </ul>
 

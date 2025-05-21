@@ -1,5 +1,6 @@
 import React from 'react';
 import Head from 'next/head'; // Import Head for title and meta tags
+import Link from 'next/link'; // Import Link
 
 // Assuming your global styles including Tailwind base are in src/app/globals.css
 import '../../app/globals.css'; 
@@ -58,7 +59,7 @@ const OverviewPage = () => {
                 <p className="text-gray-700 leading-relaxed flex-grow">
                   Connect deeply to win in every market. Our AI crafts content that speaks authentically to each specific culture, boosting our share of search and making our brands a local favourite.
                 </p>
-                <a href="/deep-dive/cultural-resonance" className="text-blue-600 hover:text-blue-800 font-semibold mt-4 inline-block self-start">Learn more &rarr;</a>
+                <Link href="/deep-dive/cultural-resonance" className="text-blue-600 hover:text-blue-800 font-semibold mt-4 inline-block self-start">Learn more &rarr;</Link>
               </div>
               {/* Benefit 2 */}
               <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300 flex flex-col">
@@ -67,7 +68,7 @@ const OverviewPage = () => {
                 <p className="text-gray-700 leading-relaxed flex-grow">
                   Our robust workflow and approval system ensures every piece of our content meets the highest standards of quality and compliance. Empower our MAT's with agility, while our BDT's ensure global brand integrity.
                 </p>
-                <a href="/deep-dive/quality-workflow" className="text-blue-600 hover:text-blue-800 font-semibold mt-4 inline-block self-start">Learn more &rarr;</a>
+                <Link href="/deep-dive/quality-workflow" className="text-blue-600 hover:text-blue-800 font-semibold mt-4 inline-block self-start">Learn more &rarr;</Link>
               </div>
               {/* Benefit 3 */}
               <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300 flex flex-col">
@@ -76,7 +77,7 @@ const OverviewPage = () => {
                 <p className="text-gray-700 leading-relaxed flex-grow">
                   Produce impactful content at scale, optimising our ROI on non-working media. Our BDT's can establish clear guidelines, empowering our MAT's to create and adapt content swiftly and efficiently.
                 </p>
-                <a href="/deep-dive/streamlined-operations" className="text-blue-600 hover:text-blue-800 font-semibold mt-4 inline-block self-start">Learn more &rarr;</a>
+                <Link href="/deep-dive/streamlined-operations" className="text-blue-600 hover:text-blue-800 font-semibold mt-4 inline-block self-start">Learn more &rarr;</Link>
               </div>
               {/* Benefit 4 */}
               <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300 flex flex-col">
@@ -85,8 +86,31 @@ const OverviewPage = () => {
                 <p className="text-gray-700 leading-relaxed flex-grow">
                   Unlock new growth by keeping our brand messaging fresh and relevant. Effortlessly seasonalise our content across our diverse portfolio, at virtually zero incremental cost for creation, driving sustained engagement and market penetration.
                 </p>
-                <a href="/deep-dive/business-growth" className="text-blue-600 hover:text-blue-800 font-semibold mt-4 inline-block self-start">Learn more &rarr;</a>
+                <Link href="/deep-dive/business-growth" className="text-blue-600 hover:text-blue-800 font-semibold mt-4 inline-block self-start">Learn more &rarr;</Link>
               </div>
+            </div>
+            
+            {/* New Sub-section for Content Use Cases */}
+            <div className="mt-16 text-center">
+              <h3 className="text-2xl md:text-3xl font-bold mb-6 text-gray-900">What We Create: From PDPs to Optimised Recipes</h3>
+              <p className="text-lg md:text-xl text-gray-700 leading-relaxed max-w-3xl mx-auto mb-8">
+                MixerAI 2.0 excels at crafting a variety of lower-funnel content types essential for driving conversions and engagement. Our teams leverage it to produce:
+              </p>
+              <ul className="list-none space-y-2 mb-8 inline-block text-left">
+                <li className="flex items-center"><span className="text-green-500 mr-2">✔</span> High-conversion Product Detail Pages (PDPs)</li>
+                <li className="flex items-center"><span className="text-green-500 mr-2">✔</span> Insightful Articles and SEO-friendly blog posts</li>
+                <li className="flex items-center"><span className="text-green-500 mr-2">✔</span> Personalised Email Newsletters</li>
+                <li className="flex items-center"><span className="text-green-500 mr-2">✔</span> Culturally-adapted Recipes for our food brands</li>
+              </ul>
+              <p className="text-lg md:text-xl text-gray-700 leading-relaxed max-w-3xl mx-auto mb-8">
+                These are just a few examples of how MixerAI 2.0 empowers our MAT's and BDT's to achieve specific marketing goals and connect more deeply with our consumers.
+              </p>
+              <Link 
+                href="/deep-dive/content-use-cases" 
+                className="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-blue-700 transition duration-300 ease-in-out transform hover:scale-105"
+              >
+                Explore Our Content Use Cases &rarr;
+              </Link>
             </div>
           </div>
         </section>

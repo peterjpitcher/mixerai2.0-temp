@@ -38,7 +38,7 @@ const CulturalResonancePage = () => {
 
               <h3>The Power of Speaking Like a Local</h3>
               <p>
-                MixerAI 2.0 leverages advanced AI to analyse and understand the specific cultural contexts of our target markets. This means our content isn't just linguistically accurate; it's infused with the local idiom, references, and sensitivities that make it feel genuinely native. For our BDT's, this provides the confidence that global brand narratives are being adapted respectfully and effectively. For our MAT's, it means having the power to create content that truly speaks the language of their customers, leading to:
+                MixerAI 2.0 leverages advanced AI to analyse and understand the specific cultural contexts of our target markets. This means our content isn't just linguistically accurate; it's infused with the local idiom, references, and sensitivities that make it feel genuinely native. For example, our MAT's can ensure product descriptions for a breakfast cereal highlight its convenience for busy mornings in one market, while emphasizing its nutritional benefits for active families in another. For our BDT's, this provides the confidence that global brand narratives are being adapted respectfully and effectively. For our MAT's, it means having the power to create content that truly speaks the language of their customers, leading to:
               </p>
               <ul>
                 <li><strong>Increased Share of Search:</strong> Content that uses locally relevant keywords and addresses local interests naturally performs better in search engines, making our brands more discoverable.</li>
@@ -56,7 +56,7 @@ const CulturalResonancePage = () => {
 
               <h3>Beyond Words: Understanding Cultural Nuance</h3>
               <p>
-                Cultural resonance goes beyond just words. It involves understanding visual preferences, colour symbolism, humour, social etiquette, and even the unwritten rules of communication within a specific region. MixerAI 2.0 provides insights and guidance that help our MAT's navigate these complexities, ensuring that every aspect of our content – from tone of voice to imagery – is culturally appropriate and impactful.
+                Cultural resonance goes beyond just words. It involves understanding visual preferences, colour symbolism, humour, social etiquette, and even the unwritten rules of communication within a specific region. MixerAI 2.0 provides insights and guidance that help our MAT's navigate these complexities, ensuring that every aspect of our content – from tone of voice in an article to imagery in a newsletter – is culturally appropriate and impactful. For our food brands, this extends to optimising recipes to match local palates or ensuring that food-related content uses locally available ingredients and familiar culinary terminology.
               </p>
               <p>
                 Our BDT's can set the strategic framework and core brand values, and MixerAI 2.0 equips our MAT's with the intelligence to bring those values to life in a way that resonates deeply within each unique market. This collaborative approach ensures both global consistency and local relevance, a key factor in building strong, enduring global brands.

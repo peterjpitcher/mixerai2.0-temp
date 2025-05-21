@@ -42,7 +42,7 @@ const StreamlinedOperationsPage = () => {
               </p>
               <ul>
                 <li><strong>BDT's Define the Blueprint:</strong> Our Brand Development Teams can establish core messaging pillars, brand voice guidelines, approved product claims, and campaign frameworks directly within the platform. This ensures global consistency and strategic alignment for our brands.</li>
-                <li><strong>MAT's Activate with Speed & Precision:</strong> Our Market Activation Teams can then leverage these BDT-defined blueprints, using MixerAI 2.0's intelligent localisation capabilities to rapidly adapt and generate a high volume of market-specific content variations. This allows for targeted messaging across diverse consumer segments and channels for our brands.</li>
+                <li><strong>MAT's Activate with Speed & Precision:</strong> Our Market Activation Teams can then leverage these BDT-defined blueprints, using MixerAI 2.0's intelligent localisation capabilities to rapidly adapt and generate a high volume of market-specific content variations. For example, they can efficiently generate and adapt numerous versions of Product Detail Pages for different e-commerce platforms, create multiple newsletter variations for segmented audiences, or quickly localise a core article for several regional blogs. This allows for targeted messaging across diverse consumer segments and channels for our brands.</li>
               </ul>
 
               {/* Placeholder for an impactful inline image */}
@@ -59,9 +59,9 @@ const StreamlinedOperationsPage = () => {
                 'Non-working media' – the budget spent on the creation and production of advertising content – can be a significant investment. MixerAI 2.0 helps us maximise this ROI by:
               </p>
               <ul>
-                <li><strong>Reducing Redundant Creation:</strong> Instead of our MAT's creating content from scratch for every local need, they can adapt and build upon centrally provided assets and AI-generated localisations, drastically reducing duplicated effort.</li>
-                <li><strong>Accelerating Time-to-Market:</strong> The speed of AI-powered localisation and streamlined workflows means our content gets to market faster, allowing us to capitalise on opportunities more quickly.</li>
-                <li><strong>Enabling Cost-Effective Versioning:</strong> Need slightly different versions of an ad for various demographics or A/B testing? MixerAI 2.0 makes this process highly efficient, allowing for more granular targeting without a linear increase in production costs for our campaigns.</li>
+                <li><strong>Reducing Redundant Creation:</strong> Instead of our MAT's creating content from scratch for every local need, they can adapt and build upon centrally provided assets and AI-generated localisations, drastically reducing duplicated effort. This is particularly impactful for creating variations of PDPs or localising base recipes.</li>
+                <li><strong>Accelerating Time-to-Market:</strong> The speed of AI-powered localisation and streamlined workflows means our content gets to market faster, allowing us to capitalise on opportunities more quickly. This could be launching a seasonal recipe campaign or updating PDPs with new promotional messaging.</li>
+                <li><strong>Enabling Cost-Effective Versioning:</strong> Need slightly different versions of an ad, a product description for an e-commerce site, or a newsletter for various demographics or A/B testing? MixerAI 2.0 makes this process highly efficient, allowing for more granular targeting without a linear increase in production costs for our campaigns.</li>
               </ul>
 
               <h3>Seasonal Content & Campaign Agility with Ease for Our Brands</h3>
