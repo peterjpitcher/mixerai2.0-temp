@@ -16,7 +16,7 @@ export const GET = withRouteAuth(async (request: NextRequest, user: any, context
   try {
     const isViewingOwnProfile = user.id === params.id;
     // Check global admin role from user metadata, ensuring user_metadata exists
-    const isGlobalAdmin = user.user_metadata && user.user_metadata.role === 'admin';
+    const isGlobalAdmin = user.user_metadata && user.user_metadata.role === 'brand_admin';
 
     console.log(`[API /users/[id]] Auth check: User ${user.id} (GlobalAdmin: ${isGlobalAdmin}) attempting to view profile ${params.id} (IsOwn: ${isViewingOwnProfile})`);
 
@@ -113,9 +113,9 @@ export const GET = withRouteAuth(async (request: NextRequest, user: any, context
     if (userBrandPermissions.length > 0) {
       for (const permission of userBrandPermissions) {
         if (permission.role === 'brand_admin') {
-          highestRole = 'admin';
+          highestRole = 'brand_admin';
           break;
-        } else if (permission.role === 'editor' && highestRole !== 'admin') {
+        } else if (permission.role === 'editor' && highestRole !== 'brand_admin') {
           highestRole = 'editor';
         }
       }
@@ -153,7 +153,7 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: any, context
     const body = await request.json();
 
     const isSelf = user.id === params.id;
-    const isGlobalAdmin = user.user_metadata?.role === 'admin';
+    const isGlobalAdmin = user.user_metadata?.role === 'brand_admin';
 
     // --- Profile Data Updates (full_name, job_title, company) ---
     if (isSelf || isGlobalAdmin) {
@@ -194,7 +194,7 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: any, context
       const userMetadataAdminUpdates: { [key: string]: any } = {};
       // Global role update
       if (body.role && typeof body.role === 'string') {
-        const validRoles = ['admin', 'editor', 'viewer'];
+        const validRoles = ['brand_admin', 'editor', 'viewer'];
         const requestedRole = body.role.toLowerCase();
         if (validRoles.includes(requestedRole)) {
           userMetadataAdminUpdates.role = requestedRole;
@@ -224,13 +224,10 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: any, context
 
         const permissionsToUpsert = body.brand_permissions.map(permission => {
           const existingPermission = existingPermissionsMap.get(permission.brand_id);
-          // Map role 'admin' to 'brand_admin' for user_brand_role_enum compatibility
-          const dbRole = permission.role === 'admin' ? 'brand_admin' : permission.role;
-
           const record: { user_id: string; brand_id: string; role: string; id?: string; } = {
             user_id: params.id,
             brand_id: permission.brand_id,
-            role: dbRole, // Use the mapped role
+            role: permission.role,
           };
           if (existingPermission) record.id = existingPermission.id;
           return record;
@@ -279,14 +276,14 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: any, context
     let highestRoleAfterUpdate = 'viewer'; // Recalculate highest role
     if (finalBrandPermissions && finalBrandPermissions.length > 0) {
       highestRoleAfterUpdate = finalBrandPermissions.reduce((acc, p) => {
-        if (p.role === 'brand_admin') return 'admin';
-        if (p.role === 'editor' && acc !== 'admin') return 'editor';
+        if (p.role === 'brand_admin') return 'brand_admin';
+        if (p.role === 'editor' && acc !== 'brand_admin') return 'editor';
         return acc;
       }, 'viewer');
     }
     if (highestRoleAfterUpdate === 'viewer' && updatedAuthUser.user.user_metadata?.role) {
         const metadataRole = String(updatedAuthUser.user.user_metadata.role).toLowerCase();
-        if (['admin', 'editor'].includes(metadataRole)) highestRoleAfterUpdate = metadataRole;
+        if (['brand_admin', 'editor'].includes(metadataRole)) highestRoleAfterUpdate = metadataRole;
     }
 
     return NextResponse.json({
@@ -324,7 +321,7 @@ export const DELETE = withRouteAuth(async (request: NextRequest, user: any, cont
     }
     
     // Role check: Only Global Admins can delete users
-    if (!user.user_metadata || user.user_metadata.role !== 'admin') {
+    if (!user.user_metadata || user.user_metadata.role !== 'brand_admin') {
       return NextResponse.json(
         { success: false, error: 'Forbidden: You do not have permission to delete users.' },
         { status: 403 }

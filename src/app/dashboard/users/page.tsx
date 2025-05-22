@@ -13,7 +13,8 @@ import {
   Pencil, 
   Trash2, 
   AlertCircle,
-  Users2
+  Users2,
+  Mail
 } from 'lucide-react';
 import {
   Table,
@@ -112,6 +113,7 @@ export default function UsersPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [resendingInviteToUserId, setResendingInviteToUserId] = useState<string | null>(null);
 
   // RBAC State
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
@@ -272,33 +274,49 @@ export default function UsersPage() {
   // Delete user functionality
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
-    
+    setIsDeleting(true);
     try {
-      setIsDeleting(true);
-      
       const response = await fetch(`/api/users/${userToDelete.id}`, {
         method: 'DELETE',
       });
-      
       const data = await response.json();
-      
       if (data.success) {
-        // Remove user from the list
-        setUsers(users.filter(user => user.id !== userToDelete.id));
-        
-        toast(`User ${userToDelete.full_name} has been removed.`);
+        setUsers(users.filter(u => u.id !== userToDelete.id));
+        toast.success(`User ${userToDelete.full_name} deleted successfully.`);
       } else {
-        throw new Error(data.error || 'Failed to delete user');
+        toast.error(data.error || 'Failed to delete user.');
       }
     } catch (error) {
-      // console.error('Error deleting user:', error);
-      toast.error('Failed to delete user. Please try again.');
+      toast.error('An error occurred while deleting the user.');
     } finally {
       setIsDeleting(false);
       setUserToDelete(null);
     }
   };
-  
+
+  const handleResendInvite = async (userId: string, email: string) => {
+    setResendingInviteToUserId(userId);
+    try {
+      const response = await fetch('/api/users/resend-invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }), // API expects email
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        toast.success(`Invitation resent to ${email}.`);
+      } else {
+        toast.error(data.error || 'Failed to resend invitation.');
+      }
+    } catch (error) {
+      toast.error('An error occurred while resending the invitation.');
+    } finally {
+      setResendingInviteToUserId(null);
+    }
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Never';
     const date = new Date(dateString);
@@ -465,7 +483,7 @@ export default function UsersPage() {
                     <SortIndicator field="last_sign_in_at" />
                   </div>
                 </TableHead>
-                <TableHead className="w-[120px] text-right">Actions</TableHead>
+                <TableHead className="w-[180px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -502,11 +520,27 @@ export default function UsersPage() {
                   <TableCell>{user.job_title || '-'}</TableCell>
                   <TableCell>{formatDate(user.last_sign_in_at)}</TableCell>
                   <TableCell className="text-right space-x-1">
-                    <Button variant="ghost" size="icon" asChild title="View User Details">
-                      <Link href={`/dashboard/users/${user.id}`} >
-                        <ExternalLink className="h-4 w-4" />
-                      </Link>
-                    </Button>
+                    {!user.last_sign_in_at && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleResendInvite(user.id, user.email)}
+                        disabled={resendingInviteToUserId === user.id}
+                        title="Resend Invite"
+                      >
+                        {resendingInviteToUserId === user.id ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Sending...
+                          </>
+                        ) : (
+                          <Mail className="h-4 w-4" />
+                        )}
+                      </Button>
+                    )}
                     <Button variant="ghost" size="icon" asChild title="Edit User">
                       <Link href={`/dashboard/users/${user.id}/edit`} >
                         <Pencil className="h-4 w-4" />
@@ -517,6 +551,7 @@ export default function UsersPage() {
                       size="icon"
                       title="Delete User"
                       onClick={() => setUserToDelete(user)}
+                      disabled={isDeleting && userToDelete?.id === user.id}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
