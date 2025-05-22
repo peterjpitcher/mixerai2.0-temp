@@ -1231,3 +1231,68 @@ To help manage token consumption rates with the AI service and improve stability
     - Added "Submit Feedback" link to the sidebar for all authenticated users, linking to `/dashboard/admin/feedback-log`.
 - **Documentation**:
     - Detailed documentation for the feedback system is available at [docs/feedback_system.md](docs/feedback_system.md).
+
+### 6. Claims Management
+
+The application includes a comprehensive system for managing product claims across different markets, including features for global claims, product-specific claims, ingredient-specific claims, and market-specific overrides. It also features an AI-powered tool to suggest replacement claims.
+
+- **Database Structure**: Utilises several tables including `claims`, `global_claim_brands`, `products`, `ingredients`, `product_ingredients`, and `market_claim_overrides` to manage the hierarchy and relationships of claims.
+- **Claim Levels**: Supports claims at Brand, Product, and Ingredient levels.
+- **Market Specificity**: Claims can be global (`__GLOBAL__`) or tied to specific country codes.
+- **Claim Stacking**: A sophisticated logic (`getStackedClaimsForProduct`) determines the effective claims for a product in a given market, considering precedence (Product > Ingredient > Brand) and market-specificity (specific country > `__GLOBAL__`). Disallowed claims correctly override others.
+- **Claims Matrix UI**: A central UI (`/dashboard/admin/claims-matrix`) allows administrators to view the effective claims for all products across different markets. It provides an interface to manage market-specific overrides for global claims.
+- **Market Overrides**: Administrators can:
+    - Block a global claim for a specific product in a specific market.
+    - Block a global claim and replace it with an existing market-specific claim.
+- **Admin UI**: Dedicated pages for managing `global_claim_brands`, `ingredients`, `products`, and `claims` (list, new, edit).
+
+#### 6.1 AI-Powered Replacement Claim Suggestions
+
+To assist administrators when a global claim needs a market-specific replacement, an AI-powered suggestion tool is integrated into the Claims Matrix UI.
+
+- **API Endpoint**: `POST /api/ai/suggest-replacement-claims`
+    - **Purpose**: Generates suitable, market-specific replacement claim suggestions based on a master claim, product details, brand guidelines, and the target market.
+    - **Authentication**: Requires an authenticated user (via `withAuth` wrapper).
+    - **Request Body**:
+      ```json
+      {
+        "masterClaimText": "string",
+        "masterClaimType": "allowed" | "disallowed" | "mandatory",
+        "targetMarketCountryCode": "string", // e.g., "US", "GB"
+        "productId": "string", // UUID of the product
+        "maxSuggestions": "number" // Optional, defaults to 3
+      }
+      ```
+    - **Response Body (Success)**:
+      ```json
+      {
+        "success": true,
+        "suggestions": [
+          {
+            "claim_text": "string",
+            "claim_type": "allowed" | "disallowed" | "mandatory",
+            "reasoning": "string" // AI's reasoning for the suggestion
+          }
+        ]
+      }
+      ```
+    - **Response Body (Error)**:
+      ```json
+      {
+        "success": false,
+        "error": "string" // Error message
+      }
+      ```
+    - **AI Interaction**: 
+        - The API fetches product and brand details (including name, description, brand identity, tone of voice, guardrails, language, country) to construct a detailed prompt for the Azure OpenAI service (`generateTextCompletion` utility from `src/lib/azure/openai.ts`).
+        - The AI is instructed to return suggestions in a specific JSON format.
+        - Adheres to the "NO FALLBACKS" policy for AI generation; if AI fails or returns an invalid format, an error is returned or an empty suggestion list is provided to the client.
+
+- **UI Integration** (`/dashboard/admin/claims-matrix`):
+    - In the "Block and Replace" modal (when creating a new market override for a global claim):
+        - A "Get AI Suggestions" button is available.
+        - Clicking this button calls the `/api/ai/suggest-replacement-claims` endpoint.
+        - AI-generated suggestions (text, type, reasoning) are displayed to guide the user.
+        - The user then manually selects an existing market-specific claim or uses the AI guidance to create/choose an appropriate replacement. The system does not automatically apply AI suggestions. 
+
+This feature enhances the administrator's ability to quickly find or formulate compliant and contextually appropriate claims when global claims are not suitable for specific markets.
