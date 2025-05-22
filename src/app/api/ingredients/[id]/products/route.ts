@@ -18,15 +18,15 @@ interface ProductDetails {
 
 interface RequestContext {
     params: {
-        ingredientId: string;
+        id: string;
     };
 }
 
 // GET handler for fetching all products for a specific ingredient
 export const GET = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
-    const { ingredientId } = context.params;
+    const { id } = context.params;
 
-    if (!ingredientId || typeof ingredientId !== 'string') {
+    if (!id || typeof id !== 'string') {
         return NextResponse.json({ success: false, error: 'Ingredient ID is required and must be a string.' }, { status: 400 });
     }
 
@@ -39,11 +39,11 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
         // @ts-ignore
         const { data: ingredientData, error: ingredientError } = await supabase.from('ingredients')
             .select('id')
-            .eq('id', ingredientId)
+            .eq('id', id)
             .single();
 
         if (ingredientError || !ingredientData) {
-            console.warn(`[API /ingredients/${ingredientId}/products GET] Ingredient not found or error checking ingredient:`, ingredientError);
+            console.warn(`[API /ingredients/${id}/products GET] Ingredient not found or error checking ingredient:`, ingredientError);
             return NextResponse.json({ success: false, error: 'Ingredient not found.' }, { status: 404 });
         }
 
@@ -52,10 +52,10 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
         // @ts-ignore
         const { data, error } = await supabase.from('product_ingredients')
             .select('products (*)') // Fetches all columns from the related 'products' table
-            .eq('ingredient_id', ingredientId);
+            .eq('ingredient_id', id);
 
         if (error) {
-            console.error(`[API /ingredients/${ingredientId}/products GET] Error fetching products for ingredient:`, error);
+            console.error(`[API /ingredients/${id}/products GET] Error fetching products for ingredient:`, error);
             return handleApiError(error, 'Failed to fetch products for the ingredient.');
         }
 
@@ -76,7 +76,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
         return NextResponse.json({ success: true, data: products });
 
     } catch (error: any) {
-        console.error(`[API /ingredients/${ingredientId}/products GET] Catched error:`, error);
+        console.error(`[API /ingredients/${id}/products GET] Catched error:`, error);
         return handleApiError(error, 'An unexpected error occurred.');
     }
 }); 

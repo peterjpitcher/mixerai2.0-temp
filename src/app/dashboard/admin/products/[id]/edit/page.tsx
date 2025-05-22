@@ -15,6 +15,7 @@ import {
   Globe, Tag, ShieldCheck, ShieldOff, ShieldAlert, Sprout, Info, Search
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 import { COUNTRY_CODES, GLOBAL_COUNTRY_CODE, GLOBAL_COUNTRY_NAME } from "@/lib/constants/country-codes";
 import { Claim, ClaimTypeEnum, ClaimLevelEnum } from "@/lib/claims-utils"; // Import from claims-utils
 import { Badge } from "@/components/ui/badge";
@@ -74,6 +75,16 @@ export default function EditProductPage() {
   const [stackedClaims, setStackedClaims] = useState<Claim[]>([]);
   const [isLoadingStackedClaims, setIsLoadingStackedClaims] = useState(false);
   const [stackedClaimsError, setStackedClaimsError] = useState<string | null>(null);
+
+  const pageTitle = "Edit Product";
+  const pageDescription = `Modifying product: ${formData.name || (id ? `ID: ${id}` : "Loading...")}`;
+
+  const breadcrumbItems = [
+    { label: "Dashboard", href: "/dashboard" },
+    { label: "Admin", href: "/dashboard/admin" },
+    { label: "Products", href: "/dashboard/admin/products" },
+    { label: `Edit: ${formData.name || (id || 'Product')}` }
+  ];
 
   useEffect(() => {
     if (!id) {
@@ -268,144 +279,139 @@ export default function EditProductPage() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      <div className="mb-4">
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/dashboard/admin/products">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Products
-          </Link>
-        </Button>
-      </div>
-
-      <PageHeader 
-        title={`Edit Product`}
-        description={`Editing product: ${formData.name || id}`}
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+      <Breadcrumbs items={breadcrumbItems} />
+      <PageHeader
+        title={pageTitle}
+        description={pageDescription}
       />
+      <form onSubmit={handleSubmit}>
+        <Card>
+          <CardHeader>
+            <CardTitle>Product Information</CardTitle>
+            <CardDescription>
+              Edit the details for this product. The Global Claim Brand association cannot be changed after creation via this form.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Product Name <span className="text-red-500">*</span></Label>
+              <Input id="name" name="name" value={formData.name} onChange={handleInputChange} placeholder="e.g., Super Immune Booster Capsules" maxLength={255} className={formErrors.name ? "border-red-500" : ""} />
+              {formErrors.name && <p className="text-xs text-red-500 mt-1">{formErrors.name}</p>}
+            </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <form onSubmit={handleSubmit} className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Product Details</CardTitle>
-              <CardDescription>Modify the product details.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Product Name <span className="text-red-500">*</span></Label>
-                <Input id="name" name="name" value={formData.name} onChange={handleInputChange} placeholder="e.g., Super Immune Booster Capsules" maxLength={255} className={formErrors.name ? "border-red-500" : ""} />
-                {formErrors.name && <p className="text-xs text-red-500 mt-1">{formErrors.name}</p>}
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="global_brand_id">Global Claim Brand <span className="text-red-500">*</span></Label>
+              <Select value={formData.global_brand_id} onValueChange={handleSelectChange} disabled={isLoadingBrands}>
+                <SelectTrigger className={formErrors.global_brand_id ? "border-red-500" : ""}>
+                  <SelectValue placeholder={isLoadingBrands ? "Loading brands..." : "Select a Global Claim Brand"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {globalBrands.length === 0 && !isLoadingBrands ? (
+                    <SelectItem value="" disabled>No brands available</SelectItem>
+                  ) : (
+                    globalBrands.map((brand) => (
+                      <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {formErrors.global_brand_id && <p className="text-xs text-red-500 mt-1">{formErrors.global_brand_id}</p>}
+            </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="global_brand_id">Global Claim Brand <span className="text-red-500">*</span></Label>
-                <Select value={formData.global_brand_id} onValueChange={handleSelectChange} disabled={isLoadingBrands}>
-                  <SelectTrigger className={formErrors.global_brand_id ? "border-red-500" : ""}>
-                    <SelectValue placeholder={isLoadingBrands ? "Loading brands..." : "Select a Global Claim Brand"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {globalBrands.length === 0 && !isLoadingBrands ? (
-                      <SelectItem value="" disabled>No brands available</SelectItem>
-                    ) : (
-                      globalBrands.map((brand) => (
-                        <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                {formErrors.global_brand_id && <p className="text-xs text-red-500 mt-1">{formErrors.global_brand_id}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Description (Optional)</Label>
-                <Textarea id="description" name="description" value={formData.description || ''} onChange={handleInputChange} placeholder="Provide a brief description of the product..." rows={4} maxLength={1000} />
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving}>Cancel</Button>
-              <Button type="submit" disabled={isSaving || overallIsLoading}>
-                {isSaving ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>) : (<><Save className="mr-2 h-4 w-4" /> Save Changes</>)}
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (Optional)</Label>
+              <Textarea id="description" name="description" value={formData.description || ''} onChange={handleInputChange} placeholder="Provide a brief description of the product..." rows={4} maxLength={1000} />
+            </div>
+          </CardContent>
+          <CardFooter className="border-t px-6 py-4">
+            <div className="flex justify-end gap-2 w-full">
+              <Button type="button" variant="outline" onClick={() => router.push("/dashboard/admin/products")}>
+                Cancel
               </Button>
-            </CardFooter>
-          </Card>
-        </form>
+              <Button type="submit" disabled={isSaving || overallIsLoading}>
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Changes
+              </Button>
+            </div>
+          </CardFooter>
+        </Card>
+      </form>
 
-        {/* Stacked Claims Section */}
-        <div className="lg:col-span-1 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Stacked Claims Viewer</CardTitle>
-              <CardDescription>View applicable claims for this product in a selected country.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="stacked_claims_country_code">Country for Claims</Label>
-                <Select value={selectedCountry} onValueChange={setSelectedCountry}>
-                  <SelectTrigger id="stacked_claims_country_code">
-                    <SelectValue placeholder="Select country" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    <SelectItem value={GLOBAL_COUNTRY_CODE}>{GLOBAL_COUNTRY_NAME} ({GLOBAL_COUNTRY_CODE})</SelectItem>
-                    {COUNTRY_CODES.map(country => (
-                      <SelectItem key={country.code} value={country.code}>{country.name} ({country.code})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {isLoadingStackedClaims && (
-                <div className="flex items-center justify-center py-6">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  <p className="ml-2 text-muted-foreground">Loading claims...</p>
-                </div>
-              )}
-
-              {!isLoadingStackedClaims && stackedClaimsError && (
-                <div className="text-red-600 bg-red-50 p-3 rounded-md text-sm">
-                  <div className="flex items-center">
-                    <AlertTriangle className="h-5 w-5 mr-2 shrink-0" />
-                    <strong>Error loading claims:</strong>
-                  </div>
-                  <p className="ml-7 text-xs">{stackedClaimsError}</p>
-                </div>
-              )}
-
-              {!isLoadingStackedClaims && !stackedClaimsError && stackedClaims.length === 0 && (
-                <div className="text-center text-muted-foreground py-6">
-                  <FileText className="mx-auto h-10 w-10 mb-2 opacity-50" />
-                  <p>No stacked claims found for the selected country.</p>
-                </div>
-              )}
-
-              {!isLoadingStackedClaims && !stackedClaimsError && stackedClaims.length > 0 && (
-                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-                  {stackedClaims.map((claim) => (
-                    <div key={claim.id} className="p-3 border rounded-md bg-background shadow-sm hover:shadow-md transition-shadow">
-                      <p className="font-semibold text-sm leading-snug">{claim.claim_text}</p>
-                      {claim.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{claim.description}</p>}
-                      <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-2 text-xs">
-                        <Badge variant="outline" className="flex items-center text-muted-foreground">
-                          {claimTypeIcons[claim.claim_type]} {claim.claim_type}
-                        </Badge>
-                        <Badge variant="outline" className="flex items-center text-muted-foreground">
-                          {claimLevelIcons[claim.level]} {claim.level}
-                        </Badge>
-                        <Badge variant="outline" className="flex items-center text-muted-foreground">
-                          <Globe className="mr-1.5 h-3.5 w-3.5" /> 
-                          {claim.country_code === GLOBAL_COUNTRY_CODE ? GLOBAL_COUNTRY_NAME : claim.country_code}
-                        </Badge>
-                      </div>
-                    </div>
+      {/* Stacked Claims Section */}
+      <div className="lg:col-span-1 space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Stacked Claims Viewer</CardTitle>
+            <CardDescription>View applicable claims for this product in a selected country.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="stacked_claims_country_code">Country for Claims</Label>
+              <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+                <SelectTrigger id="stacked_claims_country_code">
+                  <SelectValue placeholder="Select country" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  <SelectItem value={GLOBAL_COUNTRY_CODE}>{GLOBAL_COUNTRY_NAME} ({GLOBAL_COUNTRY_CODE})</SelectItem>
+                  {COUNTRY_CODES.map(country => (
+                    <SelectItem key={country.code} value={country.code}>{country.name} ({country.code})</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {isLoadingStackedClaims && (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <p className="ml-2 text-muted-foreground">Loading claims...</p>
+              </div>
+            )}
+
+            {!isLoadingStackedClaims && stackedClaimsError && (
+              <div className="text-red-600 bg-red-50 p-3 rounded-md text-sm">
+                <div className="flex items-center">
+                  <AlertTriangle className="h-5 w-5 mr-2 shrink-0" />
+                  <strong>Error loading claims:</strong>
                 </div>
-              )}
-            </CardContent>
-             <CardFooter className="text-xs text-muted-foreground">
-                <Info className="h-3.5 w-3.5 mr-1.5 shrink-0" />
-                Claims are stacked: Product &gt; Ingredient &gt; Brand. Specific country claims override Global.
-            </CardFooter>
-          </Card>
-        </div>
+                <p className="ml-7 text-xs">{stackedClaimsError}</p>
+              </div>
+            )}
+
+            {!isLoadingStackedClaims && !stackedClaimsError && stackedClaims.length === 0 && (
+              <div className="text-center text-muted-foreground py-6">
+                <FileText className="mx-auto h-10 w-10 mb-2 opacity-50" />
+                <p>No stacked claims found for the selected country.</p>
+              </div>
+            )}
+
+            {!isLoadingStackedClaims && !stackedClaimsError && stackedClaims.length > 0 && (
+              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+                {stackedClaims.map((claim) => (
+                  <div key={claim.id} className="p-3 border rounded-md bg-background shadow-sm hover:shadow-md transition-shadow">
+                    <p className="font-semibold text-sm leading-snug">{claim.claim_text}</p>
+                    {claim.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{claim.description}</p>}
+                    <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-2 text-xs">
+                      <Badge variant="outline" className="flex items-center text-muted-foreground">
+                        {claimTypeIcons[claim.claim_type]} {claim.claim_type}
+                      </Badge>
+                      <Badge variant="outline" className="flex items-center text-muted-foreground">
+                        {claimLevelIcons[claim.level]} {claim.level}
+                      </Badge>
+                      <Badge variant="outline" className="flex items-center text-muted-foreground">
+                        <Globe className="mr-1.5 h-3.5 w-3.5" /> 
+                        {claim.country_code === GLOBAL_COUNTRY_CODE ? GLOBAL_COUNTRY_NAME : claim.country_code}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+           <CardFooter className="text-xs text-muted-foreground">
+              <Info className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+              Claims are stacked: Product &gt; Ingredient &gt; Brand. Specific country claims override Global.
+          </CardFooter>
+        </Card>
       </div>
     </div>
   );

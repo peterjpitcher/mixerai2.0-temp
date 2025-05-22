@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Save, AlertTriangle, Info, Link2 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 import { COUNTRY_CODES, GLOBAL_COUNTRY_CODE, GLOBAL_COUNTRY_NAME } from "@/lib/constants/country-codes";
 
 // Types
@@ -78,6 +79,16 @@ export default function EditClaimPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof ClaimEditFormData, string>>>({});
+
+  const pageTitle = "Edit Claim";
+  const pageDescription = `Modifying claim: ${formData.claim_text || (id ? `ID: ${id}` : "Loading...")}`;
+
+  const breadcrumbItems = [
+    { label: "Dashboard", href: "/dashboard" },
+    { label: "Admin", href: "/dashboard/admin" },
+    { label: "Claims", href: "/dashboard/admin/claims" },
+    { label: `Edit: ${associatedEntity?.name ? formData.claim_text.substring(0,20)+'...' : (id || 'Claim')}` }
+  ];
 
   useEffect(() => {
     if (!id) {
@@ -265,19 +276,20 @@ export default function EditClaimPage() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      <div className="mb-4">
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/dashboard/admin/claims"><ArrowLeft className="mr-2 h-4 w-4" />Back to Claims</Link>
-        </Button>
-      </div>
-      <PageHeader title={`Edit Claim: ${formData.claim_text.substring(0,50)}${formData.claim_text.length > 50 ? '...' : ''}`} description={`Modifying claim ID: ${id}`}/>
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+      <Breadcrumbs items={breadcrumbItems} />
+      <PageHeader
+        title={pageTitle}
+        description={pageDescription}
+      />
 
       <form onSubmit={handleSubmit}>
         <Card>
           <CardHeader>
             <CardTitle>Claim Details</CardTitle>
-            <CardDescription>Update the information for the claim. Level and associated entity are not editable.</CardDescription>
+            <CardDescription>
+              Edit the core properties of the claim. The claim level and its primary associated entity (Brand, Product, or Ingredient) cannot be changed once created.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Display Associated Entity Info (Read-Only) */}
@@ -367,11 +379,15 @@ export default function EditClaimPage() {
             </div>
 
           </CardContent>
-          <CardFooter className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving}>Cancel</Button>
-            <Button type="submit" disabled={isSaving || isLoadingOverrides}>
-              {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : <><Save className="mr-2 h-4 w-4" />Save Changes</>}
-            </Button>
+          <CardFooter className="border-t px-6 py-4">
+            <div className="flex justify-end gap-2 w-full">
+              <Button type="button" variant="outline" onClick={() => router.push("/dashboard/admin/claims")}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSaving || isLoading}>
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Changes
+              </Button>
+            </div>
           </CardFooter>
         </Card>
       </form>

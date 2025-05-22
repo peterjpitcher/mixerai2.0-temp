@@ -12,6 +12,7 @@ import {
   Loader2, AlertTriangle, Search, FileText, Edit3, XOctagon, CornerDownRight, Info, CheckCircle2, MinusCircle, ShieldQuestion, Settings2, Trash2, Undo2, Replace, Save, Sparkles
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 import { COUNTRY_CODES, GLOBAL_COUNTRY_CODE, GLOBAL_COUNTRY_NAME } from "@/lib/constants/country-codes";
 import { Claim, ClaimTypeEnum, GlobalClaimBrand as GlobalBrand, Product } from "@/lib/claims-utils";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,12 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { 
+  Tooltip, 
+  TooltipContent, 
+  TooltipProvider, 
+  TooltipTrigger 
+} from "@/components/ui/tooltip";
 
 // Types for AI Suggestions (matching API)
 interface AISuggestion {
@@ -96,6 +103,13 @@ export default function ClaimsMatrixPage() {
   // State for AI suggestions
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
   const [isLoadingAISuggestions, setIsLoadingAISuggestions] = useState(false);
+
+  // Breadcrumb items
+  const breadcrumbItems = [
+    { label: "Dashboard", href: "/dashboard" },
+    { label: "Admin", href: "/dashboard/admin" }, // Assuming an admin root page exists
+    { label: "Claims Matrix" },
+  ];
 
   const fetchMatrixData = useCallback(async (showToast = false) => {
     if (!selectedCountry) return;
@@ -309,24 +323,75 @@ export default function ClaimsMatrixPage() {
     }
     const currentClaimForBadge = displayClaim || cellData.sourceMasterClaim;
     const typeInfo = currentClaimForBadge ? claimTypeDisplayInfo[currentClaimForBadge.claim_type] : null;
+
+    let buttonIcon = <FileText className="h-4 w-4" />;
+    let buttonText = "View Details (N/A)";
+    let buttonVariant: "outline" | "secondary" | "default" | "ghost" = "ghost";
+    let cellBorderClass = "";
+
+    if (cellData?.activeOverride) {
+      buttonIcon = <Settings2 className="h-4 w-4" />;
+      buttonText = "Manage Override";
+      actionHandler = () => handleOpenModalForEdit(product, claimText, cellData.activeOverride!, cellData.sourceMasterClaim);
+      cellBorderClass = "border-orange-400 ring-1 ring-orange-400";
+    } else if (cellData?.sourceMasterClaim && selectedCountry !== GLOBAL_COUNTRY_CODE) {
+      buttonIcon = <Settings2 className="h-4 w-4" />;
+      buttonText = "Override Global Claim";
+      actionHandler = () => handleOpenModalForNew(product, claimText, cellData.sourceMasterClaim!);
+      cellBorderClass = "border-blue-300 hover:border-blue-500";
+    } else if (cellData?.effectiveClaim) {
+      // ... existing logic for effective claim ...
+    }
+
     return (
-      <div className="flex items-center justify-center space-x-1 relative group h-full" title={titleText}>
-        {typeInfo && currentClaimForBadge ? (
-          <Badge variant={typeInfo.badgeVariant} className={`flex-grow flex items-center justify-center p-1 text-xs ${badgeClassName || typeInfo.className} border-current h-full whitespace-normal break-words`}>
-            {typeInfo.icon}
-            <span className="ml-1 hidden sm:inline">{currentClaimForBadge.claim_text === 'Blocked' ? 'Blocked' : typeInfo.text}</span>
-          </Badge>
+      <TableCell key={claimText} className={`p-1 text-center border ${cellBorderClass}`}>
+        {cellData?.effectiveClaim ? (
+          <TooltipProvider>
+            <Tooltip delayDuration={100}>
+              <TooltipTrigger asChild>
+                <Button variant={buttonVariant} size="sm" onClick={actionHandler} className="w-full h-full text-xs flex-col p-1 items-center justify-center">
+                  <div className="flex items-center">
+                    {claimTypeDisplayInfo[cellData.effectiveClaim.claim_type].icon}
+                    <span className="ml-1 font-semibold">{claimTypeDisplayInfo[cellData.effectiveClaim.claim_type].text}</span>
+                  </div>
+                  {cellData.activeOverride && <span className="text-xs text-orange-600">(Overridden)</span>}
+                  {/* <span className="mt-0.5 text-muted-foreground text-[10px] truncate max-w-[80px]">{claimText}</span> */}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs max-w-xs">
+                <p className="font-semibold">{claimText}</p>
+                <p>Status: {claimTypeDisplayInfo[cellData.effectiveClaim.claim_type].text}</p>
+                {cellData.activeOverride ? (
+                  <p className="text-orange-600">This is actively overridden in {getCountryName(selectedCountry)}.</p>
+                ) : cellData.sourceMasterClaim ? (
+                  <p className="text-blue-600">This is a Global claim. Click to manage for {getCountryName(selectedCountry)}.</p>
+                ) : (
+                  <p>This is a Market-specific claim for {getCountryName(cellData.effectiveClaim.country_code)}.</p>
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : cellData?.sourceMasterClaim && selectedCountry !== GLOBAL_COUNTRY_CODE ? (
+          // Cell for a global claim in a market context where it *could* be overridden but currently isn't
+          // and there's no *effective* market-specific version of this claim text.
+          <TooltipProvider>
+            <Tooltip delayDuration={100}>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" onClick={() => handleOpenModalForNew(product, claimText, cellData.sourceMasterClaim!)} className="w-full h-full text-xs flex-col p-1 items-center justify-center hover:bg-blue-50">
+                  <Settings2 className="h-5 w-5 text-blue-500 mb-0.5" />
+                   <span className="text-blue-600 text-[10px]">Override Global</span> 
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs max-w-xs">
+                <p className="font-semibold">Global: {claimText}</p>
+                <p>Click to manage this Global claim for {getCountryName(selectedCountry)}.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         ) : (
-            <span className={`flex-grow flex items-center justify-center p-1 text-xs text-gray-500 bg-gray-100 border-gray-300 h-full whitespace-normal break-words ${badgeClassName}`}> 
-             { cellData.activeOverride?.isBlocked && !cellData.activeOverride?.replacementClaimId ? 'Blocked' : (displayClaim?.claim_text || 'N/A') }
-            </span>
+          <span className="text-muted-foreground text-xs">N/A</span>
         )}
-        {isInteractable && (
-          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity absolute -right-1 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-muted z-10" onClick={actionHandler}>
-            {iconAction}
-          </Button>
-        )}
-      </div>
+      </TableCell>
     );
   };
 
@@ -335,7 +400,8 @@ export default function ClaimsMatrixPage() {
   const pageDescription = `View effective claims for products in ${COUNTRY_CODES.find(c=>c.code === selectedCountry)?.name || selectedCountry}. Select a specific market to manage overrides.`;
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+      <Breadcrumbs items={breadcrumbItems} />
       <PageHeader title={pageTitle} description={pageDescription} />
       <Card>
         <CardHeader>
@@ -537,6 +603,26 @@ export default function ClaimsMatrixPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Fallback for overall page if something is really wrong after loading is complete */}
+      {/* This error is if the main matrixData state is null AFTER loading AND there's a top-level error string */}
+      {error && !matrixData && !isLoading && (
+         <Card className="mt-6 bg-red-50 border-red-200">
+            <CardHeader>
+            <CardTitle className="text-red-700 flex items-center"><AlertTriangle className="mr-2" />Matrix Unavailable</CardTitle>
+            </CardHeader>
+            <CardContent>
+            <p className="text-red-600">{error}</p>
+            <Button onClick={() => fetchMatrixData(false)} className="mt-4">Try Again</Button>
+            </CardContent>
+        </Card>
+      )}
     </div>
   );
+}
+
+function getCountryName(countryCode: string): string {
+  if (countryCode === GLOBAL_COUNTRY_CODE) return GLOBAL_COUNTRY_NAME;
+  const country = COUNTRY_CODES.find(c => c.code === countryCode);
+  return country ? country.name : countryCode;
 } 

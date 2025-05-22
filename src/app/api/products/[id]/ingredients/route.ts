@@ -17,19 +17,19 @@ interface IngredientDetails {
 
 interface RequestContext {
     params: {
-        productId: string;
+        id: string;
     };
 }
 
 // GET handler for fetching all ingredients for a specific product
 export const GET = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
-    const { productId } = context.params;
+    const { id } = context.params;
 
-    if (!productId || typeof productId !== 'string') {
+    if (!id || typeof id !== 'string') {
         return NextResponse.json({ success: false, error: 'Product ID is required and must be a string.' }, { status: 400 });
     }
 
-    // TODO: Permission check - user should have access to the product productId
+    // TODO: Permission check - user should have access to the product id
 
     try {
         const supabase = createSupabaseAdminClient();
@@ -38,11 +38,11 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
         // @ts-ignore
         const { data: productData, error: productError } = await supabase.from('products')
             .select('id')
-            .eq('id', productId)
+            .eq('id', id)
             .single();
 
         if (productError || !productData) {
-            console.warn(`[API /products/${productId}/ingredients GET] Product not found or error checking product:`, productError);
+            console.warn(`[API /products/${id}/ingredients GET] Product not found or error checking product:`, productError);
             return NextResponse.json({ success: false, error: 'Product not found.' }, { status: 404 });
         }
 
@@ -52,10 +52,10 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
         // @ts-ignore
         const { data, error } = await supabase.from('product_ingredients')
             .select('ingredients (*)') // This syntax fetches all columns from the related 'ingredients' table
-            .eq('product_id', productId);
+            .eq('product_id', id);
 
         if (error) {
-            console.error(`[API /products/${productId}/ingredients GET] Error fetching ingredients for product:`, error);
+            console.error(`[API /products/${id}/ingredients GET] Error fetching ingredients for product:`, error);
             return handleApiError(error, 'Failed to fetch ingredients for the product.');
         }
 
@@ -77,7 +77,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
         return NextResponse.json({ success: true, data: ingredients });
 
     } catch (error: any) {
-        console.error(`[API /products/${productId}/ingredients GET] Catched error:`, error);
+        console.error(`[API /products/${id}/ingredients GET] Catched error:`, error);
         return handleApiError(error, 'An unexpected error occurred.');
     }
 }); 

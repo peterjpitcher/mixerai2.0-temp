@@ -56,8 +56,8 @@ async function assignSuperadminRole(userId: string, existingUserMetadata: any, s
 async function assignBrandPermissions(userId: string, brandId: string, role: UserRoles, supabase: SupabaseClient<Database>) {
   console.log(`[InviteService] Assigning role '${role}' to user ${userId} for brand ${brandId}`);
   
-  // Map 'admin' (from UserRoles / global context) to 'brand_admin' for user_brand_permissions table
-  const brandPermissionRole = role === 'admin' ? 'brand_admin' : role;
+  // The role from UserRoles should now directly map to the role in user_brand_permissions
+  const brandPermissionRole = role; // Removed mapping to 'brand_admin'
   
   const { error } = await supabase
     .from('user_brand_permissions')

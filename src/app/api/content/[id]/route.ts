@@ -351,19 +351,26 @@ export const DELETE = withAuth(async (request: NextRequest, user: User, context:
     if (globalRole !== 'admin') {
       const { data: permissionsData, error: permissionsError } = await supabase
         .from('user_brand_permissions')
-        .select('role')
+        .select('brand_id, role')
         .eq('user_id', user.id)
         .eq('brand_id', targetBrandId)
-        .single(); // Expecting one permission record or null
+        .single(); // Assuming one permission record per user per brand
 
-      if (permissionsError && permissionsError.code !== 'PGRST116') { // PGRST116 means no rows, which is a valid permission check outcome
+      if (permissionsError) {
+        if (permissionsError.code === 'PGRST116') { // No rows found
+          console.warn(`[API Content DELETE] User ${user.id} has no specific permissions for brand ${targetBrandId}.`);
+          return NextResponse.json(
+            { success: false, error: 'You do not have permission to delete this content.' },
+            { status: 403 }
+          );
+        }
         console.error('[API Content DELETE] Error fetching brand permissions for user:', user.id, targetBrandId, permissionsError);
-        return handleApiError(permissionsError, 'Failed to verify user permissions for deletion');
+        return handleApiError(permissionsError, 'Failed to verify user permissions for content deletion');
       }
 
       const brandRole = permissionsData?.role;
 
-      if (!brandRole || brandRole !== 'brand_admin') {
+      if (!brandRole || brandRole !== 'admin') { // Changed 'brand_admin' to 'admin'
         console.warn(`[API Content DELETE] User ${user.id} (global role: ${globalRole}, brand role: ${brandRole}) access denied to delete content ${id} for brand ${targetBrandId}.`);
         return NextResponse.json(
           { success: false, error: 'You do not have permission to delete this content.' },

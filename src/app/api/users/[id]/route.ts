@@ -16,7 +16,7 @@ export const GET = withRouteAuth(async (request: NextRequest, user: any, context
   try {
     const isViewingOwnProfile = user.id === params.id;
     // Check global admin role from user metadata, ensuring user_metadata exists
-    const isGlobalAdmin = user.user_metadata && user.user_metadata.role === 'brand_admin';
+    const isGlobalAdmin = user.user_metadata && user.user_metadata.role === 'admin';
 
     console.log(`[API /users/[id]] Auth check: User ${user.id} (GlobalAdmin: ${isGlobalAdmin}) attempting to view profile ${params.id} (IsOwn: ${isViewingOwnProfile})`);
 
@@ -110,12 +110,18 @@ export const GET = withRouteAuth(async (request: NextRequest, user: any, context
 
     // Get the highest role (admin > editor > viewer) from the fetched permissions
     let highestRole = 'viewer';
-    if (userBrandPermissions.length > 0) {
+    // Check global role from user_metadata first, as it might be 'admin'
+    const globalUserMetaRole = authUserData.user.user_metadata?.role;
+    if (globalUserMetaRole === 'admin') {
+        highestRole = 'admin';
+    }
+
+    if (userBrandPermissions.length > 0 && highestRole !== 'admin') {
       for (const permission of userBrandPermissions) {
-        if (permission.role === 'brand_admin') {
-          highestRole = 'brand_admin';
+        if (permission.role === 'admin') {
+          highestRole = 'admin';
           break;
-        } else if (permission.role === 'editor' && highestRole !== 'brand_admin') {
+        } else if (permission.role === 'editor' && highestRole !== 'admin') {
           highestRole = 'editor';
         }
       }
@@ -153,7 +159,7 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: any, context
     const body = await request.json();
 
     const isSelf = user.id === params.id;
-    const isGlobalAdmin = user.user_metadata?.role === 'brand_admin';
+    const isGlobalAdmin = user.user_metadata?.role === 'admin';
 
     // --- Profile Data Updates (full_name, job_title, company) ---
     if (isSelf || isGlobalAdmin) {
@@ -194,7 +200,7 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: any, context
       const userMetadataAdminUpdates: { [key: string]: any } = {};
       // Global role update
       if (body.role && typeof body.role === 'string') {
-        const validRoles = ['brand_admin', 'editor', 'viewer'];
+        const validRoles = ['admin', 'editor', 'viewer'];
         const requestedRole = body.role.toLowerCase();
         if (validRoles.includes(requestedRole)) {
           userMetadataAdminUpdates.role = requestedRole;
@@ -276,14 +282,14 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: any, context
     let highestRoleAfterUpdate = 'viewer'; // Recalculate highest role
     if (finalBrandPermissions && finalBrandPermissions.length > 0) {
       highestRoleAfterUpdate = finalBrandPermissions.reduce((acc, p) => {
-        if (p.role === 'brand_admin') return 'brand_admin';
-        if (p.role === 'editor' && acc !== 'brand_admin') return 'editor';
+        if (p.role === 'admin') return 'admin';
+        if (p.role === 'editor' && acc !== 'admin') return 'editor';
         return acc;
       }, 'viewer');
     }
     if (highestRoleAfterUpdate === 'viewer' && updatedAuthUser.user.user_metadata?.role) {
         const metadataRole = String(updatedAuthUser.user.user_metadata.role).toLowerCase();
-        if (['brand_admin', 'editor'].includes(metadataRole)) highestRoleAfterUpdate = metadataRole;
+        if (['admin', 'editor'].includes(metadataRole)) highestRoleAfterUpdate = metadataRole;
     }
 
     return NextResponse.json({
@@ -350,7 +356,7 @@ export const DELETE = withRouteAuth(async (request: NextRequest, user: any, cont
               .from('user_brand_permissions')
               .select('user_id')
               .eq('brand_id', workflow.brand_id)
-              .eq('role', 'brand_admin')
+              .eq('role', 'admin')
               .limit(1);
             
             if (brandAdminError) continue; // Skip this workflow if we can't find the brand admin

@@ -231,7 +231,7 @@ export const PUT = withAuth(async (
         .select('brand_id')
         .eq('user_id', user.id)
         .eq('brand_id', workflowForPermCheck.brand_id) // Now brand_id is guaranteed to be non-null
-        .eq('role', 'brand_admin') // Must be brand_admin for the brand
+        .eq('role', 'admin') // Changed from 'brand_admin'
         .maybeSingle();
 
       if (permError) {
@@ -452,105 +452,76 @@ export const DELETE = withAuth(async (
     const supabase = createSupabaseAdminClient();
     const workflowId = params.id;
 
-    // Permission Check:
-    // First, fetch the workflow to get its brand_id
-    const { data: workflowForPermCheck, error: fetchPermError } = await supabase
-      .from('workflows')
-      .select('brand_id')
-      .eq('id', workflowId)
-      .single();
-
-    if (fetchPermError) {
-      // If error is because workflow not found, return 404
-      if (fetchPermError.code === 'PGRST116') {
-        return NextResponse.json({ success: false, error: 'Workflow not found.' }, { status: 404 });
-      }
-      console.error(`[API Workflows DELETE /${workflowId}] Error fetching workflow for permission check:`, fetchPermError);
-      return handleApiError(fetchPermError, 'Error fetching workflow for permissions.');
-    }
-
-    if (!workflowForPermCheck || !workflowForPermCheck.brand_id) {
-        return NextResponse.json(
-            { success: false, error: 'Forbidden: Workflow not found or not associated with a brand, cannot determine permissions.' }, 
-            { status: 404 } // Or 403, but 404 if brand_id is essential for existence/operation
-        );
-    }
-
+    // Permission Check (similar to PUT)
     const isGlobalAdmin = user.user_metadata?.role === 'admin';
-    let canDeleteWorkflow = isGlobalAdmin;
-
     if (!isGlobalAdmin) {
+      const { data: workflowForPermCheck, error: fetchPermError } = await supabase
+        .from('workflows')
+        .select('brand_id')
+        .eq('id', workflowId)
+        .single();
+
+      if (fetchPermError || !workflowForPermCheck) {
+        return NextResponse.json({ success: false, error: 'Workflow not found or error fetching for permissions.' }, { status: 404 });
+      }
+      if (!workflowForPermCheck.brand_id) {
+        return NextResponse.json({ success: false, error: 'Forbidden: Workflow not associated with a brand.' }, { status: 403 });
+      }
+
       const { data: brandAdminPermission, error: permError } = await supabase
         .from('user_brand_permissions')
         .select('brand_id')
         .eq('user_id', user.id)
         .eq('brand_id', workflowForPermCheck.brand_id)
-        .eq('role', 'brand_admin')
+        .eq('role', 'admin') // Changed from 'brand_admin'
         .maybeSingle();
 
       if (permError) {
-        console.error(`[API Workflows DELETE /${workflowId}] Error checking brand admin permission:`, permError);
-        return handleApiError(permError, 'Error checking brand permissions');
+        return handleApiError(permError, 'Error checking brand permissions for delete');
       }
-      if (brandAdminPermission) {
-        canDeleteWorkflow = true;
+      if (!brandAdminPermission) {
+        return NextResponse.json({ success: false, error: 'Forbidden: You do not have admin permission for this workflow\'s brand to delete it.' }, { status: 403 });
       }
+    }
+    // If global admin or brand admin, proceed with delete
+
+    // First, delete associated workflow steps to maintain data integrity if ON DELETE CASCADE is not set
+    const { error: deleteStepsError } = await supabase
+      .from('workflow_steps')
+      .delete()
+      .eq('workflow_id', workflowId);
+
+    if (deleteStepsError) {
+      console.error(`Error deleting steps for workflow ${workflowId}:`, deleteStepsError);
+      // Decide if this is a fatal error for workflow deletion. For now, log and continue.
+    }
+    
+    // Then, delete associated workflow invitations
+    const { error: deleteInvitesError } = await supabase
+      .from('workflow_invitations')
+      .delete()
+      .eq('workflow_id', workflowId);
+      
+    if (deleteInvitesError) {
+        console.error(`Error deleting invitations for workflow ${workflowId}:`, deleteInvitesError);
+        // Log and continue
     }
 
-    if (!canDeleteWorkflow) {
-      return NextResponse.json(
-        { success: false, error: 'Forbidden: You do not have permission to delete this workflow.' },
-        { status: 403 }
-      );
-    }
-    // If we reach here, user is a Global Admin or Brand Admin for this workflow's brand
-    
-    const { data: contentCountResult, error: countError } = await supabase
-      .from('content')
-      .select('id', { count: 'exact' })
-      .eq('workflow_id', workflowId); // Corrected from id to workflowId
-      
-    if (countError) throw countError;
-    
-    // contentCountResult is an array, so check its length
-    if (contentCountResult && contentCountResult.length > 0) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Cannot delete workflow that has associated content' 
-        },
-        { status: 409 }
-      );
-    }
-    
-    // Deleting associated workflow invitations is handled automatically by 
-    // ON DELETE CASCADE constraint defined in the database schema.
-    // await supabase
-    //   .from('workflow_invitations')
-    //   .delete()
-    //   .eq('workflow_id', id);
-    
-    // Delete the workflow itself (cascade will handle invitations)
-    const { error: deleteErrorData, count } = await supabase
+    // Finally, delete the workflow itself
+    const { error: deleteWorkflowError } = await supabase
       .from('workflows')
       .delete()
-      .eq('id', workflowId) // Corrected from id to workflowId
-      .select(); 
-    
-    if (deleteErrorData) throw deleteErrorData;
-    
-    if (count === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Workflow not found' },
-        { status: 404 }
-      );
+      .eq('id', workflowId);
+
+    if (deleteWorkflowError) {
+      throw deleteWorkflowError;
     }
-    
+
     return NextResponse.json({ 
-      success: true,
-      message: 'Workflow deleted successfully' 
+      success: true, 
+      message: 'Workflow and associated steps/invitations deleted successfully' 
     });
   } catch (error) {
-    return handleApiError(error, 'Error deleting workflow');
+    return handleApiError(error, 'Failed to delete workflow');
   }
 }); 

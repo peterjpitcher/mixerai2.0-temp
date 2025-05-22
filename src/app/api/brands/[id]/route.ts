@@ -142,9 +142,9 @@ export const GET = withAuth(async (
     // Fetch Brand Admins
     const { data: adminPermissions, error: adminPermissionsError } = await supabase
       .from('user_brand_permissions')
-      .select('user_id, profiles (id, full_name, email, avatar_url, job_title)') // Assuming profiles table exists and is linked
+      .select('user_id, profiles (id, full_name, email, avatar_url, job_title)')
       .eq('brand_id', brandId)
-      .eq('role', 'brand_admin');
+      .eq('role', 'admin');
 
     if (adminPermissionsError) {
       console.error('Error fetching brand admins:', adminPermissionsError);
@@ -194,7 +194,7 @@ export const GET = withAuth(async (
 // PUT endpoint to update a brand
 export const PUT = withAuth(async (
   request: NextRequest,
-  authenticatedUser: any, // Renamed 'user' to 'authenticatedUser' to avoid conflict with 'adminUser' variable
+  authenticatedUser: any, 
   context: { params: { id: string } }
 ) => {
   const supabase = createSupabaseAdminClient();
@@ -272,15 +272,16 @@ export const PUT = withAuth(async (
     }
     
     // Handle brand admins updates
+    /*
     if (body.admins !== undefined && Array.isArray(body.admins)) {
       const newAdminEmails = body.admins.map((admin: { email: string }) => admin.email.toLowerCase());
 
       // Get current brand admins
       const { data: currentBrandAdmins, error: currentAdminsError } = await supabase
         .from('user_brand_permissions')
-        .select('user_id, users:profiles(email)') // Assuming 'profiles' table has email and is referenced as 'users' here
+        .select('user_id, users:profiles(email)') 
         .eq('brand_id', brandIdToUpdate)
-        .eq('role', 'brand_admin');
+        .eq('role', 'admin');
 
       if (currentAdminsError) throw currentAdminsError;
 
@@ -298,57 +299,60 @@ export const PUT = withAuth(async (
           .delete()
           .in('user_id', userIdsToRemove)
           .eq('brand_id', brandIdToUpdate)
-          .eq('role', 'brand_admin'); // Ensure we only delete 'brand_admin' roles
+          .eq('role', 'admin');
         if (deleteError) throw deleteError;
       }
 
       // Add or invite new admins
-      const upsertOperations: Array<{ user_id: string; brand_id: string; role: 'brand_admin'; }> = [];
+      const upsertOperations: Array<{ user_id: string; brand_id: string; role: 'admin'; }> = [];
       for (const email of emailsToAdd) {
         let existingUser: User | null = null;
         let userFetchError: Error | null = null;
 
         try {
-          existingUser = await getUserAuthByEmail(email, supabase);
+          const authResponse = await getUserAuthByEmail(email, supabase);
+          if (authResponse && 'id' in authResponse) {
+             existingUser = authResponse as User;
+          } else if (authResponse && 'data' in authResponse && authResponse.data && 'user' in authResponse.data) {
+            existingUser = authResponse.data.user;
+          } else if (authResponse && 'error' in authResponse && authResponse.error) {
+             userFetchError = authResponse.error;
+          }
+
         } catch (e: any) {
           userFetchError = e;
         }
 
         if (existingUser) {
-          // If user exists, add permission
           upsertOperations.push({
             user_id: existingUser.id,
             brand_id: brandIdToUpdate,
-            role: 'brand_admin' as const,
+            role: 'admin' as const,
           });
         } else if (userFetchError) {
-          // Handle other errors during user fetch
           console.error(`Error fetching user ${email} during getUserAuthByEmail:`, userFetchError);
         } else {
-          // User not found (existingUser is null and no unexpected error from getUserAuthByEmail)
-          // Attempt to invite them
           try {
-            const { user: invitedUserObject, error: inviteError } = await inviteNewUserWithAppMetadata(
+            const inviteResult = await inviteNewUserWithAppMetadata(
               email,
-              { role: 'editor', invited_to_brand: brandIdToUpdate, invited_as_brand_role: 'brand_admin' },
+              { role: 'editor', invited_to_brand: brandIdToUpdate, invited_as_brand_role: 'admin' }, 
               supabase
             );
+            
+            const invitedUserObject = inviteResult.user;
 
-            if (inviteError) {
-              console.error(`Failed to invite user ${email} (inviteNewUserWithAppMetadata error):`, inviteError);
-              // Decide if you want to throw, or collect errors and report them
+            if (inviteResult.error) {
+              console.error(`Failed to invite user ${email} (inviteNewUserWithAppMetadata error):`, inviteResult.error);
             } else if (invitedUserObject) {
               upsertOperations.push({
                 user_id: invitedUserObject.id,
                 brand_id: brandIdToUpdate,
-                role: 'brand_admin' as const,
+                role: 'admin' as const,
               });
             } else {
-              // This case (no error, no user object) should ideally not happen based on inviteNewUserWithAppMetadata signature if invite is successful
               console.warn(`Invite for ${email} completed without error but no user object was returned.`);
             }
           } catch (inviteCatchError: any) {
-            // Catch any unexpected error during the invite process itself
             console.error(`Unexpected error during invite process for ${email}:`, inviteCatchError);
           }
         }
@@ -364,10 +368,12 @@ export const PUT = withAuth(async (
         }
       }
     }
+    */
     
+    // Main brand update logic
+    updateData.updated_at = new Date().toISOString();
     let updatedSupabaseBrandData: any = null;
     if (Object.keys(updateData).length > 0) {
-        updateData.updated_at = new Date().toISOString();
         const { data, error } = await supabase
           .from('brands')
           .update(updateData)
@@ -607,6 +613,20 @@ export const DELETE = withAuth(async (
       }
     }
     
+    // Optional: Before deleting the brand, you might want to remove associated user permissions
+    // to avoid orphaned records if ON DELETE CASCADE is not set up for user_brand_permissions
+    // This depends on your database schema and desired cleanup behavior.
+    // Example: remove all permissions for this brand
+    const { error: deletePermissionsError } = await supabase
+      .from('user_brand_permissions')
+      .delete()
+      .eq('brand_id', brandIdToDelete);
+
+    if (deletePermissionsError) {
+      console.warn(`[API Brands DELETE /${brandIdToDelete}] Failed to delete user permissions for brand. Proceeding with brand deletion. Error:`, deletePermissionsError.message);
+      // Not treating this as a fatal error for brand deletion itself, but logging it.
+    }
+
     const { error: rpcError } = await supabase.rpc('delete_brand_and_dependents', {
       brand_id_to_delete: brandIdToDelete
     });
