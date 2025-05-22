@@ -121,6 +121,18 @@ const ContentUseCasesPage = () => {
           </div>
         </main>
 
+        {/* AI Taskforce Disclaimer Section */}
+        <section className="py-12 bg-yellow-50 border-t border-yellow-200">
+          <div className="container mx-auto px-6 text-center">
+            <div className="max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md border border-yellow-300">
+              <h3 className="text-xl font-semibold mb-3 text-yellow-700">Important Notice: AI Taskforce Approval</h3>
+              <p className="text-gray-700 leading-relaxed">
+                Please note: All use cases must be submitted and approved through the AI Taskforce before content can be set live on any public domain. Brands can use the system to test and trial without setting it live until approval is received.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* Footer - Consistent with Overview */}
         <footer className="py-8 bg-gray-800 text-gray-400 text-center mt-auto">
           <div className="container mx-auto px-6">
