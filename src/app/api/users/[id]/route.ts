@@ -321,7 +321,7 @@ export const DELETE = withRouteAuth(async (request: NextRequest, user: any, cont
     }
     
     // Role check: Only Global Admins can delete users
-    if (!user.user_metadata || user.user_metadata.role !== 'brand_admin') {
+    if (!user.user_metadata || user.user_metadata.role !== 'admin') {
       return NextResponse.json(
         { success: false, error: 'Forbidden: You do not have permission to delete users.' },
         { status: 403 }
