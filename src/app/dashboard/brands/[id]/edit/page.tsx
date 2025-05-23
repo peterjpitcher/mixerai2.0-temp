@@ -96,7 +96,7 @@ const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) =
 );
 
 // Add a constant for the required role
-const REQUIRED_ROLE = 'brand_admin';
+const REQUIRED_ROLE = 'admin';
 
 /**
  * BrandEditPage allows users to modify the details of an existing brand.

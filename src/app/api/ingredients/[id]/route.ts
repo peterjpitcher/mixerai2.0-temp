@@ -89,8 +89,15 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
        }
 
         const supabase = createSupabaseAdminClient();
-        // For now, assuming any authenticated user can update ingredients.
-        // This might need to be restricted based on roles later.
+        
+        // --- Permission Check Start ---
+        if (user?.user_metadata?.role !== 'admin') {
+            return NextResponse.json(
+                { success: false, error: 'You do not have permission to update ingredients.' },
+                { status: 403 }
+            );
+        }
+        // --- Permission Check End ---
 
         const updateData: Partial<Omit<Ingredient, 'id' | 'created_at'>> & { updated_at: string } = {
             updated_at: new Date().toISOString(),
@@ -153,8 +160,15 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
 
     try {
         const supabase = createSupabaseAdminClient();
-        // For now, assuming any authenticated user can delete ingredients.
-        // This might need to be restricted based on roles later.
+
+        // --- Permission Check Start ---
+        if (user?.user_metadata?.role !== 'admin') {
+            return NextResponse.json(
+                { success: false, error: 'You do not have permission to delete ingredients.' },
+                { status: 403 }
+            );
+        }
+        // --- Permission Check End ---
 
         // @ts-ignore
         const { error, count } = await supabase.from('ingredients')

@@ -165,7 +165,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
 
   // Derived permissions and access control
   const isGlobalAdmin = currentUser?.user_metadata?.role === 'admin';
-  const userBrandAdminPermissions = currentUser?.brand_permissions?.filter(p => p.role === 'brand_admin').map(p => p.brand_id) || [];
+  const userBrandAdminPermissions = currentUser?.brand_permissions?.filter(p => p.role === 'admin').map(p => p.brand_id) || [];
   
   const canEditThisWorkflow = workflow && (
     isGlobalAdmin || 

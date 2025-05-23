@@ -132,11 +132,92 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
         }
 
         const supabase = createSupabaseAdminClient();
-        // TODO: Permission checks: user needs rights to update this specific claim.
-        const isAdmin = user?.user_metadata?.role === 'admin'; 
-        if (!isAdmin) {
+
+        // --- Permission Check Start ---
+        let hasPermission = user?.user_metadata?.role === 'admin';
+
+        if (!hasPermission) {
+            // Fetch the claim to determine its context for permission checking
+            // @ts-ignore
+            const { data: claimData, error: claimFetchError } = await supabase
+                .from('claims')
+                .select('level, global_brand_id, product_id, created_by')
+                .eq('id', id)
+                .single();
+
+            if (claimFetchError || !claimData) {
+                console.error(`[API Claims PUT /${id}] Error fetching claim for permissions:`, claimFetchError);
+                return handleApiError(claimFetchError, 'Failed to verify claim for permissions.');
+            }
+
+            // Allow if user is the creator of the claim
+            if (claimData.created_by === user.id) {
+                hasPermission = true;
+            }
+
+            if (!hasPermission) { // If not creator, check brand admin permissions
+                let coreBrandId: string | null = null;
+                if (claimData.level === 'brand' && claimData.global_brand_id) {
+                    // @ts-ignore
+                    const { data: gcbData, error: gcbError } = await supabase
+                        .from('global_claim_brands')
+                        .select('mixerai_brand_id')
+                        .eq('id', claimData.global_brand_id)
+                        .single();
+                    if (gcbError || !gcbData) {
+                        console.error(`[API Claims PUT /${id}] Error fetching GCB for brand-level claim permissions:`, gcbError);
+                    } else {
+                        coreBrandId = gcbData.mixerai_brand_id;
+                    }
+                } else if (claimData.level === 'product' && claimData.product_id) {
+                    // @ts-ignore
+                    const { data: productData, error: productError } = await supabase
+                        .from('products')
+                        .select('global_brand_id')
+                        .eq('id', claimData.product_id)
+                        .single();
+                    if (productError || !productData || !productData.global_brand_id) {
+                        console.error(`[API Claims PUT /${id}] Error fetching product/GCB for product-level claim permissions:`, productError);
+                    } else {
+                        // @ts-ignore
+                        const { data: gcbData, error: gcbError } = await supabase
+                            .from('global_claim_brands')
+                            .select('mixerai_brand_id')
+                            .eq('id', productData.global_brand_id)
+                            .single();
+                        if (gcbError || !gcbData) {
+                            console.error(`[API Claims PUT /${id}] Error fetching GCB for product-level claim (via product) permissions:`, gcbError);
+                        } else {
+                            coreBrandId = gcbData.mixerai_brand_id;
+                        }
+                    }
+                } else if (claimData.level === 'ingredient') {
+                    // For ingredient-level claims, only global admin (already checked) or creator can modify for now.
+                    // hasPermission would be true if creator, or if already global admin.
+                }
+
+                if (coreBrandId) {
+                    // @ts-ignore
+                    const { data: permissionsData, error: permissionsError } = await supabase
+                        .from('user_brand_permissions')
+                        .select('role')
+                        .eq('user_id', user.id)
+                        .eq('brand_id', coreBrandId)
+                        .eq('role', 'admin') // Must be a brand admin
+                        .limit(1);
+                    if (permissionsError) {
+                        console.error(`[API Claims PUT /${id}] Error fetching user_brand_permissions:`, permissionsError);
+                    } else if (permissionsData && permissionsData.length > 0) {
+                        hasPermission = true;
+                    }
+                }
+            }
+        }
+
+        if (!hasPermission) {
             return NextResponse.json({ success: false, error: 'You do not have permission to update this claim.' }, { status: 403 });
         }
+        // --- Permission Check End ---
 
         // @ts-ignore
         const { data, error } = await supabase.from('claims')
@@ -197,11 +278,96 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
 
     try {
         const supabase = createSupabaseAdminClient();
-        // TODO: Permission checks: user needs rights to delete this specific claim.
-        const isAdmin = user?.user_metadata?.role === 'admin'; 
-        if (!isAdmin) {
+        
+        // --- Permission Check Start ---
+        let hasPermission = user?.user_metadata?.role === 'admin';
+
+        if (!hasPermission) {
+            // Fetch the claim to determine its context for permission checking
+            // @ts-ignore
+            const { data: claimData, error: claimFetchError } = await supabase
+                .from('claims')
+                .select('level, global_brand_id, product_id, created_by')
+                .eq('id', id)
+                .single();
+
+            if (claimFetchError || !claimData) {
+                // If the claim doesn't exist, the delete operation later will handle it with a 404.
+                // However, if there's an error fetching, we should stop.
+                if (claimFetchError) {
+                    console.error(`[API Claims DELETE /${id}] Error fetching claim for permissions:`, claimFetchError);
+                    return handleApiError(claimFetchError, 'Failed to verify claim for permissions before deletion.');
+                }
+                // If !claimData but no error, it means claim not found, let delete handle it.
+            } else {
+                 // Allow if user is the creator of the claim
+                if (claimData.created_by === user.id) {
+                    hasPermission = true;
+                }
+
+                if (!hasPermission) { // If not creator, check brand admin permissions
+                    let coreBrandId: string | null = null;
+                    if (claimData.level === 'brand' && claimData.global_brand_id) {
+                        // @ts-ignore
+                        const { data: gcbData, error: gcbError } = await supabase
+                            .from('global_claim_brands')
+                            .select('mixerai_brand_id')
+                            .eq('id', claimData.global_brand_id)
+                            .single();
+                        if (gcbError || !gcbData) {
+                            console.error(`[API Claims DELETE /${id}] Error fetching GCB for brand-level claim permissions:`, gcbError);
+                        } else {
+                            coreBrandId = gcbData.mixerai_brand_id;
+                        }
+                    } else if (claimData.level === 'product' && claimData.product_id) {
+                        // @ts-ignore
+                        const { data: productData, error: productError } = await supabase
+                            .from('products')
+                            .select('global_brand_id')
+                            .eq('id', claimData.product_id)
+                            .single();
+                        if (productError || !productData || !productData.global_brand_id) {
+                            console.error(`[API Claims DELETE /${id}] Error fetching product/GCB for product-level claim permissions:`, productError);
+                        } else {
+                            // @ts-ignore
+                            const { data: gcbData, error: gcbError } = await supabase
+                                .from('global_claim_brands')
+                                .select('mixerai_brand_id')
+                                .eq('id', productData.global_brand_id)
+                                .single();
+                            if (gcbError || !gcbData) {
+                                console.error(`[API Claims DELETE /${id}] Error fetching GCB for product-level claim (via product) permissions:`, gcbError);
+                            } else {
+                                coreBrandId = gcbData.mixerai_brand_id;
+                            }
+                        }
+                    } else if (claimData.level === 'ingredient') {
+                        // For ingredient-level claims, only global admin or creator can modify.
+                    }
+
+                    if (coreBrandId) {
+                        // @ts-ignore
+                        const { data: permissionsData, error: permissionsError } = await supabase
+                            .from('user_brand_permissions')
+                            .select('role')
+                            .eq('user_id', user.id)
+                            .eq('brand_id', coreBrandId)
+                            .eq('role', 'admin') // Must be a brand admin
+                            .limit(1);
+                        if (permissionsError) {
+                            console.error(`[API Claims DELETE /${id}] Error fetching user_brand_permissions:`, permissionsError);
+                        } else if (permissionsData && permissionsData.length > 0) {
+                            hasPermission = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!hasPermission) {
             return NextResponse.json({ success: false, error: 'You do not have permission to delete this claim.' }, { status: 403 });
         }
+        // --- Permission Check End ---
 
         // @ts-ignore
         const { error, count } = await supabase.from('claims')

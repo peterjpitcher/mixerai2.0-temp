@@ -231,7 +231,7 @@ export const PUT = withAuth(async (
         .select('brand_id')
         .eq('user_id', user.id)
         .eq('brand_id', workflowForPermCheck.brand_id) // Now brand_id is guaranteed to be non-null
-        .eq('role', 'admin') // Changed from 'brand_admin'
+        .eq('role', 'admin') // Changed from 'admin'
         .maybeSingle();
 
       if (permError) {
@@ -473,7 +473,7 @@ export const DELETE = withAuth(async (
         .select('brand_id')
         .eq('user_id', user.id)
         .eq('brand_id', workflowForPermCheck.brand_id)
-        .eq('role', 'admin') // Changed from 'brand_admin'
+        .eq('role', 'admin') // Changed from 'admin'
         .maybeSingle();
 
       if (permError) {

@@ -253,7 +253,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
 
       const specificBrandPermission = permissionsData?.[0];
 
-      if (!specificBrandPermission || !['brand_admin', 'editor'].includes(specificBrandPermission.role)) {
+      if (!specificBrandPermission || !['admin', 'editor'].includes(specificBrandPermission.role)) {
         console.warn(`[API Content POST] User ${user.id} (global role: ${globalRole}, brand role: ${specificBrandPermission?.role}) access denied to create content for brand ${targetBrandId}.`);
         return NextResponse.json(
           { success: false, error: 'You do not have permission to create content for this brand.' },

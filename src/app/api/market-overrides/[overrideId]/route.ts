@@ -61,25 +61,94 @@ export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { p
 
         const supabase = createSupabaseAdminClient();
 
-        // TODO: Permission check - User needs rights for the target_product_id's brand and the market_country_code associated with this override.
-        const isAdmin = user?.user_metadata?.role === 'admin';
-        if (!isAdmin) {
-            return NextResponse.json({ success: false, error: 'You do not have permission to update market overrides.' }, { status: 403 });
+        // --- Permission Check Start ---
+        let hasPermission = user?.user_metadata?.role === 'admin';
+        let existingOverrideForPermissionCheck: Partial<MarketClaimOverride> | null = null;
+
+        if (!hasPermission) {
+            // Fetch the existing override to get its target_product_id and created_by for permission checking
+            // @ts-ignore
+            const { data: fetchedOverride, error: fetchPermError } = await supabase
+                .from('market_claim_overrides')
+                .select('id, market_country_code, master_claim_id, target_product_id, created_by') // Added target_product_id and created_by
+                .eq('id', overrideId)
+                .single<MarketClaimOverride>();
+
+            if (fetchPermError || !fetchedOverride) {
+                // If the override doesn't exist, the main logic later will handle it with a 404.
+                // However, if there's an error fetching for permissions, we should stop.
+                if (fetchPermError) {
+                    console.error(`[API MarketOverrides PUT /${overrideId}] Error fetching override for permissions:`, fetchPermError);
+                    return handleApiError(fetchPermError, 'Failed to verify override for permissions.');
+                }
+                // If !fetchedOverride, let main logic handle 404. For permission, this means we can't check specific brand.
+                // However, the subsequent `existingOverride` fetch will fail, effectively blocking non-admins if override not found.
+            } else {
+                existingOverrideForPermissionCheck = fetchedOverride; // Store for later use if needed
+
+                // Allow if user is the creator of the override
+                if (fetchedOverride.created_by === user.id) {
+                    hasPermission = true;
+                }
+
+                if (!hasPermission && fetchedOverride.target_product_id) { // If not creator, check brand admin permissions
+                    // @ts-ignore
+                    const { data: productData, error: productError } = await supabase
+                        .from('products')
+                        .select('global_brand_id')
+                        .eq('id', fetchedOverride.target_product_id)
+                        .single();
+
+                    if (productError || !productData || !productData.global_brand_id) {
+                        console.error(`[API MarketOverrides PUT /${overrideId}] Error fetching product/GCB for permissions:`, productError);
+                    } else {
+                        // @ts-ignore
+                        const { data: gcbData, error: gcbError } = await supabase
+                            .from('global_claim_brands')
+                            .select('mixerai_brand_id')
+                            .eq('id', productData.global_brand_id)
+                            .single();
+                        
+                        if (gcbError || !gcbData || !gcbData.mixerai_brand_id) {
+                            console.error(`[API MarketOverrides PUT /${overrideId}] Error fetching GCB or GCB not linked for permissions:`, gcbError);
+                        } else {
+                            // @ts-ignore
+                            const { data: permissionsData, error: permissionsError } = await supabase
+                                .from('user_brand_permissions')
+                                .select('role')
+                                .eq('user_id', user.id)
+                                .eq('brand_id', gcbData.mixerai_brand_id)
+                                .eq('role', 'admin')
+                                .limit(1);
+                            if (permissionsError) {
+                                console.error(`[API MarketOverrides PUT /${overrideId}] Error fetching user_brand_permissions:`, permissionsError);
+                            } else if (permissionsData && permissionsData.length > 0) {
+                                hasPermission = true;
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        // Fetch the existing override to get its market_country_code for validation if replacement_claim_id is changing
-        // @ts-ignore
-        const { data: existingOverride, error: fetchError } = await supabase
-            .from('market_claim_overrides')
-            .select('id, market_country_code, master_claim_id')
-            .eq('id', overrideId)
-            .single<MarketClaimOverride>();
+        if (!hasPermission) {
+            return NextResponse.json({ success: false, error: 'You do not have permission to update this market override.' }, { status: 403 });
+        }
+        // --- Permission Check End ---
 
-        if (fetchError || !existingOverride) {
+        // Fetch the existing override again OR use existingOverrideForPermissionCheck if it was successfully fetched
+        // This is to get its market_country_code for validation if replacement_claim_id is changing
+        const existingOverrideToUse = existingOverrideForPermissionCheck && existingOverrideForPermissionCheck.id === overrideId 
+            ? existingOverrideForPermissionCheck 
+            // @ts-ignore
+            : (await supabase.from('market_claim_overrides').select('id, market_country_code, master_claim_id').eq('id', overrideId).single<MarketClaimOverride>()).data;
+
+        if (!existingOverrideToUse) {
             return NextResponse.json({ success: false, error: `Market override with ID ${overrideId} not found.` }, { status: 404 });
         }
         
-        if (replacement_claim_id === existingOverride.master_claim_id) {
+        // @ts-ignore - existingOverrideToUse might be partial if only from perm check, but master_claim_id should be there
+        if (replacement_claim_id === existingOverrideToUse.master_claim_id) {
             return NextResponse.json({ success: false, error: 'Replacement claim cannot be the same as the master claim.'}, { status: 400 });
         }
 
@@ -89,8 +158,9 @@ export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { p
             if (!replacementClaimProps) {
                 return NextResponse.json({ success: false, error: `Replacement claim with ID ${replacement_claim_id} not found.` }, { status: 400 });
             }
-            if (replacementClaimProps.country_code !== existingOverride.market_country_code) {
-                return NextResponse.json({ success: false, error: `Replacement claim ID ${replacement_claim_id} is for country ${replacementClaimProps.country_code}, not for the market ${existingOverride.market_country_code} of this override.` }, { status: 400 });
+            // @ts-ignore - existingOverrideToUse might be partial if only from perm check, but market_country_code should be there
+            if (replacementClaimProps.country_code !== existingOverrideToUse.market_country_code) {
+                return NextResponse.json({ success: false, error: `Replacement claim ID ${replacement_claim_id} is for country ${replacementClaimProps.country_code}, not for the market ${existingOverrideToUse.market_country_code} of this override.` }, { status: 400 });
             }
         }
 
@@ -142,11 +212,73 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, { params }: 
     try {
         const supabase = createSupabaseAdminClient();
 
-        // TODO: Permission check - User needs rights for the target_product_id's brand and the market_country_code associated with this override.
-        const isAdmin = user?.user_metadata?.role === 'admin';
-        if (!isAdmin) {
-            return NextResponse.json({ success: false, error: 'You do not have permission to delete market overrides.' }, { status: 403 });
+        // --- Permission Check Start ---
+        let hasPermission = user?.user_metadata?.role === 'admin';
+
+        if (!hasPermission) {
+            // Fetch the existing override to get its target_product_id and created_by for permission checking
+            // @ts-ignore
+            const { data: fetchedOverride, error: fetchPermError } = await supabase
+                .from('market_claim_overrides')
+                .select('target_product_id, created_by') // Select fields needed for permission
+                .eq('id', overrideId)
+                .single<MarketClaimOverride>();
+
+            if (fetchPermError || !fetchedOverride) {
+                if (fetchPermError) {
+                    console.error(`[API MarketOverrides DELETE /${overrideId}] Error fetching override for permissions:`, fetchPermError);
+                    return handleApiError(fetchPermError, 'Failed to verify override for permissions before deletion.');
+                }
+                // If !fetchedOverride, let the main delete logic handle the 404.
+            } else {
+                if (fetchedOverride.created_by === user.id) {
+                    hasPermission = true;
+                }
+
+                if (!hasPermission && fetchedOverride.target_product_id) {
+                    // @ts-ignore
+                    const { data: productData, error: productError } = await supabase
+                        .from('products')
+                        .select('global_brand_id')
+                        .eq('id', fetchedOverride.target_product_id)
+                        .single();
+
+                    if (productError || !productData || !productData.global_brand_id) {
+                        console.error(`[API MarketOverrides DELETE /${overrideId}] Error fetching product/GCB for permissions:`, productError);
+                    } else {
+                        // @ts-ignore
+                        const { data: gcbData, error: gcbError } = await supabase
+                            .from('global_claim_brands')
+                            .select('mixerai_brand_id')
+                            .eq('id', productData.global_brand_id)
+                            .single();
+                        
+                        if (gcbError || !gcbData || !gcbData.mixerai_brand_id) {
+                            console.error(`[API MarketOverrides DELETE /${overrideId}] Error fetching GCB or GCB not linked for permissions:`, gcbError);
+                        } else {
+                            // @ts-ignore
+                            const { data: permissionsData, error: permissionsError } = await supabase
+                                .from('user_brand_permissions')
+                                .select('role')
+                                .eq('user_id', user.id)
+                                .eq('brand_id', gcbData.mixerai_brand_id)
+                                .eq('role', 'admin')
+                                .limit(1);
+                            if (permissionsError) {
+                                console.error(`[API MarketOverrides DELETE /${overrideId}] Error fetching user_brand_permissions:`, permissionsError);
+                            } else if (permissionsData && permissionsData.length > 0) {
+                                hasPermission = true;
+                            }
+                        }
+                    }
+                }
+            }
         }
+
+        if (!hasPermission) {
+            return NextResponse.json({ success: false, error: 'You do not have permission to delete this market override.' }, { status: 403 });
+        }
+        // --- Permission Check End ---
 
         // @ts-ignore
         const { error, count } = await supabase

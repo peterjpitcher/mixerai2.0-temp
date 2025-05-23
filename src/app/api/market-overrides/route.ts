@@ -67,11 +67,57 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 
         const supabase = createSupabaseAdminClient();
 
-        // TODO: Permission check - User needs rights for the target_product_id's brand and the market_country_code.
-        const isAdmin = user?.user_metadata?.role === 'admin';
-        if (!isAdmin) {
-            return NextResponse.json({ success: false, error: 'You do not have permission to create market overrides.' }, { status: 403 });
+        // --- Permission Check Start ---
+        let hasPermission = user?.user_metadata?.role === 'admin';
+
+        if (!hasPermission && target_product_id) {
+            // @ts-ignore
+            const { data: productData, error: productError } = await supabase
+                .from('products')
+                .select('global_brand_id')
+                .eq('id', target_product_id)
+                .single();
+
+            if (productError || !productData || !productData.global_brand_id) {
+                console.error(`[API MarketOverrides POST] Error fetching product/GCB for permissions (Product ID: ${target_product_id}):`, productError);
+                // Deny permission if product or its GCB link is not found
+            } else {
+                // @ts-ignore
+                const { data: gcbData, error: gcbError } = await supabase
+                    .from('global_claim_brands')
+                    .select('mixerai_brand_id')
+                    .eq('id', productData.global_brand_id)
+                    .single();
+                
+                if (gcbError || !gcbData || !gcbData.mixerai_brand_id) {
+                    console.error(`[API MarketOverrides POST] Error fetching GCB or GCB not linked for permissions (GCB ID: ${productData.global_brand_id}):`, gcbError);
+                    // Deny permission if GCB not found or not linked to a core MixerAI brand
+                } else {
+                    // @ts-ignore
+                    const { data: permissionsData, error: permissionsError } = await supabase
+                        .from('user_brand_permissions')
+                        .select('role')
+                        .eq('user_id', user.id)
+                        .eq('brand_id', gcbData.mixerai_brand_id)
+                        .eq('role', 'admin') // Must be an admin of the core MixerAI brand
+                        .limit(1);
+
+                    if (permissionsError) {
+                        console.error(`[API MarketOverrides POST] Error fetching user_brand_permissions:`, permissionsError);
+                    } else if (permissionsData && permissionsData.length > 0) {
+                        hasPermission = true;
+                    }
+                }
+            }
+        } else if (!target_product_id && !hasPermission) {
+            // If target_product_id is missing and user is not admin, deny (though already caught by basic validation)
+            // This case is mostly for completeness, as the initial check `!master_claim_id || ...` should catch missing target_product_id.
         }
+
+        if (!hasPermission) {
+            return NextResponse.json({ success: false, error: 'You do not have permission to create market overrides for this product.' }, { status: 403 });
+        }
+        // --- Permission Check End ---
 
         // Validate master_claim_id is indeed a __GLOBAL__ claim
         const masterClaimProps = await getClaimProperties(supabase, master_claim_id);
@@ -150,25 +196,36 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
             return NextResponse.json({ success: true, isMockData: true, data: [] });
         }
         const { searchParams } = new URL(req.url);
-        const productId = searchParams.get('productId');
-        const marketCode = searchParams.get('marketCode');
-        const replacementClaimId = searchParams.get('replacementClaimId');
+        const target_product_id = searchParams.get('target_product_id');
+        const market_country_code = searchParams.get('market_country_code');
 
         const supabase = createSupabaseAdminClient();
-        // @ts-ignore
-        let query = supabase.from('market_claim_overrides').select('*');
+        
+        // Updated query to join with claims table for master and replacement claim details
+        const selectQuery = `
+            id, 
+            master_claim_id, 
+            market_country_code, 
+            target_product_id, 
+            is_blocked, 
+            replacement_claim_id,
+            created_by,
+            created_at,
+            updated_at,
+            master_claim:claims!inner!master_claim_id(claim_text, claim_type),
+            replacement_claim:claims!left!replacement_claim_id(claim_text, claim_type)
+        `;
 
-        if (productId) {
+        // @ts-ignore supabase client query typing
+        let query = supabase.from('market_claim_overrides').select(selectQuery);
+
+        if (target_product_id) {
             // @ts-ignore
-            query = query.eq('target_product_id', productId);
+            query = query.eq('target_product_id', target_product_id);
         }
-        if (marketCode) {
+        if (market_country_code) {
             // @ts-ignore
-            query = query.eq('market_country_code', marketCode);
-        }
-        if (replacementClaimId) {
-            // @ts-ignore
-            query = query.eq('replacement_claim_id', replacementClaimId);
+            query = query.eq('market_country_code', market_country_code);
         }
         
         // @ts-ignore
@@ -179,7 +236,19 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
             return handleApiError(error, 'Failed to fetch market overrides');
         }
 
-        return NextResponse.json({ success: true, data: data as MarketClaimOverride[] });
+        // Transform data to include flattened claim texts and types
+        const enrichedData = data.map((override: any) => ({
+            ...override,
+            master_claim_text: override.master_claim?.claim_text,
+            master_claim_type: override.master_claim?.claim_type,
+            replacement_claim_text: override.replacement_claim?.claim_text,
+            replacement_claim_type: override.replacement_claim?.claim_type,
+            // Remove nested objects if they are not needed by client directly
+            master_claim: undefined,
+            replacement_claim: undefined,
+        }));
+
+        return NextResponse.json({ success: true, data: enrichedData });
 
     } catch (error: any) {
         console.error('[API MarketOverrides GET] Catched error:', error);

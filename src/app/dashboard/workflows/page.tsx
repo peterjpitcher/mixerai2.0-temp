@@ -35,7 +35,7 @@ interface UserSessionData {
   };
   brand_permissions?: Array<{
     brand_id: string;
-    role: string; // e.g., 'brand_admin', 'editor', 'viewer' for that brand
+    role: string; // e.g., 'admin', 'editor', 'viewer' for that brand
   }>;
 }
 

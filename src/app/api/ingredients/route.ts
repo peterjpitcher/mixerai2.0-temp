@@ -69,15 +69,15 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
        }
 
         const supabase = createSupabaseAdminClient();
-        // For now, assuming any authenticated user can create ingredients.
-        // This might need to be restricted based on roles later.
-        // const isAdmin = user?.user_metadata?.role === 'admin'; 
-        // if (!isAdmin) {
-        //     return NextResponse.json(
-        //         { success: false, error: 'You do not have permission to create an ingredient.' },
-        //         { status: 403 }
-        //     );
-        // }
+        
+        // --- Permission Check Start ---
+        if (user?.user_metadata?.role !== 'admin') {
+            return NextResponse.json(
+                { success: false, error: 'You do not have permission to create ingredients.' },
+                { status: 403 }
+            );
+        }
+        // --- Permission Check End ---
         
         const newRecord: Omit<Ingredient, 'id' | 'created_at' | 'updated_at'> = {
             name: name.trim(),

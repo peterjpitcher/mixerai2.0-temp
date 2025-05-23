@@ -79,17 +79,49 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
        }
 
         const supabase = createSupabaseAdminClient();
-        // Permission check: User should be admin or have rights to the global_brand_id.
-        // For now, only global admin can create.
-        const isAdmin = user?.user_metadata?.role === 'admin'; 
-        if (!isAdmin) {
-            // TODO: Implement more granular check based on user permissions for the global_brand_id
-            console.warn(`[API Products POST] User ${user.id} attempted to create a product without admin privileges.`);
+        
+        // --- Permission Check Start ---
+        let hasPermission = user?.user_metadata?.role === 'admin';
+
+        if (!hasPermission && global_brand_id) {
+            // @ts-ignore
+            const { data: gcbData, error: gcbError } = await supabase
+                .from('global_claim_brands')
+                .select('mixerai_brand_id')
+                .eq('id', global_brand_id)
+                .single();
+
+            if (gcbError || !gcbData || !gcbData.mixerai_brand_id) {
+                console.error(`[API Products POST] Error fetching GCB or GCB not linked for permissions (GCB ID: ${global_brand_id}):`, gcbError);
+                // Deny if GCB not found or not linked to a core MixerAI brand
+            } else {
+                // @ts-ignore
+                const { data: permissionsData, error: permissionsError } = await supabase
+                    .from('user_brand_permissions')
+                    .select('role')
+                    .eq('user_id', user.id)
+                    .eq('brand_id', gcbData.mixerai_brand_id)
+                    .eq('role', 'admin') // Must be an admin of the core MixerAI brand
+                    .limit(1);
+
+                if (permissionsError) {
+                    console.error(`[API Products POST] Error fetching user_brand_permissions:`, permissionsError);
+                } else if (permissionsData && permissionsData.length > 0) {
+                    hasPermission = true;
+                }
+            }
+        } else if (!global_brand_id && !hasPermission) {
+             // This case should ideally be caught by required field validation for global_brand_id earlier.
+             // If global_brand_id is missing and user is not admin, deny.
+        }
+
+        if (!hasPermission) {
             return NextResponse.json(
-                { success: false, error: 'You do not have permission to create a product.' },
+                { success: false, error: 'You do not have permission to create a product for this brand.' },
                 { status: 403 }
             );
         }
+        // --- Permission Check End ---
         
         const newRecord: Omit<Product, 'id' | 'created_at' | 'updated_at'> = {
             name: name.trim(),

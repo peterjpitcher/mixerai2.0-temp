@@ -77,7 +77,7 @@ USING (
   (EXISTS (
     SELECT 1
     FROM public.user_brand_permissions ubp
-    WHERE ((ubp.brand_id = brands.id) AND (ubp.user_id = auth.uid()) AND (ubp.role = 'brand_admin'::public.user_brand_role_enum))
+    WHERE ((ubp.brand_id = brands.id) AND (ubp.user_id = auth.uid()) AND (ubp.role = 'admin'::public.user_brand_role_enum))
   )) AND 
   (public.get_current_user_role() IS NULL OR public.get_current_user_role() <> 'admin') -- Ensures user is not a global admin
 );
@@ -91,7 +91,7 @@ USING (
   (EXISTS (
     SELECT 1
     FROM public.user_brand_permissions ubp
-    WHERE ((ubp.brand_id = brands.id) AND (ubp.user_id = auth.uid()) AND (ubp.role = 'brand_admin'::public.user_brand_role_enum))
+    WHERE ((ubp.brand_id = brands.id) AND (ubp.user_id = auth.uid()) AND (ubp.role = 'admin'::public.user_brand_role_enum))
   )) AND 
   (public.get_current_user_role() IS NULL OR public.get_current_user_role() <> 'admin') -- Ensures user is not a global admin
 )
@@ -99,7 +99,7 @@ WITH CHECK (
   (EXISTS (
     SELECT 1
     FROM public.user_brand_permissions ubp
-    WHERE ((ubp.brand_id = brands.id) AND (ubp.user_id = auth.uid()) AND (ubp.role = 'brand_admin'::public.user_brand_role_enum))
+    WHERE ((ubp.brand_id = brands.id) AND (ubp.user_id = auth.uid()) AND (ubp.role = 'admin'::public.user_brand_role_enum))
   )) AND 
   (public.get_current_user_role() IS NULL OR public.get_current_user_role() <> 'admin') -- Ensures user is not a global admin
 );

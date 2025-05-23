@@ -224,7 +224,7 @@ export const PUT = withAuth(async (request: NextRequest, user: User, context: { 
 
       const specificBrandPermission = permissionsData?.[0];
 
-      if (!specificBrandPermission || !['brand_admin', 'editor'].includes(specificBrandPermission.role)) {
+      if (!specificBrandPermission || !['admin', 'editor'].includes(specificBrandPermission.role)) {
         console.warn(`[API Content PUT] User ${user.id} (global role: ${globalRole}, brand role: ${specificBrandPermission?.role}) access denied to update content ${id} for brand ${targetBrandId}.`);
         return NextResponse.json(
           { success: false, error: 'You do not have permission to update this content.' },
@@ -370,7 +370,7 @@ export const DELETE = withAuth(async (request: NextRequest, user: User, context:
 
       const brandRole = permissionsData?.role;
 
-      if (!brandRole || brandRole !== 'admin') { // Changed 'brand_admin' to 'admin'
+      if (!brandRole || brandRole !== 'admin') { // Changed 'admin' to 'admin'
         console.warn(`[API Content DELETE] User ${user.id} (global role: ${globalRole}, brand role: ${brandRole}) access denied to delete content ${id} for brand ${targetBrandId}.`);
         return NextResponse.json(
           { success: false, error: 'You do not have permission to delete this content.' },

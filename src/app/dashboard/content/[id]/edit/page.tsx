@@ -206,7 +206,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         allowed = true;
       } else if (content.brand_id && currentUser.brand_permissions) {
         const brandPerm = currentUser.brand_permissions.find(p => p.brand_id === content.brand_id);
-        if (brandPerm && (brandPerm.role === 'brand_admin' || brandPerm.role === 'editor')) {
+        if (brandPerm && (brandPerm.role === 'admin' || brandPerm.role === 'editor')) {
           allowed = true;
         }
       }

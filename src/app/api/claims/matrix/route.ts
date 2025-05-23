@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { getStackedClaimsForProduct, Claim, Product, ClaimTypeEnum } from '@/lib/claims-utils';
+import { getStackedClaimsForProduct, Claim, Product, ClaimTypeEnum, EffectiveClaim, FinalClaimTypeEnum } from '@/lib/claims-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { SupabaseClient, User } from '@supabase/supabase-js';
 import { handleApiError, isBuildPhase } from '@/lib/api-utils';
@@ -7,146 +7,181 @@ import { withAuth } from '@/lib/auth/api-auth';
 
 export const dynamic = "force-dynamic";
 
-// Enhanced types for matrix response
+// Types for the new API response structure
 interface MarketClaimOverrideInfo {
   overrideId: string;
   isBlocked: boolean;
   masterClaimIdItOverrides: string;
   replacementClaimId?: string | null;
-  replacementClaimText?: string | null; // For UI display
+  replacementClaimText?: string | null;
   replacementClaimType?: ClaimTypeEnum | null;
 }
 
-interface MatrixCellData {
-  effectiveClaim: Claim | null;
-  sourceMasterClaim?: Claim | null; // The __GLOBAL__ claim that would apply if no override, or is the effectiveClaim
-  activeOverride?: MarketClaimOverrideInfo | null;
-}
-
-interface MatrixProductRow {
+interface ApiProductInfo {
   id: string;
   name: string;
-  claims: Record<string, MatrixCellData | null>; // Key: claim_text, Value: enriched cell data
 }
 
-interface ClaimsMatrixResponse {
-  products: MatrixProductRow[];
-  uniqueClaimTexts: string[];
+interface ApiClaimTextInfo {
+  text: string;
+  // Future: Add other claim-specific details here if needed for row headers
 }
 
-// Helper to fetch replacement claim details if an ID is present
+interface MatrixCell {
+  effectiveStatus: FinalClaimTypeEnum;
+  effectiveClaimSourceLevel?: EffectiveClaim['source_level'];
+  sourceMasterClaimId?: string | null;
+  isActuallyMaster: boolean;
+  activeOverride?: MarketClaimOverrideInfo | null;
+  description?: string | null;
+  isBlockedOverride?: boolean;
+  isReplacementOverride?: boolean;
+  originalMasterClaimIdIfOverridden?: string | null;
+  // Store the original effective claim for more detailed popups/interactions on the frontend
+  originalEffectiveClaimDetails?: EffectiveClaim | null; 
+}
+
+interface ClaimsMatrixApiResponseData {
+  claimTextsAsRows: ApiClaimTextInfo[];
+  productsAsCols: ApiProductInfo[];
+  cellData: Record<string, Record<string, MatrixCell | null>>; // Keyed by claimText.text, then by product.id
+}
+
+// Helper to fetch replacement claim details (can remain similar)
 async function getReplacementClaimDetails(supabase: SupabaseClient, claimId: string | null | undefined): Promise<Claim | null> {
     if (!claimId) return null;
-    // @ts-ignore
-    const { data, error } = await supabase.from('claims').select('id, claim_text, claim_type, country_code, level').eq('id', claimId).single();
+    const { data, error } = await supabase.from('claims').select('id, claim_text, claim_type, country_code, level').eq('id', claimId).single<Claim>();
     if (error || !data) {
         console.warn(`[API Claims Matrix] Could not fetch replacement claim details for ID ${claimId}:`, error);
         return null;
     }
-    return data as Claim;
+    return data;
 }
 
-// GET handler for fetching the claims matrix
 export const GET = withAuth(async (req: NextRequest, user: User) => {
   try {
     const { searchParams } = new URL(req.url);
     const targetCountryCode = searchParams.get('countryCode');
-    const globalBrandIdFilter = searchParams.get('globalBrandId'); // Optional filter
+    const globalBrandIdFilter = searchParams.get('globalBrandId');
 
     if (isBuildPhase()) {
       console.log(`[API Claims Matrix GET] Build phase: returning empty structure.`);
-      return NextResponse.json<ClaimsMatrixResponse>({ 
-        success: true, 
-        isMockData: true, 
-        data: { products: [], uniqueClaimTexts: [] }
-      } as any); // Added 'as any' to satisfy build phase return type until full type is defined
+      return NextResponse.json({
+        success: true,
+        isMockData: true,
+        data: { claimTextsAsRows: [], productsAsCols: [], cellData: {} }
+      });
     }
 
     if (!targetCountryCode || typeof targetCountryCode !== 'string' || targetCountryCode.trim() === '') {
       return NextResponse.json(
-        { success: false, error: 'countryCode query parameter is required and must be a non-empty string.' }, 
+        { success: false, error: 'countryCode query parameter is required.' },
         { status: 400 }
       );
     }
 
-    // TODO: Permission check: Does the user have rights to view this matrix?
-    // This could involve checking roles or specific brand access if globalBrandIdFilter is used.
-
     const supabase = createSupabaseAdminClient();
 
-    // 1. Fetch products
-    // @ts-ignore - Assuming 'products' table exists and types are broadly compatible
-    let productsQuery = supabase.from('products').select('id, name, global_brand_id');
+    let productsQuery = supabase.from('products').select('id, name, description, global_brand_id');
     if (globalBrandIdFilter) {
-      // @ts-ignore
       productsQuery = productsQuery.eq('global_brand_id', globalBrandIdFilter);
     }
-    // @ts-ignore
     const { data: productsData, error: productsError } = await productsQuery.order('name');
 
     if (productsError) {
       console.error('[API Claims Matrix GET] Error fetching products:', productsError);
       return handleApiError(productsError, 'Failed to fetch products for the matrix.');
     }
-    const products: Product[] = (productsData as Product[]) || [];
+    // Filter out products with null global_brand_id as the Product type expects it to be a string
+    const validProductsData = (productsData || []).filter(p => p.global_brand_id !== null);
+    const products: Product[] = validProductsData.map(p => ({ ...p, global_brand_id: p.global_brand_id as string }));
+
     if (products.length === 0) {
-        return NextResponse.json<ClaimsMatrixResponse>({ 
-            success: true, 
-            data: { products: [], uniqueClaimTexts: [] } 
-        } as any); // Added 'as any' for now
+      return NextResponse.json({
+        success: true,
+        data: { claimTextsAsRows: [], productsAsCols: [], cellData: {} }
+      });
     }
 
-    // 2. Determine all unique claim texts by checking effective claims for targetCountryCode across all products
+    const productsAsCols: ApiProductInfo[] = products.map(p => ({ id: p.id, name: p.name }));
     const allClaimTextsSet = new Set<string>();
-    const initialProductClaimResults = await Promise.all(products.map(async (product) => {
-        const claims = await getStackedClaimsForProduct(product.id, targetCountryCode);
-        claims.forEach(claim => allClaimTextsSet.add(claim.claim_text));
-        return { productId: product.id, claims }; // Keep these for step 3a
-    }));
-    const uniqueClaimTexts = Array.from(allClaimTextsSet).sort();
+    const productEffectiveClaimsCache: Record<string, EffectiveClaim[]> = {};
+    const productGlobalClaimsCache: Record<string, EffectiveClaim[]> = {};
+    const productOverridesCache: Record<string, any[]> = {}; // Using any for Supabase dynamic type
 
-    const matrixProductRows: MatrixProductRow[] = [];
-
+    // Pre-fetch all necessary data for each product
     for (const product of products) {
-      const productCellClaims: Record<string, MatrixCellData | null> = {};
+      const effectiveClaims = await getStackedClaimsForProduct(product.id, targetCountryCode);
+      productEffectiveClaimsCache[product.id] = effectiveClaims;
+      effectiveClaims.forEach(claim => allClaimTextsSet.add(claim.claim_text));
 
-      // 3a. Get effective claims for the current product in the target market (already fetched)
-      const effectiveClaimsForProductInMarket = initialProductClaimResults.find(r => r.productId === product.id)?.claims || [];
-
-      // 3b. Get potential source master claims for this product (by checking __GLOBAL__ market)
-      const globalMarketClaimsForProduct = await getStackedClaimsForProduct(product.id, '__GLOBAL__');
+      const globalClaims = await getStackedClaimsForProduct(product.id, '__GLOBAL__');
+      productGlobalClaimsCache[product.id] = globalClaims;
+      // Add global claim texts too, as they might be overridden and thus relevant
+      globalClaims.forEach(claim => allClaimTextsSet.add(claim.claim_text));
       
-      // 3c. Fetch all market overrides related to this product and target market for efficiency
-      // @ts-ignore
-      const { data: productOverridesData, error: overridesError } = await supabase
+      const { data: overridesData, error: overridesError } = await supabase
         .from('market_claim_overrides')
         .select('id, master_claim_id, is_blocked, replacement_claim_id')
         .eq('target_product_id', product.id)
         .eq('market_country_code', targetCountryCode);
-
-      const productOverrides: any[] = productOverridesData || [];
-
+      
       if (overridesError) {
         console.warn(`[API Claims Matrix] Error fetching overrides for product ${product.id}:`, overridesError);
-        // Continue processing this product but overrides might be missing
+        productOverridesCache[product.id] = [];
+      } else {
+        productOverridesCache[product.id] = overridesData || [];
       }
+    }
 
-      for (const claimText of uniqueClaimTexts) {
-        const cellData: MatrixCellData = { effectiveClaim: null, sourceMasterClaim: null, activeOverride: null };
+    const claimTextsAsRows: ApiClaimTextInfo[] = Array.from(allClaimTextsSet).sort().map(text => ({ text }));
+    const cellData: Record<string, Record<string, MatrixCell | null>> = {};
 
-        // Find effective claim for this cell
-        cellData.effectiveClaim = effectiveClaimsForProductInMarket.find(c => c.claim_text === claimText) || null;
+    for (const claimInfo of claimTextsAsRows) {
+      const claimText = claimInfo.text;
+      cellData[claimText] = {};
 
-        // Find potential source master claim for this cell
-        const potentialMaster = globalMarketClaimsForProduct.find(c => c.claim_text === claimText);
-        if (potentialMaster && potentialMaster.country_code === '__GLOBAL__') {
-          cellData.sourceMasterClaim = potentialMaster;
+      for (const product of products) {
+        const effectiveClaimForCell = productEffectiveClaimsCache[product.id]?.find(ec => ec.claim_text === claimText);
+        const globalClaimForCellText = productGlobalClaimsCache[product.id]?.find(gc => gc.claim_text === claimText);
+        
+        let matrixCell: MatrixCell | null = null;
 
-          // Check if an override exists for this sourceMasterClaim and product/market
-          const override = productOverrides.find((ov: any) => ov.master_claim_id === cellData.sourceMasterClaim!.id);
+        if (effectiveClaimForCell) {
+          matrixCell = {
+            effectiveStatus: effectiveClaimForCell.final_claim_type,
+            effectiveClaimSourceLevel: effectiveClaimForCell.source_level,
+            isActuallyMaster: effectiveClaimForCell.original_claim_country_code === '__GLOBAL__' && effectiveClaimForCell.source_level !== 'override',
+            description: effectiveClaimForCell.description,
+            isBlockedOverride: effectiveClaimForCell.is_blocked_override,
+            isReplacementOverride: effectiveClaimForCell.is_replacement_override,
+            originalMasterClaimIdIfOverridden: effectiveClaimForCell.original_master_claim_id_if_overridden,
+            sourceMasterClaimId: null, // Will be populated below if applicable
+            activeOverride: null, // Will be populated below if applicable
+            originalEffectiveClaimDetails: effectiveClaimForCell,
+          };
+        } else {
+           // If no effective claim, it implies 'none' or the claim text doesn't apply at all to this product.
+           // We still need to check if a global claim for this text existed and was overridden.
+            matrixCell = {
+                effectiveStatus: 'none',
+                isActuallyMaster: false,
+                sourceMasterClaimId: null,
+                activeOverride: null,
+                originalEffectiveClaimDetails: null,
+            };
+        }
+
+        // Check for master claim context and overrides
+        if (globalClaimForCellText && globalClaimForCellText.original_claim_country_code === '__GLOBAL__') {
+          matrixCell.sourceMasterClaimId = globalClaimForCellText.source_claim_id; // ID of the original master claim
+          
+          const productOverrides = productOverridesCache[product.id];
+          const override = productOverrides.find(ov => ov.master_claim_id === globalClaimForCellText.source_claim_id);
+
           if (override) {
-            const replacementDetails = await getReplacementClaimDetails(supabase as SupabaseClient, override.replacement_claim_id);
-            cellData.activeOverride = {
+            const replacementDetails = await getReplacementClaimDetails(supabase, override.replacement_claim_id);
+            matrixCell.activeOverride = {
               overrideId: override.id,
               isBlocked: override.is_blocked,
               masterClaimIdItOverrides: override.master_claim_id,
@@ -154,30 +189,32 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
               replacementClaimText: replacementDetails?.claim_text || null,
               replacementClaimType: replacementDetails?.claim_type || null,
             };
-            // If an override is active and it blocks, the effective claim might be null (if no replacement) 
-            // or it is the replacement. getStackedClaimsForProduct should handle this correctly for effectiveClaim.
-            // Here we are primarily identifying the override itself.
+            // If an override exists, the effectiveClaimForCell should reflect it.
+            // isActuallyMaster should be false if an override is in play for a master claim.
+            matrixCell.isActuallyMaster = false; 
           }
         }
-        productCellClaims[claimText] = cellData;
-      }
+        
+        // If there's no effective claim AND no global master context for this text, it truly doesn't apply.
+        // However, the loop through claimTextsAsRows ensures we have a cell for every claim text.
+        // If matrixCell is still mostly empty but effectiveClaimForCell was null, this means
+        // the claim text (potentially from another product) is not applicable to this product.
+        // The effectiveStatus would be 'none'.
 
-      matrixProductRows.push({
-        id: product.id,
-        name: product.name,
-        claims: productCellClaims,
-      });
+        cellData[claimText][product.id] = matrixCell;
+      }
     }
-    
-    const responseData: ClaimsMatrixResponse = {
-        products: matrixProductRows,
-        uniqueClaimTexts,
+
+    const responseData: ClaimsMatrixApiResponseData = {
+      claimTextsAsRows,
+      productsAsCols,
+      cellData,
     };
 
     return NextResponse.json({ success: true, data: responseData });
 
   } catch (error: any) {
-    console.error(`[API Claims Matrix GET] Catched error:`, error);
+    console.error(`[API Claims Matrix GET] Caught error:`, error);
     return handleApiError(error, 'An unexpected error occurred while fetching the claims matrix.');
   }
 });

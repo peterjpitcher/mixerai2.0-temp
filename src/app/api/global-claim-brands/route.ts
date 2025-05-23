@@ -63,26 +63,52 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
                 { status: 400 }
             );
         }
-        if (mixerai_brand_id && typeof mixerai_brand_id !== 'string') {
+        // mixerai_brand_id can be null, but if provided, must be a string.
+        if (mixerai_brand_id !== undefined && mixerai_brand_id !== null && typeof mixerai_brand_id !== 'string') {
              return NextResponse.json(
-                { success: false, error: 'MixerAI Brand ID must be a string if provided.' },
+                { success: false, error: 'MixerAI Brand ID must be a string or null if provided.' },
                 { status: 400 }
             );
         }
 
         const supabase = createSupabaseAdminClient();
-        const isAdmin = user?.user_metadata?.role === 'admin';
-        if (!isAdmin) {
-            console.warn(`[API GlobalClaimBrands POST] User ${user.id} (role: ${user?.user_metadata?.role}) attempted to create a global claim brand without admin privileges.`);
+
+        // --- Permission Check Start ---
+        let hasPermission = user?.user_metadata?.role === 'admin';
+
+        if (!hasPermission && mixerai_brand_id) { // Non-admin can only create if linking to a specific mixerai_brand_id they manage
+            // @ts-ignore
+            const { data: permissionsData, error: permissionsError } = await supabase
+                .from('user_brand_permissions')
+                .select('role')
+                .eq('user_id', user.id)
+                .eq('brand_id', mixerai_brand_id)
+                .eq('role', 'admin')
+                .limit(1);
+
+            if (permissionsError) {
+                console.error(`[API GlobalClaimBrands POST] Error checking permissions for user ${user.id} and brand ${mixerai_brand_id}:`, permissionsError);
+                // Fall through, hasPermission remains false
+            } else if (permissionsData && permissionsData.length > 0) {
+                hasPermission = true;
+            }
+        } else if (!hasPermission && !mixerai_brand_id) {
+            // Non-admin cannot create an unlinked global claim brand
+            // hasPermission remains false
+        }
+        
+        if (!hasPermission) {
+            console.warn(`[API GlobalClaimBrands POST] User ${user.id} (role: ${user?.user_metadata?.role}) permission denied to create global claim brand with name "${name}" and mixerai_brand_id "${mixerai_brand_id}".`);
             return NextResponse.json(
-                { success: false, error: 'You do not have permission to create a global claim brand.' },
+                { success: false, error: 'You do not have permission to create this global claim brand.' },
                 { status: 403 }
             );
         }
+        // --- Permission Check End ---
         
         const newRecord: Omit<GlobalClaimBrand, 'id' | 'created_at' | 'updated_at'> = {
             name: name.trim(),
-            mixerai_brand_id: mixerai_brand_id || null
+            mixerai_brand_id: mixerai_brand_id || null // Ensure it's explicitly null if not provided or empty string
         };
 
         // TODO: Regenerate Supabase types to include 'global_claim_brands' for strong typing.

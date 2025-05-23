@@ -236,7 +236,7 @@ export default function ContentPageClient() {
     }
     if (currentUser.brand_permissions && item.brand_id) {
       const brandPerm = currentUser.brand_permissions.find(p => p.brand_id === item.brand_id);
-      if (brandPerm && brandPerm.role === 'brand_admin') {
+      if (brandPerm && brandPerm.role === 'admin') {
         return true; // Brand Admins for this content's brand can delete
       }
     }

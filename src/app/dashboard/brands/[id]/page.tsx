@@ -38,7 +38,7 @@ interface UserSessionData {
   };
   brand_permissions?: Array<{ // Brand-specific permissions
     brand_id: string;
-    role: string; // e.g., 'brand_admin', 'editor', 'viewer' for that brand
+    role: string; // e.g., 'admin', 'editor', 'viewer' for that brand
   }>;
 }
 
@@ -161,7 +161,7 @@ export default function BrandDetails({ params }: BrandDetailsProps) {
   // Define role booleans after currentUser and brand are loaded and not null
   const isGlobalAdmin = currentUser?.user_metadata?.role === 'admin';
   const isSpecificBrandAdmin = currentUser?.brand_permissions?.some(
-    p => p.brand_id === id && p.role === 'brand_admin' // Assuming 'brand_admin' is the role name
+    p => p.brand_id === id && p.role === 'admin' // Assuming 'admin' is the role name
   );
   const isEditorAssignedToThisBrand = 
     currentUser?.user_metadata?.role === 'editor' && 

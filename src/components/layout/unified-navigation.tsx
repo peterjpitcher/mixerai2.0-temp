@@ -21,7 +21,17 @@ import {
   ListChecks,
   Loader2,
   MessageSquareWarning,
-  Info
+  Info,
+  ClipboardList,
+  LayoutGrid,
+  FilePlus2,
+  Package,
+  FlaskConical,
+  ShieldCheck,
+  Settings2,
+  ClipboardEdit,
+  Globe2,
+  SearchCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect, useRef } from 'react';
@@ -255,6 +265,57 @@ export function UnifiedNavigation() {
       segment: 'content-new', 
       defaultOpen: true,
       show: () => (isGlobalAdmin || isEditor_BrandAssigned_NonAdmin) && contentItems.length > 0
+    },
+    {
+      label: 'Product Claims',
+      icon: <ClipboardList className="h-5 w-5" />,
+      segment: 'product-claims-group',
+      defaultOpen: false, // Users can open it if interested
+      show: () => isAuthenticatedUserWithBrandAccess, // Show group if user has general access
+      items: [
+        {
+          href: '/dashboard/claims/preview',
+          label: 'Claims Matrix',
+          icon: <LayoutGrid className="h-4 w-4" />,
+          segment: 'claims-preview'
+        },
+        {
+          href: '/dashboard/admin/claims/definitions',
+          label: 'Define Claims',
+          icon: <ClipboardEdit className="h-4 w-4" />,
+          segment: 'claims-definitions'
+        },
+        {
+          href: '/dashboard/admin/claims/overrides',
+          label: 'Market Overrides',
+          icon: <Globe2 className="h-4 w-4" />,
+          segment: 'claims-overrides'
+        },
+        {
+          label: 'Brand Claims Review',
+          href: '/dashboard/admin/claims/brand-review',
+          icon: <SearchCheck className="h-4 w-4" />,
+          segment: 'claims-brand-review'
+        },
+        {
+          href: '/dashboard/admin/products',
+          label: 'Products',
+          icon: <Package className="h-4 w-4" />,
+          segment: 'claims-manage-products'
+        },
+        {
+          href: '/dashboard/admin/ingredients',
+          label: 'Ingredients',
+          icon: <FlaskConical className="h-4 w-4" />,
+          segment: 'claims-manage-ingredients'
+        },
+        {
+          href: '/dashboard/admin/global-claim-brands',
+          label: 'Claim Brands',
+          icon: <Building2 className="h-4 w-4" />,
+          segment: 'claims-manage-global-brands'
+        }
+      ]
     },
     { type: 'divider' as const, show: () => (isGlobalAdmin || isEditor_BrandAssigned_NonAdmin) }, // Divider after Create Content block
     {

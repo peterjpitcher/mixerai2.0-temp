@@ -74,7 +74,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
 
     try {
         const body = await req.json();
-        const { name, mixerai_brand_id } = body;
+        const { name, mixerai_brand_id: newMixeraiBrandIdInput } = body; // Renamed to avoid conflict
 
         if (!name || typeof name !== 'string' || name.trim() === '') {
             return NextResponse.json(
@@ -82,31 +82,87 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
                 { status: 400 }
             );
         }
-        if (mixerai_brand_id && typeof mixerai_brand_id !== 'string') {
+        // mixerai_brand_id can be null, but if provided, must be a string.
+        if (newMixeraiBrandIdInput !== undefined && newMixeraiBrandIdInput !== null && typeof newMixeraiBrandIdInput !== 'string') {
             return NextResponse.json(
-               { success: false, error: 'MixerAI Brand ID must be a string if provided.' },
+               { success: false, error: 'MixerAI Brand ID must be a string or null if provided.' },
                { status: 400 }
            );
        }
 
         const supabase = createSupabaseAdminClient();
-        const isAdmin = user?.user_metadata?.role === 'admin';
-        // TODO: Add more granular permission check: user must be admin or have specific rights on the linked mixerai_brand_id
-        if (!isAdmin) {
-            console.warn(`[API GlobalClaimBrands PUT /${id}] User ${user.id} (role: ${user?.user_metadata?.role}) attempted to update global claim brand without admin privileges.`);
+
+        // --- Permission Check Start ---
+        let hasPermission = user?.user_metadata?.role === 'admin';
+
+        if (!hasPermission) {
+            // @ts-ignore
+            const { data: gcbData, error: gcbFetchError } = await supabase
+                .from('global_claim_brands')
+                .select('mixerai_brand_id')
+                .eq('id', id)
+                .single();
+
+            if (gcbFetchError) {
+                console.error(`[API GlobalClaimBrands PUT /${id}] Error fetching GCB for permissions:`, gcbFetchError);
+                // Let main logic handle 404 if not found, otherwise deny.
+            } else if (!gcbData) {
+                console.warn(`[API GlobalClaimBrands PUT /${id}] GCB not found during permission check.`);
+            } else if (!gcbData.mixerai_brand_id) {
+                console.warn(`[API GlobalClaimBrands PUT /${id}] GCB ${id} is not linked to any MixerAI brand. Only global admin can manage.`);
+            } else {
+                // GCB is linked, check user permission for that mixerai_brand_id
+                // @ts-ignore
+                const { data: permissionsData, error: permissionsError } = await supabase
+                    .from('user_brand_permissions')
+                    .select('role')
+                    .eq('user_id', user.id)
+                    .eq('brand_id', gcbData.mixerai_brand_id)
+                    .eq('role', 'admin')
+                    .limit(1);
+                if (permissionsError) {
+                    console.error(`[API GlobalClaimBrands PUT /${id}] Error fetching user_brand_permissions for GCB ${id} and brand ${gcbData.mixerai_brand_id}:`, permissionsError);
+                } else if (permissionsData && permissionsData.length > 0) {
+                    hasPermission = true;
+                }
+            }
+        }
+        
+        // If attempting to change mixerai_brand_id and user is not global admin, deny.
+        if (newMixeraiBrandIdInput !== undefined && user?.user_metadata?.role !== 'admin') {
+            // Fetch current GCB again to compare mixerai_brand_id, or rely on initial fetch if it was successful and stored.
+            // For simplicity, if newMixeraiBrandIdInput is in payload and user is not admin, deny if it implies a change.
+            // To be absolutely sure, one would re-fetch gcbData here if not already available and compare gcbData.mixerai_brand_id with newMixeraiBrandIdInput.
+            // However, the current design is: non-admins cannot change mixerai_brand_id at all.
+             // So if newMixeraiBrandIdInput is part of the payload from a non-admin, it implies an attempt to set/change it.
+            console.warn(`[API GlobalClaimBrands PUT /${id}] Non-admin user ${user.id} attempted to modify mixerai_brand_id.`);
+            return NextResponse.json(
+                { success: false, error: 'You do not have permission to change the linked MixerAI Brand ID.' },
+                { status: 403 }
+            );
+        }
+
+        if (!hasPermission) {
+            console.warn(`[API GlobalClaimBrands PUT /${id}] User ${user.id} (role: ${user?.user_metadata?.role}) permission denied for GCB ${id}.`);
             return NextResponse.json(
                 { success: false, error: 'You do not have permission to update this global claim brand.' },
                 { status: 403 }
             );
         }
+        // --- Permission Check End ---
 
-        const updateData: Partial<Omit<GlobalClaimBrand, 'id' | 'created_at' | 'updated_at'>> & { updated_at: string } = {
+        const baseUpdateData: { name: string; updated_at: string; mixerai_brand_id?: string | null } = {
             name: name.trim(),
             updated_at: new Date().toISOString(),
         };
-        if (mixerai_brand_id !== undefined) { // Allow unsetting or setting mixerai_brand_id
-            updateData.mixerai_brand_id = mixerai_brand_id;
+
+        // Only global admins can change the mixerai_brand_id link.
+        // If newMixeraiBrandIdInput is provided AND user is admin, it's included in updateData.
+        if (newMixeraiBrandIdInput !== undefined && user?.user_metadata?.role === 'admin') {
+            baseUpdateData.mixerai_brand_id = newMixeraiBrandIdInput === null ? null : newMixeraiBrandIdInput.toString();
         }
+        
+        const updateData = { ...baseUpdateData };
 
         // @ts-ignore
         const { data, error } = await supabase.from('global_claim_brands')
@@ -159,15 +215,51 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
 
     try {
         const supabase = createSupabaseAdminClient();
-        const isAdmin = user?.user_metadata?.role === 'admin';
-        // TODO: Add more granular permission check
-        if (!isAdmin) {
-            console.warn(`[API GlobalClaimBrands DELETE /${id}] User ${user.id} (role: ${user?.user_metadata?.role}) attempted to delete global claim brand without admin privileges.`);
+
+        // --- Permission Check Start ---
+        let hasPermission = user?.user_metadata?.role === 'admin';
+
+        if (!hasPermission) {
+            // @ts-ignore
+            const { data: gcbData, error: gcbFetchError } = await supabase
+                .from('global_claim_brands')
+                .select('mixerai_brand_id')
+                .eq('id', id)
+                .single();
+
+            if (gcbFetchError) {
+                console.error(`[API GlobalClaimBrands DELETE /${id}] Error fetching GCB for permissions:`, gcbFetchError);
+                // Let main logic handle 404 if not found, otherwise deny.
+            } else if (!gcbData) {
+                console.warn(`[API GlobalClaimBrands DELETE /${id}] GCB not found during permission check.`);
+            } else if (!gcbData.mixerai_brand_id) {
+                console.warn(`[API GlobalClaimBrands DELETE /${id}] GCB ${id} is not linked to any MixerAI brand. Only global admin can manage.`);
+            } else {
+                // GCB is linked, check user permission for that mixerai_brand_id
+                // @ts-ignore
+                const { data: permissionsData, error: permissionsError } = await supabase
+                    .from('user_brand_permissions')
+                    .select('role')
+                    .eq('user_id', user.id)
+                    .eq('brand_id', gcbData.mixerai_brand_id)
+                    .eq('role', 'admin')
+                    .limit(1);
+                if (permissionsError) {
+                    console.error(`[API GlobalClaimBrands DELETE /${id}] Error fetching user_brand_permissions for GCB ${id} and brand ${gcbData.mixerai_brand_id}:`, permissionsError);
+                } else if (permissionsData && permissionsData.length > 0) {
+                    hasPermission = true;
+                }
+            }
+        }
+
+        if (!hasPermission) {
+            console.warn(`[API GlobalClaimBrands DELETE /${id}] User ${user.id} (role: ${user?.user_metadata?.role}) permission denied for GCB ${id}.`);
             return NextResponse.json(
                 { success: false, error: 'You do not have permission to delete this global claim brand.' },
                 { status: 403 }
             );
         }
+        // --- Permission Check End ---
 
         // @ts-ignore
         const { error, count } = await supabase.from('global_claim_brands')

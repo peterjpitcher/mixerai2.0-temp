@@ -210,7 +210,7 @@ export default function NewWorkflowPage() {
 
   const isGlobalAdmin = currentUser?.user_metadata?.role === 'admin';
   
-  const hasAnyBrandAdminPermission = currentUser?.brand_permissions?.some(p => p.role === 'brand_admin');
+  const hasAnyBrandAdminPermission = currentUser?.brand_permissions?.some(p => p.role === 'admin');
 
   const canAccessPage = isGlobalAdmin || hasAnyBrandAdminPermission;
 
@@ -260,7 +260,7 @@ export default function NewWorkflowPage() {
       userSpecificBrands = allFetchedBrands;
     } else {
       const adminBrandIds = currentUser?.brand_permissions
-                              ?.filter(p => p.role === 'brand_admin')
+                              ?.filter(p => p.role === 'admin')
                               .map(p => p.brand_id) || [];
       userSpecificBrands = allFetchedBrands.filter(brand => adminBrandIds.includes(brand.id));
     }

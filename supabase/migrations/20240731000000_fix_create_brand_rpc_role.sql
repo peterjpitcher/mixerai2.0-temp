@@ -1,6 +1,6 @@
 -- Migration: Update create_brand_and_set_admin function
 -- Description: This function is updated to:
--- 1. Correctly assign 'brand_admin' (user_brand_role_enum) to the creator in user_brand_permissions.
+-- 1. Correctly assign 'admin' (user_brand_role_enum) to the creator in user_brand_permissions.
 -- 2. Align its signature with parameters passed from /api/brands POST route, including
 --    brand_color_input and approved_content_types_input.
 -- 3. Handle insertion of new fields: brand_color and approved_content_types into the brands table.
@@ -54,9 +54,9 @@ BEGIN
   )
   RETURNING id INTO new_brand_id;
 
-  -- Assign the creator as a 'brand_admin' for the new brand
+  -- Assign the creator as a 'admin' for the new brand
   INSERT INTO public.user_brand_permissions (user_id, brand_id, role)
-  VALUES (creator_user_id, new_brand_id, 'brand_admin'::public.user_brand_role_enum);
+  VALUES (creator_user_id, new_brand_id, 'admin'::public.user_brand_role_enum);
 
   -- Return the ID of the newly created brand
   RETURN new_brand_id;

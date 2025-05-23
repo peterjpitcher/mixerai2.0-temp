@@ -72,6 +72,98 @@ Users can view a history of their past runs for AI-powered tools (Alt Text Gener
     - Accessible via `/api/me/tool-run-history` API endpoints.
 - For detailed information, see [Tool Run History Feature Plan](./docs/tool_run_history_feature_plan.md).
 
+## API Permissions and Security
+
+MixerAI 2.0 employs a role-based access control (RBAC) model to secure its API endpoints, ensuring that users can only perform actions and access data appropriate to their permissions. The system primarily distinguishes between **Global Administrators** and **Brand Administrators**.
+
+-   **Global Administrators (`user.user_metadata.role === 'admin'`):** These users have unrestricted access to all API functionalities, including creating, reading, updating, and deleting any data across all brands.
+-   **Brand Administrators:** Users can be granted 'admin' rights for specific MixerAI Brands via the `user_brand_permissions` table. Their permissions are typically scoped to the brands they administer.
+-   **Authenticated Users:** Some GET endpoints (primarily for listing data for UI selectors) are available to any authenticated user.
+
+Below is a breakdown of permissions for key API endpoint groups related to Claims Management and associated entities:
+
+### 1. Claims API (`/api/claims`, `/api/claims/[id]`)
+
+-   **`POST /api/claims` (Create Claim):**
+    -   Global admins: Allowed.
+    -   Brand admins:
+        -   For Brand-level claims: Allowed if admin of the `mixerai_brand_id` linked to the claim's `brand_id`.
+        -   For Product-level claims: Allowed if admin for *all* `mixerai_brand_id`s linked to the specified products.
+    -   Ingredient-level claims: Restricted to Global admins.
+-   **`GET /api/claims` (List Claims):**
+    -   Allowed for all authenticated users (data is typically filtered by accessibility or used in contexts where broad visibility is required, e.g., admin interfaces).
+-   **`GET /api/claims/[id]` (Get Single Claim):**
+    -   Allowed for all authenticated users.
+-   **`PUT /api/claims/[id]` (Update Claim):**
+    -   Global admins: Allowed.
+    -   Claim creator (`created_by`): Allowed.
+    -   Brand admins: Allowed if admin of the `mixerai_brand_id` associated with the claim's level (Brand or Product). Ingredient-level claims restricted to global admins or creator.
+-   **`DELETE /api/claims/[id]` (Delete Claim):**
+    -   Global admins: Allowed.
+    -   Claim creator (`created_by`): Allowed.
+    -   Brand admins: Allowed if admin of the `mixerai_brand_id` associated with the claim's level (Brand or Product). Ingredient-level claims restricted to global admins or creator.
+
+### 2. Market Overrides API (`/api/market-overrides`, `/api/market-overrides/[overrideId]`)
+
+-   **`POST /api/market-overrides` (Create Override):**
+    -   Global admins: Allowed.
+    -   Brand admins: Allowed if admin of the `mixerai_brand_id` linked to the `target_product_id` of the override.
+-   **`GET /api/market-overrides` (List Overrides):**
+    -   Allowed for all authenticated users (typically filtered by product/market on the frontend).
+-   **`PUT /api/market-overrides/[overrideId]` (Update Override):**
+    -   Global admins: Allowed.
+    -   Override creator: Allowed.
+    -   Brand admins: Allowed if admin of the `mixerai_brand_id` linked to the override's `target_product_id`.
+-   **`DELETE /api/market-overrides/[overrideId]` (Delete Override):**
+    -   Global admins: Allowed.
+    -   Override creator: Allowed.
+    -   Brand admins: Allowed if admin of the `mixerai_brand_id` linked to the override's `target_product_id`.
+
+### 3. Products API (`/api/products`, `/api/products/[id]`)
+
+-   **`POST /api/products` (Create Product):**
+    -   Global admins: Allowed.
+    -   Brand admins: Allowed if admin of the `mixerai_brand_id` linked to the `global_brand_id` being assigned to the new product.
+-   **`GET /api/products` (List Products):**
+    -   Allowed for all authenticated users.
+-   **`GET /api/products/[id]` (Get Single Product):**
+    -   Allowed for all authenticated users.
+-   **`PUT /api/products/[id]` (Update Product):**
+    -   Global admins: Allowed.
+    -   Brand admins: Allowed if admin of the `mixerai_brand_id` linked to the product's current `global_brand_id`. (Note: `global_brand_id` itself is not updatable via this endpoint by non-admins).
+-   **`DELETE /api/products/[id]` (Delete Product):**
+    -   Global admins: Allowed.
+    -   Brand admins: Allowed if admin of the `mixerai_brand_id` linked to the product's `global_brand_id`.
+
+### 4. Ingredients API (`/api/ingredients`, `/api/ingredients/[id]`)
+
+-   **`POST /api/ingredients` (Create Ingredient):**
+    -   Restricted to Global admins only.
+-   **`GET /api/ingredients` (List Ingredients):**
+    -   Allowed for all authenticated users.
+-   **`GET /api/ingredients/[id]` (Get Single Ingredient):**
+    -   Allowed for all authenticated users.
+-   **`PUT /api/ingredients/[id]` (Update Ingredient):**
+    -   Restricted to Global admins only.
+-   **`DELETE /api/ingredients/[id]` (Delete Ingredient):**
+    -   Restricted to Global admins only.
+
+### 5. Global Claim Brands API (`/api/global-claim-brands`, `/api/global-claim-brands/[id]`)
+
+-   **`POST /api/global-claim-brands` (Create Global Claim Brand):**
+    -   Global admins: Allowed.
+    -   Brand admins: Allowed if linking to a `mixerai_brand_id` for which they are an admin. Creating an unlinked Global Claim Brand (no `mixerai_brand_id`) is restricted to Global admins.
+-   **`GET /api/global-claim-brands` (List Global Claim Brands):**
+    -   Allowed for all authenticated users.
+-   **`GET /api/global-claim-brands/[id]` (Get Single Global Claim Brand):**
+    -   Allowed for all authenticated users.
+-   **`PUT /api/global-claim-brands/[id]` (Update Global Claim Brand):**
+    -   Global admins: Allowed (can update name and `mixerai_brand_id`).
+    -   Brand admins: Allowed to update `name` if admin of the *currently linked* `mixerai_brand_id`. Non-admins cannot change the `mixerai_brand_id` link itself. If the GCB is unlinked, only Global Admins can edit.
+-   **`DELETE /api/global-claim-brands/[id]` (Delete Global Claim Brand):**
+    -   Global admins: Allowed.
+    -   Brand admins: Allowed if admin of the linked `mixerai_brand_id`. If the GCB is unlinked, only Global Admins can delete.
+
 ## Recent Updates and Feature Details
 
 # MixerAI 2.0 - UI and Authentication Updates

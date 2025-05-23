@@ -57,7 +57,7 @@ async function assignBrandPermissions(userId: string, brandId: string, role: Use
   console.log(`[InviteService] Assigning role '${role}' to user ${userId} for brand ${brandId}`);
   
   // The role from UserRoles should now directly map to the role in user_brand_permissions
-  const brandPermissionRole = role; // Removed mapping to 'brand_admin'
+  const brandPermissionRole = role; // Removed mapping to 'admin'
   
   const { error } = await supabase
     .from('user_brand_permissions')
