@@ -298,7 +298,7 @@ const OverrideModalContent: React.FC<OverrideModalContentProps> = ({
             Claim Text: "<span className="font-semibold">{modalContextData.claimTextInfo.text}</span>"
             {modalContextData.cellData?.activeOverride && 
               <span className="text-xs block mt-1 text-muted-foreground">Override ID: {modalContextData.cellData.activeOverride.overrideId}</span>}
-            {modalContextData.cellData?.sourceMasterClaimId && 
+            {modalContextData?.cellData?.sourceMasterClaimId && 
                <span className="text-xs block mt-1 text-muted-foreground">Master Claim ID: {modalContextData.cellData.sourceMasterClaimId}</span>}
         </DialogDescription>
       </DialogHeader>
@@ -636,35 +636,35 @@ export default function ClaimsPreviewPage() {
   const pageDescription = `View and manage claim overrides for products in ${COUNTRY_CODES.find(c=>c.code === selectedCountry)?.name || selectedCountry}.`; 
 
   return (
-    <div className="space-y-1 p-2 sm:p-3 lg:p-4"> 
+    <div className="space-y-0 p-y-0 sm:py-0.5 lg:py-1"> 
       <div className="flex-shrink-0"> 
         <Breadcrumbs items={breadcrumbItems} /> 
         <PageHeader title={pageTitle} description={pageDescription} /> 
       </div>
       
-      <Card className="mb-1"> 
-        <CardContent className="p-1.5"> 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2"> 
-            <div>
+      <Card className="mb-0"> 
+        <CardContent className="flex items-center justify-between py-0"> 
+          <div className="flex space-x-2"> 
+            <div className="flex-1"> 
               <Label htmlFor="matrix_country_code" className="text-xs mb-0.5 block">Country</Label> 
-              <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+              <Select value={selectedCountry} onValueChange={setSelectedCountry}> 
                 <SelectTrigger id="matrix_country_code" className="h-8 text-xs"><SelectValue /></SelectTrigger> 
               <SelectContent>
-                  <SelectItem value={GLOBAL_COUNTRY_CODE} className="text-xs min-h-[1.5rem]">{GLOBAL_COUNTRY_NAME} ({GLOBAL_COUNTRY_CODE})</SelectItem>
-                  {COUNTRY_CODES.map(c => <SelectItem key={c.code} value={c.code} className="text-xs min-h-[1.5rem]">{c.name} ({c.code})</SelectItem>)}
+                  <SelectItem value={GLOBAL_COUNTRY_CODE} className="text-xs min-h-[1.5rem]">{GLOBAL_COUNTRY_NAME} ({GLOBAL_COUNTRY_CODE})</SelectItem> 
+                  {COUNTRY_CODES.map(c => <SelectItem key={c.code} value={c.code} className="text-xs min-h-[1.5rem]">{c.name} ({c.code})</SelectItem>)} 
               </SelectContent>
             </Select>
           </div>
-            <div>
+            <div className="flex-1"> 
               <Label htmlFor="matrix_brand_filter" className="text-xs mb-0.5 block">Brand</Label> 
-              <Select value={selectedBrandId} onValueChange={setSelectedBrandId} disabled={isLoadingBrands}>
+              <Select value={selectedBrandId} onValueChange={setSelectedBrandId} disabled={isLoadingBrands}> 
                 <SelectTrigger id="matrix_brand_filter" className="h-8 text-xs"><SelectValue placeholder={isLoadingBrands ? "Loading..." : "All Brands"} /></SelectTrigger> 
               <SelectContent>
-                  <SelectItem value="all" className="text-xs min-h-[1.5rem]">All Brands</SelectItem>
-                  {availableBrands.map(b => <SelectItem key={b.id} value={b.id} className="text-xs min-h-[1.5rem]">{b.name}</SelectItem>)}
+                  <SelectItem value="all" className="text-xs min-h-[1.5rem]">All Brands</SelectItem> 
+                  {availableBrands.map(b => <SelectItem key={b.id} value={b.id} className="text-xs min-h-[1.5rem]">{b.name}</SelectItem>)} 
               </SelectContent>
             </Select>
-            </div>
+            </div> 
           </div>
         </CardContent>
       </Card>
@@ -680,9 +680,7 @@ export default function ClaimsPreviewPage() {
         
         {!isLoading && !error && matrixData && matrixData.productsAsCols.length > 0 && matrixData.claimTextsAsRows.length > 0 && (
             <Table className="min-w-full border-collapse">
-              <TableHeader 
-                className="sticky top-0 z-20 bg-muted shadow"
-              >
+              <TableHeader className="sticky top-0 z-10 bg-white shadow">
                 <TableRow>
                   <TableHead 
                     className="sticky left-0 z-30 p-1 text-xs font-semibold text-muted-foreground min-w-[160px] sm:min-w-[200px] border bg-muted"
