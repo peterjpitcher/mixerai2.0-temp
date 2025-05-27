@@ -23,7 +23,20 @@ export async function middleware(request: NextRequest) {
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+  
+  // Determine the base URL based on the environment
+  let baseUrl = request.nextUrl.origin; // Default to current origin (good for local dev)
+
+  if (process.env.NEXT_PUBLIC_VERCEL_ENV === 'production' && process.env.NEXT_PUBLIC_APP_URL) {
+    // For Vercel production deployments, use the canonical app URL if set
+    baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+  } else if (process.env.NEXT_PUBLIC_VERCEL_URL) {
+    // For Vercel preview or other Vercel deployments, use the Vercel-provided URL
+    // NEXT_PUBLIC_VERCEL_URL does not include the protocol, so we add it.
+    baseUrl = `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`;
+  }
+  // For local development (NEXT_PUBLIC_VERCEL_ENV is not set or is 'development'),
+  // request.nextUrl.origin (the initial value of baseUrl) is appropriate.
 
   if (supabaseUrl && supabaseAnonKey) {
     const supabase = createServerClient(
