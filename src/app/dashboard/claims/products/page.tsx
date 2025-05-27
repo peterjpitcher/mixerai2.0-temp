@@ -23,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trash2, Edit3, PlusCircle, Search, AlertTriangle, Package, Building2, Loader2, GripHorizontal } from "lucide-react";
+import { Trash2, Edit3, PlusCircle, Search, AlertTriangle, Package, Building2, Loader2, GripHorizontal, Pencil } from "lucide-react";
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -269,25 +269,21 @@ export default function ProductsPage() {
                       <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{product.description || "-"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{product.created_at ? new Date(product.created_at).toLocaleDateString() : "-"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{product.updated_at ? new Date(product.updated_at).toLocaleDateString() : "-"}</TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <span className="sr-only">Open menu</span>
-                              <GripHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/claims/products/${product.id}/edit`} className="cursor-pointer">
-                                <Edit3 className="mr-2 h-4 w-4" /> Edit
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openDeleteDialog(product)} className="text-red-600 hover:!text-red-600 focus:text-red-600 cursor-pointer">
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                      <TableCell className="text-right space-x-1">
+                        <Button variant="ghost" size="icon" asChild title="Edit Product">
+                          <Link href={`/dashboard/claims/products/${product.id}/edit`} >
+                            <Pencil className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          title="Delete Product"
+                          onClick={() => openDeleteDialog(product)}
+                          // disabled={isDeleting && itemToDelete?.id === product.id} // Assuming itemToDelete is the state for the dialog
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))

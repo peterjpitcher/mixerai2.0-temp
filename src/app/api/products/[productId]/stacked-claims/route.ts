@@ -99,6 +99,10 @@ export const GET = withAuth(async (req: NextRequest, user: User, { params }: { p
     // getStackedClaimsForProduct creates its own admin client, so no need to pass one here.
     const effectiveClaims = await getStackedClaimsForProduct(productId, countryCode);
 
+    console.log("--- Effective Claims from getStackedClaimsForProduct --- প্রোডাক্ট:", productId, "দেশ:", countryCode);
+    console.log(JSON.stringify(effectiveClaims, null, 2)); // Pretty print the JSON
+    console.log("-----------------------------------------------------");
+
     // getStackedClaimsForProduct is designed to return [] on error or if no claims, 
     // so checking for !effectiveClaims might be redundant if it never returns null/undefined.
     // However, it's a safe check.

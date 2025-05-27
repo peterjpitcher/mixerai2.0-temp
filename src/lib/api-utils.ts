@@ -3,6 +3,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import axios from 'axios';
 
 /**
  * Get environment mode (development, production, test)
@@ -111,4 +112,37 @@ export const handleApiError = (
     },
     { status }
   );
+};
+
+export const fetchCountries = async () => {
+  try {
+    const response = await axios.get('/api/countries');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching countries:', error);
+    return [];
+  }
+};
+
+export const fetchProducts = async () => {
+  try {
+    const response = await axios.get('/api/products');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    return [];
+  }
+};
+
+export const fetchClaims = async (productId: string, countryCodeValue: string) => {
+  try {
+    const response = await axios.get(`/api/products/${productId}/stacked-claims`, {
+      params: { countryCode: countryCodeValue },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching claims for product:', productId, 'country:', countryCodeValue, error);
+    // Return a more structured error or rethrow, to be handled by the caller
+    return { success: false, error: 'Failed to fetch claims.', data: [] };
+  }
 }; 

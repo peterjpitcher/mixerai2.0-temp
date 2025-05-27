@@ -23,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trash2, Edit3, PlusCircle, Search, AlertTriangle, Loader2, Sprout, GripHorizontal } from "lucide-react";
+import { Trash2, Edit3, PlusCircle, Search, AlertTriangle, Loader2, Sprout, GripHorizontal, Pencil } from "lucide-react";
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
 import {
@@ -205,7 +205,7 @@ export default function IngredientsPage() {
               </TableCaption>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[250px]">Ingredient Name</TableHead>
+                  <TableHead className="w-[200px]">Ingredient Name</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Updated</TableHead>
@@ -216,31 +216,31 @@ export default function IngredientsPage() {
                 {filteredIngredients.length > 0 ? (
                   filteredIngredients.map((ingredient) => (
                     <TableRow key={ingredient.id}>
-                      <TableCell className="font-medium truncate" title={ingredient.name}>{ingredient.name}</TableCell>
-                      <TableCell className="truncate max-w-sm" title={ingredient.description || ''}>
-                        {ingredient.description || <span className="italic text-muted-foreground">No description</span>}
+                      <TableCell className="font-medium truncate" title={ingredient.name}>
+                        <Link href={`/dashboard/claims/ingredients/${ingredient.id}/edit`} className="hover:underline text-primary">
+                          {ingredient.name}
+                        </Link>
                       </TableCell>
-                      <TableCell>{ingredient.created_at ? new Date(ingredient.created_at).toLocaleDateString() : 'N/A'}</TableCell>
-                      <TableCell>{ingredient.updated_at ? new Date(ingredient.updated_at).toLocaleDateString() : 'N/A'}</TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <span className="sr-only">Open menu</span>
-                              <GripHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/claims/ingredients/${ingredient.id}/edit`} className="cursor-pointer"> {/* Updated path */}
-                                <Edit3 className="mr-2 h-4 w-4" /> Edit
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openDeleteDialog(ingredient)} className="text-red-600 hover:!text-red-600 focus:text-red-600 cursor-pointer">
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                      <TableCell className="text-sm text-muted-foreground max-w-xs truncate" title={ingredient.description || ''}>
+                        {ingredient.description || "-"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{ingredient.created_at ? new Date(ingredient.created_at).toLocaleDateString() : '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{ingredient.updated_at ? new Date(ingredient.updated_at).toLocaleDateString() : '-'}</TableCell>
+                      <TableCell className="text-right space-x-1">
+                        <Button variant="ghost" size="icon" asChild title="Edit Ingredient">
+                          <Link href={`/dashboard/claims/ingredients/${ingredient.id}/edit`} >
+                            <Pencil className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          title="Delete Ingredient"
+                          onClick={() => openDeleteDialog(ingredient)}
+                          // disabled={isDeleting && itemToDelete?.id === ingredient.id} 
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))

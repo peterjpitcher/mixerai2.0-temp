@@ -1,5 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { withAuth } from '@/lib/auth/api-auth';
+import { User } from '@supabase/supabase-js';
 
 // Initialize Supabase client
 // Ensure your environment variables are correctly set up
@@ -13,7 +15,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 const supabase = createClient(supabaseUrl!, supabaseAnonKey!);
 
-export async function GET(request: Request) {
+// Original GET logic, now to be wrapped by withAuth
+async function getCountriesHandler(request: NextRequest, user: User) {
   try {
     const { data, error } = await supabase
       .from('countries')
@@ -29,7 +32,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, data: data });
 
   } catch (e: any) {
-    console.error('Unexpected error in GET /api/countries:', e);
+    console.error('Unexpected error in GET /api/countries handler:', e);
     return NextResponse.json({ success: false, error: e.message || 'An unexpected server error occurred' }, { status: 500 });
   }
-} 
+}
+
+// Export the wrapped handler
+export const GET = withAuth(getCountriesHandler); 

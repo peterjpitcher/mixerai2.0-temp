@@ -23,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trash2, Edit3, PlusCircle, Search, AlertTriangle, Loader2, GripHorizontal, Globe } from "lucide-react";
+import { Trash2, Edit3, PlusCircle, Search, AlertTriangle, Loader2, GripHorizontal, Globe, Pencil } from "lucide-react";
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
 import {
@@ -205,7 +205,7 @@ export default function MasterClaimBrandsPage() {
               </TableCaption>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[300px]">Brand Name</TableHead>
+                  <TableHead className="w-[200px]">Brand Name</TableHead>
                   <TableHead>MixerAI Brand ID</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Updated</TableHead>
@@ -216,29 +216,29 @@ export default function MasterClaimBrandsPage() {
                 {filteredBrands.length > 0 ? (
                   filteredBrands.map((brand) => (
                     <TableRow key={brand.id}>
-                      <TableCell className="font-medium truncate" title={brand.name}>{brand.name}</TableCell>
-                      <TableCell>{brand.mixerai_brand_id || <span className="italic text-muted-foreground">N/A</span>}</TableCell>
-                      <TableCell>{brand.created_at ? new Date(brand.created_at).toLocaleDateString() : 'N/A'}</TableCell>
-                      <TableCell>{brand.updated_at ? new Date(brand.updated_at).toLocaleDateString() : 'N/A'}</TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <span className="sr-only">Open menu</span>
-                              <GripHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/claims/brands/${brand.id}/edit`} className="cursor-pointer"> {/* Updated path */}
-                                <Edit3 className="mr-2 h-4 w-4" /> Edit
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openDeleteDialog(brand)} className="text-red-600 hover:!text-red-600 focus:text-red-600 cursor-pointer">
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                      <TableCell className="font-medium truncate" title={brand.name}>
+                        <Link href={`/dashboard/claims/brands/${brand.id}/edit`} className="hover:underline text-primary">
+                          {brand.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-sm">{brand.mixerai_brand_id || "-"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{brand.created_at ? new Date(brand.created_at).toLocaleDateString() : '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{brand.updated_at ? new Date(brand.updated_at).toLocaleDateString() : '-'}</TableCell>
+                      <TableCell className="text-right space-x-1">
+                        <Button variant="ghost" size="icon" asChild title="Edit Brand">
+                          <Link href={`/dashboard/claims/brands/${brand.id}/edit`} >
+                            <Pencil className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          title="Delete Brand"
+                          onClick={() => openDeleteDialog(brand)}
+                          // disabled={isDeleting && itemToDelete?.id === brand.id} 
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
