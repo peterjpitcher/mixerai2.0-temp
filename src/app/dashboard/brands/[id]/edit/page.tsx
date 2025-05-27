@@ -1,22 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/button';
-import { Input } from '@/components/input';
-import { Textarea } from '@/components/textarea';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
-import { Label } from '@/components/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+// import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs'; // Commented out due to persistent import issues
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, X, PlusCircle, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react';
+import { Loader2, X, PlusCircle, ArrowLeft, Trash2, AlertTriangle, Users, Link2, ExternalLink, Sparkles } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
-import { Checkbox } from "@/components/checkbox";
-import { Badge } from "@/components/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { Breadcrumbs as CustomBreadcrumbs } from '@/components/dashboard/breadcrumbs';
+import { cn } from '@/lib/utils';
 
 // export const metadata: Metadata = {
 //   title: 'Edit Brand | MixerAI 2.0',
@@ -29,7 +32,6 @@ interface BrandEditPageProps {
   };
 }
 
-// Define the type for user search results
 interface UserSearchResult {
   id: string;
   full_name: string | null;
@@ -38,7 +40,6 @@ interface UserSearchResult {
   job_title?: string | null;
 }
 
-// Define the type for content vetting agencies (can be refined based on API response)
 interface VettingAgency {
   id: string;
   name: string;
@@ -47,7 +48,6 @@ interface VettingAgency {
   priority?: 'High' | 'Medium' | 'Low' | null;
 }
 
-// Define UserSessionData interface (can be moved to a shared types file later)
 interface UserSessionData {
   id: string;
   email?: string;
@@ -61,63 +61,31 @@ interface UserSessionData {
   }>;
 }
 
-// Helper function to get priority-based Tailwind CSS classes
+interface MasterClaimBrand {
+  id: string;
+  name: string;
+}
+
 const getPriorityAgencyStyles = (priority: 'High' | 'Medium' | 'Low' | null | undefined): string => {
-  if (priority === 'High') {
-    return 'text-red-600 font-bold';
-  }
-  if (priority === 'Medium') {
-    return 'text-orange-500 font-semibold';
-  }
-  if (priority === 'Low') {
-    return 'text-blue-600 font-normal'; // Example for Low
-  }
-  return 'font-normal text-gray-700 dark:text-gray-300'; // Default for null/undefined or other values
+  if (priority === 'High') return 'text-red-600 font-bold';
+  if (priority === 'Medium') return 'text-orange-500 font-semibold';
+  if (priority === 'Low') return 'text-blue-600 font-normal';
+  return 'font-normal text-gray-700 dark:text-gray-300';
 };
 
-// Placeholder Breadcrumbs component - replace with actual implementation later
-const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
-  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
-    <ol className="flex items-center space-x-1.5">
-      {items.map((item, index) => (
-        <li key={index} className="flex items-center">
-          {item.href ? (
-            <Link href={item.href} className="hover:underline">
-              {item.label}
-            </Link>
-          ) : (
-            <span>{item.label}</span>
-          )}
-          {index < items.length - 1 && <span className="mx-1.5">/</span>}
-        </li>
-      ))}
-    </ol>
-  </nav>
-);
-
-// Add a constant for the required role
 const REQUIRED_ROLE = 'admin';
 
-/**
- * BrandEditPage allows users to modify the details of an existing brand.
- * It includes sections for basic information (name, website, country, language, brand colour)
- * and brand identity (AI-generated or manually entered brand identity, tone of voice, guardrails,
- * and content vetting agencies).
- * The page fetches brand data on load and allows saving changes or generating brand identity content.
- */
 export default function BrandEditPage({ params }: BrandEditPageProps) {
   const router = useRouter();
   const { id } = params;
   
-  // States for data, loading, and errors
   const [brand, setBrand] = useState<any>(null);
-  const [isLoadingBrand, setIsLoadingBrand] = useState(true); // Renamed for clarity
+  const [isLoadingBrand, setIsLoadingBrand] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState('basic');
+  // const [activeTab, setActiveTab] = useState('basic'); // Commented out as Tabs are removed
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // States for user session and permissions
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [isForbidden, setIsForbidden] = useState(false);
@@ -132,47 +100,26 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     brand_identity: '',
     tone_of_voice: '',
     guardrails: '',
-    content_vetting_agencies: [] as string[]
+    content_vetting_agencies: [] as string[],
+    master_claim_brand_id: null as string | null,
   });
   const [currentAdditionalUrl, setCurrentAdditionalUrl] = useState('');
   const [customAgencyInput, setCustomAgencyInput] = useState('');
 
   const [allVettingAgencies, setAllVettingAgencies] = useState<VettingAgency[]>([]);
+  const [masterClaimBrands, setMasterClaimBrands] = useState<MasterClaimBrand[]>([]);
+  const [isLoadingMasterClaimBrands, setIsLoadingMasterClaimBrands] = useState(true);
 
-  // UPDATED: State for selected brand admins
-  const [selectedAdmins, setSelectedAdmins] = useState<UserSearchResult[]>([]);
-  const [userSearchResults, setUserSearchResults] = useState<UserSearchResult[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [displayedAdmins, setDisplayedAdmins] = useState<UserSearchResult[]>([]);
 
   const priorityOrder: Array<'High' | 'Medium' | 'Low'> = ['High', 'Medium', 'Low'];
-
-  // Function to search users
-  const searchUsers = async (query) => {
-    if (!query) return;
-    try {
-      const response = await fetch(`/api/users/search?query=${query}`);
-      const data = await response.json();
-      if (data.success) {
-        setUserSearchResults(data.users);
-      } else {
-        setUserSearchResults([]);
-      }
-    } catch (error) {
-      console.error('Error searching users:', error);
-      setUserSearchResults([]);
-    }
-  };
-
-  // Effect to trigger user search
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      searchUsers(searchQuery);
-    }, 300);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery]);
   
-  // Modify the useEffect to check user role
+  const breadcrumbItems = [
+    { label: "Dashboard", href: "/dashboard" },
+    { label: "Brands", href: "/dashboard/brands" },
+    { label: `Edit: ${brand?.name || id}` },
+  ];
+
   useEffect(() => {
     const fetchCurrentUser = async () => {
       setIsLoadingUser(true);
@@ -182,10 +129,21 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         const data = await response.json();
         if (data.success && data.user) {
           setCurrentUser(data.user);
-          // PERMISSION CHECK REMOVED FROM HERE
+          const userRole = data.user.user_metadata?.role;
+          let hasBrandAdminPermission = false;
+          if (data.user.brand_permissions) {
+            const brandPerm = data.user.brand_permissions.find(p => p.brand_id === id);
+            if (brandPerm && brandPerm.role === 'admin') {
+              hasBrandAdminPermission = true;
+            }
+          }
+          if (userRole !== REQUIRED_ROLE && !hasBrandAdminPermission) {
+            setIsForbidden(true);
+            toast.error("Access Denied", { description: "You do not have permission to edit this brand." });
+          }
         } else {
           setCurrentUser(null);
-          setIsForbidden(true); // No user implies forbidden
+          setIsForbidden(true);
           toast.error('Your session could not be verified.');
         }
       } catch (err) {
@@ -200,20 +158,21 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     fetchCurrentUser();
   }, [id]);
 
-  // Effect to fetch brand data
   useEffect(() => {
+    if (isForbidden) return;
+
     const fetchBrandData = async () => {
       setIsLoadingBrand(true);
       try {
         const response = await fetch(`/api/brands/${id}`);
         if (!response.ok) {
           if (response.status === 404) {
-            setError('Brand not found.'); // Specific error for 404
-            setIsForbidden(true); // Can't edit a non-existent brand
+            setError('Brand not found.');
+            setIsForbidden(true); 
           } else {
-            throw new Error(`Failed to fetch brand: ${response.status}`);
+            throw new Error(`Failed to fetch brand: ${response.statusText}`);
           }
-          return; // Exit if response not ok
+          return;
         }
         
         const data = await response.json();
@@ -242,132 +201,110 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
           content_vetting_agencies: Array.isArray(data.brand.selected_vetting_agencies) 
                                       ? data.brand.selected_vetting_agencies.map((agency: VettingAgency) => agency.id) 
                                       : [],
+          master_claim_brand_id: data.brand.master_claim_brand_id || null,
         });
 
         if (data.brand.admins && Array.isArray(data.brand.admins)) {
-          setSelectedAdmins(data.brand.admins);
+          setDisplayedAdmins(data.brand.admins);
+        } else {
+          setDisplayedAdmins([]);
         }
 
       } catch (err) {
+        console.error('Error fetching brand data:', err);
         setError((err as Error).message);
-        toast.error('Failed to load brand details. Please try again.');
-        // Potentially set isForbidden true here too if brand load fails critically
+        toast.error("Failed to load brand data", { description: (err as Error).message });
       } finally {
         setIsLoadingBrand(false);
       }
     };
-    
-    if (id) fetchBrandData(); // Only fetch if ID is available
-  }, [id]);
 
-  // Effect for permission check after user and brand data are loaded
-  useEffect(() => {
-    if (isLoadingUser || isLoadingBrand) {
-      return; // Wait until both user and brand data are loaded
-    }
-
-    if (!currentUser || !brand) {
-      // If either is null after loading (e.g., brand not found, user session error)
-      setIsForbidden(true);
-      return;
-    }
-
-    const isGlobalAdmin = currentUser.user_metadata?.role === 'admin';
-    const isBrandAdminForThisBrand = currentUser.brand_permissions?.some(
-      p => p.brand_id === id && p.role === REQUIRED_ROLE // USE REQUIRED_ROLE HERE
-    );
-
-    if (!isGlobalAdmin && !isBrandAdminForThisBrand) {
-      setIsForbidden(true);
-      setError('You do not have permission to edit this brand.'); // More specific error
-    } else {
-      setIsForbidden(false); // Explicitly set to false if user has permission
-      setError(null); // Clear any previous permission-related error
-    }
-  }, [currentUser, brand, isLoadingUser, isLoadingBrand, id, REQUIRED_ROLE]); // Add REQUIRED_ROLE to dependency array
-
-  // useEffect to fetch vetting agencies based on brand's country
-  useEffect(() => {
     const fetchAllVettingAgencies = async () => {
-      if (isForbidden || isLoadingBrand || isLoadingUser || !formData) return;
-
-      let apiUrl = '/api/content-vetting-agencies';
-      if (formData.country) {
-        apiUrl = `/api/content-vetting-agencies?country_code=${formData.country}`;
-      }
-
       try {
-        const response = await fetch(apiUrl);
-        if (!response.ok) {
-          throw new Error('Failed to fetch vetting agencies');
-        }
+        const response = await fetch('/api/content-vetting-agencies');
+        if (!response.ok) throw new Error('Failed to fetch vetting agencies');
         const data = await response.json();
-        if (data.success && Array.isArray(data.data)) {
-          setAllVettingAgencies(data.data);
+        if (data.success && Array.isArray(data.agencies)) {
+          setAllVettingAgencies(data.agencies);
         } else {
-          toast.error(data.error || 'Could not load vetting agencies for the selected country.');
-          setAllVettingAgencies([]); // Clear previous list if fetch fails or returns no data for country
+          throw new Error(data.error || 'Failed to parse vetting agencies');
         }
       } catch (err) {
-        toast.error('Failed to fetch vetting agencies list.');
-        console.error('Error fetching all vetting agencies:', err);
-        setAllVettingAgencies([]);
+        console.error('Error fetching vetting agencies:', err);
+        toast.error("Failed to load vetting agencies", { description: (err as Error).message });
       }
     };
 
-    // We need formData.country to be populated before fetching agencies by country.
-    // Check if isLoadingBrand is false, which means fetchBrandData has likely completed and set formData.country.
-    if (!isLoadingBrand) { 
-      fetchAllVettingAgencies();
-    }
-  }, [formData.country, isLoadingBrand, isForbidden, isLoadingUser, formData]); // Added formData and more checks
-  
+    const fetchMasterClaimBrands = async () => {
+      setIsLoadingMasterClaimBrands(true);
+      try {
+        const response = await fetch('/api/master-claim-brands');
+        if (!response.ok) throw new Error('Failed to fetch Master Claim Brands');
+        const data = await response.json();
+        if (data.success && Array.isArray(data.data)) {
+          setMasterClaimBrands(data.data);
+        } else {
+          throw new Error(data.error || 'Failed to parse Master Claim Brands');
+        }
+      } catch (err) {
+        console.error('Error fetching Master Claim Brands:', err);
+        toast.error("Failed to load Master Claim Brands", { description: (err as Error).message });
+      } finally {
+        setIsLoadingMasterClaimBrands(false);
+      }
+    };
+
+    fetchBrandData();
+    fetchAllVettingAgencies();
+    fetchMasterClaimBrands();
+
+  }, [id, isForbidden]);
+
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value
-    });
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
-  
+
   const handleSelectChange = (name: string, value: string) => {
-    setFormData({
-      ...formData,
-      [name]: value
-    });
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
   
-  // --- Handlers for Additional Website URLs ---
+  const handleMasterClaimBrandChange = (value: string) => {
+    setFormData(prev => ({ ...prev, master_claim_brand_id: value === "none" ? null : value }));
+  };
+
   const handleAddAdditionalUrlField = () => {
-    setFormData(prev => ({
-      ...prev,
-      additional_website_urls: [...prev.additional_website_urls, { id: uuidv4(), value: '' }]
-    }));
+    if (currentAdditionalUrl.trim() !== '') {
+      setFormData(prev => ({
+        ...prev,
+        additional_website_urls: [...prev.additional_website_urls, { id: uuidv4(), value: currentAdditionalUrl.trim() }]
+      }));
+      setCurrentAdditionalUrl('');
+    }
   };
 
   const handleRemoveAdditionalUrl = (idToRemove: string) => {
     setFormData(prev => ({
       ...prev,
-      additional_website_urls: prev.additional_website_urls.filter(urlObj => urlObj.id !== idToRemove)
+      additional_website_urls: prev.additional_website_urls.filter(url => url.id !== idToRemove)
     }));
   };
 
-  const handleAdditionalUrlChange = (id: string, value: string) => {
+  const handleAdditionalUrlChange = (idToUpdate: string, newValue: string) => {
     setFormData(prev => ({
       ...prev,
-      additional_website_urls: prev.additional_website_urls.map(urlObj => 
-        urlObj.id === id ? { ...urlObj, value } : urlObj
+      additional_website_urls: prev.additional_website_urls.map(url =>
+        url.id === idToUpdate ? { ...url, value: newValue } : url
       )
     }));
   };
-  // --- End Handlers for Additional Website URLs ---
 
-  // --- Handlers for Content Vetting Agencies ---
   const handleAgencyCheckboxChange = (agencyId: string, checked: boolean) => {
     setFormData(prev => {
-      const currentAgencies = Array.isArray(prev.content_vetting_agencies) ? prev.content_vetting_agencies : [];
+      const currentAgencies = prev.content_vetting_agencies || [];
       if (checked) {
-        return { ...prev, content_vetting_agencies: Array.from(new Set([...currentAgencies, agencyId])) };
+        return { ...prev, content_vetting_agencies: [...currentAgencies, agencyId] };
       } else {
         return { ...prev, content_vetting_agencies: currentAgencies.filter(id => id !== agencyId) };
       }
@@ -375,522 +312,399 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   };
 
   const handleAddCustomAgency = () => {
-    if (customAgencyInput && customAgencyInput.trim() !== '') {
-      const agencyToAdd = customAgencyInput.trim();
-      if (!formData.content_vetting_agencies.includes(agencyToAdd)) {
-        setFormData(prev => ({
-          ...prev,
-          content_vetting_agencies: [...prev.content_vetting_agencies, agencyToAdd]
-        }));
-      }
+    if (customAgencyInput.trim() !== '') {
+      const newAgency: VettingAgency = {
+        id: `custom-${uuidv4()}`,
+        name: customAgencyInput.trim(),
+      };
+      setAllVettingAgencies(prev => [...prev, newAgency]);
+      setFormData(prev => ({
+        ...prev,
+        content_vetting_agencies: [...(prev.content_vetting_agencies || []), newAgency.id]
+      }));
       setCustomAgencyInput('');
-    } else {
-      toast.error('Please enter a custom agency name.');
     }
   };
 
   const handleRemoveCustomAgency = (agencyIdToRemove: string) => {
+    setAllVettingAgencies(prev => prev.filter(agency => agency.id !== agencyIdToRemove));
     setFormData(prev => ({
       ...prev,
-      // This assumes content_vetting_agencies is an array of IDs
-      content_vetting_agencies: prev.content_vetting_agencies.filter(id => id !== agencyIdToRemove)
+      content_vetting_agencies: (prev.content_vetting_agencies || []).filter(id => id !== agencyIdToRemove)
     }));
   };
-  // --- End Handlers for Content Vetting Agencies ---
   
   const handleGenerateBrandIdentity = async () => {
-    if (!formData.name) {
-      toast.error('Please enter a brand name before generating the brand identity.');
+    if (!formData.name || !formData.website_url) {
+      toast.error("Brand Name and Main Website URL are required to generate brand identity.");
       return;
     }
-    
-    const validUrls = [formData.website_url, ...formData.additional_website_urls.map(u => u.value)].filter(url => url && url.trim() !== '');
-
-    if (validUrls.length === 0) {
-      toast.error('Please enter at least one valid website URL (main or additional).');
-      return;
-    }
-    
-    for (const url of validUrls) {
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        toast.error('URLs must start with http:// or https://');
-        return;
-      }
-    }
-    
+    setIsGenerating(true);
     try {
-      setIsGenerating(true);
-      toast.info('Generating brand identity content...');
-      
-      const response = await fetch('/api/brands/identity', {
+      const response = await fetch('/api/ai/generate-brand-identity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           brandName: formData.name,
-          urls: validUrls,
-          country: formData.country,
-          language: formData.language
-        })
+          websiteUrl: formData.website_url,
+          additionalWebsites: formData.additional_website_urls.map(url => url.value),
+          brandCountry: formData.country,
+          brandLanguage: formData.language,
+        }),
       });
-      
       if (!response.ok) {
-        throw new Error(`Failed to generate brand identity: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `AI generation failed: ${response.statusText}`);
       }
-      
       const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to generate brand identity');
+      if (data.success && data.brandIdentity) {
+        setFormData(prev => ({
+          ...prev,
+          brand_identity: data.brandIdentity.brand_identity || prev.brand_identity,
+          tone_of_voice: data.brandIdentity.tone_of_voice || prev.tone_of_voice,
+          guardrails: data.brandIdentity.guardrails || prev.guardrails,
+        }));
+        toast.success("Brand identity generated successfully!");
+      } else {
+        throw new Error(data.error || "Failed to parse AI-generated brand identity.");
       }
-      
-      // Update formData with the generated content
-      setFormData({
-        ...formData,
-        brand_identity: data.data.brandIdentity || formData.brand_identity,
-        tone_of_voice: data.data.toneOfVoice || formData.tone_of_voice,
-        guardrails: data.data.guardrails || formData.guardrails,
-        content_vetting_agencies: Array.isArray(data.data.suggestedAgencies) 
-                                    ? Array.from(new Set([...formData.content_vetting_agencies, ...data.data.suggestedAgencies.map((a:any) => a.name)])) 
-                                    : formData.content_vetting_agencies,
-        brand_color: data.data.brandColor || formData.brand_color
-      });
-      
-      toast.success('Brand identity generated successfully!');
-      
-      // Switch to brand identity tab
-      setActiveTab('identity');
     } catch (error) {
-      // console.error('Error generating brand identity:', error);
-      toast.error('Failed to generate brand identity. Please try again.');
+      console.error("Error generating brand identity:", error);
+      toast.error("Failed to generate brand identity", { description: (error as Error).message });
     } finally {
       setIsGenerating(false);
     }
   };
-  
-  // UPDATED: Handler for selecting an admin from search results
-  const handleSelectAdmin = (user: UserSearchResult) => {
-    if (!selectedAdmins.find(admin => admin.id === user.id)) {
-      setSelectedAdmins(prevAdmins => [...prevAdmins, user]);
-    }
-    setSearchQuery(''); // Clear search query
-    setUserSearchResults([]); // Clear search results
-  };
 
-  // NEW: Handler for removing a selected admin
-  const handleRemoveAdmin = (adminId: string) => {
-    setSelectedAdmins(prevAdmins => prevAdmins.filter(admin => admin.id !== adminId));
-  };
-  
   const handleSave = async () => {
+    setIsSaving(true);
+    setError(null);
+
+    const payload = {
+      ...formData,
+      additional_website_urls: formData.additional_website_urls.map(url => url.value),
+      selected_vetting_agencies: formData.content_vetting_agencies,
+    };
+
     try {
-      setIsSaving(true);
-      
-      if (!formData.name) {
-        toast.error('Brand name is required.');
-        setIsSaving(false);
-        return;
-      }
-      
-      const { content_vetting_agencies, ...restOfFormData } = formData;
-      
-      const updateData = {
-        ...restOfFormData,
-        // UPDATED: Send an array of admin IDs
-        brand_admin_ids: selectedAdmins.map(admin => admin.id), 
-        selected_agency_ids: content_vetting_agencies,
-        updated_at: new Date().toISOString()
-      };
-      
       const response = await fetch(`/api/brands/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updateData)
+        body: JSON.stringify(payload),
       });
-      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({})); // Try to parse error
-        throw new Error(errorData.error || `Failed to update brand: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to save brand: ${response.statusText}`);
       }
-      
       const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to update brand');
+      if (data.success) {
+        toast.success("Brand saved successfully!");
+        router.push('/dashboard/brands');
+      } else {
+        throw new Error(data.error || "Failed to save brand data.");
       }
-      
-      toast.success('Brand updated successfully!');
-      router.push(`/dashboard/brands/${id}`); // Or router.refresh() if staying on page
-    } catch (error) {
-      toast.error((error as Error).message || 'Failed to save brand. Please try again.');
+    } catch (err) {
+      console.error("Error saving brand:", err);
+      setError((err as Error).message);
+      toast.error("Failed to save brand", { description: (err as Error).message });
     } finally {
       setIsSaving(false);
     }
   };
-  
-  // Error state component from BrandsPage, adapted for this page
+
   const ErrorDisplay = ({ message }: { message: string | null }) => (
-    <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
-      <div className="mb-4 text-red-500">
-        <AlertTriangle size={64} strokeWidth={1.5} />
+    message && (
+      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+        <strong className="font-bold">Error: </strong>
+        <span className="block sm:inline">{message}</span>
       </div>
-      <h3 className="text-xl font-bold mb-2">Error Loading Brand</h3>
-      <p className="text-muted-foreground mb-4 text-center max-w-md">{message}</p>
-      <Button onClick={() => window.location.reload()}>Try Again</Button>
-    </div>
+    )
   );
 
-  // Not found state component from BrandsPage, adapted for this page
   const NotFoundDisplay = () => (
-    <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
-       <div className="mb-4 text-yellow-500"> {/* Changed color for not found */}
-        <AlertTriangle size={64} strokeWidth={1.5} /> {/* Or a different icon like SearchX */}
-      </div>
-      <h3 className="text-xl font-bold mb-2">Brand Not Found</h3>
-      <p className="text-muted-foreground mb-4 text-center max-w-md">
-        The brand you are looking for does not exist or has been deleted.
-      </p>
-      <Button onClick={() => router.push('/dashboard/brands')}>Back to Brands</Button>
+    <div className="text-center py-10">
+      <AlertTriangle className="mx-auto h-12 w-12 text-destructive" />
+      <h2 className="mt-4 text-xl font-semibold">Brand Not Found</h2>
+      <p className="mt-2 text-muted-foreground">The brand you are looking for does not exist or you do not have permission to view it.</p>
+      <Button asChild className="mt-6">
+        <Link href="/dashboard/brands">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Go Back to Brands
+        </Link>
+      </Button>
     </div>
   );
 
-  // Conditional rendering for loading and forbidden states
-  // These MUST come AFTER all hook calls
+  const ForbiddenDisplay = () => (
+     <div className="text-center py-10">
+      <AlertTriangle className="mx-auto h-12 w-12 text-destructive" />
+      <h2 className="mt-4 text-xl font-semibold">Access Denied</h2>
+      <p className="mt-2 text-muted-foreground">You do not have the necessary permissions to edit this brand.</p>
+      <Button asChild className="mt-6">
+        <Link href="/dashboard/brands">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Go Back to Brands
+        </Link>
+      </Button>
+    </div>
+  );
+  
   if (isLoadingUser || isLoadingBrand) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg">Loading brand details...</p>
+      <div className="flex justify-center items-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2">Loading brand details...</p>
       </div>
     );
   }
 
-  if (isForbidden) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen p-8 text-center">
-        <X className="h-16 w-16 text-destructive mb-4" />
-        <h1 className="text-3xl font-bold mb-2">Access Denied</h1>
-        <p className="text-lg text-muted-foreground mb-6">
-          {error || 'You do not have the necessary permissions to edit this brand.'}
-        </p>
-        <Button onClick={() => router.push('/dashboard/brands')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Return to Brands List
-        </Button>
-      </div>
-    );
-  }
+  if (isForbidden) return <ForbiddenDisplay />;
+  if (error && error === 'Brand not found.') return <NotFoundDisplay />;
 
-  // Error display if brand loaded but other errors occurred (and not forbidden due to permissions)
-  if (error && !isForbidden) { // Show general error if not a permission-based forbidden state
-    return <ErrorDisplay message={error} />;
-  }
-
-  // Not found display if brand is null after loading and not specifically forbidden (edge case)
-  if (!brand && !isLoadingBrand && !isForbidden) {
-    return <NotFoundDisplay />;
-  }
-
-  // Find the country and language labels for the selected values
-  const countryName = COUNTRIES.find(c => c.value === formData.country)?.label || formData.country || 'Select country';
-  const languageName = LANGUAGES.find(l => l.value === formData.language)?.label || formData.language || 'Select language';
-  
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6"> {/* Standard 0.4: Consistent Page Padding & root spacing */}
-      <Breadcrumbs items={[
-        { label: "Dashboard", href: "/dashboard" }, 
-        { label: "Brands", href: "/dashboard/brands" }, 
-        { label: formData.name || "Loading...", href: `/dashboard/brands/${id}` }, // Display current name, link to view page
-        { label: "Edit" }
-      ]} />
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {/* Standard 1.3: Back Button - Top Left */}
-          <Button variant="outline" size="icon" onClick={() => router.push(id ? `/dashboard/brands/${id}` : '/dashboard/brands')} aria-label="Back to Brand">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <BrandIcon name={formData.name} color={formData.brand_color ?? undefined} size="lg" /> {/* Ensured color prop safety */}
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Edit: {formData.name || 'Brand'}</h1>
-            <p className="text-muted-foreground">
-              Update the name, identity, and other settings for this brand.
-            </p>
-          </div>
-        </div>
-        
-        {/* Standard: Page-level actions like Delete can be here */}
-        <Button 
-          variant="destructive" 
-          onClick={() => { /* Logic to show delete confirmation dialog */ }}
-          disabled={isSaving || isGenerating} // Consider if isGenerating applies here
-        >
-          <Trash2 className="mr-2 h-4 w-4" />
-          Delete Brand
-        </Button>
-        {/* Top-right save/cancel removed from here, moved to bottom */}
-      </div>
-      
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="basic">Basic Details</TabsTrigger>
-          <TabsTrigger value="identity">Brand Identity</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="basic" className="space-y-4">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+      <CustomBreadcrumbs items={breadcrumbItems} />
+      <PageHeader 
+        title="Edit Brand"
+        description={`Manage details for ${brand?.name || 'this brand'}.`}
+      />
+
+      <ErrorDisplay message={error} />
+
+      <div className="space-y-6"> 
+          {/* Basic Information Section */}
           <Card>
-            <CardHeader><CardTitle>Basic Information</CardTitle></CardHeader>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Basic Information</CardTitle>
+                {brand && <BrandIcon name={brand.name} color={formData.brand_color} size="md" />}
+              </div>
+              <CardDescription>Update the core details of your brand.</CardDescription>
+            </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Brand Name <span className="text-destructive">*</span></Label>
-                  <Input id="name" name="name" value={formData.name} onChange={handleInputChange} />
+                  <Label htmlFor="name">Brand Name <span className="text-red-500">*</span></Label>
+                  <Input id="name" name="name" value={formData.name} onChange={handleInputChange} placeholder="e.g., Awesome Inc." />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="website_url">Main Website URL</Label>
-                  <Input id="website_url" name="website_url" value={formData.website_url} onChange={handleInputChange} placeholder="https://example.com" />
+                  <Input id="website_url" name="website_url" type="url" value={formData.website_url} onChange={handleInputChange} placeholder="https://www.example.com" />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="country">Country</Label>
-                  <Select value={formData.country} onValueChange={(v) => handleSelectChange('country', v)}>
+                  <Select name="country" value={formData.country} onValueChange={(value) => handleSelectChange('country', value)}>
                     <SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger>
-                    <SelectContent className="max-h-[300px]">
-                      {COUNTRIES.map(c => (<SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>))}
+                    <SelectContent className="max-h-60">
+                      {COUNTRIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="language">Language</Label>
-                  <Select value={formData.language} onValueChange={(v) => handleSelectChange('language', v)}>
+                  <Label htmlFor="language">Primary Language</Label>
+                  <Select name="language" value={formData.language} onValueChange={(value) => handleSelectChange('language', value)}>
                     <SelectTrigger><SelectValue placeholder="Select language" /></SelectTrigger>
-                    <SelectContent className="max-h-[300px]">
-                      {LANGUAGES.map(l => (<SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>))}
+                    <SelectContent className="max-h-60">
+                      {LANGUAGES.map(lang => <SelectItem key={lang.value} value={lang.value}>{lang.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="brand_admins_search">Brand Admins</Label>
-                {/* Display selected admins */}
-                {selectedAdmins.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-2 p-2 border rounded-md bg-muted/50">
-                    {selectedAdmins.map(admin => (
-                      <Badge key={admin.id} variant="secondary" className="flex items-center gap-1">
-                        {admin.full_name || admin.email}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-4 w-4 rounded-full hover:bg-destructive/20"
-                          onClick={() => handleRemoveAdmin(admin.id)}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                <Input 
-                  id="brand_admins_search" 
-                  name="brand_admins_search" 
-                  value={searchQuery} 
-                  onChange={(e) => setSearchQuery(e.target.value)} 
-                  placeholder="Search and add admins by name or email" 
-                />
-                {userSearchResults.length > 0 && (
-                  <div className="border rounded-md mt-1 max-h-60 overflow-y-auto">
-                    {userSearchResults.map(user => (
-                      <div 
-                        key={user.id} 
-                        className="p-2 hover:bg-muted/50 cursor-pointer"
-                        onClick={() => handleSelectAdmin(user)}
-                      >
-                        {user.full_name || user.email}
-                        {user.job_title && <span className="text-xs text-muted-foreground ml-2">({user.job_title})</span>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {searchQuery && userSearchResults.length === 0 && (
-                  <p className="text-sm text-muted-foreground mt-1">No users found matching "{searchQuery}".</p>
-                )}
-              </div>
             </CardContent>
           </Card>
-        </TabsContent>
-        
-        <TabsContent value="identity" className="space-y-4">
+      
+          {/* Brand Identity Section */}
           <Card>
-            <CardHeader><CardTitle>Brand Identity</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Brand Identity</CardTitle>
+              <CardDescription>
+                Define the voice and style for AI-generated content. You can generate this with AI or fill it manually.
+              </CardDescription>
+            </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
-                  <div className="space-y-4 border-b pb-4">
-                    <h3 className="text-lg font-semibold">Generate Brand Identity</h3>
-                    <p className="text-sm text-muted-foreground">Add website URLs to auto-generate or enhance brand identity, tone, and guardrails. The main URL from Basic Details is included by default.</p>
-                      <div className="space-y-2">
-                      <Label>Additional Website URLs</Label>
-                      {formData.additional_website_urls.map((urlObj) => (
-                        <div key={urlObj.id} className="flex items-center gap-2">
-                          <Input
-                            value={urlObj.value}
-                            onChange={(e) => handleAdditionalUrlChange(urlObj.id, e.target.value)}
-                            placeholder="https://additional-example.com"
-                            className="flex-grow"
-                          />
-                          <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveAdditionalUrl(urlObj.id)} className="h-8 w-8">
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button type="button" variant="outline" onClick={handleAddAdditionalUrlField} size="sm" className="mt-2 w-full">
-                        <PlusCircle className="mr-2 h-4 w-4" /> Add another URL
-                        </Button>
-                      </div>
-                    <div className="space-y-2 pt-2">
-                      <p className="text-xs text-muted-foreground">Identity will be generated for {countryName} in {languageName} (if set).</p>
-                      <Button onClick={handleGenerateBrandIdentity} disabled={isGenerating} className="w-full">
-                        {isGenerating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</> : 'Generate Brand Identity'}
-                      </Button>
-                    </div>
+              <Button type="button" onClick={handleGenerateBrandIdentity} disabled={isGenerating || !formData.name || !formData.website_url}>
+                {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                Generate with AI
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Ensure Brand Name and Main Website URL are filled in the Basic Information tab to enable AI generation.
+                 Additional URLs and Vetting Agencies below will also be considered.
+              </p>
+
+              <div className="space-y-2">
+                <Label htmlFor="brand_color">Brand Color</Label>
+                <Input id="brand_color" name="brand_color" type="color" value={formData.brand_color} onChange={handleInputChange} className="w-24 h-10 p-1" />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="additional_website_urls">Additional Website URLs (used for AI generation)</Label>
+                {formData.additional_website_urls.map((urlField) => (
+                  <div key={urlField.id} className="flex items-center space-x-2">
+                    <Input
+                      type="url"
+                      value={urlField.value}
+                      onChange={(e) => handleAdditionalUrlChange(urlField.id, e.target.value)}
+                      placeholder="https://www.another-example.com"
+                      className="flex-grow"
+                    />
+                    <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveAdditionalUrl(urlField.id)} aria-label="Remove URL">
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
-                  
-                  <div className="space-y-4">
-                    <div className="space-y-2"><Label htmlFor="brand_identity">Brand Identity</Label><Textarea id="brand_identity" name="brand_identity" value={formData.brand_identity} onChange={handleInputChange} rows={6}/></div>
-                    <div className="space-y-2"><Label htmlFor="tone_of_voice">Tone of Voice</Label><Textarea id="tone_of_voice" name="tone_of_voice" value={formData.tone_of_voice} onChange={handleInputChange} rows={4}/></div>
-                    <div className="space-y-2"><Label htmlFor="guardrails">Content Guardrails</Label><Textarea id="guardrails" name="guardrails" value={formData.guardrails} onChange={handleInputChange} rows={4}/></div>
-                    
-                    <div className="space-y-4">
-                      <Label>Content Vetting Agencies</Label>
-                      {/* START: Render checkboxes for allVettingAgencies grouped by priority */}
-                      {isLoadingBrand && <p className="text-sm text-muted-foreground">Loading agencies...</p>}
-                      {!isLoadingBrand && allVettingAgencies.length === 0 && (
-                        <p className="text-sm text-muted-foreground">
-                          No vetting agencies available for the selected country.
-                        </p>
-                      )}
-                      {!isLoadingBrand && allVettingAgencies.length > 0 && priorityOrder.map(priorityLevel => {
-                        const agenciesInGroup = allVettingAgencies.filter(agency => agency.priority === priorityLevel);
-                        if (agenciesInGroup.length === 0) {
-                          return null; // Explicitly return null here
-                        }
-                        return (
-                          <div key={priorityLevel} className="mt-3">
-                            <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(priorityLevel)}`}>{priorityLevel} Priority</h4>
-                            <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
-                              {agenciesInGroup.map(agency => (
-                                <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
-                                  <Checkbox 
-                                    id={`edit-agency-${agency.id}`} 
-                                    checked={formData.content_vetting_agencies.includes(agency.id)}
-                                    onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)}
-                                  />
-                                  <Label 
-                                    htmlFor={`edit-agency-${agency.id}`} 
-                                    className={getPriorityAgencyStyles(agency.priority)} // Apply dynamic styles to name as well
-                                  >
-                                    {agency.name}
-                                  </Label>
-                                </div>
-                              ))}
+                ))}
+                <div className="flex items-center space-x-2">
+                  <Input
+                    type="url"
+                    value={currentAdditionalUrl}
+                    onChange={(e) => setCurrentAdditionalUrl(e.target.value)}
+                    placeholder="Add another URL"
+                    className="flex-grow"
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddAdditionalUrlField(); }}}
+                  />
+                  <Button type="button" variant="outline" onClick={handleAddAdditionalUrlField} disabled={!currentAdditionalUrl.trim()}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="brand_identity">Brand Identity</Label>
+                <Textarea id="brand_identity" name="brand_identity" value={formData.brand_identity} onChange={handleInputChange} placeholder="Describe your brand's core identity, values, and mission." rows={5} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tone_of_voice">Tone of Voice</Label>
+                <Textarea id="tone_of_voice" name="tone_of_voice" value={formData.tone_of_voice} onChange={handleInputChange} placeholder="e.g., Professional yet approachable, witty and informal, inspiring and authoritative." rows={3} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="guardrails">Guardrails & Restrictions</Label>
+                <Textarea id="guardrails" name="guardrails" value={formData.guardrails} onChange={handleInputChange} placeholder="Specific topics, phrases, or styles to avoid. Sensitive subjects, competitor mentions, etc." rows={4} />
+              </div>
+
+              <div className="pt-4 border-t">
+                <h4 className="text-md font-semibold mb-2">Content Vetting Agencies (considered for AI context)</h4>
+                <div className="space-y-2">
+                  <Label>Available Agencies</Label>
+                  <div className="max-h-60 overflow-y-auto border rounded-md p-2 space-y-2">
+                  {allVettingAgencies.length > 0 ? (
+                    priorityOrder.flatMap(priority =>
+                      allVettingAgencies
+                        .filter(agency => (agency.priority || 'Medium') === priority)
+                        .map(agency => (
+                          <div key={agency.id} className={cn("flex items-center space-x-2 p-2 rounded hover:bg-muted/50 transition-colors")}>
+                            <Checkbox
+                              id={`agency-${agency.id}`}
+                              checked={(formData.content_vetting_agencies || []).includes(agency.id)}
+                              onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)}
+                            />
+                            <div className="flex-grow">
+                              <Label htmlFor={`agency-${agency.id}`} className={cn("font-medium cursor-pointer", getPriorityAgencyStyles(agency.priority))}>
+                                {agency.name}
+                              </Label>
+                              {agency.country_code && <Badge variant="outline" className="ml-2 text-xs">{agency.country_code}</Badge>}
+                              {agency.description && <p className="text-xs text-muted-foreground">{agency.description}</p>}
                             </div>
+                            {agency.id.startsWith('custom-') && (
+                                <Button variant="ghost" size="sm" onClick={() => handleRemoveCustomAgency(agency.id)} aria-label="Remove custom agency">
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                            )}
                           </div>
-                        );
-                      })}
-                      {/* Render agencies with other/null priorities last */}
-                      {!isLoadingBrand && allVettingAgencies.filter(a => !priorityOrder.includes(a.priority as any) && a.priority != null).length > 0 && (
-                         <div key="other-priority" className="mt-3">
-                            <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(null)}`}>Other Priority</h4>
-                            <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
-                              {allVettingAgencies.filter(a => !priorityOrder.includes(a.priority as any) && a.priority != null).map(agency => (
-                                <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
-                                  <Checkbox
-                                    id={`edit-agency-${agency.id}`}
-                                    checked={formData.content_vetting_agencies.includes(agency.id)}
-                                    onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)}
-                                  />
-                                  <Label
-                                    htmlFor={`edit-agency-${agency.id}`}
-                                    className={getPriorityAgencyStyles(agency.priority)}
-                                  >
-                                    {agency.name}
-                                  </Label>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                      )}
-                      {!isLoadingBrand && allVettingAgencies.filter(a => a.priority == null).length > 0 && (
-                         <div key="no-priority" className="mt-3">
-                            <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(null)}`}>Uncategorized</h4>
-                            <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
-                              {allVettingAgencies.filter(a => a.priority == null).map(agency => (
-                                <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
-                                  <Checkbox
-                                    id={`edit-agency-${agency.id}`}
-                                    checked={formData.content_vetting_agencies.includes(agency.id)}
-                                    onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)}
-                                  />
-                                  <Label
-                                    htmlFor={`edit-agency-${agency.id}`}
-                                    className={getPriorityAgencyStyles(agency.priority)}
-                                  >
-                                    {agency.name}
-                                  </Label>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                      )}
-                      {/* END: Render checkboxes grouped by priority */}
-                    </div>
+                        ))
+                    )
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No vetting agencies available or configured.</p>
+                  )}
                   </div>
                 </div>
-                
-                <div className="lg:col-span-1">
-                  <div className="bg-muted rounded-lg p-4 space-y-6 sticky top-4">
-                    <div className="space-y-2">
-                      <Label className="font-semibold">Quick Preview</Label>
-                      <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/30">
-                        <BrandIcon name={formData.name || 'Brand Name'} color={formData.brand_color || '#1982C4'} />
-                        <span className="truncate">{formData.name || 'Your Brand Name'}</span>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="brand_color">Brand Colour</Label>
-                      <div className="flex gap-2 items-center">
-                        <input 
-                          type="color" 
-                          id="brand_color" 
-                          name="brand_color" 
-                          value={formData.brand_color} 
-                          onChange={handleInputChange} 
-                          className="w-10 h-10 rounded cursor-pointer border"
-                        />
-                        <Input 
-                          value={formData.brand_color} 
-                          onChange={handleInputChange} 
-                          name="brand_color" 
-                          placeholder="#HEX colour" 
-                          className="w-32" />
-                      </div>
-                    </div>
+                <div className="space-y-2 mt-4">
+                  <Label htmlFor="custom_agency_input">Add Custom Agency</Label>
+                  <div className="flex items-center space-x-2">
+                    <Input 
+                      id="custom_agency_input"
+                      value={customAgencyInput}
+                      onChange={(e) => setCustomAgencyInput(e.target.value)}
+                      placeholder="Enter name of new agency"
+                      className="flex-grow"
+                    />
+                    <Button type="button" variant="outline" onClick={handleAddCustomAgency} disabled={!customAgencyInput.trim()}>
+                      <PlusCircle className="mr-2 h-4 w-4" /> Add Agency
+                    </Button>
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
-      {/* Standard 3.1: Consolidated Form Actions - Bottom Right, sticky if form is long */}
-      <div className="flex justify-end space-x-2 pt-4 mt-4 border-t">
-        <Button variant="outline" onClick={() => router.push(id ? `/dashboard/brands/${id}` : '/dashboard/brands')} disabled={isSaving || isGenerating}>
-            Cancel
+        
+          {/* Settings & Admins Section - Now only Claims Brand Association and Admins List */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Settings & Connections</CardTitle>
+              <CardDescription>Manage external connections and administrative access.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <Label htmlFor="master_claim_brand_id" className="text-md font-semibold">Master Claim Brand</Label>
+                <p className="text-xs text-muted-foreground mb-2">Link this MixerAI brand to a Master Claim Brand for claims management.</p>
+                <Select 
+                  value={formData.master_claim_brand_id || "none"} 
+                  onValueChange={handleMasterClaimBrandChange}
+                  disabled={isLoadingMasterClaimBrands}
+                >
+                  <SelectTrigger id="master_claim_brand_id">
+                    <SelectValue placeholder={isLoadingMasterClaimBrands ? "Loading claim brands..." : "Select Master Claim Brand"} />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    <SelectItem value="none">(None)</SelectItem>
+                    {masterClaimBrands.map(mcb => (
+                      <SelectItem key={mcb.id} value={mcb.id}>{mcb.name}</SelectItem>
+                    ))}
+                    {isLoadingMasterClaimBrands && masterClaimBrands.length === 0 && <SelectItem value="loading" disabled>Loading...</SelectItem>}
+                    {!isLoadingMasterClaimBrands && masterClaimBrands.length === 0 && <SelectItem value="no-options" disabled>No Master Claim Brands available</SelectItem>}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="pt-4 border-t">
+                <h4 className="text-md font-semibold mb-1 flex items-center">
+                  <Users className="mr-2 h-5 w-5 text-muted-foreground" /> Brand Administrators
+                </h4>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Users with admin roles for this brand. Manage admin assignments via the 
+                  <Link href="/dashboard/users" className="text-primary hover:underline mx-1">Users</Link> page.
+                </p>
+                {displayedAdmins.length > 0 ? (
+                  <ul className="space-y-2">
+                    {displayedAdmins.map(admin => (
+                      <li key={admin.id} className="flex items-center justify-between p-2 border rounded-md bg-muted/30 hover:bg-muted/60">
+                        <div>
+                          <span className="font-medium">{admin.full_name || 'N/A'}</span>
+                          <span className="text-sm text-muted-foreground ml-2">({admin.email || 'No email'})</span>
+                        </div>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/dashboard/users/${admin.id}/edit`}>
+                            View User <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                          </Link>
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No administrators are currently assigned to this brand.</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+      </div> 
+
+      <div className="flex justify-end space-x-2 mt-8">
+        <Button type="button" variant="outline" onClick={() => router.push('/dashboard/brands')} disabled={isSaving}>
+          Cancel
         </Button>
-        <Button onClick={handleSave} disabled={isSaving || isGenerating}>
-            {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
+        <Button type="button" onClick={handleSave} disabled={isSaving || isLoadingBrand || isLoadingUser || isGenerating || isForbidden}>
+          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Save Changes
         </Button>
       </div>
-      {/* TODO: Ensure Delete Confirmation Dialog is correctly implemented and triggered by the new Delete Brand button */}
     </div>
   );
 } 

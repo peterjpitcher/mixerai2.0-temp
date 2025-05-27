@@ -2,20 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/card';
-import { Separator } from '@/components/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import { BrandIcon } from '@/components/brand-icon';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 import { toast } from 'sonner';
-import { Spinner } from '@/components/spinner';
-import { AlertCircle, HelpCircleIcon, FileText as ContentIcon, GitFork as WorkflowIcon, ArchiveX } from 'lucide-react';
+import { Loader2 as Spinner } from 'lucide-react';
+import { AlertCircle, HelpCircleIcon, FileText as ContentIcon, GitFork as WorkflowIcon, ArchiveX, Users, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import type { Metadata } from 'next';
-import { Label } from "@/components/label";
-import { createBrowserClient } from '@supabase/ssr';
+import { Label } from "@/components/ui/label";
 import RejectedContentList from '@/components/dashboard/brand/rejected-content-list';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 // export const metadata: Metadata = {
 //   title: 'Brand Details | MixerAI 2.0', // Dynamic title would be set server-side ideally
@@ -42,6 +41,12 @@ interface UserSessionData {
   }>;
 }
 
+interface AdminUser {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+}
+
 /**
  * BrandDetails page component.
  * Displays detailed information about a specific brand, including overview, brand identity,
@@ -58,6 +63,12 @@ export default function BrandDetails({ params }: BrandDetailsProps) {
   const [workflowCount, setWorkflowCount] = useState(0);
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null); // New state for full user object
   const [isLoadingUser, setIsLoadingUser] = useState(true); // Added loading state for user
+
+  const breadcrumbItems = [
+    { label: "Dashboard", href: "/dashboard" },
+    { label: "Brands", href: "/dashboard/brands" },
+    { label: brand?.name || id },
+  ];
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -128,7 +139,7 @@ export default function BrandDetails({ params }: BrandDetailsProps) {
   if (isLoading || isLoadingUser) { // Check both brand and user loading
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,theme(spacing.16))-theme(spacing.12))] p-4">
-        <Spinner className="h-12 w-12 text-primary" />
+        <Spinner className="h-12 w-12 text-primary animate-spin" />
         <p className="text-muted-foreground mt-4">Loading brand details...</p>
       </div>
     );
@@ -169,225 +180,164 @@ export default function BrandDetails({ params }: BrandDetailsProps) {
 
   const countryName = COUNTRIES.find(c => c.value === brand.country)?.label || brand.country || 'Not specified';
   const languageName = LANGUAGES.find(l => l.value === brand.language)?.label || brand.language || 'Not specified';
+  const brandAdmins: AdminUser[] = brand.admins || [];
   
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b pb-4 mb-6">
-        <div className="flex items-center gap-4">
-          <BrandIcon name={brand.name} color={brand.brand_color} size="lg" />
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight">{brand.name}</h1>
-            <p className="text-muted-foreground">
-              {countryName} &bull; {languageName}
-            </p>
-          </div>
-        </div>
-        <div className="flex space-x-2 self-start sm:self-auto">
-          {(isGlobalAdmin || isSpecificBrandAdmin) && (
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+      <Breadcrumbs items={breadcrumbItems} />
+      <PageHeader 
+        title={brand.name}
+        description={`Overview and details for ${brand.name}.`}
+        actions={
+          (isGlobalAdmin || isSpecificBrandAdmin) && (
             <Button variant="outline" onClick={() => router.push(`/dashboard/brands/${id}/edit`)}>
               Edit Brand
             </Button>
-          )}
-        </div>
-      </header>
+          )
+        }
+      />
       
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="mb-6">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="identity">Brand Identity</TabsTrigger>
-          <TabsTrigger value="content">Content ({contentCount})</TabsTrigger>
-          <TabsTrigger value="workflows">Workflows ({workflowCount})</TabsTrigger>
-          {(isGlobalAdmin || isSpecificBrandAdmin) && (
-            <TabsTrigger value="rejected">Rejected Content</TabsTrigger>
-          )}
-        </TabsList>
-        
-        <TabsContent value="overview" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Brand Details</CardTitle>
-              <CardDescription>Key information and statistics for {brand.name}.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
-                <div>
-                  <Label className="text-xs font-semibold text-muted-foreground">Name</Label>
-                  <p>{brand.name}</p>
-                </div>
-                <div>
-                  <Label className="text-xs font-semibold text-muted-foreground">Company</Label>
-                  <p>{brand.company || <span className="italic text-muted-foreground">Not specified</span>}</p>
-                </div>
-                <div>
-                  <Label className="text-xs font-semibold text-muted-foreground">Website</Label>
-                  {brand.website_url ? (
-                    <Link 
-                      href={brand.website_url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline break-all"
-                    >
-                      {brand.website_url}
-                    </Link>
-                  ) : (
-                    <p className="italic text-muted-foreground">Not specified</p>
-                  )}
-                </div>
-                <div>
-                  <Label className="text-xs font-semibold text-muted-foreground">Country</Label>
-                  <p>{countryName}</p>
-                </div>
-                <div>
-                  <Label className="text-xs font-semibold text-muted-foreground">Language</Label>
-                  <p>{languageName}</p>
-                </div>
-                <div>
-                  <Label className="text-xs font-semibold text-muted-foreground">Brand Colour</Label>
-                  <div className="flex items-center gap-2">
-                    {brand.brand_color ? 
-                      <div className="w-5 h-5 rounded-full border" style={{ backgroundColor: brand.brand_color }} /> 
-                      : <div className="w-5 h-5 rounded-full border bg-muted" title="No colour set"/>
-                    }
-                    <p>{brand.brand_color || <span className="italic text-muted-foreground">Not specified</span>}</p>
-                  </div>
-                </div>
-              </div>
-              <Separator className="my-6" /> 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-base font-semibold mb-1">Content Items</h3>
-                  <p className="text-3xl font-bold text-primary">{contentCount}</p>
-                  {contentCount > 0 && (
-                    <Button variant="outline" className="mt-2" size="sm" onClick={() => router.push(`/dashboard/content?brandId=${id}`)}>
-                      View All Content
-                    </Button>
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-base font-semibold mb-1">Associated Workflows</h3>
-                  <p className="text-3xl font-bold text-primary">{workflowCount}</p>
-                  {workflowCount > 0 && (
-                    <Button variant="outline" className="mt-2" size="sm" onClick={() => router.push(`/dashboard/workflows?brandId=${id}`)}>
-                      View All Workflows
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="identity" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Brand Identity Details</CardTitle>
-              <CardDescription>The core voice, tone, and guidelines that define {brand.name}.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {[ { title: "Brand Identity", value: brand.brand_identity, placeholder: "No brand identity has been defined yet." },
-                { title: "Tone of Voice", value: brand.tone_of_voice, placeholder: "No tone of voice has been defined yet." },
-                { title: "Content Guardrails", value: brand.guardrails, placeholder: "No content guardrails have been defined yet." },
-              ].map(item => (
-                <div key={item.title}>
-                  <Label className="text-xs font-semibold text-muted-foreground mb-1 block">{item.title}</Label>
-                  <div className="p-4 rounded-md bg-muted min-h-[60px]">
-                    {item.value ? (
-                      <pre className="whitespace-pre-wrap text-sm text-foreground font-sans break-words">{item.value}</pre> 
-                    ) : (
-                      <p className="text-muted-foreground italic text-sm">{item.placeholder}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Brand Overview</CardTitle>
+            <CardDescription>Key information, statistics, and connections for {brand.name}.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
               <div>
-                <Label className="text-xs font-semibold text-muted-foreground mb-1 block">Content Vetting Agencies</Label>
-                <div className="p-4 rounded-md bg-muted min-h-[60px]">
-                  {brand.selected_vetting_agencies && brand.selected_vetting_agencies.length > 0 ? (
-                    <ul className="list-disc list-inside space-y-1">
-                      {brand.selected_vetting_agencies.map((agency: { id: string; name: string; priority: number }) => (
-                        <li key={agency.id} className="text-sm">
-                          {agency.name}
-                          {agency.priority === 1 && <span className="ml-2 text-xs font-semibold text-red-600">(High Priority)</span>}
-                          {agency.priority === 2 && <span className="ml-2 text-xs font-semibold text-orange-500">(Medium Priority)</span>}
-                          {agency.priority === 3 && <span className="ml-2 text-xs font-semibold text-blue-600">(Low Priority)</span>}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-muted-foreground italic text-sm">No content vetting agencies specified.</p>
-                  )}
+                <Label className="text-xs font-semibold text-muted-foreground">Name</Label>
+                <p>{brand.name}</p>
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground">Company</Label>
+                <p>{brand.company || <span className="italic text-muted-foreground">Not specified</span>}</p>
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground">Website</Label>
+                {brand.website_url ? (
+                  <Link 
+                    href={brand.website_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline break-all"
+                  >
+                    {brand.website_url}
+                  </Link>
+                ) : (
+                  <p className="italic text-muted-foreground">Not specified</p>
+                )}
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground">Country</Label>
+                <p>{countryName}</p>
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground">Language</Label>
+                <p>{languageName}</p>
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground">Brand Colour</Label>
+                <div className="flex items-center gap-2">
+                  {brand.brand_color ? 
+                    <div className="w-5 h-5 rounded-full border" style={{ backgroundColor: brand.brand_color }} /> 
+                    : <div className="w-5 h-5 rounded-full border bg-muted" title="No colour set"/>
+                  }
+                  <span className="text-sm">{brand.brand_color || 'Default'}</span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="content">
-          <Card>
-            <CardHeader>
-              <CardTitle>Content Management</CardTitle>
-              <CardDescription>View and manage all content items associated with {brand.name}.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {contentCount > 0 ? (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">This brand has {contentCount} piece{contentCount === 1 ? '' : 's'} of content.</p>
-                  <Button onClick={() => router.push(`/dashboard/content?brandId=${id}`)}>
-                    View All Brand Content
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <ContentIcon className="mx-auto h-12 w-12 text-muted-foreground/70" /> 
-                  <h3 className="mt-2 text-lg font-medium">No Content Yet</h3>
-                  <p className="mt-1 text-sm text-muted-foreground mb-4">Get started by creating content for {brand.name}.</p>
-                  {(isGlobalAdmin || isEditorAssignedToThisBrand) && (
-                    <Button onClick={() => router.push(`/dashboard/content/new?brandId=${id}`)}>
-                      Create First Content Item
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground">Master Claim Brand</Label>
+                <p>{brand.master_claim_brand_name || <span className="italic text-muted-foreground">Not associated</span>}</p>
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground">Content Items</Label>
+                <p className="flex items-center"><ContentIcon className="mr-1.5 h-4 w-4 text-muted-foreground"/> {contentCount}</p>
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground">Workflows</Label>
+                <p className="flex items-center"><WorkflowIcon className="mr-1.5 h-4 w-4 text-muted-foreground"/> {workflowCount}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center"><Users className="mr-2 h-5 w-5 text-muted-foreground" /> Brand Administrators</CardTitle>
+            <CardDescription>
+              Users with administrative roles for this brand. Manage assignments via the 
+              <Link href="/dashboard/users" className="text-primary hover:underline mx-1">Users</Link> page.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {brandAdmins.length > 0 ? (
+              <ul className="space-y-2">
+                {brandAdmins.map(admin => (
+                  <li key={admin.id} className="flex items-center justify-between p-3 border rounded-md bg-muted/30 hover:bg-muted/60">
+                    <div>
+                      <span className="font-medium">{admin.full_name || 'N/A'}</span>
+                      <span className="text-sm text-muted-foreground ml-2">({admin.email || 'No email'})</span>
+                    </div>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/dashboard/users/${admin.id}/edit`}>
+                        View User <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                      </Link>
                     </Button>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="workflows">
-          <Card>
-            <CardHeader>
-              <CardTitle>Workflow Management</CardTitle>
-              <CardDescription>View and manage approval workflows associated with {brand.name}.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {workflowCount > 0 ? (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">This brand has {workflowCount} associated workflow{workflowCount === 1 ? '' : 's'}.</p>
-                  <Button onClick={() => router.push(`/dashboard/workflows?brandId=${id}`)}>
-                    View Associated Workflows
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <WorkflowIcon className="mx-auto h-12 w-12 text-muted-foreground/70" /> 
-                  <h3 className="mt-2 text-lg font-medium">No Workflows Yet</h3>
-                  <p className="mt-1 text-sm text-muted-foreground mb-4">Create workflows to manage content approval for {brand.name}.</p>
-                  {(isGlobalAdmin || isSpecificBrandAdmin) && (
-                    <Button onClick={() => router.push(`/dashboard/workflows/new?brandId=${id}`)}>
-                      Create First Workflow
-                    </Button>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">No administrators are currently assigned to this brand.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Brand Identity</CardTitle>
+            <CardDescription>Voice, style, and guardrails defined for {brand.name}.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 prose prose-sm dark:prose-invert max-w-none">
+            {brand.brand_identity && (<div><h4>Brand Identity</h4><p>{brand.brand_identity}</p></div>)}
+            {brand.tone_of_voice && (<div><h4>Tone of Voice</h4><p>{brand.tone_of_voice}</p></div>)}
+            {brand.guardrails && (<div><h4>Guardrails</h4><p>{brand.guardrails}</p></div>)}
+            {(!brand.brand_identity && !brand.tone_of_voice && !brand.guardrails) && 
+              <p className="italic text-muted-foreground">No brand identity details have been specified.</p>
+            }
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Content</CardTitle>
+            <CardDescription>View content associated with {brand.name}. For full management, go to the main Content page.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Displaying content list here is TBD. (Content Count: {contentCount})</p>
+            <Button asChild variant="link" className="px-0">
+              <Link href={`/dashboard/content?brandId=${id}`}>View All Content for this Brand</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Workflows</CardTitle>
+            <CardDescription>View workflows associated with {brand.name}.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Displaying workflows list here is TBD. (Workflow Count: {workflowCount})</p>
+            <Button asChild variant="link" className="px-0">
+              <Link href={`/dashboard/workflows?brandId=${id}`}>View All Workflows for this Brand</Link>
+            </Button>
+          </CardContent>
+        </Card>
 
         {(isGlobalAdmin || isSpecificBrandAdmin) && (
-          <TabsContent value="rejected">
-            <RejectedContentList brandId={id} />
-          </TabsContent>
+          <RejectedContentList brandId={id} />
         )}
-      </Tabs>
+      </div>
     </div>
   );
 } 

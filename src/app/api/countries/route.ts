@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
 
+export const dynamic = 'force-dynamic';
+
 // Initialize Supabase client
 // Ensure your environment variables are correctly set up
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

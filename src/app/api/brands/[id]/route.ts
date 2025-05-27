@@ -70,7 +70,7 @@ export const GET = withAuth(async (
     }
     // If global admin or has specific permission, proceed to fetch brand details
 
-    const { data: brandData, error: brandFetchError } = await supabase
+    const { data: brandDataResult, error: brandFetchError } = await supabase
       .from('brands')
       .select('*')
       .eq('id', brandId)
@@ -80,6 +80,8 @@ export const GET = withAuth(async (
         throw brandFetchError;
     }
     
+    const brandData: any = brandDataResult; // Cast to any to bypass strict typing for now
+
     if (!brandData) {
       return NextResponse.json(
         { success: false, error: 'Brand not found' },
@@ -88,6 +90,22 @@ export const GET = withAuth(async (
           headers: { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }
         }
       );
+    }
+
+    let masterClaimBrandName: string | null = null;
+    if (brandData.master_claim_brand_id) {
+      const { data: masterClaimBrandData, error: mcbError } = await supabase
+        .from('master_claim_brands')
+        .select('name')
+        .eq('id', brandData.master_claim_brand_id)
+        .single();
+
+      if (mcbError) {
+        console.warn(`[API Brands GET /${brandId}] Error fetching master_claim_brand name for ID ${brandData.master_claim_brand_id}:`, mcbError.message);
+        // Do not fail the request, just proceed without the name
+      } else if (masterClaimBrandData) {
+        masterClaimBrandName = masterClaimBrandData.name;
+      }
     }
 
     const { data: selectedAgenciesData, error: selectedAgenciesError } = await supabase
@@ -153,6 +171,9 @@ export const GET = withAuth(async (
 
     const adminUsers = adminPermissions?.map(p => p.profiles).filter(profile => profile !== null) || [];
     brand.admins = adminUsers; // Add admins to the brand object
+    if (masterClaimBrandName) {
+      brand.master_claim_brand_name = masterClaimBrandName;
+    }
 
     const { count: contentCount, error: contentCountError } = await supabase
       .from('content')

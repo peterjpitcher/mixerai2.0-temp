@@ -3,6 +3,8 @@ import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { createSupabaseServerClient } from '@/lib/supabase/server'; // Using server client for RLS with user context
 import { Database } from '@/types/supabase';
 
+export const dynamic = 'force-dynamic';
+
 export const GET = withAuthAndMonitoring(async (request: NextRequest, user) => {
   try {
     const supabase = createSupabaseServerClient();
