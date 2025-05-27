@@ -3,7 +3,7 @@ import { createSupabaseAdminClient } from './supabase/client';
 // Types mirroring database schema and API responses
 // These might be better placed in a central types file (e.g., src/types/claims.ts) if used widely
 
-export type ClaimTypeEnum = 'allowed' | 'disallowed' | 'mandatory';
+export type ClaimTypeEnum = 'allowed' | 'disallowed' | 'mandatory' | 'conditional';
 export type ClaimLevelEnum = 'brand' | 'product' | 'ingredient';
 export type FinalClaimTypeEnum = ClaimTypeEnum | 'none'; // 'none' if no claim applies or it's blocked without replacement
 
@@ -15,11 +15,11 @@ export interface Claim {
   master_brand_id?: string | null;
   product_id?: string | null;
   ingredient_id?: string | null;
-  country_code: string; // Can be '__GLOBAL__' or ISO country code
+  country_code: string | null; // Changed to string | null
   description?: string | null;
   created_by?: string | null;
-  created_at?: string;
-  updated_at?: string;
+  created_at?: string | null; // Changed to string | null
+  updated_at?: string | null; // Changed to string | null
 }
 
 export interface Product {
@@ -62,10 +62,11 @@ export interface EffectiveClaim {
   original_master_claim_id_if_overridden?: string | null; // If overridden, the ID of the master claim
   is_blocked_override?: boolean; // True if a master claim was blocked by an override
   is_replacement_override?: boolean; // True if a master claim was replaced by an override
+  isActuallyMaster?: boolean; // ADDED: True if this effective claim originates from a non-overridden master claim
   description?: string | null; // Description from the source claim
   applies_to_product_id: string;
   applies_to_country_code: string;
-  original_claim_country_code?: string; // Country code of the original claim (__GLOBAL__ or market-specific)
+  original_claim_country_code?: string | null | undefined; // Changed to allow null
   source_entity_id?: string | null; // ID of the product, ingredient, or brand from the source claim
 }
 
@@ -77,8 +78,8 @@ export interface MarketClaimOverride {
   target_product_id: string;
   is_blocked: boolean;
   replacement_claim_id: string | null;
-  created_at?: string;
-  updated_at?: string;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 // Intermediate type for processing claims with priority
@@ -262,6 +263,7 @@ export async function getStackedClaimsForProduct(
                         source_claim_id: overrideApplied.id, // ID of the override rule
                         original_master_claim_id_if_overridden: masterClaimIdForOverrideCheck,
                         is_blocked_override: true,
+                        isActuallyMaster: false,
                         description: `Master claim "${claim.claim_text}" blocked in ${countryCode} for product ${productId}.`,
                         applies_to_product_id: productId,
                         applies_to_country_code: countryCode,
@@ -278,6 +280,7 @@ export async function getStackedClaimsForProduct(
                             source_claim_id: replacementClaim.id, // ID of the replacement claim
                             original_master_claim_id_if_overridden: masterClaimIdForOverrideCheck,
                             is_replacement_override: true,
+                            isActuallyMaster: false,
                             description: replacementClaim.description || `Master claim "${claim.claim_text}" replaced by "${replacementClaim.claim_text}" in ${countryCode}.`,
                             applies_to_product_id: productId,
                             applies_to_country_code: countryCode,
@@ -294,6 +297,7 @@ export async function getStackedClaimsForProduct(
                             source_claim_id: overrideApplied.id,
                             original_master_claim_id_if_overridden: masterClaimIdForOverrideCheck,
                             is_blocked_override: true, // Treat as blocked if replacement is missing
+                            isActuallyMaster: false,
                             description: `Master claim "${claim.claim_text}" intended for replacement in ${countryCode} but replacement claim missing. Considered blocked.`,
                             applies_to_product_id: productId,
                             applies_to_country_code: countryCode,
@@ -332,6 +336,7 @@ export async function getStackedClaimsForProduct(
                 applies_to_country_code: countryCode, // or claim.country_code if we want to show __GLOBAL__
                 original_claim_country_code: claim.country_code,
                 source_entity_id: entityIdForSource,
+                isActuallyMaster: true,
             });
         }
     }

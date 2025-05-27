@@ -102,6 +102,11 @@ const claimTypeDisplayInfo: Record<FinalClaimTypeEnum, {
     text: "Mandatory", 
     cellBgClassName: "bg-blue-200 hover:bg-blue-300",
   },
+  conditional: { // Added entry for conditional
+    icon: <AlertTriangle className="text-yellow-700" />, // Example icon
+    text: "Conditional", 
+    cellBgClassName: "bg-yellow-200 hover:bg-yellow-300", // Example style
+  },
   none: { // For N/A or explicitly blocked without replacement
     icon: <XOctagon className="text-gray-600" />, 
     text: "None/Blocked", 

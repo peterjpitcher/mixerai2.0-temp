@@ -45,6 +45,7 @@ const claimTypeIcons: Record<ClaimTypeEnum, JSX.Element> = {
   allowed: <ShieldCheck className="mr-1.5 h-4 w-4 text-green-500" />,
   disallowed: <ShieldOff className="mr-1.5 h-4 w-4 text-red-500" />,
   mandatory: <ShieldAlert className="mr-1.5 h-4 w-4 text-blue-500" />,
+  conditional: <AlertTriangle className="mr-1.5 h-4 w-4 text-yellow-500" />
 };
 
 const claimLevelIcons: Record<ClaimLevelEnum, JSX.Element> = {
