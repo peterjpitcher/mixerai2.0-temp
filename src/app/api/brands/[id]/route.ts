@@ -264,6 +264,11 @@ export const PUT = withAuth(async (
     if (body.tone_of_voice !== undefined) updateData.tone_of_voice = body.tone_of_voice;
     if (body.brand_color !== undefined) updateData.brand_color = body.brand_color;
     if (body.approved_content_types !== undefined) updateData.approved_content_types = body.approved_content_types;
+    if (body.master_claim_brand_id !== undefined) {
+      updateData.master_claim_brand_id = body.master_claim_brand_id;
+    } else if (body.master_claim_brand_id === null) {
+      updateData.master_claim_brand_id = null;
+    }
     
     if (body.brand_summary !== undefined) {
       updateData.brand_summary = body.brand_summary;
@@ -291,105 +296,6 @@ export const PUT = withAuth(async (
       }
       updateData.guardrails = formattedGuardrails;
     }
-    
-    // Handle brand admins updates
-    /*
-    if (body.admins !== undefined && Array.isArray(body.admins)) {
-      const newAdminEmails = body.admins.map((admin: { email: string }) => admin.email.toLowerCase());
-
-      // Get current brand admins
-      const { data: currentBrandAdmins, error: currentAdminsError } = await supabase
-        .from('user_brand_permissions')
-        .select('user_id, users:profiles(email)') 
-        .eq('brand_id', brandIdToUpdate)
-        .eq('role', 'admin');
-
-      if (currentAdminsError) throw currentAdminsError;
-
-      const currentAdminEmails = currentBrandAdmins?.map((p: any) => p.users?.email?.toLowerCase()).filter(Boolean) || [];
-      
-      const emailsToAdd = newAdminEmails.filter(email => !currentAdminEmails.includes(email));
-      const userIdsToRemove = currentBrandAdmins
-                              ?.filter((p: any) => p.users?.email && !newAdminEmails.includes(p.users.email.toLowerCase()))
-                              .map((p: any) => p.user_id) || [];
-
-      // Remove admins
-      if (userIdsToRemove.length > 0) {
-        const { error: deleteError } = await supabase
-          .from('user_brand_permissions')
-          .delete()
-          .in('user_id', userIdsToRemove)
-          .eq('brand_id', brandIdToUpdate)
-          .eq('role', 'admin');
-        if (deleteError) throw deleteError;
-      }
-
-      // Add or invite new admins
-      const upsertOperations: Array<{ user_id: string; brand_id: string; role: 'admin'; }> = [];
-      for (const email of emailsToAdd) {
-        let existingUser: User | null = null;
-        let userFetchError: Error | null = null;
-
-        try {
-          const authResponse = await getUserAuthByEmail(email, supabase);
-          if (authResponse && 'id' in authResponse) {
-             existingUser = authResponse as User;
-          } else if (authResponse && 'data' in authResponse && authResponse.data && 'user' in authResponse.data) {
-            existingUser = authResponse.data.user;
-          } else if (authResponse && 'error' in authResponse && authResponse.error) {
-             userFetchError = authResponse.error;
-          }
-
-        } catch (e: any) {
-          userFetchError = e;
-        }
-
-        if (existingUser) {
-          upsertOperations.push({
-            user_id: existingUser.id,
-            brand_id: brandIdToUpdate,
-            role: 'admin' as const,
-          });
-        } else if (userFetchError) {
-          console.error(`Error fetching user ${email} during getUserAuthByEmail:`, userFetchError);
-        } else {
-          try {
-            const inviteResult = await inviteNewUserWithAppMetadata(
-              email,
-              { role: 'editor', invited_to_brand: brandIdToUpdate, invited_as_brand_role: 'admin' }, 
-              supabase
-            );
-            
-            const invitedUserObject = inviteResult.user;
-
-            if (inviteResult.error) {
-              console.error(`Failed to invite user ${email} (inviteNewUserWithAppMetadata error):`, inviteResult.error);
-            } else if (invitedUserObject) {
-              upsertOperations.push({
-                user_id: invitedUserObject.id,
-                brand_id: brandIdToUpdate,
-                role: 'admin' as const,
-              });
-            } else {
-              console.warn(`Invite for ${email} completed without error but no user object was returned.`);
-            }
-          } catch (inviteCatchError: any) {
-            console.error(`Unexpected error during invite process for ${email}:`, inviteCatchError);
-          }
-        }
-      }
-      
-      if (upsertOperations.length > 0) {
-        const { error: upsertError } = await supabase
-          .from('user_brand_permissions')
-          .upsert(upsertOperations, { onConflict: 'user_id,brand_id' });
-        if (upsertError) {
-          console.error('Error upserting brand admin permissions:', upsertError);
-          throw upsertError;
-        }
-      }
-    }
-    */
     
     // Main brand update logic
     updateData.updated_at = new Date().toISOString();
@@ -423,6 +329,79 @@ export const PUT = withAuth(async (
       updatedSupabaseBrandData = data;
     }
     
+    // ----- Start of Vetting Agency Logic Update -----
+    const brandCountryForLookup = updatedSupabaseBrandData?.country || body.country;
+    let allFinalAgencyIdsToLink: string[] = [];
+
+    // 1. Process explicitly selected agency UUIDs
+    if (body.selected_agency_ids && Array.isArray(body.selected_agency_ids)) {
+      const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+      (body.selected_agency_ids as string[]).forEach(id => {
+        if (uuidRegex.test(id)) {
+          allFinalAgencyIdsToLink.push(id);
+        } else {
+          console.warn(`[API /api/brands PUT] Invalid UUID in selected_agency_ids: "${id}". Skipping.`);
+        }
+      });
+    }
+    
+    // 2. Process new custom agency names
+    if (body.new_custom_agency_names && Array.isArray(body.new_custom_agency_names) && brandCountryForLookup) {
+      const customAgencyNames = body.new_custom_agency_names as string[];
+      for (const agencyName of customAgencyNames) {
+        if (typeof agencyName !== 'string' || agencyName.trim() === '') {
+          console.warn(`[API /api/brands PUT] Invalid custom agency name: "${agencyName}". Skipping.`);
+          continue;
+        }
+        // Check if agency already exists for this name and country
+        let { data: existingAgency, error: findError } = await supabase
+          .from('content_vetting_agencies')
+          .select('id')
+          .eq('name', agencyName.trim())
+          .eq('country_code', brandCountryForLookup)
+          .maybeSingle();
+
+        if (findError) {
+          console.error(`[API /api/brands PUT] Error checking for existing custom agency "${agencyName}":`, findError);
+          // Potentially skip this agency or throw, depending on desired error handling
+          continue;
+        }
+
+        if (existingAgency) {
+          allFinalAgencyIdsToLink.push(existingAgency.id);
+        } else {
+          // Create new agency
+          console.log(`[API /api/brands PUT] Creating new content vetting agency: "${agencyName}" for country ${brandCountryForLookup}`);
+          const { data: newAgency, error: createError } = await supabase
+            .from('content_vetting_agencies')
+            .insert({
+              name: agencyName.trim(),
+              country_code: brandCountryForLookup,
+              // Add other default fields like description or priority if necessary
+              // e.g., description: 'Custom agency added for brand.', priority: 'Medium'
+            })
+            .select('id')
+            .single();
+          
+          if (createError) {
+            console.error(`[API /api/brands PUT] Error creating new custom agency "${agencyName}":`, createError);
+            // Potentially skip this agency
+            continue;
+          }
+          if (newAgency) {
+            allFinalAgencyIdsToLink.push(newAgency.id);
+            console.log(`[API /api/brands PUT] Successfully created new agency "${agencyName}" with ID ${newAgency.id}`);
+          }
+        }
+      }
+    } else if (body.new_custom_agency_names && !brandCountryForLookup) {
+        console.warn("[API /api/brands PUT] Cannot create custom agencies because brand country is not available.");
+    }
+
+    // Remove duplicates
+    allFinalAgencyIdsToLink = Array.from(new Set(allFinalAgencyIdsToLink));
+    
+    // 3. Update brand_selected_agencies table
     // First, delete all existing links for this brand
     const { error: deleteAgenciesError } = await supabase
       .from('brand_selected_agencies')
@@ -434,76 +413,27 @@ export const PUT = withAuth(async (
       throw deleteAgenciesError;
     }
 
-    // Then, insert the new set of links
-    if (body.selected_agency_ids && Array.isArray(body.selected_agency_ids) && body.selected_agency_ids.length > 0) {
-      let resolvedAgencyIds: string[] = [];
-      const submittedIds = body.selected_agency_ids as string[];
-      const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+    // Then, insert the new set of links if there are any
+    if (allFinalAgencyIdsToLink.length > 0) {
+      const agenciesToInsert = allFinalAgencyIdsToLink.map(agencyId => ({
+        brand_id: brandIdToUpdate,
+        agency_id: agencyId,
+      }));
 
-      // Check if the first item looks like a UUID to determine input type
-      // This is a heuristic; a more robust way might be an explicit param from frontend
-      const firstItemIsLikelyUuid = uuidRegex.test(submittedIds[0]);
+      const { error: insertAgenciesError } = await supabase
+        .from('brand_selected_agencies')
+        .insert(agenciesToInsert);
 
-      if (firstItemIsLikelyUuid) {
-        console.log("[API /api/brands PUT] Assuming selected_agency_ids are UUIDs.");
-        resolvedAgencyIds = submittedIds.filter(id => {
-          if (!uuidRegex.test(id)) {
-            console.warn(`[API /api/brands PUT] Invalid UUID format for agencyId: "${id}" in an array assumed to be UUIDs. Skipping.`);
-            return false;
-          }
-          return true;
-        });
-      } else {
-        console.log("[API /api/brands PUT] Assuming selected_agency_ids are names. Attempting to resolve to UUIDs.");
-        const agencyNamesToLookup = submittedIds;
-        const brandCountryForLookup = updatedSupabaseBrandData?.country || body.country;
-
-        if (agencyNamesToLookup.length > 0 && brandCountryForLookup) {
-          const { data: agenciesFromDb, error: fetchAgenciesError } = await supabase
-            .from('content_vetting_agencies')
-            .select('id, name')
-            .in('name', agencyNamesToLookup)
-            .eq('country_code', brandCountryForLookup); // Use brand's country for context
-
-          if (fetchAgenciesError) {
-            console.error('[API /api/brands PUT] Error fetching agencies by name:', fetchAgenciesError);
-            // Decide if to throw or proceed with successfully resolved ones
-          } else if (agenciesFromDb) {
-            const nameToIdMap = new Map(agenciesFromDb.map(a => [a.name, a.id]));
-            agencyNamesToLookup.forEach(name => {
-              const foundId = nameToIdMap.get(name);
-              if (foundId) {
-                resolvedAgencyIds.push(foundId);
-              } else {
-                console.warn(`[API /api/brands PUT] Agency name "${name}" for country ${brandCountryForLookup} not found in database. Skipping.`);
-              }
-            });
-          }
-        } else if (!brandCountryForLookup) {
-            console.warn("[API /api/brands PUT] Cannot resolve agency names to IDs because brand country is not available.");
-        }
+      if (insertAgenciesError) {
+        console.error('[API /api/brands PUT] Error inserting new brand agencies:', insertAgenciesError);
+        throw insertAgenciesError;
       }
-
-      if (resolvedAgencyIds.length > 0) {
-        const agenciesToInsert = resolvedAgencyIds.map(agencyId => ({
-          brand_id: brandIdToUpdate,
-          agency_id: agencyId, // This should now always be a UUID
-        }));
-
-        const { error: insertAgenciesError } = await supabase
-          .from('brand_selected_agencies')
-          .insert(agenciesToInsert);
-
-        if (insertAgenciesError) {
-          console.error('[API /api/brands PUT] Error inserting new brand agencies (with resolved IDs):', insertAgenciesError);
-          throw insertAgenciesError;
-        }
-        console.log(`[API /api/brands PUT] Successfully inserted/updated ${agenciesToInsert.length} agency links.`);
-      } else {
-        console.log("[API /api/brands PUT] No valid agency IDs to insert after resolution.");
-      }
+      console.log(`[API /api/brands PUT] Successfully updated agency links for brand ${brandIdToUpdate}. Linked ${agenciesToInsert.length} agencies.`);
+    } else {
+      console.log(`[API /api/brands PUT] No agency links to update for brand ${brandIdToUpdate}.`);
     }
-    
+    // ----- End of Vetting Agency Logic Update -----
+
     // Fetch final state of selected agencies to return in response
     const { data: finalSelectedAgenciesData, error: finalAgenciesError } = await supabase
       .from('brand_selected_agencies')
