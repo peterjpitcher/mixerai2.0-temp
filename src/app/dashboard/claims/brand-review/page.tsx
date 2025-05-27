@@ -197,7 +197,9 @@ const ProductClaimsOutputPage = () => {
                     <SelectItem value="loading" disabled>Loading...</SelectItem>
                   ) : countries.length > 0 ? (
                     countries.map(country => (
-                      <SelectItem key={country.code} value={country.code}>{country.name}</SelectItem>
+                      <SelectItem key={country.code} value={country.code}>
+                        <span className="truncate">{country.name}</span>
+                      </SelectItem>
                     ))
                   ) : (
                     <SelectItem value="no-countries" disabled>No countries available</SelectItem>
@@ -221,7 +223,9 @@ const ProductClaimsOutputPage = () => {
                     <SelectItem value="loading" disabled>Loading...</SelectItem>
                   ) : products.length > 0 ? (
                     products.map(product => (
-                      <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>
+                      <SelectItem key={product.id} value={product.id}>
+                        <span className="truncate">{product.name}</span>
+                      </SelectItem>
                     ))
                   ) : (
                     <SelectItem value="no-products" disabled>No products available</SelectItem>

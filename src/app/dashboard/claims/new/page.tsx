@@ -239,9 +239,9 @@ export default function NewClaimPage() {
                 <Select name="country_code" value={formData.country_code} onValueChange={(value) => handleSelectChange('country_code', value)} disabled={isLoadingCountries}>
                     <SelectTrigger className={errors.country_code ? "border-red-500" : ""}><SelectValue placeholder={isLoadingCountries ? "Loading countries..." : "Select country"} /></SelectTrigger>
                     <SelectContent className="max-h-60">
-                        <SelectItem value={ALL_COUNTRIES_CODE}>{ALL_COUNTRIES_NAME}</SelectItem>
+                        <SelectItem value={ALL_COUNTRIES_CODE}><span className="truncate">{ALL_COUNTRIES_NAME}</span></SelectItem>
                         {availableCountries.map(country => (
-                            <SelectItem key={country.code} value={country.code}>{country.name} ({country.code})</SelectItem>
+                            <SelectItem key={country.code} value={country.code}><span className="truncate">{country.name} ({country.code})</span></SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
@@ -254,10 +254,13 @@ export default function NewClaimPage() {
               <div className="space-y-2">
                 <Label htmlFor="master_brand_id">Master Claim Brand <span className="text-red-500">*</span></Label>
                 <Select name="master_brand_id" value={formData.master_brand_id || ""} onValueChange={(value) => handleSelectChange('master_brand_id', value)} disabled={isLoadingBrands}>
-                  <SelectTrigger className={errors.master_brand_id ? "border-red-500" : ""}><SelectValue placeholder={isLoadingBrands ? "Loading brands..." : "Select Master Brand"} /></SelectTrigger>
-                  <SelectContent>
-                    {masterBrands.length === 0 && !isLoadingBrands ? <SelectItem value="" disabled>No brands available</SelectItem> : 
-                     masterBrands.map(brand => <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>)}
+                  <SelectTrigger className={errors.master_brand_id ? "border-red-500" : ""}>
+                    <SelectValue placeholder={isLoadingBrands ? "Loading brands..." : "Select master brand"} />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {masterBrands.map(brand => (
+                      <SelectItem key={brand.id} value={brand.id}><span className="truncate">{brand.name}</span></SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {errors.master_brand_id && <p className="text-xs text-red-500 mt-1">{errors.master_brand_id}</p>}
@@ -267,10 +270,13 @@ export default function NewClaimPage() {
               <div className="space-y-2">
                 <Label htmlFor="product_id">Product <span className="text-red-500">*</span></Label>
                 <Select name="product_id" value={formData.product_id || ""} onValueChange={(value) => handleSelectChange('product_id', value)} disabled={isLoadingProducts}>
-                  <SelectTrigger className={errors.product_id ? "border-red-500" : ""}><SelectValue placeholder={isLoadingProducts ? "Loading products..." : "Select Product"} /></SelectTrigger>
-                  <SelectContent>
-                    {products.length === 0 && !isLoadingProducts ? <SelectItem value="" disabled>No products available</SelectItem> : 
-                     products.map(product => <SelectItem key={product.id} value={product.id}>{product.name} {product.master_brand_name ? `(${product.master_brand_name})` : ''}</SelectItem>)}
+                  <SelectTrigger className={errors.product_id ? "border-red-500" : ""}>
+                    <SelectValue placeholder={isLoadingProducts ? "Loading products..." : "Select product"} />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {products.map(product => (
+                      <SelectItem key={product.id} value={product.id}><span className="truncate">{product.name} {product.master_brand_name ? `(${product.master_brand_name})` : ""}</span></SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {errors.product_id && <p className="text-xs text-red-500 mt-1">{errors.product_id}</p>}
@@ -280,10 +286,13 @@ export default function NewClaimPage() {
               <div className="space-y-2">
                 <Label htmlFor="ingredient_id">Ingredient <span className="text-red-500">*</span></Label>
                 <Select name="ingredient_id" value={formData.ingredient_id || ""} onValueChange={(value) => handleSelectChange('ingredient_id', value)} disabled={isLoadingIngredients}>
-                  <SelectTrigger className={errors.ingredient_id ? "border-red-500" : ""}><SelectValue placeholder={isLoadingIngredients ? "Loading ingredients..." : "Select Ingredient"} /></SelectTrigger>
-                  <SelectContent>
-                    {ingredients.length === 0 && !isLoadingIngredients ? <SelectItem value="" disabled>No ingredients available</SelectItem> : 
-                    ingredients.map(ing => <SelectItem key={ing.id} value={ing.id}>{ing.name}</SelectItem>)}
+                  <SelectTrigger className={errors.ingredient_id ? "border-red-500" : ""}>
+                    <SelectValue placeholder={isLoadingIngredients ? "Loading ingredients..." : "Select ingredient"} />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {ingredients.map(ingredient => (
+                      <SelectItem key={ingredient.id} value={ingredient.id}><span className="truncate">{ingredient.name}</span></SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {errors.ingredient_id && <p className="text-xs text-red-500 mt-1">{errors.ingredient_id}</p>}

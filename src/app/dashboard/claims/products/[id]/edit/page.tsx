@@ -326,15 +326,17 @@ export default function EditProductPage() {
               <Label htmlFor="master_brand_id">Master Claim Brand <span className="text-red-500">*</span></Label>
               <Select value={formData.master_brand_id} onValueChange={handleSelectChange} disabled={isLoadingBrands || isSaving}>
                 <SelectTrigger className={formErrors.master_brand_id ? "border-red-500" : ""}>
-                  <SelectValue placeholder={isLoadingBrands ? "Loading brands..." : "Select a Master Claim Brand"} />
+                  <SelectValue placeholder={isLoadingBrands ? "Loading brands..." : "Select Master Claim Brand"} />
                 </SelectTrigger>
-                <SelectContent>
-                  {masterBrands.length === 0 && !isLoadingBrands ? (
-                    <SelectItem value="" disabled>No brands available</SelectItem>
-                  ) : (
-                    masterBrands.map((brand) => (
-                      <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
+                <SelectContent className="max-h-60">
+                  {isLoadingBrands ? (
+                    <SelectItem value="loading" disabled>Loading brands...</SelectItem>
+                  ) : masterBrands.length > 0 ? (
+                    masterBrands.map(brand => (
+                      <SelectItem key={brand.id} value={brand.id}><span className="truncate">{brand.name}</span></SelectItem>
                     ))
+                  ) : (
+                    <SelectItem value="" disabled>No brands available</SelectItem>
                   )}
                 </SelectContent>
               </Select>
@@ -370,14 +372,20 @@ export default function EditProductPage() {
             <div className="space-y-2">
               <Label htmlFor="stacked_claims_country_code">Country for Claims</Label>
               <Select value={selectedCountry} onValueChange={setSelectedCountry}>
-                <SelectTrigger id="stacked_claims_country_code">
-                  <SelectValue placeholder="Select country" />
+                <SelectTrigger className="w-full md:w-[280px]">
+                  <SelectValue placeholder="Select Country to View Claims" />
                 </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  <SelectItem value={ALL_COUNTRIES_CODE}>{ALL_COUNTRIES_NAME} ({ALL_COUNTRIES_CODE})</SelectItem>
-                  {countries.map(country => (
-                    <SelectItem key={country} value={country}>{country}</SelectItem>
-                  ))}
+                <SelectContent className="max-h-72">
+                  <SelectItem value={ALL_COUNTRIES_CODE}><span className="truncate">{ALL_COUNTRIES_NAME} (Effective Total)</span></SelectItem>
+                  {Array.isArray(countries) ? countries.map((country: any) => {
+                    const countryCode = typeof country === 'object' && country.code ? country.code : typeof country === 'string' ? country : 'unknown';
+                    const countryName = typeof country === 'object' && country.name ? country.name : typeof country === 'string' ? country : 'Unknown Country';
+                    return (
+                      <SelectItem key={countryCode} value={countryCode}>
+                        <span className="truncate">{countryName}</span>
+                      </SelectItem>
+                    );
+                  }) : <SelectItem value="loading-countries" disabled>Loading countries...</SelectItem>}
                 </SelectContent>
               </Select>
             </div>
