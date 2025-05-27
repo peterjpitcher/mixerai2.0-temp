@@ -280,40 +280,40 @@ export function UnifiedNavigation() {
           segment: 'claims-preview'
         },
         {
-          href: '/dashboard/admin/claims/definitions',
+          href: '/dashboard/claims/definitions',
           label: 'Define Claims',
           icon: <ClipboardEdit className="h-4 w-4" />,
           segment: 'claims-definitions'
         },
         {
-          href: '/dashboard/admin/claims/overrides',
+          href: '/dashboard/claims/overrides',
           label: 'Market Overrides',
           icon: <Globe2 className="h-4 w-4" />,
           segment: 'claims-overrides'
         },
         {
           label: 'Brand Claims Review',
-          href: '/dashboard/admin/claims/brand-review',
+          href: '/dashboard/claims/brand-review',
           icon: <SearchCheck className="h-4 w-4" />,
           segment: 'claims-brand-review'
         },
         {
-          href: '/dashboard/admin/products',
+          href: '/dashboard/claims/products',
           label: 'Products',
           icon: <Package className="h-4 w-4" />,
           segment: 'claims-manage-products'
         },
         {
-          href: '/dashboard/admin/ingredients',
+          href: '/dashboard/claims/ingredients',
           label: 'Ingredients',
           icon: <FlaskConical className="h-4 w-4" />,
           segment: 'claims-manage-ingredients'
         },
         {
-          href: '/dashboard/admin/global-claim-brands',
+          href: '/dashboard/claims/brands',
           label: 'Claim Brands',
           icon: <Building2 className="h-4 w-4" />,
-          segment: 'claims-manage-global-brands'
+          segment: 'claims-manage-master-brands'
         }
       ]
     },

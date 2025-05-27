@@ -15,7 +15,7 @@ interface Claim {
     claim_text: string;
     claim_type: ClaimTypeEnum;
     level: ClaimLevelEnum;
-    global_brand_id?: string | null;
+    master_brand_id?: string | null;
     product_id?: string | null;
     ingredient_id?: string | null;
     country_code: string;
@@ -65,7 +65,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
             claim_text: singleDataObject.claim_text,
             claim_type: singleDataObject.claim_type,
             level: singleDataObject.level,
-            global_brand_id: singleDataObject.global_brand_id,
+            master_brand_id: singleDataObject.master_brand_id,
             product_id: singleDataObject.product_id,
             ingredient_id: singleDataObject.ingredient_id,
             country_code: singleDataObject.country_code,
@@ -94,10 +94,10 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
         const body = await req.json();
         const { claim_text, claim_type, description, country_code } = body;
 
-        // Level and associated entity IDs (product_id, global_brand_id, ingredient_id) are not updatable here.
+        // Level and associated entity IDs (product_id, master_brand_id, ingredient_id) are not updatable here.
         // To change those, one would typically delete and recreate the claim if necessary.
 
-        const updatePayload: Partial<Omit<Claim, 'id' | 'level' | 'global_brand_id' | 'product_id' | 'ingredient_id' | 'created_by' | 'created_at'> & { updated_at: string }> = {
+        const updatePayload: Partial<Omit<Claim, 'id' | 'level' | 'master_brand_id' | 'product_id' | 'ingredient_id' | 'created_by' | 'created_at'> & { updated_at: string }> = {
             updated_at: new Date().toISOString(),
         };
 
@@ -141,13 +141,13 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
             // @ts-ignore
             const { data: claimData, error: claimFetchError } = await supabase
                 .from('claims')
-                .select('level, global_brand_id, product_id, created_by')
+                .select('level, master_brand_id, product_id, created_by')
                 .eq('id', id)
                 .single();
 
             if (claimFetchError || !claimData) {
                 console.error(`[API Claims PUT /${id}] Error fetching claim for permissions:`, claimFetchError);
-                return handleApiError(claimFetchError, 'Failed to verify claim for permissions.');
+                return handleApiError(claimFetchError || new Error('Claim not found for permission check'), 'Failed to verify claim for permissions.');
             }
 
             // Allow if user is the creator of the claim
@@ -155,40 +155,40 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
                 hasPermission = true;
             }
 
-            if (!hasPermission) { // If not creator, check brand admin permissions
+            if (!hasPermission && claimData) { 
                 let coreBrandId: string | null = null;
-                if (claimData.level === 'brand' && claimData.global_brand_id) {
+                if (claimData.level === 'brand' && claimData.master_brand_id) { 
                     // @ts-ignore
-                    const { data: gcbData, error: gcbError } = await supabase
-                        .from('global_claim_brands')
+                    const { data: mcbData, error: mcbError } = await supabase 
+                        .from('master_claim_brands') 
                         .select('mixerai_brand_id')
-                        .eq('id', claimData.global_brand_id)
+                        .eq('id', claimData.master_brand_id) 
                         .single();
-                    if (gcbError || !gcbData) {
-                        console.error(`[API Claims PUT /${id}] Error fetching GCB for brand-level claim permissions:`, gcbError);
+                    if (mcbError || !mcbData) {
+                        console.error(`[API Claims PUT /${id}] Error fetching MCB for brand-level claim permissions:`, mcbError);
                     } else {
-                        coreBrandId = gcbData.mixerai_brand_id;
+                        coreBrandId = mcbData.mixerai_brand_id;
                     }
                 } else if (claimData.level === 'product' && claimData.product_id) {
                     // @ts-ignore
                     const { data: productData, error: productError } = await supabase
                         .from('products')
-                        .select('global_brand_id')
+                        .select('master_brand_id') 
                         .eq('id', claimData.product_id)
                         .single();
-                    if (productError || !productData || !productData.global_brand_id) {
-                        console.error(`[API Claims PUT /${id}] Error fetching product/GCB for product-level claim permissions:`, productError);
+                    if (productError || !productData || !productData.master_brand_id) {
+                        console.error(`[API Claims PUT /${id}] Error fetching product/MCB for product-level claim permissions:`, productError);
                     } else {
                         // @ts-ignore
-                        const { data: gcbData, error: gcbError } = await supabase
-                            .from('global_claim_brands')
+                        const { data: mcbData, error: mcbError } = await supabase 
+                            .from('master_claim_brands') 
                             .select('mixerai_brand_id')
-                            .eq('id', productData.global_brand_id)
+                            .eq('id', productData.master_brand_id) 
                             .single();
-                        if (gcbError || !gcbData) {
-                            console.error(`[API Claims PUT /${id}] Error fetching GCB for product-level claim (via product) permissions:`, gcbError);
+                        if (mcbError || !mcbData) {
+                            console.error(`[API Claims PUT /${id}] Error fetching MCB for product-level claim (via product) permissions:`, mcbError);
                         } else {
-                            coreBrandId = gcbData.mixerai_brand_id;
+                            coreBrandId = mcbData.mixerai_brand_id;
                         }
                     }
                 } else if (claimData.level === 'ingredient') {
@@ -248,7 +248,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
             claim_text: singleDataObject.claim_text,
             claim_type: singleDataObject.claim_type,
             level: singleDataObject.level,
-            global_brand_id: singleDataObject.global_brand_id,
+            master_brand_id: singleDataObject.master_brand_id,
             product_id: singleDataObject.product_id,
             ingredient_id: singleDataObject.ingredient_id,
             country_code: singleDataObject.country_code,
@@ -287,63 +287,58 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
             // @ts-ignore
             const { data: claimData, error: claimFetchError } = await supabase
                 .from('claims')
-                .select('level, global_brand_id, product_id, created_by')
+                .select('level, master_brand_id, product_id, created_by')
                 .eq('id', id)
                 .single();
 
-            if (claimFetchError || !claimData) {
-                // If the claim doesn't exist, the delete operation later will handle it with a 404.
-                // However, if there's an error fetching, we should stop.
-                if (claimFetchError) {
-                    console.error(`[API Claims DELETE /${id}] Error fetching claim for permissions:`, claimFetchError);
-                    return handleApiError(claimFetchError, 'Failed to verify claim for permissions before deletion.');
-                }
-                // If !claimData but no error, it means claim not found, let delete handle it.
+            if (claimFetchError) { 
+                console.error(`[API Claims DELETE /${id}] Error fetching claim for permissions:`, claimFetchError);
+                return handleApiError(claimFetchError, 'Failed to verify claim for permissions before deletion.');
+            }
+            if (!claimData) { // Claim not found, let the actual delete call handle the 404 or specific error.
+                // Proceed to delete attempt which will fail if claim not found or if other error occurs
             } else {
-                 // Allow if user is the creator of the claim
                 if (claimData.created_by === user.id) {
                     hasPermission = true;
                 }
 
-                if (!hasPermission) { // If not creator, check brand admin permissions
+                if (!hasPermission && claimData) { 
                     let coreBrandId: string | null = null;
-                    if (claimData.level === 'brand' && claimData.global_brand_id) {
+                    if (claimData.level === 'brand' && claimData.master_brand_id) { 
                         // @ts-ignore
-                        const { data: gcbData, error: gcbError } = await supabase
-                            .from('global_claim_brands')
+                        const { data: mcbData, error: mcbError } = await supabase 
+                            .from('master_claim_brands') 
                             .select('mixerai_brand_id')
-                            .eq('id', claimData.global_brand_id)
+                            .eq('id', claimData.master_brand_id) 
                             .single();
-                        if (gcbError || !gcbData) {
-                            console.error(`[API Claims DELETE /${id}] Error fetching GCB for brand-level claim permissions:`, gcbError);
+                        if (mcbError || !mcbData) {
+                            console.error(`[API Claims DELETE /${id}] Error fetching MCB for brand-level claim permissions:`, mcbError);
                         } else {
-                            coreBrandId = gcbData.mixerai_brand_id;
+                            coreBrandId = mcbData.mixerai_brand_id;
                         }
                     } else if (claimData.level === 'product' && claimData.product_id) {
                         // @ts-ignore
                         const { data: productData, error: productError } = await supabase
                             .from('products')
-                            .select('global_brand_id')
+                            .select('master_brand_id') 
                             .eq('id', claimData.product_id)
                             .single();
-                        if (productError || !productData || !productData.global_brand_id) {
-                            console.error(`[API Claims DELETE /${id}] Error fetching product/GCB for product-level claim permissions:`, productError);
+                        if (productError || !productData || !productData.master_brand_id) {
+                            console.error(`[API Claims DELETE /${id}] Error fetching product/MCB for product-level claim permissions:`, productError);
                         } else {
                             // @ts-ignore
-                            const { data: gcbData, error: gcbError } = await supabase
-                                .from('global_claim_brands')
+                            const { data: mcbData, error: mcbError } = await supabase 
+                                .from('master_claim_brands') 
                                 .select('mixerai_brand_id')
-                                .eq('id', productData.global_brand_id)
+                                .eq('id', productData.master_brand_id) 
                                 .single();
-                            if (gcbError || !gcbData) {
-                                console.error(`[API Claims DELETE /${id}] Error fetching GCB for product-level claim (via product) permissions:`, gcbError);
+                            if (mcbError || !mcbData) {
+                                console.error(`[API Claims DELETE /${id}] Error fetching MCB for product-level claim (via product) permissions:`, mcbError);
                             } else {
-                                coreBrandId = gcbData.mixerai_brand_id;
+                                coreBrandId = mcbData.mixerai_brand_id;
                             }
                         }
-                    } else if (claimData.level === 'ingredient') {
-                        // For ingredient-level claims, only global admin or creator can modify.
-                    }
+                    } 
 
                     if (coreBrandId) {
                         // @ts-ignore
@@ -352,7 +347,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
                             .select('role')
                             .eq('user_id', user.id)
                             .eq('brand_id', coreBrandId)
-                            .eq('role', 'admin') // Must be a brand admin
+                            .eq('role', 'admin') 
                             .limit(1);
                         if (permissionsError) {
                             console.error(`[API Claims DELETE /${id}] Error fetching user_brand_permissions:`, permissionsError);

@@ -4,7 +4,7 @@ import { handleApiError, isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
 import { generateTextCompletion } from '@/lib/azure/openai';
-import { ClaimTypeEnum, Product, GlobalClaimBrand as GlobalClaimBrandSummary } from '@/lib/claims-utils';
+import { ClaimTypeEnum, Product, MasterClaimBrand as MasterClaimBrandSummary } from '@/lib/claims-utils';
 
 export const dynamic = "force-dynamic";
 
@@ -45,11 +45,11 @@ async function getProductAndFullBrandDetails(supabase: any, productId: string): 
     let product: Product | null = null;
     let brandDetails: BrandDetails | null = null;
 
-    // 1. Fetch product and its associated GlobalClaimBrandSummary (which contains mixerai_brand_id)
     // @ts-ignore
     const { data: productData, error: productError } = await supabase
         .from('products')
-        .select('*, global_claim_brand_id(*)') // Fetch the related global_claim_brand record
+        // @ts-ignore 
+        .select('*, master_brand_id(*)') // Renamed from global_claim_brand_id
         .eq('id', productId)
         .single();
 
@@ -60,20 +60,20 @@ async function getProductAndFullBrandDetails(supabase: any, productId: string): 
 
     if (productData) {
         product = productData as Product;
-        // @ts-ignore (Supabase populates foreign keys as nested objects)
-        const globalClaimBrandSummary = productData.global_claim_brand_id as GlobalClaimBrandSummary;
+        // @ts-ignore 
+        const masterClaimBrandSummary = productData.master_brand_id as MasterClaimBrandSummary; // Renamed
 
-        if (globalClaimBrandSummary && globalClaimBrandSummary.mixerai_brand_id) {
+        if (masterClaimBrandSummary && masterClaimBrandSummary.mixerai_brand_id) {
             // 2. Fetch full brand details from 'brands' table using mixerai_brand_id
             // @ts-ignore
             const { data: fullBrandData, error: brandError } = await supabase
                 .from('brands') // The main brands table
                 .select('id, name, website_url, country, language, brand_identity, tone_of_voice, guardrails')
-                .eq('id', globalClaimBrandSummary.mixerai_brand_id)
+                .eq('id', masterClaimBrandSummary.mixerai_brand_id)
                 .single();
 
             if (brandError) {
-                console.warn(`[AI Suggest] Could not fetch full brand details for mixerai_brand_id ${globalClaimBrandSummary.mixerai_brand_id}:`, brandError);
+                console.warn(`[AI Suggest] Could not fetch full brand details for mixerai_brand_id ${masterClaimBrandSummary.mixerai_brand_id}:`, brandError);
                 // Proceed without full brand details if this fetch fails
             } else if (fullBrandData) {
                 brandDetails = fullBrandData as BrandDetails;

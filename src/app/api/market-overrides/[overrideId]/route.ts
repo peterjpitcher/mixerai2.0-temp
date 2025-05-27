@@ -95,29 +95,31 @@ export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { p
                     // @ts-ignore
                     const { data: productData, error: productError } = await supabase
                         .from('products')
-                        .select('global_brand_id')
+                        // @ts-ignore
+                        .select('master_brand_id') // Renamed
                         .eq('id', fetchedOverride.target_product_id)
                         .single();
 
-                    if (productError || !productData || !productData.global_brand_id) {
-                        console.error(`[API MarketOverrides PUT /${overrideId}] Error fetching product/GCB for permissions:`, productError);
+                    if (productError || !productData || !productData.master_brand_id) { // Renamed
+                        console.error(`[API MarketOverrides PUT /${overrideId}] Error fetching product/MCB for permissions:`, productError);
                     } else {
                         // @ts-ignore
-                        const { data: gcbData, error: gcbError } = await supabase
-                            .from('global_claim_brands')
+                        const { data: mcbData, error: mcbError } = await supabase // Renamed
+                            .from('master_claim_brands') // Renamed
                             .select('mixerai_brand_id')
-                            .eq('id', productData.global_brand_id)
+                            // @ts-ignore
+                            .eq('id', productData.master_brand_id) // Renamed
                             .single();
                         
-                        if (gcbError || !gcbData || !gcbData.mixerai_brand_id) {
-                            console.error(`[API MarketOverrides PUT /${overrideId}] Error fetching GCB or GCB not linked for permissions:`, gcbError);
+                        if (mcbError || !mcbData || !mcbData.mixerai_brand_id) {
+                            console.error(`[API MarketOverrides PUT /${overrideId}] Error fetching MCB or MCB not linked for permissions (MCB ID: ${productData.master_brand_id}):`, mcbError);
                         } else {
                             // @ts-ignore
                             const { data: permissionsData, error: permissionsError } = await supabase
                                 .from('user_brand_permissions')
                                 .select('role')
                                 .eq('user_id', user.id)
-                                .eq('brand_id', gcbData.mixerai_brand_id)
+                                .eq('brand_id', mcbData.mixerai_brand_id)
                                 .eq('role', 'admin')
                                 .limit(1);
                             if (permissionsError) {
@@ -239,29 +241,31 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, { params }: 
                     // @ts-ignore
                     const { data: productData, error: productError } = await supabase
                         .from('products')
-                        .select('global_brand_id')
+                        // @ts-ignore
+                        .select('master_brand_id') // Renamed
                         .eq('id', fetchedOverride.target_product_id)
                         .single();
 
-                    if (productError || !productData || !productData.global_brand_id) {
-                        console.error(`[API MarketOverrides DELETE /${overrideId}] Error fetching product/GCB for permissions:`, productError);
+                    if (productError || !productData || !productData.master_brand_id) { // Renamed
+                        console.error(`[API MarketOverrides DELETE /${overrideId}] Error fetching product/MCB for permissions:`, productError);
                     } else {
                         // @ts-ignore
-                        const { data: gcbData, error: gcbError } = await supabase
-                            .from('global_claim_brands')
+                        const { data: mcbData, error: mcbError } = await supabase // Renamed
+                            .from('master_claim_brands') // Renamed
                             .select('mixerai_brand_id')
-                            .eq('id', productData.global_brand_id)
+                            // @ts-ignore
+                            .eq('id', productData.master_brand_id) // Renamed
                             .single();
                         
-                        if (gcbError || !gcbData || !gcbData.mixerai_brand_id) {
-                            console.error(`[API MarketOverrides DELETE /${overrideId}] Error fetching GCB or GCB not linked for permissions:`, gcbError);
+                        if (mcbError || !mcbData || !mcbData.mixerai_brand_id) {
+                            console.error(`[API MarketOverrides DELETE /${overrideId}] Error fetching MCB or MCB not linked for permissions (MCB ID: ${productData.master_brand_id}):`, mcbError);
                         } else {
                             // @ts-ignore
                             const { data: permissionsData, error: permissionsError } = await supabase
                                 .from('user_brand_permissions')
                                 .select('role')
                                 .eq('user_id', user.id)
-                                .eq('brand_id', gcbData.mixerai_brand_id)
+                                .eq('brand_id', mcbData.mixerai_brand_id)
                                 .eq('role', 'admin')
                                 .limit(1);
                             if (permissionsError) {

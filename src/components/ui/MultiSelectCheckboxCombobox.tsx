@@ -24,6 +24,7 @@ interface MultiSelectCheckboxComboboxProps {
   searchPlaceholder?: string;
   className?: string;
   triggerClassName?: string;
+  disabled?: boolean;
 }
 
 export const MultiSelectCheckboxCombobox: React.FC<MultiSelectCheckboxComboboxProps> = ({
@@ -34,6 +35,7 @@ export const MultiSelectCheckboxCombobox: React.FC<MultiSelectCheckboxComboboxPr
   searchPlaceholder = 'Search options...',
   className,
   triggerClassName,
+  disabled = false,
 }) => {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [isOpen, setIsOpen] = React.useState(false);
@@ -61,18 +63,20 @@ export const MultiSelectCheckboxCombobox: React.FC<MultiSelectCheckboxComboboxPr
   const displayedSelectedOptions = options.filter(option => selectedValues.includes(option.value));
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
+    <Popover open={isOpen && !disabled} onOpenChange={(openState) => !disabled && setIsOpen(openState)}>
       <div className={cn('w-full', className)}>
-        <PopoverTrigger asChild>
+        <PopoverTrigger asChild disabled={disabled}>
           <Button
             variant="outline"
             role="combobox"
             aria-expanded={isOpen}
+            disabled={disabled}
             className={cn(
               'w-full justify-between h-auto min-h-10 items-start',
-              triggerClassName
+              triggerClassName,
+              disabled && "cursor-not-allowed opacity-50"
             )}
-            onClick={() => setIsOpen(!isOpen)}
+            onClick={() => !disabled && setIsOpen(!isOpen)}
           >
             {displayedSelectedOptions.length > 0 ? (
               <div className="flex gap-1 flex-wrap py-1">
@@ -109,6 +113,7 @@ export const MultiSelectCheckboxCombobox: React.FC<MultiSelectCheckboxComboboxPr
                         placeholder={searchPlaceholder} 
                         value={inputValue} 
                         onValueChange={setInputValue} 
+                        disabled={disabled}
                     />
                     <CommandList>
                         {options.length === 0 && (
@@ -123,17 +128,18 @@ export const MultiSelectCheckboxCombobox: React.FC<MultiSelectCheckboxComboboxPr
                                 <CommandItem
                                 key={option.value}
                                 value={option.value}
-                                onSelect={() => handleSelect(option.value)}
-                                className="flex items-center justify-between cursor-pointer"
+                                onSelect={() => !disabled && handleSelect(option.value)}
+                                className={cn("flex items-center justify-between", disabled ? "cursor-not-allowed opacity-75" : "cursor-pointer")}
                                 >
                                 <div className="flex items-center">
                                     <Checkbox
                                         id={`checkbox-${option.value}`}
                                         checked={isSelected}
-                                        onCheckedChange={() => handleSelect(option.value)}
+                                        onCheckedChange={() => !disabled && handleSelect(option.value)}
                                         className="mr-2 h-4 w-4"
+                                        disabled={disabled}
                                     />
-                                    <label htmlFor={`checkbox-${option.value}`} className="cursor-pointer">
+                                    <label htmlFor={`checkbox-${option.value}`} className={cn(disabled ? "cursor-not-allowed" : "cursor-pointer")}>
                                         {option.label}
                                     </label>
                                 </div>

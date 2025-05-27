@@ -12,7 +12,7 @@ export interface Claim {
   claim_text: string;
   claim_type: ClaimTypeEnum;
   level: ClaimLevelEnum;
-  global_brand_id?: string | null;
+  master_brand_id?: string | null;
   product_id?: string | null;
   ingredient_id?: string | null;
   country_code: string; // Can be '__GLOBAL__' or ISO country code
@@ -26,7 +26,7 @@ export interface Product {
   id: string;
   name: string;
   description: string | null;
-  global_brand_id: string; 
+  master_brand_id: string; 
   created_at?: string;
   updated_at?: string;
 }
@@ -39,7 +39,7 @@ export interface Ingredient {
   updated_at?: string;
 }
 
-export interface GlobalClaimBrand {
+export interface MasterClaimBrand {
   id: string;
   name: string;
   mixerai_brand_id: string | null;
@@ -121,11 +121,11 @@ export async function getStackedClaimsForProduct(
   }
 
   try {
-    // 1. Fetch the product details to get its global_brand_id
+    // 1. Fetch the product details to get its master_brand_id
     // @ts-ignore
     const { data: product, error: productError } = await supabase
       .from('products')
-      .select('id, name, global_brand_id')
+      .select('id, name, master_brand_id')
       .eq('id', productId)
       .single<Product>();
 
@@ -134,7 +134,7 @@ export async function getStackedClaimsForProduct(
       return [];
     }
 
-    const globalBrandId = product.global_brand_id;
+    const masterBrandId = product.master_brand_id;
 
     // Helper to fetch claims for a given level and entity ID(s)
     // Now fetches both country-specific and __GLOBAL__ claims together for easier processing later
@@ -146,7 +146,7 @@ export async function getStackedClaimsForProduct(
 
       const idColumn = level === 'product' ? 'product_id' :
                        level === 'ingredient' ? 'ingredient_id' :
-                       'global_brand_id';
+                       'master_brand_id';
       
       // @ts-ignore
       const { data: fetchedClaims, error } = await supabase
@@ -185,8 +185,8 @@ export async function getStackedClaimsForProduct(
 
     // 5. Fetch Brand-specific claims (Master & Market)
     let brandClaims: Claim[] = [];
-    if (globalBrandId) {
-      brandClaims = await fetchClaimsForLevel('brand', [globalBrandId]);
+    if (masterBrandId) {
+      brandClaims = await fetchClaimsForLevel('brand', [masterBrandId]);
     }
 
     // 6. Fetch Market Claim Overrides for this product and country
@@ -226,7 +226,7 @@ export async function getStackedClaimsForProduct(
         let level: ClaimLevelEnum = 'brand'; // Default, will be overridden
         if (c.product_id) level = 'product';
         else if (c.ingredient_id) level = 'ingredient';
-        else if (c.global_brand_id) level = 'brand';
+        else if (c.master_brand_id) level = 'brand';
         
         return {
             ...c,
@@ -282,7 +282,7 @@ export async function getStackedClaimsForProduct(
                             applies_to_product_id: productId,
                             applies_to_country_code: countryCode,
                             original_claim_country_code: replacementClaim.country_code, // Country of the replacement claim
-                            source_entity_id: replacementClaim.product_id || replacementClaim.ingredient_id || replacementClaim.global_brand_id,
+                            source_entity_id: replacementClaim.product_id || replacementClaim.ingredient_id || replacementClaim.master_brand_id,
                         });
                     } else {
                          // This case should be rare if DB constraints are good (replacement_claim_id FK)
@@ -318,8 +318,8 @@ export async function getStackedClaimsForProduct(
                 entityIdForSource = claim.product_id;
              } else if (sourceLevel === 'ingredient' && claim.ingredient_id) {
                 entityIdForSource = claim.ingredient_id;
-             } else if (sourceLevel === 'brand' && claim.global_brand_id) {
-                entityIdForSource = claim.global_brand_id;
+             } else if (sourceLevel === 'brand' && claim.master_brand_id) {
+                entityIdForSource = claim.master_brand_id;
              }
 
             effectiveClaimsMap.set(claim.claim_text, {

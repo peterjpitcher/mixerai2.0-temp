@@ -10,21 +10,21 @@ interface Product {
     id: string;
     name: string;
     description: string | null;
-    global_brand_id: string;
+    master_brand_id: string;
     created_at?: string;
     updated_at?: string;
 }
 
 interface RequestContext {
     params: {
-        productId: string; // Changed from id to productId
+        productId: string;
     };
 }
 
 // GET handler for a single product by ID
 export const GET = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
-    const { productId } = context.params; // Changed from id to productId
-    if (!productId) { // Changed from id to productId
+    const { productId } = context.params;
+    if (!productId) {
         return NextResponse.json({ success: false, error: 'Product ID is required.' }, { status: 400 });
     }
     // TODO: Implement permission checks - user might only see products for brands they have access to.
@@ -33,12 +33,12 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
         const supabase = createSupabaseAdminClient();
         // @ts-ignore
         const { data, error } = await supabase.from('products')
-            .select('*') // Consider joining with global_claim_brands for brand name
-            .eq('id', productId) // Changed from id to productId
+            .select('*')
+            .eq('id', productId)
             .single();
 
         if (error) {
-            console.error(`[API Products GET /${productId}] Error fetching product:`, error); // Changed from id to productId
+            console.error(`[API Products GET /${productId}] Error fetching product:`, error);
             if (error.code === 'PGRST116') { 
                 return NextResponse.json({ success: false, error: 'Product not found.' }, { status: 404 });
             }
@@ -54,7 +54,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
             id: singleDataObject.id,
             name: singleDataObject.name,
             description: singleDataObject.description,
-            global_brand_id: singleDataObject.global_brand_id,
+            master_brand_id: singleDataObject.master_brand_id,
             created_at: singleDataObject.created_at,
             updated_at: singleDataObject.updated_at
         };
@@ -62,15 +62,15 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
         return NextResponse.json({ success: true, data: validatedData });
 
     } catch (error: any) {
-        console.error(`[API Products GET /${productId}] Catched error:`, error); // Changed from id to productId
+        console.error(`[API Products GET /${productId}] Catched error:`, error);
         return handleApiError(error, 'An unexpected error occurred while fetching the product.');
     }
 });
 
 // PUT handler for updating a product by ID
 export const PUT = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
-    const { productId } = context.params; // Changed from id to productId
-    if (!productId) { // Changed from id to productId
+    const { productId } = context.params;
+    if (!productId) {
         return NextResponse.json({ success: false, error: 'Product ID is required for update.' }, { status: 400 });
     }
 
@@ -78,7 +78,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
         const body = await req.json();
         const { name, description } = body;
 
-        // global_brand_id is not updatable via this endpoint for simplicity.
+        // master_brand_id is not updatable via this endpoint for simplicity.
         // If it needs to be updatable, careful consideration of permissions and implications is needed.
 
         if (!name || typeof name !== 'string' || name.trim() === '') {
@@ -100,56 +100,56 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
         let hasPermission = user?.user_metadata?.role === 'admin';
 
         if (!hasPermission) {
-            // Fetch the product to get its global_brand_id for permission checking
+            // Fetch the product to get its master_brand_id for permission checking
             // @ts-ignore
             const { data: productData, error: productFetchError } = await supabase
                 .from('products')
-                .select('global_brand_id')
-                .eq('id', productId) // Changed from id to productId
+                .select('master_brand_id')
+                .eq('id', productId)
                 .single();
 
             if (productFetchError) {
-                console.error(`[API Products PUT /${productId}] Error fetching product for permissions:`, productFetchError); // Changed from id to productId
+                console.error(`[API Products PUT /${productId}] Error fetching product for permissions:`, productFetchError);
                 // If product not found, the main update logic later will return a 404.
                 // If any other error, deny permission.
                 // hasPermission remains false.
             } else if (!productData) {
-                 console.warn(`[API Products PUT /${productId}] Product not found during permission check.`); // Changed from id to productId
+                 console.warn(`[API Products PUT /${productId}] Product not found during permission check.`);
                  // hasPermission remains false. Main logic will 404.
-            } else if (!productData.global_brand_id) {
-                console.warn(`[API Products PUT /${productId}] Product ${productId} is missing global_brand_id, cannot verify non-admin permission.`); // Changed from id to productId
+            } else if (!productData.master_brand_id) {
+                console.warn(`[API Products PUT /${productId}] Product ${productId} is missing master_brand_id, cannot verify non-admin permission.`);
                 // hasPermission remains false.
             } else {
-                // Product found and has a global_brand_id, proceed to check GCB link
+                // Product found and has a master_brand_id, proceed to check MCB link
                 // @ts-ignore
-                const { data: gcbData, error: gcbError } = await supabase
-                    .from('global_claim_brands')
+                const { data: mcbData, error: mcbError } = await supabase
+                    .from('master_claim_brands')
                     .select('mixerai_brand_id')
-                    .eq('id', productData.global_brand_id)
+                    .eq('id', productData.master_brand_id)
                     .single();
                 
-                if (gcbError) {
-                    console.error(`[API Products PUT /${productId}] Error fetching GCB (ID: ${productData.global_brand_id}) for permissions:`, gcbError); // Changed from id to productId
+                if (mcbError) {
+                    console.error(`[API Products PUT /${productId}] Error fetching MCB (ID: ${productData.master_brand_id}) for permissions:`, mcbError);
                     // hasPermission remains false.
-                } else if (!gcbData) {
-                    console.warn(`[API Products PUT /${productId}] GCB record not found for GCB ID: ${productData.global_brand_id}. Cannot verify non-admin permission.`); // Changed from id to productId
+                } else if (!mcbData) {
+                    console.warn(`[API Products PUT /${productId}] MCB record not found for MCB ID: ${productData.master_brand_id}. Cannot verify non-admin permission.`);
                     // hasPermission remains false.
-                } else if (!gcbData.mixerai_brand_id) {
-                    console.warn(`[API Products PUT /${productId}] GCB (ID: ${productData.global_brand_id}) is not linked to a mixerai_brand_id. Cannot verify non-admin permission.`); // Changed from id to productId
+                } else if (!mcbData.mixerai_brand_id) {
+                    console.warn(`[API Products PUT /${productId}] MCB (ID: ${productData.master_brand_id}) is not linked to a mixerai_brand_id. Cannot verify non-admin permission.`);
                     // hasPermission remains false.
                 } else {
-                    // GCB found and linked to mixerai_brand_id, check user_brand_permissions
+                    // MCB found and linked to mixerai_brand_id, check user_brand_permissions
                     // @ts-ignore
                     const { data: permissionsData, error: permissionsError } = await supabase
                         .from('user_brand_permissions')
                         .select('role')
                         .eq('user_id', user.id)
-                        .eq('brand_id', gcbData.mixerai_brand_id) // gcbData.mixerai_brand_id is now guaranteed to be a string
+                        .eq('brand_id', mcbData.mixerai_brand_id)
                         .eq('role', 'admin')
                         .limit(1);
 
                     if (permissionsError) {
-                        console.error(`[API Products PUT /${productId}] Error fetching user_brand_permissions:`, permissionsError); // Changed from id to productId
+                        console.error(`[API Products PUT /${productId}] Error fetching user_brand_permissions:`, permissionsError);
                         // hasPermission remains false.
                     } else if (permissionsData && permissionsData.length > 0) {
                         hasPermission = true;
@@ -166,7 +166,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
         }
         // --- Permission Check End ---
 
-        const updateData: Partial<Omit<Product, 'id' | 'created_at' | 'global_brand_id'>> & { updated_at: string } = {
+        const updateData: Partial<Omit<Product, 'id' | 'created_at' | 'master_brand_id'>> & { updated_at: string } = {
             updated_at: new Date().toISOString(),
         };
         if (name) {
@@ -179,14 +179,14 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
         // @ts-ignore
         const { data, error } = await supabase.from('products')
             .update(updateData)
-            .eq('id', productId) // Changed from id to productId
+            .eq('id', productId)
             .select()
             .single();
 
         if (error) {
-            console.error(`[API Products PUT /${productId}] Error updating product:`, error); // Changed from id to productId
-            // Check for unique constraint on (name, global_brand_id). Need existing global_brand_id for this.
-            // This requires fetching the product first to get its global_brand_id if name is changing.
+            console.error(`[API Products PUT /${productId}] Error updating product:`, error);
+            // Check for unique constraint on (name, master_brand_id). Need existing master_brand_id for this.
+            // This requires fetching the product first to get its master_brand_id if name is changing.
             // For simplicity, if a unique error occurs, we give a general message.
             // A more specific check would involve first fetching the product to see if name is being changed to one that conflicts within its existing brand.
             if ((error as any).code === '23505') { 
@@ -207,7 +207,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
             id: singleDataObject.id,
             name: singleDataObject.name,
             description: singleDataObject.description,
-            global_brand_id: singleDataObject.global_brand_id,
+            master_brand_id: singleDataObject.master_brand_id,
             created_at: singleDataObject.created_at,
             updated_at: singleDataObject.updated_at
         };
@@ -215,7 +215,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
         return NextResponse.json({ success: true, data: validatedData });
 
     } catch (error: any) {
-        console.error(`[API Products PUT /${productId}] Catched error:`, error); // Changed from id to productId
+        console.error(`[API Products PUT /${productId}] Catched error:`, error);
         if (error.name === 'SyntaxError') { // JSON parsing error
             return NextResponse.json({ success: false, error: 'Invalid JSON payload.' }, { status: 400 });
         }
@@ -225,58 +225,63 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
 
 // DELETE handler for a product by ID
 export const DELETE = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
-    const { productId } = context.params; // Changed from id to productId
-    if (!productId) { // Changed from id to productId
+    const { productId } = context.params;
+    if (!productId) {
         return NextResponse.json({ success: false, error: 'Product ID is required for deletion.' }, { status: 400 });
     }
 
     try {
         const supabase = createSupabaseAdminClient();
         
-        // --- Permission Check Start ---
         let hasPermission = user?.user_metadata?.role === 'admin';
 
         if (!hasPermission) {
-            // Fetch the product to get its global_brand_id for permission checking
             // @ts-ignore
             const { data: productData, error: productFetchError } = await supabase
                 .from('products')
-                .select('global_brand_id')
-                .eq('id', productId) // Changed from id to productId
+                // @ts-ignore
+                .select('master_brand_id') 
+                .eq('id', productId) 
                 .single();
 
             if (productFetchError) {
-                console.error(`[API Products DELETE /${productId}] Error fetching product for permissions:`, productFetchError); // Changed from id to productId
+                console.error(`[API Products DELETE /${productId}] Error fetching product for permissions:`, productFetchError); 
+                // If error fetching, deny permission path will be taken later as hasPermission remains false.
+                // However, to be safe and explicit, we can return an error here.
+                return handleApiError(productFetchError, 'Failed to verify product for deletion permissions.');
             } else if (!productData) {
-                console.warn(`[API Products DELETE /${productId}] Product not found during permission check.`); // Changed from id to productId
-            } else if (!productData.global_brand_id) {
-                console.warn(`[API Products DELETE /${productId}] Product ${productId} is missing global_brand_id, cannot verify non-admin permission.`); // Changed from id to productId
+                console.warn(`[API Products DELETE /${productId}] Product not found during permission check.`); 
+                // If product not found, the actual delete operation later will result in a 404, which is fine.
+                // For permission check, if productData is null, hasPermission remains false.
+            } else if (!productData.master_brand_id) { 
+                console.warn(`[API Products DELETE /${productId}] Product ${productId} is missing master_brand_id, cannot verify non-admin permission.`); 
+                 // hasPermission remains false
             } else {
                 // @ts-ignore
-                const { data: gcbData, error: gcbError } = await supabase
-                    .from('global_claim_brands')
+                const { data: mcbData, error: mcbError } = await supabase 
+                    .from('master_claim_brands') 
                     .select('mixerai_brand_id')
-                    .eq('id', productData.global_brand_id)
+                    .eq('id', productData.master_brand_id) 
                     .single();
                 
-                if (gcbError) {
-                    console.error(`[API Products DELETE /${productId}] Error fetching GCB (ID: ${productData.global_brand_id}) for permissions:`, gcbError); // Changed from id to productId
-                } else if (!gcbData) {
-                    console.warn(`[API Products DELETE /${productId}] GCB record not found for GCB ID: ${productData.global_brand_id}. Cannot verify non-admin permission.`); // Changed from id to productId
-                } else if (!gcbData.mixerai_brand_id) {
-                    console.warn(`[API Products DELETE /${productId}] GCB (ID: ${productData.global_brand_id}) is not linked to a mixerai_brand_id. Cannot verify non-admin permission.`); // Changed from id to productId
+                if (mcbError) {
+                    console.error(`[API Products DELETE /${productId}] Error fetching MCB (ID: ${productData.master_brand_id}) for permissions:`, mcbError); 
+                } else if (!mcbData) {
+                    console.warn(`[API Products DELETE /${productId}] MCB record not found for MCB ID: ${productData.master_brand_id}. Cannot verify non-admin permission.`); 
+                } else if (!mcbData.mixerai_brand_id) {
+                    console.warn(`[API Products DELETE /${productId}] MCB (ID: ${productData.master_brand_id}) is not linked to a mixerai_brand_id. Cannot verify non-admin permission.`); 
                 } else {
                     // @ts-ignore
                     const { data: permissionsData, error: permissionsError } = await supabase
                         .from('user_brand_permissions')
                         .select('role')
                         .eq('user_id', user.id)
-                        .eq('brand_id', gcbData.mixerai_brand_id) // gcbData.mixerai_brand_id is guaranteed
+                        .eq('brand_id', mcbData.mixerai_brand_id) 
                         .eq('role', 'admin')
                         .limit(1);
 
                     if (permissionsError) {
-                        console.error(`[API Products DELETE /${productId}] Error fetching user_brand_permissions:`, permissionsError); // Changed from id to productId
+                        console.error(`[API Products DELETE /${productId}] Error fetching user_brand_permissions:`, permissionsError); 
                     } else if (permissionsData && permissionsData.length > 0) {
                         hasPermission = true;
                     }
@@ -285,21 +290,20 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
         }
 
         if (!hasPermission) {
-            console.warn(`[API Products DELETE /${productId}] User ${user.id} (role: ${user?.user_metadata?.role}) permission denied.`); // Changed from id to productId
+            console.warn(`[API Products DELETE /${productId}] User ${user.id} (role: ${user?.user_metadata?.role}) permission denied.`); 
             return NextResponse.json(
                 { success: false, error: 'You do not have permission to delete this product.' },
                 { status: 403 }
             );
         }
-        // --- Permission Check End ---
 
         // @ts-ignore
         const { error, count } = await supabase.from('products')
             .delete({ count: 'exact' })
-            .eq('id', productId); // Changed from id to productId
+            .eq('id', productId); 
 
         if (error) {
-            console.error(`[API Products DELETE /${productId}] Error deleting product:`, error); // Changed from id to productId
+            console.error(`[API Products DELETE /${productId}] Error deleting product:`, error); 
             return handleApiError(error, 'Failed to delete product.');
         }
 
@@ -310,7 +314,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
         return NextResponse.json({ success: true, message: 'Product deleted successfully.' });
 
     } catch (error: any) {
-        console.error(`[API Products DELETE /${productId}] Catched error:`, error); // Changed from id to productId
+        console.error(`[API Products DELETE /${productId}] Catched error:`, error);
         return handleApiError(error, 'An unexpected error occurred while deleting the product.');
     }
 }); 

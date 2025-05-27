@@ -9,12 +9,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
 import { 
-  Loader2, AlertTriangle, Search, FileText, Edit3, XOctagon, CornerDownRight, Info, CheckCircle2, MinusCircle, ShieldQuestion, Settings2, Trash2, Undo2, Replace, Save, Sparkles
+  Loader2, AlertTriangle, Search, FileText, Edit3, XOctagon, CornerDownRight, Info, CheckCircle2, MinusCircle, ShieldQuestion, Settings2, Trash2, Undo2, Replace, Save, Sparkles, Maximize, Minimize
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
-import { COUNTRY_CODES, GLOBAL_COUNTRY_CODE, GLOBAL_COUNTRY_NAME } from "@/lib/constants/country-codes";
-import { Claim, ClaimTypeEnum, GlobalClaimBrand as GlobalBrand, Product, EffectiveClaim, FinalClaimTypeEnum } from "@/lib/claims-utils";
+import { ALL_COUNTRIES_CODE, ALL_COUNTRIES_NAME } from "@/lib/constants/country-codes";
+import { Claim, ClaimTypeEnum, MasterClaimBrand as GlobalBrand, Product, EffectiveClaim, FinalClaimTypeEnum } from "@/lib/claims-utils";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -122,6 +122,7 @@ interface MatrixDisplayCellProps {
   cell: MatrixCell | null;
   selectedCountry: string; // Pass selectedCountry as a prop
   onOpenModal: (product: ApiProductInfo, claimTextInfo: ApiClaimTextInfo, cell: MatrixCell | null) => void; // Pass handler
+  getCountryName: (countryCode: string) => string; // Add new prop for the helper function
 }
 
 const MatrixDisplayCell = React.memo<MatrixDisplayCellProps>(({ 
@@ -129,7 +130,8 @@ const MatrixDisplayCell = React.memo<MatrixDisplayCellProps>(({
   claimTextInfo, 
   cell, 
   selectedCountry, 
-  onOpenModal 
+  onOpenModal, 
+  getCountryName
 }) => {
   const effectiveStatus = cell?.effectiveStatus || 'none';
   const displayConfig = claimTypeDisplayInfo[effectiveStatus];
@@ -141,12 +143,12 @@ const MatrixDisplayCell = React.memo<MatrixDisplayCellProps>(({
   let cellBorderClassName = "border";
 
   if (cell?.activeOverride) {
-    tooltipText = `Overridden: ${cell.activeOverride.isBlocked ? 'Blocked' : ''}${cell.activeOverride.replacementClaimText ? (cell.activeOverride.isBlocked ? ' & Replaced by \"' + cell.activeOverride.replacementClaimText + '\"' : 'Replaced by \"' + cell.activeOverride.replacementClaimText + '\"') : ''}. Click to edit.`;
+    tooltipText = `Overridden: ${cell.activeOverride.isBlocked ? 'Blocked' : ''}${cell.activeOverride.replacementClaimText ? (cell.activeOverride.isBlocked ? ' & Replaced by "' + cell.activeOverride.replacementClaimText + '"' : 'Replaced by "' + cell.activeOverride.replacementClaimText + '"') : ''}. Click to edit.`;
     cellInteractionClass = "cursor-pointer";
     canOpenModal = true;
     cellBorderClassName = "border-2 border-orange-500 ring-2 ring-orange-500 ring-offset-1";
-  } else if (cell?.sourceMasterClaimId && selectedCountry !== GLOBAL_COUNTRY_CODE) {
-    tooltipText = `Global Claim: ${claimTextInfo.text}. Effective status: ${displayConfig.text}. Click to override for ${selectedCountry}.`;
+  } else if (cell?.sourceMasterClaimId && selectedCountry !== ALL_COUNTRIES_CODE) {
+    tooltipText = `Master Claim: ${claimTextInfo.text}. Effective status: ${displayConfig.text}. Click to override for ${getCountryName(selectedCountry)}.`;
     cellInteractionClass = "cursor-pointer";
     canOpenModal = true;
     cellBorderClassName = "border-2 border-blue-400";
@@ -188,7 +190,7 @@ const MatrixDisplayCell = React.memo<MatrixDisplayCellProps>(({
           {cell?.description && <p className="text-xs italic mt-1">Note: {cell.description}</p>}
           {cell?.originalEffectiveClaimDetails && cell.originalEffectiveClaimDetails.source_level && 
             <p className="text-xs mt-1">Source: {cell.originalEffectiveClaimDetails.source_level} 
-              {cell.originalEffectiveClaimDetails.original_claim_country_code === GLOBAL_COUNTRY_CODE && cell.originalEffectiveClaimDetails.source_level !== 'override' && " (Master)"}
+              {cell.originalEffectiveClaimDetails.original_claim_country_code === ALL_COUNTRIES_CODE && cell.originalEffectiveClaimDetails.source_level !== 'override' && " (Master)"}
             </p>}
         </TooltipContent>
       </Tooltip>
@@ -216,10 +218,13 @@ interface OverrideModalContentProps {
   onDeleteOverride: (overrideId: string) => Promise<void>;
   modalContextData: ModalContext | null;
   selectedCountry: string;
+  getCountryName: (countryCode: string) => string;
 }
 
+interface CountryOption { code: string; name: string; }
+
 const OverrideModalContent: React.FC<OverrideModalContentProps> = ({ 
-  isOpen, onClose, onSubmitOverride, onDeleteOverride, modalContextData, selectedCountry 
+  isOpen, onClose, onSubmitOverride, onDeleteOverride, modalContextData, selectedCountry, getCountryName
 }) => {
   const [isBlocked, setIsBlocked] = useState(true);
   const [isReplacingWithNewText, setIsReplacingWithNewText] = useState(false);
@@ -319,7 +324,7 @@ const OverrideModalContent: React.FC<OverrideModalContentProps> = ({
             }}
             disabled={isSubmittingInternal || (isReplacingWithNewText)} 
           />
-          <Label htmlFor="is_blocked_modal_checkbox">Block this Global Claim in this Market</Label>
+          <Label htmlFor="is_blocked_modal_checkbox">Block this Master Claim in this Market</Label>
         </div>
         
         <div className="flex items-center space-x-2 pt-2">
@@ -400,10 +405,12 @@ export default function ClaimsPreviewPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const [selectedCountry, setSelectedCountry] = useState<string>(GLOBAL_COUNTRY_CODE);
+  const [selectedCountry, setSelectedCountry] = useState<string>(ALL_COUNTRIES_CODE);
   const [availableBrands, setAvailableBrands] = useState<GlobalBrand[]>([]);
   const [selectedBrandId, setSelectedBrandId] = useState<string>("all");
   const [isLoadingBrands, setIsLoadingBrands] = useState(true);
+  const [availableCountries, setAvailableCountries] = useState<CountryOption[]>([]);
+  const [isLoadingCountries, setIsLoadingCountries] = useState(true);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalContext, setModalContext] = useState<ModalContext | null>(null);
@@ -417,6 +424,17 @@ export default function ClaimsPreviewPage() {
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
   const [isLoadingAISuggestions, setIsLoadingAISuggestions] = useState(false);
 
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  // Helper function to get country name, moved inside component to access state
+  const getCountryName = useCallback((countryCode: string): string => {
+    if (countryCode === ALL_COUNTRIES_CODE) {
+      return ALL_COUNTRIES_NAME;
+    }
+    const country = availableCountries.find(c => c.code === countryCode);
+    return country ? country.name : countryCode;
+  }, [availableCountries]);
+
   const breadcrumbItems = [
     { label: "Dashboard", href: "/dashboard" },
     { label: "Claims Preview & Matrix" },
@@ -427,7 +445,7 @@ export default function ClaimsPreviewPage() {
     setIsLoading(true); setError(null);
     try {
       let apiUrl = `/api/claims/matrix?countryCode=${selectedCountry}`;
-      if (selectedBrandId !== "all") apiUrl += `&globalBrandId=${selectedBrandId}`;
+      if (selectedBrandId !== "all") apiUrl += `&masterBrandId=${selectedBrandId}`;
       const response = await fetch(apiUrl);
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -447,27 +465,40 @@ export default function ClaimsPreviewPage() {
   useEffect(() => { fetchMatrixData(); }, [fetchMatrixData]);
 
   useEffect(() => {
-    async function fetchBrands() {
+    async function fetchInitialData() {
       setIsLoadingBrands(true);
+      setIsLoadingCountries(true);
       try {
-        const response = await fetch('/api/global-claim-brands');
-        if (!response.ok) throw new Error("Failed to fetch brands for filter.");
-        const result = await response.json();
-        if (result.success && Array.isArray(result.data)) {
-          setAvailableBrands(result.data);
-        } else { throw new Error(result.error || "Could not parse brands data."); }
+        const [brandsRes, countriesRes] = await Promise.all([
+          fetch('/api/master-claim-brands'),
+          fetch('/api/countries')
+        ]);
+
+        if (!brandsRes.ok) throw new Error("Failed to fetch brands for filter.");
+        const brandsResult = await brandsRes.json();
+        if (brandsResult.success && Array.isArray(brandsResult.data)) {
+          setAvailableBrands(brandsResult.data);
+        } else { throw new Error(brandsResult.error || "Could not parse brands data."); }
+
+        if (!countriesRes.ok) throw new Error("Failed to fetch countries for filter.");
+        const countriesResult = await countriesRes.json();
+        if (countriesResult.success && Array.isArray(countriesResult.data)) {
+          setAvailableCountries(countriesResult.data);
+        } else { throw new Error(countriesResult.error || "Could not parse countries data."); }
+
       } catch (err) {
-        toast.error("Failed to load brands for filter.", { description: (err as Error).message });
+        toast.error("Failed to load initial filter data.", { description: (err as Error).message });
       } finally {
         setIsLoadingBrands(false);
+        setIsLoadingCountries(false);
       }
     }
-    fetchBrands();
+    fetchInitialData();
   }, []);
 
   const fetchMarketSpecificClaimsForReplacement = async (marketCountryCode: string) => {
-    if (marketCountryCode === GLOBAL_COUNTRY_CODE) {
-        toast.error("Cannot select replacements from __GLOBAL__ claims."); setMarketSpecificClaims([]); return;
+    if (marketCountryCode === ALL_COUNTRIES_CODE) {
+        toast.error("Cannot select replacements from __ALL COUNTRIES__ claims."); setMarketSpecificClaims([]); return;
     }
     setIsLoadingMarketClaims(true); setMarketSpecificClaims([]);
     try {
@@ -483,7 +514,7 @@ export default function ClaimsPreviewPage() {
   };
 
   const handleOpenModal = (product: ApiProductInfo, claimTextInfo: ApiClaimTextInfo, cell: MatrixCell | null) => {
-    if (selectedCountry === GLOBAL_COUNTRY_CODE && !(cell?.activeOverride)) {
+    if (selectedCountry === ALL_COUNTRIES_CODE && !(cell?.activeOverride)) {
         toast.info("Overrides are Market-Specific", { description: "Please select a specific market to apply an override." });
         return;
     }
@@ -531,7 +562,7 @@ export default function ClaimsPreviewPage() {
             if (originalMasterClaimDetails && originalMasterClaimDetails.source_level !== 'override' && originalMasterClaimDetails.source_level !== 'none') {
                 inferredLevel = originalMasterClaimDetails.source_level;
                 if (inferredLevel === 'brand' && originalMasterClaimDetails.source_entity_id) {
-                    associatedIdField = { global_brand_id: originalMasterClaimDetails.source_entity_id };
+                    associatedIdField = { master_brand_id: originalMasterClaimDetails.source_entity_id };
                 } else if (inferredLevel === 'ingredient' && originalMasterClaimDetails.source_entity_id) {
                     associatedIdField = { ingredient_id: originalMasterClaimDetails.source_entity_id };
                 } else {
@@ -633,25 +664,41 @@ export default function ClaimsPreviewPage() {
   
   const pageTitle = selectedBrandId === 'all' ? "Claims Preview & Matrix (All Brands)" : 
                     `Claims Preview & Matrix (${availableBrands.find(b => b.id === selectedBrandId)?.name || 'Selected Brand'})`;
-  const pageDescription = `View and manage claim overrides for products in ${COUNTRY_CODES.find(c=>c.code === selectedCountry)?.name || selectedCountry}.`; 
+  const pageDescription = `View and manage claim overrides for products in ${selectedCountry === ALL_COUNTRIES_CODE ? ALL_COUNTRIES_NAME : getCountryName(selectedCountry)}${selectedBrandId === 'all' ? ' (All Brands)' : availableBrands.find(b => b.id === selectedBrandId) ? ` (${availableBrands.find(b => b.id === selectedBrandId)?.name})` : ''}.`; 
+
+  const toggleFullScreen = () => setIsFullScreen(!isFullScreen);
+
+  useEffect(() => {
+    if (isFullScreen) {
+      document.body.style.overflow = 'hidden'; // Prevent scrolling when in full screen
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = ''; // Cleanup on unmount
+    };
+  }, [isFullScreen]);
 
   return (
-    <div className="space-y-0 p-y-0 sm:py-0.5 lg:py-1"> 
-      <div className="flex-shrink-0"> 
+    <div className={cn(
+      "flex flex-col h-screen", // Ensure the main div can take full screen height
+      isFullScreen ? "fixed inset-0 bg-background z-50 p-4" : "space-y-0 p-y-0 sm:py-0.5 lg:py-1 relative" 
+    )}> 
+      <div className={cn("flex-shrink-0", isFullScreen && "hidden")}> 
         <Breadcrumbs items={breadcrumbItems} /> 
         <PageHeader title={pageTitle} description={pageDescription} /> 
       </div>
       
-      <Card className="mb-0"> 
-        <CardContent className="flex items-center justify-between py-0"> 
-          <div className="flex space-x-2"> 
+      <Card className={cn("mb-0", isFullScreen && "hidden")}> 
+        <CardContent className="flex items-center justify-between py-2"> {/* Adjusted padding for compactness */}
+          <div className="flex space-x-2 items-center"> 
             <div className="flex-1"> 
               <Label htmlFor="matrix_country_code" className="text-xs mb-0.5 block">Country</Label> 
-              <Select value={selectedCountry} onValueChange={setSelectedCountry}> 
+              <Select value={selectedCountry} onValueChange={setSelectedCountry} disabled={isLoadingCountries}>
                 <SelectTrigger id="matrix_country_code" className="h-8 text-xs"><SelectValue /></SelectTrigger> 
               <SelectContent>
-                  <SelectItem value={GLOBAL_COUNTRY_CODE} className="text-xs min-h-[1.5rem]">{GLOBAL_COUNTRY_NAME} ({GLOBAL_COUNTRY_CODE})</SelectItem> 
-                  {COUNTRY_CODES.map(c => <SelectItem key={c.code} value={c.code} className="text-xs min-h-[1.5rem]">{c.name} ({c.code})</SelectItem>)} 
+                  <SelectItem value={ALL_COUNTRIES_CODE} className="text-xs min-h-[1.5rem]">{ALL_COUNTRIES_NAME} ({ALL_COUNTRIES_CODE})</SelectItem> 
+                  {availableCountries.map(c => <SelectItem key={c.code} value={c.code} className="text-xs min-h-[1.5rem]">{c.name} ({c.code})</SelectItem>)} 
               </SelectContent>
             </Select>
           </div>
@@ -666,31 +713,64 @@ export default function ClaimsPreviewPage() {
             </Select>
             </div> 
           </div>
+          {/* Original button position was here, it's moved out */}
         </CardContent>
       </Card>
 
+      {/* This button is for non-fullscreen mode, appears next to filters */}
+      {!isFullScreen && (
+        <div className="py-2 flex justify-end">
+            <Button onClick={toggleFullScreen} variant="outline" size="icon" className="h-8 w-8">
+                <Maximize className="h-4 w-4" />
+                <span className="sr-only">Enter Fullscreen</span>
+            </Button>
+        </div>
+      )}
+
       <div 
-        className="flex-grow overflow-auto border rounded-md relative"
-        style={{ height: 'calc(100vh - 120px)' }}
+        className={cn(
+          "flex-grow overflow-auto border rounded-md relative",
+          isFullScreen ? "h-full w-full" : "h-[calc(100vh-220px)]" // Adjusted height to account for button potentially
+        )}
       >
+        {/* This button is for fullscreen mode, absolutely positioned */}
+        {isFullScreen && (
+            <Button 
+                onClick={toggleFullScreen} 
+                variant="outline" 
+                size="icon" 
+                className="absolute top-2 right-2 z-50 bg-background/80 hover:bg-background h-8 w-8"
+                title="Exit Fullscreen"
+            >
+                <Minimize className="h-4 w-4" />
+                <span className="sr-only">Exit Fullscreen</span>
+            </Button>
+        )}
+
         {isLoading && ( <div className="flex flex-col items-center justify-center h-full text-muted-foreground"><Loader2 className="h-10 w-10 animate-spin text-primary mb-3" /><p>Loading Claims Matrix...</p></div> )}
         {!isLoading && error && ( <div className="flex flex-col items-center justify-center h-full text-red-600"><AlertTriangle className="h-10 w-10 mb-3" /><p className="font-semibold">Error: {error}</p><Button variant="outline" size="sm" onClick={()=>fetchMatrixData(true)} className="mt-4">Try Again</Button></div> )}
         {!isLoading && !error && matrixData && matrixData.productsAsCols.length === 0 && ( <div className="flex flex-col items-center justify-center h-full text-muted-foreground"><Search className="h-10 w-10 mb-3 opacity-50" /><p>No products found.</p></div> )}
         {!isLoading && !error && matrixData && matrixData.productsAsCols.length > 0 && matrixData.claimTextsAsRows.length === 0 && ( <div className="flex flex-col items-center justify-center h-full text-muted-foreground"><FileText className="h-10 w-10 mb-3 opacity-50" /><p>No claims found.</p></div> )}
         
         {!isLoading && !error && matrixData && matrixData.productsAsCols.length > 0 && matrixData.claimTextsAsRows.length > 0 && (
-            <Table className="min-w-full border-collapse">
-              <TableHeader className="sticky top-0 z-10 bg-white shadow">
+            <Table className="min-w-full border-collapse h-full">
+              <TableHeader className={cn("sticky top-0 z-10 bg-white shadow", isFullScreen && "bg-background")}>
                 <TableRow>
                   <TableHead 
-                    className="sticky left-0 z-30 p-1 text-xs font-semibold text-muted-foreground min-w-[160px] sm:min-w-[200px] border bg-muted"
+                    className={cn(
+                        "sticky left-0 z-30 p-1 text-xs font-semibold text-muted-foreground min-w-[160px] sm:min-w-[200px] border",
+                        isFullScreen ? "bg-background/95" : "bg-muted"
+                    )}
                   >
                     Claim Text
                   </TableHead>
                   {matrixData.productsAsCols.map(product => (
                     <TableHead 
                       key={product.id} 
-                      className="p-1 text-xs font-semibold text-muted-foreground min-w-[100px] sm:min-w-[120px] text-center whitespace-normal break-words border bg-muted" 
+                      className={cn(
+                        "p-1 text-xs font-semibold text-muted-foreground min-w-[100px] sm:min-w-[120px] text-center whitespace-normal break-words border",
+                        isFullScreen ? "bg-background/95" : "bg-muted"
+                        )}
                       title={product.name}
                     >
                       {product.name}
@@ -702,7 +782,10 @@ export default function ClaimsPreviewPage() {
                 {matrixData.claimTextsAsRows.map(claimTextInfo => (
                   <TableRow key={claimTextInfo.text}>
                     <TableCell 
-                      className="sticky left-0 z-10 p-1 text-xs font-medium min-w-[160px] sm:min-w-[200px] whitespace-normal break-words border bg-background hover:bg-muted/50"
+                      className={cn(
+                        "sticky left-0 z-10 p-1 text-xs font-medium min-w-[160px] sm:min-w-[200px] whitespace-normal break-words border",
+                        isFullScreen ? "bg-background hover:bg-muted/30" : "bg-background hover:bg-muted/50"
+                      )}
                       title={claimTextInfo.text}
                     >
                       {claimTextInfo.text}
@@ -717,6 +800,7 @@ export default function ClaimsPreviewPage() {
                             cell={cell} 
                             selectedCountry={selectedCountry} 
                             onOpenModal={handleOpenModal} 
+                            getCountryName={getCountryName}
                           />
                         </td>
                       );
@@ -737,15 +821,10 @@ export default function ClaimsPreviewPage() {
             onDeleteOverride={handleDeleteExistingOverride} 
             modalContextData={modalContext} 
             selectedCountry={selectedCountry}
+            getCountryName={getCountryName}
           />
         </Dialog>
       )}
     </div>
   );
-}
-
-// Helper function (can be moved to utils if shared)
-function getCountryName(countryCode: string): string {
-  if (countryCode === GLOBAL_COUNTRY_CODE) return GLOBAL_COUNTRY_NAME;
-  return COUNTRY_CODES.find(c => c.code === countryCode)?.name || countryCode;
 } 

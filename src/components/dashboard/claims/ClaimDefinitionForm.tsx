@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 // import { Input } from '@/components/ui/input'; // Not used directly, can be removed if not planned
 import { Textarea } from '@/components/ui/textarea';
@@ -8,50 +8,91 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { MultiSelectCheckboxCombobox, ComboboxOption } from '@/components/ui/MultiSelectCheckboxCombobox';
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Loader2 } from 'lucide-react';
+import { ALL_COUNTRIES_CODE, ALL_COUNTRIES_NAME } from "@/lib/constants/country-codes";
 
 // Static data for countries - will be mapped to ComboboxOption format
-const staticCountriesRaw = [
-  { code: '__GLOBAL__', name: 'Master (Global)' },
-  { code: 'US', name: 'United States' },
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'FR', name: 'France' },
-  // Add more countries as needed or make this dynamic if required
-];
+// This will be replaced by a state variable populated from API
 
 interface Entity {
   id: string;
   name: string;
+  product_ids?: string[];
+  country_codes: string[];
+  // Optional name fields that might come from the parent page (ClaimEntry)
+  master_brand_name?: string;
+  product_names_concatenated?: string; // If parent provides a concatenated string of product names
+  ingredient_name?: string;
+}
+
+// More specific type for initialData and form submission data
+export interface ClaimDefinitionData {
+  claim_grouping_id?: string; // For edits, backend might expect this or id
+  id?: string; // For edits if claim_grouping_id isn't used
+  claim_text: string;
+  claim_type: string;
+  level: 'brand' | 'product' | 'ingredient' | string; // Keep string for initial empty state
+  description?: string | null;
+  master_brand_id?: string | null;
+  ingredient_id?: string | null;
+  product_ids?: string[];
+  country_codes: string[];
+  // Optional name fields that might come from the parent page (ClaimEntry) for display purposes in edit mode
+  master_brand_name?: string;
+  // product_names_concatenated?: string; // This might be complex to pass, product_ids is primary
+  ingredient_name?: string;
 }
 
 interface ClaimDefinitionFormProps {
-  initialData?: any; 
-  onSubmit: (data: any) => Promise<void>; // Changed to Promise for async submissions
+  initialData?: ClaimDefinitionData | null; 
+  onSubmit: (data: ClaimDefinitionData) => Promise<void>;
   isLoading?: boolean;
-  // onFormReset?: () => void; // Optional callback to trigger form reset from parent
+  onCancel?: () => void; // New onCancel prop
 }
 
 export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
   initialData,
   onSubmit,
-  isLoading,
+  isLoading = false, // Default value
+  onCancel,
 }) => {
-  const [claimText, setClaimText] = useState(initialData?.claimText || '');
-  const [claimType, setClaimType] = useState(initialData?.claimType || '');
-  const [level, setLevel] = useState(initialData?.level || '');
-  const [description, setDescription] = useState(initialData?.description || '');
-  const [selectedBrand, setSelectedBrand] = useState(initialData?.global_brand_id || '');
-  const [selectedIngredient, setSelectedIngredient] = useState(initialData?.ingredient_id || '');
-  const [selectedProductValues, setSelectedProductValues] = useState<string[]>(initialData?.product_ids || []);
-  const [selectedCountryValues, setSelectedCountryValues] = useState<string[]>(initialData?.country_codes || []);
+  const isEditMode = useMemo(() => !!initialData && (!!initialData.id || !!initialData.claim_grouping_id), [initialData]);
 
-  const [brandOptions, setBrandOptions] = useState<ComboboxOption[]>([]);
+  const [claimText, setClaimText] = useState('');
+  const [claimType, setClaimType] = useState('');
+  const [level, setLevel] = useState('');
+  const [description, setDescription] = useState('');
+  const [selectedMasterBrand, setSelectedMasterBrand] = useState(''); // Renamed from selectedBrand
+  const [selectedIngredient, setSelectedIngredient] = useState('');
+  const [selectedProductValues, setSelectedProductValues] = useState<string[]>([]);
+  const [selectedCountryCodes, setSelectedCountryCodes] = useState<string[]>([]); // Renamed for clarity
+
+  const [masterBrandOptions, setMasterBrandOptions] = useState<ComboboxOption[]>([]); // Renamed
   const [productOptions, setProductOptions] = useState<ComboboxOption[]>([]);
   const [ingredientOptions, setIngredientOptions] = useState<ComboboxOption[]>([]);
-  const countryOptions: ComboboxOption[] = staticCountriesRaw.map(c => ({ value: c.code, label: c.name }));
+  const [countryOptions, setCountryOptions] = useState<ComboboxOption[]>([]);
+  const [isLoadingCountries, setIsLoadingCountries] = useState(true);
 
-  // Fetch data for selectors
+  // Effect to populate form when initialData changes (for edit mode)
+  useEffect(() => {
+    if (initialData) {
+      setClaimText(initialData.claim_text || '');
+      setClaimType(initialData.claim_type || '');
+      setLevel(initialData.level || '');
+      setDescription(initialData.description || '');
+      setSelectedMasterBrand(initialData.master_brand_id || ''); // Renamed
+      setSelectedIngredient(initialData.ingredient_id || '');
+      setSelectedProductValues(initialData.product_ids || []);
+      setSelectedCountryCodes(initialData.country_codes || []); // Renamed
+    } else {
+      // Reset form if initialData is null (e.g. switching from edit to create)
+      resetFormFields();
+    }
+  }, [initialData]);
+
+  // Fetch data for selectors (runs once on mount)
   useEffect(() => {
     const fetchData = async (url: string, setter: React.Dispatch<React.SetStateAction<ComboboxOption[]>>, entityName: string) => {
       try {
@@ -65,124 +106,179 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
             sourceArray = apiResponse;
         } else {
             console.warn(`Unexpected data structure for ${entityName}:`, apiResponse);
-            toast.error(`Could not load ${entityName} data.`);
+            // Do not toast here, let the page handle generic load errors if necessary
         }
         setter(sourceArray.map(item => ({ value: item.id, label: item.name })));
       } catch (error) {
         console.error(`Error fetching ${entityName}:`, error);
-        toast.error(`Error fetching ${entityName}.`);
+        // toast.error(`Error fetching ${entityName}.`); // Avoid excessive toasting from form component
         setter([]);
       }
     };
 
-    fetchData('/api/global-claim-brands', setBrandOptions, 'global brands');
+    fetchData('/api/master-claim-brands', setMasterBrandOptions, 'master brands');
     fetchData('/api/products', setProductOptions, 'products');
     fetchData('/api/ingredients', setIngredientOptions, 'ingredients');
-    // Countries are static for now
+
+    // Fetch countries
+    async function fetchCountries() {
+      setIsLoadingCountries(true);
+      try {
+        const response = await fetch('/api/countries');
+        if (!response.ok) throw new Error('Failed to fetch countries');
+        const apiResponse = await response.json();
+        if (apiResponse.success && Array.isArray(apiResponse.data)) {
+          const fetchedCountryOptions = apiResponse.data.map((c: {code: string, name: string}) => ({ value: c.code, label: c.name}));
+          setCountryOptions([
+            { value: ALL_COUNTRIES_CODE, label: ALL_COUNTRIES_NAME }, 
+            ...fetchedCountryOptions
+          ]);
+        } else {
+          toast.error("Could not load countries for form selection.");
+          setCountryOptions([{ value: ALL_COUNTRIES_CODE, label: ALL_COUNTRIES_NAME }]);
+        }
+      } catch (error) {
+        console.error("Error fetching countries for form:", error);
+        toast.error("Error fetching countries for form.");
+        setCountryOptions([{ value: ALL_COUNTRIES_CODE, label: ALL_COUNTRIES_NAME }]);
+      } finally {
+        setIsLoadingCountries(false);
+      }
+    }
+    fetchCountries();
+
   }, []);
+
+  // Effect to update form fields if initialData changes
+  // This ensures that even if options load after initialData is set, the display value is correct for disabled fields.
+  useEffect(() => {
+    if (initialData) {
+      setClaimText(initialData.claim_text || '');
+      setClaimType(initialData.claim_type || '');
+      setLevel(initialData.level || '');
+      setDescription(initialData.description || '');
+      setSelectedCountryCodes(initialData.country_codes || []);
+
+      if (isEditMode) {
+        // For Brand
+        if (initialData.level === 'brand' && initialData.master_brand_id) {
+          setSelectedMasterBrand(initialData.master_brand_id);
+          // Ensure the option exists for display, especially if disabled
+          if (initialData.master_brand_name && !masterBrandOptions.find(opt => opt.value === initialData.master_brand_id)) {
+            setMasterBrandOptions(prevOpts => [...prevOpts, { value: initialData.master_brand_id!, label: initialData.master_brand_name! }]);
+          }
+        }
+        // For Ingredient
+        if (initialData.level === 'ingredient' && initialData.ingredient_id) {
+          setSelectedIngredient(initialData.ingredient_id);
+          if (initialData.ingredient_name && !ingredientOptions.find(opt => opt.value === initialData.ingredient_id)) {
+            setIngredientOptions(prevOpts => [...prevOpts, { value: initialData.ingredient_id!, label: initialData.ingredient_name! }]);
+          }
+        }
+        // For Products (MultiSelect) - its display is usually handled by the component if values are set.
+        setSelectedProductValues(initialData.product_ids || []);
+      } else {
+        // For create mode, or if not specifically brand/ingredient level when editing (though level is disabled)
+        setSelectedMasterBrand(initialData.master_brand_id || '');
+        setSelectedIngredient(initialData.ingredient_id || '');
+        setSelectedProductValues(initialData.product_ids || []);
+      }
+    } else {
+      resetFormFields();
+    }
+  }, [initialData, isEditMode, masterBrandOptions, ingredientOptions]); // Add options to dependencies
 
   const resetFormFields = () => {
     setClaimText('');
     setClaimType('');
     setLevel('');
     setDescription('');
-    setSelectedBrand('');
+    setSelectedMasterBrand(''); // Renamed
     setSelectedIngredient('');
     setSelectedProductValues([]);
-    setSelectedCountryValues([]);
-    // if (onFormReset) onFormReset(); // Call parent reset if needed
+    setSelectedCountryCodes([]); // Renamed
+  };
+
+  const handleCountrySelection = (countryCode: string, checked: boolean | 'indeterminate') => {
+    setSelectedCountryCodes(prev => 
+        checked === true ? [...prev, countryCode] : prev.filter(c => c !== countryCode)
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Basic validation
-    if (!claimText || !claimType || !level) {
-        toast.error('Please fill in all required fields: Claim Text, Type, and Level.');
-        return;
+    if (!level) {
+        toast.error('Please select a Claim Level.'); return;
     }
-    if (level === 'brand' && !selectedBrand) {
-        toast.error('Please select a brand for brand-level claims.');
-        return;
+    if (level === 'brand' && !selectedMasterBrand) { // Renamed
+        toast.error('Please select a brand for brand-level claims.'); return;
     }
     if (level === 'product' && selectedProductValues.length === 0) {
-        toast.error('Please select at least one product for product-level claims.');
-        return;
+        toast.error('Please select at least one product for product-level claims.'); return;
     }
     if (level === 'ingredient' && !selectedIngredient) {
-        toast.error('Please select an ingredient for ingredient-level claims.');
-        return;
+        toast.error('Please select an ingredient for ingredient-level claims.'); return;
     }
-    if (selectedCountryValues.length === 0) {
-        toast.error('Please select at least one target market/country (or Master).');
-        return;
+     if (!claimText) {
+        toast.error('Please fill in Claim Text.'); return;
+    }
+    if (!claimType) {
+        toast.error('Please select a Claim Type.'); return;
+    }
+    if (selectedCountryCodes.length === 0) { // Renamed
+        toast.error('Please select at least one target market/country (or Master).'); return;
     }
 
-    await onSubmit({
+    const submissionData: ClaimDefinitionData = {
       claim_text: claimText,
       claim_type: claimType,
-      level,
-      description,
-      global_brand_id: level === 'brand' ? selectedBrand : null,
+      level: level as ClaimDefinitionData['level'], 
+      description: description || null,
+      master_brand_id: level === 'brand' ? selectedMasterBrand : null, // Renamed
       ingredient_id: level === 'ingredient' ? selectedIngredient : null,
       product_ids: level === 'product' ? selectedProductValues : [],
-      country_codes: selectedCountryValues,
-    });
-    // Consider resetting form here or let parent handle it via a callback
-    // For now, we can add a simple reset after successful submission indication (parent will show toast)
-    // resetFormFields(); // Or parent can call this via a ref / prop after successful API call
+      country_codes: selectedCountryCodes, // Renamed
+    };
+
+    if (isEditMode && initialData) {
+      // Include ID for updates, prioritize claim_grouping_id if available
+      submissionData.id = initialData.id;
+      submissionData.claim_grouping_id = initialData.claim_grouping_id;
+    }
+
+    await onSubmit(submissionData);
+    // Parent component is responsible for resetting/hiding form after successful submission if needed
+    // if (!isEditMode) resetFormFields(); // Only reset for create mode if desired here
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6 border p-4 sm:p-6 rounded-lg shadow-sm bg-card">
+      {/* 1. Claim Level */}
       <div>
-        <Label htmlFor="claimText">Claim Text <span className="text-destructive">*</span></Label>
-        <Textarea
-          id="claimText"
-          value={claimText}
-          onChange={e => setClaimText(e.target.value)}
-          placeholder="Enter the claim text..."
-        />
+        <Label htmlFor="level">Claim Level <span className="text-destructive">*</span></Label>
+        <Select value={level} onValueChange={setLevel} required disabled={isEditMode}>
+          <SelectTrigger id="level">
+            <SelectValue placeholder="Select claim level" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="brand">Brand</SelectItem>
+            <SelectItem value="product">Product</SelectItem>
+            <SelectItem value="ingredient">Ingredient</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <Label htmlFor="claimType">Claim Type <span className="text-destructive">*</span></Label>
-          <Select value={claimType} onValueChange={setClaimType}>
-            <SelectTrigger id="claimType">
-              <SelectValue placeholder="Select claim type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="allowed">Allowed</SelectItem>
-              <SelectItem value="disallowed">Disallowed</SelectItem>
-              <SelectItem value="mandatory">Mandatory</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="level">Claim Level <span className="text-destructive">*</span></Label>
-          <Select value={level} onValueChange={setLevel}>
-            <SelectTrigger id="level">
-              <SelectValue placeholder="Select claim level" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="brand">Brand</SelectItem>
-              <SelectItem value="product">Product</SelectItem>
-              <SelectItem value="ingredient">Ingredient</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
+      {/* 2. Associated Entity (Conditional) */}
       {level === 'brand' && (
         <div>
-          <Label htmlFor="selectedBrand">Brand <span className="text-destructive">*</span></Label>
-          <Select value={selectedBrand} onValueChange={setSelectedBrand} >
-            <SelectTrigger id="selectedBrand">
-              <SelectValue placeholder="Select brand" />
+          <Label htmlFor="selectedMasterBrand">Brand <span className="text-destructive">*</span></Label>
+          <Select value={selectedMasterBrand} onValueChange={setSelectedMasterBrand} required={level === 'brand'} disabled={isEditMode}>
+            <SelectTrigger id="selectedMasterBrand">
+              <SelectValue placeholder="Select master brand" />
             </SelectTrigger>
             <SelectContent>
-              {brandOptions.length === 0 && <SelectItem value="" disabled>Loading brands...</SelectItem>}
-              {brandOptions.map(brand => (
+              {masterBrandOptions.length === 0 && <SelectItem value="" disabled>{isLoading ? "Loading..." : "No master brands"}</SelectItem>}
+              {masterBrandOptions.map(brand => (
                 <SelectItem key={brand.value} value={brand.value}>{brand.label}</SelectItem>
               ))}
             </SelectContent>
@@ -200,6 +296,7 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
             placeholder="Select products..."
             searchPlaceholder="Search products..."
             className="w-full"
+            disabled={isEditMode}
           />
         </div>
       )}
@@ -207,12 +304,12 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
       {level === 'ingredient' && (
         <div>
           <Label htmlFor="selectedIngredient">Ingredient <span className="text-destructive">*</span></Label>
-          <Select value={selectedIngredient} onValueChange={setSelectedIngredient} >
+          <Select value={selectedIngredient} onValueChange={setSelectedIngredient} required={level === 'ingredient'} disabled={isEditMode}>
             <SelectTrigger id="selectedIngredient">
               <SelectValue placeholder="Select ingredient" />
             </SelectTrigger>
             <SelectContent>
-              {ingredientOptions.length === 0 && <SelectItem value="" disabled>Loading ingredients...</SelectItem>}
+              {ingredientOptions.length === 0 && <SelectItem value="" disabled>{isLoading ? "Loading..." : "No ingredients"}</SelectItem>}
               {ingredientOptions.map(ingredient => (
                 <SelectItem key={ingredient.value} value={ingredient.value}>{ingredient.label}</SelectItem>
               ))}
@@ -221,18 +318,60 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
         </div>
       )}
       
+      {/* 3. Claim Text */}
       <div>
-        <Label>Target Markets/Countries <span className="text-destructive">*</span></Label>
-        <MultiSelectCheckboxCombobox
-            options={countryOptions}
-            selectedValues={selectedCountryValues}
-            onChange={setSelectedCountryValues}
-            placeholder="Select markets/countries..."
-            searchPlaceholder="Search markets..."
-            className="w-full"
+        <Label htmlFor="claimText">Claim Text <span className="text-destructive">*</span></Label>
+        <Textarea
+          id="claimText"
+          value={claimText}
+          onChange={e => setClaimText(e.target.value)}
+          placeholder="Enter the claim text..."
+          required
+          rows={3}
         />
       </div>
 
+      {/* 4. Claim Type */}
+      <div>
+        <Label htmlFor="claimType">Claim Type <span className="text-destructive">*</span></Label>
+        <Select value={claimType} onValueChange={setClaimType} required>
+          <SelectTrigger id="claimType">
+            <SelectValue placeholder="Select claim type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="allowed">Allowed</SelectItem>
+            <SelectItem value="disallowed">Disallowed</SelectItem>
+            <SelectItem value="mandatory">Mandatory</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* 5. Target Markets / Countries */}
+      <div>
+        <Label htmlFor="countries">Target Markets / Countries <span className="text-destructive">*</span></Label>
+        {isLoadingCountries ? (
+          <div className="text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin mr-2 inline"/>Loading markets...</div>
+        ) : (
+          <ScrollArea className="h-40 w-full rounded-md border p-2">
+            <div className="space-y-1">
+              {countryOptions.map(option => (
+                <div key={option.value} className="flex items-center space-x-2">
+                  <Checkbox 
+                    id={`country-${option.value}`}
+                    checked={selectedCountryCodes.includes(option.value)}
+                    onCheckedChange={(checked) => handleCountrySelection(option.value, checked)}
+                  />
+                  <Label htmlFor={`country-${option.value}`} className="text-sm font-normal">
+                    {option.label}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        )}
+      </div>
+
+      {/* 6. Description (Optional) */}
       <div>
         <Label htmlFor="description">Description (Optional)</Label>
         <Textarea
@@ -240,12 +379,21 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
           value={description}
           onChange={e => setDescription(e.target.value)}
           placeholder="Enter optional notes or context for the claim..."
+          rows={3}
         />
       </div>
 
-      <Button type="submit" disabled={isLoading} className="w-full md:w-auto">
-        {isLoading ? 'Saving Claim...' : 'Save Claim'}
-      </Button>
+      <div className="flex items-center justify-end space-x-3">
+        {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+                Cancel
+            </Button>
+        )}
+        <Button type="submit" disabled={isLoading} className="min-w-[120px]">
+          {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          {isEditMode ? 'Update Definition' : 'Create Definition'}
+        </Button>
+      </div>
     </form>
   );
 }; 

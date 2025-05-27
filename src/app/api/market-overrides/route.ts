@@ -74,31 +74,31 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
             // @ts-ignore
             const { data: productData, error: productError } = await supabase
                 .from('products')
-                .select('global_brand_id')
+                .select('master_brand_id')
                 .eq('id', target_product_id)
                 .single();
 
-            if (productError || !productData || !productData.global_brand_id) {
-                console.error(`[API MarketOverrides POST] Error fetching product/GCB for permissions (Product ID: ${target_product_id}):`, productError);
-                // Deny permission if product or its GCB link is not found
+            if (productError || !productData || !productData.master_brand_id) {
+                console.error(`[API MarketOverrides POST] Error fetching product/MCB for permissions (Product ID: ${target_product_id}):`, productError);
+                // Deny permission if product or its MCB link is not found
             } else {
                 // @ts-ignore
-                const { data: gcbData, error: gcbError } = await supabase
-                    .from('global_claim_brands')
+                const { data: mcbData, error: mcbError } = await supabase
+                    .from('master_claim_brands')
                     .select('mixerai_brand_id')
-                    .eq('id', productData.global_brand_id)
+                    .eq('id', productData.master_brand_id)
                     .single();
                 
-                if (gcbError || !gcbData || !gcbData.mixerai_brand_id) {
-                    console.error(`[API MarketOverrides POST] Error fetching GCB or GCB not linked for permissions (GCB ID: ${productData.global_brand_id}):`, gcbError);
-                    // Deny permission if GCB not found or not linked to a core MixerAI brand
+                if (mcbError || !mcbData || !mcbData.mixerai_brand_id) {
+                    console.error(`[API MarketOverrides POST] Error fetching MCB or MCB not linked for permissions (MCB ID: ${productData.master_brand_id}):`, mcbError);
+                    // Deny permission if MCB not found or not linked to a core MixerAI brand
                 } else {
                     // @ts-ignore
                     const { data: permissionsData, error: permissionsError } = await supabase
                         .from('user_brand_permissions')
                         .select('role')
                         .eq('user_id', user.id)
-                        .eq('brand_id', gcbData.mixerai_brand_id)
+                        .eq('brand_id', mcbData.mixerai_brand_id)
                         .eq('role', 'admin') // Must be an admin of the core MixerAI brand
                         .limit(1);
 

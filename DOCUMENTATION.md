@@ -123,17 +123,17 @@ Below is a breakdown of permissions for key API endpoint groups related to Claim
 
 -   **`POST /api/products` (Create Product):**
     -   Global admins: Allowed.
-    -   Brand admins: Allowed if admin of the `mixerai_brand_id` linked to the `global_brand_id` being assigned to the new product.
+    -   Brand admins: Allowed if admin of the `mixerai_brand_id` linked to the `master_brand_id` being assigned to the new product.
 -   **`GET /api/products` (List Products):**
     -   Allowed for all authenticated users.
 -   **`GET /api/products/[id]` (Get Single Product):**
     -   Allowed for all authenticated users.
 -   **`PUT /api/products/[id]` (Update Product):**
     -   Global admins: Allowed.
-    -   Brand admins: Allowed if admin of the `mixerai_brand_id` linked to the product's current `global_brand_id`. (Note: `global_brand_id` itself is not updatable via this endpoint by non-admins).
+    -   Brand admins: Allowed if admin of the `mixerai_brand_id` linked to the product's current `master_brand_id`. (Note: `master_brand_id` itself is not updatable via this endpoint by non-admins).
 -   **`DELETE /api/products/[id]` (Delete Product):**
     -   Global admins: Allowed.
-    -   Brand admins: Allowed if admin of the `mixerai_brand_id` linked to the product's `global_brand_id`.
+    -   Brand admins: Allowed if admin of the `mixerai_brand_id` linked to the product's `master_brand_id`.
 
 ### 4. Ingredients API (`/api/ingredients`, `/api/ingredients/[id]`)
 
@@ -148,23 +148,65 @@ Below is a breakdown of permissions for key API endpoint groups related to Claim
 -   **`DELETE /api/ingredients/[id]` (Delete Ingredient):**
     -   Restricted to Global admins only.
 
-### 5. Global Claim Brands API (`/api/global-claim-brands`, `/api/global-claim-brands/[id]`)
+### 5. Global Claim Brands API (`/api/master-claim-brands`, `/api/master-claim-brands/[id]`)
 
--   **`POST /api/global-claim-brands` (Create Global Claim Brand):**
+-   **`POST /api/master-claim-brands` (Create Master Claim Brand):**
     -   Global admins: Allowed.
-    -   Brand admins: Allowed if linking to a `mixerai_brand_id` for which they are an admin. Creating an unlinked Global Claim Brand (no `mixerai_brand_id`) is restricted to Global admins.
--   **`GET /api/global-claim-brands` (List Global Claim Brands):**
+    -   Brand admins: Allowed if linking to a `mixerai_brand_id` for which they are an admin. Creating an unlinked Master Claim Brand (no `mixerai_brand_id`) is restricted to Global admins.
+-   **`GET /api/master-claim-brands` (List Master Claim Brands):**
     -   Allowed for all authenticated users.
--   **`GET /api/global-claim-brands/[id]` (Get Single Global Claim Brand):**
+-   **`GET /api/master-claim-brands/[id]` (Get Single Master Claim Brand):**
     -   Allowed for all authenticated users.
--   **`PUT /api/global-claim-brands/[id]` (Update Global Claim Brand):**
+-   **`PUT /api/master-claim-brands/[id]` (Update Master Claim Brand):**
     -   Global admins: Allowed (can update name and `mixerai_brand_id`).
-    -   Brand admins: Allowed to update `name` if admin of the *currently linked* `mixerai_brand_id`. Non-admins cannot change the `mixerai_brand_id` link itself. If the GCB is unlinked, only Global Admins can edit.
--   **`DELETE /api/global-claim-brands/[id]` (Delete Global Claim Brand):**
+    -   Brand admins: Allowed to update `name` if admin of the *currently linked* `mixerai_brand_id`. Non-admins cannot change the `mixerai_brand_id` link itself. If the MCB is unlinked, only Global Admins can edit.
+-   **`DELETE /api/master-claim-brands/[id]` (Delete Master Claim Brand):**
     -   Global admins: Allowed.
-    -   Brand admins: Allowed if admin of the linked `mixerai_brand_id`. If the GCB is unlinked, only Global Admins can delete.
+    -   Brand admins: Allowed if admin of the linked `mixerai_brand_id`. If the MCB is unlinked, only Global Admins can delete.
 
 ## Recent Updates and Feature Details
+
+### Standardised Claims URL Structure
+- The URL structure for claims management pages under the admin section has been standardised.
+- Pages previously under `/dashboard/admin/claims/*` (e.g., Definitions, Overrides, Brand Review) have been moved to `/dashboard/claims/*`.
+- This provides a more unified and intuitive navigation experience for claims-related features.
+- Navigation links and internal breadcrumbs have been updated throughout the application to reflect these changes.
+
+### Claims Preview Page Enhancements
+- **Fullscreen Mode**:
+    - A fullscreen toggle button has been added to the Claims Preview Matrix page (`/dashboard/claims/preview/page.tsx`).
+    - The close button for fullscreen mode (exiting fullscreen) was initially hidden. This has been fixed by ensuring the button is visible and correctly positioned when in fullscreen.
+- **Sticky Header**:
+    - The table header in the Claims Preview Matrix is designed to be sticky for better usability when scrolling through large matrices.
+    - Minor adjustments were made (e.g., ensuring `h-full` on the `Table` component) to improve the reliability of the sticky header behavior.
+
+### Standardised Country Listings (Database & API)
+- To ensure consistency and maintainability, country data is now managed centrally.
+- **New `countries` Database Table**:
+    - A new table named `countries` has been created via migration (`migrations/20231028000000_create_countries_table.sql`).
+    - This table stores country codes (e.g., 'GB', 'CA') and their full names (e.g., 'United Kingdom', 'Canada').
+    - It includes an `is_active` flag to control which countries are available in the application.
+    - The migration includes seeding this table with a comprehensive list of global countries (excluding the United States as per specific project requirements).
+- **New API Endpoint `/api/countries`**:
+    - A GET endpoint (`src/app/api/countries/route.ts`) has been created to fetch all active countries from the new `countries` table, ordered by name.
+- **Application-Wide Updates**:
+    - Pages and components that previously used hardcoded country lists or constants (e.g., from `src/lib/constants/country-codes.ts`) have been updated to fetch their country data from the new `/api/countries` endpoint. This includes:
+        - `/dashboard/claims/new/page.tsx`
+        - `/dashboard/claims/[id]/edit/page.tsx`
+        - `/dashboard/claims/preview/page.tsx` (and its child components like `MatrixDisplayCell` and `OverrideModalContent` which now receive country data/helper functions via props)
+        - `/dashboard/claims/brand-review/page.tsx`
+        - `/dashboard/claims/overrides/page.tsx`
+        - `src/components/dashboard/claims/ClaimDefinitionForm.tsx`
+    - The `COUNTRY_CODES` and `ALL_COUNTRY_CODES_OBJECT` exports have been removed from `src/lib/constants/country-codes.ts` as they are now obsolete. The `ALL_COUNTRIES_CODE` ('__ALL_COUNTRIES__') and `ALL_COUNTRIES_NAME` ('All Countries') constants remain for representing a global/non-specific market selection.
+
+### Claim Definitions Page - Editing Fixes
+- Addressed issues on the `/dashboard/claims/definitions/page.tsx` page, specifically when editing an existing claim definition using the `ClaimDefinitionForm.tsx` component.
+- **Problem**: When editing, the claim level and claim type fields were not always correctly populated or displayed, especially if their associated dropdowns (e.g., Master Brand, Product, Ingredient selector) were disabled (as `level` and associated entities are not editable post-creation).
+- **Solution in `ClaimDefinitionForm.tsx`**:
+    - The form now fetches its own list of countries from `/api/countries` for the market selection.
+    - The `ClaimDefinitionData` interface used by the form has been updated to include optional name fields (e.g., `master_brand_name`, `ingredient_name`) that can be passed from the parent page's `initialData` (which is of type `ClaimEntry`).
+    - The `useEffect` hook responsible for populating the form from `initialData` in edit mode has been enhanced. It now uses these passed-in names to synthesize temporary options for disabled dropdowns if the actual options haven't loaded yet or if the specific entity ID isn't in the current option list. This ensures that the correct entity name is displayed in the (disabled) dropdown field even if the full list of options is still loading or doesn't contain that specific old value.
+    - This provides a better user experience by correctly showing the context of the claim being edited.
 
 # MixerAI 2.0 - UI and Authentication Updates
 
@@ -178,7 +220,18 @@ Below is a breakdown of permissions for key API endpoint groups related to Claim
 ### 2. User Authentication & Management
 Details on user authentication, Supabase integration, user data structures, API updates for users, Row Level Security, user profiles, and the invitation system have been moved to [Authentication and User Management](./docs/authentication.md).
 
-### 3. Missing Pages Documentation
+### 3. Terminology Update: "Global" to "All Countries" for Market Scope
+- The term "Global" when referring to a market scope that encompasses all countries (e.g., in the Claims Preview Matrix) has been changed to "All Countries".
+- The internal constant `GLOBAL_COUNTRY_CODE` (previously `__GLOBAL__`) has been renamed to `ALL_COUNTRIES_CODE` and its value changed to `__ALL_COUNTRIES__`.
+- The display name constant `GLOBAL_COUNTRY_NAME` (previously "Global (All Countries)") has been renamed to `ALL_COUNTRIES_NAME` and its value changed to "All Countries".
+- This change ensures clarity and avoids potential confusion with "Master Claim Brands" (which was previously "Global Claim Brands").
+- Relevant files updated include:
+    - `src/lib/constants/country-codes.ts`
+    - `src/app/dashboard/claims/preview/page.tsx`
+    - `src/app/dashboard/admin/products/[id]/edit/page.tsx`
+    - `src/app/dashboard/admin/claims/[id]/edit/page.tsx`
+
+### 4. Missing Pages Documentation
 - Created comprehensive documentation for pages that have been removed or relocated
 - Developed detailed implementation guides for recreating high-priority pages
 - Established a tracking system for monitoring implementation progress
@@ -188,7 +241,7 @@ Details on user authentication, Supabase integration, user data structures, API 
   - `implementation-guide.md` - Detailed implementation instructions
   - `tracking.md` - Progress tracking document
 
-### 4. Missing Workflow Pages Implementation
+### 5. Missing Workflow Pages Implementation
 - Implemented all workflow-related missing pages:
   - `/dashboard/workflows/[id]/page.tsx` - Workflow detail view
   - `/dashboard/workflows/[id]/edit/page.tsx` - Workflow edit page 
@@ -1326,21 +1379,21 @@ To help manage token consumption rates with the AI service and improve stability
 
 ### 6. Claims Management
 
-The application includes a comprehensive system for managing product claims across different markets, including features for global claims, product-specific claims, ingredient-specific claims, and market-specific overrides. It also features an AI-powered tool to suggest replacement claims.
+The application includes a comprehensive system for managing product claims across different markets, including features for master claims, product-specific claims, ingredient-specific claims, and market-specific overrides. It also features an AI-powered tool to suggest replacement claims.
 
-- **Database Structure**: Utilises several tables including `claims`, `global_claim_brands`, `products`, `ingredients`, `product_ingredients`, and `market_claim_overrides` to manage the hierarchy and relationships of claims.
+- **Database Structure**: Utilises several tables including `claims`, `master_claim_brands`, `products`, `ingredients`, `product_ingredients`, and `market_claim_overrides` to manage the hierarchy and relationships of claims.
 - **Claim Levels**: Supports claims at Brand, Product, and Ingredient levels.
 - **Market Specificity**: Claims can be global (`__GLOBAL__`) or tied to specific country codes.
 - **Claim Stacking**: A sophisticated logic (`getStackedClaimsForProduct`) determines the effective claims for a product in a given market, considering precedence (Product > Ingredient > Brand) and market-specificity (specific country > `__GLOBAL__`). Disallowed claims correctly override others.
-- **Claims Matrix UI**: A central UI (`/dashboard/admin/claims-matrix`) allows administrators to view the effective claims for all products across different markets. It provides an interface to manage market-specific overrides for global claims.
+- **Claims Matrix UI**: A central UI (`/dashboard/admin/claims-matrix`) allows administrators to view the effective claims for all products across different markets. It provides an interface to manage market-specific overrides for master claims.
 - **Market Overrides**: Administrators can:
-    - Block a global claim for a specific product in a specific market.
-    - Block a global claim and replace it with an existing market-specific claim.
-- **Admin UI**: Dedicated pages for managing `global_claim_brands`, `ingredients`, `products`, and `claims` (list, new, edit).
+    - Block a master claim for a specific product in a specific market.
+    - Block a master claim and replace it with an existing market-specific claim.
+- **Admin UI**: Dedicated pages for managing `master_claim_brands`, `ingredients`, `products`, and `claims` (list, new, edit).
 
 #### 6.1 AI-Powered Replacement Claim Suggestions
 
-To assist administrators when a global claim needs a market-specific replacement, an AI-powered suggestion tool is integrated into the Claims Matrix UI.
+To assist administrators when a master claim needs a market-specific replacement, an AI-powered suggestion tool is integrated into the Claims Matrix UI.
 
 - **API Endpoint**: `POST /api/ai/suggest-replacement-claims`
     - **Purpose**: Generates suitable, market-specific replacement claim suggestions based on a master claim, product details, brand guidelines, and the target market.
@@ -1381,10 +1434,30 @@ To assist administrators when a global claim needs a market-specific replacement
         - Adheres to the "NO FALLBACKS" policy for AI generation; if AI fails or returns an invalid format, an error is returned or an empty suggestion list is provided to the client.
 
 - **UI Integration** (`/dashboard/admin/claims-matrix`):
-    - In the "Block and Replace" modal (when creating a new market override for a global claim):
+    - In the "Block and Replace" modal (when creating a new market override for a master claim):
         - A "Get AI Suggestions" button is available.
         - Clicking this button calls the `/api/ai/suggest-replacement-claims` endpoint.
         - AI-generated suggestions (text, type, reasoning) are displayed to guide the user.
         - The user then manually selects an existing market-specific claim or uses the AI guidance to create/choose an appropriate replacement. The system does not automatically apply AI suggestions. 
 
-This feature enhances the administrator's ability to quickly find or formulate compliant and contextually appropriate claims when global claims are not suitable for specific markets.
+This feature enhances the administrator's ability to quickly find or formulate compliant and contextually appropriate claims when master claims are not suitable for specific markets.
+
+### User Request Tracking and Initial Bug Fix (YYYY-MM-DD - Current Date)
+
+- **User Request Documentation**:
+    - Created a new document `docs/USER_REQUESTS_AND_PLAN.md` to log all current user feature requests, bug reports, and to outline a phased implementation plan. This document serves as a central tracking point for ongoing development tasks.
+- **API Bug Fix - "Get AI Brand Review"**:
+    - Addressed an error on the `/dashboard/admin/claims/brand-review` page where the "Get AI Brand Review" feature was failing due to a `405 Method Not Allowed` error.
+    - The root cause was identified as the API route handler `src/app/api/ai/master-claim-brands/[masterClaimBrandId]/review-claims/route.ts` not exporting any HTTP method handlers.
+    - **Resolution**: Modified the `route.ts` file to export a `GET` handler and stubs for other common HTTP methods (POST, PUT, DELETE, etc.) to prevent future "No HTTP methods exported" errors. The `GET` handler currently returns a placeholder success response and logs the received parameters. The actual AI review logic is marked as a TODO for future implementation.
+
+This feature enhances the administrator's ability to quickly find or formulate compliant and contextually appropriate claims when master claims are not suitable for specific markets.
+
+### User Request Tracking and Initial Bug Fix (YYYY-MM-DD - Current Date)
+
+- **User Request Documentation**:
+    - Created a new document `docs/USER_REQUESTS_AND_PLAN.md` to log all current user feature requests, bug reports, and to outline a phased implementation plan. This document serves as a central tracking point for ongoing development tasks.
+- **API Bug Fix - "Get AI Brand Review"**:
+    - Addressed an error on the `/dashboard/admin/claims/brand-review` page where the "Get AI Brand Review" feature was failing due to a `405 Method Not Allowed` error.
+    - The root cause was identified as the API route handler `src/app/api/ai/master-claim-brands/[masterClaimBrandId]/review-claims/route.ts` not exporting any HTTP method handlers.
+    - **Resolution**: Modified the `route.ts` file to export a `GET` handler and stubs for other common HTTP methods (POST, PUT, DELETE, etc.) to prevent future "No HTTP methods exported" errors. The `GET` handler currently returns a placeholder success response and logs the received parameters. The actual AI review logic is marked as a TODO for future implementation.

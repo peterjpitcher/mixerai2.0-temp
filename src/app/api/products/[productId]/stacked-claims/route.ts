@@ -30,11 +30,11 @@ export const GET = withAuth(async (req: NextRequest, user: User, { params }: { p
     let hasPermission = globalRole === 'admin';
 
     if (!hasPermission) {
-      // Fetch the product to get its global_brand_id for permission validation
+      // Fetch the product to get its master_brand_id for permission validation
       // @ts-ignore
       const { data: productData, error: productFetchError } = await supabase
         .from('products')
-        .select('global_brand_id')
+        .select('master_brand_id')
         .eq('id', productId)
         .single();
 
@@ -46,31 +46,31 @@ export const GET = withAuth(async (req: NextRequest, user: User, { params }: { p
         return handleApiError(productFetchError, 'Failed to verify product existence for permissions.');
       }
 
-      if (!productData || !productData.global_brand_id) {
-        return NextResponse.json({ success: false, error: 'Product not found or not associated with a global claim brand.' }, { status: 404 });
+      if (!productData || !productData.master_brand_id) {
+        return NextResponse.json({ success: false, error: 'Product not found or not associated with a master claim brand.' }, { status: 404 });
       }
 
-      const productGlobalBrandId = productData.global_brand_id;
+      const productMasterBrandId = productData.master_brand_id;
 
-      // Now fetch the global_claim_brand to get its mixerai_brand_id
+      // Now fetch the master_claim_brand to get its mixerai_brand_id
       // @ts-ignore
-      const { data: globalClaimBrandData, error: gcbError } = await supabase
-        .from('global_claim_brands')
+      const { data: masterClaimBrandData, error: mcbError } = await supabase
+        .from('master_claim_brands')
         .select('id, mixerai_brand_id')
-        .eq('id', productGlobalBrandId)
+        .eq('id', productMasterBrandId)
         .single();
       
-      if (gcbError) {
-        console.error(`[API /products/${productId}/stacked-claims] Error fetching global_claim_brand ${productGlobalBrandId} for permission check:`, gcbError);
-        return handleApiError(gcbError, 'Failed to verify brand linkage for permissions.');
+      if (mcbError) {
+        console.error(`[API /products/${productId}/stacked-claims] Error fetching master_claim_brand ${productMasterBrandId} for permission check:`, mcbError);
+        return handleApiError(mcbError, 'Failed to verify brand linkage for permissions.');
       }
 
-      if (!globalClaimBrandData || !globalClaimBrandData.mixerai_brand_id) {
-        // This product's global_claim_brand is not linked to a main MixerAI brand, so non-admins cannot have permission.
-        // Or, global_claim_brand itself not found, which would be an integrity issue if productData.global_brand_id was valid.
+      if (!masterClaimBrandData || !masterClaimBrandData.mixerai_brand_id) {
+        // This product's master_claim_brand is not linked to a main MixerAI brand, so non-admins cannot have permission.
+        // Or, master_claim_brand itself not found, which would be an integrity issue if productData.master_brand_id was valid.
         // hasPermission remains false
       } else {
-        const coreBrandId = globalClaimBrandData.mixerai_brand_id;
+        const coreBrandId = masterClaimBrandData.mixerai_brand_id;
         // @ts-ignore
         const { data: permissionsData, error: permissionsError } = await supabase
           .from('user_brand_permissions')
@@ -82,7 +82,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, { params }: { p
           console.error(`[API /products/${productId}/stacked-claims] Error fetching user_brand_permissions for user ${user.id}, core_brand_id ${coreBrandId}:`, permissionsError);
           // Potentially critical, but for now, let hasPermission remain false if error occurs
         } else if (permissionsData && permissionsData.length > 0) {
-          hasPermission = true; // User has some role on the core MixerAI brand linked to the product's global_claim_brand
+          hasPermission = true; // User has some role on the core MixerAI brand linked to the product's master_claim_brand
         }
       }
     }

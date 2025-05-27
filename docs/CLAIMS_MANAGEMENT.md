@@ -20,16 +20,16 @@ Stores information about individual products.
 ```sql
 CREATE TABLE products (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    global_brand_id UUID NOT NULL REFERENCES global_claim_brands(id) ON DELETE CASCADE, -- Changed from brand_id to global_brand_id
-    name TEXT NOT NULL,
+    name TEXT NOT NULL UNIQUE,
     description TEXT,
+    master_brand_id UUID NOT NULL REFERENCES master_claim_brands(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE (global_brand_id, name) -- A product name should be unique within a brand
+    UNIQUE (name)
 );
 
-COMMENT ON TABLE products IS 'Stores information about individual products, linked to a global_claim_brand.';
-COMMENT ON COLUMN products.global_brand_id IS 'Foreign key referencing the global_claim_brand this product belongs to.';
+COMMENT ON TABLE products IS 'Stores information about individual products, linked to a master_claim_brand.';
+COMMENT ON COLUMN products.master_brand_id IS 'Foreign key referencing the master_claim_brand this product belongs to.';
 ```
 
 ### `ingredients` Table
@@ -60,33 +60,37 @@ CREATE TABLE product_ingredients (
 
 COMMENT ON TABLE product_ingredients IS 'Join table linking products to their ingredients.';
 ```
-### `global_claim_brands` Table
+
+### `master_claim_brands` Table
 (This table was pre-existing but is central to brand-level claims, replacing a generic `brands` table reference in earlier drafts of this document for claims).
+
 ```sql
-CREATE TABLE global_claim_brands (
+CREATE TABLE master_claim_brands (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL UNIQUE,
-    -- other brand-related fields as they exist...
+    mixerai_brand_id UUID REFERENCES brands(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-COMMENT ON TABLE global_claim_brands IS 'Stores global brand entities for claims management.';
+
+COMMENT ON TABLE master_claim_brands IS 'Stores master brand entities for claims management.';
+COMMENT ON COLUMN master_claim_brands.mixerai_brand_id IS 'Foreign key linking to the main MixerAI brands table. Enables permissions based on main brand ownership and cascades deletes.';
 ```
 
 ### Integrating Claims Brands with Main MixerAI Brands
-To enable more granular permission management and align claims with the overall brand structure in MixerAI, the `global_claim_brands` table will be linked to the main `brands` table.
+To enable more granular permission management and align claims with the overall brand structure in MixerAI, the `master_claim_brands` table will be linked to the main `brands` table.
 
 ```sql
-ALTER TABLE global_claim_brands
+ALTER TABLE master_claim_brands
 ADD COLUMN mixerai_brand_id UUID REFERENCES brands(id) ON DELETE CASCADE;
 
-COMMENT ON COLUMN global_claim_brands.mixerai_brand_id IS 'Foreign key linking to the main MixerAI brands table. Enables permissions based on main brand ownership and cascades deletes.';
+COMMENT ON COLUMN master_claim_brands.mixerai_brand_id IS 'Foreign key linking to the main MixerAI brands table. Enables permissions based on main brand ownership and cascades deletes.';
 ```
 This integration means:
-- **Permissions**: User permissions to manage claims for a `global_claim_brands` entry can be derived from their permissions on the linked `brands` entry. For instance, a user who is an admin for "Haagen-Dazs" in the main `brands` table would implicitly have rights to manage "Haagen-Dazs" claims.
-- **Cascade Deletes**: If a brand is deleted from the main `brands` table, any associated `global_claim_brands` entry will also be deleted, which in turn will cascade to all related `claims`, `products`, and `market_claim_overrides` linked to that `global_claim_brands` entry. This ensures data integrity.
+- **Permissions**: User permissions to manage claims for a `master_claim_brands` entry can be derived from their permissions on the linked `brands` entry. For instance, a user who is an admin for "Haagen-Dazs" in the main `brands` table would implicitly have rights to manage "Haagen-Dazs" claims.
+- **Cascade Deletes**: If a brand is deleted from the main `brands` table, any associated `master_claim_brands` entry will also be deleted, which in turn will cascade to all related `claims`, `products`, and `market_claim_overrides` linked to that `master_claim_brands` entry. This ensures data integrity.
 - **UI Adjustments**:
-    - When creating or editing a `global_claim_brands` entry (e.g., in an admin interface for claims setup), there should be a mechanism to select and link to an existing brand from the main `brands` table.
+    - When creating or editing a `master_claim_brands` entry (e.g., in an admin interface for claims setup), there should be a mechanism to select and link to an existing brand from the main `brands` table.
     - The display of claims brands should ideally also show the linked MixerAI main brand name for clarity.
     - The UI for managing user permissions for claims might need to be reviewed to leverage this link (e.g., showing users who have access via the main brand).
 
@@ -110,8 +114,7 @@ CREATE TABLE claims (
     claim_text TEXT NOT NULL,
     claim_type claim_type_enum NOT NULL,
     level claim_level_enum NOT NULL,
-    -- References to specific entities based on level
-    global_brand_id UUID REFERENCES global_claim_brands(id) ON DELETE CASCADE,
+    master_brand_id UUID REFERENCES master_claim_brands(id) ON DELETE CASCADE,
     product_id UUID REFERENCES products(id) ON DELETE CASCADE,
     ingredient_id UUID REFERENCES ingredients(id) ON DELETE CASCADE,
     country_code TEXT NOT NULL, -- ISO 3166-1 alpha-2 country code (e.g., 'GB', 'US'). Use '__GLOBAL__' for Master claims.
@@ -120,22 +123,22 @@ CREATE TABLE claims (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT chk_claim_level_reference CHECK (
-        (level = 'brand' AND global_brand_id IS NOT NULL AND product_id IS NULL AND ingredient_id IS NULL) OR
-        (level = 'product' AND product_id IS NOT NULL AND global_brand_id IS NULL AND ingredient_id IS NULL) OR
-        (level = 'ingredient' AND ingredient_id IS NOT NULL AND global_brand_id IS NULL AND product_id IS NULL)
+        (level = 'brand' AND master_brand_id IS NOT NULL AND product_id IS NULL AND ingredient_id IS NULL) OR
+        (level = 'product' AND product_id IS NOT NULL AND master_brand_id IS NULL AND ingredient_id IS NULL) OR
+        (level = 'ingredient' AND ingredient_id IS NOT NULL AND master_brand_id IS NULL AND product_id IS NULL)
     ),
     -- A claim text should be unique for its specific association and context to avoid contradictory direct definitions.
     -- More complex uniqueness (e.g. only one 'allowed' and one 'disallowed' for the same text) is handled by application logic/user process.
-    UNIQUE (claim_text, level, global_brand_id, product_id, ingredient_id, country_code, claim_type) 
+    UNIQUE (claim_text, level, master_brand_id, product_id, ingredient_id, country_code, claim_type) 
 );
 
 COMMENT ON TABLE claims IS 'Stores marketing claims related to brands, products, or ingredients.';
 COMMENT ON COLUMN claims.claim_type IS 'Type of claim (allowed, disallowed, mandatory).';
 COMMENT ON COLUMN claims.level IS 'The level at which the claim applies (brand, product, or ingredient).';
-COMMENT ON COLUMN claims.global_brand_id IS 'FK to global_claim_brands if claim is at brand level.';
+COMMENT ON COLUMN claims.master_brand_id IS 'FK to master_claim_brands if claim is at brand level.';
 COMMENT ON COLUMN claims.product_id IS 'FK to products table if claim is at product level.';
 COMMENT ON COLUMN claims.ingredient_id IS 'FK to ingredients table if claim is at ingredient level.';
-COMMENT ON COLUMN claims.country_code IS 'ISO 3166-1 alpha-2 country code for Market-specific claims. Use ''__GLOBAL__'' for Master claims.';
+COMMENT ON COLUMN claims.country_code IS 'ISO 3166-1 alpha-2 country code for Market-specific claims. Use '__GLOBAL__' for Master claims.';
 COMMENT ON COLUMN claims.description IS 'Optional internal notes or context about the claim.';
 COMMENT ON COLUMN claims.created_by IS 'User who created the claim.';
 ```
@@ -194,10 +197,10 @@ When determining the effective `claim_type` (allowed, disallowed, mandatory) for
 
 1.  **Market Product Claim**: A claim specific to the `product_id` and the `market_country_code`.
 2.  **Market Ingredient Claim**: Claims specific to any of the product's `ingredient_id`s and the `market_country_code`. (If multiple ingredients have conflicting market claims for the same text, specific business rules for ingredient claim conflict resolution might be needed; typically, the most restrictive like 'disallowed' might win, or this scenario needs to be avoided by careful data entry).
-3.  **Market Brand Claim**: A claim specific to the product's `global_brand_id` and the `market_country_code`.
+3.  **Market Brand Claim**: A claim specific to the product's `master_brand_id` and the `market_country_code`.
 4.  **Master Product Claim**: A claim specific to the `product_id` with `country_code = '__GLOBAL__'`, *UNLESS* this Master Product Claim is explicitly blocked or replaced for the `target_product_id` in the `market_country_code` by an entry in `market_claim_overrides`.
 5.  **Master Ingredient Claim**: Claims specific to any of the product's `ingredient_id`s with `country_code = '__GLOBAL__'`, *UNLESS* this Master Ingredient Claim is explicitly blocked/replaced for the `target_product_id` (implying context via its ingredient) in the `market_country_code`. (Logic needed in `market_claim_overrides` or its usage to map ingredient-level master claim blocks to a product context).
-6.  **Master Brand Claim**: A claim specific to the product's `global_brand_id` with `country_code = '__GLOBAL__'`, *UNLESS* this Master Brand Claim is explicitly blocked/replaced for the `target_product_id` (implying context via its brand) in the `market_country_code`.
+6.  **Master Brand Claim**: A claim specific to the product's `master_brand_id` with `country_code = '__GLOBAL__'`, *UNLESS* this Master Brand Claim is explicitly blocked/replaced for the `target_product_id` (implying context via its brand) in the `market_country_code`.
 
 ### Market Overrides of Master Claims:
 Markets can interact with Master claims for a specific product context in the following ways using the `market_claim_overrides` table:
@@ -220,8 +223,8 @@ The core utility function responsible for determining the applicable claims for 
 
 A "Claims Management" section in the dashboard.
 
-### A. Managing Core Entities (Products, Ingredients, Global Claim Brands):
-- CRUD operations for Products, Ingredients, Global Claim Brands (as currently implemented or planned).
+### A. Managing Core Entities (Products, Ingredients, Master Claim Brands):
+- CRUD operations for Products, Ingredients, Master Claim Brands (as currently implemented or planned).
 - Associating ingredients with products.
 
 ### B. Defining and Managing Claims (`claims` table):
@@ -231,7 +234,7 @@ A "Claims Management" section in the dashboard.
     - `claim_type`: (e.g., 'allowed', 'disallowed', 'mandatory').
     - `level`: (Brand, Product, Ingredient).
     - Associated entity ID: 
-        - `global_brand_id` (if level is Brand).
+        - `master_brand_id` (if level is Brand).
         - `product_id`(s): If level is Product, users should be able to select **multiple applicable products using checkboxes** from a list filtered by the relevant brand context.
         - `ingredient_id` (if level is Ingredient).
     - `country_code`(s): Users should be able to select **multiple applicable countries/markets (including "__GLOBAL__" for Master claims) using checkboxes**.
@@ -278,7 +281,7 @@ A "Claims Management" section in the dashboard.
     - The frontend page (`/dashboard/claims/preview`) renders this matrix.
 - **Key Challenge Identified**: The current `getStackedClaimsForProduct` and the matrix API do NOT yet account for the new `market_claim_overrides` table or the refined Master/Market precedence and blocking logic. This is the next major refactoring area.
 - **UI for Blocking/Overrides**: The UI for users to interact with the matrix cells to block/override claims is not yet implemented.
-- **Original schema for `products` linked to `brands(id)`. This documentation now reflects `products` linking to `global_claim_brands` for consistency with how brand-level claims are likely managed via a central "global brands" concept.** Ensure database and code align with `global_claim_brands` for product parentage if this is the intended final structure. If `brands` is a different concept, adjust accordingly. For this document, `global_claim_brands` is assumed for brand-level claims and product parentage.
+- **Original schema for `products` linked to `brands(id)`. This documentation now reflects `products` linking to `master_claim_brands` for consistency with how brand-level claims are likely managed via a central "master brands" concept.** Ensure database and code align with `master_claim_brands` for product parentage if this is the intended final structure. If `brands` is a different concept, adjust accordingly. For this document, `master_claim_brands` is assumed for brand-level claims and product parentage.
 - **User Authentication & Types**: The `withAuth` HOC is used. The specific `User` type from the auth library should be used in API route handlers instead of `any` for better type safety.
 
 ## 7. Future Considerations
@@ -294,7 +297,7 @@ This revised plan aims to build the Claims Management feature incrementally, ens
         *   `products`
         *   `ingredients`
         *   `product_ingredients`
-        *   `global_claim_brands` (including `mixerai_brand_id` FK to `brands` table with `ON DELETE CASCADE`)
+        *   `master_claim_brands` (including `mixerai_brand_id` FK to `brands` table with `ON DELETE CASCADE`)
         *   `claims` (with ENUM types `claim_type_enum`, `claim_level_enum`)
         *   `market_claim_overrides`
     *   Run migrations to implement the schema.
@@ -302,7 +305,7 @@ This revised plan aims to build the Claims Management feature incrementally, ens
     *   Develop API endpoints (POST, GET, PUT, DELETE) for:
         *   Products (`/api/products`, `/api/products/[id]`)
         *   Ingredients (`/api/ingredients`, `/api/ingredients/[id]`)
-        *   Global Claim Brands (`/api/global-claim-brands`, `/api/global-claim-brands/[id]`)
+        *   Master Claim Brands (`/api/master-claim-brands`, `/api/master-claim-brands/[id]`)
             *   UI for linking to main MixerAI `brands`.
         *   Product-Ingredient Associations.
     *   Implement basic UI forms/tables in the dashboard for managing these entities.
@@ -310,7 +313,7 @@ This revised plan aims to build the Claims Management feature incrementally, ens
     *   Develop API endpoints for creating, reading, updating, and deleting claims (`/api/claims`, `/api/claims/[id]`).
     *   Implement the UI for defining claims with fields for:
         *   `claim_text`, `claim_type`, `level`.
-        *   Associated entity: `global_brand_id`, `ingredient_id`.
+        *   Associated entity: `master_brand_id`, `ingredient_id`.
         *   **Multi-select checkboxes for `product_id`(s)** when `level` is 'Product'.
         *   **Multi-select checkboxes for `country_code`(s)** (including '__GLOBAL__').
         *   `description`.

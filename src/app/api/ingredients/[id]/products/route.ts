@@ -11,7 +11,7 @@ interface ProductDetails {
     id: string;
     name: string;
     description: string | null;
-    global_brand_id: string;
+    master_brand_id: string;
     // We can also include the created_at from product_ingredients if needed
     // associated_at: string;
 }
@@ -66,7 +66,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
                     id: item.products.id,
                     name: item.products.name,
                     description: item.products.description,
-                    global_brand_id: item.products.global_brand_id,
+                    master_brand_id: item.products.master_brand_id,
                     // associated_at: item.created_at // from product_ingredients table if needed
                 };
             }

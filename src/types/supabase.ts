@@ -160,10 +160,10 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           description: string | null
-          global_brand_id: string | null
           id: string
           ingredient_id: string | null
           level: Database["public"]["Enums"]["claim_level_enum"]
+          master_brand_id: string | null
           product_id: string | null
           updated_at: string | null
         }
@@ -174,10 +174,10 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
-          global_brand_id?: string | null
           id?: string
           ingredient_id?: string | null
           level: Database["public"]["Enums"]["claim_level_enum"]
+          master_brand_id?: string | null
           product_id?: string | null
           updated_at?: string | null
         }
@@ -188,10 +188,10 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
-          global_brand_id?: string | null
           id?: string
           ingredient_id?: string | null
           level?: Database["public"]["Enums"]["claim_level_enum"]
+          master_brand_id?: string | null
           product_id?: string | null
           updated_at?: string | null
         }
@@ -212,9 +212,9 @@ export type Database = {
           },
           {
             foreignKeyName: "claims_global_brand_id_fkey"
-            columns: ["global_brand_id"]
+            columns: ["master_brand_id"]
             isOneToOne: false
-            referencedRelation: "global_claim_brands"
+            referencedRelation: "master_claim_brands"
             referencedColumns: ["id"]
           },
           {
@@ -674,38 +674,6 @@ export type Database = {
           },
         ]
       }
-      global_claim_brands: {
-        Row: {
-          created_at: string
-          id: string
-          mixerai_brand_id: string | null
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          mixerai_brand_id?: string | null
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          mixerai_brand_id?: string | null
-          name?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "global_claim_brands_mixerai_brand_id_fkey"
-            columns: ["mixerai_brand_id"]
-            isOneToOne: false
-            referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       ingredients: {
         Row: {
           created_at: string | null
@@ -854,6 +822,38 @@ export type Database = {
           },
         ]
       }
+      master_claim_brands: {
+        Row: {
+          created_at: string
+          id: string
+          mixerai_brand_id: string | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mixerai_brand_id?: string | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mixerai_brand_id?: string | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "global_claim_brands_mixerai_brand_id_fkey"
+            columns: ["mixerai_brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           action_label: string | null
@@ -942,33 +942,33 @@ export type Database = {
         Row: {
           created_at: string | null
           description: string | null
-          global_brand_id: string | null
           id: string
+          master_brand_id: string | null
           name: string
           updated_at: string | null
         }
         Insert: {
           created_at?: string | null
           description?: string | null
-          global_brand_id?: string | null
           id?: string
+          master_brand_id?: string | null
           name: string
           updated_at?: string | null
         }
         Update: {
           created_at?: string | null
           description?: string | null
-          global_brand_id?: string | null
           id?: string
+          master_brand_id?: string | null
           name?: string
           updated_at?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "products_global_brand_id_fkey"
-            columns: ["global_brand_id"]
+            columns: ["master_brand_id"]
             isOneToOne: false
-            referencedRelation: "global_claim_brands"
+            referencedRelation: "master_claim_brands"
             referencedColumns: ["id"]
           },
         ]

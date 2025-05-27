@@ -62,7 +62,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
   try {
     const { searchParams } = new URL(req.url);
     const targetCountryCode = searchParams.get('countryCode');
-    const globalBrandIdFilter = searchParams.get('globalBrandId');
+    const masterBrandIdFilter = searchParams.get('masterBrandId');
 
     if (isBuildPhase()) {
       console.log(`[API Claims Matrix GET] Build phase: returning empty structure.`);
@@ -82,9 +82,9 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
 
     const supabase = createSupabaseAdminClient();
 
-    let productsQuery = supabase.from('products').select('id, name, description, global_brand_id');
-    if (globalBrandIdFilter) {
-      productsQuery = productsQuery.eq('global_brand_id', globalBrandIdFilter);
+    let productsQuery = supabase.from('products').select('id, name, description, master_brand_id');
+    if (masterBrandIdFilter) {
+      productsQuery = productsQuery.eq('master_brand_id', masterBrandIdFilter);
     }
     const { data: productsData, error: productsError } = await productsQuery.order('name');
 
@@ -92,9 +92,9 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
       console.error('[API Claims Matrix GET] Error fetching products:', productsError);
       return handleApiError(productsError, 'Failed to fetch products for the matrix.');
     }
-    // Filter out products with null global_brand_id as the Product type expects it to be a string
-    const validProductsData = (productsData || []).filter(p => p.global_brand_id !== null);
-    const products: Product[] = validProductsData.map(p => ({ ...p, global_brand_id: p.global_brand_id as string }));
+    // Filter out products with null master_brand_id as the Product type expects it to be a string
+    const validProductsData = (productsData || []).filter(p => p.master_brand_id !== null);
+    const products: Product[] = validProductsData.map(p => ({ ...p, master_brand_id: p.master_brand_id as string }));
 
     if (products.length === 0) {
       return NextResponse.json({
