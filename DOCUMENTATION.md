@@ -1461,3 +1461,317 @@ This feature enhances the administrator's ability to quickly find or formulate c
     - Addressed an error on the `/dashboard/admin/claims/brand-review` page where the "Get AI Brand Review" feature was failing due to a `405 Method Not Allowed` error.
     - The root cause was identified as the API route handler `src/app/api/ai/master-claim-brands/[masterClaimBrandId]/review-claims/route.ts` not exporting any HTTP method handlers.
     - **Resolution**: Modified the `route.ts` file to export a `GET` handler and stubs for other common HTTP methods (POST, PUT, DELETE, etc.) to prevent future "No HTTP methods exported" errors. The `GET` handler currently returns a placeholder success response and logs the received parameters. The actual AI review logic is marked as a TODO for future implementation.
+
+## Documentation from /docs Directory
+
+This section summarizes the content of individual markdown files found within the `/docs` directory, providing a quick overview of their purpose and key information.
+
+### `USER_REQUESTS_AND_PLAN.md`
+
+*   **Purpose**: Tracks feature requests, bug fixes, and the phased implementation plan for MixerAI 2.0a.
+*   **Content**: Lists user requests related to claims management (fullscreen preview, definitions page, overrides page, brand review bug), product/ingredient/master claim brand display, URL standardizations, and terminology changes. It also includes a detailed phased implementation plan tracking the status of each item (Done, Pending, In Progress).
+*   **Key Information**: Serves as a changelog and task tracker for development, detailing specific UI/UX enhancements, bug resolutions, and foundational changes like "Global" to "Master" renaming and country list standardization.
+
+### `CLAIMS_MANAGEMENT.md`
+
+*   **Purpose**: Provides comprehensive documentation for the Claims Management feature.
+*   **Content**:
+    *   **Introduction**: Objectives of the claims management system.
+    *   **Database Schema**: Detailed SQL definitions and descriptions for tables: `products`, `ingredients`, `product_ingredients`, `master_claim_brands` (including its integration with main MixerAI `brands`), `claims` (with enums `claim_type_enum`, `claim_level_enum`), and `market_claim_overrides`.
+    *   **Claim Hierarchy and Logic**: Explains Master Claims vs. Market Claims, the precedence order for determining effective claims, and how market overrides (block, replace) work. Details the `getStackedClaimsForProduct` utility.
+    *   **UI Flow & Functionality**: Describes UI for managing core entities, defining claims (Master and Market-specific, multi-select for products/countries), and the Claims Preview/Matrix page (inputs, display options, matrix view interactivity, detailed stacked view, AI-simplified summary).
+    *   **AI-Powered Review**: Details for preview-time AI analysis and brand-wide AI claims review.
+    *   **Development Learnings & Status**: Notes on API, matrix implementation challenges, and schema considerations.
+    *   **Phased Implementation Plan**: A revised plan for incrementally building the feature.
+*   **Key Information**: This is a deep-dive into the technical and functional aspects of claims management, crucial for understanding its data model, logic, and UI.
+
+### `navigation_permissions_matrix.md`
+
+*   **Purpose**: Defines the target visibility of main navigation items based on user-defined roles.
+*   **Content**:
+    *   **Role Definitions**: Global Admin, Brand Admin (Non-Global), Editor (Brand-Assigned, Non-Admin), Viewer (Brand-Assigned, Non-Admin).
+    *   **Permissions Matrix**: A table detailing which navigation items each role can see (Dashboard, My Tasks, Brands, Content Templates, Workflows, All Content, Create Content, Tools, Feedback, Users, Account, Help).
+    *   **Implementation Plan**: A phased plan to align the actual application (specifically `UnifiedNavigation.tsx` and backend APIs/RLS) with this matrix. This includes discovery, backend API/RLS updates, frontend navigation updates, and page-level/component-level authorization. Tracks progress of this plan.
+*   **Key Information**: Acts as the source of truth for how navigation should behave for different user roles and outlines the steps to achieve this.
+
+### `tool_run_history_feature_plan.md`
+
+*   **Purpose**: Outlines the plan and implementation details for the feature that records and displays the history of AI tool runs.
+*   **Content**:
+    *   **Database Schema**: Details for the `tool_run_history` table (including `tool_run_status` enum), migration script, record limiting strategy, and SQL logic for cleanup.
+    *   **Backend API Modifications**: How existing tool API routes (`alt-text-generator`, `metadata-generator`, `content-transcreator`) were updated to log each run, including tool-specific input/output structures.
+    *   **Backend API for Fetching History**: New API routes (`GET /api/me/tool-run-history`, `GET /api/me/tool-run-history/[historyId]`).
+    *   **Frontend UI Updates**: Addition of "Run History" summary lists on each tool page and a new detailed history page (`/dashboard/tools/history/[historyId]`).
+    *   **Documentation Updates** and **Implementation Order**.
+*   **Key Information**: Documents a completed feature, providing technical details for database, backend, and frontend implementation of tool usage tracking.
+
+### `user_guide.md`
+
+*   **Purpose**: A user-facing help document for MixerAI.
+*   **Content**:
+    *   **Welcome & Getting Started**: Brief overview of Dashboard, Brands, Content, Templates, Workflows.
+    *   **Common Questions (FAQ)**: How to create content, edit brand details.
+    *   **Need More Help?**: Contact information for Peter Pitcher.
+    *   **Training and Tutorials**: Note about upcoming materials.
+*   **Key Information**: Provides basic guidance for end-users of the application. This content is intended to be part of the in-app `/help` section.
+
+### `azure_openai_call_pattern_investigation.md`
+
+*   **Purpose**: Investigates and documents a "404 Resource not found" error encountered with Azure OpenAI calls, specifically for the `/api/ai/suggest` endpoint.
+*   **Content**:
+    *   **Issue Description**: 404 error despite other AI functions working with the same environment variables.
+    *   **Discovery Findings**: Analyzes `getAzureOpenAIClient` and `getModelName` functions. Contrasts the failing call pattern (using the OpenAI SDK client method `client.chat.completions.create()`) with the working call pattern (direct `fetch` with manually constructed full Azure OpenAI endpoint URL).
+    *   **Conclusion**: The SDK, with the then-current `baseURL` initialization, wasn't forming the Azure-specific URL path correctly.
+    *   **Recommendations**: Either use direct `fetch` consistently or modify `getAzureOpenAIClient()` to include the deployment name in the `baseURL` for SDK-compliant calls.
+*   **Key Information**: A technical deep-dive into a specific Azure OpenAI integration issue, explaining the cause and proposing solutions. This led to changes in how Azure OpenAI clients are initialized or used.
+
+### `CODEBASE_DISCOVERY_AND_OUTSTANDING_QUESTIONS.md`
+
+*   **Purpose**: Documents findings from a codebase discovery phase focused on diagnosing and resolving issues related to user authentication, session management, and role-based access, particularly a `ReadonlyRequestCookiesError` in `src/middleware.ts`.
+*   **Content**:
+    *   **Key Dependencies**: Lists relevant Supabase and Next.js packages.
+    *   **Analysis of `src/middleware.ts`**: Identifies the root cause of the `ReadonlyRequestCookiesError` (attempting to write to read-only request cookies from `next/headers`).
+    *   **Supabase Client Instantiation Patterns**: Reviews usage of `createServerClient`, `createBrowserClient`, `createClient`.
+    *   **`user_system_roles` Table Analysis**: Hypothesizes its role in permissions alongside JWT metadata.
+    *   **RLS Policy Status**: Notes resolution of a previous RLS error.
+    *   **Outstanding Questions & Next Steps**: Areas needing further investigation (middleware fix, `user_system_roles` integration, other client usages, impact of `@supabase/auth-helpers-nextjs`).
+*   **Key Information**: A snapshot of an investigation into authentication/session issues, highlighting problems and a plan for resolution.
+
+### `feedback_system_development_log.md`
+
+*   **Purpose**: Tracks the requirements, design decisions, and implementation steps for the MixerAI Feedback System. This appears to be the more current and detailed document for the feedback system.
+*   **Content**:
+    *   **Core Requirements**: Users log requests/bugs, view feedback, admin management.
+    *   **Database Schema (`feedback_items`)**: Detailed SQL for the table including enums (`feedback_type`, `feedback_priority`, `feedback_status`), columns (type, title, description, status, priority, URL, browser/OS info, context, reproduction steps, etc.), indexes, and an `updated_at` trigger.
+    *   **Row-Level Security (RLS) Policies**: Details for authenticated users (insert, select all) and admin users (update, delete, full select).
+    *   **API Endpoints**: `POST /api/feedback`, `GET /api/feedback`, `GET /api/feedback/[id]`, `PATCH /api/feedback/[id]`.
+    *   **User Interface Pages & Features**:
+        *   Feedback Log & Submission Page (`/dashboard/admin/feedback-log`): Navigation link, title, description, submission form fields, recently logged items table, UI standards compliance.
+        *   Feedback Detail Page (`/dashboard/feedback/[id]`): Displayed fields, "Edit" button for admins, UI standards compliance.
+        *   Feedback Edit Page (`/dashboard/feedback/[id]/edit`): Admin-only, editable fields, UI standards compliance.
+    *   **Miscellaneous**: Linter errors, Supabase types, Shadcn/UI components used.
+*   **Key Information**: A comprehensive log of the feedback system's development, including schema, API, and UI details.
+
+### `feedback_system.md`
+
+*   **Purpose**: Describes a system for logging and viewing feedback, seemingly an earlier or simplified version compared to `feedback_system_development_log.md`.
+*   **Content**:
+    *   **Purpose**: Global admins log requests/bugs; all authenticated users view them.
+    *   **Database Schema**: `feedback_items` table schema (less detailed than the dev log) and ENUMs.
+    *   **API Endpoints**: `POST /api/feedback` (create, auth users), `GET /api/feedback` (list, auth users). The GET endpoint description is incomplete.
+    *   **Navigation/UI Access**: Submit Feedback Page (`/dashboard/admin/feedback-log`, all auth users), View Feedback Page (`/dashboard/feedback`, all auth users).
+    *   **Future Enhancements**.
+*   **Key Information**: Outlines an initial concept or a basic version of the feedback system. `feedback_system_development_log.md` should be considered more authoritative for the actual implementation.
+
+### `mobile-responsiveness-plan.md`
+
+*   **Purpose**: Outlines the plan to improve the mobile-friendliness of the MixerAI 2.0 application.
+*   **Content**:
+    *   **Current State Assessment**: Desktop-first approach, existing sidebar hidden on small screens.
+    *   **Core Objective: Bottom Mobile Navigation**:
+        *   New component: `BottomMobileNavigation.tsx` (location, purpose, visibility, styling, content - initial links: Dashboard, My Tasks, Content, Workflows, Menu/More - functionality).
+        *   Integration into `DashboardLayout` (including padding adjustments for main content).
+    *   **General UI Responsiveness Improvements**:
+        *   Key areas for review: Dashboard pages, Forms, Data Tables, Modals.
+        *   Common responsive patterns: Layout adjustments (flex, grid), spacing/typography, table adaptations, form adjustments, image scaling.
+    *   **Development Phases**: 1. Implement `BottomMobileNavigation`. 2. Iterative UI responsiveness review.
+    *   **Future Considerations**: Mobile-specific components, performance, touch target sizes.
+*   **Key Information**: A strategic plan for enhancing mobile UX, centered around a new bottom navigation bar and general responsive design principles.
+
+### `brand-visibility-enhancement.md`
+
+*   **Purpose**: Outlines findings and solutions for restricting brand visibility to ensure non-admin users only see brands and brand-linked entities they are assigned to.
+*   **Content**:
+    *   **Objective**: Non-admins see only permitted brands and associated content/workflows/tasks. Global admins see all.
+    *   **Discovery Findings**:
+        *   Primary brand data source (`/api/brands/route.ts`) already filters correctly.
+        *   User authentication (`withAuth` HOC) provides necessary role/permission data.
+        *   Brand-linked data types/APIs needing similar filtering: `/api/workflows`, `/api/content`, `/api/me/tasks`. Content templates are global.
+        *   Frontend consumers affected.
+    *   **Proposed Solution**: Extend API-level filtering to brand-linked data GET handlers by checking global role and `brandPermissions`. Handle specific `brand_id` query params.
+    *   **Frontend Adjustments**: `EmptyState` message updates.
+    *   **Security**: Emphasizes API-level filtering.
+    *   **Next Steps**: Implement and test.
+*   **Key Information**: A plan to enforce data scoping for brands and related entities based on user permissions, primarily through API modifications.
+
+### `NAVIGATION_PERMISSIONS.md`
+
+*   **Purpose**: Outlines role-based navigation permissions, detailing visibility and accessibility of main navigation items. This appears to be a more detailed or alternative version to `navigation_permissions_matrix.md`.
+*   **Content**:
+    *   **User Role Definitions**: Viewer, Editor, Admin (Platform Admin vs. Scoped Admin - based on brand assignments).
+    *   **Detailed Navigation Visibility Matrix**: Table indicating visibility (✓/✗) for navigation items (Dashboard, My Tasks, Brands (View/Create), Content (View/Create), Workflows (View/Create), Templates (View/Create), Tools, User Management, Account, Help). Uses `*` for brand-filtered access and `**` for conditional admin access.
+    *   **Notes on the Matrix**: Explains conditional admin access and viewer/editor brand restrictions.
+    *   **Simplified Navigation View**: Lists primary navigation sections visible to each role and admin scenario.
+*   **Key Information**: Provides a granular definition of navigation access based on roles, including nuanced rules for administrators with and without brand assignments.
+
+### `UI_STANDARDS.MD`
+
+*   **Purpose**: A definitive guide outlining UI and UX standards for the MixerAI application's dashboard area to ensure consistency, usability, and a professional user experience.
+*   **Content**:
+    *   **0. Global Page Layout & Structure**: Standard page regions (header, sidebar, main content), grid system, spacing scale, page width (full width usage), and consistent internal padding.
+    *   **1. Navigation & Structure**: Consistent breadcrumbs (with Brand Avatar/Name context), page titles (`<h1>` with Brand Avatar/Name) & descriptions (`<p>`), "Back" buttons, "Create New" / primary list action buttons, main sidebar navigation (collapsible, active state), and brand selection controls (must show Brand Avatar/Name).
+    *   **2. Branding & Contextual Information**: Active Brand display (prominent Avatar/Name, subtle Brand Colour accent), other contextual info, Brand Avatar usage guidelines (clarity, fallback, accessibility, consistency, performance), and Brand Colour application guidelines (accessibility/contrast critical, consistency of core UI, subtlety, dark mode, user-selected colours, legibility).
+    *   **3. Forms & User Input**: Standard action buttons (primary, secondary, other - positioning in bottom-right or sticky footer, styling), field labels (above field), placeholder text (examples only), helper/instructional text (below field), required field indication (`*`), consistent input styling, validation messages (inline), and loading/saving states for buttons.
+    *   **4. Data Display**: Consistent table layout (headers, cell alignment, row actions with icons/tooltips, Brand Avatar/Name in cross-brand views, sorting/filtering), list views (cards), empty states (clear message, CTA), loading indicators (skeleton screens preferred), consistent iconography (from library, with tooltips), date & time formatting (`dd Mmmm yyyy`), and brand-specific data visualisations (use Brand Colour).
+    *   **5. Mobile & Responsive Standards**: Responsive layout principles (content reflow, navigation adaptation, table adaptation), touch-friendly target sizes (44x44px), legible font sizes, content prioritisation, device capabilities, interaction patterns for touch.
+    *   **6. General UI & UX**: Typography system (font family, scale), consistent colour palette (primary, secondary, accent, semantic states), interaction feedback states (hover, focus, active), modals & pop-ups (purposeful use, structure, dismissal, action buttons, overlay), notifications & toasts (non-intrusive, positioning, styling), performance (load times, interaction responsiveness, optimisations), and Accessibility (WCAG 2.1 AA minimum - keyboard nav, semantic HTML, ARIA, colour contrast, alt text, form labels).
+*   **Key Information**: This is the foundational document for all UI/UX design and development, providing detailed rules and guidelines for a wide range of interface elements and principles.
+
+### `UI_AUDIT_FINDINGS.MD`
+
+*   **Purpose**: An audit of the MixerAI Dashboard against the `UI_STANDARDS.MD`, outlining findings and recommended changes to align the application.
+*   **Content**:
+    *   **A. Global Dashboard Implementation**: Checks against standards for global header, sidebar, content area, grid, spacing, typography, color palette, interaction states, and global accessibility.
+    *   **B. Page Categories & Specific Page Reviews**:
+        *   Listing Pages (e.g., `/brands`, `/content`): Audit points for breadcrumbs, titles/descriptions, "Create New" button, brand display, table/list layouts, empty states, loading indicators, etc.
+        *   Create Pages (e.g., `/brands/new`): Audit points for breadcrumbs, titles/descriptions, "Back" button, forms (action buttons, labels, validation, etc.).
+        *   Edit Pages (e.g., `/brands/[id]/edit`): Similar to Create Pages, focusing on edit context.
+        *   Detail/View Pages (e.g., `/content/[id]`): Audit points for breadcrumbs, titles, data display.
+        *   Specific Static/Information Pages (e.g., `/account`, `/help`).
+        *   Tools Pages (e.g., `/tools/alt-text-generator`): Audit points for breadcrumbs, titles, forms.
+    *   **C. Overarching Review Points**: Iconography, modals, notifications, performance, page-specific accessibility.
+    *   **D. Detailed Page Audits & Fixes**: In-depth audit and recommended fixes for specific files:
+        *   `src/app/dashboard/brands/page.tsx` (Brands Listing).
+        *   `src/app/dashboard/brands/new/page.tsx` (Create New Brand).
+*   **Key Information**: A practical checklist and action plan for implementing the UI Standards across the application, identifying discrepancies and suggesting fixes on a page-by-page and component basis.
+
+### `RECENT_UI_ALIGNMENT_SUMMARY.MD`
+
+*   **Purpose**: Summarizes recent UI alignment efforts based on user requests and the `UI_STANDARDS.MD`.
+*   **Content**:
+    *   **User Requests Summary**: Consistent UI standards application (specific pages highlighted), layout/field parity for Brands New/Edit pages, consistent page width/padding, removal of Import/Export buttons.
+    *   **Actions Taken**: Initial UI alignment pass (headers, buttons, icons), specific page revisions (`/templates/page.tsx`, `/brands/new/page.tsx`), Import/Export removal, `UI_STANDARDS.MD` update for padding/width, `UI_AUDIT_FINDINGS.MD` updates.
+    *   **Next Steps for UI Alignment**: Consistently apply page width/padding standards, then address remaining items from UI standards and audit findings.
+*   **Key Information**: Tracks progress of UI alignment efforts, bridging specific user feedback with the formal standards documents.
+
+### `AZURE_OPENAI_INTEGRATION.MD`
+
+*   **Purpose**: Provides a comprehensive overview of how Azure OpenAI is integrated into MixerAI 2.0.
+*   **Content**:
+    *   **Core Principle: No Fallback Generation**: Strict policy against template-based or default content fallbacks if AI generation fails.
+    *   **Technical Setup**: Client configuration (env vars `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`), client initialization (`/src/lib/azure/openai.ts`), API endpoint structure.
+    *   **API Error Handling Strategy**: Server-side logging, user-friendly error messages, UI toasts, HTTP status codes. Includes a table of common errors.
+    *   **Brand Context Integration**: AI tools use brand language, country, identity, tone, guardrails.
+    *   **AI-Powered Technical Tools**: Metadata Generator, Alt Text Generator, Content Trans-Creator (purpose, features, API, UI for each).
+    *   **Azure OpenAI for Specific Features**: Brand Identity Generation, Workflow Description Auto-Generation.
+    *   **Testing and Debugging**: Diagnostic scripts, test API endpoint (`/api/test-azure-openai`), dedicated testing page (`/openai-test`), enhanced logging.
+    *   **Security Considerations**: API key storage, server-side calls, user auth, rate limiting.
+    *   **Deployment Considerations**: Azure resource config, env vars, connectivity verification.
+    *   **Response Format Standardization**: Recommends configuring AI calls to return JSON.
+*   **Key Information**: A crucial document detailing the setup, principles, tools, and testing methodologies for all Azure OpenAI powered features.
+
+### `user_flows.md` (No Hyphen)
+
+*   **Purpose**: Outlines expected user flows through the MixerAI 2.0 application, categorized by feature area. This appears to be an older or more high-level version.
+*   **Content**: Covers User Management & Authentication, Brand Management, Content Type Management, Content Creation & Lifecycle, Workflow Management, AI-Assisted Tools, Task Management, and Administration.
+*   **Key Information**: Provides a general overview of user interactions with major application features. `docs/user-flows.md` (with a hyphen) is more detailed and likely supersedes this.
+
+### `user-flows.md` (With Hyphen)
+
+*   **Purpose**: A more detailed and up-to-date document outlining primary user flows, emphasizing role-based access and specific UI interactions.
+*   **Content**:
+    *   **User Authentication & Invitation**: Invitation-only registration (removal of `/auth/register`), login.
+    *   **Brand Management**: Create, view, edit (including inviting Brand Admins).
+    *   **Content Management**: Creation (must originate from a Template), viewing (role-based), editing (role-based), workflow actions.
+    *   **Template Management**: Create, view, edit content and workflow templates.
+    *   **User Management & Roles**: Details for Superadmin, Brand Admin, and Standard User (invitation, permissions, navigation visibility).
+    *   **AI Tools Usage**: Alt Text Generator, Content Transcreator, Metadata Generator (including brand matching logic).
+    *   **Account Management**: Profile editing, "My Tasks".
+    *   **Notes for Discovery & Implementation**: Superadmin seeding, workflow step storage, profile schema, `/auth/register` removal.
+*   **Key Information**: This is the primary user flow document, offering granular details on how different user roles interact with the application's features and specific UI behaviors.
+
+### `deployment.md`
+
+*   **Purpose**: A guide for deployment and operations of the MixerAI 2.0 application.
+*   **Content**:
+    *   **Running the Application**: Development mode (`npm run dev`, local DB usage), Production build/start (`npm run build`, `npm start`), Database migrations.
+    *   **Build and Deployment Optimizations**: Dynamic API Routes (`export const dynamic = "force-dynamic";`), configuration cleanup (`next.config.js`, dependencies).
+    *   **Domain Configuration**: Key areas for production domain (Supabase Auth settings, email templates, environment variables like `NEXT_PUBLIC_APP_URL`, DNS/SSL). Domain configuration testing.
+*   **Key Information**: Provides practical instructions for developers and operations on running, building, deploying, and configuring the application for different environments.
+
+### `brand_management.md`
+
+*   **Purpose**: Details features and functionalities related to managing brands.
+*   **Content**:
+    *   **Overview**: Importance of brands for content alignment.
+    *   **Brand Pages and UI**: Fixes for routing (`/dashboard/brands/[id]`, `/dashboard/brands/[id]/edit`), enhanced brand detail UI (tabs, stats), comprehensive brand edit/new interface (tabs, AI identity generation, preview panel), general UI enhancements (two-column layout, British English).
+    *   **Brand Identity Generation**: Azure OpenAI powered process (URL collection, AI analysis, profile generation - identity, tone, guardrails, agencies, color), regional content adaptation, multi-language support.
+    *   **Content Vetting Agencies**: AI-suggested, user-selectable, priority settings, custom agencies.
+    *   **Brand Color Generation**: AI-generated, editable, used in UI.
+    *   **BrandIcon Component**: Reusable UI for displaying brand avatars/icons.
+*   **Key Information**: A comprehensive guide to brand-specific features, focusing on UI, AI-driven identity generation, and associated configurations.
+
+### `database.md`
+
+*   **Purpose**: Provides an overview of the database architecture, schema, connection methods, and migration strategy.
+*   **Content**:
+    *   **Database System**: PostgreSQL via Supabase.
+    *   **Connection Methods**: Supabase Connection (production standard) and Direct PostgreSQL Connection (local dev). Configuration via `.env`.
+    *   **Database Schema**: `supabase-schema.sql` is the authoritative source. Overview of Enum Types (`content_status`, `user_role`, etc.) and key Table Definitions (e.g., `brands`, `content`, `content_templates`, `profiles`, `user_brand_permissions`, `workflows`). Summary of Foreign Key Relationships and Primary Key/Unique Constraints.
+    *   **Row Level Security (RLS)**: Extensively used; general principles (public view/restricted modification, ownership-based, brand-level permissions).
+    *   **Migrations**: `supabase-schema.sql` is the source of truth. Archived migration files are for historical reference only. No new individual migration files.
+    *   **Database Utility Scripts**: Scripts in `/scripts` for DB management.
+*   **Key Information**: Critical document for understanding the data layer, schema structure, RLS policies, and migration practices. `supabase-schema.sql` is the definitive schema reference.
+
+### `authentication.md`
+
+*   **Purpose**: Outlines authentication mechanisms, user management features, and related data structures.
+*   **Content**:
+    *   **Core Authentication Strategy**: Supabase Auth, Auth Helpers, Next.js Middleware, secure cookie-based auth, API route protection.
+    *   **User Authentication Integration**: `/api/users` merges Supabase Auth data with `profiles`. Enhanced user data structure.
+    *   **Authentication Implementation Updates**: `withAuth`/`withAuthAndMonitoring` wrappers, RLS policies, permission checks, middleware (`src/middleware.ts`), server component utils (`requireAuth`, `getCurrentUser`), root page redirect.
+    *   **User Profile & Related Fields**: Table of fields (name, email, job title, company, etc.). Details on "Company" field.
+    *   **User Invitation System**: Core flow (initiation, new user invite with `user_metadata` and `app_metadata`, profile creation trigger, frontend/backend invite completion). Enhanced error handling, Jest testing.
+    *   **Email Template Configuration**: Templates in `/docs/email-templates/`, usage in Supabase, variables, notes.
+*   **Key Information**: A comprehensive guide to how authentication, user identity, permissions, and invitations are handled, heavily relying on Supabase.
+
+### `api_reference.md`
+
+*   **Purpose**: Provides a reference for the main API routes.
+*   **Content**:
+    *   **General Principles**: `/api` prefix, auth required, `dynamic = "force-dynamic"`, error structure.
+    *   **Authentication Endpoints**: Standard Supabase Auth paths.
+    *   **User Management API (`/api/users`)**: Endpoints for listing, inviting, getting, updating, deleting users.
+    *   **Brand Management API (`/api/brands`)**: Endpoints for listing, creating, getting, updating, deleting brands, and generating brand identity.
+    *   **Content & Content Template API**:
+        *   Content (`/api/content`): Endpoints for listing, creating, getting, updating, deleting, generating content, versioning, comments, workflow actions.
+        *   Content Templates (`/api/content-templates`): Endpoints for listing, creating, getting, updating, deleting templates.
+    *   *(File appears to be incomplete, cutting off during Content Types API)*
+*   **Key Information**: A quick reference for available API endpoints and their general purpose.
+
+### `NAVIGATION_SYSTEM.MD`
+
+*   **Purpose**: Explains the unified navigation system implementation.
+*   **Content**:
+    *   **Problem Statement**: Issues with previous navigation (competing components, client-side redirects, highlighting issues).
+    *   **Solution Architecture**: Framework-level redirects (`next.config.js`), `UnifiedNavigation` component (`src/components/layout/unified-navigation.tsx` using `useSelectedLayoutSegments`), updated `DashboardLayout`, new `Dashboard Home Page`.
+    *   **Implementation Best Practices**: Use of `useSelectedLayoutSegments()`, expandable groups, framework redirects, responsive design, type safety.
+    *   **Usage Guidelines**: How to add new navigation items and groups.
+    *   **Future Improvements**: Automated testing, permission-based navigation, state persistence, mobile enhancements, breadcrumbs.
+*   **Key Information**: Details the structure and rationale behind the current navigation system, focusing on the `UnifiedNavigation` component.
+
+### `CONTENT_TEMPLATE_SYSTEM.MD`
+
+*   **Purpose**: Describes the system for creating and managing content templates, which replaced static content types.
+*   **Content**:
+    *   **Overview & Navigation**: Access via "Content" in sidebar; lists All, Default (Article, Product), and User-Created templates.
+    *   **Core Functionality**:
+        *   Default Templates: Article and Product templates with predefined input/output fields and AI features.
+        *   Template Designer: CRUD for templates, field configuration (input/output fields), drag-and-drop reordering.
+        *   Input/Output Field Types.
+        *   AI Integration: Input field suggestions, output field auto-complete (customizable prompts).
+    *   **Implementation**: Database structure (`content_templates` table, updates to `content` table), API routes (`/api/content-templates`, `/api/ai/suggest`, `/api/ai/generate`), Frontend components (`TemplateForm`, `FieldDesigner`, `TemplateCard`).
+    *   **Usage Flow**: Admin creates templates -> creators select template -> fill inputs (AI suggestions) -> AI generates outputs -> creators review/edit.
+    *   **Security**: Admin-only creation, field validation, rate limiting, input sanitization.
+*   **Key Information**: Explains the flexible content templating feature, including its design, AI integration, and implementation details.
+
+The `/docs/archive/` directory contains older documentation that may no_longer be relevant or has been superseded.
+The `/docs/email-templates/` directory contains HTML templates for emails sent by Supabase Auth (invitation, confirm signup, reset password, magic link).
+The `/docs/missing-pages/` directory contains documentation related to identifying and planning the implementation of pages that were found to be missing.
+The `/docs/auth-strategy/` directory contains documents related to earlier explorations or specific aspects of the authentication strategy.
+
+This consolidated documentation aims to provide a comprehensive understanding of the MixerAI 2.0 application.
+
+## Dashboard Pages Documentation
+
+For detailed documentation on individual pages within the `/dashboard` directory, including their structure, UI components, layout, and key functionalities, please refer to the dedicated [Dashboard Pages Documentation](./docs/dashboard-documentation.md).

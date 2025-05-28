@@ -222,11 +222,8 @@ export const PUT = withAuth(async (
   try {
     const brandIdToUpdate = context.params.id;
 
-    // Check if the authenticated user is a global admin
     const isGlobalAdmin = authenticatedUser.user_metadata?.role === 'admin';
-
     if (!isGlobalAdmin) {
-      // If not a global admin, check for specific brand admin rights
       const hasBrandAdminPermission = await isBrandAdmin(authenticatedUser.id, brandIdToUpdate, supabase);
       if (!hasBrandAdminPermission) {
         return NextResponse.json(
@@ -235,7 +232,6 @@ export const PUT = withAuth(async (
         );
       }
     }
-    // If the user is a global admin, or has specific brand admin rights, proceed.
 
     const body = await request.json();
     
@@ -246,252 +242,91 @@ export const PUT = withAuth(async (
       );
     }
     
-    const updateData: any = {};
-    if (body.name !== undefined) updateData.name = body.name;
-    if (body.website_url !== undefined) {
-      updateData.website_url = body.website_url;
-      // Also update normalized_website_domain if website_url is changing
-      if (body.website_url === null || body.website_url.trim() === '') {
-        updateData.normalized_website_domain = null;
-      } else {
-        const normalizedDomain = extractCleanDomain(body.website_url);
-        updateData.normalized_website_domain = normalizedDomain;
+    // Prepare parameters for the RPC call
+    const rpcParams = {
+      p_brand_id_to_update: brandIdToUpdate,
+      p_name: body.name,
+      p_website_url: body.website_url || null,
+      // Ensure additional_website_urls is an array of strings
+      p_additional_website_urls: Array.isArray(body.additional_website_urls) 
+        ? body.additional_website_urls.filter((url: any) => typeof url === 'string') 
+        : [],
+      p_country: body.country || null,
+      p_language: body.language || null,
+      p_brand_identity: body.brand_identity || null,
+      p_tone_of_voice: body.tone_of_voice || null,
+      p_guardrails: body.guardrails || null,
+      p_brand_color: body.brand_color || '#1982C4',
+      p_master_claim_brand_id: body.master_claim_brand_id === "@none@" || body.master_claim_brand_id === "" ? null : body.master_claim_brand_id,
+      // Ensure selected_agency_ids is an array of strings (UUIDs)
+      p_selected_agency_ids: Array.isArray(body.selected_agency_ids) 
+        ? body.selected_agency_ids.filter((id: any) => typeof id === 'string') 
+        : [],
+      // Ensure new_custom_agency_names is an array of strings
+      p_new_custom_agency_names: Array.isArray(body.new_custom_agency_names) 
+        ? body.new_custom_agency_names.filter((name: any) => typeof name === 'string') 
+        : [],
+      p_user_id: authenticatedUser.id // Pass the authenticated user's ID
+    };
+
+    const { data: updatedBrandData, error: rpcError } = await supabase.rpc(
+      'update_brand_with_agencies' as any, // Cast to any to bypass TS error for new RPC
+      rpcParams
+    );
+
+    if (rpcError) {
+      console.error(`[API Brands PUT /${brandIdToUpdate}] RPC Error:`, rpcError);
+      // Check if the error from RPC is already a JSON object with an 'error' field
+      if (rpcError.message && rpcError.message.includes('"{')) { // Simple check for JSON string
+          try {
+              const parsedError = JSON.parse(rpcError.message.substring(rpcError.message.indexOf('"{')));
+              if(parsedError.error) {
+                return handleApiError({ message: parsedError.error, details: rpcError }, 'Failed to update brand via RPC.');
+              }
+          } catch (e) { /* Fall through to generic error */ }
       }
+      return handleApiError(rpcError, 'Failed to update brand via RPC.');
     }
-    if (body.country !== undefined) updateData.country = body.country;
-    if (body.language !== undefined) updateData.language = body.language;
-    if (body.brand_identity !== undefined) updateData.brand_identity = body.brand_identity;
-    if (body.tone_of_voice !== undefined) updateData.tone_of_voice = body.tone_of_voice;
-    if (body.brand_color !== undefined) updateData.brand_color = body.brand_color;
-    if (body.approved_content_types !== undefined) updateData.approved_content_types = body.approved_content_types;
-    if (body.master_claim_brand_id !== undefined) {
-      updateData.master_claim_brand_id = body.master_claim_brand_id;
-    } else if (body.master_claim_brand_id === null) {
-      updateData.master_claim_brand_id = null;
+
+    // The RPC function is designed to return a JSON object representing the updated brand
+    // or an object like { success: false, error: 'message' } if it failed internally
+    if (updatedBrandData && typeof updatedBrandData === 'object' && (updatedBrandData as any).error) {
+        // Error explicitly returned from the RPC function's EXCEPTION block
+        console.error(`[API Brands PUT /${brandIdToUpdate}] Error from RPC function:`, (updatedBrandData as any).error);
+        return NextResponse.json(
+          { success: false, error: (updatedBrandData as any).error },
+          { status: 500 }
+        );
     }
     
-    if (body.brand_summary !== undefined) {
-      updateData.brand_summary = body.brand_summary;
-    } else if (body.brand_identity !== undefined && (body.brand_identity !== "")) {
-      updateData.brand_summary = body.brand_identity.slice(0, 250);
-      if (body.brand_identity.length > 250) {
-        updateData.brand_summary += '...';
+    // If RPC was successful and returned brand data
+    if (!updatedBrandData) {
+        console.error(`[API Brands PUT /${brandIdToUpdate}] RPC returned no data.`);
+        return NextResponse.json(
+          { success: false, error: 'Failed to update brand: No data returned from operation.' },
+          { status: 500 }
+        );
+    }
+
+    return NextResponse.json({
+      success: true,
+      brand: updatedBrandData, // This should be the JSON object returned by the RPC
+      message: 'Brand updated successfully.',
+      meta: {
+        source: 'database (Supabase RPC)',
+        requestId: crypto.randomUUID(),
+        timestamp: new Date().toISOString()
       }
-    }
-    
-    if (body.guardrails !== undefined) {
-      let formattedGuardrails = body.guardrails;
-      if (Array.isArray(body.guardrails)) {
-        formattedGuardrails = body.guardrails.map((item:string) => `- ${item}`).join('\n');
-      } 
-      else if (typeof body.guardrails === 'string' && 
-               body.guardrails.trim().startsWith('[') && 
-               body.guardrails.trim().endsWith(']')) {
-        try {
-          const guardrailsArray = JSON.parse(body.guardrails);
-          if (Array.isArray(guardrailsArray)) {
-            formattedGuardrails = guardrailsArray.map((item:string) => `- ${item}`).join('\n');
-          }
-        } catch (e) { /* ignore */ }
+    }, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-store',
+        'x-data-source': 'database (Supabase RPC)'
       }
-      updateData.guardrails = formattedGuardrails;
-    }
-    
-    // Main brand update logic
-    updateData.updated_at = new Date().toISOString();
-    let updatedSupabaseBrandData: any = null;
-    if (Object.keys(updateData).length > 0) {
-        const { data, error } = await supabase
-          .from('brands')
-          .update(updateData)
-          .eq('id', brandIdToUpdate)
-          .select()
-          .single();
-        if (error) throw error;
-        if (!data) {
-            return NextResponse.json(
-              { success: false, error: 'Brand not found after attempting update with Supabase' },
-              { status: 404 }
-            );
-        }
-        updatedSupabaseBrandData = data;
-    } else {
-      // If only admins or agencies changed, still need to fetch the brand data
-      const { data, error } = await supabase
-        .from('brands')
-        .select('*')
-        .eq('id', brandIdToUpdate)
-        .single();
-      if (error) throw error;
-      if (!data) {
-        return NextResponse.json( { success: false, error: 'Brand not found' }, { status: 404 });
-      }
-      updatedSupabaseBrandData = data;
-    }
-    
-    // ----- Start of Vetting Agency Logic Update -----
-    const brandCountryForLookup = updatedSupabaseBrandData?.country || body.country;
-    let allFinalAgencyIdsToLink: string[] = [];
-
-    // 1. Process explicitly selected agency UUIDs
-    if (body.selected_agency_ids && Array.isArray(body.selected_agency_ids)) {
-      const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-      (body.selected_agency_ids as string[]).forEach(id => {
-        if (uuidRegex.test(id)) {
-          allFinalAgencyIdsToLink.push(id);
-        } else {
-          console.warn(`[API /api/brands PUT] Invalid UUID in selected_agency_ids: "${id}". Skipping.`);
-        }
-      });
-    }
-    
-    // 2. Process new custom agency names
-    if (body.new_custom_agency_names && Array.isArray(body.new_custom_agency_names) && brandCountryForLookup) {
-      const customAgencyNames = body.new_custom_agency_names as string[];
-      for (const agencyName of customAgencyNames) {
-        if (typeof agencyName !== 'string' || agencyName.trim() === '') {
-          console.warn(`[API /api/brands PUT] Invalid custom agency name: "${agencyName}". Skipping.`);
-          continue;
-        }
-        // Check if agency already exists for this name and country
-        let { data: existingAgency, error: findError } = await supabase
-          .from('content_vetting_agencies')
-          .select('id')
-          .eq('name', agencyName.trim())
-          .eq('country_code', brandCountryForLookup)
-          .maybeSingle();
-
-        if (findError) {
-          console.error(`[API /api/brands PUT] Error checking for existing custom agency "${agencyName}":`, findError);
-          // Potentially skip this agency or throw, depending on desired error handling
-          continue;
-        }
-
-        if (existingAgency) {
-          allFinalAgencyIdsToLink.push(existingAgency.id);
-        } else {
-          // Create new agency
-          console.log(`[API /api/brands PUT] Creating new content vetting agency: "${agencyName}" for country ${brandCountryForLookup}`);
-          const { data: newAgency, error: createError } = await supabase
-            .from('content_vetting_agencies')
-            .insert({
-              name: agencyName.trim(),
-              country_code: brandCountryForLookup,
-              // Add other default fields like description or priority if necessary
-              // e.g., description: 'Custom agency added for brand.', priority: 'Medium'
-            })
-            .select('id')
-            .single();
-          
-          if (createError) {
-            console.error(`[API /api/brands PUT] Error creating new custom agency "${agencyName}":`, createError);
-            // Potentially skip this agency
-            continue;
-          }
-          if (newAgency) {
-            allFinalAgencyIdsToLink.push(newAgency.id);
-            console.log(`[API /api/brands PUT] Successfully created new agency "${agencyName}" with ID ${newAgency.id}`);
-          }
-        }
-      }
-    } else if (body.new_custom_agency_names && !brandCountryForLookup) {
-        console.warn("[API /api/brands PUT] Cannot create custom agencies because brand country is not available.");
-    }
-
-    // Remove duplicates
-    allFinalAgencyIdsToLink = Array.from(new Set(allFinalAgencyIdsToLink));
-    
-    // 3. Update brand_selected_agencies table
-    // First, delete all existing links for this brand
-    const { error: deleteAgenciesError } = await supabase
-      .from('brand_selected_agencies')
-      .delete()
-      .eq('brand_id', brandIdToUpdate);
-
-    if (deleteAgenciesError) {
-      console.error('[API /api/brands PUT] Error deleting old brand agencies:', deleteAgenciesError);
-      throw deleteAgenciesError;
-    }
-
-    // Then, insert the new set of links if there are any
-    if (allFinalAgencyIdsToLink.length > 0) {
-      const agenciesToInsert = allFinalAgencyIdsToLink.map(agencyId => ({
-        brand_id: brandIdToUpdate,
-        agency_id: agencyId,
-      }));
-
-      const { error: insertAgenciesError } = await supabase
-        .from('brand_selected_agencies')
-        .insert(agenciesToInsert);
-
-      if (insertAgenciesError) {
-        console.error('[API /api/brands PUT] Error inserting new brand agencies:', insertAgenciesError);
-        throw insertAgenciesError;
-      }
-      console.log(`[API /api/brands PUT] Successfully updated agency links for brand ${brandIdToUpdate}. Linked ${agenciesToInsert.length} agencies.`);
-    } else {
-      console.log(`[API /api/brands PUT] No agency links to update for brand ${brandIdToUpdate}.`);
-    }
-    // ----- End of Vetting Agency Logic Update -----
-
-    // Fetch final state of selected agencies to return in response
-    const { data: finalSelectedAgenciesData, error: finalAgenciesError } = await supabase
-      .from('brand_selected_agencies')
-      .select(`
-        agency_id,
-        content_vetting_agencies (
-          id,
-          name,
-          description,
-          country_code,
-          priority
-        )
-      `)
-      .eq('brand_id', brandIdToUpdate);
-
-    if (finalAgenciesError) {
-      console.error('Error fetching final selected agencies with Supabase:', finalAgenciesError);
-      throw finalAgenciesError;
-    }
-    
-    let finalProcessedAgencies: VettingAgencyForResponse[] = [];
-    if (finalSelectedAgenciesData) {
-      finalProcessedAgencies = finalSelectedAgenciesData
-        .map(item => {
-            const agencyFromDb = item.content_vetting_agencies;
-            if (agencyFromDb) {
-                return {
-                    id: agencyFromDb.id,
-                    name: agencyFromDb.name,
-                    description: agencyFromDb.description,
-                    country_code: agencyFromDb.country_code,
-                    priority: mapSupabasePriorityToNumber(agencyFromDb.priority as SupabaseVettingAgencyPriority),
-                } as VettingAgencyForResponse;
-            }
-            return null;
-        })
-        .filter((agency): agency is VettingAgencyForResponse => agency !== null)
-        .sort((a, b) => {
-          if (a.priority !== b.priority) {
-            return a.priority - b.priority;
-          }
-          return (a.name || '').localeCompare(b.name || '');
-        });
-    }
-
-    const finalBrandResponse: any = updatedSupabaseBrandData;
-    finalBrandResponse.selected_vetting_agencies = finalProcessedAgencies;
-    // Ensure `admins` are also part of the final response if fetched/updated
-    // For now, GET /api/brands/[id] is responsible for returning admins.
-    // This PUT response primarily confirms the brand update.
-
-    return NextResponse.json({ 
-      success: true, 
-      brand: finalBrandResponse // Contains updated brand fields and new agency list
     });
 
-  } catch (error) {
-    console.error('Error in PUT /api/brands/[id]:', error);
+  } catch (error: any) {
+    console.error(`[API Brands PUT /${context.params.id}] General error:`, error);
     return handleApiError(error, 'Error updating brand');
   }
 });
