@@ -260,7 +260,7 @@ export function UnifiedNavigation() {
       defaultOpen: false,
       show: () => isPlatformAdmin || isScopedAdmin || (isEditor && hasAssignedBrandWithMasterClaimId()),
       items: [
-        { href: '/dashboard/admin/claims-matrix', label: 'Claims Matrix', icon: <LayoutGrid className="h-4 w-4" />, segment: 'claims-matrix' },
+        { href: '/dashboard/claims/preview', label: 'Claims Matrix', icon: <LayoutGrid className="h-4 w-4" />, segment: 'claims-matrix' },
         { href: '/dashboard/claims/definitions', label: 'Define Claims', icon: <BookOpen className="h-4 w-4" />, segment: 'definitions' },
         { href: '/dashboard/claims/overrides', label: 'Market Overrides', icon: <Globe2 className="h-4 w-4" />, segment: 'overrides' },
         { href: '/dashboard/claims/brand-review', label: 'Brand Claims Review', icon: <SearchCheck className="h-4 w-4" />, segment: 'brand-review' },
@@ -291,7 +291,7 @@ export function UnifiedNavigation() {
       show: () => isAuthenticatedUser,
       items: [
         { 
-          href: '/dashboard/feedback/new',
+          href: '/dashboard/admin/feedback-log',
           label: 'Submit Feedback',
           icon: <FilePlus2 className="h-4 w-4" />,
           segment: 'new'
