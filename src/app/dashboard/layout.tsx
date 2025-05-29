@@ -90,28 +90,17 @@ export default function DashboardLayout({
   };
 
   const displayName = currentUser?.user_metadata?.full_name || currentUser?.full_name || 'User';
-  const avatarUrl = currentUser?.avatar_url || currentUser?.user_metadata?.avatar_url; // Use direct avatar_url from /api/me response first
+  const avatarUrl = currentUser?.avatar_url || currentUser?.user_metadata?.avatar_url;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b bg-secondary text-secondary-foreground sticky top-0 z-40">
-        <div className="w-full mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Link href="/dashboard" className="flex items-center space-x-2">
-              <div 
-                className="w-10 h-10 rounded-full bg-secondary-foreground text-secondary flex items-center justify-center font-bold text-xl shadow-sm"
-              >
-                M
-              </div>
-              <h1 className="text-2xl font-bold">MixerAI 2.0</h1>
-            </Link>
-          </div>
-          <div className="flex items-center space-x-2 sm:space-x-4">
-            {/* Get Help Button - Links to Teams chat */}
+        <div className="w-full mx-auto px-4 py-3 flex items-center justify-between sm:pl-64">
+          <div className="flex-grow sm:hidden"></div>
+          <div className="flex items-center space-x-2 sm:space-x-4 ml-auto sm:ml-0">
             <Button
               size="sm"
-              asChild // To use Link properties
-              // Apply yellow-ish background with good contrast text and hover states
+              asChild
               className="hidden sm:flex bg-yellow-400 text-neutral-800 hover:bg-yellow-500 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-400 dark:bg-yellow-500 dark:text-neutral-900 dark:hover:bg-yellow-600 dark:focus-visible:ring-yellow-500"
             >
               <Link href="https://teams.microsoft.com/l/chat/0/0?users=peter.pitcher@genmills.com" target="_blank" rel="noopener noreferrer">
@@ -119,7 +108,6 @@ export default function DashboardLayout({
               </Link>
             </Button>
 
-            {/* <NotificationCenter /> */}
             {isLoadingUser ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : currentUser ? (
@@ -127,7 +115,6 @@ export default function DashboardLayout({
                 <div className="flex items-center space-x-2">
                   {avatarUrl ? (
                     avatarUrl.includes('api.dicebear.com') ? (
-                      // eslint-disable-next-line @next/next/no-img-element
                       <img 
                         src={avatarUrl} 
                         alt={displayName} 
@@ -151,10 +138,6 @@ export default function DashboardLayout({
                     {displayName}
                   </span>
                 </div>
-                {/* Simple Dropdown (conceptual) - could be replaced with shadcn DropdownMenu */}
-                {/* <Button variant="ghost" size="icon" className="text-secondary-foreground hover:bg-black/10">
-                  <ChevronDown className="h-5 w-5" />
-                </Button> */}
               </>
             ) : null}
             <Button 

@@ -656,7 +656,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                       <Label htmlFor="guardrails">Content Guardrails</Label>
                       <Textarea id="guardrails" name="guardrails" value={formData.guardrails} onChange={handleInputChange} placeholder="e.g., Do not mention competitors..." rows={4}/>
               </div>
-
+              
               <div className="space-y-4">
                       <Label>Content Vetting Agencies (Optional)</Label>
                       {isLoadingAgencies && <p className="text-sm text-muted-foreground">Loading agencies...</p>}

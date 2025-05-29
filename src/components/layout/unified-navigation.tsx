@@ -442,7 +442,7 @@ export function UnifiedNavigation() {
   
   if (isLoadingUser) {
     return (
-      <aside className="fixed left-0 top-16 bottom-0 z-10 hidden w-64 flex-col border-r bg-background sm:flex">
+      <aside className="fixed inset-y-0 left-0 z-50 hidden w-64 flex-col border-r bg-background sm:flex">
         <nav className="flex flex-col items-center gap-4 px-2 sm:py-5">
           <div className="flex h-16 shrink-0 items-center justify-start gap-2 border-b px-4 text-lg font-semibold text-primary-foreground md:px-6 w-full">
             {/* Placeholder for logo while loading - THIS IS THE SIDEBAR'S TOP PART, NOT THE MAIN HEADER */}
@@ -466,7 +466,7 @@ export function UnifiedNavigation() {
   }
 
   return (
-    <aside className="fixed left-0 top-16 bottom-0 z-10 hidden w-64 flex-col border-r bg-background sm:flex">
+    <aside className="fixed inset-y-0 left-0 z-50 hidden w-64 flex-col border-r bg-background sm:flex">
       <nav className="flex h-full flex-col items-stretch gap-4 px-2 sm:py-5 text-sm font-medium">
         <div className="flex h-16 shrink-0 items-center justify-start gap-2 border-b px-4 text-lg font-semibold text-primary-foreground md:px-6 w-full">
           {/* This div is the top part OF THE SIDEBAR, containing the logo */}
