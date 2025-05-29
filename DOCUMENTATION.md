@@ -166,6 +166,11 @@ Below is a breakdown of permissions for key API endpoint groups related to Claim
 
 ## Recent Updates and Feature Details
 
+### UI: Logo moved to Top Navigation
+- The application logo, previously located in the sidebar (`src/components/layout/unified-navigation.tsx`), has been moved to the main top navigation bar (`src/components/layout/top-navigation.tsx`).
+- The text-based site title in the top navigation was replaced with the graphical logo and the site title text.
+- The left padding on the main content area (`sm:pl-64` in `src/app/dashboard/layout.tsx` header) was removed as the sidebar no longer dictates the starting position of the top bar content.
+
 ### Standardised Claims URL Structure
 - The URL structure for claims management pages under the admin section has been standardised.
 - Pages previously under `/dashboard/admin/claims/*` (e.g., Definitions, Overrides, Brand Review) have been moved to `/dashboard/claims/*`.

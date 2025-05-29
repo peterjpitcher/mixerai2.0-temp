@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { UserCircle, Menu, Bell } from 'lucide-react';
 import { Button } from '@/components/button';
@@ -24,7 +25,14 @@ export function TopNavigation() {
           </Button>
           
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
+            <Image 
+              src="/mixerai_logo.svg" 
+              alt="MixerAI Logo" 
+              width={32} 
+              height={32} 
+              priority 
+            />
             <span className="font-bold text-xl">MixerAI</span>
           </Link>
           

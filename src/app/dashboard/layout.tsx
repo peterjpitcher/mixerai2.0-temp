@@ -94,8 +94,17 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <header className="border-b bg-secondary text-secondary-foreground sticky top-0 z-40">
-        <div className="w-full mx-auto px-4 py-3 flex items-center justify-end sm:pl-64">
+      <header className="border-b bg-secondary text-secondary-foreground sticky top-0 z-40 h-16">
+        <div className="w-full mx-auto px-4 py-3 flex items-center justify-between h-full">
+          <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
+            <Image 
+              src="/Mixerai2.0Logo.png" 
+              alt="MixerAI 2.0 Logo"
+              width={150}
+              height={35} 
+              priority 
+            />
+          </Link>
           <div className="flex items-center space-x-2 sm:space-x-4">
             <Button
               size="sm"
