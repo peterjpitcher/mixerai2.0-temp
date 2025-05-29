@@ -11,12 +11,13 @@ import { Label } from '@/components/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { toast } from 'sonner';
-import { Loader2, X, PlusCircle, ArrowLeft } from 'lucide-react';
+import { Loader2, X, PlusCircle, ArrowLeft, Info } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 import { Checkbox } from "@/components/checkbox";
 import { v4 as uuidv4 } from 'uuid';
 import { Badge } from "@/components/badge";
+import { cn } from "@/lib/utils";
 
 // Define UserSessionData interface (can be moved to a shared types file later)
 interface UserSessionData {
@@ -50,8 +51,24 @@ interface VettingAgency {
   name: string;
   description?: string | null;
   country_code?: string | null;
-  priority?: 'High' | 'Medium' | 'Low' | null;
+  priority: 'High' | 'Medium' | 'Low' | null;
 }
+
+interface VettingAgencyFromAPI {
+  id: string;
+  name: string;
+  description?: string | null;
+  country_code?: string | null;
+  priority: 'High' | 'Medium' | 'Low' | number | null;
+}
+
+// Helper function to map numeric priority to string label
+const mapNumericPriorityToLabel = (priority: number | string | null | undefined): 'High' | 'Medium' | 'Low' | null => {
+  if (priority === 1 || priority === 'High') return 'High';
+  if (priority === 2 || priority === 'Medium') return 'Medium';
+  if (priority === 3 || priority === 'Low') return 'Low';
+  return null;
+};
 
 // Helper function for VettingAgency styles (copied from edit page)
 const getPriorityAgencyStyles = (priority: 'High' | 'Medium' | 'Low' | null | undefined): string => {
@@ -67,6 +84,11 @@ interface UserSearchResult {
   email: string | null;
   avatar_url: string | null;
   job_title?: string | null;
+}
+
+interface MasterClaimBrand {
+  id: string;
+  name: string;
 }
 
 // Placeholder Breadcrumbs component - replace with actual implementation later
@@ -112,15 +134,42 @@ export default function NewBrandPage() {
     brand_identity: '',
     tone_of_voice: '',
     guardrails: '',
-    content_vetting_agencies: [] as string[] 
+    content_vetting_agencies: [] as string[],
+    master_claim_brand_id: null as string | null,
   });
 
-  const [selectedAdmins, setSelectedAdmins] = useState<UserSearchResult[]>([]);
-  const [userSearchResults, setUserSearchResults] = useState<UserSearchResult[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
   const [allVettingAgencies, setAllVettingAgencies] = useState<VettingAgency[]>([]);
   const [customAgencyInput, setCustomAgencyInput] = useState('');
   const priorityOrder: Array<'High' | 'Medium' | 'Low'> = ['High', 'Medium', 'Low'];
+
+  const [masterClaimBrands, setMasterClaimBrands] = useState<MasterClaimBrand[]>([]);
+  const [isLoadingMasterClaimBrands, setIsLoadingMasterClaimBrands] = useState(true);
+
+  // Fetch Master Claim Brands
+  useEffect(() => {
+    const fetchMasterClaimBrands = async () => {
+      if (isForbidden || isLoadingUser) return;
+      setIsLoadingMasterClaimBrands(true);
+      try {
+        const response = await fetch('/api/master-claim-brands');
+        if (!response.ok) throw new Error('Failed to fetch Master Claim Brands');
+        const data = await response.json();
+        if (data.success && Array.isArray(data.data)) {
+          setMasterClaimBrands(data.data);
+        } else {
+          toast.error(data.error || 'Could not load Master Claim Brands.');
+          setMasterClaimBrands([]);
+        }
+      } catch (err) {
+        toast.error('Failed to fetch Master Claim Brands list.');
+        console.error('Error fetching Master Claim Brands:', err);
+        setMasterClaimBrands([]);
+      } finally {
+        setIsLoadingMasterClaimBrands(false);
+      }
+    };
+    fetchMasterClaimBrands();
+  }, [isForbidden, isLoadingUser]);
 
   // Effect for fetching current user data and checking permissions
   useEffect(() => {
@@ -154,22 +203,21 @@ export default function NewBrandPage() {
   // Effect for fetching vetting agencies
   useEffect(() => {
     const fetchAllVettingAgencies = async () => {
-      // Don't fetch if access is denied or user/form data isn't ready
-      if (isForbidden || isLoadingUser || !formData) return; 
-
-      let apiUrl = '/api/content-vetting-agencies';
-      if (formData.country) {
-        apiUrl = `/api/content-vetting-agencies?country_code=${formData.country}`;
-      }
+      if (isForbidden || isLoadingUser) return; 
+      const apiUrl = '/api/content-vetting-agencies';
       setIsLoading(true);
       try {
         const response = await fetch(apiUrl);
         if (!response.ok) throw new Error('Failed to fetch vetting agencies');
         const data = await response.json();
         if (data.success && Array.isArray(data.data)) {
-          setAllVettingAgencies(data.data);
+          const transformedAgencies: VettingAgency[] = data.data.map((agency: VettingAgencyFromAPI) => ({
+            ...agency,
+            priority: mapNumericPriorityToLabel(agency.priority),
+          }));
+          setAllVettingAgencies(transformedAgencies);
         } else {
-          toast.error(data.error || 'Could not load vetting agencies for the selected country.');
+          toast.error(data.error || 'Could not load vetting agencies.');
           setAllVettingAgencies([]); 
         }
       } catch (err) {
@@ -181,36 +229,7 @@ export default function NewBrandPage() {
       }
     };
     fetchAllVettingAgencies();
-  }, [formData.country, isForbidden, isLoadingUser, formData]); // Added formData to dependencies
-
-  // Effect for user search debounce
-  useEffect(() => {
-    // Don't run if forbidden, user loading, or search query is empty
-    if (isForbidden || isLoadingUser || !searchQuery.trim()) { 
-      if (!searchQuery.trim()) setUserSearchResults([]); // Clear results if query is empty
-      return;
-    }
-
-    const searchUsersInternal = async (query: string) => {
-      try {
-        const response = await fetch(`/api/users/search?query=${encodeURIComponent(query)}`);
-        const data = await response.json();
-        if (data.success) {
-          setUserSearchResults(data.users);
-        } else {
-          setUserSearchResults([]);
-        }
-      } catch (error) {
-        console.error('Error searching users:', error);
-        setUserSearchResults([]);
-      }
-    };
-
-    const delayDebounceFn = setTimeout(() => {
-      searchUsersInternal(searchQuery);
-    }, 300);
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery, isForbidden, isLoadingUser]);
+  }, [isForbidden, isLoadingUser]); // Removed formData and formData.country dependency to fetch all initially
 
   // Conditional rendering for loading and forbidden states
   // These MUST come AFTER all hook calls (useState, useEffect)
@@ -249,6 +268,10 @@ export default function NewBrandPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleMasterClaimBrandChange = (value: string) => {
+    setFormData(prev => ({ ...prev, master_claim_brand_id: value === 'NO_SELECTION' ? null : value }));
+  };
+
   const handleAddAdditionalUrlField = () => {
     setFormData(prev => ({
       ...prev,
@@ -284,28 +307,18 @@ export default function NewBrandPage() {
     });
   };
 
-  const handleSelectAdmin = (user: UserSearchResult) => {
-    if (!selectedAdmins.find(admin => admin.id === user.id)) {
-      setSelectedAdmins(prevAdmins => [...prevAdmins, user]);
-    }
-    setSearchQuery('');
-    setUserSearchResults([]);
-  };
-
-  const handleRemoveAdmin = (adminId: string) => {
-    setSelectedAdmins(prevAdmins => prevAdmins.filter(admin => admin.id !== adminId));
-  };
+  const canGenerateIdentity = formData.additional_website_urls.some(url => url.value.trim() !== '') || (formData.website_url && formData.website_url.trim() !== '');
 
   const handleGenerateBrandIdentity = async () => {
     if (!formData.name) {
       toast.error('Please enter a brand name first.');
       return;
     }
-    const urls = [formData.website_url, ...formData.additional_website_urls.map(u => u.value)].filter(url => url && url.trim() !== '');
-    if (urls.length === 0) {
-      toast.error('Please enter at least one website URL (main or additional) to generate identity.');
-      return;
+    if (!canGenerateIdentity) {
+       toast.error('Please enter at least one website URL (main or additional) to generate identity.');
+       return;
     }
+    const urls = [formData.website_url, ...formData.additional_website_urls.map(u => u.value)].filter(url => url && url.trim() !== '');
     for (const url of urls) {
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
         toast.error('All URLs must start with http:// or https://');
@@ -333,7 +346,7 @@ export default function NewBrandPage() {
       const data = await response.json();
       if (data.success && data.data) {
         const generatedAgencies = Array.isArray(data.data.suggestedAgencies) 
-                                    ? data.data.suggestedAgencies.map((a: any) => a.id || a.name) // Prefer ID if available
+                                    ? data.data.suggestedAgencies.map((a: any) => a.id || a.name)
                                     : [];
         setFormData(prev => ({
           ...prev,
@@ -365,8 +378,7 @@ export default function NewBrandPage() {
     try {
       const payload: any = { 
         ...formData,
-        brand_admin_ids: selectedAdmins.map(admin => admin.id),
-        selected_agency_ids: formData.content_vetting_agencies 
+        selected_agency_ids: formData.content_vetting_agencies,
       };
       
       Object.keys(payload).forEach(key => {
@@ -377,6 +389,9 @@ export default function NewBrandPage() {
       if (payload.additional_website_urls && Array.isArray(payload.additional_website_urls)){
         payload.additional_website_urls = payload.additional_website_urls.map((item: {id:string, value:string}) => item.value).filter(Boolean);
         if(payload.additional_website_urls.length === 0) payload.additional_website_urls = null;
+      }
+      if (payload.master_claim_brand_id === 'NO_SELECTION') {
+        payload.master_claim_brand_id = null;
       }
 
       const response = await fetch('/api/brands', {
@@ -434,49 +449,28 @@ export default function NewBrandPage() {
                 <div className="space-y-2"><Label htmlFor="country">Country</Label><Select value={formData.country} onValueChange={(v) => handleSelectChange('country', v)}><SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger><SelectContent className="max-h-[300px]">{COUNTRIES.map(c => (<SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>))}</SelectContent></Select></div>
                 <div className="space-y-2"><Label htmlFor="language">Language</Label><Select value={formData.language} onValueChange={(v) => handleSelectChange('language', v)}><SelectTrigger><SelectValue placeholder="Select language" /></SelectTrigger><SelectContent className="max-h-[300px]">{LANGUAGES.map(l => (<SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>))}</SelectContent></Select></div>
               </div>
+
+              {/* Master Claim Brand Selector */}
               <div className="space-y-2">
-                <Label htmlFor="brand_admins_search">Brand Admins <span className="text-muted-foreground text-xs">(Optional)</span></Label>
-                {selectedAdmins.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-2 p-2 border rounded-md bg-muted/50">
-                    {selectedAdmins.map(admin => (
-                      <Badge key={admin.id} variant="secondary" className="flex items-center gap-1">
-                        {admin.full_name || admin.email}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-4 w-4 rounded-full hover:bg-destructive/20"
-                          onClick={() => handleRemoveAdmin(admin.id)}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </Badge>
+                <Label htmlFor="master_claim_brand_id">Product Claims Brand (Optional)</Label>
+                <Select 
+                  value={formData.master_claim_brand_id || 'NO_SELECTION'} 
+                  onValueChange={handleMasterClaimBrandChange}
+                  disabled={isLoadingMasterClaimBrands}
+                >
+                  <SelectTrigger id="master_claim_brand_id">
+                    <SelectValue placeholder={isLoadingMasterClaimBrands ? "Loading claim brands..." : "Link to a Product Claims Brand..."} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NO_SELECTION">No specific Product Claims Brand</SelectItem>
+                    {masterClaimBrands.map(mcb => (
+                      <SelectItem key={mcb.id} value={mcb.id}>{mcb.name}</SelectItem>
                     ))}
-                  </div>
-                )}
-                <Input 
-                  id="brand_admins_search" 
-                  name="brand_admins_search" 
-                  value={searchQuery} 
-                  onChange={(e) => setSearchQuery(e.target.value)} 
-                  placeholder="Search and add admins by name or email" 
-                />
-                {userSearchResults.length > 0 && (
-                  <div className="border rounded-md mt-1 max-h-60 overflow-y-auto">
-                    {userSearchResults.map(user => (
-                      <div 
-                        key={user.id} 
-                        className="p-2 hover:bg-muted/50 cursor-pointer"
-                        onClick={() => handleSelectAdmin(user)}
-                      >
-                        {user.full_name || user.email}
-                        {user.job_title && <span className="text-xs text-muted-foreground ml-2">({user.job_title})</span>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {searchQuery && userSearchResults.length === 0 && (
-                  <p className="text-sm text-muted-foreground mt-1">No users found matching "{searchQuery}".</p>
-                )}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground flex items-center">
+                  <Info className="h-3 w-3 mr-1" /> Link this MixerAI brand to a central Product Claims Brand if applicable.
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -513,7 +507,7 @@ export default function NewBrandPage() {
                       </div>
                     <div className="space-y-2 pt-2">
                       <p className="text-xs text-muted-foreground">Identity will be generated for {countryName} in {languageName} (if set).</p>
-                      <Button onClick={handleGenerateBrandIdentity} disabled={isGenerating} className="w-full">
+                      <Button onClick={handleGenerateBrandIdentity} disabled={isGenerating || !canGenerateIdentity} className="w-full">
                         {isGenerating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</> : 'Generate Brand Identity'}
                       </Button>
                     </div>
@@ -527,86 +521,113 @@ export default function NewBrandPage() {
                     <div className="space-y-4">
                       <Label>Content Vetting Agencies (Optional)</Label>
                       {isLoading && <p className="text-sm text-muted-foreground">Loading agencies...</p>}
-                      {!isLoading && allVettingAgencies.length === 0 && formData.country && (
-                        <p className="text-sm text-muted-foreground">
-                          No specific vetting agencies found for the selected country.
-                        </p>
-                      )}
-                      {!isLoading && allVettingAgencies.length === 0 && !formData.country && (
-                        <p className="text-sm text-muted-foreground">
-                          Select a country to see relevant vetting agencies.
-                        </p>
-                      )}
-                      {!isLoading && allVettingAgencies.length > 0 && priorityOrder.map(priorityLevel => {
-                        const agenciesInGroup = allVettingAgencies.filter(agency => agency.priority === priorityLevel);
-                        if (agenciesInGroup.length === 0) return null; 
-                        return (
-                          <div key={priorityLevel} className="mt-3">
-                            <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(priorityLevel)}`}>{priorityLevel} Priority</h4>
-                            <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
-                              {agenciesInGroup.map(agency => (
-                                <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
-                                  <Checkbox 
-                                    id={`new-agency-${agency.id}`} 
-                                    checked={formData.content_vetting_agencies.includes(agency.id)}
-                                    onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)}
-                                  />
-                                  <Label 
-                                    htmlFor={`new-agency-${agency.id}`} 
-                                    className={getPriorityAgencyStyles(agency.priority)}
-                                  >
-                                    {agency.name}
-                                  </Label>
+                      
+                      {(() => { // IIFE to manage filteredAgencies
+                        const filteredAgenciesByIdentityTab = allVettingAgencies.filter(agency => !formData.country || !agency.country_code || agency.country_code === formData.country);
+
+                        if (!isLoading && !formData.country && allVettingAgencies.length > 0) {
+                          return (
+                            <p className="text-sm text-muted-foreground">
+                              Select a country to see relevant vetting agencies. Showing all available agencies.
+                            </p>
+                          );
+                        }
+
+                        if (!isLoading && formData.country && filteredAgenciesByIdentityTab.length === 0) {
+                          return (
+                            <p className="text-sm text-muted-foreground">
+                              No specific vetting agencies found for {COUNTRIES.find(c => c.value === formData.country)?.label || formData.country}.
+                            </p>
+                          );
+                        }
+
+                        if (!isLoading && allVettingAgencies.length === 0) {
+                           return (
+                             <p className="text-sm text-muted-foreground">
+                               No vetting agencies found in the system.
+                             </p>
+                           );
+                        }
+                        
+                        // Render agency groups only if there are agencies to show (either all or filtered)
+                        if (!isLoading && (allVettingAgencies.length > 0 && (!formData.country || filteredAgenciesByIdentityTab.length > 0))) {
+                          return (
+                            <>
+                              {priorityOrder.map(priorityLevel => {
+                                const agenciesInGroup = filteredAgenciesByIdentityTab.filter(agency => agency.priority === priorityLevel);
+                                if (agenciesInGroup.length === 0) return null;
+                                return (
+                                  <div key={priorityLevel} className="mt-3">
+                                    <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(priorityLevel)}`}>{priorityLevel} Priority</h4>
+                                    <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
+                                      {agenciesInGroup.map(agency => (
+                                        <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
+                                          <Checkbox
+                                            id={`new-agency-${agency.id}`}
+                                            checked={formData.content_vetting_agencies.includes(agency.id)}
+                                            onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)}
+                                          />
+                                          <Label
+                                            htmlFor={`new-agency-${agency.id}`}
+                                            className={getPriorityAgencyStyles(agency.priority)}
+                                          >
+                                            {agency.name}
+                                          </Label>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              {filteredAgenciesByIdentityTab.filter(a => !priorityOrder.includes(a.priority as any) && a.priority != null).length > 0 && (
+                                <div key="other-priority" className="mt-3">
+                                  <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(null)}`}>Other Priority</h4>
+                                  <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
+                                    {filteredAgenciesByIdentityTab.filter(a => !priorityOrder.includes(a.priority as any) && a.priority != null).map(agency => (
+                                      <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
+                                        <Checkbox
+                                          id={`new-agency-${agency.id}`}
+                                          checked={formData.content_vetting_agencies.includes(agency.id)}
+                                          onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)}
+                                        />
+                                        <Label
+                                          htmlFor={`new-agency-${agency.id}`}
+                                          className={getPriorityAgencyStyles(agency.priority)}
+                                        >
+                                          {agency.name}
+                                        </Label>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {!isLoading && allVettingAgencies.filter(a => !priorityOrder.includes(a.priority as any) && a.priority != null).length > 0 && (
-                         <div key="other-priority" className="mt-3">
-                            <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(null)}`}>Other Priority</h4>
-                            <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
-                              {allVettingAgencies.filter(a => !priorityOrder.includes(a.priority as any) && a.priority != null).map(agency => (
-                                <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
-                                  <Checkbox
-                                    id={`new-agency-${agency.id}`}
-                                    checked={formData.content_vetting_agencies.includes(agency.id)}
-                                    onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)}
-                                  />
-                                  <Label
-                                    htmlFor={`new-agency-${agency.id}`}
-                                    className={getPriorityAgencyStyles(agency.priority)}
-                                  >
-                                    {agency.name}
-                                  </Label>
+                              )}
+                              {filteredAgenciesByIdentityTab.filter(a => a.priority == null).length > 0 && (
+                                <div key="no-priority" className="mt-3">
+                                  <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(null)}`}>Uncategorised</h4>
+                                  <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
+                                    {filteredAgenciesByIdentityTab.filter(a => a.priority == null).map(agency => (
+                                      <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
+                                        <Checkbox
+                                          id={`new-agency-${agency.id}`}
+                                          checked={formData.content_vetting_agencies.includes(agency.id)}
+                                          onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)}
+                                        />
+                                        <Label
+                                          htmlFor={`new-agency-${agency.id}`}
+                                          className={getPriorityAgencyStyles(agency.priority)}
+                                        >
+                                          {agency.name}
+                                        </Label>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                              ))}
-                            </div>
-                          </div>
-                      )}
-                      {!isLoading && allVettingAgencies.filter(a => a.priority == null).length > 0 && (
-                         <div key="no-priority" className="mt-3">
-                            <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(null)}`}>Uncategorised</h4>
-                            <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
-                              {allVettingAgencies.filter(a => a.priority == null).map(agency => (
-                                <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
-                                  <Checkbox
-                                    id={`new-agency-${agency.id}`}
-                                    checked={formData.content_vetting_agencies.includes(agency.id)}
-                                    onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)}
-                                  />
-                                  <Label
-                                    htmlFor={`new-agency-${agency.id}`}
-                                    className={getPriorityAgencyStyles(agency.priority)}
-                                  >
-                                    {agency.name}
-                                  </Label>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                      )}
+                              )}
+                            </>
+                          );
+                        }
+                        return null; // Fallback if no conditions met to render agencies
+                      })()}
                     </div>
                   </div>
                 </div>

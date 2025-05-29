@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { Badge } from '@/components/badge';
 import { toast } from 'sonner';
-import { Loader2, PlusCircle, LayoutTemplate, Edit3, FileTextIcon, MoreVertical, FileCog, Eye, Trash2, ShieldAlert } from 'lucide-react';
+import { Loader2, PlusCircle, LayoutTemplate, Edit3, FileTextIcon, MoreVertical, FileCog, Eye, Trash2, ShieldAlert, Copy } from 'lucide-react';
 import type { Metadata } from 'next';
 import {
   AlertDialog,
@@ -48,6 +49,8 @@ interface Template {
     inputFields: any[];
     outputFields: any[];
   };
+  icon?: string | null;
+  brand_id?: string | null;
   usageCount?: number;
   created_at?: string;
   created_by?: string;
@@ -73,12 +76,14 @@ interface UserSessionData {
  * manage, and create new content based on these templates.
  */
 export default function TemplatesPage() {
+  const router = useRouter();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [templateToDelete, setTemplateToDelete] = useState<Template | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDuplicating, setIsDuplicating] = useState<string | null>(null);
 
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
@@ -143,6 +148,44 @@ export default function TemplatesPage() {
         fetchTemplates();
     }
   }, [isLoadingUser, currentUser]);
+
+  const handleDuplicateTemplate = async (templateToDuplicate: Template) => {
+    if (!currentUser || currentUser.user_metadata?.role !== 'admin') {
+      toast.error('You do not have permission to duplicate templates.');
+      return;
+    }
+    setIsDuplicating(templateToDuplicate.id);
+    try {
+      const newTemplateData = {
+        name: `Copy of ${templateToDuplicate.name}`,
+        description: templateToDuplicate.description,
+        icon: templateToDuplicate.icon,
+        fields: JSON.parse(JSON.stringify(templateToDuplicate.fields)), // Deep copy
+        brand_id: templateToDuplicate.brand_id,
+      };
+
+      const response = await fetch('/api/content-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTemplateData),
+      });
+
+      const result = await response.json();
+      if (result.success && result.template) {
+        toast.success(`Template "${result.template.name}" duplicated successfully!`);
+        // Add to templates list or refetch for immediate UI update
+        // setTemplates(prev => [...prev, result.template]); // simple add
+        router.push(`/dashboard/templates/${result.template.id}`); // Navigate to edit page (assuming /id is edit)
+      } else {
+        throw new Error(result.error || 'Failed to duplicate template.');
+      }
+    } catch (error: any) {
+      console.error('Error duplicating template:', error);
+      toast.error(error.message || 'An error occurred while duplicating the template.');
+    } finally {
+      setIsDuplicating(null);
+    }
+  };
 
   const handleDeleteTemplate = async () => {
     if (!currentUser || currentUser.user_metadata?.role !== 'admin') {
@@ -242,30 +285,44 @@ export default function TemplatesPage() {
               </div>
             </CardContent>
             <CardFooter className="border-t pt-4 flex justify-between items-center">
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button variant="outline" size="sm" asChild title="View this template">
                   <Link href={`/dashboard/templates/${template.id}`} className="flex items-center">
                     <Eye className="mr-2 h-4 w-4" /> View
                   </Link>
                 </Button>
                 {isGlobalAdmin && (
-                  <Button variant="ghost" size="sm" asChild title="Edit this template">
-                    <Link href={`/dashboard/templates/${template.id}`} className="flex items-center">
-                       <Edit3 className="mr-2 h-4 w-4" /> Edit
-                    </Link>
-                  </Button>
+                  <>
+                    <Button variant="ghost" size="sm" asChild title="Edit this template">
+                      <Link href={`/dashboard/templates/${template.id}`} className="flex items-center">
+                        <Edit3 className="mr-2 h-4 w-4" /> Edit
+                      </Link>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleDuplicateTemplate(template)}
+                      disabled={isDuplicating === template.id}
+                      title="Duplicate this template"
+                      className="flex items-center"
+                    >
+                      {isDuplicating === template.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Copy className="mr-2 h-4 w-4" />}
+                      Duplicate
+                    </Button>
+                  </>
                 )}
               </div>
               {isGlobalAdmin && (
                 <Button 
                   variant="ghost" 
                   size="icon"
-                  className="text-destructive hover:text-destructive/90"
+                  className="text-destructive hover:text-destructive/90 shrink-0"
                   title="Delete this template"
                   onClick={() => {
                     setTemplateToDelete(template);
                     setShowDeleteDialog(true);
                   }}
+                  disabled={isDuplicating === template.id}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

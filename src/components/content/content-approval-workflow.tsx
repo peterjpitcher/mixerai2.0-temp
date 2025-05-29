@@ -9,6 +9,7 @@ import { Badge } from '@/components/badge';
 import { Textarea } from '@/components/textarea';
 import { CheckCircle, XCircle, AlertCircle, Clock, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 export interface WorkflowStep {
   id: string | number;
@@ -27,6 +28,28 @@ interface ContentVersion {
   feedback?: string;
   reviewer?: { full_name?: string };
   created_at: string;
+  content_json?: {
+    generatedOutputs?: Record<string, string>;
+  } | null;
+}
+
+// Define Template related interfaces if not imported (minimal version for prop type)
+interface TemplateOutputField {
+  id: string;
+  name: string;
+  // type: string; // Not strictly needed by ContentApprovalWorkflow for now
+}
+
+interface TemplateFields {
+  // inputFields: any[]; 
+  outputFields: TemplateOutputField[];
+}
+
+interface TemplateForHistory {
+  id: string;
+  name: string;
+  // description?: string;
+  fields: TemplateFields;
 }
 
 interface ContentApprovalWorkflowProps {
@@ -35,6 +58,7 @@ interface ContentApprovalWorkflowProps {
   currentStepObject?: WorkflowStep;
   isCurrentUserStepOwner: boolean;
   versions?: ContentVersion[];
+  template?: TemplateForHistory | null; // Added template prop
   onActionComplete: () => void;
   performContentSave?: () => Promise<boolean>;
 }
@@ -45,6 +69,7 @@ export function ContentApprovalWorkflow({
   currentStepObject,
   isCurrentUserStepOwner,
   versions,
+  template, // Added template prop
   onActionComplete,
   performContentSave
 }: ContentApprovalWorkflowProps) {
@@ -152,12 +177,53 @@ export function ContentApprovalWorkflow({
         {relevantVersions && relevantVersions.length > 0 && (
           <div className="space-y-3">
             <h4 className="text-sm font-medium">Recent Feedback/History:</h4>
-            {relevantVersions.slice(0,3).map(v => (
-              <div key={v.id} className="p-2 border rounded-md bg-muted/30 text-xs">
-                <p><strong>{v.step_name} - {v.action_status}</strong> by {v.reviewer?.full_name || 'N/A'} ({new Date(v.created_at).toLocaleDateString()})</p>
-                {v.feedback && <p className="italic mt-1">{v.feedback}</p>}
-              </div>
-            ))}
+            {relevantVersions.slice(0,3).map(v => {
+              // Determine if template name can be found for an output field
+              const getOutputFieldName = (outputFieldId: string): string => {
+                if (template && template.fields && template.fields.outputFields) {
+                  const field = template.fields.outputFields.find(f => f.id === outputFieldId);
+                  return field?.name || outputFieldId; // Return name or ID if not found
+                }
+                return outputFieldId; // Fallback to ID if no template or fields
+              };
+
+              return (
+                <div key={v.id} className="p-3 border rounded-md bg-background text-sm space-y-2">
+                  <div className="flex justify-between items-center">
+                    <p className="font-semibold">{v.step_name || 'N/A'} - <span className={cn(
+                      v.action_status === 'approved' && 'text-green-600',
+                      v.action_status === 'rejected' && 'text-red-600',
+                      v.action_status === 'pending_review' && 'text-yellow-600',
+                      !['approved', 'rejected', 'pending_review'].includes(v.action_status) && 'text-gray-600'
+                    )}>{v.action_status || 'N/A'}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">{new Date(v.created_at).toLocaleDateString()}</p>
+                  </div>
+                  {v.reviewer?.full_name && <p className="text-xs text-muted-foreground">By: {v.reviewer.full_name}</p>}
+                  {v.feedback && <p className="italic text-muted-foreground bg-muted p-2 rounded-sm">{v.feedback}</p>}
+                  
+                  {/* Display generatedOutputs */}
+                  {v.content_json?.generatedOutputs && Object.keys(v.content_json.generatedOutputs).length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-border/50 space-y-2">
+                      <h5 className="text-xs font-semibold text-muted-foreground">Content at this step:</h5>
+                      {Object.entries(v.content_json.generatedOutputs).map(([fieldId, htmlContent]) => {
+                        if (fieldId === 'userId' || fieldId === 'success') return null; 
+                        const fieldDisplayName = getOutputFieldName(fieldId);
+                        return (
+                          <div key={fieldId} className="space-y-1">
+                            <p className="text-xs font-medium text-foreground">{fieldDisplayName}:</p>
+                            <div 
+                              className="prose prose-sm max-w-none p-2 border rounded-md bg-input/30 text-foreground/80"
+                              dangerouslySetInnerHTML={{ __html: htmlContent || '<p><em>No content</em></p>' }} 
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 

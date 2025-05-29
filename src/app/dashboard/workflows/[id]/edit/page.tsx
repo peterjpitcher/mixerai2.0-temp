@@ -1,32 +1,28 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { notFound } from 'next/navigation';
+// import { notFound } from 'next/navigation'; // notFound can be used if needed based on API response
 import { Button } from '@/components/button';
 import { Input } from '@/components/input';
 import { Textarea } from '@/components/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
 import { Label } from '@/components/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import { Switch } from '@/components/switch';
 import { Badge } from '@/components/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
 import { toast } from 'sonner';
-import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2, ArrowLeft, ShieldAlert } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2, ArrowLeft, ShieldAlert, UserPlus, Search, Info } from 'lucide-react'; // Added Info
 import type { Metadata } from 'next';
 import debounce from 'lodash.debounce';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { cn } from '@/lib/utils';
 import { BrandIcon } from '@/components/brand-icon';
-import { MultiSelectUserCombobox, UserOption } from '@/components/ui/multi-select-user-combobox';
+// Assuming UserOption might be defined elsewhere or keep it local if specific
+// import { MultiSelectUserCombobox, UserOption } from '@/components/ui/multi-select-user-combobox';
 
-// export const metadata: Metadata = {
-//   title: 'Edit Workflow | MixerAI 2.0',
-//   description: 'Modify the details, steps, and configuration of an existing content workflow.',
-// };
 
 interface WorkflowEditPageProps {
   params: {
@@ -47,12 +43,52 @@ interface UserSessionData {
   }>;
 }
 
+interface BrandSummary {
+    id: string;
+    name: string;
+    color?: string;
+}
+
 interface ContentTemplateSummary {
   id: string;
   name: string;
 }
 
-// Placeholder Breadcrumbs component
+interface UserOption {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  avatar_url?: string | null;
+}
+
+interface WorkflowStepDefinition {
+  id: string; 
+  name: string;
+  description: string;
+  role: string;
+  approvalRequired: boolean;
+  assignees: UserOption[];
+}
+
+interface WorkflowFull {
+  id: string;
+  name: string;
+  description?: string | null;
+  brand_id: string;
+  status: string;
+  template_id?: string | null;
+  steps: WorkflowStepDefinition[];
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+  brand?: BrandSummary; // For displaying brand info
+}
+
+interface WorkflowSummary { 
+  id: string;
+  template_id?: string | null;
+}
+
 const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
   <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
     <ol className="flex items-center space-x-1.5">
@@ -72,35 +108,73 @@ const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) =
   </nav>
 );
 
-/**
- * WorkflowEditPage allows users to modify an existing content approval workflow.
- * Users can update the workflow's name, description, status, and associated brand.
- * The core functionality involves managing the workflow steps: adding, removing, reordering,
- * and configuring each step's name, description, assigned role, approval requirement,
- * and specific user assignees by email.
- */
+const roles = [
+  { id: 'editor', name: 'Editor', description: 'Reviews and edits content for clarity, grammar, and style.' },
+  { id: 'seo', name: 'SEO', description: 'Optimises content for search engines, including keywords and metadata.' },
+  { id: 'legal', name: 'Legal', description: 'Ensures content complies with legal and regulatory requirements.' },
+  { id: 'culinary', name: 'Culinary', description: 'Verifies recipes, cooking instructions, and culinary accuracy.' },
+  { id: 'brand', name: 'Brand', description: 'Checks content for brand alignment, tone of voice, and messaging.' },
+  { id: 'publisher', name: 'Publisher', description: 'Manages the final publication and distribution of content.' }
+];
+
+interface RoleSelectionCardsProps {
+  selectedRole: string;
+  onRoleSelect: (roleId: string) => void;
+  disabled?: boolean;
+}
+
+const RoleSelectionCards: React.FC<RoleSelectionCardsProps> = ({ selectedRole, onRoleSelect, disabled }) => {
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        {roles.map((role) => (
+          <button
+            key={role.id}
+            type="button"
+            onClick={() => onRoleSelect(role.id)}
+            disabled={disabled}
+            className={cn(
+              'border rounded-lg p-3 text-left transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+              selectedRole === role.id
+                ? 'bg-primary/10 border-primary ring-1 ring-primary'
+                : 'hover:bg-accent hover:text-accent-foreground',
+              disabled ? 'opacity-50 cursor-not-allowed' : ''
+            )}
+          >
+            <p className="font-medium text-sm">{role.name}</p>
+            <p className="text-xs text-muted-foreground mt-1">{role.description}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
   const { id } = params;
   const router = useRouter();
-  const [workflow, setWorkflow] = useState<any>(null);
+  const [workflow, setWorkflow] = useState<WorkflowFull | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [assigneeInputs, setAssigneeInputs] = useState<string[]>([]);
-  const [userSearchResults, setUserSearchResults] = useState<Record<number, any[]>>({});
+  const [userSearchResults, setUserSearchResults] = useState<Record<number, UserOption[]>>({});
   const [userSearchLoading, setUserSearchLoading] = useState<Record<number, boolean>>({});
-  const [brands, setBrands] = useState<any[]>([]);
+  const [brands, setBrands] = useState<BrandSummary[]>([]);
   const [contentTemplates, setContentTemplates] = useState<ContentTemplateSummary[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('NO_TEMPLATE_SELECTED');
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [stepDescLoading, setStepDescLoading] = useState<Record<number, boolean>>({});
   
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
-  const [allFetchedBrands, setAllFetchedBrands] = useState<any[]>([]);
+  const [allFetchedBrands, setAllFetchedBrands] = useState<BrandSummary[]>([]);
 
-  const currentBrandForDisplay = brands.find(b => b.id === (workflow?.brand_id || workflow?.brand?.id));
+  const [otherBrandWorkflows, setOtherBrandWorkflows] = useState<WorkflowSummary[]>([]);
+  const [isLoadingBrandWorkflows, setIsLoadingBrandWorkflows] = useState(false);
+
+  const currentBrandForDisplay = brands.find(b => b.id === workflow?.brand_id);
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -115,10 +189,10 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
           setCurrentUser(null);
           toast.error(data.error || 'Could not verify your session.');
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error fetching current user:', err);
         setCurrentUser(null);
-        toast.error('Error fetching your user data.');
+        toast.error('Error fetching user data: ' + err.message);
       } finally {
         setIsLoadingUser(false);
       }
@@ -129,33 +203,41 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
+      setError(null);
       try {
-        // Fetch workflow data
         const workflowResponse = await fetch(`/api/workflows/${id}`);
-        if (!workflowResponse.ok) throw new Error(`Failed to fetch workflow: ${workflowResponse.status}`);
+        if (!workflowResponse.ok) {
+          if (workflowResponse.status === 404) {
+            // notFound(); // Alternative: use error state to display message
+            setError("Workflow not found.");
+            throw new Error('Workflow not found');
+          } 
+          throw new Error(`Failed to fetch workflow: ${workflowResponse.statusText}`);
+        }
         const workflowData = await workflowResponse.json();
-        if (!workflowData.success) throw new Error(workflowData.error || 'Failed to fetch workflow data');
+        if (!workflowData.success || !workflowData.workflow) {
+          throw new Error(workflowData.error || 'Failed to process workflow data');
+        }
         setWorkflow(workflowData.workflow);
-        setSelectedTemplateId(workflowData.workflow?.template_id || '');
+        setSelectedTemplateId(workflowData.workflow?.template_id || 'NO_TEMPLATE_SELECTED');
+        setAssigneeInputs(new Array(workflowData.workflow?.steps?.length || 0).fill(''));
 
-        // Fetch brands data
+
         const brandsResponse = await fetch('/api/brands');
-        if (!brandsResponse.ok) throw new Error(`Failed to fetch brands: ${brandsResponse.status}`);
+        if (!brandsResponse.ok) throw new Error(`Failed to fetch brands: ${brandsResponse.statusText}`);
         const brandsData = await brandsResponse.json();
-        if (!brandsData.success) throw new Error(brandsData.error || 'Failed to fetch brands data');
-        setBrands(Array.isArray(brandsData.data) ? brandsData.data : []);
-        setAllFetchedBrands(Array.isArray(brandsData.data) ? brandsData.data : []); // Store all brands
+        if (!brandsData.success) throw new Error(brandsData.error || 'Failed to process brands data');
+        setAllFetchedBrands(Array.isArray(brandsData.data) ? brandsData.data : []);
 
-        // Fetch content templates data
         const templatesResponse = await fetch('/api/content-templates');
-        if (!templatesResponse.ok) throw new Error(`Failed to fetch content templates: ${templatesResponse.status}`);
+        if (!templatesResponse.ok) throw new Error(`Failed to fetch content templates: ${templatesResponse.statusText}`);
         const templatesData = await templatesResponse.json();
-        if (!templatesData.success) throw new Error(templatesData.error || 'Failed to fetch content templates data');
+        if (!templatesData.success) throw new Error(templatesData.error || 'Failed to process content templates data');
         setContentTemplates(Array.isArray(templatesData.templates) ? templatesData.templates : []);
 
-      } catch (error) {
-        setError((error as Error).message || 'Failed to load data.');
-        toast.error('Failed to load data. Please try again.');
+      } catch (err: any) {
+        setError(err.message || 'Failed to load workflow data.');
+        toast.error(err.message || 'Failed to load workflow data.');
       } finally {
         setIsLoading(false);
       }
@@ -163,99 +245,233 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
     fetchData();
   }, [id]);
 
-  // Derived permissions and access control
+  useEffect(() => {
+    if (isLoadingUser || isLoading || !currentUser || !workflow || allFetchedBrands.length === 0) return;
+
+    const isGlobalAdminUser = currentUser?.user_metadata?.role === 'admin';
+    const userBrandAdminPerms = currentUser?.brand_permissions?.filter(p => p.role === 'admin').map(p => p.brand_id) || [];
+
+    if (isGlobalAdminUser) {
+      setBrands(allFetchedBrands);
+    } else if (userBrandAdminPerms.length > 0) {
+      const manageableBrands = allFetchedBrands.filter(b => userBrandAdminPerms.includes(b.id));
+      setBrands(manageableBrands);
+    } else {
+      setBrands([]);
+    }
+  }, [isLoadingUser, isLoading, currentUser, workflow, allFetchedBrands]);
+
+  useEffect(() => {
+    const currentBrandId = workflow?.brand_id;
+    if (!currentBrandId) {
+      setOtherBrandWorkflows([]);
+      return;
+    }
+    const fetchOtherBrandWorkflows = async () => {
+      setIsLoadingBrandWorkflows(true);
+      try {
+        const response = await fetch(`/api/workflows?brand_id=${currentBrandId}`);
+        if (!response.ok) throw new Error('Failed to fetch other workflows for brand');
+        const data = await response.json();
+        if (data.success && Array.isArray(data.data)) {
+          setOtherBrandWorkflows(data.data.filter((wf: WorkflowSummary) => wf.id !== id));
+        } else {
+          setOtherBrandWorkflows([]);
+          toast.error(data.error || 'Could not load other workflows for the brand.');
+        }
+      } catch (error: any) {
+        console.error('Error fetching other brand workflows:', error);
+        toast.error(error.message || 'Failed to load other workflows for brand.');
+        setOtherBrandWorkflows([]);
+      } finally {
+        setIsLoadingBrandWorkflows(false);
+      }
+    };
+    fetchOtherBrandWorkflows();
+  }, [workflow?.brand_id, id]);
+
+  const availableContentTemplates = useMemo(() => {
+    const currentWorkflowTemplateId = workflow?.template_id;
+    if (!workflow?.brand_id) return contentTemplates;
+    if (isLoadingBrandWorkflows && !currentWorkflowTemplateId) return [];
+
+    const usedTemplateIdsByOtherWorkflows = new Set(
+      otherBrandWorkflows.map(wf => wf.template_id).filter(Boolean)
+    );
+    return contentTemplates.filter(template => 
+      template.id === currentWorkflowTemplateId || 
+      !usedTemplateIdsByOtherWorkflows.has(template.id)
+    );
+  }, [contentTemplates, otherBrandWorkflows, workflow?.template_id, workflow?.brand_id, isLoadingBrandWorkflows]);
+
   const isGlobalAdmin = currentUser?.user_metadata?.role === 'admin';
   const userBrandAdminPermissions = currentUser?.brand_permissions?.filter(p => p.role === 'admin').map(p => p.brand_id) || [];
-  
-  const canEditThisWorkflow = workflow && (
-    isGlobalAdmin || 
-    (workflow.brand_id && userBrandAdminPermissions.includes(workflow.brand_id))
+  const canEditThisWorkflow = workflow && (isGlobalAdmin || (workflow.brand_id && userBrandAdminPermissions.includes(workflow.brand_id)));
+
+  const debouncedUserSearch = useCallback(
+    debounce(async (searchTerm: string, stepIndex: number) => {
+      if (searchTerm.trim().length < 2) {
+        setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
+      return;
+    }
+      setUserSearchLoading(prev => ({ ...prev, [stepIndex]: true }));
+      try {
+        const response = await fetch(`/api/users/search?query=${encodeURIComponent(searchTerm)}`);
+        const data = await response.json();
+        if (data.success && Array.isArray(data.users)) {
+          setUserSearchResults(prev => ({ ...prev, [stepIndex]: data.users }));
+        } else {
+          setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
+        }
+      } catch (error) {
+        console.error('User search error:', error);
+        setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
+      } finally {
+        setUserSearchLoading(prev => ({ ...prev, [stepIndex]: false }));
+      }
+    }, 300),
+    []
   );
 
-  const canAccessPage = !isLoadingUser && !isLoading && workflow ? canEditThisWorkflow : false;
-  // More refined canAccessPage logic will be placed after data fetching completed check
-
-  // useEffect to filter brands based on user permissions AFTER all data is loaded
-  useEffect(() => {
-    if (isLoadingUser || isLoading || !currentUser || !workflow || allFetchedBrands.length === 0) {
-      return; // Wait for all necessary data
-    }
-
-    if (isGlobalAdmin) {
-      setBrands(allFetchedBrands);
-    } else if (userBrandAdminPermissions.length > 0) {
-      const manageableBrands = allFetchedBrands.filter(b => userBrandAdminPermissions.includes(b.id));
-      setBrands(manageableBrands);
-      // If current workflow's brand is not in manageable brands, it implies an issue,
-      // but canEditThisWorkflow check should handle overall page access.
-      // For brand dropdown, it will be correctly filtered.
+  const handleAssigneeInputChange = (stepIndex: number, value: string) => {
+    setAssigneeInputs(prev => {
+      const newInputs = [...prev];
+      newInputs[stepIndex] = value;
+      return newInputs;
+    });
+    if (value.trim()) {
+      debouncedUserSearch(value, stepIndex);
     } else {
-      setBrands([]); // No brands manageable if not global admin and no brand_admin permissions
+      setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
     }
-  }, [isLoadingUser, isLoading, currentUser, workflow, allFetchedBrands, isGlobalAdmin, userBrandAdminPermissions]);
-
-  // --- Role Card Selection Component ---
-  const roles = [
-    { id: 'editor', name: 'Editor', description: 'Reviews and edits content for clarity, grammar, and style.' },
-    { id: 'seo', name: 'SEO', description: 'Optimises content for search engines, including keywords and metadata.' },
-    { id: 'legal', name: 'Legal', description: 'Ensures content complies with legal and regulatory requirements.' },
-    { id: 'culinary', name: 'Culinary', description: 'Verifies recipes, cooking instructions, and culinary accuracy.' },
-    { id: 'brand', name: 'Brand', description: 'Checks content for brand alignment, tone of voice, and messaging.' },
-    { id: 'publisher', name: 'Publisher', description: 'Manages the final publication and distribution of content.' }
-  ];
-
-  interface RoleSelectionCardsProps {
-    selectedRole: string;
-    onRoleSelect: (roleId: string) => void;
-    stepIndex: number;
-    disabled?: boolean; // Added disabled prop
-  }
-
-  const RoleSelectionCards: React.FC<RoleSelectionCardsProps> = ({ selectedRole, onRoleSelect, stepIndex, disabled }) => {
-    return (
-      <div className="space-y-2">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-          {roles.map((role) => (
-            <button
-              key={role.id}
-              type="button"
-              onClick={() => onRoleSelect(role.id)}
-              disabled={disabled} // Apply disabled prop
-              className={cn(
-                'border rounded-lg p-3 text-left transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
-                selectedRole === role.id
-                  ? 'bg-primary/10 border-primary ring-1 ring-primary'
-                  : 'hover:bg-accent hover:text-accent-foreground',
-                disabled ? 'opacity-50 cursor-not-allowed' : '' // Style for disabled state
-              )}
-            >
-              <p className="font-medium text-sm">{role.name}</p>
-              <p className="text-xs text-muted-foreground mt-1">{role.description}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-    );
   };
-  // --- End Role Card Selection Component ---
+
+  const handleAddUserToStep = (stepIndex: number, user: UserOption) => {
+    setWorkflow((prevWorkflow: WorkflowFull | null) => {
+      if (!prevWorkflow) return null;
+      const newSteps = [...prevWorkflow.steps];
+      const currentStep = newSteps[stepIndex];
+      if (!currentStep.assignees.find(a => a.id === user.id || a.email === user.email)) {
+        currentStep.assignees = [...currentStep.assignees, user];
+      }
+      return { ...prevWorkflow, steps: newSteps };
+    });
+    setAssigneeInputs(prev => {
+      const newInputs = [...prev];
+      newInputs[stepIndex] = '';
+      return newInputs;
+    });
+    setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
+  };
+
+  const handleAddEmailAsAssignee = (stepIndex: number) => {
+    const email = assigneeInputs[stepIndex]?.trim();
+    if (email && workflow) {
+      if (!/\S+@\S+\.\S+/.test(email)) {
+        toast.error("Please enter a valid email address.");
+        return;
+      }
+      const currentStep = workflow.steps[stepIndex];
+      if (!currentStep.assignees.some(a => a.email?.toLowerCase() === email.toLowerCase())) {
+        handleAddUserToStep(stepIndex, { id: `email_${email}_${Date.now()}`, email: email, full_name: email, avatar_url: null });
+      } else {
+        toast.info("This email is already an assignee for this step.");
+      }
+    }
+  };
+
+  const handleRemoveUserFromStep = (stepIndex: number, userIdToRemove: string) => {
+    setWorkflow((prevWorkflow: WorkflowFull | null) => {
+      if (!prevWorkflow) return null;
+      const newSteps = [...prevWorkflow.steps];
+      newSteps[stepIndex].assignees = newSteps[stepIndex].assignees.filter(
+        assignee => assignee.id !== userIdToRemove && assignee.email !== userIdToRemove // Allow removal by email if ID is temp
+      );
+      return { ...prevWorkflow, steps: newSteps };
+    });
+  };
+
+  const handleUpdateWorkflowDetails = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setWorkflow((prev: WorkflowFull | null) => prev ? ({ ...prev, [name]: value }) : null);
+  };
+
+  const handleUpdateWorkflowStatus = (value: string) => {
+    setWorkflow((prev: WorkflowFull | null) => prev ? ({ ...prev, status: value }) : null);
+  };
+
+  const handleUpdateBrand = (value: string) => {
+    const selectedBrand = brands.find((brand: BrandSummary) => brand.id === value);
+    if (selectedBrand) {
+      setWorkflow((prev: WorkflowFull | null) => prev ? ({
+        ...prev,
+        brand_id: selectedBrand.id,
+        brand: selectedBrand, // Keep the brand object for display consistency
+        template_id: null // Reset template when brand changes
+      }) : null);
+      setSelectedTemplateId('NO_TEMPLATE_SELECTED');
+      setOtherBrandWorkflows([]);
+    }
+  };
+
+  const handleUpdateTemplate = (value: string) => {
+    setSelectedTemplateId(value);
+    setWorkflow((prev: WorkflowFull | null) => prev ? ({
+      ...prev,
+      template_id: value === 'NO_TEMPLATE_SELECTED' ? null : value,
+    }) : null);
+  };
+
+  const handleUpdateStepName = (index: number, value: string) => {
+    setWorkflow((prev: WorkflowFull | null) => {
+      if (!prev) return null;
+      const newSteps = [...prev.steps];
+      newSteps[index] = { ...newSteps[index], name: value };
+      return { ...prev, steps: newSteps };
+    });
+  };
+
+  const handleUpdateStepDescription = (index: number, value: string) => {
+    setWorkflow((prev: WorkflowFull | null) => {
+      if (!prev) return null;
+      const newSteps = [...prev.steps];
+      newSteps[index] = { ...newSteps[index], description: value };
+      return { ...prev, steps: newSteps };
+    });
+  };
+
+  const handleUpdateStepRole = (index: number, value: string) => {
+    setWorkflow((prev: WorkflowFull | null) => {
+      if (!prev) return null;
+      const newSteps = [...prev.steps];
+      newSteps[index] = { ...newSteps[index], role: value };
+      return { ...prev, steps: newSteps };
+    });
+  };
+
+  const handleUpdateStepApprovalRequired = (index: number, value: boolean) => {
+    setWorkflow((prev: WorkflowFull | null) => {
+      if (!prev) return null;
+      const newSteps = [...prev.steps];
+      newSteps[index] = { ...newSteps[index], approvalRequired: value };
+      return { ...prev, steps: newSteps };
+    });
+  };
 
   const handleGenerateStepDescription = async (index: number) => {
     if (!workflow || !workflow.steps || !workflow.steps[index]) {
       toast.error('Step data not available.');
       return;
-    }
+            }
     const step = workflow.steps[index];
     if (!step.name || !step.role) {
       toast.error('Step name and role are required to generate a description.');
-      return;
-    }
-
+        return;
+      }
     setStepDescLoading(prev => ({ ...prev, [index]: true }));
-
-    try {
-      const currentBrand = allFetchedBrands.find(b => b.id === (workflow.brand_id || workflow.brand?.id));
+      try {
+      const currentBrand = allFetchedBrands.find(b => b.id === workflow.brand_id);
       const currentTemplate = contentTemplates.find(ct => ct.id === selectedTemplateId);
-
       const response = await fetch('/api/ai/generate-step-description', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -265,354 +481,176 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
           templateName: currentTemplate?.name,
           stepName: step.name,
           role: step.role,
+          existingSteps: workflow.steps.slice(0, index).map(s => ({ name: s.name, description: s.description, role: s.role }))
         }),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to generate description');
       }
-
-      const result = await response.json();
-      if (result.success && result.description) {
-        handleUpdateStepDescription(index, result.description);
+      const data = await response.json();
+      if (data.success && data.description) {
+        handleUpdateStepDescription(index, data.description);
         toast.success('Step description generated!');
-      } else {
-        throw new Error(result.error || 'AI service did not return a description.');
-      }
+        } else {
+        throw new Error(data.error || 'AI service did not return a description.');
+        }
     } catch (error: any) {
       console.error('Error generating step description:', error);
       toast.error(error.message || 'Could not generate step description.');
-    } finally {
-      setStepDescLoading(prev => ({ ...prev, [index]: false }));
-    }
-  };
-
-  const handleUpdateWorkflowDetails = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setWorkflow((prev: any) => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleUpdateWorkflowStatus = (value: string) => {
-    setWorkflow((prev: any) => ({
-      ...prev,
-      status: value
-    }));
-  };
-
-  const handleUpdateBrand = (value: string) => {
-    // Find the selected brand in the brands array, not workflow.brands
-    const selectedBrand = brands.find((brand: any) => brand.id === value);
-    if (selectedBrand) {
-      setWorkflow((prev: any) => ({
-        ...prev,
-        brand: selectedBrand,
-        brand_id: selectedBrand.id
-      }));
-    }
-  };
-
-  const handleUpdateTemplate = (value: string) => {
-    setSelectedTemplateId(value);
-    setWorkflow((prev: any) => ({
-      ...prev,
-      template_id: value || null,
-    }));
-  };
-
-  const handleUpdateStepName = (index: number, value: string) => {
-    setWorkflow((prev: any) => {
-      if (!prev || !Array.isArray(prev.steps)) return prev;
-      
-      const updatedSteps = [...prev.steps];
-      updatedSteps[index] = {
-        ...updatedSteps[index],
-        name: value
-      };
-      return {
-        ...prev,
-        steps: updatedSteps
-      };
-    });
-  };
-
-  const handleUpdateStepDescription = (index: number, value: string) => {
-    setWorkflow((prev: any) => {
-      if (!prev || !Array.isArray(prev.steps)) return prev;
-      
-      const updatedSteps = [...prev.steps];
-      updatedSteps[index] = {
-        ...updatedSteps[index],
-        description: value
-      };
-      return {
-        ...prev,
-        steps: updatedSteps
-      };
-    });
-  };
-
-  const handleUpdateStepRole = (index: number, value: string) => {
-    setWorkflow((prev: any) => {
-      if (!prev || !Array.isArray(prev.steps)) return prev;
-      
-      const updatedSteps = [...prev.steps];
-      updatedSteps[index] = {
-        ...updatedSteps[index],
-        role: value
-      };
-      return {
-        ...prev,
-        steps: updatedSteps
-      };
-    });
-  };
-
-  const handleUpdateStepApprovalRequired = (index: number, value: boolean) => {
-    setWorkflow((prev: any) => {
-      if (!prev || !Array.isArray(prev.steps)) return prev;
-      
-      const updatedSteps = [...prev.steps];
-      updatedSteps[index] = {
-        ...updatedSteps[index],
-        approvalRequired: value
-      };
-      return {
-        ...prev,
-        steps: updatedSteps
-      };
-    });
-  };
-
-  // Initialize/resize assigneeInputs when steps change (if workflow and steps are defined)
-  useEffect(() => {
-    if (workflow && workflow.steps) {
-        setAssigneeInputs(prevInputs => {
-            const newInputs = new Array(workflow.steps.length).fill('');
-            // Preserve existing inputs if an old step still exists at the same index
-            for (let i = 0; i < Math.min(prevInputs.length, newInputs.length); i++) {
-                newInputs[i] = prevInputs[i];
-            }
-            return newInputs;
-        });
-    }
-  }, [workflow?.steps?.length]); // Depend on the length of steps array
-
-  // Debounced user search function
-  const searchUsers = React.useCallback(
-    debounce(async (query: string, stepIndex: number) => {
-      if (!query || query.length < 2) {
-        setUserSearchResults((prev) => ({ ...prev, [stepIndex]: [] }));
-        return;
-      }
-      setUserSearchLoading((prev) => ({ ...prev, [stepIndex]: true }));
-      try {
-        const res = await fetch(`/api/users/search?query=${encodeURIComponent(query)}`);
-        if (res.ok) {
-          const data = await res.json();
-          setUserSearchResults((prev) => ({ ...prev, [stepIndex]: data.users || [] }));
-        } else {
-          setUserSearchResults((prev) => ({ ...prev, [stepIndex]: [] }));
-        }
-      } catch {
-        setUserSearchResults((prev) => ({ ...prev, [stepIndex]: [] }));
       } finally {
-        setUserSearchLoading((prev) => ({ ...prev, [stepIndex]: false }));
+      setStepDescLoading(prev => ({ ...prev, [index]: false }));
       }
-    }, 300),
-    []
-  );
-
-  const handleAddAssignee = (stepIndex: number, email?: string) => {
-    const value = typeof email === 'string' ? email : assigneeInputs[stepIndex];
-    if (!value || !value.includes('@')) {
-      toast.error('Please enter a valid email address.');
-      return;
-    }
-    if (!workflow || !workflow.steps || !workflow.steps[stepIndex]) {
-      toast.error('Cannot add assignee - workflow step not found.');
-      return;
-    }
-    const stepAssignees = workflow.steps[stepIndex].assignees || [];
-    const exists = Array.isArray(stepAssignees) && stepAssignees.some((a: any) => a.email === value);
-    if (exists) {
-      toast.error('This assignee is already added to this step.');
-      return;
-    }
-    setWorkflow((prev: any) => {
-      if (!prev || !Array.isArray(prev.steps)) return prev;
-      const updatedSteps = [...prev.steps];
-      if (!updatedSteps[stepIndex].assignees) {
-        updatedSteps[stepIndex].assignees = [];
-      }
-      updatedSteps[stepIndex] = {
-        ...updatedSteps[stepIndex],
-        assignees: [
-          ...updatedSteps[stepIndex].assignees,
-          {
-            id: `temp-${Date.now()}`,
-            email: value
-          }
-        ]
-      };
-      return {
-        ...prev,
-        steps: updatedSteps
-      };
-    });
-    // Clear only this input
-    setAssigneeInputs((prev) => {
-      const updated = [...prev];
-      updated[stepIndex] = '';
-      return updated;
-    });
-    setUserSearchResults((prev) => ({ ...prev, [stepIndex]: [] }));
-  };
-
-  const handleRemoveAssignee = (stepIndex: number, assigneeId: string) => {
-    setWorkflow((prev: any) => {
-      if (!prev || !Array.isArray(prev.steps)) return prev;
-      
-      const updatedSteps = [...prev.steps];
-      
-      if (!updatedSteps[stepIndex] || !Array.isArray(updatedSteps[stepIndex].assignees)) {
-        return prev;
-      }
-      
-      updatedSteps[stepIndex] = {
-        ...updatedSteps[stepIndex],
-        assignees: updatedSteps[stepIndex].assignees.filter(
-          (a: any) => a.id !== assigneeId
-        )
-      };
-      return {
-        ...prev,
-        steps: updatedSteps
-      };
-    });
-  };
-
-  const handleMoveStepUp = (index: number) => {
-    if (index === 0) return;
-    
-    setWorkflow((prev: any) => {
-      if (!prev || !Array.isArray(prev.steps)) return prev;
-      
-      const updatedSteps = [...prev.steps];
-      // Save the step we want to move up
-      const stepToMove = updatedSteps[index];
-      // Remove it from its current position
-      updatedSteps.splice(index, 1);
-      // Insert it at the new position (one index up)
-      updatedSteps.splice(index - 1, 0, stepToMove);
-      
-      return {
-        ...prev,
-        steps: updatedSteps
-      };
-    });
-    
-    // Show success message
-    toast.success('Step moved up successfully');
-  };
-
-  const handleMoveStepDown = (index: number) => {
-    if (!workflow || !Array.isArray(workflow.steps) || index === workflow.steps.length - 1) return;
-    
-    setWorkflow((prev: any) => {
-      if (!prev || !Array.isArray(prev.steps)) return prev;
-      
-      const updatedSteps = [...prev.steps];
-      // Save the step we want to move down
-      const stepToMove = updatedSteps[index];
-      // Remove it from its current position
-      updatedSteps.splice(index, 1);
-      // Insert it at the new position (one index down)
-      updatedSteps.splice(index + 1, 0, stepToMove);
-      
-      return {
-        ...prev,
-        steps: updatedSteps
-      };
-    });
-    
-    // Show success message
-    toast.success('Step moved down successfully');
   };
 
   const handleAddStep = () => {
-    setWorkflow((prev: any) => {
-      if (!prev) return prev;
-      
-      const steps = Array.isArray(prev.steps) ? prev.steps : [];
-      const newStep = {
-        id: `step${steps.length + 1}`,
-        name: `Step ${steps.length + 1}`,
-        description: '',
-        role: 'editor',
-        approvalRequired: true,
-        assignees: []
-      };
-      
-      return {
-        ...prev,
-        steps: [...steps, newStep]
-      };
+    setWorkflow((prevWorkflow: WorkflowFull | null) => {
+      if (!prevWorkflow) return null;
+      const newStepId = `temp_step_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+      const newSteps = [
+        ...prevWorkflow.steps,
+        {
+          id: newStepId,
+          name: `Review Step ${prevWorkflow.steps.length + 1}`,
+          description: '',
+          role: 'editor',
+          approvalRequired: true,
+          assignees: []
+        }
+      ];
+      setAssigneeInputs(prevInputs => [...prevInputs, '']);
+      setUserSearchResults(prevResults => ({...prevResults, [newSteps.length -1]: []}));
+      return { ...prevWorkflow, steps: newSteps };
     });
   };
 
   const handleRemoveStep = (index: number) => {
-    if (!workflow || !Array.isArray(workflow.steps)) return;
-    
-    if (workflow.steps.length <= 1) {
+    if (!workflow || workflow.steps.length <= 1) {
       toast.error('A workflow must have at least one step.');
       return;
     }
-    
-    setWorkflow((prev: any) => {
-      if (!prev || !Array.isArray(prev.steps)) return prev;
-      
-      const updatedSteps = prev.steps.filter((_: any, i: number) => i !== index);
-      return {
-        ...prev,
-        steps: updatedSteps
-      };
+    setWorkflow((prevWorkflow: WorkflowFull | null) => {
+      if (!prevWorkflow) return null;
+      const newSteps = prevWorkflow.steps.filter((_, i) => i !== index);
+      setAssigneeInputs(prevInputs => prevInputs.filter((_, i) => i !== index));
+      setUserSearchResults(prevResults => {
+        const newResults = {...prevResults};
+        delete newResults[index];
+        return newResults;
+      });
+      return { ...prevWorkflow, steps: newSteps };
     });
   };
 
+  const handleMoveStepUp = (index: number) => {
+    if (index === 0 || !workflow) return;
+    setWorkflow((prevWorkflow: WorkflowFull | null) => {
+      if (!prevWorkflow) return null;
+      const newSteps = [...prevWorkflow.steps];
+      [newSteps[index - 1], newSteps[index]] = [newSteps[index], newSteps[index - 1]];
+      setAssigneeInputs(prevInputs => {
+        const newInputs = [...prevInputs];
+        [newInputs[index - 1], newInputs[index]] = [newInputs[index], newInputs[index - 1]];
+        return newInputs;
+      });
+      setUserSearchResults(prevResults => {
+        const newResults = {...prevResults};
+        const temp = newResults[index-1];
+        newResults[index-1] = newResults[index];
+        newResults[index] = temp;
+        return newResults;
+      });
+      return { ...prevWorkflow, steps: newSteps };
+    });
+    toast.success('Step moved up successfully');
+  };
+
+  const handleMoveStepDown = (index: number) => {
+    if (!workflow || index === workflow.steps.length - 1) return;
+    setWorkflow((prevWorkflow: WorkflowFull | null) => {
+      if (!prevWorkflow) return null;
+      const newSteps = [...prevWorkflow.steps];
+      [newSteps[index + 1], newSteps[index]] = [newSteps[index], newSteps[index + 1]];
+      setAssigneeInputs(prevInputs => {
+        const newInputs = [...prevInputs];
+        [newInputs[index + 1], newInputs[index]] = [newInputs[index], newInputs[index + 1]];
+        return newInputs;
+      });
+      setUserSearchResults(prevResults => {
+        const newResults = {...prevResults};
+        const temp = newResults[index+1];
+        newResults[index+1] = newResults[index];
+        newResults[index] = temp;
+        return newResults;
+      });
+      return { ...prevWorkflow, steps: newSteps };
+    });
+    toast.success('Step moved down successfully');
+  };
+
+  const validateWorkflow = (): boolean => {
+    if (!workflow) return false;
+    if (!workflow.name.trim()) {
+      toast.error('Workflow name is required.');
+      return false;
+    }
+    if (!workflow.brand_id) {
+      toast.error('Please select a brand for the workflow.');
+      return false;
+    }
+    if (workflow.steps.length === 0) {
+      toast.error('A workflow must have at least one step.');
+      return false;
+    }
+    for (const step of workflow.steps) {
+      if (!step.name.trim()) {
+        toast.error('All steps must have a name.');
+        return false;
+      }
+      if (!step.role) {
+        toast.error(`Step "${step.name}" must have an assigned role.`);
+        return false;
+      }
+    }
+    return true;
+  };
+
   const handleSaveWorkflow = async () => {
+    if (!validateWorkflow() || !workflow) return;
     setIsSaving(true);
-    try {
-      if (!workflow) throw new Error('Workflow data is missing');
-      
-      const workflowDataToSave = {
-        ...workflow,
-        template_id: selectedTemplateId || null,
+    const workflowToSave: Partial<WorkflowFull> = {
+      name: workflow.name,
+      description: workflow.description,
+      brand_id: workflow.brand_id,
+      status: workflow.status,
+      template_id: selectedTemplateId === 'NO_TEMPLATE_SELECTED' ? null : selectedTemplateId,
+      steps: workflow.steps.map(step => ({
+        // Ensure only necessary fields are sent, especially if step.id is temporary client-side ID
+        name: step.name,
+        description: step.description,
+        role: step.role,
+        approvalRequired: step.approvalRequired,
+        assignees: step.assignees.map(a => ({ email: a.email, id: a.id && !a.id.startsWith('temp_') && !a.id.startsWith('email_') ? a.id : '', full_name: a.full_name || null })), // Ensure full_name is included
+        ...(step.id && !step.id.startsWith('temp_') && !step.id.startsWith('email_') ? { id: step.id && !step.id.startsWith('temp_') && !step.id.startsWith('email_') ? step.id : 'default-id' } : { id: 'default-id' }) // Ensure id is always a string by providing a default value
+      })),
         updated_at: new Date().toISOString()
       };
       
-      // Remove client-side only brand object if it exists to avoid sending nested object if API expects only brand_id
-      if (workflowDataToSave.brand) delete workflowDataToSave.brand;
-      
-      console.log("Saving workflow with data:", workflowDataToSave);
-
+    try {
       const response = await fetch(`/api/workflows/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(workflowDataToSave)
+        body: JSON.stringify(workflowToSave)
       });
-      
-      if (!response.ok) throw new Error(`Failed to update workflow: ${response.status}`);
       const data = await response.json();
-      if (!data.success) throw new Error(data.error || 'Failed to update workflow.');
-      
-      toast.success('Workflow updated successfully');
-      router.push(`/dashboard/workflows/${id}`);
-    } catch (error) {
-      toast.error('Failed to save workflow. Please try again.');
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update workflow. Please try again.');
+      }
+      toast.success('Workflow updated successfully!');
+      router.push(`/dashboard/workflows/${id}`); // Or to list: /dashboard/workflows
+    } catch (error: any) {
+      console.error('Error saving workflow:', error);
+      toast.error(error.message || 'An unexpected error occurred.');
     } finally {
       setIsSaving(false);
     }
@@ -620,27 +658,22 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
 
   const handleDeleteWorkflow = async () => {
     setIsDeleting(true);
-    setShowDeleteConfirm(false); // Close confirm dialog
-
+    setShowDeleteConfirm(false);
     try {
       const response = await fetch(`/api/workflows/${id}`, {
         method: 'DELETE',
       });
-
       const data = await response.json();
-
       if (response.ok && data.success) {
         toast.success('Workflow deleted successfully');
         router.push('/dashboard/workflows');
       } else {
         throw new Error(data.error || 'Failed to delete workflow.');
       }
-    } catch (error) {
+    } catch (error: any) {
       toast.error(
-        error instanceof Error ? error.message : 'An unexpected error occurred.',
-        {
-          description: 'Please check if content items are using this workflow.',
-        }
+        error.message || 'An unexpected error occurred.',
+        { description: 'Please check if content items are using this workflow.' }
       );
     } finally {
       setIsDeleting(false);
@@ -669,9 +702,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
     );
   }
   
-  if (!workflow) { // Workflow not found after loading, or initial error (redundant with error state but good check)
-    // This can also happen if initial fetch failed and error state was set, but as a fallback.
-    // Or if workflow ID is invalid and API returns no workflow without explicit error.
+  if (!workflow) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
         <XCircle className="h-12 w-12 text-destructive" />
@@ -684,7 +715,6 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
     );
   }
 
-  // Access Denied Check (after user and workflow data are loaded)
   if (!isLoadingUser && !isLoading && workflow && !canEditThisWorkflow) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
@@ -698,14 +728,12 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
     );
   }
 
-  // If we reach here, user is loaded, workflow is loaded, and user has permission.
-
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" }, 
         { label: "Workflows", href: "/dashboard/workflows" }, 
-        { label: workflow?.name || "Loading...", href: `/dashboard/workflows/${id}` },
+        { label: workflow.name || "Loading...", href: `/dashboard/workflows/${id}` },
         { label: "Edit" }
       ]} />
 
@@ -718,7 +746,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
             <BrandIcon name={currentBrandForDisplay.name} color={currentBrandForDisplay.color ?? undefined} size="md" className="mr-1" />
           }
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Edit: {workflow?.name || 'Workflow'}</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Edit: {workflow.name || 'Workflow'}</h1>
             <p className="text-muted-foreground mt-1">
               Modify the details, steps, assignees, and other settings for this workflow.
               {currentBrandForDisplay && <span className="block text-xs">For Brand: {currentBrandForDisplay.name}</span>}
@@ -738,7 +766,6 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
               <><Trash2 className="mr-2 h-4 w-4" /> Delete Workflow</>
             )}
           </Button>
-          {/* Save and Cancel (to view) moved to bottom of form */}
         </div>
       </div>
       
@@ -757,12 +784,13 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                   name="name"
                   value={workflow.name || ''}
                   onChange={handleUpdateWorkflowDetails}
+                  disabled={!canEditThisWorkflow}
                 />
               </div>
               
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select defaultValue={workflow.status} onValueChange={handleUpdateWorkflowStatus} disabled={!canEditThisWorkflow}>
+                <Select value={workflow.status || 'draft'} onValueChange={handleUpdateWorkflowStatus} disabled={!canEditThisWorkflow}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
@@ -776,12 +804,12 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
               
               <div className="space-y-2">
                 <Label htmlFor="brand">Brand</Label>
-                <Select defaultValue={workflow.brand?.id || workflow.brand_id || ''} onValueChange={handleUpdateBrand} value={workflow.brand?.id || workflow.brand_id || ''} disabled={!canEditThisWorkflow}>
+                <Select value={workflow.brand_id || ''} onValueChange={handleUpdateBrand} disabled={!canEditThisWorkflow || (brands.length === 0 && !isGlobalAdmin)}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select brand" />
+                    <SelectValue placeholder={brands.length === 0 && !isGlobalAdmin ? "No brands assigned" : "Select brand"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {brands.map((brand: any) => (
+                    {brands.map((brand: BrandSummary) => (
                       <SelectItem key={brand.id} value={brand.id}>
                         <div className="flex items-center">
                           <div 
@@ -794,24 +822,37 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                     ))}
                   </SelectContent>
                 </Select>
+                 {brands.length === 0 && isGlobalAdmin && (
+                  <p className="text-xs text-muted-foreground">No brands found. <Link href="/dashboard/brands/new" className="underline">Create one?</Link></p>
+                )}
               </div>
               
               <div className="space-y-2">
                 <Label htmlFor="contentTemplate">Content Template (Optional)</Label>
-                <Select value={selectedTemplateId} onValueChange={handleUpdateTemplate} disabled={!canEditThisWorkflow}>
+                <Select 
+                  value={selectedTemplateId || 'NO_TEMPLATE_SELECTED'} 
+                  onValueChange={handleUpdateTemplate} 
+                  disabled={!canEditThisWorkflow || !workflow?.brand_id || isLoadingBrandWorkflows}
+                >
                   <SelectTrigger id="contentTemplate">
-                    <SelectValue placeholder="Select a content template" />
+                    <SelectValue placeholder={!workflow?.brand_id ? "Select a brand first" : isLoadingBrandWorkflows ? "Loading templates..." : "Select a content template"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {contentTemplates.map((template) => (
+                    <SelectItem value="NO_TEMPLATE_SELECTED">No Template</SelectItem>
+                    {availableContentTemplates.map((template) => (
                       <SelectItem key={template.id} value={template.id}>
                         {template.name}
                       </SelectItem>
                     ))}
+                     {workflow?.brand_id && !isLoadingBrandWorkflows && availableContentTemplates.length === 0 && contentTemplates.length > 0 && (
+                        <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                            All templates are in use for this brand, or no templates available.
+                        </div>
+                    )}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Link this workflow to a specific content template to automatically use it when new content is created from that template for the selected brand.
+                <p className="text-xs text-muted-foreground flex items-center">
+                 <Info className="h-3 w-3 mr-1 shrink-0" /> Link this workflow to a template.
                 </p>
               </div>
             </div>
@@ -832,27 +873,34 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
             </div>
           </CardHeader>
           <CardContent>
-            {workflow.steps.length === 0 ? (
+            {(!workflow.steps || workflow.steps.length === 0) ? (
               <div className="text-center py-8 text-muted-foreground">
                 No steps defined for this workflow. Click "Add Step" to create your first workflow step.
               </div>
             ) : (
               <div className="space-y-6">
-                {workflow.steps.map((step: any, index: number) => (
-                  <div key={step.id || index} className="border rounded-lg p-4">
+                {workflow.steps.map((step: WorkflowStepDefinition, index: number) => (
+                  <div key={step.id || `step-${index}`} className="border rounded-lg p-4 bg-card">
                     <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center">
-                        <span className="flex items-center justify-center w-6 h-6 bg-primary text-white rounded-full text-xs font-medium mr-3">
+                      <div className="flex items-center gap-3">
+                        <span className="flex items-center justify-center w-6 h-6 bg-primary text-primary-foreground rounded-full text-xs font-medium">
                           {index + 1}
                         </span>
-                        <h3 className="font-medium">Step {index + 1}</h3>
-                      </div>
-                      <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-1">
+                          <Input
+                            id={`step-name-${index}`}
+                            value={step.name}
+                            onChange={(e) => handleUpdateStepName(index, e.target.value)}
+                            placeholder={`Step ${index + 1} Name`}
+                            className="text-base font-medium flex-grow"
+                            disabled={!canEditThisWorkflow}
+                          />
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleMoveStepUp(index)}
-                          disabled={index === 0}
+                            disabled={index === 0 || !canEditThisWorkflow}
+                            aria-label="Move step up"
                         >
                           <ChevronUp className="h-4 w-4" />
                         </Button>
@@ -860,7 +908,8 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleMoveStepDown(index)}
-                          disabled={index === workflow.steps.length - 1}
+                            disabled={index === workflow.steps.length - 1 || !canEditThisWorkflow}
+                            aria-label="Move step down"
                         >
                           <ChevronDown className="h-4 w-4" />
                         </Button>
@@ -869,130 +918,131 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                           size="icon"
                           onClick={() => handleRemoveStep(index)}
                           className="text-destructive hover:text-destructive/90"
+                            aria-label="Remove step"
+                            disabled={!canEditThisWorkflow || workflow.steps.length <=1}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
-                    
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor={`step-name-${index}`}>Step Name <span className="text-destructive">*</span></Label>
-                          <Input id={`step-name-${index}`} value={step.name || ''} onChange={(e) => handleUpdateStepName(index, e.target.value)} placeholder="Enter step name" disabled={!canEditThisWorkflow}/>
                         </div>
                         
-                        <div className="space-y-2">
-                          <Label>Role</Label>
+                    <div className="mb-4">
+                      <Label className="text-sm font-medium mb-2 block">Assigned Role</Label>
                           <RoleSelectionCards 
-                            stepIndex={index} 
-                            selectedRole={step.role || 'editor'} 
-                            onRoleSelect={(value) => handleUpdateStepRole(index, value)} 
+                        selectedRole={step.role}
+                        onRoleSelect={(roleId) => handleUpdateStepRole(index, roleId)}
                             disabled={!canEditThisWorkflow}
                           />
-                        </div>
                       </div>
                       
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <Label htmlFor={`step-description-${index}`}>Step Description</Label>
+                    <div className="mb-4 space-y-2">
+                      <Label htmlFor={`step-description-${index}`} className="text-sm font-medium">Step Description</Label>
+                       <div className="relative">
+                        <Textarea
+                          id={`step-description-${index}`}
+                          value={step.description}
+                          onChange={(e) => handleUpdateStepDescription(index, e.target.value)}
+                          placeholder="Describe the purpose or actions for this step..."
+                          rows={3}
+                          className="pr-32" 
+                          disabled={!canEditThisWorkflow}
+                        />
                           <Button 
                              type="button" 
                              variant="outline" 
                              size="sm" 
                              onClick={() => handleGenerateStepDescription(index)}
-                             disabled={stepDescLoading[index] || !workflow.steps[index]?.name || !workflow.steps[index]?.role || !canEditThisWorkflow}
+                            disabled={stepDescLoading[index] || !step.name || !step.role || !canEditThisWorkflow}
+                            className="absolute bottom-2 right-2"
                            >
-                            {stepDescLoading[index] ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                            Auto-Generate
+                            {stepDescLoading[index] ? (
+                                <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Generating...</>
+                            ) : (
+                                <>✨ Auto-Generate</>
+                            )}
                           </Button>
                         </div>
-                        <Textarea
-                          id={`step-description-${index}`}
-                          value={step.description || ''}
-                          onChange={(e) => handleUpdateStepDescription(index, e.target.value)}
-                          rows={2}
-                          disabled={!canEditThisWorkflow}
-                        />
                       </div>
                       
-                      <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2 mb-4">
                         <Switch
-                          id={`step-approval-${index}`}
+                        id={`approval-required-${index}`}
                           checked={!step.approvalRequired}
-                          onCheckedChange={(value) => handleUpdateStepApprovalRequired(index, !value)}
+                        onCheckedChange={(checked) => handleUpdateStepApprovalRequired(index, !checked)}
                           disabled={!canEditThisWorkflow}
                         />
-                        <Label htmlFor={`step-approval-${index}`}>This step is optional</Label>
+                      <Label htmlFor={`approval-required-${index}`} className="text-sm font-medium cursor-pointer">
+                        This step is optional (approval not strictly required)
+                      </Label>
                       </div>
                       
-                      <div className="space-y-2">
-                        <Label htmlFor={`step-assignees-${index}`}>Assignees</Label>
-                        <div className="relative flex items-center space-x-2">
+                    <div className="space-y-3">
+                        <Label htmlFor={`assignee-input-${index}`} className="text-sm font-medium">Assign Users (Optional)</Label>
+                        <div className="flex items-center gap-2">
                           <Input
-                            id={`step-assignees-${index}`}
-                            placeholder="Enter email address or search for user."
+                                id={`assignee-input-${index}`}
+                                type="text"
+                                placeholder="Enter email or search by name/email"
                             value={assigneeInputs[index] || ''}
-                            onChange={e => {
-                              const val = e.target.value;
-                              setAssigneeInputs(prev => {
-                                const updated = [...prev];
-                                updated[index] = val;
-                                return updated;
-                              });
-                              searchUsers(val, index);
-                            }}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleAddAssignee(index);
-                              }
-                            }}
-                            className="flex-grow mr-2"
+                                onChange={(e) => handleAssigneeInputChange(index, e.target.value)}
+                                className="flex-grow"
                             disabled={!canEditThisWorkflow}
                           />
                           <Button 
+                                type="button" 
+                                onClick={() => handleAddEmailAsAssignee(index)}
+                                disabled={!canEditThisWorkflow || !assigneeInputs[index]?.trim() || !assigneeInputs[index]?.includes('@')}
                             variant="outline" 
-                            size="sm"
-                            onClick={() => handleAddAssignee(index)}
-                            disabled={!canEditThisWorkflow || !assigneeInputs[index]?.trim()}
                           >
-                            Add
+                                <UserPlus className="mr-2 h-4"/> Add Email
                           </Button>
-                          {userSearchLoading[index] && <span className="ml-2 text-xs">Searching...</span>}
-                          {userSearchResults[index] && userSearchResults[index].length > 0 && (
-                            <div className="absolute left-0 top-full z-10 bg-white border rounded shadow mt-1 w-full max-w-xs">
-                              {userSearchResults[index].map((user: any) => (
-                                <div
-                                  key={user.id}
-                                  className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
-                                  onClick={() => handleAddAssignee(index, user.email)}
-                                >
-                                  {user.full_name ? `${user.full_name} <${user.email}>` : user.email}
-                                </div>
-                              ))}
-                            </div>
-                          )}
                         </div>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {Array.isArray(step.assignees) ? (
-                            step.assignees.map((assignee: any) => (
-                              <Badge key={assignee.id || assignee.email} variant="outline" className="text-xs flex items-center">
-                                {assignee.email || 'No email'}
+
+                        {userSearchLoading[index] && <div className="text-sm text-muted-foreground py-2"><Loader2 className="inline-block mr-2 h-4 w-4 animate-spin" />Searching users...</div>}
+                          {userSearchResults[index] && userSearchResults[index].length > 0 && (
+                            <Card className="mt-2 max-h-48 overflow-y-auto">
+                                <CardContent className="p-2 space-y-1">
+                                    {userSearchResults[index].map((user) => (
+                                        <button
+                                  key={user.id}
+                                            type="button"
+                                            onClick={() => handleAddUserToStep(index, user)}
+                                            className="w-full text-left p-2 hover:bg-accent rounded-md text-sm flex items-center justify-between"
+                                            disabled={!canEditThisWorkflow}
+                                >
+                                          <span>{user.full_name || user.email} {user.full_name && user.email && `(${user.email})`}</span>
+                                          <Plus className="h-4 w-4 text-muted-foreground" />
+                                        </button>
+                              ))}
+                                </CardContent>
+                            </Card>
+                          )}
+                        {assigneeInputs[index] && userSearchResults[index]?.length === 0 && !userSearchLoading[index] && assigneeInputs[index].length >=2 && (
+                             <p className="text-sm text-muted-foreground py-2">No users found matching "{assigneeInputs[index]}". You can still add by full email address.</p>
+                        )}
+
+                        {step.assignees.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                                <p className="text-xs text-muted-foreground">Assigned:</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {step.assignees.map((assignee) => (
+                                        <Badge key={assignee.id || assignee.email} variant="secondary" className="pl-2 text-sm">
+                                            {assignee.full_name || assignee.email}
                                 <button
                                   type="button"
-                                  onClick={() => handleRemoveAssignee(index, assignee.id)}
-                                  className="ml-1 text-muted-foreground hover:text-destructive"
+                                                onClick={() => handleRemoveUserFromStep(index, assignee.id || assignee.email!)}
+                                                className="ml-1.5 p-0.5 rounded-full hover:bg-destructive/20 text-destructive"
+                                                aria-label={`Remove ${assignee.full_name || assignee.email}`}
+                                                disabled={!canEditThisWorkflow}
                                 >
-                                  <XCircle className="h-3 w-3" />
+                                                <XCircle className="h-3.5 w-3.5" />
                                 </button>
                               </Badge>
-                            ))
-                          ) : (
-                            <span className="text-xs text-muted-foreground">No assignees</span>
-                          )}
+                                    ))}
                         </div>
                       </div>
+                        )}
                     </div>
                   </div>
                 ))}
@@ -1011,17 +1061,13 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
         onConfirm={handleDeleteWorkflow}
       />
 
-      {/* Standard 3.1: Consolidated Form Actions - Bottom Right */}
-      <div className="flex justify-end space-x-2 pt-4 mt-4 border-t">
-        <Button variant="outline" asChild disabled={isSaving || isDeleting}>
-            <Link href={`/dashboard/workflows/${id}`}>Cancel</Link>
+      <div className="flex justify-end space-x-3 mt-8 sticky bottom-0 bg-background/95 py-4 z-10 border-t border-border">
+        <Button variant="outline" onClick={() => router.push(`/dashboard/workflows/${id}`)} disabled={isSaving || isDeleting}>
+            Cancel
         </Button>
-        <Button onClick={handleSaveWorkflow} disabled={isSaving || isDeleting}>
+        <Button onClick={handleSaveWorkflow} disabled={isSaving || isDeleting || !canEditThisWorkflow}>
             {isSaving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
-              </>
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
             ) : (
               'Save Changes'
             )}

@@ -80,6 +80,9 @@ interface ContentVersion {
   reviewer_id?: string;
   reviewer?: { id: string; full_name?: string; avatar_url?: string };
   created_at: string;
+  content_json?: { // Added for displaying content at this step
+    generatedOutputs?: Record<string, string>;
+  } | null;
 }
 
 // Define Template related interfaces if not imported
@@ -579,6 +582,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
               ) as WorkflowStep | undefined}
               isCurrentUserStepOwner={content.workflow.steps.some((step: any) => step.id === content.current_step && step.assignees?.some((assignee: any) => assignee.id === currentUser?.id))}
               versions={versions}
+              template={template}
               onActionComplete={handleWorkflowActionCompletion}
               performContentSave={handleSave}
             />

@@ -129,7 +129,7 @@ const getFallbackBrands = (): FormattedBrand[] => {
 export const GET = withAuth(async (req: NextRequest, user) => {
   try {
     if (isBuildPhase()) {
-      console.log('Returning mock brands during build');
+      // console.log('Returning mock brands during build');
       return NextResponse.json({ 
         success: true, 
         isMockData: true,
@@ -137,11 +137,11 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       });
     }
     
-    console.log('Attempting to fetch brands from database');
+    // console.log('Attempting to fetch brands from database');
     const supabase = createSupabaseAdminClient();
     
     const globalRole = user?.user_metadata?.role;
-    console.log('User global role:', globalRole); 
+    // console.log('User global role:', globalRole); 
 
     let brandsQuery = supabase
       .from('brands')
@@ -149,45 +149,45 @@ export const GET = withAuth(async (req: NextRequest, user) => {
 
     if (globalRole !== 'admin') {
       // Fetch brand_permissions directly for the user if they are not a global admin
-      console.log(`User ${user.id} is not a global admin. Fetching specific brand permissions.`);
+      // console.log(`User ${user.id} is not a global admin. Fetching specific brand permissions.`);
       const { data: permissionsData, error: permissionsError } = await supabase
         .from('user_brand_permissions')
         .select('brand_id')
         .eq('user_id', user.id);
 
       if (permissionsError) {
-        console.error(`[API Brands GET] Error fetching brand permissions for user ${user.id}:`, permissionsError);
+        // console.error(`[API Brands GET] Error fetching brand permissions for user ${user.id}:`, permissionsError);
         // Potentially return error or handle appropriately, for now, let it fall through to an empty list if query fails this way
         // but ideally, this should be a hard error.
         return handleApiError(permissionsError, 'Failed to fetch user brand permissions');
       }
 
       if (!permissionsData || permissionsData.length === 0) {
-        console.log(`[API Brands GET] Non-admin user ${user.id} has no brand permissions in user_brand_permissions table. Returning empty array.`);
+        // console.log(`[API Brands GET] Non-admin user ${user.id} has no brand permissions in user_brand_permissions table. Returning empty array.`);
         return NextResponse.json({ success: true, data: [] });
       }
       
       const permittedBrandIds = permissionsData.map(p => p.brand_id).filter(id => id != null);
       
       if (permittedBrandIds.length === 0) {
-        console.log(`[API Brands GET] Non-admin user ${user.id} has no valid brand IDs after fetching permissions. Returning empty array.`);
+        // console.log(`[API Brands GET] Non-admin user ${user.id} has no valid brand IDs after fetching permissions. Returning empty array.`);
         return NextResponse.json({ success: true, data: [] });
       }
       
-      console.log(`[API Brands GET] User ${user.id} (role: ${globalRole}) has permitted brand IDs: ${permittedBrandIds.join(', ')}. Applying filter.`);
+      // console.log(`[API Brands GET] User ${user.id} (role: ${globalRole}) has permitted brand IDs: ${permittedBrandIds.join(', ')}. Applying filter.`);
       brandsQuery = brandsQuery.in('id', permittedBrandIds);
     } else {
-      console.log(`User ${user.id} is a global admin. Fetching all brands.`);
+      // console.log(`User ${user.id} is a global admin. Fetching all brands.`);
     }
     
     const { data: brandsData, error } = await brandsQuery.order('name');
     
     if (error) {
-      console.error('Error executing brands query:', error);
+      // console.error('Error executing brands query:', error);
       throw error;
     }
     
-    console.log('Brands data fetched from database:', brandsData); // Log the raw data fetched
+    // console.log('Brands data fetched from database:', brandsData); // Log the raw data fetched
     
     const brandsDataCast = brandsData as BrandFromSupabase[] | null;
 
@@ -234,17 +234,17 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       };
     });
 
-    console.log(`Successfully fetched ${formattedBrands.length} brands`);
+    // console.log(`Successfully fetched ${formattedBrands.length} brands`);
     
     return NextResponse.json({ 
       success: true, 
       data: formattedBrands 
     });
   } catch (error: any) {
-    console.error('Error fetching brands:', error);
+    // console.error('Error fetching brands:', error);
     
     if (isDatabaseConnectionError(error)) {
-      console.error('Database connection error, using fallback brands data:', error);
+      // console.error('Database connection error, using fallback brands data:', error);
       return NextResponse.json({ 
         success: true, 
         isFallback: true,
@@ -318,12 +318,25 @@ export const POST = withAuth(async (req: NextRequest, user) => {
     );
 
     if (rpcError) {
-      console.error('RPC Error creating brand:', rpcError);
+      // console.error('RPC Error creating brand:', rpcError);
       throw new Error(`Failed to create brand: ${rpcError.message}`);
     }
 
     if (!newBrandId) {
       throw new Error('Failed to create brand, no ID returned from function.');
+    }
+
+    // Update master_claim_brand_id if provided
+    if (body.master_claim_brand_id) {
+      const { error: updateMasterClaimError } = await supabase
+        .from('brands')
+        .update({ master_claim_brand_id: body.master_claim_brand_id } as any)
+        .eq('id', newBrandId);
+      
+      if (updateMasterClaimError) {
+        // Log the error but don't fail the brand creation, as the primary record is made
+        // console.warn(`[API /api/brands POST] Failed to update master_claim_brand_id for new brand ${newBrandId}: ${updateMasterClaimError.message}`);
+      }
     }
 
     // Populate normalized_website_domain
@@ -337,7 +350,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
         
         if (updateDomainError) {
           // Log the error but don't fail the brand creation, as the primary record is made
-          console.warn(`[API /api/brands POST] Failed to update normalized_website_domain for new brand ${newBrandId}: ${updateDomainError.message}`);
+          // console.warn(`[API /api/brands POST] Failed to update normalized_website_domain for new brand ${newBrandId}: ${updateDomainError.message}`);
         }
       }
     }
@@ -357,7 +370,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
         adminUser = await getUserAuthByEmail(identifier, supabase);
         if (!adminUser) {
           // User does not exist, invite them
-          console.log(`[API /api/brands POST] Admin email ${identifier} not found. Inviting as new user for brand ${newBrandId}.`);
+          // console.log(`[API /api/brands POST] Admin email ${identifier} not found. Inviting as new user for brand ${newBrandId}.`);
           const appMetadata = { 
             intended_role: 'admin', 
             assigned_as_brand_admin_for_brand_id: newBrandId,
@@ -374,13 +387,13 @@ export const POST = withAuth(async (req: NextRequest, user) => {
           );
 
           if (inviteError || !invitedAdmin) {
-            console.warn(`[API /api/brands POST] Failed to invite new admin ${identifier} for brand ${newBrandId}. Error: ${inviteError?.message}`);
+            // console.warn(`[API /api/brands POST] Failed to invite new admin ${identifier} for brand ${newBrandId}. Error: ${inviteError?.message}`);
             // Decide on error handling: skip this admin, or fail request? For now, skip.
             continue;
           }
           adminUser = invitedAdmin;
           isNewAdmin = true;
-          console.log(`[API /api/brands POST] Successfully invited new admin ${identifier} (ID: ${adminUser.id}) for brand ${newBrandId}.`);
+          // console.log(`[API /api/brands POST] Successfully invited new admin ${identifier} (ID: ${adminUser.id}) for brand ${newBrandId}.`);
         }
       } else {
         // Identifier is assumed to be an existing user ID
@@ -408,7 +421,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
       const { error: permissionError } = await supabase.from('user_brand_permissions').upsert(permissionUpserts, { onConflict: 'user_id,brand_id' });
 
       if (permissionError) {
-        console.error('[API /api/brands POST] Error setting brand admin permissions for existing users:', permissionError);
+        // console.error('[API /api/brands POST] Error setting brand admin permissions for existing users:', permissionError);
         // Non-critical if some permissions fail for existing users? Or rollback?
         // For now, log and continue.
       }
@@ -423,7 +436,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
         .eq('brand_id', newBrandId);
 
       if (fetchLinksError) {
-        console.warn(`[API /api/brands POST] Error fetching existing agency links for brand ${newBrandId}:`, fetchLinksError);
+        // console.warn(`[API /api/brands POST] Error fetching existing agency links for brand ${newBrandId}:`, fetchLinksError);
         // Decide if this is critical. For now, proceed cautiously.
       }
 
@@ -441,7 +454,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
           .insert(agencyInserts);
 
         if (agencyError) {
-          console.warn('[API /api/brands POST] Error linking new agencies to brand:', agencyError);
+          // console.warn('[API /api/brands POST] Error linking new agencies to brand:', agencyError);
           // Log and continue, as brand creation itself was successful.
         }
       }
@@ -467,7 +480,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
       .eq('brand_id', newBrandId);
     
     if (fetchAgenciesError) {
-        console.warn('[API /api/brands POST] Error fetching agencies for new brand:', fetchAgenciesError);
+        // console.warn('[API /api/brands POST] Error fetching agencies for new brand:', fetchAgenciesError);
     }
 
     const finalSelectedVettingAgencies: VettingAgency[] = (finalSelectedSupabaseAgencies || [])

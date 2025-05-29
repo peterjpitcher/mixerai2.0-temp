@@ -23,12 +23,12 @@ export const GET = withAuth(async (
       );
     }
 
-    console.log('API Route - GET template - Context:', context);
+    // console.log('API Route - GET template - Context:', context);
     const id = context.params.id;
-    console.log('API Route - Template ID from params:', id);
+    // console.log('API Route - Template ID from params:', id);
     
     if (!id) {
-      console.error('API Route - Missing template ID in params');
+      // console.error('API Route - Missing template ID in params');
       return NextResponse.json(
         { success: false, error: 'Template ID is required' },
         { status: 400 }
@@ -45,17 +45,17 @@ export const GET = withAuth(async (
       .single();
     
     if (error) {
-      console.error('API Route - Supabase error fetching template:', error);
+      // console.error('API Route - Supabase error fetching template:', error);
       throw error;
     }
     
-    console.log('API Route - Successfully fetched template:', template?.id);
+    // console.log('API Route - Successfully fetched template:', template?.id);
     return NextResponse.json({ 
       success: true, 
       template 
     });
   } catch (error) {
-    console.error('Error fetching content template:', error);
+    // console.error('Error fetching content template:', error);
     return handleApiError(error, 'Failed to fetch content template');
   }
 });
@@ -77,14 +77,14 @@ export const PUT = withAuth(async (
       );
     }
 
-    console.log('API Route - PUT template - Context:', context);
+    // console.log('API Route - PUT template - Context:', context);
     const id = context.params.id;
-    console.log('API Route - Template ID from params:', id);
+    // console.log('API Route - Template ID from params:', id);
     
     const data = await request.json();
     
     if (!id) {
-      console.error('API Route - Missing template ID in params');
+      // console.error('API Route - Missing template ID in params');
       return NextResponse.json(
         { success: false, error: 'Template ID is required' },
         { status: 400 }
@@ -136,10 +136,10 @@ export const PUT = withAuth(async (
             generatedDescription = aiData.description;
           }
         } else {
-          console.warn('Failed to generate AI description for template update.');
+          // console.warn('Failed to generate AI description for template update.');
         }
       } catch (aiError) {
-        console.warn('Error calling AI template description generation service on update:', aiError);
+        // console.warn('Error calling AI template description generation service on update:', aiError);
       }
     }
     // --- End AI Description Generation ---
@@ -172,7 +172,7 @@ export const PUT = withAuth(async (
 
     if (!singleUpdatedTemplate) {
       // This case should ideally not happen if the update was successful and ID exists
-      console.error('API Route - Template not found after update, or update returned no data. ID:', id);
+      // console.error('API Route - Template not found after update, or update returned no data. ID:', id);
       return NextResponse.json(
         { success: false, error: 'Template not found after update.' },
         { status: 404 } 
@@ -184,7 +184,7 @@ export const PUT = withAuth(async (
       template: singleUpdatedTemplate
     });
   } catch (error) {
-    console.error('Error updating content template:', error);
+    // console.error('Error updating content template:', error);
     return handleApiError(error, 'Failed to update content template');
   }
 });
@@ -207,10 +207,10 @@ export const DELETE = withAuth(async (
     }
 
     const templateIdToDelete = context.params.id;
-    console.log('API Route - DELETE template - Template ID from params:', templateIdToDelete);
+    // console.log('API Route - DELETE template - Template ID from params:', templateIdToDelete);
     
     if (!templateIdToDelete) {
-      console.error('API Route - Missing template ID in params');
+      // console.error('API Route - Missing template ID in params');
       return NextResponse.json(
         { success: false, error: 'Template ID is required' },
         { status: 400 }
@@ -225,7 +225,7 @@ export const DELETE = withAuth(async (
     });
 
     if (rpcError) {
-      console.error('Error calling delete_template_and_update_content RPC:', rpcError);
+      // console.error('Error calling delete_template_and_update_content RPC:', rpcError);
       // Check for specific PostgreSQL error codes if the function indicates template not found
       // This depends on how the function handles "not found" (e.g., raises an error or warning)
       // If it raises a specific error or a general one that we can identify:
@@ -241,7 +241,7 @@ export const DELETE = withAuth(async (
     });
 
   } catch (error) {
-    console.error('Error deleting content template:', error);
+    // console.error('Error deleting content template:', error);
     // Ensure the error response structure is consistent if handleApiError is not already doing so
     const apiError = handleApiError(error, 'Failed to delete content template');
     // Check if apiError is already a NextResponse, if so return it, otherwise wrap it.

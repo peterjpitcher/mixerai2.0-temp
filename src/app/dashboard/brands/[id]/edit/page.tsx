@@ -7,14 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-// import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs'; // Commented out due to persistent import issues
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, X, PlusCircle, ArrowLeft, Trash2, AlertTriangle, Users, Link2, ExternalLink, Sparkles } from 'lucide-react';
+import { Loader2, X, PlusCircle, ArrowLeft, Trash2, AlertTriangle, Users, Link2, ExternalLink, Sparkles, Info } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/checkbox";
+import { Badge } from "@/components/badge";
 import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
 import { PageHeader } from '@/components/dashboard/page-header';
@@ -83,8 +83,8 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   const [isLoadingBrand, setIsLoadingBrand] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  // const [activeTab, setActiveTab] = useState('basic'); // Commented out as Tabs are removed
   const [isGenerating, setIsGenerating] = useState(false);
+  const [activeTab, setActiveTab] = useState('basic');
 
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
@@ -100,16 +100,12 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     brand_identity: '',
     tone_of_voice: '',
     guardrails: '',
-    selected_agency_ids: [] as string[], // Renamed for clarity, stores IDs of selected agencies
+    selected_agency_ids: [] as string[],
     master_claim_brand_id: null as string | null,
   });
   const [currentAdditionalUrl, setCurrentAdditionalUrl] = useState('');
-  const [customAgencyInput, setCustomAgencyInput] = useState('');
-  const [newCustomAgencyNames, setNewCustomAgencyNames] = useState<string[]>([]); // For custom agencies not in the list
 
   const [allVettingAgencies, setAllVettingAgencies] = useState<VettingAgency[]>([]);
-  // Updated state for grouped agencies
-  const [groupedAgenciesForBrandCountry, setGroupedAgenciesForBrandCountry] = useState<GroupedVettingAgencies>({ high: [], medium: [], low: [], other: [] });
   const [isLoadingAgencies, setIsLoadingAgencies] = useState(true);
 
   const [masterClaimBrands, setMasterClaimBrands] = useState<MasterClaimBrand[]>([]);
@@ -120,7 +116,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   const breadcrumbItems = [
     { label: "Dashboard", href: "/dashboard" },
     { label: "Brands", href: "/dashboard/brands" },
-    { label: `Edit: ${brand?.name || id}` },
+    { label: `Edit: ${formData.name || brand?.name || id}` },
   ];
 
   useEffect(() => {
@@ -162,7 +158,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   }, [id]);
 
   useEffect(() => {
-    if (isForbidden) return;
+    if (isForbidden || isLoadingUser) return;
 
     const fetchBrandData = async () => {
       setIsLoadingBrand(true);
@@ -228,8 +224,8 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         const response = await fetch('/api/content-vetting-agencies');
         if (!response.ok) throw new Error('Failed to fetch vetting agencies');
         const data = await response.json();
-        if (data.success && Array.isArray(data.data)) { // Corrected to data.data
-          setAllVettingAgencies(data.data);
+        if (data.success && Array.isArray(data.data)) {
+          setAllVettingAgencies(data.data.map((a:any) => ({...a, priority: a.priority || 4 })));
         } else {
           throw new Error(data.error || 'Failed to parse vetting agencies');
         }
@@ -259,50 +255,13 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         setIsLoadingMasterClaimBrands(false);
       }
     };
-
-    fetchBrandData();
-    fetchAllVettingAgencies();
-    fetchMasterClaimBrands();
-  }, [id, isForbidden]);
-
-  // Effect to filter and group agencies based on brand country
-  useEffect(() => {
-    if (formData.country && allVettingAgencies.length > 0) {
-      const filtered = allVettingAgencies.filter(agency => !agency.country_code || agency.country_code === formData.country);
-      
-      // Sort by priority (numeric) then by name
-      filtered.sort((a, b) => {
-        const priorityAValue = typeof a.priority === 'number' ? a.priority : Number.MAX_SAFE_INTEGER;
-        const priorityBValue = typeof b.priority === 'number' ? b.priority : Number.MAX_SAFE_INTEGER;
-        
-        if (priorityAValue !== priorityBValue) {
-          return priorityAValue - priorityBValue;
-        }
-        return (a.name || '').localeCompare(b.name || '');
-      });
-
-      const groups: GroupedVettingAgencies = { high: [], medium: [], low: [], other: [] };
-      filtered.forEach(agency => {
-        const priorityValue = agency.priority;
-        if (typeof priorityValue === 'number') {
-          if (priorityValue === 1) {
-            groups.high.push(agency);
-          } else if (priorityValue === 2) {
-            groups.medium.push(agency);
-          } else if (priorityValue === 3) {
-            groups.low.push(agency);
-          } else {
-            groups.other.push(agency); // Other numeric priorities
-          }
-        } else {
-          groups.other.push(agency); // Agencies with undefined or non-numeric priority
-        }
-      });
-      setGroupedAgenciesForBrandCountry(groups);
-    } else {
-      setGroupedAgenciesForBrandCountry({ high: [], medium: [], low: [], other: [] });
+    
+    if (!isForbidden) {
+        fetchBrandData();
+        fetchAllVettingAgencies();
+        fetchMasterClaimBrands();
     }
-  }, [formData.country, allVettingAgencies]);
+  }, [id, isForbidden, isLoadingUser]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -314,14 +273,14 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   };
 
   const handleMasterClaimBrandChange = (value: string) => {
-    setFormData(prev => ({ ...prev, master_claim_brand_id: value === "@none@" ? null : value }));
+    setFormData(prev => ({ ...prev, master_claim_brand_id: value || null }));
   };
 
   const handleAddAdditionalUrlField = () => {
     if (currentAdditionalUrl.trim() !== '') {
       setFormData(prev => ({
         ...prev,
-        additional_website_urls: [...prev.additional_website_urls, { id: uuidv4(), value: currentAdditionalUrl.trim() }],
+        additional_website_urls: [...prev.additional_website_urls, { id: uuidv4(), value: currentAdditionalUrl.trim() }]
       }));
       setCurrentAdditionalUrl('');
     }
@@ -330,146 +289,89 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   const handleRemoveAdditionalUrl = (idToRemove: string) => {
     setFormData(prev => ({
       ...prev,
-      additional_website_urls: prev.additional_website_urls.filter(url => url.id !== idToRemove),
+      additional_website_urls: prev.additional_website_urls.filter(url => url.id !== idToRemove)
     }));
   };
-
+  
   const handleAdditionalUrlChange = (idToUpdate: string, newValue: string) => {
     setFormData(prev => ({
       ...prev,
       additional_website_urls: prev.additional_website_urls.map(url =>
         url.id === idToUpdate ? { ...url, value: newValue } : url
-      ),
+      )
     }));
   };
 
   const handleAgencyCheckboxChange = (agencyId: string, checked: boolean | string) => {
     setFormData(prev => {
-      const currentSelectedIds = prev.selected_agency_ids || [];
-      let newSelectedIds;
-      if (checked === true) {
-        newSelectedIds = Array.from(new Set([...currentSelectedIds, agencyId]));
+      const currentSelected = prev.selected_agency_ids || [];
+      if (checked) {
+        return { ...prev, selected_agency_ids: [...currentSelected, agencyId] };
       } else {
-        newSelectedIds = currentSelectedIds.filter(id => id !== agencyId);
+        return { ...prev, selected_agency_ids: currentSelected.filter(id => id !== agencyId) };
       }
-      return { ...prev, selected_agency_ids: newSelectedIds };
     });
   };
 
-  const handleAddCustomAgency = () => {
-    if (customAgencyInput.trim() !== '' && !newCustomAgencyNames.includes(customAgencyInput.trim())) {
-      setNewCustomAgencyNames(prev => [...prev, customAgencyInput.trim()]);
-      setCustomAgencyInput('');
-    }
-  };
-
-  const handleRemoveCustomAgency = (nameToRemove: string) => {
-    setNewCustomAgencyNames(prev => prev.filter(name => name !== nameToRemove));
-  };
-
-
   const handleGenerateBrandIdentity = async () => {
-    if (!formData.name || !formData.website_url) {
-      toast.error('Brand Name and Website URL are required to generate Brand Identity.');
+    if (!formData.website_url && formData.additional_website_urls.length === 0) {
+      toast.error("Please provide at least one website URL to generate brand identity.");
       return;
     }
     setIsGenerating(true);
     try {
-      const response = await fetch('/api/ai/generate-brand-identity', {
+      const primaryUrl = formData.website_url;
+      const otherUrls = formData.additional_website_urls.map(item => item.value);
+      
+      const response = await fetch('/api/brands/identity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brandName: formData.name,
-          websiteUrl: formData.website_url,
-          country: formData.country,
-          currentIdentity: formData.brand_identity,
-          brandId: id
-        }),
+        body: JSON.stringify({ main_url: primaryUrl, additional_urls: otherUrls })
       });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
       const data = await response.json();
-      if (data.success && data.brandIdentity) {
-        setFormData(prev => ({ ...prev, brand_identity: data.brandIdentity }));
-        toast.success('Brand Identity Generated', { description: 'The AI has generated a new brand identity based on the provided details.'});
+      if (data.success) {
+        setFormData(prev => ({
+          ...prev,
+          brand_identity: data.brandIdentity?.brandIdentity || prev.brand_identity,
+          tone_of_voice: data.brandIdentity?.toneOfVoice || prev.tone_of_voice,
+        }));
+        toast.success("Brand identity generated!");
       } else {
-        throw new Error(data.error || 'Failed to generate brand identity - no content returned.');
+        toast.error(data.error || "Failed to generate brand identity.");
       }
-    } catch (err: any) {
-      console.error('Error generating brand identity:', err);
-      toast.error('Generation Failed', { description: err.message || 'Could not generate brand identity at this time.' });
+    } catch (err) {
+      toast.error("An error occurred while generating brand identity.");
+      console.error(err);
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleSave = async () => {
-    if (!formData.name) {
-      toast.error('Brand Name is required.');
-      return;
-    }
     setIsSaving(true);
-    setError(null);
-
-    const payload = {
-      ...formData,
-      additional_website_urls: formData.additional_website_urls.map(url => url.value), // Send only values
-      // selected_agency_ids is already in the correct format (array of IDs)
-      new_custom_agency_names: newCustomAgencyNames, // Send the names of newly added custom agencies
-    };
-    
-    // Remove content_vetting_agencies if it exists from old structure to avoid confusion
-    // delete (payload as any).content_vetting_agencies;
-    // Actually, ensure only selected_agency_ids and new_custom_agency_names are sent for agencies
-    const finalPayload: Record<string, any> = { ...payload };
-    delete finalPayload.content_vetting_agencies; // if this field was ever part of formData directly
-
     try {
+      const payload = {
+        ...formData,
+      };
       const response = await fetch(`/api/brands/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(finalPayload),
+        body: JSON.stringify(payload)
       });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || `HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Brand updated successfully!');
+        setBrand(data.brand);
+        if (data.brand && data.brand.admins && Array.isArray(data.brand.admins)) {
+          setDisplayedAdmins(data.brand.admins);
+        }
+        router.refresh(); 
+      } else {
+        toast.error(data.error || 'Failed to update brand.');
       }
-
-      setBrand(result.brand); // Update local brand state with response from API
-      setFormData(prev => ({
-        ...prev,
-        name: result.brand.name || '',
-        website_url: result.brand.website_url || '',
-        additional_website_urls: Array.isArray(result.brand.additional_website_urls)
-                                    ? result.brand.additional_website_urls.map((urlItem: string | { id?: string, value: string }) =>
-                                        typeof urlItem === 'string'
-                                            ? { id: uuidv4(), value: urlItem }
-                                            : { id: urlItem.id || uuidv4(), value: urlItem.value }
-                                      )
-                                    : [],
-        country: result.brand.country || '',
-        language: result.brand.language || '',
-        brand_color: result.brand.brand_color || '#1982C4',
-        brand_identity: result.brand.brand_identity || '',
-        tone_of_voice: result.brand.tone_of_voice || '',
-        guardrails: result.brand.guardrails || '',
-        selected_agency_ids: Array.isArray(result.brand.selected_vetting_agencies) 
-                                    ? result.brand.selected_vetting_agencies.map((agency: VettingAgency) => agency.id) 
-                                    : [],
-        master_claim_brand_id: result.brand.master_claim_brand_id || null,
-      }));
-      setNewCustomAgencyNames([]); // Clear custom names after successful save
-      toast.success('Brand Updated', { description: `Successfully updated ${result.brand.name}.` });
-      // Optionally, redirect or refresh some data
-      // router.push('/dashboard/brands');
-    } catch (err: any) {
-      console.error('Error saving brand:', err);
-      setError(err.message);
-      toast.error('Save Failed', { description: err.message || 'Could not update brand details.' });
+    } catch (err) {
+      toast.error('An error occurred while saving the brand.');
+      console.error(err);
     } finally {
       setIsSaving(false);
     }
@@ -503,340 +405,321 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     </div>
   );
 
-  if (isLoadingUser || (isLoadingBrand && !isForbidden)) {
+  if (isLoadingUser || (!isForbidden && isLoadingBrand)) {
+    return <div className="flex items-center justify-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
+  }
+  if (isForbidden) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      <div className="container mx-auto px-4 py-8">
+        <Card className="max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center">
+              <AlertTriangle className="mr-2 h-6 w-6" /> Access Denied
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>You do not have the necessary permissions to view or edit this brand.</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Contact your administrator if you believe this is an error.
+            </p>
+          </CardContent>
+          <CardFooter>
+            <Button onClick={() => router.push('/dashboard/brands')} variant="outline">
+              Back to Brands List
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
     );
   }
-
-  if (isForbidden && error === 'Brand not found.') {
-    return <NotFoundDisplay />;
+  if (error) {
+    return (
+        <div className="container mx-auto px-4 py-8 text-center">
+            <Card className="max-w-md mx-auto">
+                <CardHeader><CardTitle className="text-destructive">Error</CardTitle></CardHeader>
+                <CardContent><p>{error}</p></CardContent>
+                <CardFooter>
+                    <Button onClick={() => router.push('/dashboard/brands')} variant="outline">
+                        Back to Brands List
+                    </Button>
+                </CardFooter>
+            </Card>
+        </div>
+    );
   }
-  if (isForbidden) {
-    return <ForbiddenDisplay />;
-  }
-  if (error && error !== 'Brand not found.') {
-    return <ErrorDisplay message={error} />;
-  }
-  if (!brand && !isLoadingBrand && !isForbidden) {
-    return <NotFoundDisplay />;
-  }
-
-  const pageTitle = brand ? `Edit Brand: ${brand.name}` : 'Edit Brand';
-
+  
   return (
     <div className="container mx-auto px-4 py-8">
       <CustomBreadcrumbs items={breadcrumbItems} />
       <PageHeader 
-        title={pageTitle}
-        description="Manage the brand details, identity, and configurations."
-        actions={[
-          <Button key="back" variant="outline" onClick={() => router.push('/dashboard/brands')} className="text-sm">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Brands
-          </Button>,
-          <Button key="save" onClick={handleSave} disabled={isSaving || isGenerating} className="text-sm">
-            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-            Save Changes
-          </Button>
-        ]}
+        title={`Edit Brand: ${formData.name || 'Loading...'}`}
+        description="Update the details, identity, and settings for this brand."
+        actions={
+          <div className="flex items-center space-x-2">
+            <Button onClick={() => router.push('/dashboard/brands')} variant="outline">
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to List
+            </Button>
+            <Button onClick={handleSave} disabled={isSaving || isGenerating}>
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save Changes
+            </Button>
+          </div>
+        }
       />
 
-      {/* <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mt-6"> */}
-      {/*   <TabsList className="grid w-full grid-cols-3 md:max-w-md"> */}
-      {/*     <TabsTrigger value="basic">Basic Information</TabsTrigger> */}
-      {/*     <TabsTrigger value="identity">Brand Identity</TabsTrigger> */}
-      {/*     <TabsTrigger value="advanced">Advanced Settings</TabsTrigger> */}
-      {/*   </TabsList> */}
-      {/*   <TabsContent value="basic"> */}
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Basic Information</CardTitle>
-              <CardDescription>Set the foundational details for this brand.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="name">Brand Name <span className="text-red-500">*</span></Label>
-                <Input id="name" name="name" value={formData.name} onChange={handleInputChange} placeholder="e.g., MixerAI Foods" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="website_url">Main Website URL</Label>
-                <Input id="website_url" name="website_url" value={formData.website_url} onChange={handleInputChange} placeholder="e.g., https://www.mixerai.com" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="country">Primary Country</Label>
-                <Select name="country" value={formData.country} onValueChange={(value) => handleSelectChange('country', value)}>
-                  <SelectTrigger id="country">
-                    <SelectValue placeholder="Select country..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COUNTRIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="language">Primary Language</Label>
-                <Select name="language" value={formData.language} onValueChange={(value) => handleSelectChange('language', value)}>
-                  <SelectTrigger id="language">
-                    <SelectValue placeholder="Select language..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LANGUAGES.map(lang => <SelectItem key={lang.value} value={lang.value}>{lang.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-      {/*   </TabsContent> */}
-      {/*   <TabsContent value="identity"> */}
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Brand Identity</CardTitle>
-              <CardDescription>
-                Define the core identity, voice, and visual style of the brand. 
-                This information will be used by AI to generate on-brand content.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* 1. Additional Website URLs */}
-              <div className="space-y-2">
-                <Label htmlFor="additional_website_urls">Additional Website URLs (for context)</Label>
-                {formData.additional_website_urls.map((urlField) => (
-                  <div key={urlField.id} className="flex items-center gap-2">
+      <Card className="mt-6">
+        <CardHeader>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-4 mb-6">
+              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+              <TabsTrigger value="identity">Brand Identity</TabsTrigger>
+              <TabsTrigger value="team">Team</TabsTrigger>
+              <TabsTrigger value="rules">Content Rules</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="basic">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <Label htmlFor="name">Brand Name <span className="text-red-500">*</span></Label>
+                    <Input id="name" name="name" value={formData.name} onChange={handleInputChange} placeholder="e.g., Acme Innovations" required />
+                  </div>
+                  <div>
+                    <Label htmlFor="website_url">Primary Website URL</Label>
+                    <Input id="website_url" name="website_url" type="url" value={formData.website_url} onChange={handleInputChange} placeholder="https://www.example.com" />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="additional_website_urls">Additional Website URLs</Label>
+                  {formData.additional_website_urls.map((urlItem) => (
+                    <div key={urlItem.id} className="flex items-center space-x-2 mt-2">
+                      <Input
+                        type="url"
+                        value={urlItem.value}
+                        onChange={(e) => handleAdditionalUrlChange(urlItem.id, e.target.value)}
+                        placeholder="https://www.another-example.com"
+                        className="flex-grow"
+                      />
+                      <Button variant="ghost" size="icon" onClick={() => handleRemoveAdditionalUrl(urlItem.id)} aria-label="Remove URL">
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <div className="flex items-center space-x-2 mt-2">
                     <Input
                       type="url"
-                      value={urlField.value}
-                      onChange={(e) => handleAdditionalUrlChange(urlField.id, e.target.value)}
-                      placeholder="e.g., https://blog.mixerai.com, https://mixerai.com/about-us"
+                      value={currentAdditionalUrl}
+                      onChange={(e) => setCurrentAdditionalUrl(e.target.value)}
+                      placeholder="Add another URL and click Plus"
                       className="flex-grow"
                     />
-                    <Button variant="ghost" size="icon" onClick={() => handleRemoveAdditionalUrl(urlField.id)}>
-                      <Trash2 className="h-4 w-4 text-red-500" />
+                    <Button variant="outline" size="icon" onClick={handleAddAdditionalUrlField} aria-label="Add URL">
+                      <PlusCircle className="h-4 w-4" />
                     </Button>
                   </div>
-                ))}
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="additional_website_urls_new"
-                    type="url"
-                    value={currentAdditionalUrl}
-                    onChange={(e) => setCurrentAdditionalUrl(e.target.value)}
-                    placeholder="Add another URL..."
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddAdditionalUrlField()}
-                    className="flex-grow"
-                  />
-                  <Button onClick={handleAddAdditionalUrlField} variant="outline" size="sm">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add URL
-                  </Button>
+                   <p className="text-xs text-muted-foreground mt-1">
+                    <Info className="inline-block h-3 w-3 mr-1" />
+                    Used for brand identity generation and content research.
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Provide links to other relevant pages like blogs, about us, or specific product lines for better AI context.
-                </p>
-              </div>
-
-              {/* 2. AI Generate / Refine Button for Brand Identity */}
-              <div className="space-y-2">
-                <Button onClick={handleGenerateBrandIdentity} disabled={isGenerating || !formData.name || !formData.website_url} size="sm" variant="outline">
-                  {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                  AI Generate / Refine Brand Identity
-                </Button>
-                <p className="text-xs text-muted-foreground">
-                  Provide a brand name and main website URL (in Basic Information) to enable AI generation. Results are best when you provide a starting point in the Brand Identity field below.
-                </p>
-              </div>
-
-              {/* 3. Brand Identity Textarea */}
-              <div className="space-y-2">
-                <Label htmlFor="brand_identity">Brand Identity</Label>
-                <Textarea 
-                  id="brand_identity" 
-                  name="brand_identity" 
-                  value={formData.brand_identity} 
-                  onChange={handleInputChange} 
-                  placeholder="Describe the brand mission, values, target audience, and unique selling propositions..." 
-                  rows={8} 
-                  className="min-h-[160px]"
-                />
-              </div>
-
-              {/* 4. Tone of Voice */}
-              <div className="space-y-2">
-                <Label htmlFor="tone_of_voice">Tone of Voice</Label>
-                <Textarea id="tone_of_voice" name="tone_of_voice" value={formData.tone_of_voice} onChange={handleInputChange} placeholder="e.g., Friendly & approachable, Professional & authoritative, Witty & humorous..." rows={3} />
-              </div>
-
-              {/* 5. Guardrails & Restrictions */}
-              <div className="space-y-2">
-                <Label htmlFor="guardrails">Guardrails & Restrictions</Label>
-                <Textarea id="guardrails" name="guardrails" value={formData.guardrails} onChange={handleInputChange} placeholder="List topics, phrases, or claims to avoid. e.g., - Do not mention competitors by name.\n- Avoid making definitive health claims.\n- Max 3 exclamation marks per paragraph." rows={5} />
-                <p className="text-xs text-muted-foreground">Enter each restriction on a new line, optionally starting with a dash or bullet.</p>
-              </div>
-              
-              {/* 6. Brand Colour */}
-              <div className="space-y-2">
-                <Label htmlFor="brand_color" className="mb-1 block">Brand Colour</Label>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <Input 
-                      id="brand_color" 
-                      name="brand_color" 
-                      type="color" 
-                      value={formData.brand_color} 
-                      onChange={handleInputChange} 
-                      className="w-12 h-12 p-0.5 border-none rounded-md cursor-pointer"
-                    />
-                    <Input
-                      type="text"
-                      value={formData.brand_color}
-                      onChange={handleInputChange}
-                      name="brand_color"
-                      className="w-24 h-10"
-                      aria-label="Brand color hex code"
-                    />
-                  </div>
-                  <div className="mt-0">
-                    <BrandIcon color={formData.brand_color} name={formData.name || 'B'} size="md" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Content Vetting Agencies - ensuring correct display of groups */}
-              <div className="space-y-4">
-                <Label className="text-base font-medium">Content Vetting Agencies</Label>
-                {isLoadingAgencies ? (
-                  <div className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading agencies...</div>
-                ) : (
-                  <>
-                    {(Object.keys(groupedAgenciesForBrandCountry) as Array<keyof GroupedVettingAgencies>)
-                      .filter(priorityGroup => groupedAgenciesForBrandCountry[priorityGroup].length > 0)
-                      .map(priorityGroup => {
-                        const agenciesInGroup = groupedAgenciesForBrandCountry[priorityGroup];
-
-                        let groupLabel = '';
-                        switch (priorityGroup) {
-                          case 'high': groupLabel = 'High Priority'; break;
-                          case 'medium': groupLabel = 'Medium Priority'; break;
-                          case 'low': groupLabel = 'Low Priority'; break;
-                          case 'other': groupLabel = 'Other / Uncategorized'; break;
-                        }
-
-                        return (
-                          <div key={priorityGroup} className="pt-3">
-                            <h4 className="text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">{groupLabel}</h4>
-                            <div className="space-y-2 pl-2"> {/* Removed scrolling container, added slight indent */}
-                              {agenciesInGroup.map(agency => (
-                                <div key={agency.id} className="flex items-center space-x-2 py-1">
-                                  <Checkbox 
-                                    id={`agency-${agency.id}`}
-                                    checked={formData.selected_agency_ids.includes(agency.id)}
-                                    onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, checked)}
-                                  />
-                                  <label htmlFor={`agency-${agency.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                    {agency.name}
-                                    {agency.description && <p className="text-xs text-muted-foreground">{agency.description}</p>}
-                                  </label>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                    })}
-                    {Object.values(groupedAgenciesForBrandCountry).every(group => group.length === 0) && formData.country && (
-                      <p className="text-sm text-muted-foreground pt-2">No vetting agencies found for the selected country. You can add custom ones below.</p>
-                    )}
-                    {!formData.country && (
-                       <p className="text-sm text-muted-foreground pt-2">Please select a country in 'Basic Information' to see available vetting agencies.</p>
-                    )}
-                  </>
-                )}
                 
-                <div className="mt-4 space-y-2">
-                    <Label htmlFor="custom_agency_input">Add Custom Vetting Agency</Label>
-                    <div className="flex items-center gap-2">
-                        <Input 
-                            id="custom_agency_input"
-                            value={customAgencyInput} 
-                            onChange={(e) => setCustomAgencyInput(e.target.value)} 
-                            placeholder="Enter name of a new agency..."
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddCustomAgency()}
-                            className="flex-grow"
-                        />
-                        <Button onClick={handleAddCustomAgency} variant="outline" size="sm">
-                            <PlusCircle className="mr-2 h-4 w-4" /> Add Custom
-                        </Button>
-                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <Label htmlFor="country">Country</Label>
+                    <Select name="country" value={formData.country} onValueChange={(value) => handleSelectChange('country', value)}>
+                      <SelectTrigger id="country">
+                        <SelectValue placeholder="Select country" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COUNTRIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="language">Language</Label>
+                    <Select name="language" value={formData.language} onValueChange={(value) => handleSelectChange('language', value)}>
+                      <SelectTrigger id="language">
+                        <SelectValue placeholder="Select language" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LANGUAGES.map(l => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                  
-                {newCustomAgencyNames.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                        <p className="text-sm text-muted-foreground">New custom agencies to be created:</p>
-                        <div className="flex flex-wrap gap-2">
-                        {newCustomAgencyNames.map(name => (
-                            <Badge key={name} variant="secondary" className="flex items-center">
-                            {name}
-                            <button onClick={() => handleRemoveCustomAgency(name)} className="ml-2 appearance-none border-none bg-transparent p-0 cursor-pointer">
-                                <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                            </button>
-                            </Badge>
-                        ))}
-                        </div>
-                    </div>
-                )}
+                <div>
+                  <Label htmlFor="brand_color">Brand Color</Label>
+                  <div className="flex items-center space-x-2">
+                    <Input id="brand_color" name="brand_color" type="color" value={formData.brand_color} onChange={handleInputChange} className="w-16 h-10 p-1" />
+                    <Input type="text" value={formData.brand_color} onChange={handleInputChange} name="brand_color" className="max-w-xs" placeholder="#1982C4"/>
+                    <BrandIcon color={formData.brand_color} name={formData.name || 'B'} className="h-6 w-6" />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Used for UI theming and visual consistency.</p>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-      {/*   </TabsContent> */}
-      {/*   <TabsContent value="advanced"> */}
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Advanced Settings & Associations</CardTitle>
-              <CardDescription>Manage content approval workflows and other advanced configurations.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="master_claim_brand_id">Master Claim Brand Association</Label>
-                <Select 
-                  value={formData.master_claim_brand_id || '@none@'} 
-                  onValueChange={handleMasterClaimBrandChange}
-                >
-                  <SelectTrigger id="master_claim_brand_id">
-                    <SelectValue placeholder="Select Master Claim Brand..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="@none@"><em>None</em></SelectItem>
-                    {isLoadingMasterClaimBrands ? (
-                      <div className="flex items-center justify-center p-2"><Loader2 className="h-4 w-4 animate-spin" /></div>
-                    ) : (
-                      masterClaimBrands.map(mcb => (
-                        <SelectItem key={mcb.id} value={mcb.id}>{mcb.name}</SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+            </TabsContent>
+            
+            <TabsContent value="identity">
+              <div className="space-y-6">
+                <div>
+                  <Button 
+                    onClick={handleGenerateBrandIdentity} 
+                    disabled={isGenerating || (!formData.website_url?.trim() && !formData.additional_website_urls.some(url => url.value.trim() !== ''))}
+                    variant="outline"
+                  >
+                    {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                    AI Generate / Refine Brand Identity
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    <Info className="inline-block h-3 w-3 mr-1" />
+                    Provide a Website URL (in Basic Info) to enable AI generation. Results are best with a starting point below.
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="brand_identity">Brand Identity</Label>
+                  <Textarea 
+                    id="brand_identity" 
+                    name="brand_identity" 
+                    value={formData.brand_identity} 
+                    onChange={handleInputChange} 
+                    placeholder="Describe the brand values, mission, target audience, and unique selling propositions..." 
+                    rows={8} 
+                    className="min-h-[160px]"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="tone_of_voice">Tone of Voice</Label>
+                  <Textarea 
+                    id="tone_of_voice" 
+                    name="tone_of_voice" 
+                    value={formData.tone_of_voice} 
+                    onChange={handleInputChange} 
+                    placeholder="e.g., Friendly & approachable, Formal & authoritative, Witty & irreverent..." 
+                    rows={4} 
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="team">
+              <div className="space-y-4">
+                <Label className="text-base font-medium">Brand Administrators</Label>
+                {displayedAdmins.length > 0 ? (
+                  <div className="p-3 border rounded-md bg-muted/10 space-y-2">
+                    {displayedAdmins.map(admin => (
+                      <div key={admin.id} className="flex items-center justify-between p-2 border-b last:border-b-0">
+                        <div>
+                          <p className="font-medium">{admin.full_name || 'N/A'}</p>
+                          <p className="text-sm text-muted-foreground">{admin.email || 'No email provided'}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No specific administrators are assigned to this brand. Global administrators have access.
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground">
-                  Associate this brand with a Master Claim Brand to inherit its claim definitions and rules.
+                  <Info className="inline-block h-3 w-3 mr-1" />
+                  Brand-specific administrators are managed via the global Users page. 
+                  This section is for informational purposes only.
                 </p>
               </div>
+            </TabsContent>
 
-              <div className="space-y-2">
-                <Label>Brand Administrators</Label>
-                {displayedAdmins.length > 0 ? (
-                  <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                    {displayedAdmins.map(admin => (
-                      <li key={admin.id}>{admin.full_name || 'N/A'} ({admin.email || 'No email'})</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No administrators specifically assigned to this brand. Global admins have access.</p>
-                )}
+            <TabsContent value="rules">
+              <div className="space-y-6">
+                <div>
+                  <Label htmlFor="guardrails">Guardrails & Restrictions</Label>
+                  <Textarea 
+                    id="guardrails" 
+                    name="guardrails" 
+                    value={formData.guardrails} 
+                    onChange={handleInputChange} 
+                    placeholder="List topics, phrases, brand elements to avoid, or specific mandatory inclusions. Enter each on a new line..." 
+                    rows={6} 
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Guidelines for AI to follow, ensuring content aligns with brand safety and specific messaging requirements.
+                  </p>
+                </div>
+
+                <div>
+                  <Label className="text-base font-medium">Content Vetting Agencies</Label>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Select agencies pre-approved for vetting content for this brand. 
+                    Agencies are typically filtered by the brand's country (set in Basic Info).
+                  </p>
+                  {isLoadingAgencies ? (
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading agencies...
+                    </div>
+                  ) : allVettingAgencies.length > 0 ? (
+                    <div className="space-y-2 max-h-60 overflow-y-auto border rounded-md p-4">
+                      {allVettingAgencies
+                        .filter(agency => !formData.country || !agency.country_code || agency.country_code === formData.country)
+                        .map(agency => (
+                        <div key={agency.id} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`agency-${agency.id}`} 
+                            checked={formData.selected_agency_ids.includes(agency.id)} 
+                            onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)} // Ensure boolean
+                          />
+                          <Label htmlFor={`agency-${agency.id}`} className="font-normal">
+                            {agency.name}
+                            {agency.country_code && <span className='text-xs text-muted-foreground ml-1'>({agency.country_code})</span>}
+                          </Label>
+                        </div>
+                      ))}
+                      {allVettingAgencies.filter(agency => !formData.country || !agency.country_code || agency.country_code === formData.country).length === 0 && formData.country && (
+                        <p className="text-xs text-muted-foreground">No agencies found for the selected country ({formData.country}).</p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No vetting agencies available. Please select a country or add agencies in the system.</p>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="master_claim_brand_id">Master Claim Brand</Label>
+                  <Select 
+                    name="master_claim_brand_id"
+                    value={formData.master_claim_brand_id || ''} // Ensure value is not null for Select
+                    onValueChange={handleMasterClaimBrandChange}
+                    disabled={isLoadingMasterClaimBrands}
+                  >
+                    <SelectTrigger id="master_claim_brand_id">
+                      <SelectValue placeholder={isLoadingMasterClaimBrands ? "Loading..." : "Select Master Claim Brand (Optional)"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value=""><em>None</em></SelectItem> {/* Use empty string for "None" selection */}
+                      {masterClaimBrands.map(mcb => (
+                        <SelectItem key={mcb.id} value={mcb.id}>{mcb.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Associate this brand with a global Master Claim Brand for consistent claim management.
+                  </p>
+                </div>
               </div>
-
-            </CardContent>
-          </Card>
-      {/*   </TabsContent> */}
-      {/* </Tabs> */}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+        <CardFooter className="border-t pt-6 flex justify-between items-center">
+            <Button variant="outline" onClick={() => router.push('/dashboard/brands')}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to List
+            </Button>
+            <Button onClick={handleSave} disabled={isSaving || isGenerating}>
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save Changes
+            </Button>
+        </CardFooter>
+      </Card>
     </div>
   );
 } 

@@ -66,6 +66,7 @@ export interface Workflow {
   steps: WorkflowStep[]; 
   steps_count?: number; 
   template_id?: string | null;
+  status?: 'active' | 'draft' | 'archived' | string;
   created_by?: string | null;
   created_at?: string | null;
   updated_at?: string | null;

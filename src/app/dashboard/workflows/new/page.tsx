@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/button';
@@ -84,6 +84,11 @@ interface WorkflowData {
   steps: WorkflowStep[];
 }
 
+interface WorkflowSummary { // For storing fetched workflows for brand
+  id: string;
+  template_id?: string | null;
+}
+
 // --- New Role Card Selection Component ---
 const roles = [
   { id: 'editor', name: 'Editor', description: 'Reviews and edits content for clarity, grammar, and style.' },
@@ -154,13 +159,15 @@ export default function NewWorkflowPage() {
   const [allFetchedBrands, setAllFetchedBrands] = useState<Brand[]>([]);
   const [contentTemplates, setContentTemplates] = useState<ContentTemplateSummary[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('NO_TEMPLATE_SELECTED');
+  const [brandWorkflows, setBrandWorkflows] = useState<WorkflowSummary[]>([]);
+  const [isLoadingBrandWorkflows, setIsLoadingBrandWorkflows] = useState(false);
 
   const [stepDescLoading, setStepDescLoading] = useState<Record<number, boolean>>({});
 
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
 
-  const [workflow, setWorkflow] = useState<WorkflowData>(() => ({ // Use a function for initial state to avoid re-computing Date.now()
+  const [workflow, setWorkflow] = useState<WorkflowData>(() => ({ 
     name: '',
     description: '',
     brand_id: '',
@@ -274,6 +281,49 @@ export default function NewWorkflowPage() {
 
   }, [isLoadingUser, currentUser, allFetchedBrands, isGlobalAdmin, workflow.brand_id]);
 
+  // Fetch workflows for the selected brand
+  useEffect(() => {
+    if (!workflow.brand_id) {
+      setBrandWorkflows([]); // Clear if no brand is selected
+      return;
+    }
+    const fetchBrandWorkflows = async () => {
+      setIsLoadingBrandWorkflows(true);
+      try {
+        const response = await fetch(`/api/workflows?brand_id=${workflow.brand_id}`);
+        if (!response.ok) throw new Error('Failed to fetch workflows for brand');
+        const data = await response.json();
+        if (data.success && Array.isArray(data.data)) {
+          setBrandWorkflows(data.data);
+        } else {
+          setBrandWorkflows([]);
+          toast.error(data.error || 'Could not load workflows for the selected brand.');
+        }
+      } catch (error: any) {
+        console.error('Error fetching brand workflows:', error);
+        toast.error(error.message || 'Failed to load workflows for brand.');
+        setBrandWorkflows([]);
+      } finally {
+        setIsLoadingBrandWorkflows(false);
+      }
+    };
+    fetchBrandWorkflows();
+  }, [workflow.brand_id]);
+
+  // Memoize available content templates
+  const availableContentTemplates = useMemo(() => {
+    if (!workflow.brand_id) {
+      // If no brand is selected, show all templates initially or templates not tied to any brand.
+      // For simplicity here, showing all if no brand. Could be refined.
+      return contentTemplates;
+    }
+    if (isLoadingBrandWorkflows || brandWorkflows.length === 0 && workflow.brand_id) {
+        // If loading or no workflows for the brand yet, all templates are available
+        return contentTemplates;
+    }
+    const usedTemplateIds = new Set(brandWorkflows.map(wf => wf.template_id).filter(Boolean));
+    return contentTemplates.filter(template => !usedTemplateIds.has(template.id));
+  }, [contentTemplates, brandWorkflows, workflow.brand_id, isLoadingBrandWorkflows]);
 
   const debouncedUserSearch = useCallback(
     debounce(async (searchTerm: string, stepIndex: number) => {
@@ -387,7 +437,13 @@ export default function NewWorkflowPage() {
   };
 
   const handleUpdateBrand = (value: string) => {
-    setWorkflow(prev => ({ ...prev, brand_id: value }));
+    setWorkflow(prev => ({ 
+        ...prev, 
+        brand_id: value,
+        template_id: null // Reset template when brand changes
+    }));
+    setSelectedTemplateId('NO_TEMPLATE_SELECTED'); // Reset UI for template dropdown
+    setBrandWorkflows([]); // Clear old brand workflows immediately
   };
 
   const handleUpdateTemplate = (value: string) => {
@@ -728,17 +784,26 @@ export default function NewWorkflowPage() {
               
               <div className="space-y-2">
                 <Label htmlFor="contentTemplate">Content Template (Optional)</Label>
-                <Select value={selectedTemplateId} onValueChange={handleUpdateTemplate}>
+                <Select 
+                  value={selectedTemplateId} 
+                  onValueChange={handleUpdateTemplate}
+                  disabled={!workflow.brand_id || isLoadingBrandWorkflows}
+                >
                   <SelectTrigger id="contentTemplate">
-                    <SelectValue placeholder="Select a content template" />
+                    <SelectValue placeholder={!workflow.brand_id ? "Select a brand first" : isLoadingBrandWorkflows ? "Loading templates..." : "Select a content template"} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="NO_TEMPLATE_SELECTED">No Template</SelectItem>
-                    {contentTemplates.map((template) => (
+                    {availableContentTemplates.map((template) => (
                       <SelectItem key={template.id} value={template.id}>
                         {template.name}
                       </SelectItem>
                     ))}
+                    {workflow.brand_id && !isLoadingBrandWorkflows && availableContentTemplates.length === 0 && contentTemplates.length > 0 && (
+                        <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                            All templates are in use for this brand.
+                        </div>
+                    )}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">

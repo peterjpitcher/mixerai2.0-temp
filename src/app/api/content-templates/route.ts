@@ -114,9 +114,8 @@ const mockTemplates = [
  */
 export const GET = withAuth(async (request: NextRequest, user) => {
   try {
-    // Role check: Allow Global Admins and Editors to list/view content templates
-    const allowedRoles = ['admin', 'editor'];
-    if (!user.user_metadata?.role || !allowedRoles.includes(user.user_metadata.role)) {
+    // Role check: Only Global Admins can list/view content templates
+    if (user.user_metadata?.role !== 'admin') {
       return NextResponse.json(
         { success: false, error: 'Forbidden: You do not have permission to access this resource.' },
         { status: 403 }
@@ -233,10 +232,10 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         }
       } else {
         // Log if AI description generation fails but don't block template creation
-        console.warn('Failed to generate AI description for new template.');
+        // console.warn('Failed to generate AI description for new template.');
       }
     } catch (aiError) {
-      console.warn('Error calling AI template description generation service:', aiError);
+      // console.warn('Error calling AI template description generation service:', aiError);
     }
     // --- End AI Description Generation ---
 
@@ -255,7 +254,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       .single();
     
     if (error) {
-      console.error('Supabase error creating template:', error);
+      // console.error('Supabase error creating template:', error);
       throw error;
     }
     
@@ -264,7 +263,52 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       template: newTemplate
     });
   } catch (error) {
-    console.error('Error creating content template:', error);
+    // console.error('Error creating content template:', error);
     return handleApiError(error, 'Failed to create content template');
+  }
+});
+
+/**
+ * DELETE: Delete a content template, withAuth applied directly.
+ */
+export const DELETE = withAuth(async (request: NextRequest, user) => {
+  try {
+    // Role check: Only Global Admins can delete content templates
+    if (user.user_metadata?.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: You do not have permission to delete this resource.' },
+        { status: 403 }
+      );
+    }
+
+    const url = new URL(request.url);
+    const id = url.searchParams.get('id');
+    const supabase = createSupabaseAdminClient();
+    
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'Template ID is required' },
+        { status: 400 }
+      );
+    }
+    
+    // Optional: Check if template exists before attempting to delete
+    // This is good practice but adds an extra DB call.
+    // For now, we'll rely on the delete operation itself.
+
+    const { error: deleteError } = await supabase
+      .from('content_templates')
+      .delete()
+      .eq('id', id);
+    
+    if (deleteError) {
+      // console.error('Error deleting template:', deleteError);
+      throw deleteError;
+    }
+    
+    return NextResponse.json({ success: true, message: 'Template deleted successfully' });
+  } catch (error) {
+    // console.error('Error in DELETE /api/content-templates:', error);
+    return handleApiError(error, 'Failed to delete content template');
   }
 }); 

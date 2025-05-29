@@ -93,6 +93,7 @@ export type Database = {
           guardrails: string | null
           id: string
           language: string | null
+          master_claim_brand_id: string | null
           name: string
           normalized_website_domain: string | null
           tone_of_voice: string | null
@@ -111,6 +112,7 @@ export type Database = {
           guardrails?: string | null
           id?: string
           language?: string | null
+          master_claim_brand_id?: string | null
           name: string
           normalized_website_domain?: string | null
           tone_of_voice?: string | null
@@ -129,6 +131,7 @@ export type Database = {
           guardrails?: string | null
           id?: string
           language?: string | null
+          master_claim_brand_id?: string | null
           name?: string
           normalized_website_domain?: string | null
           tone_of_voice?: string | null
@@ -148,6 +151,20 @@ export type Database = {
             columns: ["brand_admin_id"]
             isOneToOne: false
             referencedRelation: "profiles_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_brands_master_claim_brand"
+            columns: ["master_claim_brand_id"]
+            isOneToOne: false
+            referencedRelation: "master_claim_brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_master_claim_brand"
+            columns: ["master_claim_brand_id"]
+            isOneToOne: false
+            referencedRelation: "master_claim_brands"
             referencedColumns: ["id"]
           },
         ]
@@ -211,17 +228,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "claims_global_brand_id_fkey"
-            columns: ["master_brand_id"]
-            isOneToOne: false
-            referencedRelation: "master_claim_brands"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "claims_ingredient_id_fkey"
             columns: ["ingredient_id"]
             isOneToOne: false
             referencedRelation: "ingredients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "claims_master_brand_id_fkey"
+            columns: ["master_brand_id"]
+            isOneToOne: false
+            referencedRelation: "master_claim_brands"
             referencedColumns: ["id"]
           },
           {
@@ -605,6 +622,33 @@ export type Database = {
         }
         Relationships: []
       }
+      countries: {
+        Row: {
+          code: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       feedback_items: {
         Row: {
           actual_behavior: string | null
@@ -965,7 +1009,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "products_global_brand_id_fkey"
+            foreignKeyName: "products_master_brand_id_fkey"
             columns: ["master_brand_id"]
             isOneToOne: false
             referencedRelation: "master_claim_brands"
@@ -1587,6 +1631,25 @@ export type Database = {
       test_plpgsql_declare: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      update_brand_with_agencies: {
+        Args: {
+          p_brand_id_to_update: string
+          p_name: string
+          p_website_url: string
+          p_additional_website_urls: string[]
+          p_country: string
+          p_language: string
+          p_brand_identity: string
+          p_tone_of_voice: string
+          p_guardrails: string
+          p_brand_color: string
+          p_master_claim_brand_id: string
+          p_selected_agency_ids: string[]
+          p_new_custom_agency_names: string[]
+          p_user_id: string
+        }
+        Returns: Json
       }
       update_workflow_and_handle_invites: {
         Args:

@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/card';
 import { Input } from '@/components/input';
-import { Plus, Search, Trash2, Eye, Edit3, AlertTriangle, WorkflowIcon, ShieldAlert, Loader2 } from 'lucide-react';
+import { Plus, Search, Trash2, Eye, Edit3, AlertTriangle, WorkflowIcon, ShieldAlert, Loader2, Copy } from 'lucide-react';
 import type { Metadata } from 'next';
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -90,6 +91,7 @@ const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) =
  * step count, and usage by content items.
  */
 export default function WorkflowsPage() {
+  const router = useRouter();
   const [allWorkflows, setAllWorkflows] = useState<WorkflowFromAPI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +104,9 @@ export default function WorkflowsPage() {
   const [workflowToDelete, setWorkflowToDelete] = useState<WorkflowFromAPI | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // State for duplicate action
+  const [isDuplicating, setIsDuplicating] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -163,8 +168,29 @@ export default function WorkflowsPage() {
     };
     
     fetchWorkflows();
-  }, [isLoadingUser, canAccessPage, currentUser]); // Added currentUser to ensure re-check if it changes
-  
+  }, [isLoadingUser, canAccessPage, currentUser]);
+
+  const handleDuplicateWorkflow = async (workflowId: string) => {
+    setIsDuplicating(workflowId);
+    try {
+      const response = await fetch(`/api/workflows/${workflowId}/duplicate`, {
+        method: 'POST',
+      });
+      const result = await response.json();
+      if (result.success && result.workflow) {
+        toast.success(`Workflow "${result.workflow.name}" duplicated successfully.`);
+        router.push(`/dashboard/workflows/${result.workflow.id}/edit`);
+      } else {
+        throw new Error(result.error || 'Failed to duplicate workflow.');
+      }
+    } catch (error: any) {
+      console.error('Error duplicating workflow:', error);
+      toast.error(error.message || 'An error occurred while duplicating the workflow.');
+    } finally {
+      setIsDuplicating(null);
+    }
+  };
+
   const filteredWorkflowsList = allWorkflows.filter(workflow => 
     workflow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     workflow.brand_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -343,6 +369,16 @@ export default function WorkflowsPage() {
                         </Button>
                         {canManageThisSpecificWorkflow && (
                           <>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => handleDuplicateWorkflow(workflow.id)}
+                              disabled={isDuplicating === workflow.id}
+                              title="Duplicate this workflow"
+                            >
+                              {isDuplicating === workflow.id ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Copy className="mr-1.5 h-4 w-4" />}
+                              Duplicate
+                            </Button>
                             <Button variant="secondary" size="sm" asChild>
                               <Link href={`/dashboard/workflows/${workflow.id}/edit`}><Edit3 className="mr-1.5 h-4 w-4" />Edit</Link>
                             </Button>

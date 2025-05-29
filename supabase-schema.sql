@@ -20,6 +20,14 @@ EXCEPTION
         NULL;
 END $$;
 
+-- Create workflow_status enum type
+DO $$ BEGIN
+    CREATE TYPE public.workflow_status AS ENUM ('active', 'draft', 'archived');
+EXCEPTION
+    WHEN duplicate_object THEN
+        NULL;
+END $$;
+
 -- Create profiles table (linked to auth.users)
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id),
@@ -132,6 +140,7 @@ CREATE TABLE IF NOT EXISTS workflows (
   template_id UUID REFERENCES content_templates(id) ON DELETE SET NULL,
   name TEXT NOT NULL,
   steps JSONB NOT NULL DEFAULT '[]',
+  status public.workflow_status NOT NULL DEFAULT 'draft',
   created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -146,10 +155,16 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'workflows' AND column_name = 'created_by') THEN
       ALTER TABLE public.workflows ADD COLUMN created_by UUID REFERENCES profiles(id) ON DELETE SET NULL;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'workflows' AND column_name = 'status') THEN
+      ALTER TABLE public.workflows ADD COLUMN status public.workflow_status NOT NULL DEFAULT 'draft';
+    END IF;
   END IF;
 END$$;
 CREATE INDEX IF NOT EXISTS idx_workflows_brand_id ON workflows(brand_id);
 CREATE INDEX IF NOT EXISTS idx_workflows_template_id ON workflows(template_id);
+CREATE INDEX IF NOT EXISTS idx_workflows_status ON workflows(status);
+
+COMMENT ON COLUMN public.workflows.status IS 'The current status of the workflow (e.g., active, draft, archived).';
 
 -- Create workflow_user_assignments table
 CREATE TABLE IF NOT EXISTS workflow_user_assignments (

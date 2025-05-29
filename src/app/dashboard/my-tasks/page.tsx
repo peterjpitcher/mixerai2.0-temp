@@ -168,7 +168,7 @@ export default function MyTasksPage() {
                   {tasks.map((task) => (
                     <tr key={task.id} className="border-b hover:bg-muted/50">
                       <td className="p-3 font-medium">
-                        <Link href={`/dashboard/content/${task.content_id}`} className="hover:underline">
+                        <Link href={`/dashboard/content/${task.content_id}/edit`} className="hover:underline">
                             {task.content_title || 'N/A'}
                         </Link>
                       </td>
