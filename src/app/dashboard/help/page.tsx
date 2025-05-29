@@ -6,7 +6,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ChevronRight } from 'lucide-react';
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 export const metadata = {
   title: 'Help Wiki | MixerAI',
@@ -58,26 +58,6 @@ async function getHelpArticleContent(slug: string): Promise<string | null> {
   }
 }
 
-// Placeholder Breadcrumbs component - replace with actual implementation later
-const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
-  <nav aria-label="Breadcrumb" className="mb-6 text-sm text-muted-foreground">
-    <ol className="flex items-center space-x-1.5">
-      {items.map((item, index) => (
-        <li key={index} className="flex items-center">
-          {item.href ? (
-            <Link href={item.href} className="hover:underline">
-              {item.label}
-            </Link>
-          ) : (
-            <span>{item.label}</span>
-          )}
-          {index < items.length - 1 && <ChevronRight className="h-4 w-4" />}
-        </li>
-      ))}
-    </ol>
-  </nav>
-);
-
 interface HelpPageProps {
   searchParams?: { article?: string };
 }
@@ -109,6 +89,13 @@ export default async function HelpPage({ searchParams }: HelpPageProps) {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6">
       <Breadcrumbs items={breadcrumbItems} />
+      
+      <header className="my-6">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+          Help Wiki
+        </h1>
+      </header>
+
       <div className="flex flex-col md:flex-row gap-8">
         {/* Sidebar Navigation */}
         <aside className="w-full md:w-1/4 lg:w-1/5">

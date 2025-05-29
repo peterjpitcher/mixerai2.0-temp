@@ -17,6 +17,7 @@ import {
 import { toast } from 'sonner';
 import { Skeleton } from "@/components/skeleton";
 import { AlertCircle } from 'lucide-react';
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 interface Brand {
   id: string;
@@ -201,30 +202,10 @@ export default function InviteUserPage() {
     }
   };
   
-  // Placeholder Breadcrumbs component
-  const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
-    <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
-      <ol className="flex items-center space-x-1.5">
-        {items.map((item, index) => (
-          <li key={index} className="flex items-center">
-            {item.href ? (
-              <Link href={item.href} className="hover:underline">
-                {item.label}
-              </Link>
-            ) : (
-              <span>{item.label}</span>
-            )}
-            {index < items.length - 1 && <span className="mx-1.5">/</span>}
-          </li>
-        ))}
-      </ol>
-    </nav>
-  );
-  
   // --- Loading and Access Denied States ---
   if (isLoadingUserSession || isCheckingPermissions) {
     return (
-      <div className="space-y-8">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
         <Skeleton className="h-8 w-1/3 mb-4" />
         <div className="flex items-center justify-between mb-6">
           <Skeleton className="h-10 w-1/2" />
@@ -271,7 +252,7 @@ export default function InviteUserPage() {
   }
   // --- Main Page Content (shown if allowed) ---
   return (
-    <div className="space-y-8">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" },
         { label: "Users", href: "/dashboard/users" },

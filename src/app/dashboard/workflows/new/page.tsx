@@ -19,11 +19,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { debounce } from 'lodash';
 import { cn } from '@/lib/utils';
 import { BrandIcon } from '@/components/brand-icon';
-
-// export const metadata: Metadata = {
-//   title: 'Create New Workflow | MixerAI 2.0',
-//   description: 'Design and configure a new content approval workflow for your brands.',
-// };
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 /**
  * NewWorkflowPage allows users to create a new content approval workflow.
@@ -130,26 +126,6 @@ const RoleSelectionCards: React.FC<RoleSelectionCardsProps> = ({ selectedRole, o
   );
 };
 // --- End Role Card Selection Component ---
-
-// Placeholder Breadcrumbs component
-const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
-  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
-    <ol className="flex items-center space-x-1.5">
-      {items.map((item, index) => (
-        <li key={index} className="flex items-center">
-          {item.href ? (
-            <Link href={item.href} className="hover:underline">
-              {item.label}
-            </Link>
-          ) : (
-            <span>{item.label}</span>
-          )}
-          {index < items.length - 1 && <span className="mx-1.5">/</span>}
-        </li>
-      ))}
-    </ol>
-  </nav>
-);
 
 export default function NewWorkflowPage() {
   const router = useRouter();
@@ -729,7 +705,7 @@ export default function NewWorkflowPage() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="space-y-2 lg:col-span-2">
-                <Label htmlFor="name">Workflow Name</Label>
+                <Label htmlFor="name">Workflow Name <span className="text-destructive">*</span></Label>
                 <Input
                   id="name"
                   name="name"
@@ -753,7 +729,7 @@ export default function NewWorkflowPage() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="brand">Brand</Label>
+                <Label htmlFor="brand">Brand <span className="text-destructive">*</span></Label>
                 <Select value={workflow.brand_id} onValueChange={handleUpdateBrand} disabled={brands.length === 0 && !isGlobalAdmin}>
                   <SelectTrigger>
                     <SelectValue placeholder={brands.length === 0 && !isGlobalAdmin ? "No brands assigned" : "Select brand"} />
@@ -853,11 +829,12 @@ export default function NewWorkflowPage() {
                         <span className="flex items-center justify-center w-6 h-6 bg-primary text-primary-foreground rounded-full text-xs font-medium">
                           {index + 1}
                         </span>
+                        <Label htmlFor={`step-name-${index}`} className="sr-only">Step Name <span className="text-destructive">*</span></Label>
                         <Input
                           id={`step-name-${index}`}
                           value={step.name}
                           onChange={(e) => handleUpdateStepName(index, e.target.value)}
-                          placeholder={`Step ${index + 1} Name`}
+                          placeholder={`Step ${index + 1} Name *`}
                           className="text-base font-medium flex-grow"
                         />
                       </div>
@@ -894,7 +871,7 @@ export default function NewWorkflowPage() {
 
                     {/* Role Selection */}
                     <div className="mb-4">
-                      <Label className="text-sm font-medium mb-2 block">Assigned Role</Label>
+                      <Label className="text-sm font-medium mb-2 block">Assigned Role <span className="text-destructive">*</span></Label>
                       <RoleSelectionCards
                         selectedRole={step.role}
                         onRoleSelect={(roleId) => handleUpdateStepRole(index, roleId)}

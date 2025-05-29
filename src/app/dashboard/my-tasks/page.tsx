@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { format as formatDateFns } from 'date-fns';
 import { BrandIcon } from '@/components/brand-icon';
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 // TaskItem interface for the page - this should match the output of /api/me/tasks
 interface TaskItem {
@@ -28,25 +29,6 @@ interface TaskItem {
   workflow_step_name: string | null;
   workflow_step_order?: number | null;
 }
-
-const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
-  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
-    <ol className="flex items-center space-x-1.5">
-      {items.map((item, index) => (
-        <li key={index} className="flex items-center">
-          {item.href ? (
-            <Link href={item.href} className="hover:underline">
-              {item.label}
-            </Link>
-          ) : (
-            <span>{item.label}</span>
-          )}
-          {index < items.length - 1 && <span className="mx-1.5">/</span>}
-        </li>
-      ))}
-    </ol>
-  </nav>
-);
 
 export default function MyTasksPage() {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
@@ -157,11 +139,11 @@ export default function MyTasksPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left p-3 font-medium">Content Title</th>
-                    <th className="text-left p-3 font-medium">Brand</th>
-                    <th className="text-left p-3 font-medium">Workflow Step</th>
-                    <th className="text-left p-3 font-medium">Assigned On</th>
-                    <th className="text-left p-3 font-medium">Actions</th>
+                    <th scope="col" className="text-left p-3 font-medium">Content Title</th>
+                    <th scope="col" className="text-left p-3 font-medium">Brand</th>
+                    <th scope="col" className="text-left p-3 font-medium">Workflow Step</th>
+                    <th scope="col" className="text-left p-3 font-medium">Assigned On</th>
+                    <th scope="col" className="text-left p-3 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -169,7 +151,7 @@ export default function MyTasksPage() {
                     <tr key={task.id} className="border-b hover:bg-muted/50">
                       <td className="p-3 font-medium">
                         <Link href={`/dashboard/content/${task.content_id}/edit`} className="hover:underline">
-                            {task.content_title || 'N/A'}
+                            {task.content_title || 'Untitled Content'}
                         </Link>
                       </td>
                       <td className="p-3">

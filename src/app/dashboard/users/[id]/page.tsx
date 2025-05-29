@@ -30,7 +30,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/dialog";
-import type { Metadata } from 'next';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -42,11 +41,8 @@ import { BrandIcon } from '@/components/brand-icon';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { Label } from '@/components/label';
 import { format as formatDateFns } from 'date-fns';
-
-// export const metadata: Metadata = {
-//   title: 'User Details | MixerAI 2.0',
-//   description: 'View detailed information and brand permissions for a specific user.',
-// };
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
+import type { Metadata } from 'next';
 
 interface Brand {
   id: string;
@@ -79,26 +75,6 @@ const formatBrandRole = (role: string): string => {
   // Capitalize first letter as a fallback for unknown roles
   return role.charAt(0).toUpperCase() + role.slice(1);
 };
-
-// Placeholder Breadcrumbs component
-const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
-  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
-    <ol className="flex items-center space-x-1.5">
-      {items.map((item, index) => (
-        <li key={index} className="flex items-center">
-          {item.href ? (
-            <Link href={item.href} className="hover:underline">
-              {item.label}
-            </Link>
-          ) : (
-            <span>{item.label}</span>
-          )}
-          {index < items.length - 1 && <span className="mx-1.5">/</span>}
-        </li>
-      ))}
-    </ol>
-  </nav>
-);
 
 /**
  * UserDetailPage displays comprehensive details for a specific user account.

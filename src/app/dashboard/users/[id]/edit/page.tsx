@@ -20,26 +20,7 @@ import type { Metadata } from 'next';
 import { toast } from 'sonner';
 import { Separator } from '@/components/separator';
 import { Skeleton } from '@/components/skeleton';
-
-// Placeholder Breadcrumbs component
-const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
-  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
-    <ol className="flex items-center space-x-1.5">
-      {items.map((item, index) => (
-        <li key={index} className="flex items-center">
-          {item.href ? (
-            <Link href={item.href} className="hover:underline">
-              {item.label}
-            </Link>
-          ) : (
-            <span>{item.label}</span>
-          )}
-          {index < items.length - 1 && <span className="mx-1.5">/</span>}
-        </li>
-      ))}
-    </ol>
-  </nav>
-);
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 // export const metadata: Metadata = {
 //   title: 'Edit User | MixerAI 2.0',
@@ -376,7 +357,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
   }
   
   return (
-    <div className="space-y-8">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" },
         { label: "Users", href: "/dashboard/users" },
@@ -408,7 +389,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="full_name">Full Name</Label>
+                <Label htmlFor="full_name">Full Name <span className="text-destructive">*</span></Label>
                 <Input id="full_name" name="full_name" value={form.full_name} onChange={handleInputChange} />
               </div>
               <div>
@@ -427,7 +408,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
               </div>
             </div>
             <div>
-              <Label htmlFor="globalRole">Global Role</Label>
+              <Label htmlFor="globalRole">Global Role <span className="text-destructive">*</span></Label>
               <Select name="globalRole" value={form.globalRole} onValueChange={handleGlobalRoleChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a global role" />

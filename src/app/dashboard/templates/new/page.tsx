@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/dashboard/page-header';
 import { TemplateForm } from '@/components/template/template-form';
 import { ChevronLeft, Loader2, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 // Define UserSessionData interface (copied for standalone use here)
 interface UserSessionData {
@@ -22,30 +23,6 @@ interface UserSessionData {
     role: string;
   }>;
 }
-
-// export const metadata: Metadata = { // Metadata should be handled differently for client components if needed
-//   title: 'Create Template | MixerAI',
-//   description: 'Create a new content template.',
-// };
-
-const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
-  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
-    <ol className="flex items-center space-x-1.5">
-      {items.map((item, index) => (
-        <li key={index} className="flex items-center">
-          {item.href ? (
-            <Link href={item.href} className="hover:underline">
-              {item.label}
-            </Link>
-          ) : (
-            <span>{item.label}</span>
-          )}
-          {index < items.length - 1 && <span className="mx-1.5">/</span>}
-        </li>
-      ))}
-    </ol>
-  </nav>
-);
 
 export default function NewTemplatePage() {
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);

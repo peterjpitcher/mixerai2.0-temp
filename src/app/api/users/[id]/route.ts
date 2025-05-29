@@ -219,29 +219,47 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: any, context
 
       // Brand permissions update
       if (body.brand_permissions && Array.isArray(body.brand_permissions)) {
-        const { data: existingPermissions, error: permissionsError } = await supabase
+        const { data: existingPermissionsData, error: fetchExistingError } = await supabase
           .from('user_brand_permissions')
           .select('id, brand_id, role')
           .eq('user_id', params.id);
-        if (permissionsError) throw permissionsError;
 
-        const existingPermissionsMap = new Map();
-        (existingPermissions || []).forEach(p => existingPermissionsMap.set(p.brand_id, p));
+        if (fetchExistingError) throw fetchExistingError;
+        const existingPermissions = existingPermissionsData || [];
 
-        const permissionsToUpsert = body.brand_permissions.map(permission => {
-          const existingPermission = existingPermissionsMap.get(permission.brand_id);
-          const record: { user_id: string; brand_id: string; role: string; id?: string; } = {
-            user_id: params.id,
-            brand_id: permission.brand_id,
-            role: permission.role,
-          };
-          if (existingPermission) record.id = existingPermission.id;
-          return record;
-        });
+        const existingPermissionsMap = new Map(existingPermissions.map(p => [p.brand_id, p]));
+        // const receivedPermissionsMap = new Map(body.brand_permissions.map((p: any) => [p.brand_id, p])); // Not strictly needed with current loop
 
-        const brandIdsToKeep = new Set(body.brand_permissions.map(p => p.brand_id));
-        const permissionIdsToDelete = (existingPermissions || [])
-          .filter(p => !brandIdsToKeep.has(p.brand_id))
+        const permissionsToInsert: any[] = [];
+        const permissionsToUpdate: any[] = [];
+
+        for (const receivedPermission of body.brand_permissions as Array<{ brand_id: string; role: string; id?:string }>) {
+          const existingPermission = existingPermissionsMap.get(receivedPermission.brand_id);
+          if (existingPermission) {
+            // Exists, check if role needs update
+            if (existingPermission.role !== receivedPermission.role) {
+              permissionsToUpdate.push({
+                id: existingPermission.id, // Must include PK for update
+                user_id: params.id,
+                brand_id: receivedPermission.brand_id,
+                role: receivedPermission.role,
+              });
+            }
+          } else {
+            // New permission
+            permissionsToInsert.push({
+              user_id: params.id,
+              brand_id: receivedPermission.brand_id,
+              role: receivedPermission.role,
+              // ID is omitted, DB default will apply
+            });
+          }
+        }
+
+        // Permissions to delete: in existing but not in received
+        const receivedBrandIds = new Set(body.brand_permissions.map((p: any) => p.brand_id));
+        const permissionIdsToDelete = existingPermissions
+          .filter(p => !receivedBrandIds.has(p.brand_id))
           .map(p => p.id);
 
         if (permissionIdsToDelete.length > 0) {
@@ -249,14 +267,35 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: any, context
             .from('user_brand_permissions')
             .delete()
             .in('id', permissionIdsToDelete);
-          if (deleteError) throw deleteError;
+          if (deleteError) {
+            console.error("Error deleting permissions:", deleteError);
+            throw deleteError;
+          }
         }
 
-        if (permissionsToUpsert.length > 0) {
-          const { error: upsertError } = await supabase
+        if (permissionsToInsert.length > 0) {
+          const { error: insertError } = await supabase
             .from('user_brand_permissions')
-            .upsert(permissionsToUpsert, { onConflict: 'user_id,brand_id' }); // Ensure onConflict is correctly handled based on your table
-          if (upsertError) throw upsertError;
+            .insert(permissionsToInsert);
+          if (insertError) {
+            console.error("Error inserting new permissions:", insertError);
+            throw insertError;
+          }
+        }
+
+        if (permissionsToUpdate.length > 0) {
+          // For updates, we can iterate or use upsert if sure about its behavior for updates.
+          // Iterating for clarity, though upsert on existing IDs should work.
+          for (const permToUpdate of permissionsToUpdate) {
+            const { error: updateError } = await supabase
+              .from('user_brand_permissions')
+              .update({ role: permToUpdate.role, user_id: permToUpdate.user_id, brand_id: permToUpdate.brand_id }) // ensure all necessary fields for update are included besides PK
+              .eq('id', permToUpdate.id);
+            if (updateError) {
+              console.error("Error updating permission:", permToUpdate, updateError);
+              throw updateError;
+            }
+          }
         }
       }
     } else {

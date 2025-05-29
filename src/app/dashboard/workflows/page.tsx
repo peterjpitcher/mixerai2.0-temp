@@ -21,11 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/alert-dialog";
-
-// export const metadata: Metadata = {
-//   title: 'Manage Workflows | MixerAI 2.0',
-//   description: 'View, search, and manage content approval workflows for your brands.',
-// };
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 interface UserSessionData {
   id: string;
@@ -63,26 +59,6 @@ interface GroupedWorkflows {
     workflows: WorkflowFromAPI[];
   }
 }
-
-// Placeholder Breadcrumbs component
-const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
-  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
-    <ol className="flex items-center space-x-1.5">
-      {items.map((item, index) => (
-        <li key={index} className="flex items-center">
-          {item.href ? (
-            <Link href={item.href} className="hover:underline">
-              {item.label}
-            </Link>
-          ) : (
-            <span>{item.label}</span>
-          )}
-          {index < items.length - 1 && <span className="mx-1.5">/</span>}
-        </li>
-      ))}
-    </ol>
-  </nav>
-);
 
 /**
  * WorkflowsPage displays a list of all content approval workflows, grouped by brand.
@@ -319,7 +295,9 @@ export default function WorkflowsPage() {
       {canAccessPage && (allWorkflows.length > 0 || isLoading || error) && (
          <div className="flex items-center justify-between">
           <div className="max-w-sm w-full">
+            <label htmlFor="workflow-search" className="sr-only">Search workflows</label>
             <Input 
+              id="workflow-search"
               placeholder="Search workflows by name, brand, or content type..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}

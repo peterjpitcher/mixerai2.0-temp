@@ -32,6 +32,23 @@ interface WorkflowWithSteps {
   steps: ProcessedWorkflowStep[];
 }
 
+interface ContentVersionWithReviewer {
+  id: string;
+  content_id: string;
+  workflow_step_identifier: string;
+  step_name: string | null;
+  version_number: number;
+  content_json: any; // Or a more specific type if known for content_json
+  action_status: string;
+  feedback: string | null;
+  reviewer_id: string | null;
+  created_at: string;
+  reviewer: { 
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
+}
+
 export const GET = withAuth(async (request: NextRequest, user: User, context: { params: { id: string } }) => {
   const { id } = context.params;
 
@@ -63,6 +80,27 @@ export const GET = withAuth(async (request: NextRequest, user: User, context: { 
 
     if (!content) {
       return NextResponse.json({ success: false, error: 'Content not found' }, { status: 404 });
+    }
+
+    // Step 1.5: Fetch content versions
+    let versions: ContentVersionWithReviewer[] = [];
+    const { data: versionData, error: versionError } = await supabase
+      .from('content_versions')
+      .select(`
+        *,
+        reviewer:reviewer_id (full_name, avatar_url)
+      `)
+      .eq('content_id', id)
+      .order('created_at', { ascending: false });
+
+    if (versionError) {
+      console.error(`Error fetching versions for content ${id}:`, versionError);
+      // Decide if this is a critical error or if we can proceed without versions
+      // For now, we'll proceed and versions will be an empty array
+      versions = []; // Ensure versions is an empty array on error
+    } else {
+      versions = (versionData as ContentVersionWithReviewer[]) || []; // Explicit cast
+      console.log(`[API /content/${id}] Fetched versions:`, JSON.stringify(versions, null, 2)); // Log fetched versions
     }
 
     let workflowDataWithSteps: WorkflowWithSteps | null = null;
@@ -148,9 +186,12 @@ export const GET = withAuth(async (request: NextRequest, user: User, context: { 
       created_by_name: content.profiles?.full_name || null,
       template_name: content.content_templates?.name || null,
       template_icon: content.content_templates?.icon || null,
-      workflow: workflowDataWithSteps // Embed the workflow with its steps and assignees
+      workflow: workflowDataWithSteps, // Embed the workflow with its steps and assignees
+      versions: versions // Add versions to the response
     };
     
+    console.log(`[API /content/${id}] Returning formattedContent with versions:`, JSON.stringify(formattedContent.versions, null, 2)); // Log versions being returned
+
     // Optionally remove original nested objects if they are fully flattened or embedded elsewhere
     // delete formattedContent.brands;
     // delete formattedContent.profiles;

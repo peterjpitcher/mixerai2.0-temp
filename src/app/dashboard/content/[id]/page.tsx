@@ -54,6 +54,7 @@ interface ContentData {
   workflow_id?: string;
   workflow?: { id: string; name: string; steps: any[] };
   current_step: number;
+  versions?: ContentVersion[];
 }
 
 interface ContentVersion {
@@ -121,10 +122,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const [contentResponse, versionsResponse] = await Promise.all([
-          fetch(`/api/content/${id}`),
-          fetch(`/api/content/${id}/versions`)
-        ]);
+        const contentResponse = await fetch(`/api/content/${id}`);
 
         if (!contentResponse.ok) {
           if (contentResponse.status === 404) notFound();
@@ -133,6 +131,10 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
         const contentResult = await contentResponse.json();
         if (contentResult.success && contentResult.data) {
           setContent(contentResult.data);
+          console.log('[ContentDetailPage] Received content data:', contentResult.data);
+          const fetchedVersions = contentResult.data.versions || [];
+          setVersions(fetchedVersions);
+          console.log('[ContentDetailPage] Set versions state to:', fetchedVersions);
           if (contentResult.data.brand_id) {
             fetch(`/api/brands/${contentResult.data.brand_id}`)
               .then(res => res.json())
@@ -168,19 +170,6 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
           throw new Error(contentResult.error || 'Failed to load content data.');
         }
 
-        if (!versionsResponse.ok) {
-          console.error(`Failed to fetch content versions: ${versionsResponse.statusText}`);
-        } else {
-          const versionsResult = await versionsResponse.json();
-          if (versionsResult.success && versionsResult.data) {
-            setVersions(versionsResult.data);
-          } else if (versionsResult.data === null || versionsResult.data.length === 0) {
-            setVersions([]);
-          } else {
-            console.error(versionsResult.error || 'Failed to load versions data.');
-          }
-        }
-
       } catch (error: any) {
         console.error('Error fetching page data:', error);
         toast.error(error.message || 'Failed to load page data. Please try again.');
@@ -211,10 +200,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const [contentResponse, versionsResponse] = await Promise.all([
-          fetch(`/api/content/${id}`),
-          fetch(`/api/content/${id}/versions`)
-        ]);
+        const contentResponse = await fetch(`/api/content/${id}`);
 
         if (!contentResponse.ok) {
           if (contentResponse.status === 404) notFound();
@@ -223,20 +209,14 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
         const contentResult = await contentResponse.json();
         if (contentResult.success && contentResult.data) {
           setContent(contentResult.data);
+          console.log('[ContentDetailPage] Refreshed content data:', contentResult.data);
+          const refreshedVersions = contentResult.data.versions || [];
+          setVersions(refreshedVersions);
+          console.log('[ContentDetailPage] Set versions state after refresh to:', refreshedVersions);
         } else {
           throw new Error(contentResult.error || 'Failed to load content data.');
         }
 
-        if (!versionsResponse.ok) {
-          console.error(`Failed to fetch content versions: ${versionsResponse.statusText}`);
-        } else {
-          const versionsResult = await versionsResponse.json();
-          if (versionsResult.success && versionsResult.data) {
-            setVersions(versionsResult.data);
-          } else if (versionsResult.data === null || versionsResult.data.length === 0) {
-             setVersions([]);
-          }
-        }
       } catch (error: any) {
         console.error('Error refetching page data:', error);
         toast.error(error.message || 'Failed to reload page data. Please try again.');

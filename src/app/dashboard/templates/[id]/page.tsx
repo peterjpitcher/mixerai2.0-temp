@@ -7,7 +7,6 @@ import { Button } from '@/components/button';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { TemplateForm } from '@/components/template/template-form';
 import { Loader2, ChevronLeft, Trash2, ShieldAlert } from 'lucide-react';
-import type { Metadata } from 'next';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,31 +18,8 @@ import {
   AlertDialogTitle,
 } from "@/components/alert-dialog";
 import { toast } from 'sonner';
-
-// export const metadata: Metadata = {
-//   title: 'Edit Template | MixerAI 2.0',
-//   description: 'Modify and configure an existing content template.',
-// };
-
-// Placeholder Breadcrumbs component - to be replaced with actual implementation
-const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
-  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
-    <ol className="flex items-center space-x-1.5">
-      {items.map((item, index) => (
-        <li key={index} className="flex items-center">
-          {item.href ? (
-            <Link href={item.href} className="hover:underline">
-              {item.label}
-            </Link>
-          ) : (
-            <span>{item.label}</span>
-          )}
-          {index < items.length - 1 && <span className="mx-1.5">/</span>}
-        </li>
-      ))}
-    </ol>
-  </nav>
-);
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
+import type { Metadata } from 'next';
 
 // Define UserSessionData interface
 interface UserSessionData {

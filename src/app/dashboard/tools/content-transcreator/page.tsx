@@ -17,6 +17,7 @@ import { BrandIcon } from '@/components/brand-icon';
 import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { Table, TableHeader, TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table";
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 // export const metadata: Metadata = {
 //   title: 'Content Trans-Creator | MixerAI 2.0',
@@ -39,26 +40,6 @@ const languageOptions = [
 
 // Country options - will be determined by selected brand's settings
 // const countryOptions = [ ... ]; // This might become redundant if brand drives the target country
-
-// Placeholder Breadcrumbs component
-const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
-  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
-    <ol className="flex items-center space-x-1.5">
-      {items.map((item, index) => (
-        <li key={index} className="flex items-center">
-          {item.href ? (
-            <Link href={item.href} className="hover:underline">
-              {item.label}
-            </Link>
-          ) : (
-            <span>{item.label}</span>
-          )}
-          {index < items.length - 1 && <span className="mx-1.5">/</span>}
-        </li>
-      ))}
-    </ol>
-  </nav>
-);
 
 interface UserSessionData {
   id: string;
@@ -364,7 +345,7 @@ export default function ContentTransCreatorPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8">
+    <div className="px-4 sm:px-6 lg:px-8 py-6">
       <Breadcrumbs 
         items={[
           { label: 'Dashboard', href: '/dashboard' },
@@ -409,7 +390,7 @@ export default function ContentTransCreatorPage() {
                   </div>
                   <div>
                     <Label htmlFor="target-brand" className="flex items-center">
-                      <Briefcase className="mr-2 h-4 w-4 text-muted-foreground"/> Target Brand
+                      <Briefcase className="mr-2 h-4 w-4 text-muted-foreground"/> Target Brand <span className="text-destructive ml-1">*</span>
                     </Label>
                     {isLoadingBrands ? (
                       <Skeleton className="h-10 w-full" />
@@ -438,7 +419,7 @@ export default function ContentTransCreatorPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="content">Content to Trans-create (Max 5000 characters)</Label>
+                  <Label htmlFor="content">Content to Trans-create (Max 5000 characters) <span className="text-destructive ml-1">*</span></Label>
                   <Textarea
                     id="content"
                     placeholder="Enter your original content here..."
@@ -522,15 +503,15 @@ export default function ContentTransCreatorPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Run Date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead scope="col">Run Date</TableHead>
+                      <TableHead scope="col">Status</TableHead>
+                      <TableHead scope="col" className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {runHistory.map((run) => (
                       <TableRow key={run.id}>
-                        <TableCell>{format(new Date(run.run_at), 'PPpp')}</TableCell>
+                        <TableCell>{format(new Date(run.run_at), 'dd MMMM yyyy, HH:mm')}</TableCell>
                         <TableCell>
                           <Badge variant={run.status === 'success' ? 'default' : 'destructive'}>
                             {run.status}

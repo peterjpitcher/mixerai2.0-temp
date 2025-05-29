@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/card';
 import { Input } from '@/components/input';
 import { Label } from '@/components/label';
 import { Textarea } from '@/components/textarea';
@@ -17,8 +17,9 @@ import { createBrowserClient } from '@supabase/ssr';
 import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandIcon, BrandIconProps } from '@/components/brand-icon';
-import { ArrowLeft, Loader2, ShieldAlert, XCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, ShieldAlert, XCircle, CheckCircle, Clock, MessageSquare, UserCircle, Edit3 } from 'lucide-react';
 import { Skeleton } from '@/components/skeleton';
+import { format as formatDateFns } from 'date-fns';
 
 // export const metadata: Metadata = {
 //   title: 'Edit Content | MixerAI 2.0',
@@ -165,6 +166,49 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
 
   // For ContentApprovalWorkflow to trigger save
   const contentSaveRef = React.useRef<() => Promise<boolean>>();
+
+  // Added from view page for version display
+  const outputFieldIdToNameMap = React.useMemo(() => {
+    if (!template || !template.fields || !template.fields.outputFields) {
+      return {};
+    }
+    return template.fields.outputFields.reduce((acc, field) => {
+      acc[field.id] = field.name;
+      return acc;
+    }, {} as Record<string, string>);
+  }, [template]);
+
+  const getHistoryItemDisplayName = (identifier: string, stepName: string | null) => {
+    return outputFieldIdToNameMap[identifier] || stepName || identifier;
+  };
+
+  const getActionIcon = (actionStatus: string) => {
+    switch (actionStatus?.toLowerCase()) {
+      case 'approved':
+      case 'completed':
+        return <CheckCircle className="h-4 w-4 text-green-500 mr-2" />;
+      case 'rejected':
+      case 'sent_back':
+        return <XCircle className="h-4 w-4 text-red-500 mr-2" />;
+      case 'submitted':
+      case 'pending_review':
+        return <Clock className="h-4 w-4 text-yellow-500 mr-2" />;
+      case 'commented':
+        return <MessageSquare className="h-4 w-4 text-blue-500 mr-2" />;
+      default:
+        return <UserCircle className="h-4 w-4 text-gray-400 mr-2" />;
+    }
+  };
+  const getFormattedDateTime = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      return formatDateFns(new Date(dateString), 'dd MMMM yyyy, HH:mm');
+    } catch (e) {
+      console.error("Error formatting date/time:", dateString, e);
+      return "Invalid Date/Time";
+    }
+  };
+  // End added from view page
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -588,6 +632,50 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             />
           )}
           {!content.workflow && <Card><CardContent><p className="text-muted-foreground py-4">No workflow associated with this content.</p></CardContent></Card>}
+
+          {/* New Card for Version History on Edit Page */}
+          {versions && versions.length > 0 && (
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>Version History</CardTitle>
+                <CardDescription>Review previous versions and feedback.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-4 max-h-96 overflow-y-auto">
+                  {versions.slice().reverse().map(version => (
+                    <li key={version.id} className="p-3 border rounded-md bg-background">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center">
+                          {getActionIcon(version.action_status)}
+                          <span className="font-semibold">
+                             {getHistoryItemDisplayName(version.workflow_step_identifier, version.step_name)}
+                          </span>
+                          <span className="text-xs text-muted-foreground ml-2">(v{version.version_number}) - {version.action_status}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {getFormattedDateTime(version.created_at)}
+                        </span>
+                      </div>
+                      {version.reviewer && (
+                        <p className="text-xs text-muted-foreground mb-1">
+                          By: {version.reviewer.full_name || 'Unknown User'}
+                        </p>
+                      )}
+                      {version.feedback && (
+                        <div className="mt-1 p-2 bg-muted/50 rounded-sm">
+                          <p className="text-xs text-foreground whitespace-pre-wrap">{version.feedback}</p>
+                        </div>
+                      )}
+                       {/* Optional: Display snapshot of content_json if needed */}
+                       {/* {version.content_json?.generatedOutputs && Object.keys(version.content_json.generatedOutputs).length > 0 && ( <details className="mt-2 text-xs"> <summary>View Content Snapshot</summary> <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-900 rounded text-xs overflow-auto max-h-40">{JSON.stringify(version.content_json.generatedOutputs, null, 2)}</pre> </details> )} */}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+          {/* End New Card for Version History */}
+
         </div>
       </div>
       

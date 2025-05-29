@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, Loader2, AlertTriangle, Save, XCircle, ChevronRight } from 'lucide-react';
 import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
 import Link from 'next/link';
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 // ENUM types - should match other feedback files
 const feedbackTypes = ['bug', 'enhancement'] as const;
@@ -42,30 +43,7 @@ interface FeedbackFormState {
   resolution_details: string;
 }
 
-// Breadcrumb component structure (conceptual)
 interface BreadcrumbItemDef { name: string; href?: string; }
-
-const BreadcrumbsComponent = ({ items }: { items: BreadcrumbItemDef[] }) => (
-  <nav aria-label="Breadcrumb" className="mb-6">
-    <ol role="list" className="flex items-center space-x-1 text-sm text-muted-foreground">
-      <li>
-        <Link href="/dashboard" className="hover:text-foreground">Dashboard</Link>
-      </li>
-      {items.map((item) => (
-        <li key={item.name}>
-          <div className="flex items-center">
-            <ChevronRight className="h-4 w-4 flex-shrink-0" />
-            {item.href ? (
-              <Link href={item.href} className="ml-1 hover:text-foreground">{item.name}</Link>
-            ) : (
-              <span className="ml-1 text-foreground">{item.name}</span>
-            )}
-          </div>
-        </li>
-      ))}
-    </ol>
-  </nav>
-);
 
 const initialFormState: FeedbackFormState = {
   type: 'bug',
@@ -299,14 +277,22 @@ export default function EditFeedbackPage() {
     );
   }
 
-  const breadcrumbItems: BreadcrumbItemDef[] = [
-    { name: 'Feedback', href: '/dashboard/admin/feedback-log' },
-    { name: 'Edit: ' + (originalTitle.length > 30 ? originalTitle.substring(0, 27) + '...' : originalTitle) }
+  const breadcrumbItemsForShared = [
+    { label: "Dashboard", href: "/dashboard" },
+    { label: "Feedback", href: "/dashboard/admin/feedback-log" },
+    { label: `Edit: ${originalTitle.length > 30 ? originalTitle.substring(0, 27) + '...' : originalTitle}` }
   ];
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 bg-gray-50 min-h-screen">
-      <BreadcrumbsComponent items={breadcrumbItems} />
+      <Breadcrumbs items={breadcrumbItemsForShared} />
+      
+      <header className="my-6">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+          Edit Feedback: {originalTitle.length > 50 ? originalTitle.substring(0, 47) + '...' : originalTitle}
+        </h1>
+      </header>
+
       <main>
         <form onSubmit={handleSubmit}>
           <Card className="shadow-lg">

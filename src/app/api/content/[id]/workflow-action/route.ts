@@ -100,7 +100,7 @@ export const POST = withAuth(async (request: NextRequest, user: User, context: {
       step_name: currentDbStep.name,
       version_number: versionNumber,
       content_json: currentContent.content_data, 
-      action_status: action === 'approve' ? 'Completed' : 'Rejected',
+      action_status: action,
       feedback: feedback || null,
       reviewer_id: user.id,
     };

@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/skeleton';
 import { Table, TableHeader, TableRow, TableCell, TableBody, TableHead } from "@/components/ui/table";
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 // Define UserSessionData interface (can be shared if not already)
 interface UserSessionData {
@@ -21,6 +22,8 @@ interface UserSessionData {
     role?: string; 
     full_name?: string;
   };
+  error_message?: string | null;
+  // Potentially add user_email or brand_name if fetched/joined by API in future
 }
 
 // Define ToolRunHistoryItem interface (can be shared if not already)
@@ -36,25 +39,6 @@ interface ToolRunHistoryItem {
   error_message?: string | null;
   // Potentially add user_email or brand_name if fetched/joined by API in future
 }
-
-const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
-  <nav aria-label="Breadcrumb" className="mb-6 text-sm text-muted-foreground">
-    <ol className="flex items-center space-x-1.5">
-      {items.map((item, index) => (
-        <li key={index} className="flex items-center">
-          {item.href ? (
-            <Link href={item.href} className="hover:underline">
-              {item.label}
-            </Link>
-          ) : (
-            <span>{item.label}</span>
-          )}
-          {index < items.length - 1 && <span className="mx-1.5">/</span>}
-        </li>
-      ))}
-    </ol>
-  </nav>
-);
 
 // Helper to format tool name for display
 const formatToolName = (toolName: string) => {
@@ -129,52 +113,56 @@ const AltTextHistoryDisplay = ({ inputs, outputs }: { inputs: AltTextInputs, out
     <div className="space-y-4">
       <div>
         <h4 className="font-semibold mb-2 text-base">Inputs</h4>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[30%]">Parameter</TableHead>
-              <TableHead>Value</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow>
-              <TableCell>Image URLs</TableCell>
-              <TableCell>
-                {inputs.imageUrls.map((url, idx) => (
-                  <div key={idx} className="truncate" title={url}>{url}</div>
-                ))}
-              </TableCell>
-            </TableRow>
-            {inputs.language && (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell>Language</TableCell>
-                <TableCell>{inputs.language}</TableCell>
+                <TableHead scope="col" className="w-[30%]">Parameter</TableHead>
+                <TableHead scope="col">Value</TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell>Image URLs</TableCell>
+                <TableCell>
+                  {inputs.imageUrls.map((url, idx) => (
+                    <div key={idx} className="truncate" title={url}>{url}</div>
+                  ))}
+                </TableCell>
+              </TableRow>
+              {inputs.language && (
+                <TableRow>
+                  <TableCell>Language</TableCell>
+                  <TableCell>{inputs.language}</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
       <div>
         <h4 className="font-semibold mb-2 text-base">Outputs</h4>
         {outputs.results && outputs.results.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Image URL</TableHead>
-                <TableHead>Generated Alt Text</TableHead>
-                <TableHead>Error</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {outputs.results.map((item, idx) => (
-                <TableRow key={idx}>
-                  <TableCell className="truncate" title={item.imageUrl}>{item.imageUrl}</TableCell>
-                  <TableCell className="whitespace-pre-wrap">{item.altText || 'N/A'}</TableCell>
-                  <TableCell className="whitespace-pre-wrap text-destructive">{item.error || 'N/A'}</TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead scope="col">Image URL</TableHead>
+                  <TableHead scope="col">Generated Alt Text</TableHead>
+                  <TableHead scope="col">Error</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {outputs.results.map((item, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell className="truncate" title={item.imageUrl}>{item.imageUrl}</TableCell>
+                    <TableCell className="whitespace-pre-wrap">{item.altText || 'N/A'}</TableCell>
+                    <TableCell className="whitespace-pre-wrap text-destructive">{item.error || 'N/A'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         ) : <p className="text-sm text-muted-foreground">No output results found.</p>}
       </div>
     </div>
@@ -202,60 +190,64 @@ const MetadataHistoryDisplay = ({ inputs, outputs }: { inputs: MetadataInputs, o
     <div className="space-y-4">
       <div>
         <h4 className="font-semibold mb-2 text-base">Inputs</h4>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[30%]">Parameter</TableHead>
-              <TableHead>Value</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow>
-              <TableCell>Page URLs</TableCell>
-              <TableCell>
-                {inputs.urls.map((url, idx) => (
-                  <div key={idx} className="truncate" title={url}>{url}</div>
-                ))}
-              </TableCell>
-            </TableRow>
-            {inputs.language && (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell>Language</TableCell>
-                <TableCell>{inputs.language}</TableCell>
+                <TableHead scope="col" className="w-[30%]">Parameter</TableHead>
+                <TableHead scope="col">Value</TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell>Page URLs</TableCell>
+                <TableCell>
+                  {inputs.urls.map((url, idx) => (
+                    <div key={idx} className="truncate" title={url}>{url}</div>
+                  ))}
+                </TableCell>
+              </TableRow>
+              {inputs.language && (
+                <TableRow>
+                  <TableCell>Language</TableCell>
+                  <TableCell>{inputs.language}</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
       <div>
         <h4 className="font-semibold mb-2 text-base">Outputs</h4>
         {outputs.results && outputs.results.length > 0 ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>URL</TableHead>
-              <TableHead>Meta Title</TableHead>
-              <TableHead>Meta Description</TableHead>
-              <TableHead>Keywords</TableHead>
-              <TableHead>Error</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {outputs.results.map((item, idx) => (
-              <TableRow key={idx}>
-                <TableCell className="truncate" title={item.url}>{item.url}</TableCell>
-                <TableCell className="whitespace-pre-wrap">{item.metaTitle || 'N/A'}</TableCell>
-                <TableCell className="whitespace-pre-wrap">{item.metaDescription || 'N/A'}</TableCell>
-                <TableCell>
-                  {item.keywords && item.keywords.length > 0 
-                    ? item.keywords.map(kw => <Badge key={kw} variant="secondary" className="mr-1 mb-1">{kw}</Badge>) 
-                    : 'N/A'}
-                </TableCell>
-                <TableCell className="whitespace-pre-wrap text-destructive">{item.error || 'N/A'}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead scope="col">URL</TableHead>
+                  <TableHead scope="col">Meta Title</TableHead>
+                  <TableHead scope="col">Meta Description</TableHead>
+                  <TableHead scope="col">Keywords</TableHead>
+                  <TableHead scope="col">Error</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {outputs.results.map((item, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell className="truncate" title={item.url}>{item.url}</TableCell>
+                    <TableCell className="whitespace-pre-wrap">{item.metaTitle || 'N/A'}</TableCell>
+                    <TableCell className="whitespace-pre-wrap">{item.metaDescription || 'N/A'}</TableCell>
+                    <TableCell>
+                      {item.keywords && item.keywords.length > 0 
+                        ? item.keywords.map(kw => <Badge key={kw} variant="secondary" className="mr-1 mb-1">{kw}</Badge>) 
+                        : 'N/A'}
+                    </TableCell>
+                    <TableCell className="whitespace-pre-wrap text-destructive">{item.error || 'N/A'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         ) : <p className="text-sm text-muted-foreground">No output results found.</p>}
       </div>
     </div>
@@ -289,75 +281,79 @@ const ContentTranscreatorHistoryDisplay = ({ inputs, outputs, status }: { inputs
     <div className="space-y-4">
       <div>
         <h4 className="font-semibold mb-2 text-base">Inputs</h4>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[30%]">Parameter</TableHead>
-              <TableHead>Value</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow>
-              <TableCell>Original Content</TableCell>
-              <TableCell className="whitespace-pre-wrap">{inputs.content}</TableCell>
-            </TableRow>
-            {inputs.sourceLanguage && (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell>Source Language</TableCell>
-                <TableCell>{inputs.sourceLanguage}</TableCell>
+                <TableHead scope="col" className="w-[30%]">Parameter</TableHead>
+                <TableHead scope="col">Value</TableHead>
               </TableRow>
-            )}
-            <TableRow>
-              <TableCell>Target Brand ID</TableCell>
-              <TableCell>{inputs.brand_id}</TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell>Original Content</TableCell>
+                <TableCell className="whitespace-pre-wrap">{inputs.content}</TableCell>
+              </TableRow>
+              {inputs.sourceLanguage && (
+                <TableRow>
+                  <TableCell>Source Language</TableCell>
+                  <TableCell>{inputs.sourceLanguage}</TableCell>
+                </TableRow>
+              )}
+              <TableRow>
+                <TableCell>Target Brand ID</TableCell>
+                <TableCell>{inputs.brand_id}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
       </div>
       <div>
         <h4 className="font-semibold mb-2 text-base">Outputs</h4>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[30%]">Detail</TableHead>
-              <TableHead>Value</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {status === 'success' && outputs.transCreatedContent && (
-              <>
-                <TableRow>
-                  <TableCell>Trans-created Content</TableCell>
-                  <TableCell className="whitespace-pre-wrap">{(outputs as ContentTranscreatorSuccessOutputs).transCreatedContent}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Target Language</TableCell>
-                  <TableCell>{(outputs as ContentTranscreatorSuccessOutputs).targetLanguage}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Target Country</TableCell>
-                  <TableCell>{(outputs as ContentTranscreatorSuccessOutputs).targetCountry}</TableCell>
-                </TableRow>
-              </>
-            )}
-            {status === 'failure' && outputs.error && (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell>Error</TableCell>
-                <TableCell className="whitespace-pre-wrap text-destructive">{(outputs as ContentTranscreatorFailureOutputs).error}</TableCell>
+                <TableHead scope="col" className="w-[30%]">Detail</TableHead>
+                <TableHead scope="col">Value</TableHead>
               </TableRow>
-            )}
-             {status === 'success' && !outputs.transCreatedContent && !outputs.error && (
+            </TableHeader>
+            <TableBody>
+              {status === 'success' && outputs.transCreatedContent && (
+                <>
+                  <TableRow>
+                    <TableCell>Trans-created Content</TableCell>
+                    <TableCell className="whitespace-pre-wrap">{(outputs as ContentTranscreatorSuccessOutputs).transCreatedContent}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Target Language</TableCell>
+                    <TableCell>{(outputs as ContentTranscreatorSuccessOutputs).targetLanguage}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Target Country</TableCell>
+                    <TableCell>{(outputs as ContentTranscreatorSuccessOutputs).targetCountry}</TableCell>
+                  </TableRow>
+                </>
+              )}
+              {status === 'failure' && outputs.error && (
                 <TableRow>
-                    <TableCell colSpan={2} className="text-muted-foreground text-center">No specific output details available for this successful run.</TableCell>
+                  <TableCell>Error</TableCell>
+                  <TableCell className="whitespace-pre-wrap text-destructive">{(outputs as ContentTranscreatorFailureOutputs).error}</TableCell>
                 </TableRow>
-             )}
-             {status === 'failure' && !outputs.error && (
-                <TableRow>
-                    <TableCell colSpan={2} className="text-muted-foreground text-center">No specific error details available for this failed run.</TableCell>
-                </TableRow>
-             )}
-          </TableBody>
-        </Table>
+              )}
+               {status === 'success' && !outputs.transCreatedContent && !outputs.error && (
+                  <TableRow>
+                      <TableCell colSpan={2} className="text-muted-foreground text-center">No specific output details available for this successful run.</TableCell>
+                  </TableRow>
+               )}
+               {status === 'failure' && !outputs.error && (
+                  <TableRow>
+                      <TableCell colSpan={2} className="text-muted-foreground text-center">No specific error details available for this failed run.</TableCell>
+                  </TableRow>
+               )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </div>
   );
@@ -522,7 +518,7 @@ export default function ToolRunHistoryDetailPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8">
+    <div className="px-4 sm:px-6 lg:px-8 py-6">
       <Breadcrumbs 
         items={[
           { label: 'Dashboard', href: '/dashboard' },
@@ -556,7 +552,7 @@ export default function ToolRunHistoryDetailPage() {
             {formatToolName(historyItem.tool_name)} - Run Overview
           </CardTitle>
           <CardDescription>
-            Run executed on {format(new Date(historyItem.run_at), 'PPPPpppp')}
+            Run executed on {format(new Date(historyItem.run_at), 'dd MMMM yyyy, HH:mm')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

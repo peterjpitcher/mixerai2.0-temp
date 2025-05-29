@@ -6,7 +6,7 @@ import {
   ArrowLeft, Loader2, AlertTriangle, UserCircle, Tag, List, MessageSquare, 
   CheckSquare, AlertCircle, /*Calendar, Hash, UserCheck, UserCog, Paperclip,*/ // Removed unused icons for cleaner imports
   ClipboardEdit, CheckCircle2, LinkIcon, Globe, Monitor, FileText, LayoutGrid, Bug, Puzzle, Edit3,
-  ChevronRight
+  ChevronRight, Calendar
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent /*CardHeader, CardTitle*/ } from '@/components/ui/card'; // Removed unused Card parts
@@ -14,6 +14,8 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { createSupabaseClient } from '@/lib/supabase/client';
+import { format as formatDateFns } from 'date-fns'; // Added date-fns import
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs'; // Added import for shared Breadcrumbs
 // Tooltip import removed as component might not exist
 // import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -44,6 +46,8 @@ interface FeedbackItem {
   user_impact_details?: string | null;
   
   resolution_details?: string | null;
+  created_at?: string | null; // Added created_at
+  updated_at?: string | null; // Added updated_at
 }
 
 // Helper to render a detail item
@@ -70,30 +74,6 @@ const SectionTitle = ({ title, icon }: { title: string; icon?: React.ReactNode }
       {title}
     </h3>
   </div>
-);
-
-interface BreadcrumbItemDef { name: string; href?: string; }
-
-const BreadcrumbsComponent = ({ items }: { items: BreadcrumbItemDef[] }) => (
-  <nav aria-label="Breadcrumb" className="mb-6">
-    <ol role="list" className="flex items-center space-x-1 text-sm text-muted-foreground">
-      <li>
-        <Link href="/dashboard" className="hover:text-foreground">Dashboard</Link>
-      </li>
-      {items.map((item) => (
-        <li key={item.name}>
-          <div className="flex items-center">
-            <ChevronRight className="h-4 w-4 flex-shrink-0" />
-            {item.href ? (
-              <Link href={item.href} className="ml-1 hover:text-foreground">{item.name}</Link>
-            ) : (
-              <span className="ml-1 text-foreground">{item.name}</span>
-            )}
-          </div>
-        </li>
-      ))}
-    </ol>
-  </nav>
 );
 
 export default function FeedbackDetailPage() {
@@ -139,7 +119,7 @@ export default function FeedbackDetailPage() {
         if (result.success && result.data) {
           const {
             // Destructure and rename as needed, ensure all fields for FeedbackItem are covered
-            id, created_at, created_by, created_by_profile, updated_at, 
+            id, /*created_at,*/ created_by, created_by_profile, /*updated_at,*/ 
             assigned_to, assigned_to_profile, attachments_metadata, 
             user_context,
             ...displayData
@@ -150,6 +130,8 @@ export default function FeedbackDetailPage() {
               affected_area: result.data.affected_area,
               app_version: result.data.app_version,
               user_impact_details: result.data.user_impact_details || result.data.user_context,
+              created_at: result.data.created_at, // Ensure created_at is passed
+              updated_at: result.data.updated_at, // Ensure updated_at is passed
           };
           setFeedbackItem(finalDisplayData as FeedbackItem);
         } else {
@@ -202,7 +184,7 @@ export default function FeedbackDetailPage() {
   if (error || !feedbackItem) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 bg-gray-50 min-h-screen">
-         <BreadcrumbsComponent items={[{ name: 'Feedback', href: '/dashboard/admin/feedback-log' }, { name: 'Error' }]} />
+        <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Feedback", href: "/dashboard/admin/feedback-log" }, { label: 'Error' }]} />
         <div className="flex flex-col items-center justify-center h-[calc(100vh-15rem)] p-6 text-center">
             <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
             <h1 className="text-2xl font-bold text-destructive mb-2">Error Loading Feedback</h1>
@@ -236,14 +218,26 @@ export default function FeedbackDetailPage() {
     }
   };
   
-  const breadcrumbItems: BreadcrumbItemDef[] = [
-    { name: 'Feedback', href: '/dashboard/admin/feedback-log' },
-    { name: feedbackItem.title && feedbackItem.title.length > 50 ? `${feedbackItem.title.substring(0, 50)}...` : (feedbackItem.title || 'Detail') }
+  const breadcrumbItemsForShared = [
+    { label: "Dashboard", href: "/dashboard" },
+    { label: "Feedback", href: "/dashboard/admin/feedback-log" },
+    { label: feedbackItem.title && feedbackItem.title.length > 50 ? `${feedbackItem.title.substring(0, 50)}...` : (feedbackItem.title || 'Detail') }
   ];
+
+  // Helper function to format dates, can be moved to utils if used elsewhere
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return 'N/A';
+    try {
+      return formatDateFns(new Date(dateString), 'dd MMMM yyyy, HH:mm');
+    } catch (e) {
+      console.error("Error formatting date:", dateString, e);
+      return "Invalid Date";
+    }
+  };
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      <BreadcrumbsComponent items={breadcrumbItems} />
+      <Breadcrumbs items={breadcrumbItemsForShared} /> {/* Using shared Breadcrumbs */}
       <header className="space-y-1">
         <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -287,9 +281,8 @@ export default function FeedbackDetailPage() {
                 </Badge>} 
                 icon={<CheckSquare />} 
             />
-            {/* Placeholder to balance grid if only one of type/priority/status is shown - not common but for robustness */}
-            {/* This might not be necessary with current layout but keeping as a thought if items become conditional */} 
-            {/* <div className="md:col-span-1"></div>  */}
+            <DetailItem label="Created On" value={formatDate(feedbackItem.created_at)} icon={<Calendar />} />
+            <DetailItem label="Last Updated" value={formatDate(feedbackItem.updated_at)} icon={<ClipboardEdit />} />
 
             <SectionTitle title="Web & System Context" icon={<Globe />} />
             <DetailItem label="URL" value={feedbackItem.url ? <Link href={feedbackItem.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">{feedbackItem.url}</Link> : 'N/A'} icon={<LinkIcon />} fullWidth />

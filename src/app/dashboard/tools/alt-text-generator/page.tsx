@@ -29,31 +29,12 @@ import {
 import { Skeleton } from "@/components/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 // export const metadata: Metadata = {
 //   title: 'Alt Text Generator | MixerAI 2.0',
 //   description: 'Generate accessible alt text for images using your brand guidelines.',
 // };
-
-// Placeholder Breadcrumbs component
-const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
-  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
-    <ol className="flex items-center space-x-1.5">
-      {items.map((item, index) => (
-        <li key={index} className="flex items-center">
-          {item.href ? (
-            <Link href={item.href} className="hover:underline">
-              {item.label}
-            </Link>
-          ) : (
-            <span>{item.label}</span>
-          )}
-          {index < items.length - 1 && <span className="mx-1.5">/</span>}
-        </li>
-      ))}
-    </ol>
-  </nav>
-);
 
 interface AltTextResultItem {
   imageUrl: string;
@@ -538,9 +519,9 @@ export default function AltTextGeneratorPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[30%]">Image URL</TableHead>
-                      <TableHead className="w-[40%]">Generated Alt Text / Error</TableHead>
-                      <TableHead className="w-[30%] text-center">Preview</TableHead> 
+                      <TableHead scope="col" className="w-[30%]">Image URL</TableHead>
+                      <TableHead scope="col" className="w-[40%]">Generated Alt Text / Error</TableHead>
+                      <TableHead scope="col" className="w-[30%] text-center">Preview</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -573,7 +554,7 @@ export default function AltTextGeneratorPage() {
                                         // eslint-disable-next-line @next/next/no-img-element
                                         <img 
                                             src={item.imageUrl} 
-                                            alt="Uploaded Preview" 
+                                            alt=""
                                             className="max-w-full h-auto max-h-24 rounded-md border object-contain hover:object-scale-down transition-all duration-300 ease-in-out cursor-pointer"
                                             onClick={(e) => {
                                                 const target = e.currentTarget as HTMLImageElement;
@@ -590,7 +571,7 @@ export default function AltTextGeneratorPage() {
                                         // eslint-disable-next-line @next/next/no-img-element
                                         <img 
                                             src={item.imageUrl} 
-                                            alt="Preview" 
+                                            alt=""
                                             className="max-w-full h-auto max-h-24 rounded-md border object-contain hover:object-scale-down transition-all duration-300 ease-in-out cursor-pointer" 
                                             onError={(e) => {
                                                 const target = e.currentTarget as HTMLImageElement;
@@ -663,15 +644,15 @@ export default function AltTextGeneratorPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Run Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead scope="col">Run Date</TableHead>
+                    <TableHead scope="col">Status</TableHead>
+                    <TableHead scope="col" className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {runHistory.map((run) => (
                     <TableRow key={run.id}>
-                      <TableCell>{format(new Date(run.run_at), 'PPpp')}</TableCell>
+                      <TableCell>{format(new Date(run.run_at), 'dd MMMM yyyy, HH:mm')}</TableCell>
                       <TableCell>
                         <Badge variant={run.status === 'success' ? 'default' : 'destructive'}>
                           {run.status}

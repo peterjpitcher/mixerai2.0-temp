@@ -3,11 +3,18 @@
 import React from 'react';
 import { Heading } from '@/components/ui/heading'; // Assuming you have a Heading component
 import { Separator } from '@/components/ui/separator'; // Assuming you have a Separator component
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs'; // Added import for shared Breadcrumbs
 
 export default function ProductClaimsPage() {
+  const breadcrumbItems = [
+    { label: "Dashboard", href: "/dashboard" },
+    { label: "Product Claims" }
+  ];
+
   return (
-    <div className="flex-1 space-y-4 p-4 pt-6 md:p-8">
-      <div className="flex items-start justify-between">
+    <div className="flex-1 space-y-4 px-4 sm:px-6 lg:px-8 py-6">
+      <Breadcrumbs items={breadcrumbItems} />
+      <div className="flex items-start justify-between pt-4">
         <Heading
           title="Product Claims"
           description="Manage and review product claims here."

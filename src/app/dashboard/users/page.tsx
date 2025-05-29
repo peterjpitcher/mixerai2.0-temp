@@ -38,6 +38,7 @@ import { Badge } from '@/components/badge';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { format as formatDateFns } from 'date-fns';
 import { Skeleton } from "@/components/skeleton";
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 // export const metadata: Metadata = {
 //   title: 'Manage Users | MixerAI 2.0',
@@ -78,26 +79,6 @@ interface UserSessionData {
   };
   // brand_permissions not strictly needed for this page's top-level access check, but good for consistency
 }
-
-// Placeholder Breadcrumbs component - replace with actual implementation later
-const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
-  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
-    <ol className="flex items-center space-x-1.5">
-      {items.map((item, index) => (
-        <li key={index} className="flex items-center">
-          {item.href ? (
-            <Link href={item.href} className="hover:underline">
-              {item.label}
-            </Link>
-          ) : (
-            <span>{item.label}</span>
-          )}
-          {index < items.length - 1 && <span className="mx-1.5">/</span>}
-        </li>
-      ))}
-    </ol>
-  </nav>
-);
 
 /**
  * UsersPage displays a list of all users in the system.
@@ -450,40 +431,40 @@ export default function UsersPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[40px]"></TableHead>
-                <TableHead className="w-[180px] cursor-pointer" onClick={() => handleSort('full_name')}>
+                <TableHead scope="col" className="w-[40px]"></TableHead>
+                <TableHead scope="col" className="w-[180px] cursor-pointer" onClick={() => handleSort('full_name')}>
                   <div className="flex items-center">
                     Name
                     <SortIndicator field="full_name" />
                   </div>
                 </TableHead>
-                <TableHead className="w-[180px] cursor-pointer" onClick={() => handleSort('email')}>
+                <TableHead scope="col" className="w-[180px] cursor-pointer" onClick={() => handleSort('email')}>
                   <div className="flex items-center">
                     Email
                     <SortIndicator field="email" />
                   </div>
                 </TableHead>
-                <TableHead className="w-[100px] cursor-pointer" onClick={() => handleSort('role')}>
+                <TableHead scope="col" className="w-[100px] cursor-pointer" onClick={() => handleSort('role')}>
                   <div className="flex items-center">
                     Role
                     <SortIndicator field="role" />
                   </div>
                 </TableHead>
-                <TableHead className="w-[120px]">Brands</TableHead>
-                <TableHead className="w-[120px] cursor-pointer" onClick={() => handleSort('company')}>
+                <TableHead scope="col" className="w-[120px]">Brands</TableHead>
+                <TableHead scope="col" className="w-[120px] cursor-pointer" onClick={() => handleSort('company')}>
                   <div className="flex items-center">
                     Company
                     <SortIndicator field="company" />
                   </div>
                 </TableHead>
-                <TableHead className="w-[100px]">Job Title</TableHead>
-                <TableHead className="w-[100px] cursor-pointer" onClick={() => handleSort('last_sign_in_at')}>
+                <TableHead scope="col" className="w-[100px]">Job Title</TableHead>
+                <TableHead scope="col" className="w-[100px] cursor-pointer" onClick={() => handleSort('last_sign_in_at')}>
                   <div className="flex items-center">
                     Last Login
                     <SortIndicator field="last_sign_in_at" />
                   </div>
                 </TableHead>
-                <TableHead className="w-[180px] text-right">Actions</TableHead>
+                <TableHead scope="col" className="w-[180px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -541,7 +522,7 @@ export default function UsersPage() {
                         )}
                       </Button>
                     )}
-                    <Button variant="ghost" size="icon" asChild title="Edit User">
+                    <Button variant="ghost" size="icon" asChild aria-label="Edit User">
                       <Link href={`/dashboard/users/${user.id}/edit`} >
                         <Pencil className="h-4 w-4" />
                       </Link>
@@ -549,7 +530,7 @@ export default function UsersPage() {
                     <Button 
                       variant="ghost" 
                       size="icon"
-                      title="Delete User"
+                      aria-label="Delete User"
                       onClick={() => setUserToDelete(user)}
                       disabled={isDeleting && userToDelete?.id === user.id}
                     >
