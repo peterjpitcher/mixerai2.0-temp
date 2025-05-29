@@ -211,34 +211,48 @@ export function UnifiedNavigation() {
       segment: 'my-tasks',
       show: () => isAuthenticatedUser
     },
-    { type: 'divider', show: () => isAuthenticatedUser },
+    {
+      href: '/dashboard/content',
+      label: 'All Content',
+      icon: <Folder className="h-5 w-5" />,
+      segment: 'content', 
+      show: () => isAuthenticatedUser
+    },
     {
       label: 'Create Content',
-      icon: <FilePlus2 className="h-5 w-5" />,
+      icon: <BookOpen className="h-5 w-5" />,
       segment: 'content',
       defaultOpen: true,
       show: () => !isViewer,
       items: [
-        { 
-          href: '/dashboard/content/new', 
-          label: 'Create New', 
-          icon: <FilePlus2 className="h-4 w-4" />, 
-          segment: 'new' 
-        },
         ...(isLoadingTemplates 
-          ? [{ href: '#', label: 'Loading templates...', icon: <Loader2 className="h-4 w-4 animate-spin" /> }] 
+          ? [{ href: '#', label: 'Loading templates...', icon: <Loader2 className="h-4 w-4 animate-spin" /> }]
           : contentItems
         ),
       ]
     },
+    { type: 'divider', show: () => isAuthenticatedUser },
     {
-      href: '/dashboard/content',
-      label: 'Manage Content',
-      icon: <ClipboardList className="h-5 w-5" />,
-      segment: 'content', 
-      show: () => isAuthenticatedUser
+      href: '/dashboard/brands',
+      label: 'Brands',
+      icon: <Building2 className="h-5 w-5" />,
+      segment: 'brands',
+      show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin || isEditor)
     },
-    { type: 'divider', show: () => isAuthenticatedUser && !isViewer },
+    {
+      href: '/dashboard/workflows',
+      label: 'Workflows',
+      icon: <GitBranch className="h-5 w-5" />,
+      segment: 'workflows',
+      show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin || isEditor)
+    },
+    {
+      href: '/dashboard/templates',
+      label: 'Content Templates',
+      icon: <ClipboardList className="h-5 w-5" />,
+      segment: 'templates',
+      show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin || isEditor)
+    },
     {
       label: 'Product Claims',
       icon: <ShieldCheck className="h-5 w-5" />,
@@ -246,34 +260,16 @@ export function UnifiedNavigation() {
       defaultOpen: false,
       show: () => isPlatformAdmin || isScopedAdmin || (isEditor && hasAssignedBrandWithMasterClaimId()),
       items: [
+        { href: '/dashboard/admin/claims-matrix', label: 'Claims Matrix', icon: <LayoutGrid className="h-4 w-4" />, segment: 'claims-matrix' },
+        { href: '/dashboard/claims/definitions', label: 'Define Claims', icon: <BookOpen className="h-4 w-4" />, segment: 'definitions' },
+        { href: '/dashboard/claims/overrides', label: 'Market Overrides', icon: <Globe2 className="h-4 w-4" />, segment: 'overrides' },
+        { href: '/dashboard/claims/brand-review', label: 'Brand Claims Review', icon: <SearchCheck className="h-4 w-4" />, segment: 'brand-review' },
+        { href: '/dashboard/claims/products', label: 'Products', icon: <Package className="h-4 w-4" />, segment: 'products' },
+        { href: '/dashboard/claims/ingredients', label: 'Ingredients', icon: <FlaskConical className="h-4 w-4" />, segment: 'ingredients' },
         { href: '/dashboard/claims/brands', label: 'Claim Brands', icon: <Building2 className="h-4 w-4" />, segment: 'brands' },
-        { href: '/dashboard/claims/products', label: 'Claim Products', icon: <Package className="h-4 w-4" />, segment: 'products' },
-        { href: '/dashboard/claims/ingredients', label: 'Claim Ingredients', icon: <FlaskConical className="h-4 w-4" />, segment: 'ingredients' },
-        { href: '/dashboard/claims/definitions', label: 'Claim Definitions', icon: <BookOpen className="h-4 w-4" />, segment: 'definitions' },
       ]
     },
-    {
-      href: '/dashboard/brands',
-      label: 'Manage Brands',
-      icon: <Building2 className="h-5 w-5" />,
-      segment: 'brands',
-      show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin || isEditor)
-    },
-    {
-      href: '/dashboard/templates',
-      label: 'Content Templates',
-      icon: <ClipboardEdit className="h-5 w-5" />,
-      segment: 'templates',
-      show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin || isEditor)
-    },
-    {
-      href: '/dashboard/workflows',
-      label: 'Manage Workflows',
-      icon: <GitBranch className="h-5 w-5" />,
-      segment: 'workflows',
-      show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin || isEditor)
-    },
-    { type: 'divider', show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin) },
+    { type: 'divider', show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin || isEditor) },
     {
       label: 'Tools',
       icon: <Wrench className="h-5 w-5" />,
@@ -288,25 +284,6 @@ export function UnifiedNavigation() {
     },
     { type: 'divider', show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin) },
     {
-      label: 'Admin Settings',
-      icon: <Settings2 className="h-5 w-5" />,
-      segment: 'admin',
-      defaultOpen: false,
-      show: () => isPlatformAdmin || isScopedAdmin,
-      items: [
-        ...(isPlatformAdmin ? [
-          { href: '/dashboard/admin/global-claim-brands', label: 'Global Claim Brands', icon: <Globe className="h-4 w-4" />, segment: 'global-claim-brands' },
-          { href: '/dashboard/admin/master-claim-brands', label: 'Master Claim Brands', icon: <ShieldCheck className="h-4 w-4" />, segment: 'master-claim-brands' },
-          { href: '/dashboard/admin/ingredients', label: 'Ingredients DB', icon: <FlaskConical className="h-4 w-4" />, segment: 'ingredients' },
-          { href: '/dashboard/admin/products', label: 'Products DB', icon: <Package className="h-4 w-4" />, segment: 'products' },
-          { href: '/dashboard/admin/claims-matrix', label: 'Claims Matrix', icon: <SearchCheck className="h-4 w-4" />, segment: 'claims-matrix' },
-        ] : []),
-        { href: '/dashboard/users', label: 'User Management', icon: <Users className="h-4 w-4" />, segment: 'users' },
-         { href: '/dashboard/admin/feedback-log', label: 'Feedback Log', icon: <MessageSquareWarning className="h-4 w-4" />, segment: 'feedback-log' },
-      ]
-    },
-    { type: 'divider', show: () => isAuthenticatedUser },
-    {
       label: 'Feedback',
       icon: <MessageSquareWarning className="h-5 w-5" />,
       segment: 'feedback',
@@ -314,25 +291,38 @@ export function UnifiedNavigation() {
       show: () => isAuthenticatedUser,
       items: [
         { 
-          href: '/dashboard/feedback/new', 
-          label: 'Submit Feedback', 
-          icon: <FilePlus2 className="h-4 w-4" />, 
+          href: '/dashboard/feedback/new',
+          label: 'Submit Feedback',
+          icon: <FilePlus2 className="h-4 w-4" />,
           segment: 'new'
         },
+        { 
+          href: '/dashboard/admin/feedback-log',
+          label: 'Feedback Log',
+          icon: <ListChecks className="h-4 w-4" />,
+          segment: 'feedback-log'
+        }
       ]
     },
     {
-      href: '/dashboard/help',
-      label: 'Help & Support',
-      icon: <HelpCircle className="h-5 w-5" />,
-      segment: 'help',
-      show: () => isAuthenticatedUser
+      href: '/dashboard/users',
+      label: 'Users',
+      icon: <Users className="h-5 w-5" />,
+      segment: 'users',
+      show: () => isPlatformAdmin || isScopedAdmin
     },
     {
       href: '/dashboard/account',
-      label: 'My Account',
+      label: 'Account',
       icon: <Settings className="h-5 w-5" />,
       segment: 'account',
+      show: () => isAuthenticatedUser
+    },
+    {
+      href: '/dashboard/help',
+      label: 'Help',
+      icon: <HelpCircle className="h-5 w-5" />,
+      segment: 'help',
       show: () => isAuthenticatedUser
     },
   ];

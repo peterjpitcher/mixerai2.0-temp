@@ -100,8 +100,8 @@ export default function DashboardLayout({
             <Image 
               src="/Mixerai2.0Logo.png" 
               alt="MixerAI 2.0 Logo"
-              width={150}
-              height={35} 
+              width={225}
+              height={52}
               priority 
             />
           </Link>
@@ -164,7 +164,7 @@ export default function DashboardLayout({
 
       <div className="flex flex-1">
         <UnifiedNavigation />
-        <main className="flex-1 p-4 sm:p-6 overflow-auto lg:pb-0 pb-20 sm:ml-64">
+        <main className="flex-1 p-4 sm:p-6 overflow-auto lg:pb-0 pb-20">
           {process.env.NODE_ENV === 'development' && (
             <div id="domain-verification-container" className="mb-4">
               {/* This will be populated client-side */}
