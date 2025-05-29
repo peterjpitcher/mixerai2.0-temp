@@ -173,7 +173,7 @@ export default function DashboardLayout({
 
       <div className="flex flex-1">
         <UnifiedNavigation />
-        <main className="flex-1 p-4 sm:p-6 overflow-auto lg:pb-0 pb-20">
+        <main className="flex-1 p-4 sm:p-6 overflow-auto lg:pb-0 pb-20 sm:ml-64">
           {process.env.NODE_ENV === 'development' && (
             <div id="domain-verification-container" className="mb-4">
               {/* This will be populated client-side */}
