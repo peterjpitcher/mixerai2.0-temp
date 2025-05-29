@@ -95,9 +95,8 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b bg-secondary text-secondary-foreground sticky top-0 z-40">
-        <div className="w-full mx-auto px-4 py-3 flex items-center justify-between sm:pl-64">
-          <div className="flex-grow sm:hidden"></div>
-          <div className="flex items-center space-x-2 sm:space-x-4 ml-auto sm:ml-0">
+        <div className="w-full mx-auto px-4 py-3 flex items-center justify-end sm:pl-64">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             <Button
               size="sm"
               asChild

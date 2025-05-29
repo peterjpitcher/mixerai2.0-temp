@@ -467,12 +467,12 @@ export function UnifiedNavigation() {
 
   return (
     <aside className="fixed inset-y-0 left-0 z-50 hidden w-64 flex-col border-r bg-background sm:flex">
-      <nav className="flex h-full flex-col items-stretch gap-4 px-2 sm:py-5 text-sm font-medium">
-        <div className="flex h-16 shrink-0 items-center justify-start gap-2 border-b px-4 text-lg font-semibold text-primary-foreground md:px-6 w-full">
+      <nav className="flex h-full flex-col items-stretch px-2 sm:pt-3 sm:pb-5 text-sm font-medium">
+        <div className="flex h-15 shrink-0 items-center justify-center border-b px-2 w-full">
           {/* This div is the top part OF THE SIDEBAR, containing the logo */}
           <Link
             href="/dashboard"
-            className="group flex items-center gap-2 text-lg font-semibold text-primary-foreground"
+            className="group flex items-center pb-[11px]"
           >
             <Image 
               src="/Mixerai2.0Logo.png" 
@@ -483,7 +483,7 @@ export function UnifiedNavigation() {
             />
           </Link>
         </div>
-        <div className="flex-1 overflow-y-auto space-y-1 px-2">
+        <div className="flex-1 overflow-y-auto space-y-1 px-2 mt-5">
           {navItemsDefinition.map((item, index) => {
             // Check if item itself should be shown
             const showItem = !('show' in item && item.show !== undefined) || (typeof item.show === 'function' ? item.show() : item.show);
@@ -503,7 +503,7 @@ export function UnifiedNavigation() {
                   <button
                     onClick={() => toggleSection(group.label)}
                     className={cn(
-                      "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors",
+                      "flex w-full items-center justify-between rounded-lg px-3 py-1 text-left text-sm font-medium transition-colors",
                       "hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                       isGroupActive ? "text-primary" : "text-muted-foreground"
                     )}
@@ -523,7 +523,7 @@ export function UnifiedNavigation() {
                             key={subItem.href}
                             href={subItem.href}
                             className={cn(
-                              "group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium leading-tight",
+                              "group flex items-center gap-3 rounded-md px-3 py-1 text-sm font-medium leading-tight",
                               "hover:bg-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                               subIsActive
                                 ? "bg-muted text-primary"
@@ -547,7 +547,7 @@ export function UnifiedNavigation() {
                   key={navLink.href}
                   href={navLink.href}
                   className={cn(
-                    "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
+                    "group flex items-center gap-3 rounded-lg px-3 py-1 text-sm font-medium",
                     "hover:bg-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     isLinkActive
                       ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
