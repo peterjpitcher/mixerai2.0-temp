@@ -46,8 +46,13 @@ interface UserSessionData {
   };
   brand_permissions?: Array<{
     brand_id: string;
-    role: string; // role within that brand
-    // other permission fields
+    role: string;
+    // Updated to match the new /api/me response structure
+    brand?: { 
+      id: string; 
+      name: string; 
+      master_claim_brand_id?: string | null; 
+    } | null;
   }>;
   // Add other fields that your session endpoint might return
 }
@@ -90,7 +95,8 @@ export function UnifiedNavigation() {
     content: true,
     tools: true,
     feedback: false,
-    'create content': true
+    'create-content': true,
+    'product-claims': false,
   });
 
   // State for user templates
@@ -112,6 +118,7 @@ export function UnifiedNavigation() {
         const data = await response.json();
         if (data.success && data.user) {
           setCurrentUser(data.user);
+          // console.log('[UnifiedNavigation] Current User:', data.user); // For debugging
         } else {
           setCurrentUser(null);
         }
@@ -194,69 +201,46 @@ export function UnifiedNavigation() {
     segment: template.id
   }));
   
-  // Define permission helper functions based on currentUser
+  // --- Permission helper functions ---
   const userRole = currentUser?.user_metadata?.role;
   const userBrandPermissions = currentUser?.brand_permissions || [];
-  const hasBrandAdminPermission = userBrandPermissions.some(bp => bp.role === 'admin');
-
+  
   const isViewer = userRole === 'viewer';
   const isEditor = userRole === 'editor';
   const isAdmin = userRole === 'admin';
-  const isPlatformAdmin = userRole === 'admin' && userBrandPermissions.length === 0;
+  const isPlatformAdmin = isAdmin && userBrandPermissions.length === 0;
   const isScopedAdmin = isAdmin && userBrandPermissions.length > 0;
 
-  // New role definitions based on the navigation permissions matrix
-  const isGlobalAdmin = userRole === 'admin';
-  const isBrandAdmin_NonGlobal = userRole !== 'admin' && hasBrandAdminPermission;
-  const isEditor_BrandAssigned_NonAdmin = userRole === 'editor' && !hasBrandAdminPermission;
-  const isViewer_BrandAssigned_NonAdmin = userRole === 'viewer' && !hasBrandAdminPermission;
+  const hasAssignedBrandWithMasterClaimId = () => {
+    if (!currentUser || !userBrandPermissions) return false;
+    return userBrandPermissions.some(bp => bp.brand && bp.brand.master_claim_brand_id && bp.brand.master_claim_brand_id !== null);
+  };
+  
+  const isAuthenticatedUser = currentUser != null;
+  // --- End Permission helper functions ---
 
-  // Simplified helper for general authenticated user access (adjust if more specific logic needed for base roles)
-  const isAuthenticatedUserWithBrandAccess = currentUser != null && (isGlobalAdmin || isBrandAdmin_NonGlobal || isEditor_BrandAssigned_NonAdmin || isViewer_BrandAssigned_NonAdmin);
-
-  // Primary nav items - base structure with 'show' conditions
+  // --- Nav Item Definitions (Focus on "Create Content" and "Product Claims") ---
   let navItemsDefinition: (NavItem | NavGroupItem | NavSpacer & { show?: boolean | (() => boolean) })[] = [
     {
       href: '/dashboard',
       label: 'Dashboard',
       icon: <Home className="h-5 w-5" />,
       segment: '', 
-      show: () => isAuthenticatedUserWithBrandAccess
+      show: () => isAuthenticatedUser
     },
     {
       href: '/dashboard/my-tasks',
       label: 'My Tasks',
       icon: <ListChecks className="h-5 w-5" />,
       segment: 'my-tasks',
-      show: () => isAuthenticatedUserWithBrandAccess
+      show: () => isAuthenticatedUser
     },
     {
       href: '/dashboard/content',
       label: 'All Content',
       icon: <Folder className="h-5 w-5" />,
       segment: 'content',
-      show: () => isAuthenticatedUserWithBrandAccess
-    },
-    {
-      href: '/dashboard/brands',
-      label: 'Brands',
-      icon: <Building2 className="h-5 w-5" />,
-      segment: 'brands',
-      show: () => isGlobalAdmin || isBrandAdmin_NonGlobal
-    },
-    {
-      href: '/dashboard/workflows',
-      label: 'Workflows',
-      icon: <GitBranch className="h-5 w-5" />,
-      segment: 'workflows',
-      show: () => isGlobalAdmin || isBrandAdmin_NonGlobal
-    },
-    {
-      href: '/dashboard/templates',
-      label: 'Content Templates',
-      icon: <Folder className="h-5 w-5" />, 
-      segment: 'templates',
-      show: () => isGlobalAdmin
+      show: () => isAuthenticatedUser
     },
     {
       label: 'Create Content', 
@@ -264,14 +248,28 @@ export function UnifiedNavigation() {
       items: contentItems, 
       segment: 'content-new', 
       defaultOpen: true,
-      show: () => (isGlobalAdmin || isEditor_BrandAssigned_NonAdmin) && contentItems.length > 0
+      show: () => (isPlatformAdmin || isScopedAdmin || isEditor)
+    },
+    { type: 'divider' as const, show: () => (isPlatformAdmin || isScopedAdmin || isEditor) },
+    {
+      href: '/dashboard/brands',
+      label: 'Brands',
+      icon: <Building2 className="h-5 w-5" />,
+      segment: 'brands',
+      show: () => isPlatformAdmin || isScopedAdmin 
     },
     {
       label: 'Product Claims',
-      icon: <ClipboardList className="h-5 w-5" />,
+      icon: <ShieldCheck className="h-5 w-5" />,
       segment: 'product-claims-group',
-      defaultOpen: false, // Users can open it if interested
-      show: () => isAuthenticatedUserWithBrandAccess, // Show group if user has general access
+      defaultOpen: false,
+      show: () => {
+        if (isPlatformAdmin) return true;
+        if (isScopedAdmin || isEditor || isViewer) {
+          return hasAssignedBrandWithMasterClaimId();
+        }
+        return false;
+      },
       items: [
         {
           href: '/dashboard/claims/preview',
@@ -317,7 +315,20 @@ export function UnifiedNavigation() {
         }
       ]
     },
-    { type: 'divider' as const, show: () => (isGlobalAdmin || isEditor_BrandAssigned_NonAdmin) }, // Divider after Create Content block
+    {
+      href: '/dashboard/workflows',
+      label: 'Workflows',
+      icon: <GitBranch className="h-5 w-5" />,
+      segment: 'workflows',
+      show: () => isPlatformAdmin || isScopedAdmin
+    },
+    {
+      href: '/dashboard/templates',
+      label: 'Content Templates',
+      icon: <ClipboardList className="h-5 w-5" />,
+      segment: 'templates',
+      show: () => isPlatformAdmin 
+    },
     {
       label: 'Tools',
       icon: <Wrench className="h-5 w-5" />,
@@ -343,9 +354,9 @@ export function UnifiedNavigation() {
           segment: 'content-transcreator'
         },
       ],
-      show: () => isGlobalAdmin || isEditor_BrandAssigned_NonAdmin
+      show: () => isAuthenticatedUser 
     },
-    { type: 'divider' as const, show: () => (isGlobalAdmin || isEditor_BrandAssigned_NonAdmin) }, // Divider after Tools block
+    { type: 'divider' as const, show: () => isAuthenticatedUser },
     {
       label: 'Feedback',
       icon: <MessageSquareWarning className="h-5 w-5" />,
@@ -356,105 +367,98 @@ export function UnifiedNavigation() {
           href: '/dashboard/feedback',
           label: 'View Feedback',
           icon: <Info className="h-4 w-4" />,
-          segment: 'view' 
+          segment: 'view-feedback' 
         },
-        ...(isGlobalAdmin ? [{ 
+        ...(isAdmin ? [{ 
             href: '/dashboard/admin/feedback-log',
             label: 'Feedback Log (Admin)',
             icon: <ListChecks className="h-4 w-4" />,
             segment: 'feedback-log'
         }] : [])
       ],
-      show: () => isAuthenticatedUserWithBrandAccess 
+      show: () => isAuthenticatedUser 
     },
-    { type: 'divider' as const, show: () => isAuthenticatedUserWithBrandAccess }, // Divider after Feedback block
+    { type: 'divider' as const, show: () => isAuthenticatedUser },
     {
       href: '/dashboard/users',
       label: 'Users',
       icon: <Users className="h-5 w-5" />,
       segment: 'users', 
-      show: () => isGlobalAdmin
+      show: () => isAdmin
     },
     {
       href: '/dashboard/account',
       label: 'Account',
-      icon: <Users className="h-5 w-5" />, 
+      icon: <Settings2 className="h-5 w-5" />,
       segment: 'account',
-      show: () => currentUser != null 
+      show: () => isAuthenticatedUser
     },
     {
       href: '/dashboard/help',
       label: 'Help',
       icon: <HelpCircle className="h-5 w-5" />,
       segment: 'help',
-      show: () => currentUser != null
+      show: () => isAuthenticatedUser
     },
-    /* Commented out Settings item
-    {
-      href: '/dashboard/admin/settings', 
-      label: 'Settings',
-      icon: <Settings className="h-5 w-5" />,
-      segment: 'admin-settings',
-      show: () => isGlobalAdmin 
-    },
-    */
   ];
-
+  
   // Filter nav items based on roles and conditions
   const finalNavItems = navItemsDefinition.filter(item => {
-    if (isLoadingUser) return false; // Don't show anything until user data is loaded
+    if (isLoadingUser) return false;
     
-    // Check if the 'show' property exists and evaluate it
     if ('show' in item && item.show !== undefined) {
-      if (typeof item.show === 'boolean') return item.show;
-      if (typeof item.show === 'function') return item.show();
-      // If it's a divider, it might not have a show function, default to true or handle based on type
-      if ('type' in item && item.type === 'divider') return true; // Show dividers by default if no specific show fn
-      return true; // Should not happen if types are correct, but default to show
+      return typeof item.show === 'function' ? item.show() : item.show;
     }
-    return true; // Default to show if no 'show' condition or if it's undefined
+    if ('type' in item && item.type === 'divider') return true;
+    
+    return true;
   });
   
   // Check if a navigation item is active based on the current URL path and segments
   const isActive = (item: NavItem | NavGroupItem) => {
-    // For simple nav items
+    const currentTopSegment = segments[0];
+    const currentSecondSegment = segments[1];
+
     if ('href' in item) {
-      // Exact match for dashboard root
-      if (item.href === '/dashboard' && segments.length === 0 && pathname === '/dashboard') {
-        return true;
-      }
-      // Check if the current path starts with the item's href, for non-root items
-      // and ensure it's not just a partial match for a longer path unless it's a group segment
-      if (item.segment && segments[0] === item.segment) {
-         // If item.segment is 'content', active if segments[0] is 'content'
-         // and potentially segments[1] for sub-routes like /content/[id] or /content/new
-        if(item.segment === 'content' && segments[0] === 'content'){
-            return true;
+      if (item.href === '/dashboard' && pathname === '/dashboard') return true;
+      if (item.segment && currentTopSegment === item.segment) {
+        if (pathname.startsWith(item.href)) {
+            if (item.href === '/dashboard/content' && pathname === '/dashboard/content') return true;
+            if (item.href !== '/dashboard/content' && pathname.startsWith(item.href)) return true;
         }
-        // For items like /dashboard/users, /dashboard/brands, it's a direct segment match
-        if (segments.length === 1 && segments[0] === item.segment) {
-            return true;
-        }
-         // For /dashboard/templates specifically
-        if (item.segment === 'templates' && segments[0] === 'templates') {
-            return true;
-        }
-        return false; // Fallback for basic segment check
       }
       return pathname.startsWith(item.href) && item.href !== '/dashboard';
     }
     
-    // For group items, check if any child item is active
     if ('items' in item) {
-      return item.items.some(subItem => 
-        segments.includes(subItem.segment || '') || 
-        pathname === subItem.href
-      );
+      if (item.segment && currentTopSegment === item.segment) {
+        return true;
+      }
+      return item.items.some(subItem => {
+        if (subItem.segment && pathname.includes(subItem.href)) {
+            if (subItem.href.startsWith("/dashboard/content/new")) {
+                const templateId = new URLSearchParams(window.location.search).get('template');
+                return templateId === subItem.segment;
+            }
+            return segments.includes(subItem.segment);
+        }
+        return pathname === subItem.href;
+      });
     }
     
     return false;
   };
   
+  if (isLoadingUser) {
+    return (
+      <div className="bg-card w-64 p-4 h-[calc(100vh-4rem)] overflow-y-auto border-r border-border sticky top-16 hidden lg:block">
+        <div className="flex items-center justify-center h-full">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       <nav className="bg-card w-64 p-4 h-[calc(100vh-4rem)] overflow-y-auto border-r border-border sticky top-16 hidden lg:block">
@@ -462,24 +466,21 @@ export function UnifiedNavigation() {
           <div className="space-y-1">
             {finalNavItems.map((item, index) => {
               if ('type' in item && item.type === 'divider') {
-                // Render a visible spacer if the item is a divider
-                // And ensure it's not the very first or last item to avoid leading/trailing spacers if items are filtered out
                 if (index > 0 && index < finalNavItems.length -1) { 
-                    // Check if previous and next items are not dividers to avoid double dividers
                     const prevItem = finalNavItems[index-1];
                     const nextItem = finalNavItems[index+1];
-                    if (!('type' in prevItem && prevItem.type === 'divider') && 
-                        !('type' in nextItem && nextItem.type === 'divider')) {
+                    if (prevItem && !('type' in prevItem && prevItem.type === 'divider') && 
+                        nextItem && !('type' in nextItem && nextItem.type === 'divider')) {
                           return <hr key={`divider-${index}`} className="my-3 border-border/60" />;
                     }
                 }
-                return null; // Don't render divider if it's at the start/end or adjacent to another
+                return null;
               }
               if ('items' in item) {
                 return (
                   <div key={index} className="space-y-1">
                     <button 
-                      onClick={() => toggleSection(item.label.toLowerCase())}
+                      onClick={() => toggleSection(item.label.toLowerCase().replace(/\s+/g, '-'))}
                       className={cn(
                         "flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
                         isActive(item)
@@ -491,22 +492,22 @@ export function UnifiedNavigation() {
                         {item.icon}
                         {item.label}
                       </span>
-                      {expandedSections[item.label.toLowerCase()] 
+                      {expandedSections[item.label.toLowerCase().replace(/\s+/g, '-')]
                         ? <ChevronDown className="h-4 w-4" /> 
                         : <ChevronRight className="h-4 w-4" />
                       }
                     </button>
-                    {expandedSections[item.label.toLowerCase()] && (
-                      <div className="pl-6 space-y-1">
+                    {expandedSections[item.label.toLowerCase().replace(/\s+/g, '-')] && (
+                      <div className="pl-6 space-y-1 mt-1">
                         {item.items.map((subItem) => (
                           <Link
                             key={subItem.href}
                             href={subItem.href}
                             className={cn(
-                              'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors',
-                              (segments.includes(subItem.segment || '') || pathname === subItem.href)
-                                ? "bg-primary text-primary-foreground"
-                                : "text-muted-foreground hover:bg-muted hover:text-primary"
+                              'flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm transition-colors',
+                              (segments.includes(subItem.segment || '') || pathname === subItem.href || (subItem.href.startsWith("/dashboard/content/new") && new URLSearchParams(window.location.search).get('template') === subItem.segment) )
+                                ? "text-primary font-semibold"
+                                : "text-muted-foreground hover:text-primary"
                             )}
                           >
                             {subItem.icon}

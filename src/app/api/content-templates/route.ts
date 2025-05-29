@@ -114,8 +114,8 @@ const mockTemplates = [
  */
 export const GET = withAuth(async (request: NextRequest, user) => {
   try {
-    // Role check: Only Global Admins can list/view content templates
-    if (user.user_metadata?.role !== 'admin') {
+    // Role check: Allow Admins (Platform/Scoped) and Editors to list/view content templates
+    if (!(user.user_metadata?.role === 'admin' || user.user_metadata?.role === 'editor')) {
       return NextResponse.json(
         { success: false, error: 'Forbidden: You do not have permission to access this resource.' },
         { status: 403 }
