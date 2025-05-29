@@ -142,7 +142,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
 
   const [masterClaimBrands, setMasterClaimBrands] = useState<MasterClaimBrand[]>([]);
   const [isLoadingMasterClaimBrands, setIsLoadingMasterClaimBrands] = useState(true);
-
+  
   const breadcrumbItems = [
     { label: "Dashboard", href: "/dashboard" },
     { label: "Brands", href: "/dashboard/brands" },
@@ -305,10 +305,10 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   };
 
   const handleAddAdditionalUrlField = () => {
-    setFormData(prev => ({
-      ...prev,
+      setFormData(prev => ({
+        ...prev,
       additional_website_urls: [...prev.additional_website_urls, { id: uuidv4(), value: '' }]
-    }));
+      }));
   };
 
   const handleRemoveAdditionalUrl = (idToRemove: string) => {
@@ -408,7 +408,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     setIsSaving(true);
     try {
       const payload: any = { 
-        ...formData,
+      ...formData,
         selected_agency_ids: formData.content_vetting_agencies,
       };
       
@@ -548,12 +548,12 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
+              <div className="space-y-2">
                   <Label htmlFor="name">Brand Name <span className="text-destructive">*</span></Label>
                   <Input id="name" name="name" value={formData.name} onChange={handleInputChange} placeholder="Enter brand name" required/>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="website_url">Main Website URL</Label>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="website_url">Main Website URL</Label>
                   <Input id="website_url" name="website_url" value={formData.website_url} onChange={handleInputChange} placeholder="https://example.com" type="url"/>
                 </div>
               </div>
@@ -566,15 +566,15 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                       {COUNTRIES.map(c => (<SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-2">
+              </div>
+              <div className="space-y-2">
                   <Label htmlFor="language">Language</Label>
                   <Select value={formData.language} onValueChange={(v) => handleSelectChange('language', v)}>
                     <SelectTrigger><SelectValue placeholder="Select language" /></SelectTrigger>
                     <SelectContent className="max-h-[300px]">
                       {LANGUAGES.map(l => (<SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
+                  </SelectContent>
+                </Select>
                 </div>
               </div>
 
@@ -615,49 +615,49 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                   <div className="space-y-4 border-b pb-4">
                     <h3 className="text-lg font-semibold">Generate Brand Identity</h3>
                     <p className="text-sm text-muted-foreground">Add website URLs to auto-generate or enhance brand identity, tone, and guardrails. The main URL from Basic Details is included by default.</p>
-                    <div className="space-y-2">
+              <div className="space-y-2">
                       <Label>Additional Website URLs (Optional)</Label>
                       {formData.additional_website_urls.map((urlObj) => (
                         <div key={urlObj.id} className="flex items-center gap-2">
-                          <Input
+                    <Input
                             value={urlObj.value}
                             onChange={(e) => handleAdditionalUrlChange(urlObj.id, e.target.value)}
                             placeholder="https://additional-example.com"
                             className="flex-grow"
-                            type="url"
-                          />
+                      type="url"
+                    />
                           <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveAdditionalUrl(urlObj.id)} className="h-8 w-8" aria-label="Remove URL">
                             <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
+                    </Button>
+                  </div>
+                ))}
                       <Button type="button" variant="outline" onClick={handleAddAdditionalUrlField} size="sm" className="mt-2 w-full">
                         <PlusCircle className="mr-2 h-4 w-4" /> Add another URL
-                      </Button>
-                    </div>
+                  </Button>
+                </div>
                     <div className="space-y-2 pt-2">
                       <p className="text-xs text-muted-foreground">Identity will be generated for {countryName} in {languageName} (if set).</p>
                       <Button onClick={handleGenerateBrandIdentity} disabled={isGenerating || !canGenerateIdentity} className="w-full">
                         {isGenerating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</> : ( <> <Sparkles className="mr-2 h-4 w-4" /> Generate Brand Identity </>)}
                       </Button>
-                    </div>
-                  </div>
-                  
+              </div>
+              </div>
+
                   <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="brand_identity">Brand Identity</Label>
+              <div className="space-y-2">
+                <Label htmlFor="brand_identity">Brand Identity</Label>
                       <Textarea id="brand_identity" name="brand_identity" value={formData.brand_identity} onChange={handleInputChange} placeholder="Describe your brand..." rows={6}/>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="tone_of_voice">Tone of Voice</Label>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tone_of_voice">Tone of Voice</Label>
                       <Textarea id="tone_of_voice" name="tone_of_voice" value={formData.tone_of_voice} onChange={handleInputChange} placeholder="Describe your brand's tone..." rows={4}/>
-                    </div>
-                    <div className="space-y-2">
+              </div>
+              <div className="space-y-2">
                       <Label htmlFor="guardrails">Content Guardrails</Label>
                       <Textarea id="guardrails" name="guardrails" value={formData.guardrails} onChange={handleInputChange} placeholder="e.g., Do not mention competitors..." rows={4}/>
-                    </div>
-                    
-                    <div className="space-y-4">
+              </div>
+
+              <div className="space-y-4">
                       <Label>Content Vetting Agencies (Optional)</Label>
                       {isLoadingAgencies && <p className="text-sm text-muted-foreground">Loading agencies...</p>}
                       
@@ -694,13 +694,13 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                               {priorityOrder.map(priorityLevel => {
                                 const agenciesInGroup = filteredAgenciesByIdentityTab.filter(agency => agency.priority === priorityLevel);
                                 if (agenciesInGroup.length === 0) return null;
-                                return (
+                        return (
                                   <div key={priorityLevel} className="mt-3">
                                     <h4 className={cn("text-md font-semibold mb-2", getPriorityAgencyStyles(priorityLevel))}>{priorityLevel} Priority</h4>
                                     <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
-                                      {agenciesInGroup.map(agency => (
+                              {agenciesInGroup.map(agency => (
                                         <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
-                                          <Checkbox
+                                  <Checkbox 
                                             id={`edit-agency-${agency.id}`}
                                             checked={formData.content_vetting_agencies.includes(agency.id)}
                                             onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)}
@@ -709,14 +709,14 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                                             htmlFor={`edit-agency-${agency.id}`}
                                             className={getPriorityAgencyStyles(agency.priority)}
                                           >
-                                            {agency.name}
+                                    {agency.name}
                                           </Label>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                );
-                              })}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                    })}
                               {filteredAgenciesByIdentityTab.filter(a => !priorityOrder.includes(a.priority as any) && a.priority != null).length > 0 && (
                                 <div key="other-priority" className="mt-3">
                                   <h4 className={cn("text-md font-semibold mb-2", getPriorityAgencyStyles(null))}>Other Priority</h4>
@@ -742,8 +742,8 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                                     ))}
                                   </div>
                                 </div>
-                              )}
-                            </>
+                    )}
+                  </>
                           );
                         }
                         return null; 
@@ -783,7 +783,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                        <div className="w-full h-12 rounded-md mt-2" style={{ backgroundColor: formData.brand_color }} />
                        <p className="text-xs text-center text-muted-foreground">{formData.brand_color}</p>
                     </div>
-                  </div>
+                    </div>
                 </div>
               </div>
             </CardContent>
@@ -798,7 +798,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         <Button onClick={handleSave} disabled={isSaving || isGenerating}>
             {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
         </Button>
-      </div>
+              </div>
     </div>
   );
 } 

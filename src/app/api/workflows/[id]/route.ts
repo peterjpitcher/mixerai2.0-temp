@@ -329,24 +329,25 @@ export const PUT = withAuth(async (
     
     const stepsFromClient = body.steps || [];
     const processedStepsForRpc: any[] = [];
-
-    for (const step of stepsFromClient) {
+    
+    // Ensure step_order is present, using array index as a fallback
+    for (let i = 0; i < stepsFromClient.length; i++) {
+      const step = stepsFromClient[i];
       const validAssigneesForStep: { id: string; email?: string; name?: string }[] = [];
+      
       if (step.assignees && Array.isArray(step.assignees)) {
         for (const assignee of step.assignees) {
           let userIdToAssign: string | null = null;
 
           if (assignee.id && !assignee.id.startsWith('temp-')) {
-            // Assume it's a valid existing UUID if not starting with temp-
             userIdToAssign = assignee.id;
           } else if (assignee.email) {
-            // ID is temporary or missing, try to find user by email
-            const normalizedEmail = assignee.email.trim().toLowerCase(); // Normalize email
-            console.log(`Attempting to find user by normalized email: '${normalizedEmail}' (original: '${assignee.email}') for step '${step.name}'`);
+            const normalizedEmail = assignee.email.trim().toLowerCase();
+            // console.log(`Attempting to find user by normalized email: '${normalizedEmail}' (original: '${assignee.email}') for step '${step.name}'`);
             const { data: existingUser } = await supabase
               .from('profiles') 
               .select('id')
-              .eq('email', normalizedEmail) // Use normalized email for lookup
+              .eq('email', normalizedEmail)
               .maybeSingle();
             
             if (existingUser) {
@@ -361,23 +362,22 @@ export const PUT = withAuth(async (
           if (userIdToAssign) {
             validAssigneesForStep.push({ 
               id: userIdToAssign,
-              // Include email/name if available, though RPC might only need ID
               email: assignee.email,
               name: assignee.name 
             });
           }
         }
       }
+      
       processedStepsForRpc.push({
-        id: step.id, // This is the step's own UUID (primary key of workflow_steps)
+        id: step.id,
         name: step.name,
         description: step.description,
         role: step.role,
         approvalRequired: step.approvalRequired,
-        // IMPORTANT: Ensure the RPC 'p_steps' expects assignees as an array of UUID strings.
-        // This change makes it an array of strings: ['uuid1', 'uuid2']
-        assignees: validAssigneesForStep.map(a => a.id), 
-        step_order: step.step_order
+        assignees: validAssigneesForStep.map(a => a.id),
+        // Ensure step_order is an integer; use index + 1 as fallback if not provided or invalid
+        step_order: (typeof step.step_order === 'number' && Number.isInteger(step.step_order)) ? step.step_order : i + 1
       });
     }
 
@@ -401,15 +401,25 @@ export const PUT = withAuth(async (
       paramsToPass
     );
 
+    // Enhanced logging for RPC response
+    console.log(`[API Workflows PUT /${workflowId}] RPC Response - rpcData:`, JSON.stringify(rpcData, null, 2));
+    console.log(`[API Workflows PUT /${workflowId}] RPC Response - rpcError:`, JSON.stringify(rpcError, null, 2));
+
     if (rpcError) {
-      console.error('RPC Error updating workflow and invitations:', rpcError);
+      console.error(`[API Workflows PUT /${workflowId}] Error calling RPC update_workflow_and_handle_invites:`, rpcError);
+      // Consider if rpcData also indicates failure e.g. if rpcData === false
+      return handleApiError(rpcError, `RPC update_workflow_and_handle_invites failed for workflow ${workflowId}`);
+    }
+
+    // Additionally, if your RPC is designed to return `false` on logical failure (handled exception):
+    if (rpcData === false) {
+      console.error(`[API Workflows PUT /${workflowId}] RPC update_workflow_and_handle_invites returned false, indicating a handled error within the RPC.`);
       return NextResponse.json(
         { 
           success: false, 
-          error: `Failed to update workflow: ${rpcError.message} Hint: ${rpcError.hint}`,
-          details: rpcError
+          error: 'Workflow update failed due to a handled error within the update process.'
         },
-        { status: 500 }
+        { status: 500 } 
       );
     }
 

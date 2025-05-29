@@ -18,6 +18,7 @@ The following matrix indicates whether a main navigation item is generally visib
 Symbols used:
 *   `*`: Access is filtered based on the user's assigned brands (for Viewers & Editors).
 *   `**`: For Admins, access is comprehensive if NO brands are assigned. If ANY brands are assigned, access is filtered to those assigned brands for brand-specific entities (Brands, Content, Workflows, Templates). User management remains global.
+*   `†`: For Product Claims: Platform Admins always see this. Viewer, Editor, and Scoped Admin roles, visibility depends on at least one assigned brand having a `master_claim_brand_id`.
 
 | Navigation Item                      | Viewer | Editor | Admin  | Notes                                                                    |
 | :----------------------------------- | :----: | :----: | :----: | :----------------------------------------------------------------------- |
@@ -30,6 +31,7 @@ Symbols used:
 |   ↳ View All Content (e.g., a flat list) |   ✓`*`  |   ✓`*`  |   ✓`**` | `*`Viewers/Editors: Filtered. `**`Admins: All if unassigned; assigned only if assigned. |
 |   ↳ Content Folder (e.g. /dashboard/content/[content_type]) | ✓`*`  | ✓`*`  |   ✓`**` | `*`Viewers/Editors: Filtered. `**`Admins: All if unassigned; assigned only if assigned. |
 |   ↳ Create New Content (contextual)  |   ✗    |   ✓`*`  |   ✓`**` | `*`Editors: Filtered. `**`Admins: Can create within their scope.            |
+| **Product Claims**                   |   ✓`†`  |   ✓`†`  |   ✓`†`  | `†`See note above.                                                       |
 | **Workflows**                        |        |        |        |                                                                          |
 |   ↳ View All Workflows (List Page)   |   ✗    |   ✗    |   ✓`**` | `**`Admins: All if unassigned; assigned only if assigned.                  |
 |   ↳ Create New Workflow              |   ✗    |   ✗    |   ✓`**` | `**`Admins can create workflows (globally if unassigned, or for their scope). |
@@ -53,6 +55,9 @@ Symbols used:
     *   If an Admin IS assigned to one or more brands, their access to view and manage Brands, Content, Workflows, and Templates is restricted to ONLY those brands they are assigned to. 
     *   User Management capabilities (viewing users, inviting users) remain global for all Admins, regardless of brand assignments.
 *   **Viewer/Editor Brand-Restricted Access (`*`):** For 'Viewer' and 'Editor' roles, any access to content listings, content type categories, or content creation capabilities is strictly limited to the brands they are assigned to. The UI should filter navigation links and content views accordingly.
+*   **Product Claims Conditional Access (`†`):** 
+    *   **Platform Admins** (Admin role with no brand assignments) always have access to "Product Claims".
+    *   **Scoped Admins** (Admin role with brand assignments), **Editors**, and **Viewers** only have access to "Product Claims" if at least one of their assigned brands has an active `master_claim_brand_id`.
 *   **Contextual Actions:** Actions like "Edit Brand," "Edit Content," "Edit Workflow," etc., are generally contextual (e.g., an "edit" button on an item's detail page) and not main navigation links.
     *   Viewers: No edit capabilities.
     *   Editors: Can edit content for their assigned brands.
@@ -69,6 +74,7 @@ This version focuses on the primary navigation sections visible to each role.
 *   My Tasks
 *   Content (Filtered by assigned brands)
     *   ↳ _Access to view specific content types & items for assigned brands_
+*   Product Claims (Visible if any assigned brand has `master_claim_brand_id`)
 *   Tools (Access to all tools)
     *   ↳ _Alt Text Generator_
     *   ↳ _Content Transcreator_
@@ -82,6 +88,7 @@ This version focuses on the primary navigation sections visible to each role.
 *   My Tasks
 *   Content (Filtered by assigned brands)
     *   ↳ _Access to view/create/edit specific content types & items for assigned brands_
+*   Product Claims (Visible if any assigned brand has `master_claim_brand_id`)
 *   Tools (Access to all tools)
     *   ↳ _Alt Text Generator_
     *   ↳ _Content Transcreator_
@@ -96,6 +103,7 @@ This version focuses on the primary navigation sections visible to each role.
     *   My Tasks
     *   Brands (View All, Create New - full platform access)
     *   Content (View All, Create New - full platform access)
+    *   Product Claims (Always visible)
     *   Workflows (View All, Create New - full platform access)
     *   Templates (View All, Create New - full platform access)
     *   Tools (Access to all tools)
@@ -108,6 +116,7 @@ This version focuses on the primary navigation sections visible to each role.
     *   My Tasks
     *   Brands (View assigned brands, Create New within scope/potentially global - TBD by exact rules)
     *   Content (View/Create/Edit for assigned brands only)
+    *   Product Claims (Visible if any assigned brand has `master_claim_brand_id`)
     *   Workflows (View/Manage for assigned brands only, or global if applicable)
     *   Templates (View/Manage for assigned brands only, or global if applicable)
     *   Tools (Access to all tools)

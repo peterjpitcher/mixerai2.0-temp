@@ -219,6 +219,18 @@ export function UnifiedNavigation() {
   const isAuthenticatedUser = currentUser != null;
   // --- End Permission helper functions ---
 
+  // --- Logging for Global Admin Debugging ---
+  if (currentUser?.user_metadata?.role === 'admin') {
+    console.log('[UnifiedNavigation] For Admin User - currentUser:', JSON.stringify(currentUser, null, 2));
+    console.log('[UnifiedNavigation] For Admin User - userRole:', userRole);
+    console.log('[UnifiedNavigation] For Admin User - userBrandPermissions:', JSON.stringify(userBrandPermissions, null, 2));
+    console.log('[UnifiedNavigation] For Admin User - userBrandPermissions.length:', userBrandPermissions.length);
+    console.log('[UnifiedNavigation] For Admin User - isAdmin variable (should be true):', isAdmin);
+    console.log('[UnifiedNavigation] For Admin User - isPlatformAdmin variable:', isPlatformAdmin);
+    console.log('[UnifiedNavigation] For Admin User - isScopedAdmin variable:', isScopedAdmin);
+  }
+  // --- End Logging ---
+
   // --- Nav Item Definitions (Focus on "Create Content" and "Product Claims") ---
   let navItemsDefinition: (NavItem | NavGroupItem | NavSpacer & { show?: boolean | (() => boolean) })[] = [
     {
@@ -257,6 +269,20 @@ export function UnifiedNavigation() {
       icon: <Building2 className="h-5 w-5" />,
       segment: 'brands',
       show: () => isPlatformAdmin || isScopedAdmin 
+    },
+    {
+      href: '/dashboard/workflows',
+      label: 'Workflows',
+      icon: <GitBranch className="h-5 w-5" />,
+      segment: 'workflows',
+      show: () => isPlatformAdmin || isScopedAdmin
+    },
+    {
+      href: '/dashboard/templates',
+      label: 'Content Templates',
+      icon: <ClipboardList className="h-5 w-5" />,
+      segment: 'templates',
+      show: () => isPlatformAdmin 
     },
     {
       label: 'Product Claims',
@@ -315,20 +341,7 @@ export function UnifiedNavigation() {
         }
       ]
     },
-    {
-      href: '/dashboard/workflows',
-      label: 'Workflows',
-      icon: <GitBranch className="h-5 w-5" />,
-      segment: 'workflows',
-      show: () => isPlatformAdmin || isScopedAdmin
-    },
-    {
-      href: '/dashboard/templates',
-      label: 'Content Templates',
-      icon: <ClipboardList className="h-5 w-5" />,
-      segment: 'templates',
-      show: () => isPlatformAdmin 
-    },
+    { type: 'divider' as const, show: () => (isPlatformAdmin || isScopedAdmin || isEditor) },
     {
       label: 'Tools',
       icon: <Wrench className="h-5 w-5" />,
@@ -356,6 +369,7 @@ export function UnifiedNavigation() {
       ],
       show: () => isAuthenticatedUser 
     },
+    
     { type: 'divider' as const, show: () => isAuthenticatedUser },
     {
       label: 'Feedback',

@@ -15,8 +15,9 @@ export const GET = withAuth(async (
   context: { params: { id: string } }
 ) => {
   try {
-    // Role check: Only Global Admins can access content templates
-    if (user.user_metadata?.role !== 'admin') {
+    // Role check: Allow Admins (Platform/Scoped) and Editors to fetch a specific content template
+    const userRole = user.user_metadata?.role;
+    if (!(userRole === 'admin' || userRole === 'editor')) {
       return NextResponse.json(
         { success: false, error: 'Forbidden: You do not have permission to access this resource.' },
         { status: 403 }

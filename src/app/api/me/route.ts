@@ -16,7 +16,7 @@ interface UserProfileResponse {
   brand_permissions?: Array<{
     brand_id: string; // Assuming brand_id will always be present if the permission exists
     role: string;
-    brand?: { id: string; name: string } | null; // Brand itself could be null if join fails or brand deleted
+    brand?: { id: string; name: string; master_claim_brand_id?: string | null; } | null; // Brand itself could be null if join fails or brand deleted
   }>;
   // Add any other fields from your 'profiles' table you might want
   full_name?: string | null; // Allow null to match DB type
@@ -59,7 +59,7 @@ export const GET = withRouteAuth(async (request: NextRequest, authUser: any) => 
       .select(`
         brand_id,
         role,
-        brand:brands (id, name)
+        brand:brands (id, name, master_claim_brand_id)
       `)
       .eq('user_id', authUser.id);
 
@@ -73,7 +73,7 @@ export const GET = withRouteAuth(async (request: NextRequest, authUser: any) => 
     const typedBrandPermissions = (rawBrandPermissions || []).map(p => ({
         ...p,
         brand_id: p.brand_id as string, // Asserting brand_id is a string, as it's a FK
-        brand: p.brand as { id: string; name: string } | null // Explicitly type the joined brand
+        brand: p.brand as { id: string; name: string; master_claim_brand_id?: string | null; } | null // Explicitly type the joined brand
     })).filter(p => p.brand_id != null) as UserProfileResponse['brand_permissions'];
 
     // Combine all data into the final user object
