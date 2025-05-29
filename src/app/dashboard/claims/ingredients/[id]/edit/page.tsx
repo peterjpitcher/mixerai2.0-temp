@@ -12,6 +12,8 @@ import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Save, AlertTriangle, Sprout } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Ingredient {
   id: string;
@@ -24,6 +26,11 @@ interface Ingredient {
 interface IngredientFormData {
   name: string;
   description: string | null;
+}
+
+interface Product {
+  id: string;
+  name: string;
 }
 
 export default function EditIngredientPage() {
@@ -39,6 +46,9 @@ export default function EditIngredientPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null); 
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof IngredientFormData, string>>>({});
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [initialSelectedProductIds, setInitialSelectedProductIds] = useState<string[]>([]);
   
   const pageTitle = "Edit Ingredient";
   const pageDescription = `Modifying ingredient: ${formData.name || (id ? `ID: ${id}` : "Loading...")}`;
@@ -59,38 +69,65 @@ export default function EditIngredientPage() {
       return;
     }
     setIsLoading(true);
-    async function fetchIngredientDetails() {
+    async function fetchIngredientAndProducts() {
       try {
-        const response = await fetch(`/api/ingredients/${id}`);
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          if (response.status === 404) {
+        const ingredientResponse = await fetch(`/api/ingredients/${id}`);
+        if (!ingredientResponse.ok) {
+          const errorData = await ingredientResponse.json().catch(() => ({}));
+          if (ingredientResponse.status === 404) {
             throw new Error("Ingredient not found.");
           } 
           throw new Error(errorData.error || "Failed to fetch ingredient details.");
         }
-        const result = await response.json();
-        if (result.success && result.data) {
-          const ingredient: Ingredient = result.data;
+        const ingredientResult = await ingredientResponse.json();
+        if (ingredientResult.success && ingredientResult.data) {
+          const ingredient: Ingredient = ingredientResult.data;
           setFormData({
             name: ingredient.name,
             description: ingredient.description,
           });
-          setError(null);
         } else {
-          throw new Error(result.error || "Failed to parse ingredient details.");
+          throw new Error(ingredientResult.error || "Failed to parse ingredient details.");
         }
+
+        const productsResponse = await fetch(`/api/products`);
+        if (!productsResponse.ok) {
+          const errorData = await productsResponse.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to fetch products.");
+        }
+        const productsResult = await productsResponse.json();
+        if (productsResult.success && Array.isArray(productsResult.data)) {
+          setAllProducts(productsResult.data);
+        } else {
+          throw new Error(productsResult.error || "Failed to parse products list.");
+        }
+
+        const associatedProductsResponse = await fetch(`/api/ingredients/${id}/products`);
+        if (!associatedProductsResponse.ok) {
+          const errorData = await associatedProductsResponse.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to fetch associated products.");
+        }
+        const associatedProductsResult = await associatedProductsResponse.json();
+        if (associatedProductsResult.success && Array.isArray(associatedProductsResult.data)) {
+          const currentProductIds = associatedProductsResult.data.map((p: Product) => p.id);
+          setSelectedProductIds(currentProductIds);
+          setInitialSelectedProductIds(currentProductIds);
+        } else {
+          throw new Error(associatedProductsResult.error || "Failed to parse associated products.");
+        }
+        setError(null);
+
       } catch (err) {
         const errorMessage = (err as Error).message || "An unexpected error occurred.";
-        console.error("Error fetching ingredient details:", errorMessage);
+        console.error("Error fetching data for ingredient edit page:", errorMessage);
         setError(errorMessage);
-        toast.error("Failed to load ingredient details.", { description: errorMessage }); 
+        toast.error("Failed to load page data.", { description: errorMessage }); 
       } finally {
         setIsLoading(false);
       }
     }
-    fetchIngredientDetails();
-  }, [id]); // Removed router from dependencies as it was not used for ID-based fetching
+    fetchIngredientAndProducts();
+  }, [id]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -98,6 +135,14 @@ export default function EditIngredientPage() {
     if (formErrors[name as keyof IngredientFormData]) {
       setFormErrors(prev => ({ ...prev, [name]: undefined }));
     }
+  };
+
+  const handleProductSelectionChange = (productId: string) => {
+    setSelectedProductIds(prevSelectedIds =>
+      prevSelectedIds.includes(productId)
+        ? prevSelectedIds.filter(id => id !== productId)
+        : [...prevSelectedIds, productId]
+    );
   };
 
   const validateForm = (): boolean => {
@@ -122,7 +167,8 @@ export default function EditIngredientPage() {
 
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/ingredients/${id}`, {
+      // 1. Update Ingredient Details
+      const ingredientUpdateResponse = await fetch(`/api/ingredients/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -133,14 +179,54 @@ export default function EditIngredientPage() {
         }),
       });
 
-      const result = await response.json();
+      const ingredientUpdateResult = await ingredientUpdateResponse.json();
 
-      if (response.ok && result.success) {
-        toast.success("Ingredient updated successfully!");
-        router.push("/dashboard/claims/ingredients"); // Updated redirect path
-      } else {
-        throw new Error(result.error || "Failed to update Ingredient.");
+      if (!ingredientUpdateResponse.ok || !ingredientUpdateResult.success) {
+        throw new Error(ingredientUpdateResult.error || "Failed to update Ingredient details.");
       }
+      toast.success("Ingredient details updated successfully!");
+
+      // 2. Update Product Associations
+      const productsToAdd = selectedProductIds.filter(pid => !initialSelectedProductIds.includes(pid));
+      const productsToRemove = initialSelectedProductIds.filter(pid => !selectedProductIds.includes(pid));
+
+      const addPromises = productsToAdd.map(productId => 
+        fetch(`/api/product-ingredients`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ product_id: productId, ingredient_id: id }),
+        }).then(async res => {
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(`Failed to associate product ${productId}: ${err.error || res.statusText}`);
+          }
+          return res.json();
+        })
+      );
+
+      const removePromises = productsToRemove.map(productId =>
+        fetch(`/api/product-ingredients`, { 
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ product_id: productId, ingredient_id: id }),
+        }).then(async res => {
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(`Failed to disassociate product ${productId}: ${err.error || res.statusText}`);
+          }
+          return res.json();
+        })
+      );
+      
+      await Promise.all([...addPromises, ...removePromises]);
+      
+      if (productsToAdd.length > 0 || productsToRemove.length > 0) {
+        toast.success("Product associations updated successfully!");
+      }
+      
+      setInitialSelectedProductIds([...selectedProductIds]);
+
+      router.push("/dashboard/claims/ingredients");
     } catch (error) {
       const errorMessage = (error as Error).message || "An unexpected error occurred.";
       console.error("Failed to update Ingredient:", errorMessage);
@@ -237,6 +323,40 @@ export default function EditIngredientPage() {
               />
               {formErrors.description && <p className="text-xs text-red-500 mt-1">{formErrors.description}</p>}
             </div>
+
+            <div className="space-y-2 pt-4">
+              <Label className="text-base font-medium">Associated Products</Label>
+              <CardDescription>
+                Select the products that contain this ingredient.
+              </CardDescription>
+              {allProducts.length > 0 ? (
+                <ScrollArea className="h-72 w-full rounded-md border p-4">
+                  <div className="space-y-2">
+                    {allProducts.map((product) => (
+                      <div key={product.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`product-${product.id}`}
+                          checked={selectedProductIds.includes(product.id)}
+                          onCheckedChange={() => handleProductSelectionChange(product.id)}
+                          disabled={isSaving}
+                        />
+                        <Label 
+                          htmlFor={`product-${product.id}`}
+                          className="font-normal cursor-pointer"
+                        >
+                          {product.name}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {isLoading ? "Loading products..." : "No products available to associate."}
+                </p>
+              )}
+            </div>
+
           </CardContent>
           <CardFooter className="flex justify-end space-x-2">
             <Button type="button" variant="outline" onClick={() => router.push("/dashboard/claims/ingredients")} disabled={isSaving}> {/* Updated cancel redirect */}
