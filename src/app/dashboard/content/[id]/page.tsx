@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { notFound, usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/button';
@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { createBrowserClient } from '@supabase/ssr';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandIcon, BrandIconProps } from '@/components/brand-icon';
-import { ArrowLeft, Edit3 } from 'lucide-react';
+import { ArrowLeft, Edit3, MessageSquare, CheckCircle, XCircle, Clock, UserCircle } from 'lucide-react';
 import { format as formatDateFns } from 'date-fns';
 
 interface TemplateOutputField {
@@ -23,7 +23,7 @@ interface TemplateOutputField {
 }
 
 interface TemplateFields {
-  inputFields: any[]; // Not immediately needed for this change, can be kept simple
+  inputFields: any[];
   outputFields: TemplateOutputField[];
 }
 
@@ -102,6 +102,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   const [activeBrandData, setActiveBrandData] = useState<any>(null);
   const [template, setTemplate] = useState<Template | null>(null);
   const router = useRouter();
+  const pathname = usePathname();
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -159,6 +160,8 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
                 console.error('Error fetching template:', err);
                 toast.error('Error loading content template structure.');
               });
+          } else if (contentResult.data.content_templates) {
+            setTemplate(contentResult.data.content_templates);
           }
 
         } else {
@@ -167,11 +170,12 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
 
         if (!versionsResponse.ok) {
           console.error(`Failed to fetch content versions: ${versionsResponse.statusText}`);
-          toast.error('Could not load content history.');
         } else {
           const versionsResult = await versionsResponse.json();
           if (versionsResult.success && versionsResult.data) {
             setVersions(versionsResult.data);
+          } else if (versionsResult.data === null || versionsResult.data.length === 0) {
+            setVersions([]);
           } else {
             console.error(versionsResult.error || 'Failed to load versions data.');
           }
@@ -180,6 +184,9 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
       } catch (error: any) {
         console.error('Error fetching page data:', error);
         toast.error(error.message || 'Failed to load page data. Please try again.');
+        if (error.message.includes('404') || (error.response && error.response.status === 404)) {
+           notFound();
+        }
       } finally {
         setIsLoading(false);
       }
@@ -188,27 +195,76 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     if (id) {
       fetchData();
     }
-    // Add console.log for debugging content and template state
-    console.log("ContentDetailPage - Content State:", content);
-    console.log("ContentDetailPage - Template State:", template);
-    console.log("ContentDetailPage - Generated Outputs from Content:", content?.content_data?.generatedOutputs);
+  }, [id]);
 
-  }, [id]); // Corrected dependency array: only run when `id` changes.
+  const outputFieldIdToNameMap = useMemo(() => {
+    if (!template || !template.fields || !template.fields.outputFields) {
+      return {};
+    }
+    return template.fields.outputFields.reduce((acc, field) => {
+      acc[field.id] = field.name;
+      return acc;
+    }, {} as Record<string, string>);
+  }, [template]);
 
   const handleWorkflowAction = () => {
-    router.refresh();
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const [contentResponse, versionsResponse] = await Promise.all([
+          fetch(`/api/content/${id}`),
+          fetch(`/api/content/${id}/versions`)
+        ]);
+
+        if (!contentResponse.ok) {
+          if (contentResponse.status === 404) notFound();
+          throw new Error(`Failed to fetch content: ${contentResponse.statusText}`);
+        }
+        const contentResult = await contentResponse.json();
+        if (contentResult.success && contentResult.data) {
+          setContent(contentResult.data);
+        } else {
+          throw new Error(contentResult.error || 'Failed to load content data.');
+        }
+
+        if (!versionsResponse.ok) {
+          console.error(`Failed to fetch content versions: ${versionsResponse.statusText}`);
+        } else {
+          const versionsResult = await versionsResponse.json();
+          if (versionsResult.success && versionsResult.data) {
+            setVersions(versionsResult.data);
+          } else if (versionsResult.data === null || versionsResult.data.length === 0) {
+             setVersions([]);
+          }
+        }
+      } catch (error: any) {
+        console.error('Error refetching page data:', error);
+        toast.error(error.message || 'Failed to reload page data. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+    router.refresh(); 
   };
 
   if (isLoading || !currentUserId) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
-        <div className="animate-spin rounded-full border-2 border-current border-t-transparent h-6 w-6"></div>
+        <div className="animate-spin rounded-full border-2 border-current border-t-transparent h-6 w-6 text-blue-600"></div>
       </div>
     );
   }
   
   if (!content) {
-    return <p>Content could not be loaded or was not found.</p>; 
+    return (
+      <div className="container mx-auto p-4">
+        <PageHeader title="Content Not Found" description="The content you are looking for could not be loaded or does not exist." />
+        <Button onClick={() => router.back()} variant="outline">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
+        </Button>
+      </div>
+    );
   }
 
   let currentStepObject: WorkflowStep | undefined = undefined;
@@ -244,167 +300,148 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     }
   };
 
-  // Add another log right before rendering to see final values
-  console.log("Final check before render - Content:", content);
-  console.log("Final check before render - Template:", template);
-  console.log("Final check before render - Generated Outputs:", content?.content_data?.generatedOutputs);
+  const brandForHeader = activeBrandData || content.brands;
+  const brandName = brandForHeader?.name || 'Brand';
+  const brandColor = brandForHeader?.brand_color || '#cccccc';
+  const brandIcon = brandForHeader?.logo_url || brandForHeader?.icon_url || brandForHeader?.avatar_url;
+
+  const breadcrumbItems = [
+    { label: 'Dashboard', href: '/dashboard' },
+    { label: 'Content', href: '/dashboard/content' },
+    { label: content.title || 'Details' }
+  ];
+  
+  const generatedOutputs = content.content_data?.generatedOutputs || {};
+
+  const getHistoryItemDisplayName = (identifier: string, stepName: string) => {
+    return outputFieldIdToNameMap[identifier] || stepName || identifier;
+  };
+
+  const getActionIcon = (actionStatus: string) => {
+    switch (actionStatus?.toLowerCase()) {
+      case 'approved':
+      case 'completed':
+        return <CheckCircle className="h-4 w-4 text-green-500 mr-2" />;
+      case 'rejected':
+      case 'sent_back':
+        return <XCircle className="h-4 w-4 text-red-500 mr-2" />;
+      case 'submitted':
+      case 'pending_review':
+        return <Clock className="h-4 w-4 text-yellow-500 mr-2" />;
+      case 'commented':
+        return <MessageSquare className="h-4 w-4 text-blue-500 mr-2" />;
+      default:
+        return <UserCircle className="h-4 w-4 text-gray-400 mr-2" />;
+    }
+  };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      <Breadcrumbs items={[
-        { label: "Dashboard", href: "/dashboard" },
-        ...(activeBrandData ? 
-          [
-            { label: "Brands", href: "/dashboard/brands" },
-            { label: activeBrandData.name || "Brand", href: `/dashboard/brands/${content?.brand_id}` },
-            { label: "Content", href: `/dashboard/content?brandId=${content?.brand_id}` }
-          ] : 
-          [{ label: "Content", href: "/dashboard/content" }]),
-        { label: content.title || "View Content" }
-      ]} />
-
-      <div className="flex items-start justify-between">
+    <div className="container mx-auto p-4">
+      <Breadcrumbs items={breadcrumbItems} />
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-6 gap-4">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/content')} aria-label="Back to Content List">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
+          {brandIcon ? (
+            <img src={brandIcon} alt={`${brandName} logo`} className="h-10 w-10 rounded-full object-cover" />
+          ) : (
+            <BrandIcon name={brandName} color={brandColor} size="md" />
+          )}
           <div>
-            <h1 className="text-3xl font-bold tracking-tight flex items-center">
-              {activeBrandData && 
-                <BrandIcon name={activeBrandData.name} color={activeBrandData.brand_color} size="md" className="mr-3" />
-              }
-              {content.title}
-            </h1>
+            <h1 className="text-2xl font-bold tracking-tight">{content.title || 'Content Details'}</h1>
             <p className="text-muted-foreground mt-1">
               View details, content body, SEO metadata, and manage the approval workflow.
-            </p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Template: {content.template_name || content.content_templates?.name || 'N/A'} 
-              {activeBrandData && `• Brand: ${activeBrandData.name}`} 
-              • Created: {getFormattedDate(content.created_at)}
+              <br />
+              Template: {template?.name || content.template_name || 'N/A'} | 
+              Brand: {brandName} | 
+              Created: {getFormattedDate(content.created_at)}
             </p>
           </div>
         </div>
-        <div className="flex space-x-2">
-          {isCurrentUserStepOwner && (
-            <Button variant="default" asChild>
-              <Link href={`/dashboard/content/${id}/edit`} className="flex items-center">
-                <Edit3 className="mr-2 h-4 w-4" /> Edit
-              </Link>
-            </Button>
-          )}
+        <div className="flex-shrink-0">
+          <Button asChild variant="default">
+            <Link href={`${pathname}/edit`}>
+              <Edit3 className="mr-2 h-4 w-4" /> Edit Content
+            </Link>
+          </Button>
         </div>
       </div>
-      
-      {currentStepObject && currentStepObject.description && (
-        <Card className="mb-6 bg-blue-50 border-blue-200">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg text-blue-700">Current Task: {currentStepObject.name || 'Review Current Step'}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-blue-600">{currentStepObject.description}</p>
-          </CardContent>
-        </Card>
-      )}
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Card className="mb-6">
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Content Details</CardTitle>
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                  content.status === 'published' 
-                    ? 'bg-success/20 text-success'
-                    : content.status === 'rejected'
-                    ? 'bg-destructive/20 text-destructive'
-                    : content.status === 'pending_review'
-                    ? 'bg-yellow-300/20 text-yellow-700'
-                    : content.status === 'approved'
-                    ? 'bg-blue-300/20 text-blue-700'
-                    : 'bg-gray-100 text-gray-800'
-                }`}>
-                  {content.status.replace('_',' ').replace(/\b\w/g, l => l.toUpperCase())}
-                </span>
-              </div>
+              <CardTitle>Current Topic: {currentStepObject?.name || `Review Step ${content.current_step || 1}`}</CardTitle>
+              <CardDescription>
+                {currentStepObject?.description || 'Review the content below and take appropriate action.'}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              {/* REMOVING Main Content Body section
-              <div className="prose prose-sm max-w-none mb-6">
-                <h3 className="text-sm font-medium mb-1 border-b pb-1">Main Content Body</h3>
-                <MarkdownDisplay markdown={content.body || (content.content_data?.contentBody || 'No main body content available.')} />
-              </div>
-              */}
-
-              {/* New section for structured output fields based on template */}
-              {template && template.fields && template.fields.outputFields && content.content_data?.generatedOutputs && (
-                <>
-                  <h3 className="text-sm font-medium mb-2 border-b pb-1 pt-4">Generated Output Fields</h3>
-                  {template.fields.outputFields.length > 0 ? (
-                    template.fields.outputFields.map(outputField => {
-                      const outputValue = content.content_data?.generatedOutputs?.[outputField.id] || 'Not generated';
-                      // Avoid re-displaying if this output field's content is exactly what's in content.body
-                      // This is a simple check; a more robust check might involve comparing IDs if body is linked to a specific output field ID.
-                      if (outputValue === content.body && template.fields.outputFields.length > 1) {
-                        // If there are multiple output fields and this one is the same as main body, 
-                        // and it's not the *only* output field, we can optionally skip it to avoid redundancy.
-                        // For now, let's display all for clarity, or add a more sophisticated check if needed.
-                      }
-
-                      return (
-                        <div key={outputField.id} className="mb-4">
-                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">{outputField.name}</h4>
-                          {/* Use MarkdownDisplay or a specific component based on outputField.type if available */}
-                          <div className="prose prose-sm max-w-none border rounded p-2 bg-muted/20">
-                            <MarkdownDisplay markdown={String(outputValue)} />
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No output fields defined in the template.</p>
-                  )}
-                </>
-              )}
-              {!template && content.template_id && (
-                <p className="text-sm text-muted-foreground pt-4">Loading template structure for output fields...</p>
+              {template && template.fields && template.fields.outputFields && template.fields.outputFields.length > 0 ? (
+                template.fields.outputFields.map(field => (
+                  <div key={field.id} className="mb-6">
+                    <h3 className="font-semibold text-lg mb-2">{field.name}</h3>
+                    <div className="prose prose-sm max-w-none p-4 border rounded-md bg-gray-50/50 dark:bg-gray-800/50">
+                      <MarkdownDisplay markdown={generatedOutputs[field.id] || 'This field has no content yet.'} />
+                    </div>
+                  </div>
+                ))
+              ) : (
+                 <div className="prose prose-sm max-w-none p-4 border rounded-md bg-gray-50/50 dark:bg-gray-800/50">
+                  <MarkdownDisplay markdown={content.body || 'No dynamic fields configured or template not loaded. Showing primary content body.'} />
+                </div>
               )}
             </CardContent>
           </Card>
 
-          {versions.length > 0 && (
+          {versions && versions.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Content History & Feedback</CardTitle>
+                <CardDescription>Review previous versions and feedback for this content.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {versions.map(version => (
-                  <div key={version.id} className="p-3 border rounded-md bg-muted/50">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="font-medium">{version.step_name || `Step ${version.workflow_step_identifier}`} - <span className={`font-semibold ${version.action_status === 'Completed' ? 'text-green-600' : version.action_status === 'Rejected' ? 'text-red-600' : 'text-gray-600'}`}>{version.action_status}</span></span>
-                      <span className="text-xs text-muted-foreground">v{version.version_number}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      By: {version.reviewer?.full_name || 'N/A'} on {getFormattedDateTime(version.created_at)}
-                    </p>
-                    {version.feedback && (
-                      <p className="mt-2 text-sm italic border-l-2 pl-2 border-border">{version.feedback}</p>
-                    )}
-                  </div>
-                ))}
+              <CardContent>
+                <ul className="space-y-4">
+                  {versions.slice().reverse().map(version => (
+                    <li key={version.id} className="p-4 border rounded-md shadow-sm bg-white dark:bg-gray-800">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center">
+                          {getActionIcon(version.action_status)}
+                          <span className="font-semibold">
+                             {getHistoryItemDisplayName(version.workflow_step_identifier, version.step_name)}
+                          </span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">(v{version.version_number}) - {version.action_status}</span>
+                        </div>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {getFormattedDateTime(version.created_at)}
+                        </span>
+                      </div>
+                      {version.reviewer && (
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">
+                          By: {version.reviewer.full_name || 'Unknown User'}
+                        </p>
+                      )}
+                      {version.feedback && (
+                        <div className="mt-1 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md">
+                          <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{version.feedback}</p>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
               </CardContent>
             </Card>
           )}
+
         </div>
-        
-        <div className="lg:col-span-1">
-          {content.workflow && currentStepObject && (
+
+        <div className="lg:col-span-1 space-y-6">
+           {content.workflow_id && content.workflow && currentUserId && (
             <ContentApprovalWorkflow
               contentId={content.id}
               contentTitle={content.title}
               currentStepObject={currentStepObject}
-              isCurrentUserStepOwner={false}
+              isCurrentUserStepOwner={isCurrentUserStepOwner}
               versions={versions}
+              template={template}
               onActionComplete={handleWorkflowAction}
             />
           )}
