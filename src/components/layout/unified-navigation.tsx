@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useSelectedLayoutSegments } from 'next/navigation';
+import Image from 'next/image';
 import {
   Home,
   GitBranch,
@@ -15,7 +16,7 @@ import {
   ChevronRight,
   Wrench,
   Code,
-  Image,
+  Image as LucideImage,
   Globe,
   Folder,
   ListChecks,
@@ -357,7 +358,7 @@ export function UnifiedNavigation() {
         {
           href: '/dashboard/tools/alt-text-generator',
           label: 'Alt Text Generator',
-          icon: <Image className="h-4 w-4" />,
+          icon: <LucideImage className="h-4 w-4" />,
           segment: 'alt-text-generator'
         },
         {
@@ -474,8 +475,19 @@ export function UnifiedNavigation() {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <nav className="bg-card w-64 p-4 h-[calc(100vh-4rem)] overflow-y-auto border-r border-border sticky top-16 hidden lg:block">
+    <aside className="fixed inset-y-0 left-0 z-10 flex w-64 flex-col border-r bg-background">
+      <div className="flex h-16 shrink-0 items-center border-b px-4">
+        <Link href="/dashboard" className="flex items-center gap-2 font-semibold" aria-label="Dashboard">
+          <Image
+            src="/Mixerai2.0Logo.png"
+            alt="MixerAI 2.0 Logo"
+            width={160}
+            height={30}
+            priority
+          />
+        </Link>
+      </div>
+      <nav className="flex flex-1 flex-col overflow-y-auto">
         <div className="space-y-8">
           <div className="space-y-1">
             {finalNavItems.map((item, index) => {
@@ -555,7 +567,7 @@ export function UnifiedNavigation() {
           </div>
         </div>
       </nav>
-    </div>
+    </aside>
   );
 }
 
