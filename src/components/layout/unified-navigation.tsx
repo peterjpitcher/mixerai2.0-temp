@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useSelectedLayoutSegments } from 'next/navigation';
 import Image from 'next/image';
+import { usePathname, useSelectedLayoutSegments } from 'next/navigation';
 import {
   Home,
   GitBranch,
@@ -24,7 +24,6 @@ import {
   MessageSquareWarning,
   Info,
   ClipboardList,
-  LayoutGrid,
   FilePlus2,
   Package,
   FlaskConical,
@@ -32,10 +31,12 @@ import {
   Settings2,
   ClipboardEdit,
   Globe2,
-  SearchCheck
+  SearchCheck,
+  LayoutGrid
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect, useRef } from 'react';
+import { Separator } from '@/components/ui/separator';
 
 interface UserSessionData {
   id: string;
@@ -431,140 +432,131 @@ export function UnifiedNavigation() {
   
   // Check if a navigation item is active based on the current URL path and segments
   const isActive = (item: NavItem | NavGroupItem) => {
-    const currentTopSegment = segments[0];
-    const currentSecondSegment = segments[1];
+    const itemSegment = item.segment || (('href' in item) ? item.href.split('/').pop() || '' : '');
 
-    if ('href' in item) {
-      if (item.href === '/dashboard' && pathname === '/dashboard') return true;
-      if (item.segment && currentTopSegment === item.segment) {
-        if (pathname.startsWith(item.href)) {
-            if (item.href === '/dashboard/content' && pathname === '/dashboard/content') return true;
-            if (item.href !== '/dashboard/content' && pathname.startsWith(item.href)) return true;
-        }
-      }
-      return pathname.startsWith(item.href) && item.href !== '/dashboard';
+    if (('href' in item) && item.href && pathname.startsWith(item.href) && item.href !== '/dashboard') {
+      return true;
     }
-    
-    if ('items' in item) {
-      if (item.segment && currentTopSegment === item.segment) {
-        return true;
-      }
-      return item.items.some(subItem => {
-        if (subItem.segment && pathname.includes(subItem.href)) {
-            if (subItem.href.startsWith("/dashboard/content/new")) {
-                const templateId = new URLSearchParams(window.location.search).get('template');
-                return templateId === subItem.segment;
-            }
-            return segments.includes(subItem.segment);
-        }
-        return pathname === subItem.href;
-      });
-    }
-    
-    return false;
+    return segments.includes(itemSegment) || (itemSegment === '' && pathname === '/dashboard');
   };
   
   if (isLoadingUser) {
     return (
-      <div className="bg-card w-64 p-4 h-[calc(100vh-4rem)] overflow-y-auto border-r border-border sticky top-16 hidden lg:block">
-        <div className="flex items-center justify-center h-full">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      </div>
+      <aside className="fixed inset-y-0 left-0 z-10 hidden w-64 flex-col border-r bg-background sm:flex">
+        <nav className="flex flex-col items-center gap-4 px-2 sm:py-5">
+          <div className="flex h-16 shrink-0 items-center justify-start gap-2 border-b px-4 text-lg font-semibold text-primary-foreground md:px-6 w-full">
+            {/* Placeholder for logo while loading */}
+            <div className="h-8 w-32 bg-muted rounded animate-pulse"></div>
+          </div>
+          {/* Skeleton loading for nav items */}
+          <div className="flex-1 w-full px-4 space-y-2 overflow-y-auto">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="space-y-1 py-2">
+                <div className="h-8 bg-muted rounded animate-pulse w-full"></div>
+                <div className="h-6 bg-muted rounded animate-pulse w-3/4 ml-4 mt-1"></div>
+                <div className="h-6 bg-muted rounded animate-pulse w-3/4 ml-4 mt-1"></div>
+              </div>
+            ))}
+          </div>
+        </nav>
+      </aside>
     );
   }
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-10 flex w-64 flex-col border-r bg-background">
-      <div className="flex h-16 shrink-0 items-center border-b px-4">
-        <Link href="/dashboard" className="flex items-center gap-2 font-semibold" aria-label="Dashboard">
-          <Image
-            src="/Mixerai2.0Logo.png"
-            alt="MixerAI 2.0 Logo"
-            width={160}
-            height={30}
-            priority
-          />
-        </Link>
-      </div>
-      <nav className="flex flex-1 flex-col overflow-y-auto">
-        <div className="space-y-8">
-          <div className="space-y-1">
-            {finalNavItems.map((item, index) => {
-              if ('type' in item && item.type === 'divider') {
-                if (index > 0 && index < finalNavItems.length -1) { 
-                    const prevItem = finalNavItems[index-1];
-                    const nextItem = finalNavItems[index+1];
-                    if (prevItem && !('type' in prevItem && prevItem.type === 'divider') && 
-                        nextItem && !('type' in nextItem && nextItem.type === 'divider')) {
-                          return <hr key={`divider-${index}`} className="my-3 border-border/60" />;
-                    }
-                }
-                return null;
-              }
-              if ('items' in item) {
-                return (
-                  <div key={index} className="space-y-1">
-                    <button 
-                      onClick={() => toggleSection(item.label.toLowerCase().replace(/\s+/g, '-'))}
-                      className={cn(
-                        "flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                        isActive(item)
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:bg-muted hover:text-primary"
-                      )}
-                    >
-                      <span className="flex items-center gap-3">
-                        {item.icon}
-                        {item.label}
-                      </span>
-                      {expandedSections[item.label.toLowerCase().replace(/\s+/g, '-')]
-                        ? <ChevronDown className="h-4 w-4" /> 
-                        : <ChevronRight className="h-4 w-4" />
-                      }
-                    </button>
-                    {expandedSections[item.label.toLowerCase().replace(/\s+/g, '-')] && (
-                      <div className="pl-6 space-y-1 mt-1">
-                        {item.items.map((subItem) => (
+    <aside className="fixed inset-y-0 left-0 z-10 hidden w-64 flex-col border-r bg-background sm:flex">
+      <nav className="flex h-full flex-col items-stretch gap-4 px-2 sm:py-5 text-sm font-medium">
+        <div className="flex h-16 shrink-0 items-center justify-start gap-2 border-b px-4 text-lg font-semibold text-primary-foreground md:px-6 w-full">
+          <Link
+            href="/dashboard"
+            className="group flex items-center gap-2 text-lg font-semibold text-primary-foreground"
+          >
+            <Image 
+              src="/Mixerai2.0Logo.png" 
+              alt="MixerAI 2.0 Logo"
+              width={150}
+              height={35}
+              priority
+            />
+          </Link>
+        </div>
+        <div className="flex-1 overflow-y-auto space-y-1 px-2">
+          {navItemsDefinition.map((item, index) => {
+            // Check if item itself should be shown
+            const showItem = !('show' in item && item.show !== undefined) || (typeof item.show === 'function' ? item.show() : item.show);
+            if (!showItem) return null;
+
+            if ('type' in item && item.type === 'divider') {
+              return <Separator key={`divider-${index}`} className="my-2" />;
+            }
+
+            if ('items' in item) { // It's a NavGroupItem
+              const group = item as NavGroupItem;
+              const isGroupActive = segments.some(seg => group.items.some(subItem => subItem.segment === seg || pathname.startsWith(subItem.href)));
+              const isOpen = expandedSections[group.label] ?? group.defaultOpen ?? isGroupActive;
+
+              return (
+                <div key={group.label} className="space-y-0.5">
+                  <button
+                    onClick={() => toggleSection(group.label)}
+                    className={cn(
+                      "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors",
+                      "hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                      isGroupActive ? "text-primary" : "text-muted-foreground"
+                    )}
+                  >
+                    <div className="flex items-center">
+                      {group.icon}
+                      <span className="ml-2">{group.label}</span>
+                    </div>
+                    {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </button>
+                  {isOpen && (
+                    <div className="ml-4 mt-0.5 space-y-0.5 border-l border-muted pl-4 py-1">
+                      {group.items.map(subItem => {
+                        const subIsActive = isActive(subItem);
+                        return (
                           <Link
                             key={subItem.href}
                             href={subItem.href}
                             className={cn(
-                              'flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm transition-colors',
-                              (segments.includes(subItem.segment || '') || pathname === subItem.href || (subItem.href.startsWith("/dashboard/content/new") && new URLSearchParams(window.location.search).get('template') === subItem.segment) )
-                                ? "text-primary font-semibold"
-                                : "text-muted-foreground hover:text-primary"
+                              "group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium leading-tight",
+                              "hover:bg-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                              subIsActive
+                                ? "bg-muted text-primary"
+                                : "text-muted-foreground hover:text-foreground"
                             )}
                           >
                             {subItem.icon}
-                            {subItem.label}
+                            <span>{subItem.label}</span>
                           </Link>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-              if ('href' in item) {
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                      isActive(item)
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted hover:text-primary"
-                    )}
-                  >
-                    {item.icon}
-                    {item.label}
-                  </Link>
-                );
-              }
-              return null;
-            })}
-          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            } else { // It's a NavItem
+              const navLink = item as NavItem;
+              const isLinkActive = isActive(navLink);
+              return (
+                <Link
+                  key={navLink.href}
+                  href={navLink.href}
+                  className={cn(
+                    "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
+                    "hover:bg-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    isLinkActive
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {navLink.icon}
+                  {navLink.label}
+                </Link>
+              );
+            }
+          })}
         </div>
       </nav>
     </aside>
