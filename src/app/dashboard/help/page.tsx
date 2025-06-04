@@ -16,7 +16,23 @@ export const metadata = {
 interface HelpArticle {
   slug: string;
   title: string;
-  content?: string; // Content is loaded on demand
+  content?: string;
+}
+
+// Function to parse YAML frontmatter (simplified)
+function parseFrontmatter(fileContent: string): { title?: string; content: string } {
+  const match = fileContent.match(/^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/);
+  if (match) {
+    const frontmatter = match[1];
+    const content = match[2];
+    let title;
+    const titleMatch = frontmatter.match(/^title:\s*(.*)/m);
+    if (titleMatch) {
+      title = titleMatch[1].trim().replace(/['"`]/g, ''); // Remove quotes
+    }
+    return { title, content };
+  }
+  return { content: fileContent }; // No frontmatter found
 }
 
 async function getHelpArticles(): Promise<HelpArticle[]> {
@@ -26,15 +42,21 @@ async function getHelpArticles(): Promise<HelpArticle[]> {
     const markdownFiles = files.filter(file => file.endsWith('.md'));
 
     const articles: HelpArticle[] = [];
-    for (const file of markdownFiles.sort()) { // Sort to maintain order (e.g. 01-overview, 02-brands)
+    for (const file of markdownFiles.sort()) {
       const filePath = path.join(wikiDir, file);
-      const fileContent = await fs.readFile(filePath, 'utf-8');
-      // Extract title from the first line (e.g., "# My Article Title")
-      const firstLine = fileContent.split('\n')[0];
-      const title = firstLine.replace(/^#\s*/, '') || file.replace('.md', '');
+      const rawFileContent = await fs.readFile(filePath, 'utf-8');
+      
+      const { title: fmTitle, content: bodyContent } = parseFrontmatter(rawFileContent);
+      let articleTitle = fmTitle;
+
+      if (!articleTitle) {
+        const firstLine = bodyContent.split('\n')[0];
+        articleTitle = firstLine.replace(/^#\s*/, '').trim() || file.replace('.md', '');
+      }
+      
       articles.push({
         slug: file.replace('.md', ''),
-        title,
+        title: articleTitle,
       });
     }
     return articles;
@@ -45,13 +67,15 @@ async function getHelpArticles(): Promise<HelpArticle[]> {
 }
 
 async function getHelpArticleContent(slug: string): Promise<string | null> {
-  if (!slug || !/^[a-zA-Z0-9_-]+$/.test(slug)) { // Basic slug validation
+  if (!slug || !/^[a-zA-Z0-9_-]+$/.test(slug)) {
     console.error("Invalid slug provided for help article:", slug);
     return null;
   }
   const filePath = path.join(process.cwd(), 'src', 'content', 'help-wiki', `${slug}.md`);
   try {
-    return await fs.readFile(filePath, 'utf-8');
+    const rawFileContent = await fs.readFile(filePath, 'utf-8');
+    const { content } = parseFrontmatter(rawFileContent); // Get content after frontmatter
+    return content;
   } catch (error) {
     console.error(`Failed to load help article content for ${slug}:`, error);
     return null;
