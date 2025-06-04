@@ -2,9 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import type { InputField, OutputField } from '@/types/template'; // Import field types
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
+
+// Helper interface for the structure of the 'fields' JSONB column
+interface TemplateFieldsColumn {
+  inputFields?: InputField[];
+  outputFields?: OutputField[];
+}
 
 /**
  * GET: Retrieve a specific content template by ID
@@ -39,9 +46,9 @@ export const GET = withAuth(async (
     const supabase = createSupabaseAdminClient();
     
     // Fetch the template
-    const { data: template, error } = await supabase
+    const { data: templateFromDb, error } = await supabase
       .from('content_templates')
-      .select('*')
+      .select('*') // Fetches all columns, including the 'fields' JSONB column
       .eq('id', id)
       .single();
     
@@ -50,10 +57,27 @@ export const GET = withAuth(async (
       throw error;
     }
     
-    // console.log('API Route - Successfully fetched template:', template?.id);
+    if (!templateFromDb) {
+      return NextResponse.json(
+        { success: false, error: 'Content template not found' },
+        { status: 404 }
+      );
+    }
+    
+    // Transform the template structure for the response
+    const { fields, ...restOfTemplate } = templateFromDb;
+    // Cast fields to the specific type
+    const typedFields = fields as TemplateFieldsColumn | null | undefined;
+    const responseTemplate = {
+      ...restOfTemplate,
+      inputFields: typedFields?.inputFields || [],
+      outputFields: typedFields?.outputFields || []
+    };
+    
+    // console.log('API Route - Successfully fetched template:', responseTemplate?.id);
     return NextResponse.json({ 
       success: true, 
-      template 
+      template: responseTemplate // Send the transformed template
     });
   } catch (error) {
     // console.error('Error fetching content template:', error);
@@ -92,33 +116,25 @@ export const PUT = withAuth(async (
       );
     }
     
-    // Validate required fields
-    if (!data.name || !data.fields) {
+    // The frontend (TemplateForm) now sends inputFields and outputFields as direct properties.
+    // The database 'fields' column still expects a JSONB object: { inputFields: [], outputFields: [] }.
+    // So, we need to reconstruct the 'fields' object for the database.
+    if (!data.name || !data.inputFields || !data.outputFields) {
       return NextResponse.json(
-        { success: false, error: 'Name and fields are required' },
-        { status: 400 }
-      );
-    }
-    
-    // Validate fields structure
-    if (!data.fields.inputFields || !data.fields.outputFields) {
-      return NextResponse.json(
-        { success: false, error: 'Template must contain inputFields and outputFields' },
+        { success: false, error: 'Name, inputFields, and outputFields are required' },
         { status: 400 }
       );
     }
     
     const supabase = createSupabaseAdminClient();
     
-    // --- AI Description Generation for Template Update ---
-    let generatedDescription = data.description || ''; // Use provided desc or generate
-    // Regenerate if name or fields structure changes
-    const shouldRegenerateDescription = data.name !== undefined || data.fields !== undefined;
+    let generatedDescription = data.description || '';
+    const shouldRegenerateDescription = data.name !== undefined || data.inputFields !== undefined || data.outputFields !== undefined;
 
     if (shouldRegenerateDescription) {
       try {
-        const inputFieldNames = (data.fields.inputFields || []).map((f: any) => f.name).filter(Boolean);
-        const outputFieldNames = (data.fields.outputFields || []).map((f: any) => f.name).filter(Boolean);
+        const inputFieldNames = (data.inputFields || []).map((f: any) => f.name).filter(Boolean);
+        const outputFieldNames = (data.outputFields || []).map((f: any) => f.name).filter(Boolean);
 
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
         const aiDescriptionResponse = await fetch(`${baseUrl}/api/ai/generate-template-description`, {
@@ -143,46 +159,54 @@ export const PUT = withAuth(async (
         // console.warn('Error calling AI template description generation service on update:', aiError);
       }
     }
-    // --- End AI Description Generation ---
 
-    // Update the template
+    // Reconstruct the 'fields' object for the database
+    const fieldsForDb: TemplateFieldsColumn = {
+      inputFields: data.inputFields || [],
+      outputFields: data.outputFields || []
+    };
+
     const updatePayload: any = {
       name: data.name,
-      description: generatedDescription, // Use AI generated or existing
+      description: generatedDescription,
       icon: data.icon || null,
-      fields: data.fields,
+      fields: fieldsForDb, // Use the reconstructed fields object
       updated_at: new Date().toISOString()
     };
 
-    if (data.brand_id !== undefined) { // Allow setting brand_id to null
+    if (data.brand_id !== undefined) {
       updatePayload.brand_id = data.brand_id;
     }
 
-    const { data: updatedTemplate, error } = await supabase
+    const { data: updatedTemplateFromDb, error } = await supabase
       .from('content_templates')
       .update(updatePayload)
       .eq('id', id)
-      .select(); // Fetches the updated record
+      .select()
+      .single(); // Assuming update + select single returns the object directly
     
     if (error) throw error;
-    
-    // If select() returns an array, take the first element
-    const singleUpdatedTemplate = Array.isArray(updatedTemplate) && updatedTemplate.length > 0 
-                                    ? updatedTemplate[0] 
-                                    : null;
 
-    if (!singleUpdatedTemplate) {
-      // This case should ideally not happen if the update was successful and ID exists
-      // console.error('API Route - Template not found after update, or update returned no data. ID:', id);
+    if (!updatedTemplateFromDb) {
       return NextResponse.json(
         { success: false, error: 'Template not found after update.' },
         { status: 404 } 
       );
     }
+    
+    // Transform the updated template for the response as well
+    const { fields: updatedFieldsData, ...restOfUpdatedTemplate } = updatedTemplateFromDb;
+    // Cast updatedFieldsData to the specific type
+    const typedUpdatedFields = updatedFieldsData as TemplateFieldsColumn | null | undefined;
+    const responseUpdatedTemplate = {
+      ...restOfUpdatedTemplate,
+      inputFields: typedUpdatedFields?.inputFields || [],
+      outputFields: typedUpdatedFields?.outputFields || []
+    };
 
     return NextResponse.json({
       success: true,
-      template: singleUpdatedTemplate
+      template: responseUpdatedTemplate
     });
   } catch (error) {
     // console.error('Error updating content template:', error);

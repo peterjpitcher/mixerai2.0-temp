@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useSelectedLayoutSegments } from 'next/navigation';
+import { usePathname, useSelectedLayoutSegments, useSearchParams } from 'next/navigation';
 import {
   Home,
   GitBranch,
@@ -80,6 +80,7 @@ export function UnifiedNavigation() {
   const pathname = usePathname() || '';
   const layoutSegments = useSelectedLayoutSegments();
   const segments = layoutSegments || [];
+  const searchParams = useSearchParams();
   
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
@@ -335,15 +336,19 @@ export function UnifiedNavigation() {
   ];
   
   const isActive = (item: NavItem | NavGroupItem) => {
-    if ('href' in item && item.href) { 
-      if (!item.segment && pathname === item.href) return true;
-      if (pathname.startsWith('/dashboard/content/new?template=')) {
-        const templateId = pathname.split('template=')[1];
-        if (item.segment === templateId && segments[0] === 'content') return true;
+    if ('href' in item && item.href && item.href.startsWith('/dashboard/content/new?template=')) {
+      if (pathname === '/dashboard/content/new') {
+        if (searchParams) {
+          const templateIdFromQuery = searchParams.get('template');
+          if (templateIdFromQuery && item.segment === templateIdFromQuery && segments[0] === 'content') {
+            return true;
+          }
+        }
       }
-      if (pathname.match(/\/dashboard\/content\/[^\/]+\/edit/)) {
-         if (item.segment === 'content' && !item.href?.endsWith('/new')) return true;
-      }
+    }
+
+    if ('href' in item && item.href && pathname.match(/\/dashboard\/content\/[^\/]+\/edit/)) {
+       if (item.segment === 'content' && !item.href?.endsWith('/new')) return true;
     }
 
     if (item.segment) {
@@ -360,10 +365,17 @@ export function UnifiedNavigation() {
         if (parentGroup && parentGroup.segment) {
           return item.segment === currentSecondSegment && parentGroup.segment === currentTopSegment;
         } else {
-          return item.segment === currentTopSegment;
+          if (item.href === '/dashboard/content') {
+            return item.segment === currentTopSegment && pathname !== '/dashboard/content/new';
+          } else {
+            return item.segment === currentTopSegment;
+          }
         }
       }
     }
+    
+    if ('href' in item && item.href && !item.segment && pathname === item.href) return true;
+
     return false;
   };
 
@@ -426,7 +438,9 @@ export function UnifiedNavigation() {
                                 "group flex items-center gap-3 rounded-md px-3 py-1 text-sm font-medium leading-tight",
                                 "hover:bg-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                                 subIsActive
-                                  ? "bg-muted text-primary"
+                                  ? (group.label === 'Create Content'
+                                      ? "bg-red-600 text-white"
+                                      : "bg-muted text-primary")
                                   : "text-muted-foreground hover:text-foreground"
                               )}
                             >

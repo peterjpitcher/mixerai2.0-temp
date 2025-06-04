@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { toast as sonnerToast } from "sonner";
 import { LogOut, UserCircle2, ChevronDown, Loader2 } from "lucide-react";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Image from 'next/image';
 
 // Define UserSessionData interface (can be shared if defined elsewhere)
@@ -163,7 +163,9 @@ export default function DashboardLayout({
       </header>
 
       <div className="flex flex-1">
-        <UnifiedNavigation />
+        <Suspense fallback={<div className="w-64 p-4 border-r"><Loader2 className="h-6 w-6 animate-spin mx-auto mt-8" /></div>}>
+          <UnifiedNavigation />
+        </Suspense>
         <main className="flex-1 p-4 sm:p-6 overflow-auto lg:pb-0 pb-20">
           {process.env.NODE_ENV === 'development' && (
             <div id="domain-verification-container" className="mb-4">
