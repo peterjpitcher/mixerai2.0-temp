@@ -35,6 +35,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     const supabase = createSupabaseAdminClient();
     const url = new URL(request.url);
     const requestedBrandId = url.searchParams.get('brand_id');
+    const requestedTemplateId = url.searchParams.get('template_id');
     const globalRole = user?.user_metadata?.role;
     let permittedBrandIds: string[] | null = null;
 
@@ -94,6 +95,10 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     } else if (globalRole === 'admin') {
       console.log('[API Workflows GET] Admin user. Fetching all workflows (or specific brand if requestedBrandId set).');
       // Admins can see all, or specific if requestedBrandId is set (handled by the first if block)
+    }
+    
+    if (requestedTemplateId) {
+      query = query.eq('template_id', requestedTemplateId);
     }
     
     const { data: workflows, error } = await query;

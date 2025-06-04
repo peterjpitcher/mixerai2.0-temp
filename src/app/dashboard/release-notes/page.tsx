@@ -12,9 +12,61 @@ export default function ReleaseNotesPage() {
         </CardHeader>
         <CardContent className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
           
+          {/* New Release Entry */}
+          <section className="mb-12">
+            <h2 className="text-xl font-semibold border-b pb-2 mb-4">Release: June 4, 2025</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              This release focuses on refining the content creation process by ensuring users can only select brands with configured workflows for specific templates, and aligns navigation visibility with documented permissions.
+            </p>
+
+            <h3>Key Enhancements & Fixes (Developed on <code>feature/content-page-navigation-updates</code>)</h3>
+            
+            <h4>Content Creation Page (<code>/dashboard/content/new</code>)</h4>
+            <ul>
+              <li>
+                <strong>Smart Brand Filtering:</strong>
+                <ul>
+                  <li>The brand dropdown on the content generation page is now dynamically filtered. Users will only see brands that have an active workflow configured for the currently selected content template.</li>
+                  <li>This prevents users from selecting a brand/template combination that cannot be used for content generation.</li>
+                  <li>If no brands are configured with a workflow for the selected template, a message is displayed guiding the user to contact an administrator, and the form is disabled.</li>
+                </ul>
+              </li>
+              <li>
+                <strong>Removed Post-Selection Error:</strong> The previous behavior of allowing selection and then showing an error if no workflow was found (with admin contact details) has been replaced by the proactive filtering mentioned above.
+              </li>
+            </ul>
+
+            <h4>Navigation and Permissions (<code>UnifiedNavigation.tsx</code>)</h4>
+            <ul>
+              <li>
+                <strong>Editor Role Permissions:</strong> Corrected navigation item visibility for users with the "Editor" role. Editors will no longer see links for "Brands," "Workflows," and "Content Templates," aligning with the permissions outlined in <code>NAVIGATION_PERMISSIONS.md</code>.
+              </li>
+              <li>
+                <strong>"Create Content" Sub-menu Filtering:</strong>
+                <ul>
+                  <li>Platform Administrators continue to see all "Create Content" sub-items (derived from all available templates).</li>
+                  <li>Scoped Administrators and Editors will now only see "Create Content" sub-items for templates that have at least one workflow associated with one of their assigned brands.</li>
+                </ul>
+              </li>
+            </ul>
+
+            <h4>API Updates</h4>
+            <ul>
+              <li>
+                <strong>New Endpoint for Brand Admins:</strong> Created <code>GET /api/brands/[id]/admins</code> to fetch a list of administrators for a specific brand. This was initially used for error messaging but is now less directly exposed in the UI due to the new brand filtering logic.
+              </li>
+              <li>
+                <strong>Workflow API Enhancement:</strong> The <code>GET /api/workflows</code> endpoint now correctly filters workflows by <code>template_id</code> when this parameter is provided in the request. This ensures accurate data for both the content generation page and navigation filtering.
+              </li>
+            </ul>
+            <p className="mt-4">
+              For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+            </p>
+          </section>
+
           {/* Entry for the current/most recent release */}
           <section className="mb-12">
-            <h2 className="text-xl font-semibold border-b pb-2 mb-4">Release: June 10, 2024</h2>
+            <h2 className="text-xl font-semibold border-b pb-2 mb-4">Release: June 4, 2025</h2>
             <p className="text-sm text-muted-foreground mb-4">
               This release focuses on enhancing the content generation capabilities, improving UI/UX, ensuring build stability, and adding this Release Notes page.
             </p>

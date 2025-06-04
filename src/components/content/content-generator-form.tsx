@@ -14,7 +14,7 @@ import { RichTextEditor } from './rich-text-editor';
 import { useRouter } from 'next/navigation';
 import { BrandIcon } from '@/components/brand-icon';
 import { toast } from 'sonner';
-import { Loader2, ArrowLeft, PlusCircle, Sparkles } from 'lucide-react';
+import { Loader2, ArrowLeft, PlusCircle, Sparkles, ShieldAlert, Info } from 'lucide-react';
 import { marked } from 'marked';
 import Link from 'next/link';
 import type { InputField, OutputField, ContentTemplate as Template, SelectOptions } from '@/types/template';
@@ -32,6 +32,7 @@ interface WorkflowSummary {
   id: string;
   name: string;
   template_id?: string | null;
+  brand_id: string;
   brand_name: string;
 }
 
@@ -63,90 +64,171 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [brands, setBrands] = useState<Brand[]>([]);
+  
+  const [allBrands, setAllBrands] = useState<Brand[]>([]);
+  const [isLoadingAllBrands, setIsLoadingAllBrands] = useState(true);
+  const [displayableBrands, setDisplayableBrands] = useState<Brand[]>([]);
+  
   const [selectedBrand, setSelectedBrand] = useState('');
   const [generatedOutputs, setGeneratedOutputs] = useState<Record<string, string>>({});
   const [title, setTitle] = useState('');
   const [template, setTemplate] = useState<Template | null>(null);
-  const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
+  const [isLoadingTemplate, setIsLoadingTemplate] = useState(true);
   const [templateFieldValues, setTemplateFieldValues] = useState<Record<string, string>>({});
+  
   const [associatedWorkflowDetails, setAssociatedWorkflowDetails] = useState<WorkflowSummary | null>(null);
-  const [isFetchingWorkflow, setIsFetchingWorkflow] = useState(false);
+  const [isFetchingAssociatedWorkflow, setIsFetchingAssociatedWorkflow] = useState(false);
+  
+  const [workflowsForCurrentTemplate, setWorkflowsForCurrentTemplate] = useState<WorkflowSummary[]>([]);
+  const [isLoadingWorkflowsForTemplate, setIsLoadingWorkflowsForTemplate] = useState(true);
+
   const [isGeneratingSuggestionFor, setIsGeneratingSuggestionFor] = useState<string | null>(null);
   const [retryingFieldId, setRetryingFieldId] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   
-  const currentBrand = brands.find(b => b.id === selectedBrand);
+  const [canGenerateContent, setCanGenerateContent] = useState<boolean>(false);
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
-  const fetchTemplate = async (id: string) => {
-    setIsLoadingTemplate(true);
-    try {
-      const response = await fetch(`/api/content-templates/${id}`);
-      const data = await response.json();
-      if (data.success && data.template) {
-        setTemplate(data.template as Template);
-        const initialValues: Record<string, string> = {};
-        if (data.template.inputFields) {
-          (data.template.inputFields as InputField[]).forEach((field: InputField) => {
-            initialValues[field.id] = ''; 
-          });
-        }
-        setTemplateFieldValues(initialValues);
-      } else {
-        toast.error(data.error || "Failed to load content template.");
-        setTemplate(null);
-      }
-    } catch (error) {
-      toast.error("Error fetching template details.");
-      console.error("Error fetching template details:", error);
-      setTemplate(null);
-    } finally {
-      setIsLoadingTemplate(false);
-    }
-  };
-  
+  const currentBrand = allBrands.find(b => b.id === selectedBrand);
+
   useEffect(() => {
-    const fetchData = async () => {
+    if (!templateId) {
+      toast.error("No template ID specified. Cannot initialize content generator.");
+      setIsLoadingTemplate(false);
+      setIsLoadingAllBrands(false);
+      setIsLoadingWorkflowsForTemplate(false);
+      setInitialDataLoaded(true);
+      return;
+    }
+
+    const fetchInitialData = async () => {
+      setIsLoadingTemplate(true);
+      setIsLoadingAllBrands(true);
+      setIsLoadingWorkflowsForTemplate(true);
+      setInitialDataLoaded(false);
+
+      try {
+        const templateResponse = await fetch(`/api/content-templates/${templateId}`);
+        const templateData = await templateResponse.json();
+        if (templateData.success && templateData.template) {
+          setTemplate(templateData.template as Template);
+          const initialValues: Record<string, string> = {};
+          if (templateData.template.inputFields) {
+            (templateData.template.inputFields as InputField[]).forEach((field: InputField) => {
+              initialValues[field.id] = ''; 
+            });
+          }
+          setTemplateFieldValues(initialValues);
+        } else {
+          toast.error(templateData.error || "Failed to load content template.");
+          setTemplate(null);
+        }
+      } catch (error) {
+        toast.error("Error fetching template details.");
+        console.error("Error fetching template details:", error);
+        setTemplate(null);
+      } finally {
+        setIsLoadingTemplate(false);
+      }
+
       try {
         const brandsResponse = await fetch('/api/brands');
         const brandsData = await brandsResponse.json();
         if (brandsData.success && Array.isArray(brandsData.data)) {
-          setBrands(brandsData.data);
-          if (brandsData.data.length === 1) setSelectedBrand(brandsData.data[0].id);
+          setAllBrands(brandsData.data);
         } else {
-          toast.error('Failed to fetch brands');
+          toast.error(brandsData.error || 'Failed to fetch brands');
+          setAllBrands([]);
         }
       } catch (error) {
         toast.error('Error fetching brands');
+        console.error('Error fetching brands:', error);
+        setAllBrands([]);
+      } finally {
+        setIsLoadingAllBrands(false);
       }
+
+      try {
+        const wfForTemplateResponse = await fetch(`/api/workflows?template_id=${templateId}`);
+        const wfForTemplateData = await wfForTemplateResponse.json();
+        if (wfForTemplateData.success && Array.isArray(wfForTemplateData.data)) {
+          setWorkflowsForCurrentTemplate(wfForTemplateData.data);
+        } else {
+          toast.error(wfForTemplateData.error || 'Failed to load workflows for this template.');
+          setWorkflowsForCurrentTemplate([]);
+        }
+      } catch (error) {
+        toast.error('Error loading workflows for this template.');
+        console.error('Error fetching workflows for template:', error);
+        setWorkflowsForCurrentTemplate([]);
+      } finally {
+        setIsLoadingWorkflowsForTemplate(false);
+      }
+      setInitialDataLoaded(true);
     };
-    fetchData();
-    if (templateId) fetchTemplate(templateId);
-    else toast.error("No template ID provided.");
+
+    fetchInitialData();
   }, [templateId]);
 
   useEffect(() => {
-    const fetchWorkflow = async () => {
-      if (templateId && selectedBrand) {
-        setIsFetchingWorkflow(true);
-        setAssociatedWorkflowDetails(null);
-        try {
-          const res = await fetch(`/api/workflows?brand_id=${selectedBrand}`);
-          const data = await res.json();
-          if (data.success && Array.isArray(data.data)) {
-            const matchingWorkflow = (data.data as WorkflowSummary[]).find(wf => wf.template_id === templateId);
-            if (matchingWorkflow) {
-              setAssociatedWorkflowDetails(matchingWorkflow);
-            }
-          } else {
-            // toast.error('Could not determine workflow.'); // Optional: less noisy
-          }
-        } catch (error) { /* toast.error('Error determining workflow.'); */ } // Optional: less noisy
-        finally { setIsFetchingWorkflow(false); }
+    if (isLoadingAllBrands || isLoadingWorkflowsForTemplate || !template) return;
+
+    if (workflowsForCurrentTemplate.length > 0 && allBrands.length > 0) {
+      const brandIdsWithWorkflowForThisTemplate = new Set(
+        workflowsForCurrentTemplate.map(wf => wf.brand_id)
+      );
+      const filtered = allBrands.filter(brand => brandIdsWithWorkflowForThisTemplate.has(brand.id));
+      setDisplayableBrands(filtered);
+
+      if (filtered.length === 1 && !selectedBrand) {
+        setSelectedBrand(filtered[0].id);
       }
-    };
-    fetchWorkflow();
-  }, [templateId, selectedBrand]);
+      if (selectedBrand && !filtered.some(b => b.id === selectedBrand)) {
+        setSelectedBrand('');
+        setAssociatedWorkflowDetails(null);
+        setCanGenerateContent(false);
+      }
+
+    } else {
+      setDisplayableBrands([]);
+      setSelectedBrand('');
+      setAssociatedWorkflowDetails(null);
+      setCanGenerateContent(false);
+    }
+  }, [allBrands, workflowsForCurrentTemplate, isLoadingAllBrands, isLoadingWorkflowsForTemplate, template, selectedBrand]);
+
+  useEffect(() => {
+    setAssociatedWorkflowDetails(null);
+    setCanGenerateContent(false);
+
+    if (templateId && selectedBrand && displayableBrands.some(b => b.id === selectedBrand)) {
+      setIsFetchingAssociatedWorkflow(true);
+      const fetchSpecificWorkflow = async () => {
+        try {
+          const response = await fetch(`/api/workflows?brand_id=${selectedBrand}&template_id=${templateId}`);
+          const data = await response.json();
+          if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+            setAssociatedWorkflowDetails(data.data[0] as WorkflowSummary);
+            setCanGenerateContent(true);
+            toast.info(`Selected brand: ${currentBrand?.name}. Workflow: ${data.data[0].name}`);
+          } else {
+            toast.error('Could not confirm workflow for the selected brand and template.');
+            setAssociatedWorkflowDetails(null);
+            setCanGenerateContent(false);
+          }
+        } catch (error) {
+          toast.error('Error fetching specific workflow details.');
+          setAssociatedWorkflowDetails(null);
+          setCanGenerateContent(false);
+        } finally {
+          setIsFetchingAssociatedWorkflow(false);
+        }
+      };
+      fetchSpecificWorkflow();
+    } else {
+      setIsFetchingAssociatedWorkflow(false);
+    }
+  }, [templateId, selectedBrand, displayableBrands, currentBrand?.name]);
 
   const handleTemplateFieldChange = (fieldId: string, value: string) => {
     setTemplateFieldValues(prev => ({ ...prev, [fieldId]: value }));
@@ -173,8 +255,8 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
   };
 
   const handleGenerateSuggestion = async (field: InputField) => {
-    if (!selectedBrand) {
-      toast.error("Please select a brand first.");
+    if (!selectedBrand || !canGenerateContent) {
+      toast.error(!selectedBrand ? "Please select a brand first." : "Content generation is disabled for the selected brand/template combination.");
       return;
     }
     if (!field.aiPrompt) {
@@ -214,8 +296,8 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
   };
 
   const handleGenerate = async () => {
-    if (!selectedBrand || !template) {
-      toast.error("Please select a brand and ensure template is loaded.");
+    if (!selectedBrand || !template || !canGenerateContent) {
+      toast.error("Please select a brand and ensure a workflow is available for this template.");
       return;
     }
     const missingFields = (template.inputFields || []).filter(
@@ -240,6 +322,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
       const generationRequestBody = {
         brand_id: selectedBrand,
         template_id: template.id,
+        workflow_id: associatedWorkflowDetails?.id, 
         template: {
             id: template.id,
             name: template.name,
@@ -336,8 +419,8 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
   };
   
   const handleRetryFieldGeneration = async (outputField: OutputField) => {
-    if (!selectedBrand || !template) {
-      toast.error("Brand and template must be selected.");
+    if (!selectedBrand || !template || !canGenerateContent) {
+      toast.error("Brand, template, and an active workflow are required to retry generation.");
       return;
     }
     if (isLoading || isGeneratingTitle) {
@@ -354,6 +437,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         output_field_to_generate_id: outputField.id,
         existing_outputs: generatedOutputs,
         title: title,
+        workflow_id: associatedWorkflowDetails?.id,
       };
 
       const response = await fetch('/api/content/generate-field', {
@@ -382,14 +466,18 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
   };
 
   const handleSave = async () => {
+    if (!canGenerateContent || !associatedWorkflowDetails?.id) {
+      toast.error('Cannot save content. A specific workflow for this brand and template is required.');
+      return;
+    }
     const hasGeneratedOutputs = Object.keys(generatedOutputs).length > 0;
     if (!hasGeneratedOutputs) { toast.error('No content to save.'); return; }
-    if (isFetchingWorkflow || isGeneratingTitle) { 
-        toast.info(isGeneratingTitle ? 'Auto-generating title, please wait...' : 'Determining workflow, please wait...'); 
+    if (isGeneratingTitle) { 
+        toast.info('Auto-generating title, please wait...'); 
         return; 
     }
     if (!title && !isGeneratingTitle) {
-        toast.error('Content title is missing. Please wait for auto-generation or set manually if generation failed.');
+        toast.error('Content title is missing. Please set manually or wait for auto-generation.');
         return;
     }
     setIsSaving(true);
@@ -411,7 +499,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         brand_id: selectedBrand,
         template_id: template?.id,
         title,
-        workflow_id: associatedWorkflowDetails?.id,
+        workflow_id: associatedWorkflowDetails.id, 
         body: primaryBodyContent,
         content_data: {
             templateInputValues: templateFieldValues,
@@ -436,6 +524,9 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     finally { setIsSaving(false); }
   };
   
+  const isLoadingCoreData = isLoadingTemplate || isLoadingAllBrands || isLoadingWorkflowsForTemplate;
+  const showNoCompatibleBrandsMessage = initialDataLoaded && !isLoadingCoreData && template && displayableBrands.length === 0;
+
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
       <Breadcrumbs items={[
@@ -465,31 +556,67 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         </div>
       </div>
       
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {isGeneratingTitle ? <div className="flex items-center"><Loader2 className="h-5 w-5 animate-spin mr-2" /> Generating Title...</div> : title || (template ? template.name : 'New Content')}
-          </CardTitle>
-          <CardDescription>
-            {isLoadingTemplate ? 'Loading template...' : (template ? template.description : 'Select a brand and fill in the details.')}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="brand">Brand</Label>
-              <Select value={selectedBrand} onValueChange={setSelectedBrand} required>
-                <SelectTrigger id="brand"><SelectValue placeholder="Select a brand" /></SelectTrigger>
-                <SelectContent>{brands.map(brand => (<SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>))}</SelectContent>
-              </Select>
-            </div>
-            
-            {isLoadingTemplate && <div className="text-center p-4"><Loader2 className="h-6 w-6 animate-spin mx-auto" /> <p>Loading template fields...</p></div>}
-            {template && !isLoadingTemplate && (
-                <React.Fragment>
-                    <Separator />
-                    <h3 className="text-lg font-medium pt-2">Template Fields</h3>
-                    {(template.inputFields || []).map((field) => (
+      {isLoadingCoreData && !initialDataLoaded && (
+        <Card className="p-6 text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+          <p>Loading content generation tools...</p>
+        </Card>
+      )}
+
+      {showNoCompatibleBrandsMessage && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center"><Info className="h-5 w-5 mr-2 text-orange-500" /> Template Configuration Notice</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>
+              No brands are currently configured with a workflow for the template 
+              <strong className="mx-1">{template?.name || 'this template'}</strong>.
+            </p>
+            <p className="mt-2">
+              Please contact an administrator to set up an appropriate workflow for a brand to use this template.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!showNoCompatibleBrandsMessage && template && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {isGeneratingTitle ? <div className="flex items-center"><Loader2 className="h-5 w-5 animate-spin mr-2" /> Generating Title...</div> : title || (template ? template.name : 'New Content')}
+            </CardTitle>
+            <CardDescription>
+              {template.description || 'Select a brand and fill in the details.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="brand">Brand</Label>
+                <Select 
+                  value={selectedBrand} 
+                  onValueChange={setSelectedBrand} 
+                  required 
+                  disabled={isLoadingCoreData || displayableBrands.length === 0}
+                >
+                  <SelectTrigger id="brand">
+                    <SelectValue placeholder={isLoadingCoreData ? "Loading brands..." : "Select a compatible brand"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {displayableBrands.map(brand => (
+                      <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {isFetchingAssociatedWorkflow && <p className="text-xs text-muted-foreground mt-1 flex items-center"><Loader2 className="h-3 w-3 animate-spin mr-1" /> Verifying workflow for selected brand...</p>}
+              </div>
+              
+              {selectedBrand && canGenerateContent && (
+                <>
+                  <Separator />
+                  <h3 className="text-lg font-medium pt-2">Template Fields</h3>
+                  {(template.inputFields || []).map((field) => (
                     <div key={field.id} className="space-y-1.5">
                         <div className="flex items-center justify-between">
                             <Label htmlFor={field.id}>{field.name}{field.required && <span className="text-destructive">*</span>}</Label>
@@ -499,7 +626,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleGenerateSuggestion(field)}
-                                disabled={isGeneratingSuggestionFor !== null || !selectedBrand}
+                                disabled={isGeneratingSuggestionFor !== null || !selectedBrand || !canGenerateContent}
                                 className="ml-2"
                               >
                                 {isGeneratingSuggestionFor === field.id ? (
@@ -550,25 +677,14 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
                         )}
                     </div>
                     ))}
-                </React.Fragment>
-            )}
-            
-            {templateId && selectedBrand && (
-              <div className="pt-2">
-                <p className="text-sm text-muted-foreground">
-                  {isFetchingWorkflow ? "Determining workflow..." :
-                    associatedWorkflowDetails ? 
-                      `${associatedWorkflowDetails.brand_name || 'Brand'} / ${associatedWorkflowDetails.name || 'Workflow'} (Associated)` :
-                      "No specific workflow linked for this brand/template."
-                  }
-                </p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
       
-      {Object.keys(generatedOutputs).length > 0 && (
+      {Object.keys(generatedOutputs).length > 0 && selectedBrand && canGenerateContent && (
         <Card>
           <CardHeader>
             <CardTitle>Generated Content Review {isGeneratingTitle ? "(Generating Title...)" : (title ? `- \"${title}\"` : "")}</CardTitle>
@@ -584,12 +700,13 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
                   {!isLoading && 
                    !isGeneratingTitle && 
                    !retryingFieldId && 
-                   Object.keys(generatedOutputs).length > 0 && (
+                   Object.keys(generatedOutputs).length > 0 && 
+                   canGenerateContent && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleRetryFieldGeneration(outputField)}
-                      disabled={retryingFieldId !== null}
+                      disabled={retryingFieldId !== null || !canGenerateContent}
                       className="ml-2"
                     >
                       <Sparkles className="mr-2 h-3 w-3" /> Retry Generation
@@ -630,59 +747,64 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
                 </p>
               </div>
             ))}
-            {Object.keys(generatedOutputs).length === 0 && !isLoading && template && (
-              <p className="text-muted-foreground">Generated content will appear here for each output field once generated.</p>
-            )}
-            {isLoading && <div className="text-center p-4"><Loader2 className="h-6 w-6 animate-spin mx-auto" /> <p>Generating initial content...</p></div>}
+            {aiError && <p className="text-sm text-destructive">Error from AI: {aiError}</p>} 
           </CardContent>
         </Card>
       )}
 
+    {!showNoCompatibleBrandsMessage && template && (
       <div className="flex justify-end space-x-2 pt-4 mt-4 border-t">
         <Button 
           variant="outline" 
           onClick={() => router.back()} 
-          disabled={isLoading || isLoadingTemplate || isGeneratingTitle || isSaving || isFetchingWorkflow || retryingFieldId !== null}
+          disabled={isLoading || isLoadingCoreData || isGeneratingTitle || isSaving || isFetchingAssociatedWorkflow || retryingFieldId !== null}
         >
           Cancel
         </Button>
 
-        {/* Initial Generate Button - Only if NO outputs yet */}
         {Object.keys(generatedOutputs).length === 0 && (
           <Button 
             onClick={handleGenerate} 
-            disabled={isLoading || isLoadingTemplate || isFetchingWorkflow || isGeneratingTitle || !selectedBrand || !template || retryingFieldId !== null}
+            disabled={!canGenerateContent || !selectedBrand || isLoading || isLoadingCoreData || isFetchingAssociatedWorkflow || isGeneratingTitle || retryingFieldId !== null}
             className="flex items-center gap-2"
+            title={!canGenerateContent ? "Select a brand with a configured workflow." : "Generate initial content"}
           >
-            {(isLoading || isLoadingTemplate || isFetchingWorkflow || isGeneratingTitle) && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isLoading ? 'Generating Body...' : (isLoadingTemplate ? 'Loading Template...' : (isFetchingWorkflow ? 'Loading Workflow...' : (isGeneratingTitle ? 'Generating Title...' : 'Generate Content & Title')))}
+            {(isLoading || isLoadingCoreData || isFetchingAssociatedWorkflow || isGeneratingTitle) && <Loader2 className="h-4 w-4 animate-spin" />}
+            {isLoading ? 'Generating Body...' : 
+             (isLoadingCoreData ? 'Loading Config...' : 
+             (isFetchingAssociatedWorkflow ? 'Verifying Workflow...' : 
+             (isGeneratingTitle ? 'Generating Title...' : 'Generate Content & Title')))}
           </Button>
         )}
 
-        {/* Buttons that appear AFTER first generation */}
         {Object.keys(generatedOutputs).length > 0 && (
           <>
-            <Button // New "Regenerate All Content" Button
+            <Button 
               variant="outline"
-              onClick={handleGenerate} // Calls the existing full generation logic
-              disabled={isLoading || isLoadingTemplate || isFetchingWorkflow || isGeneratingTitle || !selectedBrand || !template || retryingFieldId !== null || isSaving}
+              onClick={handleGenerate} 
+              disabled={!canGenerateContent || !selectedBrand || isLoading || isLoadingCoreData || isFetchingAssociatedWorkflow || isGeneratingTitle || retryingFieldId !== null || isSaving}
               className="flex items-center gap-2"
+              title={!canGenerateContent ? "Workflow not configured for regeneration." : "Regenerate all content fields"}
             >
               {(isLoading || isGeneratingTitle) && <Loader2 className="h-4 w-4 animate-spin" />}
               {isLoading ? 'Regenerating Body...' : (isGeneratingTitle ? 'Regenerating Title...' : 'Regenerate All Content')}
             </Button>
 
-            <Button // Existing "Save" Button
+            <Button 
               onClick={handleSave} 
-              disabled={isSaving || isFetchingWorkflow || isGeneratingTitle || !title || retryingFieldId !== null || isLoading}
+              disabled={!canGenerateContent || !selectedBrand || !associatedWorkflowDetails?.id || isSaving || isGeneratingTitle || !title || retryingFieldId !== null || isLoading || isFetchingAssociatedWorkflow}
               className="flex items-center gap-2"
+              title={!canGenerateContent || !associatedWorkflowDetails?.id ? "Cannot save: Workflow missing or not configured." : "Save the generated content"}
             >
-              {(isSaving || isFetchingWorkflow || isGeneratingTitle) && <Loader2 className="h-4 w-4 animate-spin" />}
-              {isSaving ? 'Saving...' : (isFetchingWorkflow ? 'Checking Workflow...' : (isGeneratingTitle ? 'Generating Title...': 'Save Content'))}
+              {(isSaving || isFetchingAssociatedWorkflow || isGeneratingTitle) && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isSaving ? 'Saving...' : 
+              (isFetchingAssociatedWorkflow ? 'Verifying Workflow...' : 
+              (isGeneratingTitle ? 'Generating Title...': 'Save Content'))}
             </Button>
           </>
         )}
       </div>
+      )}
     </div>
   );
 } 

@@ -36,6 +36,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useState, useEffect, useRef } from 'react';
 import { Separator } from '@/components/ui/separator';
+import { toast } from 'sonner';
 
 interface UserSessionData {
   id: string;
@@ -76,6 +77,12 @@ interface NavGroupItem {
   defaultOpen?: boolean;
 }
 
+interface WorkflowDataType {
+  id: string;
+  template_id: string | null;
+  brand_id: string;
+}
+
 export function UnifiedNavigation() {
   const pathname = usePathname() || '';
   const layoutSegments = useSelectedLayoutSegments();
@@ -96,6 +103,10 @@ export function UnifiedNavigation() {
   const [userTemplates, setUserTemplates] = useState<any[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const templatesFetched = useRef(false);
+
+  const [userWorkflows, setUserWorkflows] = useState<WorkflowDataType[]>([]);
+  const [isLoadingUserWorkflows, setIsLoadingUserWorkflows] = useState(false);
+  const userWorkflowsFetched = useRef(false);
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -121,6 +132,15 @@ export function UnifiedNavigation() {
     fetchCurrentUser();
   }, []);
 
+  // Moved role constants declaration before the useEffect that uses them
+  const userRole = currentUser?.user_metadata?.role;
+  const userBrandPermissions = currentUser?.brand_permissions || [];
+  const isViewer = userRole === 'viewer';
+  const isEditor = userRole === 'editor';
+  const isAdmin = userRole === 'admin';
+  const isPlatformAdmin = isAdmin && userBrandPermissions.length === 0; 
+  const isScopedAdmin = isAdmin && userBrandPermissions.length > 0;
+
   useEffect(() => {
     const fetchTemplates = async () => {
       if (templatesFetched.current || isLoadingTemplates) return;
@@ -142,6 +162,41 @@ export function UnifiedNavigation() {
     };
     fetchTemplates();
   }, [isLoadingTemplates]);
+
+  useEffect(() => {
+    const fetchUserWorkflows = async () => {
+      if (userWorkflowsFetched.current || isLoadingUserWorkflows || !currentUser || isPlatformAdmin || isViewer) {
+        if (!currentUser || isPlatformAdmin || isViewer) setIsLoadingUserWorkflows(false);
+        return;
+      }
+
+      if (isScopedAdmin || isEditor) {
+        setIsLoadingUserWorkflows(true);
+        userWorkflowsFetched.current = true;
+        try {
+          const response = await fetch('/api/workflows'); 
+          const data = await response.json();
+          if (data.success && Array.isArray(data.data)) {
+            setUserWorkflows(data.data as WorkflowDataType[]);
+          } else {
+            console.error('[UnifiedNavigation] Failed to fetch user workflows:', data.error);
+            toast.error('Could not load workflows for content creation links.');
+            setUserWorkflows([]);
+          }
+        } catch (error) {
+          console.error('[UnifiedNavigation] Error fetching user workflows:', error);
+          toast.error('Error loading workflows for navigation.');
+          setUserWorkflows([]);
+        } finally {
+          setIsLoadingUserWorkflows(false);
+        }
+      }
+    };
+
+    if (!isLoadingUser) {
+        fetchUserWorkflows();
+    }
+  }, [currentUser, isLoadingUser, isPlatformAdmin, isScopedAdmin, isEditor, isViewer, isLoadingUserWorkflows]);
 
   useEffect(() => {
     const newExpandedState = { ...expandedSections };
@@ -174,22 +229,43 @@ export function UnifiedNavigation() {
     }));
   };
 
-  const contentItems = userTemplates.map(template => ({
-    href: `/dashboard/content/new?template=${template.id}`,
-    label: template.name,
-    icon: <FileText className="h-4 w-4" />,
-    segment: template.id
-  }));
+  let filteredContentItems: NavItem[] = [];
+  if (isLoadingTemplates || ( (isScopedAdmin || isEditor) && isLoadingUserWorkflows && !isPlatformAdmin) ) {
+    filteredContentItems = [
+      { href: '#', label: 'Loading templates...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }
+    ];
+  } else if (userTemplates.length > 0) {
+    if (isPlatformAdmin) {
+      filteredContentItems = userTemplates.map(template => ({
+        href: `/dashboard/content/new?template=${template.id}`,
+        label: template.name,
+        icon: <FileText className="h-4 w-4" />,
+        segment: template.id
+      }));
+    } else if (isScopedAdmin || isEditor) {
+      const userBrandIds = (currentUser?.brand_permissions || []).map(p => p.brand_id).filter(Boolean);
+      if (userBrandIds.length > 0 && userWorkflows.length > 0) {
+        filteredContentItems = userTemplates
+          .filter(template => 
+            userWorkflows.some(workflow => 
+              workflow.template_id === template.id && 
+              userBrandIds.includes(workflow.brand_id)
+            )
+          )
+          .map(template => ({
+            href: `/dashboard/content/new?template=${template.id}`,
+            label: template.name,
+            icon: <FileText className="h-4 w-4" />,
+            segment: template.id
+          }));
+      } else {
+        filteredContentItems = [];
+      }
+    } else {
+      filteredContentItems = [];
+    }
+  }
   
-  const userRole = currentUser?.user_metadata?.role;
-  const userBrandPermissions = currentUser?.brand_permissions || [];
-  
-  const isViewer = userRole === 'viewer';
-  const isEditor = userRole === 'editor';
-  const isAdmin = userRole === 'admin';
-  const isPlatformAdmin = isAdmin && userBrandPermissions.length === 0;
-  const isScopedAdmin = isAdmin && userBrandPermissions.length > 0;
-
   const hasAssignedBrandWithMasterClaimId = () => {
     if (!currentUser || !userBrandPermissions) return false;
     return userBrandPermissions.some(bp => bp.brand && bp.brand.master_claim_brand_id && bp.brand.master_claim_brand_id !== null);
@@ -224,13 +300,11 @@ export function UnifiedNavigation() {
       icon: <BookOpen className="h-5 w-5" />,
       segment: 'content',
       defaultOpen: true,
-      show: () => !isViewer,
-      items: [
-        ...(isLoadingTemplates 
-          ? [{ href: '#', label: 'Loading templates...', icon: <Loader2 className="h-4 w-4 animate-spin" /> }]
-          : contentItems
-        ),
-      ]
+      show: () => isAuthenticatedUser && !isViewer,
+      items: filteredContentItems.length > 0 ? filteredContentItems : 
+             (isLoadingTemplates || ((isScopedAdmin || isEditor) && isLoadingUserWorkflows && !isPlatformAdmin) ? 
+               [{ href: '#', label: 'Loading...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }] :
+               [{ href: '#', label: 'No content types available', icon: <MessageSquareWarning className="h-4 w-4" />, segment: 'no-content' }])
     },
     { type: 'divider', show: () => isAuthenticatedUser },
     {
@@ -238,21 +312,21 @@ export function UnifiedNavigation() {
       label: 'Brands',
       icon: <Building2 className="h-5 w-5" />,
       segment: 'brands',
-      show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin || isEditor)
+      show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin)
     },
     {
       href: '/dashboard/workflows',
       label: 'Workflows',
       icon: <GitBranch className="h-5 w-5" />,
       segment: 'workflows',
-      show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin || isEditor)
+      show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin)
     },
     {
       href: '/dashboard/templates',
       label: 'Content Templates',
       icon: <ClipboardList className="h-5 w-5" />,
       segment: 'templates',
-      show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin || isEditor)
+      show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin)
     },
     {
       label: 'Product Claims',
@@ -270,7 +344,7 @@ export function UnifiedNavigation() {
         { href: '/dashboard/claims/brands', label: 'Claim Brands', icon: <Building2 className="h-4 w-4" />, segment: 'brands' },
       ]
     },
-    { type: 'divider', show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin || isEditor) },
+    { type: 'divider', show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin) },
     {
       label: 'Tools',
       icon: <Wrench className="h-5 w-5" />,
@@ -423,9 +497,9 @@ export function UnifiedNavigation() {
                     <ul className="ml-4 mt-0.5 space-y-0.5 border-l border-muted py-1 pl-4">
                       {group.items.map(subItem => {
                         const subIsActive = isActive(subItem);
-                        if (subItem.label === 'Loading templates...') {
+                        if (subItem.segment === 'loading' || subItem.segment === 'no-content') {
                           return (
-                            <li key="loading-templates" className="flex items-center gap-3 rounded-md px-3 py-1 text-sm text-muted-foreground">
+                            <li key={subItem.label} className="flex items-center gap-3 rounded-md px-3 py-1 text-sm text-muted-foreground">
                               {subItem.icon}<span>{subItem.label}</span>
                             </li>
                           );
