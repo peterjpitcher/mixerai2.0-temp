@@ -319,6 +319,13 @@ export function UnifiedNavigation() {
       show: () => isAuthenticatedUser
     },
     {
+      href: '/dashboard/release-notes',
+      label: 'Release Notes',
+      icon: <Info className="h-5 w-5" />,
+      segment: 'release-notes',
+      show: () => isAuthenticatedUser
+    },
+    {
       href: '/dashboard/help',
       label: 'Help',
       icon: <HelpCircle className="h-5 w-5" />,

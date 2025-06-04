@@ -73,17 +73,13 @@ export interface OutputField extends BaseField {
 
 export type GenericField = InputField | OutputField;
 
-export interface TemplateFields {
-  inputFields: InputField[];
-  outputFields: OutputField[];
-}
-
 export interface ContentTemplate {
   id: string;
   name: string;
   description: string | null;
   icon: string | null;
-  fields: TemplateFields;
+  inputFields?: InputField[];
+  outputFields?: OutputField[];
   brand_id?: string | null;
   created_at: string | null;
   created_by: string | null;

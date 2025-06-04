@@ -22,9 +22,7 @@ import {
   ContentTemplate 
 } from '@/types/template';
 
-interface TemplateData extends ContentTemplate {
-  // id, name, description, icon, fields, brand_id?, created_at, created_by, updated_at
-}
+interface TemplateData extends ContentTemplate {}
 
 interface TemplateFormProps {
   initialData?: TemplateData;
@@ -40,11 +38,9 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
       name: '',
       description: '',
       icon: null,
-      brand_id: null, // Keep brand_id for data model consistency, but don't use for UI logic here
-      fields: {
-        inputFields: [],
-        outputFields: []
-      },
+      brand_id: null,
+      inputFields: [], 
+      outputFields: [],
       created_at: null,
       created_by: null,
       updated_at: null,
@@ -73,24 +69,22 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
   
   const handleFieldSave = (field: Field, isNew: boolean) => {
     setTemplateData(prev => {
-      const fieldsList = activeTab === 'input' ? 'inputFields' : 'outputFields';
-      let updatedFields;
+      const listName = activeTab === 'input' ? 'inputFields' : 'outputFields';
+      const currentList = prev[listName] || [];
+      let updatedList;
       
       if (isNew) {
-        updatedFields = [...prev.fields[fieldsList], field];
+        updatedList = [...currentList, field];
       } else {
-        updatedFields = prev.fields[fieldsList].map(f => 
+        updatedList = currentList.map(f => 
           f.id === field.id ? field : f
         );
       }
       
       return {
         ...prev,
-        fields: {
-          ...prev.fields,
-          [fieldsList]: updatedFields
-        }
-      };
+        [listName]: updatedList
+      } as TemplateData;
     });
     
     setIsAddingField(false);
@@ -104,16 +98,14 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
   
   const handleFieldDelete = (fieldId: string) => {
     setTemplateData(prev => {
-      const fieldsList = activeTab === 'input' ? 'inputFields' : 'outputFields';
-      const updatedFields = prev.fields[fieldsList].filter(f => f.id !== fieldId);
+      const listName = activeTab === 'input' ? 'inputFields' : 'outputFields';
+      const currentList = prev[listName] || [];
+      const updatedList = currentList.filter(f => f.id !== fieldId);
       
       return {
         ...prev,
-        fields: {
-          ...prev.fields,
-          [fieldsList]: updatedFields
-        }
-      };
+        [listName]: updatedList
+      } as TemplateData;
     });
   };
   
@@ -123,26 +115,20 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
     const { source, destination } = result;
 
     if (activeTab === 'input') {
-      const items = Array.from(templateData.fields.inputFields);
+      const items = Array.from(templateData.inputFields || []);
       const [reorderedItem] = items.splice(source.index, 1);
       items.splice(destination.index, 0, reorderedItem as InputField);
       setTemplateData(prev => ({
         ...prev,
-        fields: {
-          ...prev.fields,
-          inputFields: items
-        }
+        inputFields: items
       }));
     } else if (activeTab === 'output') {
-      const items = Array.from(templateData.fields.outputFields);
+      const items = Array.from(templateData.outputFields || []);
       const [reorderedItem] = items.splice(source.index, 1);
       items.splice(destination.index, 0, reorderedItem as OutputField);
       setTemplateData(prev => ({
         ...prev,
-        fields: {
-          ...prev.fields,
-          outputFields: items
-        }
+        outputFields: items
       }));
     }
   };
@@ -155,12 +141,12 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
       return;
     }
     
-    if (templateData.fields.inputFields.length === 0) {
+    if ((templateData.inputFields || []).length === 0) {
       toast.error('At least one input field is required');
       return;
     }
     
-    if (templateData.fields.outputFields.length === 0) {
+    if ((templateData.outputFields || []).length === 0) {
       toast.error('At least one output field is required');
       return;
     }
@@ -168,7 +154,12 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
     try {
       setIsSubmitting(true);
       
-      const payload = { ...templateData }; 
+      const payload = { 
+        ...templateData, 
+        inputFields: templateData.inputFields || [],
+        outputFields: templateData.outputFields || [] 
+      }; 
+
       if (payload.brand_id === undefined) {
           payload.brand_id = null;
       }
@@ -249,78 +240,24 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
               <TabsTrigger value="output">Output Fields</TabsTrigger>
             </TabsList>
             <TabsContent value="input" className="mt-4">
-              <ScrollArea className="h-72 pr-4">
-                <DragDropContext onDragEnd={handleDragEnd}>
-                  <Droppable droppableId="inputFields">
-                    {(provided) => (
-                      <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-3">
-                        {templateData.fields.inputFields.map((field, index) => (
-                          <Draggable key={field.id} draggableId={field.id} index={index}>
-                            {(provided) => (
-                              <div 
-                                ref={provided.innerRef} 
-                                {...provided.draggableProps} 
-                                {...provided.dragHandleProps}
-                                className="p-3 border rounded-md flex justify-between items-center bg-card hover:bg-muted/50"
-                              >
-                                <div>
-                                  <p className="font-medium">{field.name || '(Untitled Field)'}</p>
-                                  <p className="text-xs text-muted-foreground">Type: {field.type} {field.required ? '| Required' : ''}</p>
-                                </div>
-                                <div className="space-x-2">
-                                  <Button type="button" variant="outline" size="sm" onClick={() => handleEditField(field)}>Edit</Button>
-                                  <Button type="button" variant="ghost" size="icon" onClick={() => handleFieldDelete(field.id)}>
-                                    <Icons.trash className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
-                </DragDropContext>
-              </ScrollArea>
-              <Button type="button" variant="outline" onClick={handleAddField} className="mt-4">Add Input Field</Button>
+              <FieldList 
+                fields={templateData.inputFields || []} 
+                onAddField={handleAddField} 
+                onEditField={handleEditField} 
+                onDeleteField={handleFieldDelete} 
+                onDragEnd={handleDragEnd} 
+                fieldType="input"
+              />
             </TabsContent>
             <TabsContent value="output" className="mt-4">
-              <ScrollArea className="h-72 pr-4">
-                <DragDropContext onDragEnd={handleDragEnd}>
-                  <Droppable droppableId="outputFields">
-                    {(provided) => (
-                      <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-3">
-                        {templateData.fields.outputFields.map((field, index) => (
-                           <Draggable key={field.id} draggableId={field.id} index={index}>
-                           {(provided) => (
-                             <div 
-                               ref={provided.innerRef} 
-                               {...provided.draggableProps} 
-                               {...provided.dragHandleProps}
-                               className="p-3 border rounded-md flex justify-between items-center bg-card hover:bg-muted/50"
-                             >
-                               <div>
-                                 <p className="font-medium">{field.name || '(Untitled Field)'}</p>
-                                 <p className="text-xs text-muted-foreground">Type: {field.type} {field.required ? '| Required' : ''}</p>
-                               </div>
-                               <div className="space-x-2">
-                                 <Button type="button" variant="outline" size="sm" onClick={() => handleEditField(field)}>Edit</Button>
-                                 <Button type="button" variant="ghost" size="icon" onClick={() => handleFieldDelete(field.id)}>
-                                   <Icons.trash className="h-4 w-4" />
-                                 </Button>
-                               </div>
-                             </div>
-                           )}
-                         </Draggable>
-                        ))}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
-                </DragDropContext>
-              </ScrollArea>
-              <Button type="button" variant="outline" onClick={handleAddField} className="mt-4">Add Output Field</Button>
+              <FieldList 
+                fields={templateData.outputFields || []} 
+                onAddField={handleAddField} 
+                onEditField={handleEditField} 
+                onDeleteField={handleFieldDelete} 
+                onDragEnd={handleDragEnd} 
+                fieldType="output"
+              />
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -328,13 +265,12 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
       
       {isAddingField && (
         <FieldDesigner 
-          isOpen={isAddingField} 
+          isOpen={isAddingField}
+          initialData={editingField} 
+          onSave={handleFieldSave} 
+          onCancel={handleFieldCancel} 
+          availableInputFields={(templateData.inputFields || []).map(f => ({ id: f.id, name: f.name }))}
           fieldType={activeTab as 'input' | 'output'}
-          initialData={editingField}
-          onSave={handleFieldSave}
-          onCancel={handleFieldCancel}
-          availableInputFields={templateData.fields.inputFields.map(f => ({ id: f.id, name: f.name }))}
-          templateId={templateData.id}
         />
       )}
 
@@ -346,5 +282,56 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
         </Button>
       </CardFooter>
     </form>
+  );
+}
+
+interface FieldListProps {
+  fields: Field[];
+  onAddField: () => void;
+  onEditField: (field: Field) => void;
+  onDeleteField: (fieldId: string) => void;
+  onDragEnd: (result: DropResult) => void;
+  fieldType: 'input' | 'output';
+}
+
+function FieldList({ fields, onAddField, onEditField, onDeleteField, onDragEnd, fieldType }: FieldListProps) {
+  return (
+    <DragDropContext onDragEnd={onDragEnd}>
+      <Droppable droppableId={fieldType}>
+        {(provided) => (
+          <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-3">
+            {fields.map((field, index) => (
+              <Draggable key={field.id} draggableId={field.id} index={index}>
+                {(providedDraggable) => (
+                  <div 
+                    ref={providedDraggable.innerRef} 
+                    {...providedDraggable.draggableProps} 
+                    className="p-3 border rounded-md bg-background shadow-sm flex items-center justify-between"
+                  >
+                    <div className="flex items-center">
+                      <button {...providedDraggable.dragHandleProps} className="p-1 mr-2 text-muted-foreground hover:text-foreground">
+                        <Menu size={18} />
+                      </button>
+                      <div>
+                        <p className="font-medium">{field.name}</p>
+                        <p className="text-xs text-muted-foreground">Type: {field.type} {field.required ? '(Required)' : ''}</p>
+                      </div>
+                    </div>
+                    <div className="space-x-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => onEditField(field)}>Edit</Button>
+                      <Button type="button" variant="destructive" size="sm" onClick={() => onDeleteField(field.id)}>Delete</Button>
+                    </div>
+                  </div>
+                )}
+              </Draggable>
+            ))}
+            {provided.placeholder}
+            <Button type="button" variant="outline" onClick={onAddField} className="w-full mt-4">
+              <Icons.plus className="mr-2 h-4 w-4" /> Add {fieldType === 'input' ? 'Input' : 'Output'} Field
+            </Button>
+          </div>
+        )}
+      </Droppable>
+    </DragDropContext>
   );
 } 

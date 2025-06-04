@@ -74,6 +74,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
   const [isFetchingWorkflow, setIsFetchingWorkflow] = useState(false);
   const [isGeneratingSuggestionFor, setIsGeneratingSuggestionFor] = useState<string | null>(null);
   const [retryingFieldId, setRetryingFieldId] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
   
   const currentBrand = brands.find(b => b.id === selectedBrand);
 
@@ -85,17 +86,20 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
       if (data.success && data.template) {
         setTemplate(data.template as Template);
         const initialValues: Record<string, string> = {};
-        if (data.template.fields && data.template.fields.inputFields) {
-          (data.template.fields.inputFields as InputField[]).forEach(field => {
-            initialValues[field.id] = (field as any).value || '';
+        if (data.template.inputFields) {
+          (data.template.inputFields as InputField[]).forEach((field: InputField) => {
+            initialValues[field.id] = ''; 
           });
         }
         setTemplateFieldValues(initialValues);
       } else {
-        toast.error(data.error || "Failed to load template details");
+        toast.error(data.error || "Failed to load content template.");
+        setTemplate(null);
       }
     } catch (error) {
-      toast.error("Error fetching template details");
+      toast.error("Error fetching template details.");
+      console.error("Error fetching template details:", error);
+      setTemplate(null);
     } finally {
       setIsLoadingTemplate(false);
     }
@@ -151,21 +155,17 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
   const interpolatePrompt = (prompt: string): string => {
     let interpolated = prompt;
     if (template) {
-      template.fields.inputFields.forEach(inputField => {
+      (template.inputFields || []).forEach(inputField => {
         const placeholderByName = `{{${inputField.name}}}`;
         const placeholderById = `{{${inputField.id}}}`;
         const value = templateFieldValues[inputField.id] || '';
-        // Escape special characters for regex, then replace globally
-        const regexByName = new RegExp(placeholderByName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-        interpolated = interpolated.replace(regexByName, value);
-        const regexById = new RegExp(placeholderById.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-        interpolated = interpolated.replace(regexById, value);
+        interpolated = interpolated.replace(new RegExp(placeholderByName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), value);
+        interpolated = interpolated.replace(new RegExp(placeholderById.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), value);
       });
     }
 
-    // Specifically replace {{article title}} with the main title state, case-insensitively
-    if (title) { // Ensure title is not empty
-      const articleTitlePlaceholder = /\{\{\s*article title\s*\}\}/gi; // Matches {{article title}}, {{ Article Title }}, etc.
+    if (title) {
+      const articleTitlePlaceholder = /\{\{\s*article title\s*\}\}/gi;
       interpolated = interpolated.replace(articleTitlePlaceholder, title);
     }
     
@@ -218,20 +218,21 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
       toast.error("Please select a brand and ensure template is loaded.");
       return;
     }
-    const missingFields = template.fields.inputFields.filter(
+    const missingFields = (template.inputFields || []).filter(
       field => field.required && !templateFieldValues[field.id]
     );
     if (missingFields.length > 0) {
-      toast.error(`Please fill in: ${missingFields.map(f => f.name).join(', ')}`);
+      toast.error(`Please fill in all required fields: ${missingFields.map(f => f.name).join(', ')}`);
       return;
     }
 
     setIsLoading(true);
     setGeneratedOutputs({});
     setTitle('');
+    setAiError(null);
 
     try {
-      const input_fields_with_values = template.fields.inputFields.map(field => ({
+      const input_fields_with_values = (template.inputFields || []).map(field => ({
         ...field,
         value: templateFieldValues[field.id] || '' 
       }));
@@ -243,7 +244,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
             id: template.id,
             name: template.name,
             inputFields: input_fields_with_values,
-            outputFields: template.fields.outputFields
+            outputFields: template.outputFields || []
         },
         input: { /* additionalInstructions can be added here if needed */ }
       };
@@ -258,15 +259,15 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
       if (data.success) {
         const aiResponseData = data.data || data.content || data;
 
-        const outputsToSet = (aiResponseData && typeof aiResponseData.outputs === 'object') ? aiResponseData.outputs : 
+        const outputsToSet: Record<string, string> = (aiResponseData && typeof aiResponseData.outputs === 'object') ? aiResponseData.outputs : 
                              (typeof aiResponseData === 'object' && aiResponseData !== null) ? aiResponseData : 
                              null;
 
         if (outputsToSet) {
           setGeneratedOutputs(outputsToSet);
           toast.success('Content generated for output fields.');
-        } else if (typeof aiResponseData === 'string' && template.fields.outputFields.length === 1) {
-          setGeneratedOutputs({ [template.fields.outputFields[0].id]: aiResponseData });
+        } else if (typeof aiResponseData === 'string' && (template.outputFields || []).length === 1 && template.outputFields) {
+          setGeneratedOutputs({ [template.outputFields[0].id]: aiResponseData });
           toast.success('Content generated for the output field.');
         } else {
           toast.error('Generated content format is unexpected or not structured per output field.');
@@ -275,10 +276,10 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         }
         
         let contextForTitle = '';
-        if (outputsToSet && template.fields.outputFields.length > 0) {
+        if (outputsToSet && (template.outputFields || []).length > 0) {
           const primaryOutputField = 
-            template.fields.outputFields.find(f => f.name.toLowerCase().includes('body') || f.name.toLowerCase().includes('content')) ||
-            template.fields.outputFields[0];
+            (template.outputFields || []).find(f => f.name.toLowerCase().includes('body') || f.name.toLowerCase().includes('content')) ||
+            (template.outputFields || [])[0];
           if (primaryOutputField && outputsToSet[primaryOutputField.id]) {
             contextForTitle = outputsToSet[primaryOutputField.id];
           } else if (Object.values(outputsToSet).length > 0) {
@@ -289,8 +290,8 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         if (contextForTitle) {
           setIsGeneratingTitle(true);
           try {
-            const topicField = template.fields.inputFields.find(f => f.id === 'topic' || f.name.toLowerCase().includes('topic'));
-            const keywordsField = template.fields.inputFields.find(f => f.id === 'keywords' || f.name.toLowerCase().includes('keyword'));
+            const topicField = (template.inputFields || []).find(f => f.id === 'topic' || f.name.toLowerCase().includes('topic'));
+            const keywordsField = (template.inputFields || []).find(f => f.id === 'keywords' || f.name.toLowerCase().includes('keyword'));
             
             const titleRequestContext = {
               contentBody: contextForTitle,
@@ -394,12 +395,12 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     setIsSaving(true);
     try {
       let primaryBodyContent = '';
-      if (template && template.fields.outputFields.length > 0) {
-        const richTextOutput = template.fields.outputFields.find(f => f.type === 'richText' && generatedOutputs[f.id]);
+      if (template && (template.outputFields || []).length > 0) {
+        const richTextOutput = (template.outputFields || []).find(f => f.type === 'richText' && generatedOutputs[f.id]);
         if (richTextOutput) {
           primaryBodyContent = generatedOutputs[richTextOutput.id];
         } else {
-          const firstOutputField = template.fields.outputFields[0];
+          const firstOutputField = (template.outputFields || [])[0];
           if (firstOutputField && generatedOutputs[firstOutputField.id]) {
             primaryBodyContent = generatedOutputs[firstOutputField.id];
           }
@@ -488,7 +489,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
                 <React.Fragment>
                     <Separator />
                     <h3 className="text-lg font-medium pt-2">Template Fields</h3>
-                    {template.fields.inputFields.map((field) => (
+                    {(template.inputFields || []).map((field) => (
                     <div key={field.id} className="space-y-1.5">
                         <div className="flex items-center justify-between">
                             <Label htmlFor={field.id}>{field.name}{field.required && <span className="text-destructive">*</span>}</Label>
@@ -574,13 +575,16 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
             <CardDescription>Review and edit the generated content below.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {template?.fields.outputFields.map(outputField => (
+            {(template?.outputFields || []).map(outputField => (
               <div key={outputField.id} className="pt-2 space-y-1">
                 <div className="flex items-center justify-between">
                   <Label htmlFor={`output_field_${outputField.id}`} className="text-base font-medium">
                     {outputField.name || `Output Field (ID: ${outputField.id})`}
                   </Label>
-                  {!isLoading && !isGeneratingTitle && !retryingFieldId && !generatedOutputs[outputField.id] && Object.keys(generatedOutputs).length > 0 && (
+                  {!isLoading && 
+                   !isGeneratingTitle && 
+                   !retryingFieldId && 
+                   Object.keys(generatedOutputs).length > 0 && (
                     <Button
                       variant="outline"
                       size="sm"

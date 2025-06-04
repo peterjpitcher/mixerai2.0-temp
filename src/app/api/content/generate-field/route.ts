@@ -1,15 +1,16 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server'; // For DB access with RLS
-import { generateTextCompletion, getAzureOpenAIClient, getModelName } from '@/lib/azure/openai';
+import { generateTextCompletion } from '@/lib/azure/openai';
 import { withAuth } from '@/lib/auth/api-auth'; // Use the withAuth wrapper
-import type { InputField, OutputField, ContentTemplate as Template } from '@/types/template';
+import type { OutputField, ContentTemplate as Template } from '@/types/template';
+import type { Brand } from '@/types/models'; // Corrected Brand type import
 import { User } from '@supabase/supabase-js';
 
 // Helper function to get template details
 async function getTemplateDetails(templateId: string, supabaseClient: any): Promise<Template | null> {
   const { data: template, error } = await supabaseClient
     .from('content_templates')
-    .select('*')
+    .select('*, inputFields:content_template_input_fields(*), outputFields:content_template_output_fields(*)')
     .eq('id', templateId)
     .single();
 
@@ -20,119 +21,158 @@ async function getTemplateDetails(templateId: string, supabaseClient: any): Prom
   return template as Template;
 }
 
-// Helper function to interpolate prompt (simplified - ensure it matches your needs)
-function interpolatePrompt(prompt: string, templateFieldValues: Record<string, string>, existingOutputs: Record<string, string>, title?: string): string {
-  let interpolated = prompt;
-  
-  // Interpolate input fields by their ID (assuming templateFieldValues keys are field IDs)
-  Object.keys(templateFieldValues).forEach(fieldId => {
-    const placeholderById = `{{${fieldId}}}`; // e.g. {{topic_field_id}}
-    const value = templateFieldValues[fieldId] || '';
-    const regexById = new RegExp(placeholderById.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&'), 'gi');
-    interpolated = interpolated.replace(regexById, value);
-  });
+// Helper function to get brand details
+async function getBrandDetails(brandId: string, supabaseClient: any): Promise<Brand | null> {
+  const { data: brand, error } = await supabaseClient
+    .from('brands')
+    .select('*')
+    .eq('id', brandId)
+    .single();
 
-  // It might also be useful to interpolate by field name if prompts use that
-  // This would require access to the template inputFields definition here to map names to IDs
+  if (error) {
+    console.error('[generate-field] Error fetching brand details:', error);
+    return null;
+  }
+  return brand as Brand;
+}
 
-  // Interpolate existing outputs for context
-  Object.keys(existingOutputs).forEach(outputFieldId => {
-    const placeholder = `{{output.${outputFieldId}}}`; // e.g. {{output.body_field_id}}
-    const value = existingOutputs[outputFieldId] || '';
-    const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&'), 'gi');
-    interpolated = interpolated.replace(regex, value);
-  });
-  
-  if (title) {
-    interpolated = interpolated.replace(/\{\{\s*article title\s*\}\}/gi, title);
+// Enhanced interpolatePrompt function
+function interpolatePrompt(
+  promptText: string,
+  templateFieldValues: Record<string, string>,
+  existingOutputs: Record<string, string>,
+  brandDetails: Brand | null
+): string {
+  let interpolated = promptText;
+
+  // Replace input field placeholders: {{inputFieldName}}
+  // These come from templateFieldValues, keys are field names
+  for (const key in templateFieldValues) {
+    const placeholder = new RegExp(`{{${key.replace(/[.*+?^${}()|[\]\\\\]/g, '\\\\$&')}}}`, 'g');
+    interpolated = interpolated.replace(placeholder, templateFieldValues[key] || '');
+  }
+
+  // Replace output field placeholders: {{outputFieldName}}
+  // These come from existingOutputs, keys are field names (or IDs if that's how they are stored)
+  for (const key in existingOutputs) {
+    const placeholder = new RegExp(`{{${key.replace(/[.*+?^${}()|[\]\\\\]/g, '\\\\$&')}}}`, 'g');
+    interpolated = interpolated.replace(placeholder, existingOutputs[key] || '');
+  }
+
+  // Replace generic brand placeholders if they are used in the promptText
+  if (brandDetails) {
+    interpolated = interpolated.replace(/{{Brand Name}}/g, brandDetails.name || '');
+    interpolated = interpolated.replace(/{{Brand Identity}}/g, brandDetails.brand_identity || '');
+    interpolated = interpolated.replace(/{{Tone of Voice}}/g, brandDetails.tone_of_voice || '');
+    interpolated = interpolated.replace(/{{Guardrails}}/g, brandDetails.guardrails || '');
+    // Note: {{Brand Summary}} and {{Generic Brand Object}} are not directly mapped here
+    // as their exact source/meaning from brandDetails is unclear.
+    // If 'brand_identity' is considered 'Brand Summary', that's covered.
   }
   return interpolated;
 }
 
-export const POST = withAuth(async (request: NextRequest, user: User) => {
+export const POST = withAuth(async (req: NextRequest, user: User, supabase: any) => {
   try {
-    const supabase = createSupabaseServerClient(); // Standard server client for RLS
-
-    const body = await request.json();
-    const { 
-      brand_id, 
-      template_id, 
-      template_field_values, 
+    const body = await req.json();
+    const {
+      brand_id,
+      template_id,
+      template_field_values = {}, // User inputs for the template's input fields
       output_field_to_generate_id,
-      existing_outputs = {},
-      title = ''
+      existing_outputs = {}, // Current values of other generated output fields for context
+      // title // Current main title, if needed for context
     } = body;
 
-    if (!brand_id || !template_id || !template_field_values || !output_field_to_generate_id) {
-      return NextResponse.json({ success: false, error: 'Missing required fields for field regeneration.' }, { status: 400 });
+    if (!brand_id || !template_id || !output_field_to_generate_id) {
+      return NextResponse.json({ success: false, error: 'Missing required parameters: brand_id, template_id, or output_field_to_generate_id' }, { status: 400 });
     }
 
-    const template = await getTemplateDetails(template_id, supabase);
-    if (!template || !template.fields || !template.fields.outputFields) {
-      return NextResponse.json({ success: false, error: 'Template not found or invalid.' }, { status: 404 });
+    const [template, brandDetails] = await Promise.all([
+      getTemplateDetails(template_id, supabase),
+      getBrandDetails(brand_id, supabase)
+    ]);
+
+    if (!template) {
+      return NextResponse.json({ success: false, error: 'Content template not found' }, { status: 404 });
+    }
+    if (!brandDetails) {
+      return NextResponse.json({ success: false, error: 'Brand not found' }, { status: 404 });
     }
 
-    const outputFieldToGenerate = (template.fields.outputFields as OutputField[]).find(f => f.id === output_field_to_generate_id);
-    if (!outputFieldToGenerate || !outputFieldToGenerate.aiPrompt) {
-      return NextResponse.json({ success: false, error: 'Output field not found in template or has no AI prompt.' }, { status: 400 });
+    const outputFieldToGenerate = template.outputFields?.find(f => f.id === output_field_to_generate_id);
+
+    if (!outputFieldToGenerate) {
+      return NextResponse.json({ success: false, error: `Output field with ID ${output_field_to_generate_id} not found in template.` }, { status: 404 });
+    }
+
+    if (!outputFieldToGenerate.aiPrompt) {
+      return NextResponse.json({ success: false, error: `Output field ${outputFieldToGenerate.name} does not have an AI prompt configured.` }, { status: 400 });
     }
     
-    const populatedPrompt = interpolatePrompt(
-      outputFieldToGenerate.aiPrompt,
+    // 1. Interpolate the specific AI prompt for the output field based on its definition in the template
+    // This fills in {{inputFieldPlaceholder}}, {{outputFieldPlaceholder}}, and any {{Brand...}} placeholders
+    // *if* they were used by the template designer in this specific outputField.aiPrompt.
+    const baseFieldSpecificInstructions = interpolatePrompt(
+      outputFieldToGenerate.aiPrompt || '', // Ensure aiPrompt is a string
       template_field_values,
       existing_outputs,
-      title
+      brandDetails
     );
+
+    // 2. Construct the final user prompt with explicit brand context + the field-specific task
+    let contextualizedUserPrompt = "";
+    const INDENT = "  "; // For formatting if desired
+
+    contextualizedUserPrompt += `BRAND CONTEXT:\n`;
+    contextualizedUserPrompt += `${INDENT}Brand Name: ${brandDetails.name}\n`;
+    if (brandDetails.brand_identity) {
+      contextualizedUserPrompt += `${INDENT}Brand Identity:\n${INDENT}${INDENT}${brandDetails.brand_identity.split('\\n').join(`\\n${INDENT}${INDENT}`)}\n`; // Indent multi-line identity
+    }
+    if (brandDetails.tone_of_voice) {
+      contextualizedUserPrompt += `${INDENT}Tone of Voice: ${brandDetails.tone_of_voice}\n`;
+    }
+    if (brandDetails.guardrails) {
+      contextualizedUserPrompt += `${INDENT}Brand Guardrails:\n${INDENT}${INDENT}${brandDetails.guardrails.split('\\n').join(`\\n${INDENT}${INDENT}`)}\n`; // Indent multi-line guardrails
+    }
+    contextualizedUserPrompt += `\nTASK TO PERFORM:\n`;
+    contextualizedUserPrompt += `${INDENT}You are generating content *only* for the field named "${outputFieldToGenerate.name}".\n`;
+    contextualizedUserPrompt += `${INDENT}Adhere to the brand context provided above.\n`;
+    contextualizedUserPrompt += `${INDENT}Use the following instructions and input data (if any) to generate the content for this field:\n\n`;
+    contextualizedUserPrompt += baseFieldSpecificInstructions;
+
+    const systemPrompt = `You are an AI assistant specialized in generating specific pieces of marketing content based on detailed instructions and brand context. Your goal is to produce accurate, high-quality text for the requested field ONLY. Do not add conversational fluff or any introductory/concluding remarks beyond the direct content for the field.`;
     
-    const systemPrompt = "You are an AI assistant that generates content for a specific field based on user inputs and existing related content. Be concise and directly address the field's purpose. Provide only the direct text for the field itself.";
-    
-    // Using existing generateTextCompletion function
-    // Max tokens for a single field might be less than for a full content generation.
-    // The OutputField type doesn't have maxTokens. Using a default like 500 or the one in generateTextCompletion (250).
-    // Let's use a moderate default for single field regeneration, adjustable if needed.
-    let singleFieldMaxTokens = 500; // Default
+    let singleFieldMaxTokens = 250; // Default for plain text
     if (outputFieldToGenerate.type === 'richText') {
-      singleFieldMaxTokens = 1000; // Longer for rich text (e.g., body paragraphs)
-    } else if (outputFieldToGenerate.type === 'plainText') {
-      singleFieldMaxTokens = 200; // Shorter for plain text (e.g., titles, meta descriptions)
-    }
-    // For 'html' or 'image' types, the default 500 might still apply if they were text-based prompts,
-    // but typically they might have different generation mechanisms if not purely text.
-
-    let generated_text: string | null = null;
-    try {
-      generated_text = await generateTextCompletion(
-        systemPrompt,
-        populatedPrompt,
-        singleFieldMaxTokens // Use calculated max tokens
-      );
-    } catch (aiError: any) {
-      console.error('[generate-field] Error during AI call via generateTextCompletion:', aiError);
-      return NextResponse.json({ success: false, error: aiError.message || 'AI generation failed for the field.' }, { status: 500 });
+      singleFieldMaxTokens = 1000; // Longer for rich text
+    } else if (outputFieldToGenerate.type === 'html') {
+      singleFieldMaxTokens = 1500; // Potentially longer for HTML
     }
 
-    if (generated_text === null) {
-      // generateTextCompletion returning null implies an issue, but not necessarily an exception caught above.
-      // This could be due to the AI returning no content or an unexpected structure handled within generateTextCompletion.
-      // For the frontend, this will mean the field remains empty or unchanged, which is the desired behavior for a retry.
-      console.warn('[generate-field] AI returned null or empty content for field.');
-      // We send success:true but empty generated_text, so UI can show retry
-      return NextResponse.json({ 
-        success: true, 
-        output_field_id: output_field_to_generate_id,
-        generated_text: '' // Ensure it's an empty string for consistency
-      });
+
+    const generatedText = await generateTextCompletion(
+      systemPrompt,
+      contextualizedUserPrompt,
+      singleFieldMaxTokens,
+      0.7
+    );
+
+    if (!generatedText) {
+      console.error(`[generate-field] AI generation failed for field ${outputFieldToGenerate.name} (ID: ${outputFieldToGenerate.id}). Prompt:`, contextualizedUserPrompt);
+      return NextResponse.json({ success: false, error: `AI failed to generate content for field: ${outputFieldToGenerate.name}` }, { status: 500 });
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      output_field_id: output_field_to_generate_id,
-      generated_text: generated_text.trim()
+    return NextResponse.json({
+      success: true,
+      generated_text: generatedText,
+      field_id: outputFieldToGenerate.id,
+      field_name: outputFieldToGenerate.name
     });
 
   } catch (error: any) {
-    console.error('Error in /api/content/generate-field:', error);
-    return NextResponse.json({ success: false, error: error.message || 'An unexpected error occurred.' }, { status: 500 });
+    console.error('[generate-field] Error:', error);
+    return NextResponse.json({ success: false, error: error.message || 'An unexpected error occurred' }, { status: 500 });
   }
 });
 
