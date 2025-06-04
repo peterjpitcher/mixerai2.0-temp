@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { generateTextCompletion } from '@/lib/azure/openai'; // Import the actual AI utility
 
 // Define the expected request body schema
 const TemplateContextSchema = z.object({
@@ -8,12 +9,18 @@ const TemplateContextSchema = z.object({
   outputFields: z.array(z.string()).optional(), // Expecting array of field names
 });
 
-// Placeholder for actual OpenAI client and call
-async function callOpenAI(prompt: string): Promise<string | null> {
-  // Mock response for now:
-  await new Promise(resolve => setTimeout(resolve, 200));
-  if (prompt.includes("fail_generation")) return null;
-  return `AI Template Description: "${prompt.substring(0, 120)}..." (Based on template structure).`;
+// Actual OpenAI call using generateTextCompletion
+async function getAITemplateDescription(prompt: string): Promise<string | null> {
+  const systemPrompt = "You are an AI assistant tasked with writing a clear, concise, and helpful description for a content template. This description will be shown to users to help them understand the template's purpose and choose the right one. Do not use any prefixes like 'AI Template Description:'. Just provide the description text itself.";
+  try {
+    // Using around 100-150 tokens for a good, untruncated description.
+    // 1 token is roughly 0.75 words. 150 tokens ~ 112 words.
+    const description = await generateTextCompletion(systemPrompt, prompt, 150);
+    return description;
+  } catch (error) {
+    console.error('[getAITemplateDescription] Error calling generateTextCompletion:', error);
+    return null; // Indicate failure to the caller
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -30,20 +37,21 @@ export async function POST(request: NextRequest) {
 
     const { templateName, inputFields, outputFields } = validationResult.data;
 
-    let prompt = `Generate a clear and informative description for a content template named "${templateName}".`;
+    // Construct a detailed prompt for the AI
+    let userPrompt = `Generate a clear and informative description for a content template named "${templateName}".`;
     if (inputFields && inputFields.length > 0) {
-      prompt += ` This template is designed to take the following inputs: ${inputFields.join(', ')}.`;
+      userPrompt += ` This template is designed to take the following inputs: ${inputFields.join(', ')}.`;
     } else {
-      prompt += ` This template does not require predefined input fields; inputs can be determined as needed.`;
+      userPrompt += ` This template allows for flexible input fields to be defined as needed.`;
     }
     if (outputFields && outputFields.length > 0) {
-      prompt += ` It will generate content for the following output fields: ${outputFields.join(', ')}.`;
+      userPrompt += ` It will generate content for the following output fields: ${outputFields.join(', ')}.`;
     } else {
-      prompt += ` The specific output fields will be generated based on the content request.`;
+      userPrompt += ` The specific output fields generated can vary based on the content creation request.`;
     }
-    prompt += ` Explain its primary use case and the type of structured content it helps create efficiently. This description will be shown to users selecting a template.`;
+    userPrompt += ` Focus on its primary use case and the type of structured content it helps create efficiently. The description should be engaging and help users quickly understand if this template meets their needs. Avoid any introductory phrases like \"This template...\" if possible, and directly describe its function and benefits.`;
 
-    const generatedDescription = await callOpenAI(prompt);
+    const generatedDescription = await getAITemplateDescription(userPrompt);
 
     if (!generatedDescription) {
       return NextResponse.json(
@@ -54,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       success: true, 
-      description: generatedDescription 
+      description: generatedDescription.trim() // Trim any leading/trailing whitespace from AI output
     });
 
   } catch (error) {

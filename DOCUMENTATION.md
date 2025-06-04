@@ -1518,3 +1518,52 @@ The Template Edit page (`/dashboard/templates/[id]`) has received the following 
 ## Tool Run History Detail Page Enhancements (`src/app/dashboard/tools/history/[historyId]/page.tsx`) - YYYY-MM-DD (Use Current Date)
 
 The Tool Run History Detail page (`/dashboard/tools/history/[historyId]`) has been updated as follows:
+
+## Content Generation Page Robustness Review (2024-07-30)
+
+This section documents the review of the new content page (`/dashboard/content/new`) and its primary component `src/components/content/content-generator-form.tsx` for robustness, specifically concerning the display of AI-generated content.
+
+**1. Overview of the Request:**
+The goal was to ensure that UI elements dependent on AI-generated outputs are not displayed prematurely or in an incomplete state. The system should clearly indicate loading/processing and only show content once available.
+
+**2. Current Implementation Analysis:**
+
+*   **Page Structure (`src/app/dashboard/content/new/page.tsx`):**
+    *   Effectively handles user authentication, permission checks (showing loading skeletons and access denied messages).
+    *   Delegates core content generation logic to `ContentGeneratorForm`.
+
+*   **`ContentGeneratorForm` (`src/components/content/content-generator-form.tsx`):**
+    *   **State Management:** Uses comprehensive state variables for various loading states (`isLoading`, `isGeneratingTitle`, `isLoadingTemplate`, etc.), user inputs, selected brand, template data, and crucially, for generated results (`generatedOutputs`, `title`).
+    *   **Generation Process (`handleGenerate`):**
+        1.  Clears previous `generatedOutputs` and `title`.
+        2.  Calls `/api/content/generate` for main content (body, meta, etc.) and populates `generatedOutputs`.
+        3.  Sequentially calls `/api/ai/generate-title` (using main content as context) and populates `title`.
+        4.  Manages `isLoading` and `isGeneratingTitle` states throughout this chained process.
+    *   **Display of Generated Content (JSX):**
+        *   The entire "Generated Content Review" `<Card>` (which contains all output fields) is conditionally rendered based on `Object.keys(generatedOutputs).length > 0`. This is key to preventing an empty or broken output section from appearing.
+        *   The title area within this card (and the main page title) shows a loading indicator if `isGeneratingTitle` is true.
+        *   Output fields (Textarea, RichTextEditor) are populated directly from the `generatedOutputs` state once the card is visible.
+    *   **Action Buttons ("Generate", "Save"):**
+        *   Visibility and enabled/disabled states are managed based on `generatedOutputs`, `title`, and various loading states (`isLoading`, `isGeneratingTitle`, `isSaving`, etc.), providing clear user feedback.
+    *   **Error Handling:** Employs `toast` notifications for API errors and generally resets states like `generatedOutputs` on failure to prevent display of invalid data.
+
+**3. Robustness Assessment:**
+
+*   **Prevention of Premature Output Display:** The conditional rendering of the "Generated Content Review" card (`Object.keys(generatedOutputs).length > 0`) successfully prevents this section from appearing before the primary AI outputs are available. This directly addresses the main concern.
+*   **Progressive Feedback:** The UI provides good progressive feedback: button states change, main outputs appear, then title generation is indicated and completes. This is a user-friendly approach.
+*   **Loading State Clarity:** Distinct loading states for different operations (template loading, suggestions, main generation, title generation, saving) are well-managed, with appropriate UI feedback (spinners, button text changes, disabled states).
+*   **Error Handling:** Errors are generally caught, users are informed, and critical states are reset to maintain UI integrity.
+
+**4. Suggested Enhancements (Minor Refinements/Considerations):**
+
+*   **Current flow is largely robust for the stated problem.** No critical bugs were found that would cause premature display of an empty or broken *output section*.
+*   **Strict "All-at-Once" Display (Alternative UX):**
+    *   If the desired behavior is that *no part* of the "Generated Content Review" card appears until *both* main content and title are fully generated:
+        1.  Introduce a state like `isFullyLoaded`.
+        2.  Set this to `true` only after all generation steps (main content + title) are complete.
+        3.  Make the "Generated Content Review" card's visibility dependent on `isFullyLoaded && Object.keys(generatedOutputs).length > 0`.
+    *   **Trade-off:** This would mean a longer wait for users to see any generated text. The current progressive reveal is generally preferable for UX.
+*   **Internal Placeholder Text:** A minor observation regarding a "Generated content will appear here..." paragraph within the output card, which is unlikely to render as intended due to its nesting. This has no significant impact.
+
+**5. Conclusion:**
+The `ContentGeneratorForm` and its host page implement a robust system for handling the display of AI-generated content. The primary concern about preventing premature display of output sections is well-addressed by current conditional rendering logic. The sequential display of main content followed by title generation, with clear loading indicators, provides a good user experience.

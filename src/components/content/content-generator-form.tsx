@@ -73,6 +73,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
   const [associatedWorkflowDetails, setAssociatedWorkflowDetails] = useState<WorkflowSummary | null>(null);
   const [isFetchingWorkflow, setIsFetchingWorkflow] = useState(false);
   const [isGeneratingSuggestionFor, setIsGeneratingSuggestionFor] = useState<string | null>(null);
+  const [retryingFieldId, setRetryingFieldId] = useState<string | null>(null);
   
   const currentBrand = brands.find(b => b.id === selectedBrand);
 
@@ -333,6 +334,52 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     finally { setIsLoading(false); }
   };
   
+  const handleRetryFieldGeneration = async (outputField: OutputField) => {
+    if (!selectedBrand || !template) {
+      toast.error("Brand and template must be selected.");
+      return;
+    }
+    if (isLoading || isGeneratingTitle) {
+      toast.info("Please wait for the current generation process to complete.");
+      return;
+    }
+
+    setRetryingFieldId(outputField.id);
+    try {
+      const requestBody = {
+        brand_id: selectedBrand,
+        template_id: template.id,
+        template_field_values: templateFieldValues,
+        output_field_to_generate_id: outputField.id,
+        existing_outputs: generatedOutputs,
+        title: title,
+      };
+
+      const response = await fetch('/api/content/generate-field', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.output_field_id && typeof data.generated_text === 'string') {
+        setGeneratedOutputs(prev => ({ ...prev, [data.output_field_id]: data.generated_text }));
+        toast.success(`Content for '${outputField.name || 'field'}' regenerated.`);
+        if (!data.generated_text) {
+            toast.info(`AI returned empty content for '${outputField.name || 'field'}'. You can retry or edit manually.`);
+        }
+      } else {
+        toast.error(data.error || `Failed to regenerate content for '${outputField.name || 'field'}'.`);
+      }
+    } catch (error: any) {
+      toast.error(`Error regenerating field: ${error.message || 'Unknown error'}`);
+      console.error(`Error regenerating field ${outputField.name}:`, error);
+    } finally {
+      setRetryingFieldId(null);
+    }
+  };
+
   const handleSave = async () => {
     const hasGeneratedOutputs = Object.keys(generatedOutputs).length > 0;
     if (!hasGeneratedOutputs) { toast.error('No content to save.'); return; }
@@ -528,38 +575,61 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
           </CardHeader>
           <CardContent className="space-y-4">
             {template?.fields.outputFields.map(outputField => (
-              <div key={outputField.id} className="pt-2">
-                <Label htmlFor={`output_field_${outputField.id}`} className="text-base font-medium">
-                  {outputField.name || `Output Field (ID: ${outputField.id})`}
-                </Label>
+              <div key={outputField.id} className="pt-2 space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor={`output_field_${outputField.id}`} className="text-base font-medium">
+                    {outputField.name || `Output Field (ID: ${outputField.id})`}
+                  </Label>
+                  {!isLoading && !isGeneratingTitle && !retryingFieldId && !generatedOutputs[outputField.id] && Object.keys(generatedOutputs).length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRetryFieldGeneration(outputField)}
+                      disabled={retryingFieldId !== null}
+                      className="ml-2"
+                    >
+                      <Sparkles className="mr-2 h-3 w-3" /> Retry Generation
+                    </Button>
+                  )}
+                  {retryingFieldId === outputField.id && (
+                    <Button variant="outline" size="sm" disabled className="ml-2">
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Retrying...
+                    </Button>
+                  )}
+                </div>
                 {outputField.type === 'plainText' ? (
-                  <Textarea
+                  <Input
                     id={`output_field_${outputField.id}`}
                     value={generatedOutputs[outputField.id] || ''}
                     onChange={(e) => {
-                      setGeneratedOutputs(prev => ({ ...prev, [outputField.id]: e.target.value }));
+                      if (retryingFieldId !== outputField.id) {
+                        setGeneratedOutputs(prev => ({ ...prev, [outputField.id]: e.target.value }));
+                      }
                     }}
                     placeholder={`Content for ${outputField.name}...`}
-                    className="min-h-[120px] border shadow-sm focus-visible:ring-1 focus-visible:ring-ring text-sm p-2"
+                    className="border shadow-sm focus-visible:ring-1 focus-visible:ring-ring text-sm p-2 w-full"
+                    readOnly={retryingFieldId === outputField.id}
                   />
                 ) : (
                   <RichTextEditor 
                     value={generatedOutputs[outputField.id] || ''}
                     onChange={(value) => {
-                      setGeneratedOutputs(prev => ({ ...prev, [outputField.id]: value }));
+                      if (retryingFieldId !== outputField.id) {
+                        setGeneratedOutputs(prev => ({ ...prev, [outputField.id]: value }));
+                      }
                     }}
                     placeholder={`Content for ${outputField.name}...`}
-                    editorClassName="min-h-[150px] text-sm"
                   />
                 )}
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground pt-1">
                   Field Type: <span className='font-semibold'>{outputField.type}</span>
                 </p>
               </div>
             ))}
-            {Object.keys(generatedOutputs).length === 0 && (
+            {Object.keys(generatedOutputs).length === 0 && !isLoading && template && (
               <p className="text-muted-foreground">Generated content will appear here for each output field once generated.</p>
             )}
+            {isLoading && <div className="text-center p-4"><Loader2 className="h-6 w-6 animate-spin mx-auto" /> <p>Generating initial content...</p></div>}
           </CardContent>
         </Card>
       )}
@@ -568,29 +638,45 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         <Button 
           variant="outline" 
           onClick={() => router.back()} 
-          disabled={isLoading || isLoadingTemplate || isGeneratingTitle || isSaving || isFetchingWorkflow}
+          disabled={isLoading || isLoadingTemplate || isGeneratingTitle || isSaving || isFetchingWorkflow || retryingFieldId !== null}
         >
           Cancel
         </Button>
+
+        {/* Initial Generate Button - Only if NO outputs yet */}
         {Object.keys(generatedOutputs).length === 0 && (
           <Button 
             onClick={handleGenerate} 
-            disabled={isLoading || isLoadingTemplate || isFetchingWorkflow || isGeneratingTitle || !selectedBrand || !template}
+            disabled={isLoading || isLoadingTemplate || isFetchingWorkflow || isGeneratingTitle || !selectedBrand || !template || retryingFieldId !== null}
             className="flex items-center gap-2"
           >
             {(isLoading || isLoadingTemplate || isFetchingWorkflow || isGeneratingTitle) && <Loader2 className="h-4 w-4 animate-spin" />}
             {isLoading ? 'Generating Body...' : (isLoadingTemplate ? 'Loading Template...' : (isFetchingWorkflow ? 'Loading Workflow...' : (isGeneratingTitle ? 'Generating Title...' : 'Generate Content & Title')))}
           </Button>
         )}
+
+        {/* Buttons that appear AFTER first generation */}
         {Object.keys(generatedOutputs).length > 0 && (
-          <Button 
-            onClick={handleSave} 
-            disabled={isSaving || isFetchingWorkflow || isGeneratingTitle || !title}
-            className="flex items-center gap-2"
-          >
-            {(isSaving || isFetchingWorkflow || isGeneratingTitle) && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isSaving ? 'Saving...' : (isFetchingWorkflow ? 'Checking Workflow...' : (isGeneratingTitle ? 'Generating Title...': 'Save Content'))}
-          </Button>
+          <>
+            <Button // New "Regenerate All Content" Button
+              variant="outline"
+              onClick={handleGenerate} // Calls the existing full generation logic
+              disabled={isLoading || isLoadingTemplate || isFetchingWorkflow || isGeneratingTitle || !selectedBrand || !template || retryingFieldId !== null || isSaving}
+              className="flex items-center gap-2"
+            >
+              {(isLoading || isGeneratingTitle) && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isLoading ? 'Regenerating Body...' : (isGeneratingTitle ? 'Regenerating Title...' : 'Regenerate All Content')}
+            </Button>
+
+            <Button // Existing "Save" Button
+              onClick={handleSave} 
+              disabled={isSaving || isFetchingWorkflow || isGeneratingTitle || !title || retryingFieldId !== null || isLoading}
+              className="flex items-center gap-2"
+            >
+              {(isSaving || isFetchingWorkflow || isGeneratingTitle) && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isSaving ? 'Saving...' : (isFetchingWorkflow ? 'Checking Workflow...' : (isGeneratingTitle ? 'Generating Title...': 'Save Content'))}
+            </Button>
+          </>
         )}
       </div>
     </div>
