@@ -20,33 +20,17 @@ export default function ReleaseNotesPage() {
         <section className="mb-12">
           <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            This release introduces significant enhancements to content versioning, user avatar display, and authentication page branding.
+            This major update completely refactors the password recovery flow to be more robust and reliable, resolving persistent token expiry errors.
           </p>
 
-          <h3>Key Enhancements & Fixes (Developed on <code>fix/content-view-page-issue</code>)</h3>
-          
-          <h4>Content Version History (<code>/dashboard/content/[id]</code>)</h4>
+          <h3>Key Enhancements</h3>
+          <h4>Password Recovery Flow Overhaul (<code>/auth/confirm</code>)</h4>
           <ul>
-            <li>Implemented a version history display on the individual content view page.</li>
-            <li>Past versions of content, approved at each workflow step, are now viewable within an expandable section in "Content History and Feedback".</li>
-            <li>Ensured correct display of historical content fields and their order based on the content template.</li>
-          </ul>
-
-          <h4>Consistent User Avatars</h4>
-          <ul>
-            <li>Standardised user avatar display across the application. Avatars (or initials as fallback) now appear for:</li>
-            <li>User in the header of user detail (<code>/dashboard/users/[id]</code>) and user edit (<code>/dashboard/users/[id]/edit</code>) pages.</li>
-            <li>Reviewers in the "Content History & Feedback" section on the content detail page (<code>/dashboard/content/[id]</code>).</li>
-            <li>Reviewers and Assignees in the <code>ContentApprovalWorkflow</code> component.</li>
-            <li>Content creators and assignees in the main content list (<code>/dashboard/content</code>).</li>
-            <li>Updated backend APIs (<code>/api/me</code>, <code>/api/content</code>) to consistently provide avatar URLs, prioritising <code>profiles.avatar_url</code>, then <code>auth.user_metadata.avatar_url</code>, with a DiceBear generated avatar as a final fallback.</li>
-          </ul>
-          
-          <h4>Auth Pages Rebranding</h4>
-          <ul>
-            <li>Updated styling of Login, Account Confirmation/Invite Acceptance, and Forgot Password pages.</li>
-            <li>Pages now feature the designated blue background (from <code>bg-secondary</code>) and the MixerAI image logo.</li>
-            <li>Created a new "Forgot Password" page (<code>/auth/forgot-password</code>) for users to request a password reset link.</li>
+            <li>Replaced the previous multi-purpose confirmation page with a new, dedicated client component (<code>PasswordRecoveryFlow</code>) specifically designed for handling password resets.</li>
+            <li>The new component correctly parses the <code>access_token</code> and <code>type=recovery</code> from the URL hash fragment (<code>#</code>), which is the method used by Supabase's secure PKCE authentication flow.</li>
+            <li>It now uses <code>supabase.auth.setSession()</code> to establish a valid user session from the token before allowing a password update.</li>
+            <li>The UI has been enhanced with distinct, clear states for "Loading", "Error", "Ready" (to show the password form), "Submitting", and "Complete", providing better user feedback throughout the process.</li>
+            <li>This change fixes the root cause of the "Email link is invalid or has expired" errors by correctly implementing the client-side logic required by Supabase's PKCE password recovery.</li>
           </ul>
           <p className="mt-4">
             For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
