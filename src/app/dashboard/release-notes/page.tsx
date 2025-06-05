@@ -273,6 +273,25 @@ export default function ReleaseNotesPage() {
             For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
           </p>
         </section>
+
+        {/* Latest Release Entry - Password Reset & Email Templates */}
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            This update restores the intended password reset flow to continue investigating a token validation issue.
+          </p>
+
+          <h3>Key Changes</h3>
+          <h4>Password Reset Flow</h4>
+          <ul>
+            <li>Restored the <code>redirectTo</code> parameter in the <code>resetPasswordForEmail</code> call on the "Forgot Password" page.</li>
+            <li>Users will now be correctly redirected to <code>/auth/confirm</code> after clicking the link in the password reset email. This page is designed to handle the secure token from Supabase and allow the user to set a new password.</li>
+            <li>This change reverts a previous diagnostic step and ensures the application follows the designed authentication flow.</li>
+          </ul>
+          <p className="mt-4">
+            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+          </p>
+        </section>
       </div>
     </div>
   );

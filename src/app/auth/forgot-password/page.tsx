@@ -24,9 +24,12 @@ export default function ForgotPasswordPage() {
     setError(null);
     setSuccessMessage(null);
 
-    // Temporarily remove the redirectTo option to test the default Supabase flow
-    // which should use token_hash instead of a PKCE flow.
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email);
+    // Restore the redirectTo option to point to the dedicated confirm page
+    const resetPasswordRedirectUrl = `${window.location.origin}/auth/confirm`;
+
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: resetPasswordRedirectUrl,
+    });
 
     if (resetError) {
       setError(resetError.message);
