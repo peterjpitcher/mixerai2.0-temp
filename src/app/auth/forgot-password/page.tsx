@@ -11,8 +11,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/alert';
 import { Spinner } from '@/components/spinner';
 import { Mail, CheckCircle, AlertTriangle } from 'lucide-react';
 
+// Initialize the Supabase client outside the component to ensure it's a stable singleton instance.
+// This is critical for the PKCE flow's state to be preserved in sessionStorage.
+const supabase = createSupabaseClient();
+
 export default function ForgotPasswordPage() {
-  const supabase = createSupabaseClient();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
