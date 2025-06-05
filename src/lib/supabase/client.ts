@@ -1,13 +1,28 @@
 import { createBrowserClient } from "@supabase/ssr";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/types/supabase";
 
-// Create a single supabase client for browser-side usage using the new SSR approach
-export const createSupabaseClient = () => {
+// --- Singleton pattern for the browser client ---
+let supabaseBrowserClient: SupabaseClient<Database> | undefined;
+
+function getSupabaseBrowserClient() {
+  if (supabaseBrowserClient) {
+    return supabaseBrowserClient;
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
   
-  return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey);
+  supabaseBrowserClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey);
+  
+  return supabaseBrowserClient;
+}
+// --- End of singleton pattern ---
+
+
+// Create a single supabase client for browser-side usage using the new SSR approach
+export const createSupabaseClient = () => {
+  return getSupabaseBrowserClient();
 };
 
 // Create a client for server-side usage with service role

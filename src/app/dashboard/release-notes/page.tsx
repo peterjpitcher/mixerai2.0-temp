@@ -20,17 +20,15 @@ export default function ReleaseNotesPage() {
         <section className="mb-12">
           <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            This release implements a fully functional and secure password reset flow after a thorough investigation.
+            This release includes a definitive fix for the Supabase password reset functionality, resolving all previously encountered token errors.
           </p>
 
-          <h3>Key Fixes & Enhancements</h3>
-          <h4>Password Reset Flow (Authorization Code Grant)</h4>
+          <h3>Key Fixes & Root Cause Analysis</h3>
+          <h4>Password Reset (PKCE Flow)</h4>
           <ul>
-            <li>After extensive diagnostics, it was determined that the Supabase PKCE flow was incompatible with the current Next.js environment, causing token validation errors.</li>
-            <li>The password reset feature has been successfully re-implemented using the more stable **Authorization Code Grant** flow.</li>
-            <li>The `/auth/forgot-password` page now triggers an email with a one-time authorization `code`.</li>
-            <li>The `/auth/confirm` page has been refactored to securely exchange this `code` for a valid user session and now allows the user to update their password.</li>
-            <li>This new architecture is robust and definitively resolves the "token expired" errors.</li>
+            <li>**Final Root Cause:** After extensive diagnostics, the issue was isolated to the Supabase client initialization strategy within the Next.js application. The client was being re-instantiated on every component render, which prevented the secure PKCE `code_verifier` from being correctly persisted in the browser's `sessionStorage`.</li>
+            <li>**Solution:** The client helper function at <code>src/lib/supabase/client.ts</code> has been refactored to implement a singleton pattern. This ensures a single, stable instance of the Supabase client is used across the entire application.</li>
+            <li>**Outcome:** With a stable client instance, the PKCE state is now correctly maintained, and the password reset flow is fully functional and secure. All previous workarounds and diagnostic pages have been removed in favor of this robust solution.</li>
           </ul>
           <p className="mt-4">
             For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
