@@ -2,7 +2,6 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { createSupabaseClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Input } from '@/components/input';
@@ -13,9 +12,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/alert';
 import { Spinner } from '@/components/spinner';
 import { CheckCheck, AlertTriangle } from 'lucide-react';
 
-// Initialize the Supabase client outside the component to ensure it's a stable singleton instance.
-const supabase = createSupabaseClient();
-
 function PasswordRecoveryFlow() {
   const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'ready' | 'submitting' | 'complete' | 'error'>('loading');
@@ -23,50 +19,40 @@ function PasswordRecoveryFlow() {
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   
+  // State to hold the tokens parsed from the URL hash
+  const [tokenInfo, setTokenInfo] = useState<{ access_token: string; refresh_token: string; } | null>(null);
+
   useEffect(() => {
-    let handled = false;
+    const hash = window.location.hash;
+    if (!hash) {
+      setErrorMsg('No recovery information found in URL. Please use the link from your email.');
+      setStatus('error');
+      return;
+    }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY' && !handled) {
-        handled = true;
-        setStatus('ready');
-      }
-    });
+    const params = new URLSearchParams(hash.substring(1));
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    const errorDescription = params.get('error_description');
+    const type = params.get('type');
 
-    const timer = setTimeout(() => {
-      if (!handled) {
-        // Fallback: Manually check hash if event doesn't fire
-        const hash = window.location.hash;
-        const params = new URLSearchParams(hash.substring(1));
-        const accessToken = params.get('access_token');
+    if (errorDescription) {
+      setErrorMsg(`An error occurred: ${errorDescription.replace(/\+/g, ' ')}`);
+      setStatus('error');
+      return;
+    }
 
-        if (accessToken) {
-          console.warn('onAuthStateChange event did not fire, attempting manual session set.');
-          supabase.auth.setSession({ 
-            access_token: accessToken, 
-            refresh_token: params.get('refresh_token') || '' 
-          }).then(({ error }) => {
-            if (error) {
-              setErrorMsg('Link appears valid, but failed to establish a session. Please try again.');
-              setStatus('error');
-            } else {
-              handled = true;
-              setStatus('ready');
-            }
-          });
-        } else {
-          // If no access token in hash, the link is truly invalid/expired
-          setErrorMsg('The password recovery link is invalid, has expired, or the session could not be established. Please try requesting a new link.');
-          setStatus('error');
-        }
-      }
-    }, 2000); // Shortened timeout to 2 seconds for quicker fallback
+    if (type !== 'recovery' || !accessToken || !refreshToken) {
+      setErrorMsg('Invalid or missing recovery token information in the URL.');
+      setStatus('error');
+      return;
+    }
 
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(timer);
-    };
-  }, []); // Empty dependency array to run once
+    // Instead of setting session here, we just store the tokens to be sent to our API
+    setTokenInfo({ access_token: accessToken, refresh_token: refreshToken });
+    setStatus('ready');
+
+  }, []); // Run once on mount
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,14 +68,33 @@ function PasswordRecoveryFlow() {
     setErrorMsg(null);
     setStatus('submitting');
     
-    // The session is already set by onAuthStateChange, so we can directly update the user.
-    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    if (!tokenInfo) {
+        setErrorMsg('Authentication token information is missing. Please try again from the email link.');
+        setStatus('error');
+        return;
+    }
 
-    if (updateError) {
-      setErrorMsg(updateError.message);
-      setStatus('error');
-    } else {
+    try {
+      const response = await fetch('/api/auth/update-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          password: newPassword,
+          access_token: tokenInfo.access_token,
+          refresh_token: tokenInfo.refresh_token,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result.error) {
+        throw new Error(result.error || 'Failed to update password.');
+      }
+
       setStatus('complete');
+    } catch (error) {
+      setErrorMsg((error as Error).message);
+      setStatus('error');
     }
   };
 

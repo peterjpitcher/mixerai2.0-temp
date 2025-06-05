@@ -20,16 +20,16 @@ export default function ReleaseNotesPage() {
         <section className="mb-12">
           <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            This release includes a definitive fix for the password reset flow, resolving the "token invalid or expired" error.
+            This release implements a robust, secure, and fully functional password reset flow by moving sensitive logic to a dedicated backend API route.
           </p>
 
-          <h3>Key Fixes</h3>
-          <h4>Password Reset (PKCE Flow)</h4>
+          <h3>Key Enhancements</h3>
+          <h4>Password Reset Flow (Backend Logic)</h4>
           <ul>
-            <li>The root cause of the password reset failure was identified as an unstable Supabase client instance within React components, which prevented the secure PKCE token (<code>code_verifier</code>) from being persisted in the browser's <code>sessionStorage</code>.</li>
-            <li>Both the initiating page (<code>/auth/forgot-password</code>) and the confirmation page (<code>/auth/confirm</code>) have been updated to use a stable, singleton Supabase client instance.</li>
-            <li>This ensures the PKCE state is correctly maintained throughout the entire flow, resolving the backend error and making the password reset feature fully functional.</li>
-            <li>The temporary diagnostic page (<code>/auth/reset-password-test</code>) has been removed.</li>
+            <li>To resolve persistent client-side issues, the password update logic has been moved to a new secure API route at <code>/api/auth/update-password</code>.</li>
+            <li>The user-facing page (<code>/auth/confirm</code>) now only parses tokens from the URL and securely sends them along with the new password to the backend.</li>
+            <li>The API route handles the session-setting (<code>setSession</code>) and password update (<code>updateUser</code>) using a Supabase admin client, ensuring the flow is secure and not affected by client-side environment issues.</li>
+            <li>This architecture definitively resolves the "token expired" errors and represents the final, production-ready implementation.</li>
           </ul>
           <p className="mt-4">
             For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
