@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Input } from '@/components/input';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/card';
@@ -211,9 +212,20 @@ function ConfirmContent() {
   };
   
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background text-foreground py-12 px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md">
-        <Card className="shadow-lg">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-secondary text-foreground py-12 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md space-y-8">
+        <div className="flex justify-center">
+          <Link href="/" aria-label="Go to homepage">
+            <Image 
+              src="/Mixerai2.0Logo.png" 
+              alt="MixerAI 2.0 Logo"
+              width={250} 
+              height={58} 
+              priority 
+            />
+          </Link>
+        </div>
+        <Card className="shadow-lg w-full">
           <CardHeader className="pb-4">
             <CardTitle className="text-2xl font-bold text-center">
               {type === 'invite' ? 'Accept Invitation & Set Up Account' : 'Confirm Your Account'}

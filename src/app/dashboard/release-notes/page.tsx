@@ -3,6 +3,8 @@ import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 
 export default function ReleaseNotesPage() {
+  const currentDate = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+
   return (
     <div className="space-y-6">
       <Card>
@@ -12,6 +14,42 @@ export default function ReleaseNotesPage() {
         </CardHeader>
         <CardContent className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
           
+          <section className="mb-12">
+            <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              This release introduces significant enhancements to content versioning, user avatar display, and authentication page branding.
+            </p>
+
+            <h3>Key Enhancements & Fixes (Developed on <code>fix/content-view-page-issue</code>)</h3>
+            
+            <h4>Content Version History (<code>/dashboard/content/[id]</code>)</h4>
+            <ul>
+              <li>Implemented a version history display on the individual content view page.</li>
+              <li>Past versions of content, approved at each workflow step, are now viewable within an expandable section in "Content History and Feedback".</li>
+              <li>Ensured correct display of historical content fields and their order based on the content template.</li>
+            </ul>
+
+            <h4>Consistent User Avatars</h4>
+            <ul>
+              <li>Standardised user avatar display across the application. Avatars (or initials as fallback) now appear for:</li>
+              <li>User in the header of user detail (<code>/dashboard/users/[id]</code>) and user edit (<code>/dashboard/users/[id]/edit</code>) pages.</li>
+              <li>Reviewers in the "Content History & Feedback" section on the content detail page (<code>/dashboard/content/[id]</code>).</li>
+              <li>Reviewers and Assignees in the <code>ContentApprovalWorkflow</code> component.</li>
+              <li>Content creators and assignees in the main content list (<code>/dashboard/content</code>).</li>
+              <li>Updated backend APIs (<code>/api/me</code>, <code>/api/content</code>) to consistently provide avatar URLs, prioritising <code>profiles.avatar_url</code>, then <code>auth.user_metadata.avatar_url</code>, with a DiceBear generated avatar as a final fallback.</li>
+            </ul>
+            
+            <h4>Auth Pages Rebranding</h4>
+            <ul>
+              <li>Updated styling of Login, Account Confirmation/Invite Acceptance, and Forgot Password pages.</li>
+              <li>Pages now feature the designated blue background (from <code>bg-secondary</code>) and the MixerAI image logo.</li>
+              <li>Created a new "Forgot Password" page (<code>/auth/forgot-password</code>) for users to request a password reset link.</li>
+            </ul>
+            <p className="mt-4">
+              For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+            </p>
+          </section>
+
           {/* New Release Entry - June 5, 2025 (Moved to top) */}
           <section className="mb-12">
             <h2 className="text-xl font-semibold border-b pb-2 mb-4">Release: June 5, 2025</h2>

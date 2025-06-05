@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from 'next/image';
 import { LoginForm } from "@/components/login-form";
 import type { Metadata } from 'next';
 
@@ -13,12 +14,17 @@ export const metadata: Metadata = {
  */
 export default function LoginPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md">
-        <div className="flex justify-center mb-8">
-          <Link href="/" className="flex items-center space-x-2">
-            <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-xl">M</div>
-            <span className="text-2xl font-bold">MixerAI 2.0</span>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-secondary py-12 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md space-y-8">
+        <div className="flex justify-center">
+          <Link href="/" aria-label="Go to homepage">
+            <Image 
+              src="/Mixerai2.0Logo.png" 
+              alt="MixerAI 2.0 Logo"
+              width={250}
+              height={58}
+              priority 
+            />
           </Link>
         </div>
         
