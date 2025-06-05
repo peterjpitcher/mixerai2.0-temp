@@ -27,8 +27,8 @@ export default function ForgotPasswordPage() {
     setError(null);
     setSuccessMessage(null);
 
-    // Point the redirect to our new, simple test page
-    const resetPasswordRedirectUrl = `${window.location.origin}/auth/reset-password-test`;
+    // Restore the correct redirectTo to point to the now-fixed confirm page
+    const resetPasswordRedirectUrl = `${window.location.origin}/auth/confirm`;
 
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: resetPasswordRedirectUrl,

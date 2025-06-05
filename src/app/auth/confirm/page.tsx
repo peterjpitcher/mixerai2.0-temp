@@ -13,14 +13,15 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/alert';
 import { Spinner } from '@/components/spinner';
 import { CheckCheck, AlertTriangle } from 'lucide-react';
 
+// Initialize the Supabase client outside the component to ensure it's a stable singleton instance.
+const supabase = createSupabaseClient();
+
 function PasswordRecoveryFlow() {
   const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'ready' | 'submitting' | 'complete' | 'error'>('loading');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
-  
-  const supabase = createSupabaseClient();
   
   useEffect(() => {
     let handled = false;

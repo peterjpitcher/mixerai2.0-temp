@@ -20,16 +20,16 @@ export default function ReleaseNotesPage() {
         <section className="mb-12">
           <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            This release finalizes the password reset functionality by implementing a more stable, code-based authentication flow.
+            This release includes a definitive fix for the password reset flow, resolving the "token invalid or expired" error.
           </p>
 
-          <h3>Key Fixes & Enhancements</h3>
-          <h4>Password Reset Flow (Code Exchange)</h4>
+          <h3>Key Fixes</h3>
+          <h4>Password Reset (PKCE Flow)</h4>
           <ul>
-            <li>To bypass persistent issues with the PKCE flow, the password reset mechanism was changed to use Supabase's Authorization Code Exchange flow.</li>
-            <li>The <code>forgot-password</code> page no longer sends a <code>redirectTo</code> parameter, prompting Supabase to send a one-time <code>code</code> in the URL query string.</li>
-            <li>The diagnostic page (<code>/auth/reset-password-test</code>) has been refactored to handle this flow. It now reads the <code>code</code> from the URL, exchanges it for a valid user session using <code>supabase.auth.exchangeCodeForSession()</code>, and then securely allows the user to update their password.</li>
-            <li>This new implementation is more resilient and resolves the "token expired" errors.</li>
+            <li>The root cause of the password reset failure was identified as an unstable Supabase client instance within React components, which prevented the secure PKCE token (<code>code_verifier</code>) from being persisted in the browser's <code>sessionStorage</code>.</li>
+            <li>Both the initiating page (<code>/auth/forgot-password</code>) and the confirmation page (<code>/auth/confirm</code>) have been updated to use a stable, singleton Supabase client instance.</li>
+            <li>This ensures the PKCE state is correctly maintained throughout the entire flow, resolving the backend error and making the password reset feature fully functional.</li>
+            <li>The temporary diagnostic page (<code>/auth/reset-password-test</code>) has been removed.</li>
           </ul>
           <p className="mt-4">
             For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
