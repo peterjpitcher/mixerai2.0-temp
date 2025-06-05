@@ -19,49 +19,34 @@ function PasswordRecoveryFlow() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
-
+  
   const supabase = createSupabaseClient();
-
+  
   useEffect(() => {
-    const hash = window.location.hash;
-    if (!hash) {
-      setErrorMsg('No recovery information found in URL. Please use the link from your email.');
-      setStatus('error');
-      return;
-    }
-
-    const params = new URLSearchParams(hash.substring(1));
-    const accessToken = params.get('access_token');
-    const refreshToken = params.get('refresh_token');
-    const errorDescription = params.get('error_description');
-
-    if (errorDescription) {
-      setErrorMsg(`An error occurred: ${errorDescription.replace(/\+/g, ' ')}`);
-      setStatus('error');
-      return;
-    }
-
-    if (!accessToken) {
-      setErrorMsg('Invalid or missing recovery information in the URL.');
-      setStatus('error');
-      return;
-    }
-
-    supabase.auth.setSession({ 
-      access_token: accessToken, 
-      refresh_token: refreshToken || '' 
-    }).then(({ error: sessionError }) => {
-      if (sessionError) {
-        setErrorMsg(`Failed to establish a recovery session: ${sessionError.message}`);
-        setStatus('error');
-      } else {
+    // Supabase JS client is designed to automatically handle the session from the URL hash.
+    // We listen for the 'PASSWORD_RECOVERY' event.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // This event fires when the user is successfully authenticated after clicking the password recovery link.
+        // The session is automatically set by the Supabase client.
         setStatus('ready');
       }
-    }).catch(err => {
-      setErrorMsg(`An unexpected error occurred: ${(err as Error).message}`);
-      setStatus('error');
     });
-  }, []);
+
+    // Add a timeout to handle cases where the link is invalid and no event is fired.
+    const timer = setTimeout(() => {
+        if (status === 'loading') {
+            setErrorMsg('The password recovery link is invalid, has expired, or the session could not be established. Please try requesting a new link.');
+            setStatus('error');
+        }
+    }, 5000); // Wait 5 seconds for the Supabase event
+
+    // Cleanup function to unsubscribe and clear the timer
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timer);
+    };
+  }, [status]); // Rerun effect if status changes, e.g. from loading.
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,6 +62,7 @@ function PasswordRecoveryFlow() {
     setErrorMsg(null);
     setStatus('submitting');
     
+    // The session is already set by onAuthStateChange, so we can directly update the user.
     const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
 
     if (updateError) {
@@ -133,7 +119,7 @@ function PasswordRecoveryFlow() {
         );
     }
   };
-
+  
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-secondary py-12 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8">
@@ -150,13 +136,13 @@ function PasswordRecoveryFlow() {
             {renderContent()}
           </CardContent>
           {status === 'error' && (
-             <CardFooter className="pt-4">
+            <CardFooter className="pt-4">
                 <div className="text-center w-full text-sm">
                   <Link href="/auth/login" className="font-medium text-primary-foreground/80 hover:text-primary-foreground hover:underline">
                     Back to Login
-                  </Link>
-                </div>
-              </CardFooter>
+                </Link>
+              </div>
+            </CardFooter>
           )}
         </Card>
       </div>
