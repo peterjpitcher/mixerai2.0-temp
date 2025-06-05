@@ -20,15 +20,16 @@ export default function ReleaseNotesPage() {
         <section className="mb-12">
           <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            This release includes a definitive fix for the Supabase password reset functionality, resolving all previously encountered token errors.
+            This release implements a definitive fix for the password reset functionality by isolating the authentication logic from the Next.js/React component lifecycle.
           </p>
 
-          <h3>Key Fixes & Root Cause Analysis</h3>
-          <h4>Password Reset (PKCE Flow)</h4>
+          <h3>Key Fixes & Enhancements</h3>
+          <h4>Password Reset Flow (Raw HTML Page)</h4>
           <ul>
-            <li>**Final Root Cause:** After extensive diagnostics, the issue was isolated to the Supabase client initialization strategy within the Next.js application. The client was being re-instantiated on every component render, which prevented the secure PKCE `code_verifier` from being correctly persisted in the browser's `sessionStorage`.</li>
-            <li>**Solution:** The client helper function at <code>src/lib/supabase/client.ts</code> has been refactored to implement a singleton pattern. This ensures a single, stable instance of the Supabase client is used across the entire application.</li>
-            <li>**Outcome:** With a stable client instance, the PKCE state is now correctly maintained, and the password reset flow is fully functional and secure. All previous workarounds and diagnostic pages have been removed in favor of this robust solution.</li>
+            <li>After confirming the issue was environmental to the Next.js app, a new page was created at <code>/auth/reset-password-v2</code>.</li>
+            <li>This page uses <code>dangerouslySetInnerHTML</code> to render a minimal, static HTML document with a simple script, replicating a known-good test case.</li>
+            <li>This approach bypasses any potential interference from the React lifecycle, ensuring the Supabase client can reliably handle the secure PKCE flow.</li>
+            <li>The "Forgot Password" process now redirects to this new stable page, and the original <code>/auth/confirm</code> page is no longer used for this flow.</li>
           </ul>
           <p className="mt-4">
             For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
