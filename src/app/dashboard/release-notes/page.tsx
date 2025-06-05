@@ -276,6 +276,25 @@ export default function ReleaseNotesPage() {
             For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
           </p>
         </section>
+
+        {/* Latest Release Entry */}
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            As part of an ongoing investigation into a persistent password reset issue, a new diagnostic test page has been created.
+          </p>
+
+          <h3>Key Changes</h3>
+          <h4>New Diagnostic Password Reset Page</h4>
+          <ul>
+            <li>Created a new, minimal test page at <code>/auth/reset-password-test</code>. This page replicates a simple, known-good HTML file to isolate the password reset flow from any potential issues within the Next.js component lifecycle or routing of the original <code>/auth/confirm</code> page.</li>
+            <li>The "Forgot Password" flow now redirects to this new test page.</li>
+            <li>This step aims to definitively confirm if the Supabase PKCE flow can complete successfully within the Next.js environment, providing a clear path to resolving the issue.</li>
+          </ul>
+          <p className="mt-4">
+            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+          </p>
+        </section>
       </div>
     </div>
   );
