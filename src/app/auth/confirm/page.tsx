@@ -23,30 +23,49 @@ function PasswordRecoveryFlow() {
   const supabase = createSupabaseClient();
   
   useEffect(() => {
-    // Supabase JS client is designed to automatically handle the session from the URL hash.
-    // We listen for the 'PASSWORD_RECOVERY' event.
+    let handled = false;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        // This event fires when the user is successfully authenticated after clicking the password recovery link.
-        // The session is automatically set by the Supabase client.
+      if (event === 'PASSWORD_RECOVERY' && !handled) {
+        handled = true;
         setStatus('ready');
       }
     });
 
-    // Add a timeout to handle cases where the link is invalid and no event is fired.
     const timer = setTimeout(() => {
-        if (status === 'loading') {
-            setErrorMsg('The password recovery link is invalid, has expired, or the session could not be established. Please try requesting a new link.');
-            setStatus('error');
-        }
-    }, 5000); // Wait 5 seconds for the Supabase event
+      if (!handled) {
+        // Fallback: Manually check hash if event doesn't fire
+        const hash = window.location.hash;
+        const params = new URLSearchParams(hash.substring(1));
+        const accessToken = params.get('access_token');
 
-    // Cleanup function to unsubscribe and clear the timer
+        if (accessToken) {
+          console.warn('onAuthStateChange event did not fire, attempting manual session set.');
+          supabase.auth.setSession({ 
+            access_token: accessToken, 
+            refresh_token: params.get('refresh_token') || '' 
+          }).then(({ error }) => {
+            if (error) {
+              setErrorMsg('Link appears valid, but failed to establish a session. Please try again.');
+              setStatus('error');
+            } else {
+              handled = true;
+              setStatus('ready');
+            }
+          });
+        } else {
+          // If no access token in hash, the link is truly invalid/expired
+          setErrorMsg('The password recovery link is invalid, has expired, or the session could not be established. Please try requesting a new link.');
+          setStatus('error');
+        }
+      }
+    }, 2000); // Shortened timeout to 2 seconds for quicker fallback
+
     return () => {
       subscription.unsubscribe();
       clearTimeout(timer);
     };
-  }, [status]); // Rerun effect if status changes, e.g. from loading.
+  }, []); // Empty dependency array to run once
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
