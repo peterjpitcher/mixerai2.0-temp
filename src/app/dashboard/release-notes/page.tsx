@@ -53,6 +53,26 @@ export default function ReleaseNotesPage() {
           </p>
         </section>
 
+        {/* Latest Release Entry - Template Form Fix */}
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            This update addresses issues with creating and editing Content Templates, ensuring consistent and reliable saving of template field structures.
+          </p>
+
+          <h3>Key Fixes</h3>
+          <h4>Content Template Form & API (<code>/dashboard/templates/new</code>, <code>/dashboard/templates/[id]/edit</code>)</h4>
+          <ul>
+            <li>Resolved errors during template creation and updates caused by inconsistent payload structures for <code>inputFields</code> and <code>outputFields</code>.</li>
+            <li>The <code>TemplateForm</code> component now consistently sends <code>inputFields</code> and <code>outputFields</code> as top-level arrays in the payload.</li>
+            <li>The <code>POST /api/content-templates</code> API endpoint has been updated to accept this flat structure and internally reconstruct the nested <code>fields</code> object for database storage, aligning it with the <code>PUT</code> endpoint for template updates.</li>
+            <li>This prevents errors such as "Name and fields are required" or "Name, inputFields, and outputFields are required" during template management.</li>
+          </ul>
+          <p className="mt-4">
+            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+          </p>
+        </section>
+
         {/* Existing Release Entry - June 5, 2025 */}
         <section className="mb-12">
           <h2 className="text-xl font-semibold border-b pb-2 mb-4">Release: June 5, 2025</h2>

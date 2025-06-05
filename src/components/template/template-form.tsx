@@ -154,15 +154,14 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
     try {
       setIsSubmitting(true);
       
-      const payload = { 
-        ...templateData, 
+      const payload = {
+        name: templateData.name,
+        description: templateData.description,
+        icon: templateData.icon,
+        brand_id: templateData.brand_id === undefined ? null : templateData.brand_id, 
         inputFields: templateData.inputFields || [],
-        outputFields: templateData.outputFields || [] 
+        outputFields: templateData.outputFields || []
       }; 
-
-      if (payload.brand_id === undefined) {
-          payload.brand_id = null;
-      }
 
       const url = initialData?.id && initialData.id !== 'new'
         ? `/api/content-templates/${initialData.id}` 

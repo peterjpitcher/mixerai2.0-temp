@@ -189,30 +189,20 @@ export const POST = withAuth(async (request: NextRequest, user) => {
 
     const data = await request.json();
     
-    // Validate required fields
-    if (!data.name || !data.fields) {
+    // Validate required fields (expecting flat structure now)
+    if (!data.name || !data.inputFields || !data.outputFields) {
       return NextResponse.json(
-        { success: false, error: 'Name and fields are required' },
-        { status: 400 }
-      );
-    }
-    
-    // Validate fields structure
-    if (!data.fields.inputFields || !data.fields.outputFields) {
-      return NextResponse.json(
-        { success: false, error: 'Template must contain inputFields and outputFields' },
+        { success: false, error: 'Name, inputFields, and outputFields are required' }, // Consistent error message
         { status: 400 }
       );
     }
     
     const supabase = createSupabaseAdminClient();
     
-    // --- AI Description Generation ---
-    let generatedDescription = data.description || ''; // Use provided desc or generate
+    let generatedDescription = data.description || '';
     try {
-      // Extract field names for a concise prompt
-      const inputFieldNames = (data.fields.inputFields || []).map((f: any) => f.name).filter(Boolean);
-      const outputFieldNames = (data.fields.outputFields || []).map((f: any) => f.name).filter(Boolean);
+      const inputFieldNames = (data.inputFields || []).map((f: any) => f.name).filter(Boolean);
+      const outputFieldNames = (data.outputFields || []).map((f: any) => f.name).filter(Boolean);
 
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
       const aiDescriptionResponse = await fetch(`${baseUrl}/api/ai/generate-template-description`, {
@@ -230,23 +220,24 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         if (aiData.success && aiData.description) {
           generatedDescription = aiData.description;
         }
-      } else {
-        // Log if AI description generation fails but don't block template creation
-        // console.warn('Failed to generate AI description for new template.');
       }
     } catch (aiError) {
       // console.warn('Error calling AI template description generation service:', aiError);
     }
-    // --- End AI Description Generation ---
 
-    // Insert the new template
+    // Reconstruct the 'fields' object for the database
+    const fieldsForDb = {
+      inputFields: data.inputFields || [],
+      outputFields: data.outputFields || []
+    };
+
     const { data: newTemplate, error } = await supabase
       .from('content_templates')
       .insert({
         name: data.name,
-        description: generatedDescription, // Use AI generated or existing
+        description: generatedDescription,
         icon: data.icon || null,
-        fields: data.fields,
+        fields: fieldsForDb, // Use the reconstructed fields object
         brand_id: data.brand_id || null,
         created_by: user.id,
       })
@@ -254,7 +245,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       .single();
     
     if (error) {
-      // console.error('Supabase error creating template:', error);
       throw error;
     }
     
@@ -263,7 +253,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       template: newTemplate
     });
   } catch (error) {
-    // console.error('Error creating content template:', error);
     return handleApiError(error, 'Failed to create content template');
   }
 });
