@@ -61,7 +61,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         *,
         brands ( name, brand_color ),
         content_types ( name ),
-        creator_profile:profiles!created_by ( full_name, avatar_url ),
+        creator_profile:profiles!created_by ( id, full_name, avatar_url ),
         content_templates ( name, icon ),
         current_step_details:workflow_steps!current_step ( name )
       `)
@@ -115,28 +115,68 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       throw contentError;
     }
 
-    // Step 1: Collect all unique assignee IDs from all content items
-    const allAssigneeIds = new Set<string>();
+    // Step 1: Collect all unique creator and assignee IDs
+    const userIdsForAuthCheck = new Set<string>();
+    (contentItems || []).forEach(item => {
+      if (item.creator_profile?.id) {
+        // Only add if profile avatar_url is likely missing, to optimize if needed later
+        // For now, adding all to fetch auth data as a fallback regardless
+        userIdsForAuthCheck.add(item.creator_profile.id);
+      }
+      if (item.assigned_to && Array.isArray(item.assigned_to)) {
+        item.assigned_to.forEach((id: string) => {
+          if (id) userIdsForAuthCheck.add(id);
+        });
+      }
+    });
+    
+    // Step 2: Fetch auth user data (user_metadata) for these users
+    const authAvatarsMap = new Map<string, string | null>();
+    if (userIdsForAuthCheck.size > 0) {
+      for (const userId of Array.from(userIdsForAuthCheck)) {
+        try {
+          const { data: { user: authUser }, error: authUserError } = await supabase.auth.admin.getUserById(userId);
+          
+          if (authUserError) {
+            console.error(`Error fetching auth user data for ID ${userId}:`, authUserError);
+            continue; 
+          }
+
+          if (authUser && authUser.user_metadata && typeof authUser.user_metadata === 'object' && 'avatar_url' in authUser.user_metadata) {
+            const authAvatar = (authUser.user_metadata as any).avatar_url;
+            if (typeof authAvatar === 'string' && authAvatar.trim() !== '') {
+              authAvatarsMap.set(userId, authAvatar);
+            }
+          }
+        } catch (e) {
+           console.error(`Exception during fetching auth user data for ID ${userId}:`, e);
+        }
+      }
+    }
+
+
+    // Step 3: Fetch assignee profiles (already existing logic, slightly adjusted for context)
+    const allAssigneeIdsFromContent = new Set<string>();
     (contentItems || []).forEach(item => {
       if (item.assigned_to && Array.isArray(item.assigned_to)) {
-        item.assigned_to.forEach((id: string) => id && allAssigneeIds.add(id));
+        item.assigned_to.forEach((id: string) => {
+          if (id) allAssigneeIdsFromContent.add(id);
+        });
       }
     });
 
-    // Step 2: Fetch all relevant profiles in one go
-    let assigneeProfilesMap = new Map<string, { full_name: string | null, avatar_url: string | null }>();
-    if (allAssigneeIds.size > 0) {
+    let assigneeProfilesMap = new Map<string, { id: string, full_name: string | null, avatar_url: string | null }>();
+    if (allAssigneeIdsFromContent.size > 0) {
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, full_name, avatar_url')
-        .in('id', Array.from(allAssigneeIds));
+        .select('id, full_name, avatar_url') // ensure 'id' is selected
+        .in('id', Array.from(allAssigneeIdsFromContent));
 
       if (profilesError) {
         console.error('Error fetching assignee profiles:', profilesError);
-        // Continue without assignee names if this fails, or throw error
       } else if (profilesData) {
         profilesData.forEach(profile => {
-          assigneeProfilesMap.set(profile.id, { full_name: profile.full_name, avatar_url: profile.avatar_url });
+          assigneeProfilesMap.set(profile.id, { id: profile.id, full_name: profile.full_name, avatar_url: profile.avatar_url });
         });
       }
     }
@@ -174,16 +214,44 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     const formattedContent = (contentItems || []).map((item, index) => {
       let firstAssignedId: string | null = null;
       const assigneeNames: string[] = [];
+      // let firstAssigneeAvatarUrl: string | null = null; // Will be determined with new logic
+
       if (item.assigned_to && Array.isArray(item.assigned_to) && item.assigned_to.length > 0) {
-        firstAssignedId = (item.assigned_to as string[])[0]; // Keep for assigned_to_id if needed
+        firstAssignedId = (item.assigned_to as string[])[0];
         item.assigned_to.forEach((id: string) => {
           if (id) {
             const profile = assigneeProfilesMap.get(id);
             if (profile && profile.full_name) {
               assigneeNames.push(profile.full_name);
             }
+            // firstAssigneeAvatarUrl logic will be handled below
           }
         });
+      }
+      
+      // Determine Creator Avatar URL
+      let finalCreatorAvatarUrl: string | null = null;
+      if (item.creator_profile) {
+        finalCreatorAvatarUrl = item.creator_profile.avatar_url || null; // From profiles table
+        if (!finalCreatorAvatarUrl && item.creator_profile.id) {
+          finalCreatorAvatarUrl = authAvatarsMap.get(item.creator_profile.id) || null; // From auth.users metadata
+        }
+        if (!finalCreatorAvatarUrl && item.creator_profile.id) { // Fallback to DiceBear
+          finalCreatorAvatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.creator_profile.id}`;
+        }
+      }
+
+      // Determine First Assignee Avatar URL
+      let finalAssigneeAvatarUrl: string | null = null;
+      if (firstAssignedId) {
+        const assigneeProfile = assigneeProfilesMap.get(firstAssignedId);
+        finalAssigneeAvatarUrl = assigneeProfile?.avatar_url || null; // From profiles table
+        if (!finalAssigneeAvatarUrl) {
+          finalAssigneeAvatarUrl = authAvatarsMap.get(firstAssignedId) || null; // From auth.users metadata
+        }
+        if (!finalAssigneeAvatarUrl) { // Fallback to DiceBear
+          finalAssigneeAvatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${firstAssignedId}`;
+        }
       }
 
       return {
@@ -199,16 +267,17 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         content_type_name: item.content_types?.name || null,
         created_by: item.created_by,
         created_by_name: item.creator_profile?.full_name || null,
-        creator_avatar_url: item.creator_profile?.avatar_url || null,
+        creator_avatar_url: finalCreatorAvatarUrl, // Use determined URL
         template_id: item.template_id,
         template_name: item.content_templates?.name || null,
         template_icon: item.content_templates?.icon || null,
         workflow_id: item.workflow_id,
         current_step_id: item.current_step,
         current_step_name: item.current_step_details?.name || (item.current_step ? 'Step not found' : 'N/A'),
-        assigned_to_id: firstAssignedId, // This still shows the first ID
+        assigned_to_id: firstAssignedId,
         assigned_to_name: assigneeNames.length > 0 ? assigneeNames.join(', ') : 'N/A',
-        assigned_to: item.assigned_to || null, // Ensure the raw assigned_to array is included
+        assigned_to_avatar_url: finalAssigneeAvatarUrl, // Use determined URL
+        assigned_to: item.assigned_to || null,
         workflow: workflowDataWithSteps[index]
       };
     });

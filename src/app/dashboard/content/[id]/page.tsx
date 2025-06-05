@@ -445,9 +445,26 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
                         </div>
                       </div>
                       {version.reviewer && (
-                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">
-                          By: {version.reviewer.full_name || 'Unknown User'}
-                        </p>
+                        <div className="flex items-center mt-1 mb-1">
+                          <div className="relative h-6 w-6 rounded-full bg-muted overflow-hidden flex-shrink-0 mr-2">
+                            {version.reviewer.avatar_url ? (
+                              <img
+                                src={version.reviewer.avatar_url}
+                                alt={version.reviewer.full_name || 'Reviewer avatar'}
+                                className="object-cover w-full h-full"
+                                onError={(e) => (e.currentTarget.style.display = 'none')}
+                              />
+                            ) : null}
+                            {(!version.reviewer.avatar_url) && (
+                              <div className="flex items-center justify-center h-full w-full text-xs font-semibold text-primary bg-muted-foreground/20">
+                                {(version.reviewer.full_name || 'R').charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 dark:text-gray-300">
+                            By: {version.reviewer.full_name || 'Unknown User'}
+                          </p>
+                        </div>
                       )}
                       {version.feedback && (
                         <div className="mt-1 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md">

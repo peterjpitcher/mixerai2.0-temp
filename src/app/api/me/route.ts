@@ -85,7 +85,7 @@ export const GET = withRouteAuth(async (request: NextRequest, authUser: any) => 
       full_name: userProfileDataFromDb?.full_name,
       job_title: userProfileDataFromDb?.job_title,
       company: userProfileDataFromDb?.company,
-      avatar_url: userProfileDataFromDb?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUser.id}`,
+      avatar_url: userProfileDataFromDb?.avatar_url || authUser.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUser.id}`,
     };
 
     return NextResponse.json({ success: true, user: finalUserResponse });

@@ -17,7 +17,7 @@ export interface WorkflowStep {
   description?: string;
   role?: string;
   approvalRequired?: boolean;
-  assignees?: Array<{ id?: string; email?: string; name?: string }>;
+  assignees?: Array<{ id?: string; email?: string; name?: string; avatar_url?: string }>;
 }
 
 interface ContentVersion {
@@ -167,6 +167,36 @@ export function ContentApprovalWorkflow({
             </CardDescription>
           </div>
         </div>
+        {/* Display Assignees for the current step */}
+        {currentStepObject.assignees && currentStepObject.assignees.length > 0 && (
+          <div className="mt-3">
+            <h5 className="text-xs font-medium text-muted-foreground mb-1.5">Assigned To:</h5>
+            <div className="flex flex-wrap gap-2">
+              {currentStepObject.assignees.map((assignee, index) => (
+                <div key={assignee.id || assignee.email || index} className="flex items-center p-1.5 bg-muted/50 rounded-md text-xs">
+                  <div className="relative h-5 w-5 rounded-full bg-muted overflow-hidden flex-shrink-0 mr-1.5">
+                    {assignee.avatar_url ? (
+                      <img
+                        src={assignee.avatar_url}
+                        alt={assignee.name || assignee.email || 'Assignee'}
+                        className="object-cover w-full h-full"
+                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                      />
+                    ) : null}
+                    {(!assignee.avatar_url) && (
+                      <div className="flex items-center justify-center h-full w-full text-xxs font-semibold text-primary bg-muted-foreground/20">
+                        {(assignee.name || assignee.email || 'A').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-muted-foreground font-medium">
+                    {assignee.name || assignee.email || 'Unknown Assignee'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-2">
@@ -199,7 +229,26 @@ export function ContentApprovalWorkflow({
                     </p>
                     <p className="text-xs text-muted-foreground">{new Date(v.created_at).toLocaleDateString()}</p>
                   </div>
-                  {v.reviewer?.full_name && <p className="text-xs text-muted-foreground">By: {v.reviewer.full_name}</p>}
+                  {v.reviewer?.full_name && (
+                    <div className="flex items-center mt-1">
+                      <div className="relative h-5 w-5 rounded-full bg-muted overflow-hidden flex-shrink-0 mr-1.5">
+                        {(v.reviewer as any).avatar_url ? (
+                          <img
+                            src={(v.reviewer as any).avatar_url}
+                            alt={v.reviewer.full_name || 'Reviewer avatar'}
+                            className="object-cover w-full h-full"
+                            onError={(e) => (e.currentTarget.style.display = 'none')}
+                          />
+                        ) : null}
+                        {!(v.reviewer as any).avatar_url && (
+                          <div className="flex items-center justify-center h-full w-full text-xxs font-semibold text-primary bg-muted-foreground/20">
+                            {(v.reviewer.full_name || 'R').charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">By: {v.reviewer.full_name}</p>
+                    </div>
+                  )}
                   {v.feedback && <p className="italic text-muted-foreground bg-muted p-2 rounded-sm">{v.feedback}</p>}
                   
                   {/* Display generatedOutputs */}

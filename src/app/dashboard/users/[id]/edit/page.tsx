@@ -367,12 +367,30 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" asChild>
-            <Link href="/dashboard/users">
+            <Link href={user ? `/dashboard/users/${user.id}` : '/dashboard/users'} aria-label="Back to User Details or Users List">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
+          {/* Avatar Display for the user being edited */}
+          {user && (
+            <div className="relative h-12 w-12 rounded-full bg-muted overflow-hidden flex-shrink-0">
+              {user.avatar_url ? (
+                <img
+                  src={user.avatar_url}
+                  alt={user.full_name || 'User avatar'}
+                  className="object-cover w-full h-full"
+                  onError={(e) => (e.currentTarget.style.display = 'none')} // Hide img on error, initial will show
+                />
+              ) : null}
+              {(!user.avatar_url) && (
+                <div className="flex items-center justify-center h-full w-full text-lg font-semibold text-primary bg-muted-foreground/20">
+                  {(user.full_name || user.email || 'U').charAt(0).toUpperCase()}
+                </div>
+              )}
+            </div>
+          )}
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Edit User</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Edit User {user?.full_name ? `- ${user.full_name}` : (user?.email ? `- ${user.email}`: '' )}</h1>
             <p className="text-muted-foreground mt-1">
               Modify user profile details, roles, and brand permissions.
             </p>

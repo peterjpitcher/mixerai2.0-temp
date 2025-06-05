@@ -248,12 +248,29 @@ export default function UserDetailPage() {
       ]} />
 
       <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" asChild>
             <Link href="/dashboard/users" aria-label="Back to Users List">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
+          {user && (
+            <div className="relative h-16 w-16 rounded-full bg-muted overflow-hidden flex-shrink-0">
+              {user.avatar_url ? (
+                <img
+                  src={user.avatar_url}
+                  alt={user.full_name || 'User avatar'}
+                  className="object-cover w-full h-full"
+                  onError={(e) => (e.currentTarget.style.display = 'none')}
+                />
+              ) : null}
+              {(!user.avatar_url) && (
+                <div className="flex items-center justify-center h-full w-full text-xl font-semibold text-primary bg-muted-foreground/20">
+                  {(user.full_name || user.email || 'U').charAt(0).toUpperCase()}
+                </div>
+              )}
+            </div>
+          )}
           <div>
             <h1 className="text-3xl font-bold tracking-tight">{user.full_name || user.email}</h1>
             <p className="text-muted-foreground mt-1">

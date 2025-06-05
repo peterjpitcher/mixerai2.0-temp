@@ -41,6 +41,7 @@ interface ContentItem {
   current_step_name?: string | null;
   assigned_to_id?: string | null;
   assigned_to_name?: string | null;
+  assigned_to_avatar_url?: string | null; // Added for assignee avatar
   assigned_to?: string[] | null;
 }
 
@@ -386,47 +387,100 @@ export default function ContentPageClient() {
                       <th className="text-left p-3 font-medium">Title</th>
                       <th className="text-left p-3 font-medium">Current Step</th>
                       <th className="text-left p-3 font-medium">Assigned To</th>
+                      <th className="text-left p-3 font-medium">Created By</th>
                       <th className="text-left p-3 font-medium">Last Updated</th>
                       <th className="text-right p-3 font-medium">Actions</th>
                     </tr></thead>
                     <tbody>
-                      {items.map((item) => (
-                        <tr key={item.id} className="border-b hover:bg-muted/50 transition-colors">
-                          <td className="p-3">
-                            <Link href={`/dashboard/content/${item.id}`} className="font-medium hover:underline text-primary">
-                              {item.title || 'Untitled Content'}
-                            </Link>
-                            {item.template_name && <p className="text-xs text-muted-foreground flex items-center mt-1">
-                                {item.template_icon && <FileText className="mr-1 h-3 w-3 text-muted-foreground" />} 
-                                {item.template_name}
-                            </p>}
-                          </td>
-                          <td className="p-3">{item.current_step_name || 'N/A'}</td>
-                          <td className="p-3">{item.assigned_to_name || 'N/A'}</td>
-                          <td className="p-3 whitespace-nowrap">{formatDate(item.updated_at)}</td>
-                          <td className="p-3 text-right space-x-2 whitespace-nowrap">
-                            {(currentUser && isUserAssigned(item, currentUser.id)) && (
-                              <Button variant="outline" size="sm" asChild className="h-8 px-2.5 text-xs">
-                                  <Link href={`/dashboard/content/${item.id}/edit`}> 
-                                      <Edit3 className="h-3.5 w-3.5 mr-1.5"/> Edit
-                                  </Link>
-                              </Button>
-                            )}
-                            {canDeleteContent(item) && (
-                              <Button 
-                                variant="destructive" 
-                                size="sm" 
-                                className="h-8 px-2.5 text-xs"
-                                onClick={() => handleDeleteClick(item)}
-                                disabled={isDeleting && itemToDelete?.id === item.id}
-                              >
-                                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                                {isDeleting && itemToDelete?.id === item.id ? 'Deleting...' : 'Delete'}
-                              </Button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                      {items.map((item) => {
+                        // --- Start Diagnostic Logging for Avatar URLs ---
+                        if (process.env.NODE_ENV === 'development') {
+                          console.log(`[Content List Avatar Debug] Item ID: ${item.id}, Title: ${item.title}`);
+                          console.log(`  \_ Creator Name: ${item.created_by_name}, Creator Avatar URL: ${item.creator_avatar_url}`);
+                          console.log(`  \_ Assignee Name: ${item.assigned_to_name}, Assignee Avatar URL: ${item.assigned_to_avatar_url}`);
+                        }
+                        // --- End Diagnostic Logging ---
+                        return (
+                          <tr key={item.id} className="border-b hover:bg-muted/50 transition-colors">
+                            <td className="p-3">
+                              <Link href={`/dashboard/content/${item.id}`} className="font-medium hover:underline text-primary">
+                                {item.title || 'Untitled Content'}
+                              </Link>
+                              {item.template_name && <p className="text-xs text-muted-foreground flex items-center mt-1">
+                                  {item.template_icon && <FileText className="mr-1 h-3 w-3 text-muted-foreground" />} 
+                                  {item.template_name}
+                              </p>}
+                            </td>
+                            <td className="p-3">{item.current_step_name || 'N/A'}</td>
+                            <td className="p-3">
+                              {item.assigned_to_name ? (
+                                <div className="flex items-center">
+                                  <div className="relative h-6 w-6 rounded-full bg-muted overflow-hidden flex-shrink-0 mr-2">
+                                    {item.assigned_to_avatar_url ? (
+                                      <img
+                                        src={item.assigned_to_avatar_url}
+                                        alt={item.assigned_to_name}
+                                        className="object-cover w-full h-full"
+                                        onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }}
+                                      />
+                                    ) : null}
+                                    <div className={`flex items-center justify-center h-full w-full text-xs font-semibold text-primary bg-muted-foreground/20 ${item.assigned_to_avatar_url ? 'hidden' : ''}`}>
+                                      {(item.assigned_to_name || 'A').charAt(0).toUpperCase()}
+                                    </div>
+                                  </div>
+                                  <span className="truncate" title={item.assigned_to_name}>{item.assigned_to_name}</span>
+                                </div>
+                              ) : (
+                                'N/A'
+                              )}
+                            </td>
+                            <td className="p-3">
+                              {item.created_by_name ? (
+                                <div className="flex items-center">
+                                  <div className="relative h-6 w-6 rounded-full bg-muted overflow-hidden flex-shrink-0 mr-2">
+                                    {item.creator_avatar_url ? (
+                                      <img
+                                        src={item.creator_avatar_url}
+                                        alt={item.created_by_name}
+                                        className="object-cover w-full h-full"
+                                        onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }}
+                                      />
+                                    ) : null}
+                                    <div className={`flex items-center justify-center h-full w-full text-xs font-semibold text-primary bg-muted-foreground/20 ${item.creator_avatar_url ? 'hidden' : ''}`}>
+                                      {(item.created_by_name || 'U').charAt(0).toUpperCase()}
+                                    </div>
+                                  </div>
+                                  <span className="truncate" title={item.created_by_name}>{item.created_by_name}</span>
+                                </div>
+                              ) : (
+                                'N/A'
+                              )}
+                            </td>
+                            <td className="p-3 whitespace-nowrap">{formatDate(item.updated_at)}</td>
+                            <td className="p-3 text-right space-x-2 whitespace-nowrap">
+                              {(currentUser && isUserAssigned(item, currentUser.id)) && (
+                                <Button variant="outline" size="sm" asChild className="h-8 px-2.5 text-xs">
+                                    <Link href={`/dashboard/content/${item.id}/edit`}> 
+                                        <Edit3 className="h-3.5 w-3.5 mr-1.5"/> Edit
+                                    </Link>
+                                </Button>
+                              )}
+                              {canDeleteContent(item) && (
+                                <Button 
+                                  variant="destructive" 
+                                  size="sm" 
+                                  className="h-8 px-2.5 text-xs"
+                                  onClick={() => handleDeleteClick(item)}
+                                  disabled={isDeleting && itemToDelete?.id === item.id}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                                  {isDeleting && itemToDelete?.id === item.id ? 'Deleting...' : 'Delete'}
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
