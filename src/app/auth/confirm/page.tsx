@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { createSupabaseClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Input } from '@/components/input';
@@ -14,45 +15,38 @@ import { CheckCheck, AlertTriangle } from 'lucide-react';
 
 function PasswordRecoveryFlow() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const supabase = createSupabaseClient();
+
   const [status, setStatus] = useState<'loading' | 'ready' | 'submitting' | 'complete' | 'error'>('loading');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
-  
-  // State to hold the tokens parsed from the URL hash
-  const [tokenInfo, setTokenInfo] = useState<{ access_token: string; refresh_token: string; } | null>(null);
 
   useEffect(() => {
-    const hash = window.location.hash;
-    if (!hash) {
-      setErrorMsg('No recovery information found in URL. Please use the link from your email.');
-      setStatus('error');
-      return;
+    const code = searchParams?.get('code');
+
+    if (code) {
+      const exchangeCode = async () => {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          setStatus('error');
+          setErrorMsg(`Failed to validate link: ${error.message}`);
+        } else {
+          setStatus('ready');
+        }
+      };
+      exchangeCode();
+    } else {
+      const timer = setTimeout(() => {
+        if (!searchParams?.get('code')) {
+            setStatus('error');
+            setErrorMsg('No authorization code found in URL. The link may be invalid or expired.');
+        }
+      }, 1000);
+      return () => clearTimeout(timer);
     }
-
-    const params = new URLSearchParams(hash.substring(1));
-    const accessToken = params.get('access_token');
-    const refreshToken = params.get('refresh_token');
-    const errorDescription = params.get('error_description');
-    const type = params.get('type');
-
-    if (errorDescription) {
-      setErrorMsg(`An error occurred: ${errorDescription.replace(/\+/g, ' ')}`);
-      setStatus('error');
-      return;
-    }
-
-    if (type !== 'recovery' || !accessToken || !refreshToken) {
-      setErrorMsg('Invalid or missing recovery token information in the URL.');
-      setStatus('error');
-      return;
-    }
-
-    // Instead of setting session here, we just store the tokens to be sent to our API
-    setTokenInfo({ access_token: accessToken, refresh_token: refreshToken });
-    setStatus('ready');
-
-  }, []); // Run once on mount
+  }, [searchParams, supabase]);
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,45 +58,21 @@ function PasswordRecoveryFlow() {
       setErrorMsg("Passwords do not match.");
       return;
     }
-
     setErrorMsg(null);
     setStatus('submitting');
-    
-    if (!tokenInfo) {
-        setErrorMsg('Authentication token information is missing. Please try again from the email link.');
-        setStatus('error');
-        return;
-    }
-
-    try {
-      const response = await fetch('/api/auth/update-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          password: newPassword,
-          access_token: tokenInfo.access_token,
-          refresh_token: tokenInfo.refresh_token,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || result.error) {
-        throw new Error(result.error || 'Failed to update password.');
-      }
-
-      setStatus('complete');
-    } catch (error) {
-      setErrorMsg((error as Error).message);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
       setStatus('error');
+      setErrorMsg(`Failed to update password: ${error.message}`);
+    } else {
+      setStatus('complete');
     }
   };
-
+  
   const renderContent = () => {
     switch (status) {
       case 'loading':
-        return <div className="flex justify-center items-center py-8"><Spinner className="h-6 w-6" /><p className="ml-2 text-muted-foreground">Verifying link...</p></div>;
-
+        return <div className="flex justify-center items-center py-8"><Spinner className="h-6 w-6" /><p className="ml-2 text-muted-foreground">Verifying authorization...</p></div>;
       case 'error':
         return (
           <Alert variant="destructive">
@@ -111,10 +81,8 @@ function PasswordRecoveryFlow() {
             <AlertDescription>{errorMsg}</AlertDescription>
           </Alert>
         );
-
       case 'submitting':
         return <div className="flex justify-center items-center py-8"><Spinner className="h-6 w-6" /><p className="ml-2 text-muted-foreground">Updating password...</p></div>;
-      
       case 'complete':
         return (
           <div className="text-center py-8">
@@ -126,7 +94,6 @@ function PasswordRecoveryFlow() {
             <Button onClick={() => router.push('/auth/login')} className="mt-4">Go to Login</Button>
           </div>
         );
-
       case 'ready':
         return (
           <form onSubmit={handlePasswordUpdate} className="space-y-6">
@@ -144,7 +111,7 @@ function PasswordRecoveryFlow() {
         );
     }
   };
-  
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-secondary py-12 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8">
@@ -161,13 +128,13 @@ function PasswordRecoveryFlow() {
             {renderContent()}
           </CardContent>
           {status === 'error' && (
-            <CardFooter className="pt-4">
+             <CardFooter className="pt-4">
                 <div className="text-center w-full text-sm">
                   <Link href="/auth/login" className="font-medium text-primary-foreground/80 hover:text-primary-foreground hover:underline">
                     Back to Login
-                </Link>
-              </div>
-            </CardFooter>
+                  </Link>
+                </div>
+              </CardFooter>
           )}
         </Card>
       </div>
@@ -175,12 +142,10 @@ function PasswordRecoveryFlow() {
   );
 }
 
-// This page is now specialized for password recovery.
-// Invite/Signup flows would need to be handled by a different page if they use query tokens.
 export default function ConfirmPage() {
   return (
     <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-center"><Spinner size="lg" /><p className="text-muted-foreground ml-2">Loading...</p></div>}>
       <PasswordRecoveryFlow />
     </Suspense>
   );
-} 
+}
