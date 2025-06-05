@@ -229,6 +229,31 @@ export default function ReleaseNotesPage() {
             For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
           </p>
         </section>
+
+        {/* Latest Release Entry - Password Reset & Email Templates */}
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            This update enhances the password recovery process for improved reliability and provides new, consistently branded email templates for all authentication flows.
+          </p>
+
+          <h3>Key Enhancements & Fixes</h3>
+          <h4>Password Recovery Flow</h4>
+          <ul>
+            <li>Corrected the Supabase password reset email template to use <code>{"{{ .ConfirmationURL }}"}</code>, ensuring proper token generation and redirection. This resolves issues where reset links were sent with missing or invalid tokens.</li>
+            <li>Updated the <code>/auth/confirm</code> page (<code>src/app/auth/confirm/page.tsx</code>) to robustly handle the <code>type=recovery</code> flow, including parsing tokens from URL hash fragments and displaying a dedicated "Set New Password" form.</li>
+          </ul>
+
+          <h4>New Branded Email Templates</h4>
+          <ul>
+            <li>Provided updated HTML email templates for Password Reset, Confirm Signup, Invite User, Magic Link (Login), and Reauthentication (Email OTP).</li>
+            <li>Templates feature consistent MixerAI 2.0 branding, including the logo (referenced via <code>{"{{ .SiteURL }}/Mixerai2.0Logo.png"}</code>) and theme colors.</li>
+            <li>Ensured correct Supabase variables are used for dynamic content and links within these templates.</li>
+          </ul>
+          <p className="mt-4">
+            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+          </p>
+        </section>
       </div>
     </div>
   );
