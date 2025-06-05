@@ -24,14 +24,9 @@ export default function ForgotPasswordPage() {
     setError(null);
     setSuccessMessage(null);
 
-    // Construct the redirect URL for the password reset email
-    // This should point to your page that handles password updates after token verification
-    // We assume /auth/confirm can handle a type like 'recovery' or similar from Supabase reset links
-    const resetPasswordRedirectUrl = `${window.location.origin}/auth/confirm`;
-
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: resetPasswordRedirectUrl,
-    });
+    // Temporarily remove the redirectTo option to test the default Supabase flow
+    // which should use token_hash instead of a PKCE flow.
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email);
 
     if (resetError) {
       setError(resetError.message);

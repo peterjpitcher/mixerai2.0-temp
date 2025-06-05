@@ -254,6 +254,25 @@ export default function ReleaseNotesPage() {
             For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
           </p>
         </section>
+
+        {/* Latest Release Entry - Password Reset & Email Templates */}
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            This update includes a diagnostic change to the password reset functionality to investigate an issue with token validation.
+          </p>
+
+          <h3>Key Changes</h3>
+          <h4>Password Reset Flow (Diagnostic Step)</h4>
+          <ul>
+            <li>To investigate an issue with password reset links expiring immediately, the reset flow has been temporarily changed.</li>
+            <li>The <code>redirectTo</code> parameter has been removed from the <code>resetPasswordForEmail</code> call in the "Forgot Password" page.</li>
+            <li>This forces Supabase to use its default email-based token flow (<code>token_hash</code>) instead of the PKCE flow, helping to isolate the source of the token validation error.</li>
+          </ul>
+          <p className="mt-4">
+            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+          </p>
+        </section>
       </div>
     </div>
   );
