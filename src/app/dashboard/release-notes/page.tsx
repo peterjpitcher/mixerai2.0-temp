@@ -12,7 +12,42 @@ export default function ReleaseNotesPage() {
         </CardHeader>
         <CardContent className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
           
-          {/* New Release Entry */}
+          {/* New Release Entry - June 5, 2025 (Moved to top) */}
+          <section className="mb-12">
+            <h2 className="text-xl font-semibold border-b pb-2 mb-4">Release: June 5, 2025</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              This release addresses critical bugs on the Content Edit page, ensuring that content data and template-defined fields are correctly loaded and displayed.
+            </p>
+
+            <h3>Key Enhancements & Fixes (Developed on <code>fix/small-bugs</code>)</h3>
+            
+            <h4>Content Edit Page (<code>/dashboard/content/[id]/edit</code>)</h4>
+            <ul>
+              <li>
+                <strong>Resolved TypeError for Template Fields:</strong>
+                <ul>
+                  <li>Fixed a <code>TypeError: Cannot read properties of undefined (reading 'outputFields')</code> that occurred when the page attempted to access <code>template.fields.outputFields</code> but the <code>template.fields</code> object itself was undefined.</li>
+                  <li>Enhanced conditional checks to ensure <code>template.fields</code> exists before accessing its nested properties, preventing the error and allowing the page to proceed with rendering.</li>
+                </ul>
+              </li>
+              <li>
+                <strong>Corrected Template Data Structure Handling:</strong>
+                <ul>
+                  <li>Addressed an issue where the "Generated Output Fields" card was not appearing. This was due to a mismatch between the component's expected <code>Template</code> interface (requiring fields to be nested under a <code>fields</code> property, e.g., <code>template.fields.outputFields</code>) and the actual flat structure returned by the <code>/api/content-templates/[id]</code> endpoint (e.g., <code>template.outputFields</code>).</li>
+                  <li>Implemented a transformation step within the data fetching logic to reshape the API response for content templates. The fetched <code>inputFields</code> and <code>outputFields</code> are now correctly nested under a <code>fields</code> object before being set into the component's state.</li>
+                  <li>This ensures the data structure aligns with the component's expectations, allowing the conditional rendering logic to pass and all template-based output fields (including those using <code>Textarea</code> and <code>RichTextEditor</code>) to be displayed correctly.</li>
+                </ul>
+              </li>
+            </ul>
+            <p className="mt-4">
+              These fixes restore the full functionality of the content editing interface, allowing users to view and modify all parts of their content as intended.
+            </p>
+            <p className="mt-4">
+              For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+            </p>
+          </section>
+
+          {/* Existing Release Entry - June 4, 2025 (First of the previous entries) */}
           <section className="mb-12">
             <h2 className="text-xl font-semibold border-b pb-2 mb-4">Release: June 4, 2025</h2>
             <p className="text-sm text-muted-foreground mb-4">

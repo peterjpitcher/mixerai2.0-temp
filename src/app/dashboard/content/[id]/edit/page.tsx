@@ -282,7 +282,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         }
         const contentResult = await contentResponse.json();
         if (contentResult.success && contentResult.data) {
-          setContent({
+          const newContentState = {
             id: contentResult.data.id,
             title: contentResult.data.title || '',
             body: contentResult.data.body || (contentResult.data.content_data?.contentBody || ''),
@@ -297,7 +297,9 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             workflow_id: contentResult.data.workflow_id || null,
             current_step: contentResult.data.current_step || null,
             workflow: contentResult.data.workflow || undefined
-          });
+          };
+          setContent(newContentState);
+          console.log('[ContentEditPage] Content state AFTER setContent in fetchAllData:', JSON.stringify(newContentState, null, 2));
 
           if (contentResult.data.brand_id && !activeBrandData) {
             fetch(`/api/brands/${contentResult.data.brand_id}`)
@@ -327,7 +329,21 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
               .then(res => res.json())
               .then(templateRes => {
                 if (templateRes.success && templateRes.template) {
-                  setTemplate(templateRes.template);
+                  const fetchedApiTemplate = templateRes.template;
+                  // Reshape the fetched template to match the component's Template interface
+                  const correctlyShapedTemplate: Template = {
+                    id: fetchedApiTemplate.id,
+                    name: fetchedApiTemplate.name,
+                    description: fetchedApiTemplate.description,
+                    // Ensure other top-level fields from API response are mapped if they exist in Template interface
+                    // For now, focusing on the critical 'fields' structure:
+                    fields: {
+                      inputFields: fetchedApiTemplate.inputFields || [],
+                      outputFields: fetchedApiTemplate.outputFields || []
+                    }
+                  };
+                  setTemplate(correctlyShapedTemplate);
+                  console.log('[ContentEditPage] Template state AFTER setTemplate (SHAPED):', JSON.stringify(correctlyShapedTemplate, null, 2));
                 } else {
                   console.error('Failed to fetch template for edit page:', templateRes.error);
                   // toast.error('Could not load content template structure.'); // Avoid double toast if content load fails
@@ -360,8 +376,12 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       }
     };
     
+    console.log('[ContentEditPage] Effect for fetchAllData triggered. ID:', id, 'CurrentUser ID:', currentUser?.id);
     if (id && currentUser?.id) {
+      console.log('[ContentEditPage] Conditions met. Calling fetchAllData.');
       fetchAllData();
+    } else {
+      console.warn('[ContentEditPage] Conditions NOT met for fetchAllData. ID:', id, 'CurrentUser:', currentUser);
     }
   }, [id, currentUser?.id]);
   
@@ -389,7 +409,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     let success = false;
     try {
       let primaryBodyFromOutputs = content.body; 
-      if (template && template.fields.outputFields.length > 0 && content.content_data?.generatedOutputs) {
+      if (template && template.fields && template.fields.outputFields && template.fields.outputFields.length > 0 && content.content_data?.generatedOutputs) {
         const richTextOutputField = template.fields.outputFields.find(f => f.type === 'richText');
         const firstOutputField = template.fields.outputFields[0];
         let fieldToUseForBody = richTextOutputField || firstOutputField;
@@ -574,36 +594,52 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             </CardContent>
           </Card>
           
-          {/* Card for Generated Output Fields based on Template */}
-          {template && template.fields.outputFields.length > 0 && (
+          {/* Test: Unconditionally render a simple div here -- REMOVING THIS NOW */}
+          {/* <div style={{ border: '2px solid red', padding: '10px', marginTop: '20px' }}>
+            UNCONDITIONAL STATIC TEST DIV - If you see this, basic rendering in this position is working.
+          </div> */}
+
+          {/* Original Card for Generated Output Fields based on Template - Restoring with static content */}
+          {template && template.fields && template.fields.outputFields && template.fields.outputFields.length > 0 && (
             <Card>
               <CardHeader><CardTitle>Generated Output Fields</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                {template.fields.outputFields.map(field => (
-                  <div key={field.id}>
-                    <Label htmlFor={`output_field_${field.id}`} className="text-base">
-                      {field.name || `Output Field (ID: ${field.id})`}
-                    </Label>
-                    {field.type === 'plainText' ? (
-                      <Textarea
-                        id={`output_field_${field.id}`}
-                        value={content.content_data?.generatedOutputs?.[field.id] || ''}
-                        onChange={(e) => handleGeneratedOutputChange(field.id, e.target.value)}
-                        placeholder={`Enter content for ${field.name}...`}
-                        className="min-h-[120px] border shadow-sm focus-visible:ring-1 focus-visible:ring-ring"
-                      />
-                    ) : (
-                      <RichTextEditor
-                        value={content.content_data?.generatedOutputs?.[field.id] || ''}
-                        onChange={(value) => handleGeneratedOutputChange(field.id, value)}
-                        placeholder={`Enter content for ${field.name}...`}
-                      />
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      Field Type: <span className='font-semibold'>{field.type}</span>
-                    </p>
-                  </div>
-                ))}
+                {/* Now, restore the map but with simplified content */}
+                {template.fields.outputFields.map(field => {
+                  console.log(`[ContentEditPage] INSIDE MAP (reintroducing RichTextEditor) - Field: ${field.name}, ID: ${field.id}, Type: ${field.type}`);
+                  const fieldValue = content.content_data?.generatedOutputs?.[field.id] || '';
+                  return (
+                    <div key={field.id}>
+                      <Label htmlFor={`output_field_${field.id}`} className="text-base">
+                        {field.name || `Output Field (ID: ${field.id})`}
+                      </Label>
+                      {field.type === 'plainText' ? (
+                        <Textarea
+                          id={`output_field_${field.id}`}
+                          value={fieldValue}
+                          onChange={(e) => handleGeneratedOutputChange(field.id, e.target.value)}
+                          placeholder={`Enter content for ${field.name}...`}
+                          className="min-h-[120px] border shadow-sm focus-visible:ring-1 focus-visible:ring-ring"
+                        />
+                      ) : field.type === 'richText' ? (
+                        <RichTextEditor
+                          value={fieldValue}
+                          onChange={(value) => handleGeneratedOutputChange(field.id, value)}
+                          placeholder={`Enter content for ${field.name}...`}
+                        />
+                      ) : (
+                        // Fallback for any other unknown types (shouldn't happen with current template)
+                        <div style={{ border: '1px dashed red', padding: '5px', marginTop: '5px'}}>
+                          <p><strong>Unknown Field Type:</strong> {field.type}</p>
+                          <pre>{fieldValue || '(empty)'}</pre>
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Field Type: <span className='font-semibold'>{field.type}</span>
+                      </p>
+                    </div>
+                  );
+                })}
               </CardContent>
             </Card>
           )}
@@ -611,7 +647,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
           {!template && content.template_id && (
              <Card><CardContent><p className="text-muted-foreground py-4">Loading template structure for output fields...</p></CardContent></Card>
           )}
-          {(template && template.fields.outputFields.length === 0) && (
+          {(template && template.fields && template.fields.outputFields && template.fields.outputFields.length === 0) && (
              <Card><CardContent><p className="text-muted-foreground py-4">No output fields defined in the template.</p></CardContent></Card>
           )}
         </div>
