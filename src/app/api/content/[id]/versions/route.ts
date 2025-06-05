@@ -19,7 +19,8 @@ export const GET = withAuth(async (request: NextRequest, user, context: { params
       .from('content_versions')
       .select(`
         *,
-        reviewer:reviewer_id(id, full_name, avatar_url)
+        reviewer:reviewer_id(id, full_name, avatar_url),
+        content_json
       `)
       .eq('content_id', contentId)
       .order('created_at', { ascending: false }); // Or by version_number

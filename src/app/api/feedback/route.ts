@@ -124,7 +124,7 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from('feedback_items')
-    .select('*, created_by_profile:profiles(full_name, avatar_url)', { count: 'exact' }); // Fetch creator profile info
+    .select('*, created_by_profile:profiles!fk_feedback_created_by(full_name, avatar_url)', { count: 'exact' }); // Fetch creator profile info
 
   if (typeParam && feedbackTypes.includes(typeParam as FeedbackType)) {
     query = query.eq('type', typeParam as FeedbackType);

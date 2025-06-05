@@ -67,6 +67,7 @@ interface ContentVersion {
   reviewer_id?: string;
   reviewer?: { id: string; full_name?: string; avatar_url?: string };
   created_at: string;
+  content_json?: any;
 }
 
 interface ContentDetailPageProps {
@@ -102,6 +103,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [activeBrandData, setActiveBrandData] = useState<any>(null);
   const [template, setTemplate] = useState<Template | null>(null);
+  const [expandedVersions, setExpandedVersions] = useState<Record<string, boolean>>({});
   const router = useRouter();
   const pathname = usePathname();
 
@@ -147,23 +149,62 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
              setActiveBrandData(contentResult.data.brands);
           }
 
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[Template Debug] Attempting to load template. Template ID from content:', contentResult.data.template_id);
+            if (contentResult.data.content_templates) {
+              console.log('[Template Debug] Found embedded template data in content:', JSON.stringify(contentResult.data.content_templates, null, 2));
+            }
+          }
+
           if (contentResult.data.template_id) {
             fetch(`/api/content-templates/${contentResult.data.template_id}`)
               .then(res => res.json())
               .then(templateRes => {
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('[Template Debug] Received template API response:', JSON.stringify(templateRes, null, 2));
+                }
                 if (templateRes.success && templateRes.template) {
-                  setTemplate(templateRes.template);
+                  const apiTemplateData = templateRes.template;
+                  // Normalize the API template structure to match the component's Template interface
+                  const normalizedTemplate: Template = {
+                    id: apiTemplateData.id,
+                    name: apiTemplateData.name,
+                    description: apiTemplateData.description,
+                    // Ensure 'fields' property exists and contains inputFields and outputFields
+                    fields: {
+                      inputFields: apiTemplateData.inputFields || [],
+                      outputFields: apiTemplateData.outputFields || []
+                    }
+                  };
+                  setTemplate(normalizedTemplate);
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('[Template Debug] Successfully set template state (normalized):', JSON.stringify(normalizedTemplate, null, 2));
+                  }
                 } else {
                   console.error('Failed to fetch template:', templateRes.error);
                   toast.error('Could not load content template structure.');
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('[Template Debug] Failed to set template state. Error:', templateRes.error);
+                  }
                 }
               })
               .catch(err => {
                 console.error('Error fetching template:', err);
                 toast.error('Error loading content template structure.');
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('[Template Debug] Exception during template fetch:', err.message);
+                }
               });
           } else if (contentResult.data.content_templates) {
             setTemplate(contentResult.data.content_templates);
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[Template Debug] Set template state from embedded data:', JSON.stringify(contentResult.data.content_templates, null, 2));
+            }
+          } else {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[Template Debug] No template_id found and no embedded template data in content.');
+            }
+            toast.message('Content does not have an associated template. Field names may not display correctly in history.');
           }
 
         } else {
@@ -315,6 +356,10 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     }
   };
 
+  const toggleVersionExpansion = (versionId: string) => {
+    setExpandedVersions(prev => ({ ...prev, [versionId]: !prev[versionId] }));
+  };
+
   return (
     <div className="container mx-auto p-4">
       <Breadcrumbs items={breadcrumbItems} />
@@ -390,9 +435,14 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
                           </span>
                           <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">(v{version.version_number}) - {version.action_status}</span>
                         </div>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {getFormattedDateTime(version.created_at)}
-                        </span>
+                        <div className="flex items-center">
+                          <span className="text-xs text-gray-500 dark:text-gray-400 mr-3">
+                            {getFormattedDateTime(version.created_at)}
+                          </span>
+                          <Button variant="outline" size="sm" onClick={() => toggleVersionExpansion(version.id)}>
+                            {expandedVersions[version.id] ? 'Hide' : 'Show'} Details
+                          </Button>
+                        </div>
                       </div>
                       {version.reviewer && (
                         <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">
@@ -402,6 +452,85 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
                       {version.feedback && (
                         <div className="mt-1 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md">
                           <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{version.feedback}</p>
+                        </div>
+                      )}
+
+                      {expandedVersions[version.id] && (
+                        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                          <h4 className="text-md font-semibold mb-2 text-gray-800 dark:text-gray-100">Content Snapshot (Version {version.version_number})</h4>
+                          
+                          {(() => {
+                            if (process.env.NODE_ENV === 'development') {
+                              console.log(`[Version Snapshot Debug] Version ID: ${version.id}, Number: ${version.version_number}`);
+                              console.log('[Version Snapshot Debug] outputFieldIdToNameMap:', JSON.stringify(outputFieldIdToNameMap, null, 2));
+                              console.log('[Version Snapshot Debug] version.content_json:', JSON.stringify(version.content_json, null, 2));
+                            }
+
+                            const generatedOutputs = version.content_json?.generatedOutputs;
+                            if (generatedOutputs && typeof generatedOutputs === 'object' && template?.fields?.outputFields) {
+                              // --- Start Diagnostic Logging for generatedOutputs processing ---
+                              if (process.env.NODE_ENV === 'development') {
+                                console.log('[Version Snapshot Debug] All keys in generatedOutputs:', Object.keys(generatedOutputs));
+                                console.log('[Version Snapshot Debug] Template outputFields order:', template.fields.outputFields.map(f => ({id: f.id, name: f.name})));
+                              }
+                              // --- End Diagnostic Logging ---
+
+                              // Iterate over template.fields.outputFields to maintain order
+                              const fieldsToRender = template.fields.outputFields
+                                .map(templateField => {
+                                  if (generatedOutputs.hasOwnProperty(templateField.id)) {
+                                    return {
+                                      id: templateField.id,
+                                      name: templateField.name, // Use name directly from template definition
+                                      value: generatedOutputs[templateField.id]
+                                    };
+                                  }
+                                  return null;
+                                })
+                                .filter(field => field !== null) as { id: string; name: string; value: any }[];
+
+                              // --- Start Diagnostic Logging for displayableFields (now fieldsToRender) ---
+                              if (process.env.NODE_ENV === 'development') {
+                                console.log('[Version Snapshot Debug] Fields to render (ordered by template) count:', fieldsToRender.length);
+                                if (fieldsToRender.length > 0) {
+                                  console.log('[Version Snapshot Debug] Fields to render details (ID, Name, Value Preview):', 
+                                    fieldsToRender.map(field => ({ 
+                                      id: field.id, 
+                                      name: field.name, 
+                                      valuePreview: String(field.value).substring(0, 50) + (String(field.value).length > 50 ? '...' : '') 
+                                    }))
+                                  );
+                                }
+                              }
+                              // --- End Diagnostic Logging ---
+
+                              if (fieldsToRender.length > 0) {
+                                return fieldsToRender.map(field => {
+                                  // const fieldName = outputFieldIdToNameMap[field.id]; // No longer needed as we use field.name
+                                  return (
+                                    <div key={field.id} className="mb-4">
+                                      <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-1">{field.name}</h5>
+                                      <div className="prose prose-sm max-w-none p-3 border rounded-md bg-gray-50 dark:bg-gray-700/30 text-gray-800 dark:text-gray-200">
+                                        <MarkdownDisplay markdown={String(field.value) || 'No content for this field in this version.'} />
+                                      </div>
+                                    </div>
+                                  );
+                                });
+                              } 
+                            }
+                            // Fallback if no displayable generatedOutputs or if generatedOutputs is not in the expected format
+                            if (version.content_json?.body_snapshot) {
+                              return (
+                                <div className="mb-4">
+                                  <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-1">Body</h5>
+                                  <div className="prose prose-sm max-w-none p-3 border rounded-md bg-gray-50 dark:bg-gray-700/30 text-gray-800 dark:text-gray-200">
+                                    <MarkdownDisplay markdown={version.content_json.body_snapshot} />
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return <p className="text-sm text-gray-500 dark:text-gray-400">No displayable content snapshot available for this version.</p>;
+                          })()}
                         </div>
                       )}
                     </li>

@@ -32,6 +32,10 @@ interface FeedbackItemForTable {
   title?: string | null;
   priority: FeedbackPriority;
   status: string; // Keep as string for status from API for table display
+  created_by_profile?: {
+    full_name?: string | null;
+    // avatar_url?: string | null; // Also available if needed later
+  };
 }
 
 interface FeedbackFormState {
@@ -276,7 +280,8 @@ export default function SubmitFeedbackPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-[40%]">Title</TableHead>
+                                    <TableHead className="w-[35%]">Title</TableHead>
+                                    <TableHead>Submitted By</TableHead>
                                     <TableHead>Type</TableHead>
                                     <TableHead>Priority</TableHead>
                                     <TableHead>Status</TableHead>
@@ -291,6 +296,7 @@ export default function SubmitFeedbackPage() {
                                             {item.title || 'N/A'}
                                         </Link>
                                     </TableCell>
+                                    <TableCell>{item.created_by_profile?.full_name || 'N/A'}</TableCell>
                                     <TableCell className="capitalize">{item.type}</TableCell>
                                     <TableCell className="capitalize">{item.priority}</TableCell>
                                     <TableCell className="capitalize">{item.status.replace('_', ' ')}</TableCell>

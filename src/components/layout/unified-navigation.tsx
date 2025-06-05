@@ -505,7 +505,7 @@ export function UnifiedNavigation() {
                           );
                         }
                         return (
-                          <li key={subItem.href}>
+                          <li key={subItem.segment || subItem.label || subItem.href}>
                             <Link
                               href={subItem.href}
                               className={cn(
