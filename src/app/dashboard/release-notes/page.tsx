@@ -20,17 +20,16 @@ export default function ReleaseNotesPage() {
         <section className="mb-12">
           <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            This major update completely refactors the password recovery flow to be more robust and reliable, resolving persistent token expiry errors.
+            This release finalizes the password reset functionality by implementing a more stable, code-based authentication flow.
           </p>
 
-          <h3>Key Enhancements</h3>
-          <h4>Password Recovery Flow Overhaul (<code>/auth/confirm</code>)</h4>
+          <h3>Key Fixes & Enhancements</h3>
+          <h4>Password Reset Flow (Code Exchange)</h4>
           <ul>
-            <li>Replaced the previous multi-purpose confirmation page with a new, dedicated client component (<code>PasswordRecoveryFlow</code>) specifically designed for handling password resets.</li>
-            <li>The new component correctly parses the <code>access_token</code> and <code>type=recovery</code> from the URL hash fragment (<code>#</code>), which is the method used by Supabase's secure PKCE authentication flow.</li>
-            <li>It now uses <code>supabase.auth.setSession()</code> to establish a valid user session from the token before allowing a password update.</li>
-            <li>The UI has been enhanced with distinct, clear states for "Loading", "Error", "Ready" (to show the password form), "Submitting", and "Complete", providing better user feedback throughout the process.</li>
-            <li>This change fixes the root cause of the "Email link is invalid or has expired" errors by correctly implementing the client-side logic required by Supabase's PKCE password recovery.</li>
+            <li>To bypass persistent issues with the PKCE flow, the password reset mechanism was changed to use Supabase's Authorization Code Exchange flow.</li>
+            <li>The <code>forgot-password</code> page no longer sends a <code>redirectTo</code> parameter, prompting Supabase to send a one-time <code>code</code> in the URL query string.</li>
+            <li>The diagnostic page (<code>/auth/reset-password-test</code>) has been refactored to handle this flow. It now reads the <code>code</code> from the URL, exchanges it for a valid user session using <code>supabase.auth.exchangeCodeForSession()</code>, and then securely allows the user to update their password.</li>
+            <li>This new implementation is more resilient and resolves the "token expired" errors.</li>
           </ul>
           <p className="mt-4">
             For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.

@@ -1,76 +1,111 @@
 'use client';
 
-// A special component to render raw HTML, which we need for this diagnostic test.
-function RawHtmlComponent({ html }: { html: string }) {
-  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { createSupabaseClient } from '@/lib/supabase/client';
+
+function ResetPasswordTestContent() {
+  const searchParams = useSearchParams();
+  const supabase = createSupabaseClient();
+
+  const [status, setStatus] = useState<'loading' | 'ready' | 'submitting' | 'complete' | 'error'>('loading');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState<string>('');
+
+  useEffect(() => {
+    if (!searchParams) {
+      // searchParams is not available yet, wait for the next render.
+      return;
+    }
+    const code = searchParams.get('code');
+
+    if (!code) {
+      // This might happen on initial load before the redirect with the code
+      // We'll give it a moment, but if it's still not there, it's an issue.
+      const timer = setTimeout(() => {
+        if (!searchParams.get('code')) {
+            setStatus('error');
+            setErrorMsg('No authorization code found in URL. Please try the reset link again.');
+        }
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+
+    const exchangeCode = async () => {
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) {
+        setStatus('error');
+        setErrorMsg(`Failed to exchange code for session: ${error.message}`);
+      } else {
+        // Session is now set, user can update their password
+        setStatus('ready');
+      }
+    };
+
+    exchangeCode();
+  }, [searchParams, supabase]);
+
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      setErrorMsg("Password must be at least 6 characters long.");
+      return;
+    }
+    setErrorMsg(null);
+    setStatus('submitting');
+    
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      setStatus('error');
+      setErrorMsg(`Failed to update password: ${error.message}`);
+    } else {
+      setStatus('complete');
+    }
+  };
+  
+  if (status === 'loading') {
+    return <p>Verifying code...</p>;
+  }
+  if (status === 'error') {
+    return <p style={{ color: 'red' }}>Error: {errorMsg}</p>;
+  }
+  if (status === 'submitting') {
+    return <p>Updating password...</p>;
+  }
+  if (status === 'complete') {
+    return <p>Password updated successfully! You can now log in.</p>;
+  }
+
+  return (
+    <div>
+      <h3>Set a New Password</h3>
+      <form onSubmit={handlePasswordUpdate}>
+        <input 
+          type="password" 
+          id="new-password" 
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          placeholder="Enter your new password" 
+          style={{ display: 'block', margin: '0.5rem 0' }} 
+          required 
+          minLength={6} 
+        />
+        {errorMsg && <p style={{ color: 'red', fontSize: '12px' }}>{errorMsg}</p>}
+        <button type="submit">Update Password</button>
+      </form>
+    </div>
+  );
 }
 
 export default function ResetPasswordTestPage() {
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html lang="en-GB">
-    <head>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>Supabase Password-Reset Test</title>
-    </head>
-    <body>
-      <h2>Supabase Password-Reset Test</h2>
-      <p>This is a diagnostic page. It should be replaced with a styled component once the flow is confirmed to work.</p>
-      <p>After clicking the link in your password reset email, this page should detect the session and allow you to update your password.</p>
-      
-      <div id="password-form" style="display: none; margin-top: 1rem;">
-        <h3>Set a New Password</h3>
-        <input type="password" id="new-password" placeholder="Enter your new password" style="display: block; margin-bottom: 0.5rem;" />
-        <button id="update-password-btn">Update Password</button>
+  // Suspense is needed because we use useSearchParams
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <div>
+        <h2>Supabase Password-Reset Test</h2>
+        <p>This is a diagnostic page. It should be replaced with a styled component once the flow is confirmed to work.</p>
+        <ResetPasswordTestContent />
       </div>
-
-      <pre id="output" style="margin-top: 1rem; background: #f5f5f5; padding: 1rem; border: 1px solid #ccc;"></pre>
-
-      <script type="module">
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
-
-        const SUPABASE_URL   = '${process.env.NEXT_PUBLIC_SUPABASE_URL}';
-        const SUPABASE_ANON  = '${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}';
-
-        if (!SUPABASE_URL || !SUPABASE_ANON) {
-            document.getElementById('output').textContent = 'Error: Supabase environment variables are not loaded.';
-        } else {
-            const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
-            const outputEl = document.getElementById('output');
-            const formEl = document.getElementById('password-form');
-            const passwordInput = document.getElementById('new-password');
-            const updateBtn = document.getElementById('update-password-btn');
-
-            // Listen for the PASSWORD_RECOVERY event
-            supabase.auth.onAuthStateChange((event, session) => {
-                if (event === 'PASSWORD_RECOVERY') {
-                    outputEl.textContent = 'Session detected from recovery link. You can now set a new password.';
-                    formEl.style.display = 'block';
-
-                    updateBtn.onclick = async () => {
-                        const newPassword = passwordInput.value;
-                        if (newPassword.length < 6) {
-                            outputEl.textContent = 'Password must be at least 6 characters long.';
-                            return;
-                        }
-
-                        const { data, error } = await supabase.auth.updateUser({ password: newPassword });
-
-                        if (error) {
-                            outputEl.textContent = 'Error updating password: ' + error.message;
-                        } else {
-                            outputEl.textContent = 'Password updated successfully! You can now log in with your new password.';
-                            formEl.style.display = 'none';
-                        }
-                    };
-                }
-            });
-        }
-      </script>
-    </body>
-    </html>
-  `;
-
-  return <RawHtmlComponent html={htmlContent} />;
+    </Suspense>
+  );
 } 
