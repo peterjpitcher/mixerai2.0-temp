@@ -20,16 +20,21 @@ export default function ReleaseNotesPage() {
         <section className="mb-12">
           <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            This release implements a definitive fix for the password reset functionality by isolating the authentication logic from the Next.js/React component lifecycle.
+            This release includes a definitive fix for the Supabase password reset functionality, resolving all previously encountered token errors.
           </p>
 
           <h3>Key Fixes & Enhancements</h3>
-          <h4>Password Reset Flow (Raw HTML Page)</h4>
+          <h4>Password Reset (PKCE Flow)</h4>
           <ul>
-            <li>After confirming the issue was environmental to the Next.js app, a new page was created at <code>/auth/reset-password-v2</code>.</li>
-            <li>This page uses <code>dangerouslySetInnerHTML</code> to render a minimal, static HTML document with a simple script, replicating a known-good test case.</li>
-            <li>This approach bypasses any potential interference from the React lifecycle, ensuring the Supabase client can reliably handle the secure PKCE flow.</li>
-            <li>The "Forgot Password" process now redirects to this new stable page, and the original <code>/auth/confirm</code> page is no longer used for this flow.</li>
+            <li>**Final Root Cause:** The core issue was an unstable Supabase client instance within our React components, which prevented the secure PKCE token from being handled correctly.</li>
+            <li>**Solution:**
+              <ol>
+                <li>The Supabase client helper at <code>src/lib/supabase/client.ts</code> was refactored to use a singleton pattern, ensuring a single, stable client instance is used throughout the application.</li>
+                <li>The password reset page (<code>/auth/confirm</code>) has been finalized to use the official <code>onAuthStateChange</code> listener, which is the most robust method for handling the redirect and session creation from Supabase.</li>
+                <li>All diagnostic code and temporary pages have been removed.</li>
+              </ol>
+            </li>
+            <li>**Outcome:** The password reset flow is now fully functional, secure, and stable.</li>
           </ul>
           <p className="mt-4">
             For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
