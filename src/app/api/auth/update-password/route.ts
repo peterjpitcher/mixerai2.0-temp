@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
     if (!access_token || !refresh_token) {
       return NextResponse.json(
-        { error: 'Missing access or refresh token.' },
+        { error: 'Authentication tokens are missing.' },
         { status: 401 }
       );
     }
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
     if (sessionError) {
       return NextResponse.json(
-        { error: `Invalid token session: ${sessionError.message}` },
+        { error: `Invalid session: ${sessionError.message}` },
         { status: 401 }
       );
     }
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json(
-      { error: 'An unexpected error occurred.' },
+      { error: 'An unexpected server error occurred.' },
       { status: 500 }
     );
   }

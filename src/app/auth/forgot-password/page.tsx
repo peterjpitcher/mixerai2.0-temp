@@ -27,8 +27,8 @@ export default function ForgotPasswordPage() {
     setError(null);
     setSuccessMessage(null);
 
-    // This is the correct flow. It MUST point to the page that handles the hash fragment.
-    const resetPasswordRedirectUrl = `${window.location.origin}/auth/confirm`;
+    // Point the redirect to our new, final update-password page
+    const resetPasswordRedirectUrl = `${window.location.origin}/auth/update-password`;
 
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: resetPasswordRedirectUrl,

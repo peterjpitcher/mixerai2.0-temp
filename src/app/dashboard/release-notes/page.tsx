@@ -62,161 +62,161 @@ export default function ReleaseNotesPage() {
         </section>
 
         {/* Existing Release Entry - June 5, 2025 */}
-        <section className="mb-12">
-          <h2 className="text-xl font-semibold border-b pb-2 mb-4">Release: June 5, 2025</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            This release addresses critical bugs on the Content Edit page, ensuring that content data and template-defined fields are correctly loaded and displayed.
-          </p>
+          <section className="mb-12">
+            <h2 className="text-xl font-semibold border-b pb-2 mb-4">Release: June 5, 2025</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              This release addresses critical bugs on the Content Edit page, ensuring that content data and template-defined fields are correctly loaded and displayed.
+            </p>
 
-          <h3>Key Enhancements & Fixes (Developed on <code>fix/small-bugs</code>)</h3>
-          
-          <h4>Content Edit Page (<code>/dashboard/content/[id]/edit</code>)</h4>
-          <ul>
-            <li>
-              <strong>Resolved TypeError for Template Fields:</strong>
-              <ul>
-                <li>Fixed a <code>TypeError: Cannot read properties of undefined (reading 'outputFields')</code> that occurred when the page attempted to access <code>template.fields.outputFields</code> but the <code>template.fields</code> object itself was undefined.</li>
-                <li>Enhanced conditional checks to ensure <code>template.fields</code> exists before accessing its nested properties, preventing the error and allowing the page to proceed with rendering.</li>
-              </ul>
-            </li>
-            <li>
-              <strong>Corrected Template Data Structure Handling:</strong>
-              <ul>
-                <li>Addressed an issue where the "Generated Output Fields" card was not appearing. This was due to a mismatch between the component's expected <code>Template</code> interface (requiring fields to be nested under a <code>fields</code> property, e.g., <code>template.fields.outputFields</code>) and the actual flat structure returned by the <code>/api/content-templates/[id]</code> endpoint (e.g., <code>template.outputFields</code>).</li>
-                <li>Implemented a transformation step within the data fetching logic to reshape the API response for content templates. The fetched <code>inputFields</code> and <code>outputFields</code> are now correctly nested under a <code>fields</code> object before being set into the component's state.</li>
-                <li>This ensures the data structure aligns with the component's expectations, allowing the conditional rendering logic to pass and all template-based output fields (including those using <code>Textarea</code> and <code>RichTextEditor</code>) to be displayed correctly.</li>
-              </ul>
-            </li>
-          </ul>
-          <p className="mt-4">
-            These fixes restore the full functionality of the content editing interface, allowing users to view and modify all parts of their content as intended.
-          </p>
-          <p className="mt-4">
-            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
-          </p>
-        </section>
+            <h3>Key Enhancements & Fixes (Developed on <code>fix/small-bugs</code>)</h3>
+            
+            <h4>Content Edit Page (<code>/dashboard/content/[id]/edit</code>)</h4>
+            <ul>
+              <li>
+                <strong>Resolved TypeError for Template Fields:</strong>
+                <ul>
+                  <li>Fixed a <code>TypeError: Cannot read properties of undefined (reading 'outputFields')</code> that occurred when the page attempted to access <code>template.fields.outputFields</code> but the <code>template.fields</code> object itself was undefined.</li>
+                  <li>Enhanced conditional checks to ensure <code>template.fields</code> exists before accessing its nested properties, preventing the error and allowing the page to proceed with rendering.</li>
+                </ul>
+              </li>
+              <li>
+                <strong>Corrected Template Data Structure Handling:</strong>
+                <ul>
+                  <li>Addressed an issue where the "Generated Output Fields" card was not appearing. This was due to a mismatch between the component's expected <code>Template</code> interface (requiring fields to be nested under a <code>fields</code> property, e.g., <code>template.fields.outputFields</code>) and the actual flat structure returned by the <code>/api/content-templates/[id]</code> endpoint (e.g., <code>template.outputFields</code>).</li>
+                  <li>Implemented a transformation step within the data fetching logic to reshape the API response for content templates. The fetched <code>inputFields</code> and <code>outputFields</code> are now correctly nested under a <code>fields</code> object before being set into the component's state.</li>
+                  <li>This ensures the data structure aligns with the component's expectations, allowing the conditional rendering logic to pass and all template-based output fields (including those using <code>Textarea</code> and <code>RichTextEditor</code>) to be displayed correctly.</li>
+                </ul>
+              </li>
+            </ul>
+            <p className="mt-4">
+              These fixes restore the full functionality of the content editing interface, allowing users to view and modify all parts of their content as intended.
+            </p>
+            <p className="mt-4">
+              For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+            </p>
+          </section>
 
-        {/* Existing Release Entry - June 4, 2025 (First of the previous entries) */}
-        <section className="mb-12">
-          <h2 className="text-xl font-semibold border-b pb-2 mb-4">Release: June 4, 2025</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            This release focuses on refining the content creation process by ensuring users can only select brands with configured workflows for specific templates, and aligns navigation visibility with documented permissions.
-          </p>
+          {/* Existing Release Entry - June 4, 2025 (First of the previous entries) */}
+          <section className="mb-12">
+            <h2 className="text-xl font-semibold border-b pb-2 mb-4">Release: June 4, 2025</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              This release focuses on refining the content creation process by ensuring users can only select brands with configured workflows for specific templates, and aligns navigation visibility with documented permissions.
+            </p>
 
-          <h3>Key Enhancements & Fixes (Developed on <code>feature/content-page-navigation-updates</code>)</h3>
-          
-          <h4>Content Creation Page (<code>/dashboard/content/new</code>)</h4>
-          <ul>
-            <li>
-              <strong>Smart Brand Filtering:</strong>
-              <ul>
-                <li>The brand dropdown on the content generation page is now dynamically filtered. Users will only see brands that have an active workflow configured for the currently selected content template.</li>
-                <li>This prevents users from selecting a brand/template combination that cannot be used for content generation.</li>
-                <li>If no brands are configured with a workflow for the selected template, a message is displayed guiding the user to contact an administrator, and the form is disabled.</li>
-              </ul>
-            </li>
-            <li>
-              <strong>Removed Post-Selection Error:</strong> The previous behavior of allowing selection and then showing an error if no workflow was found (with admin contact details) has been replaced by the proactive filtering mentioned above.
-            </li>
-          </ul>
+            <h3>Key Enhancements & Fixes (Developed on <code>feature/content-page-navigation-updates</code>)</h3>
+            
+            <h4>Content Creation Page (<code>/dashboard/content/new</code>)</h4>
+            <ul>
+              <li>
+                <strong>Smart Brand Filtering:</strong>
+                <ul>
+                  <li>The brand dropdown on the content generation page is now dynamically filtered. Users will only see brands that have an active workflow configured for the currently selected content template.</li>
+                  <li>This prevents users from selecting a brand/template combination that cannot be used for content generation.</li>
+                  <li>If no brands are configured with a workflow for the selected template, a message is displayed guiding the user to contact an administrator, and the form is disabled.</li>
+                </ul>
+              </li>
+              <li>
+                <strong>Removed Post-Selection Error:</strong> The previous behavior of allowing selection and then showing an error if no workflow was found (with admin contact details) has been replaced by the proactive filtering mentioned above.
+              </li>
+            </ul>
 
-          <h4>Navigation and Permissions (<code>UnifiedNavigation.tsx</code>)</h4>
-          <ul>
-            <li>
-              <strong>Editor Role Permissions:</strong> Corrected navigation item visibility for users with the "Editor" role. Editors will no longer see links for "Brands," "Workflows," and "Content Templates," aligning with the permissions outlined in <code>NAVIGATION_PERMISSIONS.md</code>.
-            </li>
-            <li>
-              <strong>"Create Content" Sub-menu Filtering:</strong>
-              <ul>
-                <li>Platform Administrators continue to see all "Create Content" sub-items (derived from all available templates).</li>
-                <li>Scoped Administrators and Editors will now only see "Create Content" sub-items for templates that have at least one workflow associated with one of their assigned brands.</li>
-              </ul>
-            </li>
-          </ul>
+            <h4>Navigation and Permissions (<code>UnifiedNavigation.tsx</code>)</h4>
+            <ul>
+              <li>
+                <strong>Editor Role Permissions:</strong> Corrected navigation item visibility for users with the "Editor" role. Editors will no longer see links for "Brands," "Workflows," and "Content Templates," aligning with the permissions outlined in <code>NAVIGATION_PERMISSIONS.md</code>.
+              </li>
+              <li>
+                <strong>"Create Content" Sub-menu Filtering:</strong>
+                <ul>
+                  <li>Platform Administrators continue to see all "Create Content" sub-items (derived from all available templates).</li>
+                  <li>Scoped Administrators and Editors will now only see "Create Content" sub-items for templates that have at least one workflow associated with one of their assigned brands.</li>
+                </ul>
+              </li>
+            </ul>
 
-          <h4>API Updates</h4>
-          <ul>
-            <li>
-              <strong>New Endpoint for Brand Admins:</strong> Created <code>GET /api/brands/[id]/admins</code> to fetch a list of administrators for a specific brand. This was initially used for error messaging but is now less directly exposed in the UI due to the new brand filtering logic.
-            </li>
-            <li>
-              <strong>Workflow API Enhancement:</strong> The <code>GET /api/workflows</code> endpoint now correctly filters workflows by <code>template_id</code> when this parameter is provided in the request. This ensures accurate data for both the content generation page and navigation filtering.
-            </li>
-          </ul>
-          <p className="mt-4">
-            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
-          </p>
-        </section>
+            <h4>API Updates</h4>
+            <ul>
+              <li>
+                <strong>New Endpoint for Brand Admins:</strong> Created <code>GET /api/brands/[id]/admins</code> to fetch a list of administrators for a specific brand. This was initially used for error messaging but is now less directly exposed in the UI due to the new brand filtering logic.
+              </li>
+              <li>
+                <strong>Workflow API Enhancement:</strong> The <code>GET /api/workflows</code> endpoint now correctly filters workflows by <code>template_id</code> when this parameter is provided in the request. This ensures accurate data for both the content generation page and navigation filtering.
+              </li>
+            </ul>
+            <p className="mt-4">
+              For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+            </p>
+          </section>
 
-        {/* Entry for the current/most recent release */}
-        <section className="mb-12">
-          <h2 className="text-xl font-semibold border-b pb-2 mb-4">Release: June 4, 2025</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            This release focuses on enhancing the content generation capabilities, improving UI/UX, ensuring build stability, and adding this Release Notes page.
-          </p>
+          {/* Entry for the current/most recent release */}
+          <section className="mb-12">
+            <h2 className="text-xl font-semibold border-b pb-2 mb-4">Release: June 4, 2025</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              This release focuses on enhancing the content generation capabilities, improving UI/UX, ensuring build stability, and adding this Release Notes page.
+            </p>
 
-          <h3>Key Enhancements & Fixes (Developed on <code>feature/enhance-content-page</code>)</h3>
-          
-          <h4>Content Generation Form (<code>/dashboard/content/new</code>)</h4>
-          <ul>
-            <li>
-              <strong>Individual Field Retry:</strong>
-              <ul>
-                <li>Implemented a new API endpoint (<code>src/app/api/content/generate-field/route.ts</code>) to allow regeneration of content for a single output field if the initial attempt fails or if users wish to retry.</li>
-                <li>Added "Retry Generation" buttons next to each output field in the Content Generator Form (<code>src/components/content/content-generator-form.tsx</code>).</li>
-                <li>These buttons are now always visible after the initial content generation attempt, allowing users to regenerate any field.</li>
-                <li>Enhanced the retry mechanism to include comprehensive brand context (name, identity, tone of voice, guardrails) and detailed task instructions, ensuring the AI has sufficient information for high-quality, brand-aligned regeneration. This addresses issues where retried content was too generic.</li>
-                <li>Improved placeholder interpolation in AI prompts for retries to correctly use brand details and other field values.</li>
-              </ul>
-            </li>
-            <li>
-              <strong>"Regenerate All Content" Button:</strong> Added a button to allow users to re-trigger the entire content generation process for all fields, including the title, after an initial generation.
-            </li>
-          </ul>
+            <h3>Key Enhancements & Fixes (Developed on <code>feature/enhance-content-page</code>)</h3>
+            
+            <h4>Content Generation Form (<code>/dashboard/content/new</code>)</h4>
+            <ul>
+              <li>
+                <strong>Individual Field Retry:</strong>
+                <ul>
+                  <li>Implemented a new API endpoint (<code>src/app/api/content/generate-field/route.ts</code>) to allow regeneration of content for a single output field if the initial attempt fails or if users wish to retry.</li>
+                  <li>Added "Retry Generation" buttons next to each output field in the Content Generator Form (<code>src/components/content/content-generator-form.tsx</code>).</li>
+                  <li>These buttons are now always visible after the initial content generation attempt, allowing users to regenerate any field.</li>
+                  <li>Enhanced the retry mechanism to include comprehensive brand context (name, identity, tone of voice, guardrails) and detailed task instructions, ensuring the AI has sufficient information for high-quality, brand-aligned regeneration. This addresses issues where retried content was too generic.</li>
+                  <li>Improved placeholder interpolation in AI prompts for retries to correctly use brand details and other field values.</li>
+                </ul>
+              </li>
+              <li>
+                <strong>"Regenerate All Content" Button:</strong> Added a button to allow users to re-trigger the entire content generation process for all fields, including the title, after an initial generation.
+              </li>
+            </ul>
 
-          <h4>AI-Generated Template Descriptions</h4>
-          <ul>
-            <li>
-              <strong>Real AI Implementation:</strong> Replaced the mock AI call in the API route for generating content template descriptions (<code>src/app/api/ai/generate-template-description/route.ts</code>) with a call to the actual Azure OpenAI service using the project's standard <code>generateTextCompletion</code> utility.
-            </li>
-            <li>
-              <strong>Improved Prompting:</strong>
-              <ul>
-                <li>Removed the "AI Template Description: " prefix from the generated output.</li>
-                <li>Updated the system and user prompts to encourage clear, concise, helpful, and complete descriptions, avoiding truncation.</li>
-              </ul>
-            </li>
-          </ul>
+            <h4>AI-Generated Template Descriptions</h4>
+            <ul>
+              <li>
+                <strong>Real AI Implementation:</strong> Replaced the mock AI call in the API route for generating content template descriptions (<code>src/app/api/ai/generate-template-description/route.ts</code>) with a call to the actual Azure OpenAI service using the project's standard <code>generateTextCompletion</code> utility.
+              </li>
+              <li>
+                <strong>Improved Prompting:</strong>
+                <ul>
+                  <li>Removed the "AI Template Description: " prefix from the generated output.</li>
+                  <li>Updated the system and user prompts to encourage clear, concise, helpful, and complete descriptions, avoiding truncation.</li>
+                </ul>
+              </li>
+            </ul>
 
-          <h4>User Interface & User Experience (UI/UX)</h4>
-          <ul>
-            <li>
-              <strong>Toast Notification Position:</strong> Moved toast notifications (using Sonner) from the bottom-right to the **top-right** corner of the screen to prevent them from obstructing critical UI elements. This change was made globally in <code>src/components/sonner.tsx</code>.
-            </li>
-            <li>
-              <strong>Toast Notification Appearance:</strong> Updated toast notifications to have a solid white background and dark text for improved readability, addressing issues with transparency.
-            </li>
-            <li>
-              <strong>Navigation Highlighting:</strong> Adjusted active state logic in <code>src/components/layout/unified-navigation.tsx</code> to correctly highlight "Create Content" sub-items in red and ensure "All Content" is not highlighted when a sub-item is active.
-            </li>
-          </ul>
+            <h4>User Interface & User Experience (UI/UX)</h4>
+            <ul>
+              <li>
+                <strong>Toast Notification Position:</strong> Moved toast notifications (using Sonner) from the bottom-right to the **top-right** corner of the screen to prevent them from obstructing critical UI elements. This change was made globally in <code>src/components/sonner.tsx</code>.
+              </li>
+              <li>
+                <strong>Toast Notification Appearance:</strong> Updated toast notifications to have a solid white background and dark text for improved readability, addressing issues with transparency.
+              </li>
+              <li>
+                <strong>Navigation Highlighting:</strong> Adjusted active state logic in <code>src/components/layout/unified-navigation.tsx</code> to correctly highlight "Create Content" sub-items in red and ensure "All Content" is not highlighted when a sub-item is active.
+              </li>
+            </ul>
 
-          <h4>Build Stability & Technical Fixes</h4>
-          <ul>
-            <li>
-              <strong>API Structure for Templates:</strong> Corrected the API response for single content templates (<code>src/app/api/content-templates/[id]/route.ts</code>) to return a flattened structure for <code>inputFields</code> and <code>outputFields</code>, resolving an issue where template fields were not loading in the Content Generator.
-            </li>
-            <li>
-              <strong>Type Definitions:</strong> Modified <code>ContentTemplate</code> type in <code>src/types/template.ts</code> and updated consuming components (`ContentGeneratorForm`, `TemplateForm`) to align with data structure changes, resolving various linter and build errors.
-            </li>
-            <li>
-              <strong>Suspense Boundary:</strong> Added a <code>&lt;React.Suspense&gt;</code> boundary around the <code>UnifiedNavigation</code> component in <code>src/app/dashboard/layout.tsx</code> to fix build errors related to the use of <code>useSearchParams</code>.
-            </li>
-          </ul>
-          <p className="mt-4">
-            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
-          </p>
-        </section>
+            <h4>Build Stability & Technical Fixes</h4>
+            <ul>
+              <li>
+                <strong>API Structure for Templates:</strong> Corrected the API response for single content templates (<code>src/app/api/content-templates/[id]/route.ts</code>) to return a flattened structure for <code>inputFields</code> and <code>outputFields</code>, resolving an issue where template fields were not loading in the Content Generator.
+              </li>
+              <li>
+                <strong>Type Definitions:</strong> Modified <code>ContentTemplate</code> type in <code>src/types/template.ts</code> and updated consuming components (`ContentGeneratorForm`, `TemplateForm`) to align with data structure changes, resolving various linter and build errors.
+              </li>
+              <li>
+                <strong>Suspense Boundary:</strong> Added a <code>&lt;React.Suspense&gt;</code> boundary around the <code>UnifiedNavigation</code> component in <code>src/app/dashboard/layout.tsx</code> to fix build errors related to the use of <code>useSearchParams</code>.
+              </li>
+            </ul>
+            <p className="mt-4">
+              For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+            </p>
+          </section>
 
         {/* Latest Release Entry - Password Reset & Email Templates */}
         <section className="mb-12">
