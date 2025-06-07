@@ -11,63 +11,37 @@ import { Label } from '@/components/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/alert';
 import { Spinner } from '@/components/spinner';
 import { CheckCheck, AlertTriangle } from 'lucide-react';
+import { createSupabaseClient } from '@/lib/supabase/client';
 
 function UpdatePasswordForm() {
   const router = useRouter();
-  const [status, setStatus] = useState<'loading' | 'ready' | 'submitting' | 'complete' | 'error'>('loading');
+  const supabase = createSupabaseClient();
+  const [status, setStatus] = useState<'ready' | 'submitting' | 'complete' | 'error'>('ready');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
-  const [tokenInfo, setTokenInfo] = useState<{ access_token: string; refresh_token: string; } | null>(null);
-
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (!hash) {
-      setErrorMsg('No token information found in URL. Please use the link from your email.');
-      setStatus('error');
-      return;
-    }
-
-    const params = new URLSearchParams(hash.substring(1));
-    const accessToken = params.get('access_token');
-    const refreshToken = params.get('refresh_token');
-
-    if (!accessToken || !refreshToken) {
-      setErrorMsg('Invalid or incomplete token information in URL.');
-      setStatus('error');
-      return;
-    }
-
-    setTokenInfo({ access_token: accessToken, refresh_token: refreshToken });
-    setStatus('ready');
-  }, []);
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword.length < 6) { return setErrorMsg("Password must be at least 6 characters."); }
-    if (newPassword !== confirmPassword) { return setErrorMsg("Passwords do not match."); }
+    if (newPassword.length < 6) {
+      setErrorMsg("Password must be at least 6 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setErrorMsg("Passwords do not match.");
+      return;
+    }
     
     setErrorMsg(null);
     setStatus('submitting');
     
-    if (!tokenInfo) {
-      setErrorMsg('Session information lost. Please try again from the email link.');
-      setStatus('error');
-      return;
-    }
-
     try {
-      const response = await fetch('/api/auth/update-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          password: newPassword,
-          access_token: tokenInfo.access_token,
-          refresh_token: tokenInfo.refresh_token,
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok) { throw new Error(result.error || 'Failed to update password.'); }
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+      if (error) {
+        throw new Error(error.message || 'Failed to update password.');
+      }
+      
       setStatus('complete');
     } catch (error) {
       setErrorMsg((error as Error).message);
@@ -78,7 +52,6 @@ function UpdatePasswordForm() {
   // UI Rendering Logic based on status
   const renderContent = () => {
     switch (status) {
-      case 'loading': return <div className="flex justify-center items-center py-8"><Spinner className="h-6 w-6" /><p className="ml-2 text-muted-foreground">Verifying link...</p></div>;
       case 'error': return <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{errorMsg}</AlertDescription></Alert>;
       case 'submitting': return <div className="flex justify-center items-center py-8"><Spinner className="h-6 w-6" /><p className="ml-2 text-muted-foreground">Updating password...</p></div>;
       case 'complete': return <div className="text-center py-8"><div className="mb-4 flex justify-center"><div className="rounded-full bg-green-500/10 p-3 text-green-600"><CheckCheck className="h-8 w-8" /></div></div><h3 className="text-xl font-semibold">Password Updated!</h3><p className="mt-2 text-muted-foreground">You may now log in with your new password.</p><Button onClick={() => router.push('/auth/login')} className="mt-4">Go to Login</Button></div>;
