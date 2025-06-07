@@ -61,13 +61,10 @@ This document tracks major development tasks, investigations, and resolutions fo
 
 ## Archive: Supabase Password Reset Investigation
 
-### Final Summary & Recommendation
+### Final Summary & Resolution
 
-- **Root Cause:** The Supabase password reset flow (PKCE) fails within the Next.js application environment due to an issue with how the client-side `code_verifier` is handled across page loads and component re-renders. The Supabase client loses its state, causing the verification to fail with a misleading `otp_expired` error.
-- **Definitive Proof:** The flow works perfectly when initiated from a standalone, static HTML file. This isolates the problem to the Next.js/React application environment and proves the core Supabase configuration (Project URL, Anon Key, Email Templates, Redirect URLs) is correct.
-- **Recommendation:** The most robust solution is to bypass the complex React lifecycle for this specific, sensitive authentication step. A dedicated, simple page should be created to handle the redirect from the Supabase email link, similar to the static HTML test file. Once the session is established on that simple page, the user can be redirected back into the main Next.js application to complete the password update. If this proves difficult, the only remaining course of action is to contact Supabase support with the detailed evidence gathered.
-
----
+- **Root Cause:** The Supabase password reset flow (PKCE) was failing within the Next.js application environment due to an issue with how the client-side `code_verifier` was handled across page loads and component re-renders. The Supabase client was losing its state, causing the verification to fail with a misleading `otp_expired` error.
+- **Resolution:** The issue was fully resolved by isolating the PKCE callback into a dedicated, pure client-side page. This approach prevents the Next.js/React lifecycle from interfering with the sensitive authentication handshake. The session is now correctly established in a cookie, allowing for a seamless and secure password update process. This is now the standard pattern for this type of authentication flow in the application.
 
 ### Detailed Investigation Log
 
@@ -130,8 +127,22 @@ The discrepancy between the two tests points directly to the Next.js/React envir
 - **PKCE Flow Mechanics:** The client generates a secret (`code_verifier`) and stores it. When the user returns from the email link, the client sends this secret to Supabase to validate the session.
 - **Why Next.js Fails:** Component re-renders, server/client context confusion, or multiple initializations of the Supabase client in the React lifecycle likely cause this stored secret to be lost before it can be sent. Supabase receives the token from the email but not the required matching secret, so it correctly rejects the request.
 
-#### 4. Information to Provide to Supabase Support (If required)
+#### 4. Resolution: Implementing the Recommended Fix
 
-- **Project Ref:** `shsfrtemevclwpqlypoq`
-- **Problem:** Password reset links using the PKCE flow fail immediately with an `otp_expired` error when the flow is initiated from our Next.js application, but succeed when initiated from a static HTML file.
-- **Evidence:** Provide the exact failing and succeeding URL examples documented above. Explain that this strongly indicates a client-side interaction issue between the Supabase JS library and the Next.js App Router environment, specifically regarding the handling of the PKCE `code_verifier`. 
+Based on the investigation and expert recommendations, the following steps were taken to resolve the issue:
+
+1.  **Created a Dedicated Client-Side Callback Page:**
+    *   A new page was created at `src/app/auth/confirm/page.tsx`.
+    *   This page is marked with `'use client'` to ensure it runs only in the browser.
+    *   Its sole responsibility is to extract the `code` from the URL and use the `@supabase/ssr` client to call `supabase.auth.exchangeCodeForSession(code)`.
+    *   This successfully establishes a user session and stores it in a secure, HTTP-only cookie.
+
+2.  **Refactored the Update Password Page:**
+    *   The page at `src/app/auth/update-password/page.tsx` was simplified significantly.
+    *   All previous logic for parsing tokens from the URL was removed.
+    *   The form's submission handler now directly calls `supabase.auth.updateUser({ password: newPassword })`, which automatically uses the valid session from the cookie.
+
+3.  **Removed Redundant Backend Code:**
+    *   The legacy API route at `/api/auth/update-password/route.ts` was deleted as it was made obsolete by the new client-side flow.
+
+This series of changes resulted in a successful, reliable, and secure password reset functionality. 
