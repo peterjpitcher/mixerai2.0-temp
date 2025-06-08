@@ -16,7 +16,7 @@ export default function ReleaseNotesPage() {
       
       <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
         
-        {/* Latest Release Entry */}
+        {/* LATEST RELEASE - PASSWORD RESET FIX */}
         <section className="mb-12">
           <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
           <p className="text-sm text-muted-foreground mb-4">
@@ -24,17 +24,28 @@ export default function ReleaseNotesPage() {
           </p>
 
           <h3>Key Fixes & Enhancements</h3>
-          <h4>Password Reset (PKCE Flow)</h4>
+          <h4>Secure Password Reset Flow (PKCE)</h4>
           <ul>
-            <li>**Final Root Cause:** The core issue was an unstable Supabase client instance within our React components, which prevented the secure PKCE token from being handled correctly.</li>
-            <li>**Solution:**
+            <li>
+              <strong>Root Cause Identified:</strong> Addressed a critical issue where the password reset process failed with a misleading "Token Expired" error. The investigation confirmed that the Next.js/React environment was interfering with the Supabase client's ability to persist the necessary <code>code_verifier</code> across redirects, which is a key part of the secure PKCE authentication flow.
+            </li>
+            <li>
+              <strong>Resolution Implemented:</strong>
               <ol>
-                <li>The Supabase client helper at <code>src/lib/supabase/client.ts</code> was refactored to use a singleton pattern, ensuring a single, stable client instance is used throughout the application.</li>
-                <li>The password reset page (<code>/auth/confirm</code>) has been finalized to use the official <code>onAuthStateChange</code> listener, which is the most robust method for handling the redirect and session creation from Supabase.</li>
-                <li>All diagnostic code and temporary pages have been removed.</li>
+                <li>
+                  A dedicated, client-side-only callback page was created at <code>/auth/confirm</code>. This page's sole responsibility is to handle the callback from Supabase, securely exchange the authorization code for a user session, and store it in a cookie.
+                </li>
+                <li>
+                  The "Update Password" page was simplified to use the secure session from the cookie, removing all complex token-parsing logic.
+                </li>
+                <li>
+                  This new approach isolates the sensitive authentication handshake from the React component lifecycle, ensuring a reliable and secure password reset experience.
+                </li>
               </ol>
             </li>
-            <li>**Outcome:** The password reset flow is now fully functional, secure, and stable.</li>
+            <li>
+              <strong>Outcome:</strong> The password reset functionality is now fully stable, secure, and aligns with modern best practices for handling OAuth 2.0 PKCE flows in a single-page application framework.
+            </li>
           </ul>
           <p className="mt-4">
             For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
@@ -217,88 +228,6 @@ export default function ReleaseNotesPage() {
               For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
             </p>
           </section>
-
-        {/* Latest Release Entry - Password Reset & Email Templates */}
-        <section className="mb-12">
-          <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            This update enhances the password recovery process for improved reliability and provides new, consistently branded email templates for all authentication flows.
-          </p>
-
-          <h3>Key Enhancements & Fixes</h3>
-          <h4>Password Recovery Flow</h4>
-          <ul>
-            <li>Corrected the Supabase password reset email template to use <code>{"{{ .ConfirmationURL }}"}</code>, ensuring proper token generation and redirection. This resolves issues where reset links were sent with missing or invalid tokens.</li>
-            <li>Updated the <code>/auth/confirm</code> page (<code>src/app/auth/confirm/page.tsx</code>) to robustly handle the <code>type=recovery</code> flow, including parsing tokens from URL hash fragments and displaying a dedicated "Set New Password" form.</li>
-          </ul>
-
-          <h4>New Branded Email Templates</h4>
-          <ul>
-            <li>Provided updated HTML email templates for Password Reset, Confirm Signup, Invite User, Magic Link (Login), and Reauthentication (Email OTP).</li>
-            <li>Templates feature consistent MixerAI 2.0 branding, including the logo (referenced via <code>{"{{ .SiteURL }}/Mixerai2.0Logo.png"}</code>) and theme colors.</li>
-            <li>Ensured correct Supabase variables are used for dynamic content and links within these templates.</li>
-          </ul>
-          <p className="mt-4">
-            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
-          </p>
-        </section>
-
-        {/* Latest Release Entry - Password Reset & Email Templates */}
-        <section className="mb-12">
-          <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            This update includes a diagnostic change to the password reset functionality to investigate an issue with token validation.
-          </p>
-
-          <h3>Key Changes</h3>
-          <h4>Password Reset Flow (Diagnostic Step)</h4>
-          <ul>
-            <li>To investigate an issue with password reset links expiring immediately, the reset flow has been temporarily changed.</li>
-            <li>The <code>redirectTo</code> parameter has been removed from the <code>resetPasswordForEmail</code> call in the "Forgot Password" page.</li>
-            <li>This forces Supabase to use its default email-based token flow (<code>token_hash</code>) instead of the PKCE flow, helping to isolate the source of the token validation error.</li>
-          </ul>
-          <p className="mt-4">
-            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
-          </p>
-        </section>
-
-        {/* Latest Release Entry - Password Reset & Email Templates */}
-        <section className="mb-12">
-          <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            This update restores the intended password reset flow to continue investigating a token validation issue.
-          </p>
-
-          <h3>Key Changes</h3>
-          <h4>Password Reset Flow</h4>
-          <ul>
-            <li>Restored the <code>redirectTo</code> parameter in the <code>resetPasswordForEmail</code> call on the "Forgot Password" page.</li>
-            <li>Users will now be correctly redirected to <code>/auth/confirm</code> after clicking the link in the password reset email. This page is designed to handle the secure token from Supabase and allow the user to set a new password.</li>
-            <li>This change reverts a previous diagnostic step and ensures the application follows the designed authentication flow.</li>
-          </ul>
-          <p className="mt-4">
-            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
-          </p>
-        </section>
-
-        {/* Latest Release Entry */}
-        <section className="mb-12">
-          <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            As part of an ongoing investigation into a persistent password reset issue, a new diagnostic test page has been created.
-          </p>
-
-          <h3>Key Changes</h3>
-          <h4>New Diagnostic Password Reset Page</h4>
-          <ul>
-            <li>Created a new, minimal test page at <code>/auth/reset-password-test</code>. This page replicates a simple, known-good HTML file to isolate the password reset flow from any potential issues within the Next.js component lifecycle or routing of the original <code>/auth/confirm</code> page.</li>
-            <li>The "Forgot Password" flow now redirects to this new test page.</li>
-            <li>This step aims to definitively confirm if the Supabase PKCE flow can complete successfully within the Next.js environment, providing a clear path to resolving the issue.</li>
-          </ul>
-          <p className="mt-4">
-            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
-          </p>
-        </section>
       </div>
     </div>
   );
