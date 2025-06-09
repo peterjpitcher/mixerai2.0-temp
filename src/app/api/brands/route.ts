@@ -229,7 +229,7 @@ export const GET = withAuth(async (req: NextRequest, user) => {
         approved_content_types: brand.approved_content_types,
         created_at: brand.created_at,
         updated_at: brand.updated_at,
-        content_count: brand.content_count && brand.content_count[0] ? brand.content_count[0].count : 0,
+        content_count: (brand.content_count && Array.isArray(brand.content_count) && brand.content_count.length > 0) ? (brand.content_count[0]?.count ?? 0) : 0,
         selected_vetting_agencies: agencies, // Now correctly typed and sorted
       };
     });
@@ -312,20 +312,46 @@ export const POST = withAuth(async (req: NextRequest, user) => {
       approved_content_types_input: body.approved_content_types || null 
     };
 
-    const { data: newBrandId, error: rpcError } = await supabase.rpc(
-      'create_brand_and_set_admin' as any,
-      rpcParams
-    );
+    // START of replacement for 'create_brand_and_set_admin' RPC
+    const { data: brandInsertData, error: brandInsertError } = await supabase
+      .from('brands')
+      .insert({
+        name: rpcParams.brand_name,
+        website_url: rpcParams.brand_website_url,
+        country: rpcParams.brand_country,
+        language: rpcParams.brand_language,
+        brand_identity: rpcParams.brand_identity_text,
+        tone_of_voice: rpcParams.brand_tone_of_voice,
+        guardrails: rpcParams.brand_guardrails,
+        brand_color: rpcParams.brand_color_input,
+        approved_content_types: rpcParams.approved_content_types_input
+      })
+      .select('id')
+      .single();
 
-    if (rpcError) {
-      // console.error('RPC Error creating brand:', rpcError);
-      throw new Error(`Failed to create brand: ${rpcError.message}`);
+    if (brandInsertError) {
+      // console.error('Error creating brand directly:', brandInsertError);
+      throw new Error(`Failed to create brand: ${brandInsertError.message}`);
     }
 
-    if (!newBrandId) {
-      throw new Error('Failed to create brand, no ID returned from function.');
-    }
+    const newBrandId = brandInsertData.id;
 
+    const { error: permissionError } = await supabase
+      .from('user_brand_permissions')
+      .insert({
+        user_id: rpcParams.creator_user_id,
+        brand_id: newBrandId,
+        role: 'admin' // Explicitly setting the correct role
+      });
+
+    if (permissionError) {
+      // console.error('Error setting creator admin permission:', permissionError);
+      // Attempt to clean up the created brand if permission fails
+      await supabase.from('brands').delete().eq('id', newBrandId);
+      throw new Error(`Failed to set admin permission for new brand: ${permissionError.message}`);
+    }
+    // END of replacement for 'create_brand_and_set_admin' RPC
+    
     // Update master_claim_brand_id if provided
     if (body.master_claim_brand_id) {
       const { error: updateMasterClaimError } = await supabase

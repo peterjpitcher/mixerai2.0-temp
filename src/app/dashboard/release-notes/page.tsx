@@ -16,6 +16,45 @@ export default function ReleaseNotesPage() {
       
       <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
         
+        {/* LATEST RELEASE - BRAND CREATION FIX */}
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            This release resolves critical errors in the brand creation process, ensuring new brands can be created reliably by administrators.
+          </p>
+
+          <h3>Key Fixes & Enhancements</h3>
+          <h4>Brand Creation Workflow (<code>/dashboard/brands/new</code>)</h4>
+          <ul>
+            <li>
+              <strong>Root Cause Identified:</strong> The brand creation process was failing due to two separate issues in the <code>POST /api/brands</code> endpoint.
+              <ol>
+                <li>An initial error was caused by a faulty RPC (<code>create_brand_and_set_admin</code>) that attempted to assign a <code>'brand_admin'</code> role, which was an invalid value for the database's <code>user_brand_role_enum</code> type.</li>
+                <li>A subsequent fix attempt introduced a second error by trying to write to a non-existent <code>created_by</code> column in the <code>brands</code> table.</li>
+              </ol>
+            </li>
+            <li>
+              <strong>Resolution Implemented:</strong>
+              <ul>
+                <li>The problematic <code>create_brand_and_set_admin</code> RPC has been entirely removed from the brand creation logic.</li>
+                <li>The process now uses two direct Supabase calls:
+                  <ol>
+                    <li>First, a new record is inserted into the <code>brands</code> table with the core brand details.</li>
+                    <li>Second, a permission record is inserted into the <code>user_brand_permissions</code> table, explicitly granting the creator the correct <code>'admin'</code> role for the new brand.</li>
+                  </ol>
+                </li>
+                <li>This direct approach bypasses the faulty RPC and aligns with the database schema, resolving both errors.</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Outcome:</strong> The brand creation functionality is now stable. Administrators can create new brands without encountering a 500 Internal Server Error.
+            </li>
+          </ul>
+          <p className="mt-4">
+            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+          </p>
+        </section>
+
         {/* LATEST RELEASE - PASSWORD RESET FIX */}
         <section className="mb-12">
           <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
