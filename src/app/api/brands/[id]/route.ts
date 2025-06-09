@@ -34,6 +34,15 @@ interface VettingAgencyForResponse {
   // Add other fields if the original SupabaseVettingAgency had more that are needed.
 }
 
+interface BrandDetailsFromRPC {
+  id: string;
+  name: string;
+  // Add all other fields returned by the RPC
+  contentCount: number;
+  workflowCount: number;
+  [key: string]: any; // Allow other properties
+}
+
 // GET a single brand by ID
 export const GET = withAuth(async (
   request: NextRequest,
@@ -70,19 +79,16 @@ export const GET = withAuth(async (
     }
     // If global admin or has specific permission, proceed to fetch brand details
 
-    const { data: brandDataResult, error: brandFetchError } = await supabase
-      .from('brands')
-      .select('*')
-      .eq('id', brandId)
+    const { data: brandDetails, error: rpcError } = await supabase
+      .rpc('get_brand_details_by_id', { p_brand_id: brandId })
       .single();
-    
-    if (brandFetchError) {
-        throw brandFetchError;
-    }
-    
-    const brandData: any = brandDataResult; // Cast to any to bypass strict typing for now
 
-    if (!brandData) {
+    if (rpcError) {
+      console.error(`[API Brands GET /${brandId}] RPC Error:`, rpcError);
+      throw rpcError;
+    }
+
+    if (!brandDetails) {
       return NextResponse.json(
         { success: false, error: 'Brand not found' },
         { 
@@ -91,111 +97,19 @@ export const GET = withAuth(async (
         }
       );
     }
-
-    let masterClaimBrandName: string | null = null;
-    if (brandData.master_claim_brand_id) {
-      const { data: masterClaimBrandData, error: mcbError } = await supabase
-        .from('master_claim_brands')
-        .select('name')
-        .eq('id', brandData.master_claim_brand_id)
-        .single();
-
-      if (mcbError) {
-        console.warn(`[API Brands GET /${brandId}] Error fetching master_claim_brand name for ID ${brandData.master_claim_brand_id}:`, mcbError.message);
-        // Do not fail the request, just proceed without the name
-      } else if (masterClaimBrandData) {
-        masterClaimBrandName = masterClaimBrandData.name;
-      }
-    }
-
-    const { data: selectedAgenciesData, error: selectedAgenciesError } = await supabase
-      .from('brand_selected_agencies')
-      .select(`
-        agency_id,
-        content_vetting_agencies (
-          id,
-          name,
-          description,
-          country_code,
-          priority
-        )
-      `)
-      .eq('brand_id', brandId);
-
-    if (selectedAgenciesError) {
-      console.error('Error fetching selected agencies with Supabase:', selectedAgenciesError);
-      throw selectedAgenciesError;
-    }
-
-    let processedAgencies: VettingAgencyForResponse[] = [];
-    if (selectedAgenciesData) {
-      processedAgencies = selectedAgenciesData
-        .map(item => {
-            const agencyFromDb = item.content_vetting_agencies;
-            if (agencyFromDb) {
-                return {
-                    id: agencyFromDb.id,
-                    name: agencyFromDb.name,
-                    description: agencyFromDb.description,
-                    country_code: agencyFromDb.country_code,
-                    priority: mapSupabasePriorityToNumber(agencyFromDb.priority as SupabaseVettingAgencyPriority),
-                    // Include other fields from agencyFromDb if they were part of its original type
-                    // and are expected in VettingAgencyForResponse
-                } as VettingAgencyForResponse;
-            }
-            return null;
-        })
-        .filter((agency): agency is VettingAgencyForResponse => agency !== null) // Filter out nulls and type guard
-        .sort((a, b) => { // Sort by numeric priority then name
-          if (a.priority !== b.priority) {
-            return a.priority - b.priority;
-          }
-          return (a.name || '').localeCompare(b.name || '');
-        });
-    }
     
-    const brand: any = brandData;
-    brand.selected_vetting_agencies = processedAgencies; // Assign agencies with numeric priority
-
-    // Fetch Brand Admins
-    const { data: adminPermissions, error: adminPermissionsError } = await supabase
-      .from('user_brand_permissions')
-      .select('user_id, profiles (id, full_name, email, avatar_url, job_title)')
-      .eq('brand_id', brandId)
-      .eq('role', 'admin');
-
-    if (adminPermissionsError) {
-      console.error('Error fetching brand admins:', adminPermissionsError);
-      throw adminPermissionsError;
-    }
-
-    const adminUsers = adminPermissions?.map(p => p.profiles).filter(profile => profile !== null) || [];
-    brand.admins = adminUsers; // Add admins to the brand object
-    if (masterClaimBrandName) {
-      brand.master_claim_brand_name = masterClaimBrandName;
-    }
-
-    const { count: contentCount, error: contentCountError } = await supabase
-      .from('content')
-      .select('id', { count: 'exact', head: true })
-      .eq('brand_id', brandId);
-      
-    if (contentCountError) throw contentCountError; 
-    
-    const { count: workflowCount, error: workflowCountError } = await supabase
-      .from('workflows')
-      .select('id', { count: 'exact', head: true })
-      .eq('brand_id', brandId);
-      
-    if (workflowCountError) throw workflowCountError;
+    // The RPC returns a single JSON object with all the data we need.
+    const brand = brandDetails as BrandDetailsFromRPC;
+    const contentCount = brand.contentCount || 0;
+    const workflowCount = brand.workflowCount || 0;
 
     return NextResponse.json({ 
       success: true, 
-      brand, // brand now contains selected_vetting_agencies with numeric priorities
-      contentCount: contentCount || 0,
-      workflowCount: workflowCount || 0,
+      brand,
+      contentCount,
+      workflowCount,
       meta: {
-        source: 'database (Supabase)',
+        source: 'database (Supabase RPC)',
         isFallback: false,
         requestId: crypto.randomUUID(),
         timestamp: new Date().toISOString()
@@ -204,7 +118,7 @@ export const GET = withAuth(async (
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'no-store',
-        'x-data-source': 'database (Supabase)'
+        'x-data-source': 'database (Supabase RPC)'
       }
     });
   } catch (error: any) {

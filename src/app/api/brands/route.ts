@@ -242,16 +242,6 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     });
   } catch (error: any) {
     // console.error('Error fetching brands:', error);
-    
-    if (isDatabaseConnectionError(error)) {
-      // console.error('Database connection error, using fallback brands data:', error);
-      return NextResponse.json({ 
-        success: true, 
-        isFallback: true,
-        data: getFallbackBrands()
-      });
-    }
-    
     return handleApiError(error, 'Error fetching brands');
   }
 });
@@ -267,14 +257,14 @@ export const POST = withAuth(async (req: NextRequest, user) => {
   }
 
   const supabase = createSupabaseAdminClient(); 
-  // const dbClient = await pool.connect(); // Temporarily comment out pg pool for focusing on Supabase client logic
+  const dbClient = await pool.connect();
   try {
-    // await dbClient.query('BEGIN'); 
+    await dbClient.query('BEGIN'); 
     const body = await req.json();
     
     if (!body.name) {
-      // await dbClient.query('ROLLBACK');
-      // dbClient.release();
+      await dbClient.query('ROLLBACK');
+      dbClient.release();
       return NextResponse.json(
         { success: false, error: 'Brand name is required' },
         { status: 400 }
@@ -494,8 +484,8 @@ export const POST = withAuth(async (req: NextRequest, user) => {
       .single();
 
     if (fetchBrandError || !newBrandDataFromDB) {
-      // await dbClient.query('ROLLBACK');
-      // dbClient.release();
+      await dbClient.query('ROLLBACK');
+      dbClient.release();
       throw new Error(fetchBrandError?.message || 'Failed to fetch newly created brand after commit.');
     }
 
@@ -535,16 +525,16 @@ export const POST = withAuth(async (req: NextRequest, user) => {
       selected_vetting_agencies: finalSelectedVettingAgencies,
     };
 
-    // await dbClient.query('COMMIT'); 
+    await dbClient.query('COMMIT'); 
     return NextResponse.json({ 
       success: true, 
       data: finalResponseData 
     });
 
   } catch (error) {
-    // await dbClient.query('ROLLBACK');
+    await dbClient.query('ROLLBACK');
     return handleApiError(error, 'Error creating brand');
   } finally {
-    // dbClient.release();
+    dbClient.release();
   }
 }); 

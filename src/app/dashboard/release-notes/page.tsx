@@ -15,6 +15,55 @@ export default function ReleaseNotesPage() {
       <Separator className="my-6" />
       
       <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
+
+        {/* LATEST RELEASE - ARCHITECTURAL REFACTOR */}
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            This is a major architectural release focused on resolving systemic security vulnerabilities, fixing critical performance bottlenecks, and improving the overall stability and maintainability of the application. A full-code review was performed, and 28 issues were logged and resolved.
+          </p>
+
+          <h3>Key Architectural Changes</h3>
+          <h4>1. Server-Side Authorization & Data Fetching</h4>
+          <ul>
+            <li>
+              <strong>Security Hardening:</strong> All pages that were previously performing insecure authorization checks on the client-side have been refactored into <strong>Server Components</strong>. Authorization is now enforced securely on the server, preventing unauthorized access to data and pages.
+            </li>
+            <li>
+              <strong>Performance Optimization:</strong> Inefficient client-side data fetching patterns have been eliminated. Data is now fetched efficiently on the server, significantly improving page load times and reducing the number of network requests.
+            </li>
+          </ul>
+          <h4>2. Database Performance (N+1 Bug Fixes)</h4>
+          <ul>
+            <li>
+              <strong>Content API:</strong> Fixed a catastrophic N+1 query bug in the <code>GET /api/content</code> endpoint that was making over 50 database calls for a single request. This has been replaced with an efficient bulk-fetching strategy.
+            </li>
+            <li>
+              <strong>Brand Detail API:</strong> Fixed a severe N+1 query bug in the <code>GET /api/brands/[id]</code> endpoint that made 6+ database calls. This has been replaced with a single, efficient database function (<code>get_brand_details_by_id</code>).
+            </li>
+             <li>
+              <strong>User Detail API:</strong> Fixed an N+1 query bug in the <code>GET /api/users/[id]</code> endpoint and replaced it with the <code>get_user_details</code> database function.
+            </li>
+          </ul>
+          <h4>3. Data Integrity & Transactions</h4>
+          <ul>
+             <li>
+              <strong>Atomic Operations:</strong> Fixed critical data integrity bugs by adding database transactions to all multi-step API operations, including brand creation (<code>POST /api/brands</code>) and user updates/deletions (<code>PUT/DELETE /api/users/[id]</code>). This prevents the database from entering a corrupt or inconsistent state if an operation fails midway.
+            </li>
+          </ul>
+           <h4>4. Code Quality & Maintainability</h4>
+          <ul>
+            <li>
+              <strong>Component Refactoring:</strong> Broke down large, monolithic page components (e.g., Brands page, Dashboard page) into smaller, more manageable child components (e.g., `DeleteBrandDialog`, `DashboardMetrics`).
+            </li>
+             <li>
+              <strong>Centralized Services:</strong> Centralized the Supabase client initialization to ensure consistency.
+            </li>
+          </ul>
+          <p className="mt-4">
+            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+          </p>
+        </section>
         
         {/* LATEST RELEASE - BRAND CREATION FIX */}
         <section className="mb-12">

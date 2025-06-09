@@ -6,11 +6,12 @@ import { Button } from "@/components/button";
 import { UnifiedNavigation } from "@/components/layout/unified-navigation";
 import { BottomMobileNavigation } from "@/components/layout/BottomMobileNavigation";
 import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@supabase/ssr";
+import { createSupabaseClient } from "@/lib/supabase/client";
 import { toast as sonnerToast } from "sonner";
 import { LogOut, UserCircle2, ChevronDown, Loader2 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
 import Image from 'next/image';
+import { DevelopmentOnly } from "@/components/development-only";
 
 // Define UserSessionData interface (can be shared if defined elsewhere)
 interface UserSessionData {
@@ -40,10 +41,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }>) {
   const router = useRouter();
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-  );
+  const supabase = createSupabaseClient();
 
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
@@ -122,23 +120,13 @@ export default function DashboardLayout({
               <>
                 <div className="flex items-center space-x-2">
                   {avatarUrl ? (
-                    avatarUrl.includes('api.dicebear.com') ? (
-                      <img 
-                        src={avatarUrl} 
-                        alt={displayName} 
-                        width={32} 
-                        height={32} 
-                        className="rounded-full" 
-                      />
-                    ) : (
-                      <Image 
-                        src={avatarUrl} 
-                        alt={displayName} 
-                        width={32} 
-                        height={32} 
-                        className="rounded-full" 
-                      />
-                    )
+                    <Image 
+                      src={avatarUrl} 
+                      alt={displayName} 
+                      width={32} 
+                      height={32} 
+                      className="rounded-full" 
+                    />
                   ) : (
                     <UserCircle2 className="h-8 w-8" />
                   )}
@@ -167,11 +155,11 @@ export default function DashboardLayout({
           <UnifiedNavigation />
         </Suspense>
         <main className="flex-1 p-4 sm:p-6 overflow-auto lg:pb-0 pb-20">
-          {process.env.NODE_ENV === 'development' && (
+          <DevelopmentOnly>
             <div id="domain-verification-container" className="mb-4">
               {/* This will be populated client-side */}
             </div>
-          )}
+          </DevelopmentOnly>
           {children}
         </main>
       </div>

@@ -654,54 +654,103 @@ export type Database = {
           actual_behavior: string | null
           affected_area: string | null
           app_version: string | null
+          assigned_to: string | null
           attachments_metadata: Json | null
+          browser_info: string | null
           created_at: string | null
           created_by: string | null
           description: string | null
           expected_behavior: string | null
           id: string
+          os_info: string | null
           priority: Database["public"]["Enums"]["feedback_priority"]
+          resolution_details: string | null
           status: Database["public"]["Enums"]["feedback_status"]
           steps_to_reproduce: string | null
           title: string | null
           type: Database["public"]["Enums"]["feedback_type"]
+          updated_at: string | null
+          updated_by: string | null
+          url: string | null
           user_impact_details: string | null
         }
         Insert: {
           actual_behavior?: string | null
           affected_area?: string | null
           app_version?: string | null
+          assigned_to?: string | null
           attachments_metadata?: Json | null
+          browser_info?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
           expected_behavior?: string | null
           id?: string
+          os_info?: string | null
           priority: Database["public"]["Enums"]["feedback_priority"]
+          resolution_details?: string | null
           status?: Database["public"]["Enums"]["feedback_status"]
           steps_to_reproduce?: string | null
           title?: string | null
           type: Database["public"]["Enums"]["feedback_type"]
+          updated_at?: string | null
+          updated_by?: string | null
+          url?: string | null
           user_impact_details?: string | null
         }
         Update: {
           actual_behavior?: string | null
           affected_area?: string | null
           app_version?: string | null
+          assigned_to?: string | null
           attachments_metadata?: Json | null
+          browser_info?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
           expected_behavior?: string | null
           id?: string
+          os_info?: string | null
           priority?: Database["public"]["Enums"]["feedback_priority"]
+          resolution_details?: string | null
           status?: Database["public"]["Enums"]["feedback_status"]
           steps_to_reproduce?: string | null
           title?: string | null
           type?: Database["public"]["Enums"]["feedback_type"]
+          updated_at?: string | null
+          updated_by?: string | null
+          url?: string | null
           user_impact_details?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "feedback_items_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_items_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_items_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_items_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_view"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fk_feedback_created_by"
             columns: ["created_by"]
@@ -1491,6 +1540,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          status: Database["public"]["Enums"]["workflow_status"]
           steps: Json
           template_id: string | null
           updated_at: string | null
@@ -1502,6 +1552,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          status?: Database["public"]["Enums"]["workflow_status"]
           steps?: Json
           template_id?: string | null
           updated_at?: string | null
@@ -1513,6 +1564,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          status?: Database["public"]["Enums"]["workflow_status"]
           steps?: Json
           template_id?: string | null
           updated_at?: string | null
@@ -1597,6 +1649,14 @@ export type Database = {
         Args: { template_id_to_delete: string }
         Returns: undefined
       }
+      delete_user_and_reassign_tasks: {
+        Args: { p_user_id_to_delete: string }
+        Returns: undefined
+      }
+      get_brand_details_by_id: {
+        Args: { p_brand_id: string }
+        Returns: Json
+      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1604,6 +1664,10 @@ export type Database = {
       get_user_by_email: {
         Args: { user_email: string }
         Returns: unknown[]
+      }
+      get_user_details: {
+        Args: { p_user_id: string }
+        Returns: Json
       }
       has_brand_permission: {
         Args: {
@@ -1651,25 +1715,27 @@ export type Database = {
         }
         Returns: Json
       }
+      update_user_details: {
+        Args: {
+          p_user_id: string
+          p_full_name: string
+          p_job_title: string
+          p_company: string
+          p_role?: string
+          p_brand_permissions?: Json
+        }
+        Returns: undefined
+      }
       update_workflow_and_handle_invites: {
-        Args:
-          | {
-              p_workflow_id: string
-              p_name: string
-              p_brand_id: string
-              p_steps: Json
-              p_template_id: string
-              p_description: string
-              p_new_invitation_items: Json
-            }
-          | {
-              p_workflow_id: string
-              p_name?: string
-              p_brand_id?: string
-              p_steps?: Json
-              p_template_id?: string
-              p_new_invitation_items?: Json
-            }
+        Args: {
+          p_workflow_id: string
+          p_name: string
+          p_brand_id: string
+          p_steps: Json
+          p_template_id: string
+          p_description: string
+          p_new_invitation_items: Json
+        }
         Returns: boolean
       }
       update_workflow_and_handle_invites_invoker_version_temp: {
@@ -1729,6 +1795,7 @@ export type Database = {
       user_brand_role_enum: "admin" | "editor" | "viewer"
       user_role: "admin" | "editor" | "viewer"
       vetting_agency_priority_level: "High" | "Medium" | "Low"
+      workflow_status: "active" | "draft" | "archived"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1890,6 +1957,7 @@ export const Constants = {
       user_brand_role_enum: ["admin", "editor", "viewer"],
       user_role: ["admin", "editor", "viewer"],
       vetting_agency_priority_level: ["High", "Medium", "Low"],
+      workflow_status: ["active", "draft", "archived"],
     },
   },
 } as const

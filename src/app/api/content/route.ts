@@ -130,30 +130,24 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       }
     });
     
-    // Step 2: Fetch auth user data (user_metadata) for these users
+    // Step 2: Fetch all auth users in a single call to build the avatar map
     const authAvatarsMap = new Map<string, string | null>();
-    if (userIdsForAuthCheck.size > 0) {
-      for (const userId of Array.from(userIdsForAuthCheck)) {
-        try {
-          const { data: { user: authUser }, error: authUserError } = await supabase.auth.admin.getUserById(userId);
-          
-          if (authUserError) {
-            console.error(`Error fetching auth user data for ID ${userId}:`, authUserError);
-            continue; 
-          }
+    const { data: { users: allAuthUsers }, error: allUsersError } = await supabase.auth.admin.listUsers();
 
-          if (authUser && authUser.user_metadata && typeof authUser.user_metadata === 'object' && 'avatar_url' in authUser.user_metadata) {
-            const authAvatar = (authUser.user_metadata as any).avatar_url;
-            if (typeof authAvatar === 'string' && authAvatar.trim() !== '') {
-              authAvatarsMap.set(userId, authAvatar);
-            }
+    if (allUsersError) {
+      console.error('Error fetching all auth users:', allUsersError);
+      // Not a fatal error, we can proceed without the auth avatars
+    } else {
+      const relevantAuthUsers = allAuthUsers.filter(u => userIdsForAuthCheck.has(u.id));
+      for (const authUser of relevantAuthUsers) {
+        if (authUser.user_metadata && typeof authUser.user_metadata === 'object' && 'avatar_url' in authUser.user_metadata) {
+          const authAvatar = (authUser.user_metadata as any).avatar_url;
+          if (typeof authAvatar === 'string' && authAvatar.trim() !== '') {
+            authAvatarsMap.set(authUser.id, authAvatar);
           }
-        } catch (e) {
-           console.error(`Exception during fetching auth user data for ID ${userId}:`, e);
         }
       }
     }
-
 
     // Step 3: Fetch assignee profiles (already existing logic, slightly adjusted for context)
     const allAssigneeIdsFromContent = new Set<string>();
@@ -181,35 +175,41 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       }
     }
 
-    const workflowDataWithSteps = await Promise.all(
-      (contentItems || []).map(async (item) => {
-        if (item.workflow_id) {
-          const { data: workflow, error: workflowError } = await supabase
-            .from('workflows')
-            .select('id, name')
-            .eq('id', item.workflow_id)
-            .single();
+    // --- N+1 FIX: Efficiently fetch all required workflows and their steps ---
+    const workflowIds = (contentItems || []).map(item => item.workflow_id).filter((id): id is string => !!id);
+    const workflowsMap = new Map<string, { id: string; name: string; steps: any[] }>();
 
-          if (workflowError) {
-            console.error(`Error fetching workflow ${item.workflow_id} for content ${item.id}:`, workflowError);
-            return null;
-          }
+    if (workflowIds.length > 0) {
+      // Fetch all relevant workflows
+      const { data: workflowsData, error: workflowsError } = await supabase
+        .from('workflows')
+        .select('id, name')
+        .in('id', workflowIds);
 
-          const { data: steps, error: stepsError } = await supabase
-            .from('workflow_steps')
-            .select('id, name, description, step_order, role, approval_required, assigned_user_ids')
-            .eq('workflow_id', item.workflow_id)
-            .order('step_order', { ascending: true });
+      // Fetch all relevant steps
+      const { data: stepsData, error: stepsError } = await supabase
+        .from('workflow_steps')
+        .select('id, name, description, step_order, role, approval_required, assigned_user_ids, workflow_id')
+        .in('workflow_id', workflowIds)
+        .order('step_order', { ascending: true });
 
-          if (stepsError) {
-            console.error(`Error fetching steps for workflow ${item.workflow_id}:`, stepsError);
-            return { ...workflow, steps: [] }; // Return workflow data even if steps fail
-          }
-          return { ...workflow, steps };
+      if (workflowsError) throw workflowsError;
+      if (stepsError) throw stepsError;
+
+      // Populate the map with workflows
+      (workflowsData || []).forEach(wf => {
+        workflowsMap.set(wf.id, { ...wf, steps: [] });
+      });
+
+      // Populate the workflows in the map with their steps
+      (stepsData || []).forEach(step => {
+        const workflow = workflowsMap.get(step.workflow_id);
+        if (workflow) {
+          workflow.steps.push(step);
         }
-        return null;
-      })
-    );
+      });
+    }
+    // --- END N+1 FIX ---
 
     const formattedContent = (contentItems || []).map((item, index) => {
       let firstAssignedId: string | null = null;
@@ -278,7 +278,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         assigned_to_name: assigneeNames.length > 0 ? assigneeNames.join(', ') : 'N/A',
         assigned_to_avatar_url: finalAssigneeAvatarUrl, // Use determined URL
         assigned_to: item.assigned_to || null,
-        workflow: workflowDataWithSteps[index]
+        workflow: item.workflow_id ? workflowsMap.get(item.workflow_id) || null : null
       };
     });
 

@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { v4 as uuidv4 } from 'uuid';
+import { TablesInsert } from '@/types/supabase';
 
 export const dynamic = "force-dynamic";
 
@@ -85,11 +86,11 @@ export const POST = withAuth(async (request: NextRequest, user, context: { param
     }
     
     // 2. Create the new workflow shell (without steps in JSONB)
-    const newWorkflowShellData = {
+    const newWorkflowShellData: TablesInsert<'workflows'> = {
       name: `Copy of ${originalWorkflow.name}`,
       brand_id: null,
       template_id: null, // originalWorkflow.template_id if you want to copy it
-      status: 'active',
+      status: 'draft',
       created_by: user.id,
       steps: [], // Explicitly set to empty array or null if column allows
                   // to ensure we don't use the JSONB steps field for this new workflow.
