@@ -16,27 +16,37 @@ export default function ReleaseNotesPage() {
       
       <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
         
-        {/* LATEST RELEASE - DASHBOARD REDESIGN */}
+        {/* LATEST RELEASE - DASHBOARD REDESIGN & STABILIZATION */}
         <section className="mb-12">
           <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            This release introduces a complete redesign of the main dashboard, replacing the previous unhelpful metrics with a more actionable, insightful, and visually engaging command centre.
+            This release introduces a complete overhaul of the main dashboard, replacing the previous workflow matrix with a more dynamic and insightful interface. It also includes critical bug fixes to stabilize the application's data-fetching and permission systems.
           </p>
 
           <h3>Key Features & Enhancements</h3>
           <h4>Dashboard (<code>/dashboard</code>)</h4>
           <ul>
             <li>
-              <strong>New "Team Activity" Feed:</strong> The centrepiece of the new dashboard is a live feed showing significant events from across the platform, such as content creation and status changes. This provides a clear overview of team activity.
+              <strong>New "Team Activity" Feed:</strong> The centrepiece of the new dashboard is a live feed showing significant events from across the platform, such as content creation, updates, and approvals. This provides a clear, at-a-glance overview of team activity.
             </li>
             <li>
-              <strong>New "Stalled Content" Module:</strong> To help identify bottlenecks, this new module lists content that has not been updated in a while, ordered with the oldest items first. The age of the content is highlighted with colours to draw attention to the most critical items.
+              <strong>New "Stalled Content" Module:</strong> To help identify bottlenecks, this module lists content that has not been updated in a while. The age of the content is highlighted with colours (yellow for over 7 days, red for over 30 days) to draw attention to the most urgent items.
+            </li>
+             <li>
+              <strong>New "My Tasks" Module:</strong> The "My Tasks" component has been re-introduced as a robust, client-side component that fetches data safely from a dedicated API endpoint (<code>/api/me/tasks</code>), resolving the previous server-side rendering errors.
             </li>
             <li>
-              <strong>Correct Role-Based Permissions:</strong> Fixed a critical bug where the dashboard's data was not correctly filtered for non-admin users. The dashboard now correctly implements the application's RBAC rules, ensuring users only see activity and content related to their assigned brands.
+              <strong>Visual & Layout Polish:</strong> The dashboard layout and typography have been meticulously adjusted to match the design specification, ensuring a clean, professional, and consistent user interface.
             </li>
+          </ul>
+
+          <h4>Bug Fixes</h4>
+           <ul>
             <li>
-              <strong>Enhanced Visual Design:</strong> The new components feature more engaging icons and a colour-coded design to make the dashboard more intuitive and easier to scan.
+              <strong>Permissions Fix (<code>getProfileWithAssignedBrands</code>):</strong> Fixed a critical bug where brand-specific users could not see any data. The helper function was incorrectly looking for the user's role in the `profiles` table instead of the correct `user.user_metadata`. This fix ensures RBAC rules are correctly applied for all user types.
+            </li>
+             <li>
+              <strong>Database Function Fix (<code>getMyTasks</code>):</strong> Removed all calls to a non-existent and faulty database function (`get_user_details`) from the dashboard, eliminating the last of the startup errors.
             </li>
           </ul>
           <p className="mt-4">

@@ -55,7 +55,7 @@ const activityConfig: { [key in ActivityType]: { icon: React.ReactNode; bgColor:
 };
 
 const getActivityMessage = (item: ActivityItem): React.ReactNode => {
-  const userName = <strong>{item.user?.full_name || 'A user'}</strong>;
+  const userName = <span className="font-semibold">{item.user?.full_name || 'A user'}</span>;
   const targetLink = item.target ? (
     <Link href={`/dashboard/${item.target.type}/${item.target.id}`} className="font-semibold hover:underline">
       {item.target.name}
@@ -80,7 +80,8 @@ const getActivityMessage = (item: ActivityItem): React.ReactNode => {
   }
 };
 
-export function TeamActivityFeed({ activities }: { activities: ActivityItem[] }) {
+export function TeamActivityFeed({ initialActivity }: { initialActivity: ActivityItem[] }) {
+  const activities = initialActivity;
   return (
     <Card>
       <CardHeader>

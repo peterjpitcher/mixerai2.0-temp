@@ -1,13 +1,13 @@
 import { Suspense } from 'react';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { MyTasks } from '@/components/dashboard/my-tasks';
-import { TasksSkeleton } from '@/components/dashboard/dashboard-skeleton';
+import { getProfileWithAssignedBrands } from '@/lib/auth/user-profile';
 import { TeamActivityFeed } from '@/components/dashboard/team-activity-feed';
 import { MostAgedContent } from '@/components/dashboard/most-aged-content';
-import { getProfileWithAssignedBrands } from '@/lib/auth/user-profile';
+import { TasksSkeleton } from '@/components/dashboard/dashboard-skeleton';
+import { Card } from '@/components/ui/card';
+import { MyTasks } from '@/components/dashboard/my-tasks';
 
-async function getTeamActivity(supabase: any) {
-  const profile = await getProfileWithAssignedBrands(supabase);
+async function getTeamActivity(supabase: any, profile: any) {
   if (!profile) return [];
 
   let query = supabase
@@ -49,8 +49,7 @@ async function getTeamActivity(supabase: any) {
   }));
 }
 
-async function getMostAgedContent(supabase: any) {
-  const profile = await getProfileWithAssignedBrands(supabase);
+async function getMostAgedContent(supabase: any, profile: any) {
   if (!profile) return [];
 
   let query = supabase
@@ -71,70 +70,47 @@ async function getMostAgedContent(supabase: any) {
     console.error('Error fetching most aged content:', error);
     return [];
   }
-  return data;
-}
 
-async function getMyTasks(supabase: any) {
-  const { data, error } = await supabase.rpc('get_user_details');
-  if (error) {
-    console.error('Error fetching tasks:', error);
-    return [];
-  }
-  return data || [];
+  return data.map((item: any) => ({
+    ...item,
+    brandName: item.brand?.name || 'N/A',
+    brandColor: item.brand?.brand_color || '#888'
+  }));
 }
 
 export default async function DashboardPage() {
   const supabase = createSupabaseServerClient();
-  const activityPromise = getTeamActivity(supabase);
-  const agedContentPromise = getMostAgedContent(supabase);
-  const tasksPromise = getMyTasks(supabase);
+  const profile = await getProfileWithAssignedBrands(supabase);
+  
+  // Fetch data in parallel
+  const [
+    teamActivity,
+    mostAgedContent
+  ] = await Promise.all([
+    getTeamActivity(supabase, profile),
+    getMostAgedContent(supabase, profile)
+  ]);
 
   return (
-    <div className="space-y-8">
-      <div>
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+      <div className="flex items-center justify-between space-y-2 mb-4">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Welcome back! Here's what's happening across your workspace.
-        </p>
       </div>
-
-      {/* Main Content Area */}
-      <div className="grid gap-8 lg:grid-cols-3">
-        {/* Left column for main feed */}
-        <div className="lg:col-span-2 space-y-8">
-          <Suspense fallback={<p>Loading activity...</p>}>
-            <TeamActivityFeedWrapper activityPromise={activityPromise} />
-          </Suspense>
-          <Suspense fallback={<p>Loading stalled content...</p>}>
-            <MostAgedContentWrapper agedContentPromise={agedContentPromise} />
+      <div className="grid gap-6 lg:grid-cols-5">
+        <div className="lg:col-span-3">
+          <Suspense fallback={<TasksSkeleton />}>
+            <TeamActivityFeed initialActivity={teamActivity} />
           </Suspense>
         </div>
-        
-        {/* Right column for tasks */}
-        <div className="lg:col-span-1">
-          <div className="sticky top-4">
-             <Suspense fallback={<TasksSkeleton />}>
-               <MyTasksWrapper tasksPromise={tasksPromise} />
-             </Suspense>
-          </div>
+        <div className="lg:col-span-2 space-y-6">
+           <Suspense fallback={<TasksSkeleton />}>
+             <MostAgedContent initialContent={mostAgedContent} />
+           </Suspense>
+           <Suspense fallback={<TasksSkeleton />}>
+              <MyTasks />
+           </Suspense>
         </div>
       </div>
     </div>
   );
-}
-
-// Wrapper components to handle promises in Suspense
-async function TeamActivityFeedWrapper({ activityPromise }: { activityPromise: Promise<any[]> }) {
-  const activities = await activityPromise;
-  return <TeamActivityFeed activities={activities} />;
-}
-
-async function MostAgedContentWrapper({ agedContentPromise }: { agedContentPromise: Promise<any[]> }) {
-  const items = await agedContentPromise;
-  return <MostAgedContent items={items} />;
-}
-
-async function MyTasksWrapper({ tasksPromise }: { tasksPromise: Promise<any[]> }) {
-  const tasks = await tasksPromise;
-  return <MyTasks tasks={tasks} />;
 } 

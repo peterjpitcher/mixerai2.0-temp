@@ -1,80 +1,95 @@
-'use client';
+"use client";
 
-import Link from "next/link";
-import { Button } from "@/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/card";
-import { ListChecks, AlertTriangle, CheckCircle2, Clock, FileText } from "lucide-react";
-import { BrandIcon } from '@/components/brand-icon';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { TasksSkeleton } from './dashboard-skeleton';
+import { Task } from '@/types/task';
+import { formatDistanceToNow } from 'date-fns';
+import { CheckSquare } from 'lucide-react';
 
-interface TaskItem {
-  id: string;
-  task_status: string | null;
-  created_at: string;
-  content_id: string;
-  content_title: string;
-  content_status: string;
-  brand_name: string | null;
-  brand_color?: string | null;
-  workflow_name: string | null;
-  workflow_step_name: string | null;
-}
-
-interface MyTasksProps {
-  tasks: TaskItem[];
-}
-
-const getStatusIcon = (status: string | null) => {
-  switch (status) {
-    case 'pending_review': return <Clock className="h-4 w-4 text-yellow-500" />;
-    case 'approved': return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-    case 'rejected': return <AlertTriangle className="h-4 w-4 text-red-500" />;
-    default: return <FileText className="h-4 w-4 text-gray-500" />;
+async function fetchTasks(): Promise<Task[]> {
+  try {
+    const response = await fetch('/api/me/tasks');
+    if (!response.ok) {
+      console.error('Failed to fetch tasks');
+      return [];
+    }
+    const data = await response.json();
+    return data.success ? data.data : [];
+  } catch (error) {
+    console.error('Error fetching tasks:', error);
+    return [];
   }
-};
+}
 
-export function MyTasks({ tasks }: MyTasksProps) {
+export function MyTasks() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadTasks = async () => {
+      setIsLoading(true);
+      const fetchedTasks = await fetchTasks();
+      setTasks(fetchedTasks);
+      setIsLoading(false);
+    };
+    loadTasks();
+  }, []);
+
+  if (isLoading) {
+    return <TasksSkeleton />;
+  }
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center"><ListChecks className="h-5 w-5 mr-2" /> My Tasks</CardTitle>
-        <CardDescription>Content items assigned to you that require your attention.</CardDescription>
+        <CardTitle>My Tasks</CardTitle>
+        <CardDescription>
+          Items assigned to you that require action.
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        {tasks.length === 0 ? (
-          <p className="text-muted-foreground text-center py-4">You have no pending tasks. Great job!</p>
-        ) : (
-          <ul className="space-y-3">
-            {tasks.map(task => (
-              <li key={task.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 transition-colors">
-                <div className="flex items-center space-x-3">
-                  <BrandIcon name={task.brand_name || 'Default'} color={task.brand_color ?? undefined} size="sm" />
-                  {getStatusIcon(task.content_status)}
-                  <div>
-                    <Link href={`/dashboard/content/${task.content_id}`} className="font-medium hover:underline">
-                      {task.content_title || 'Untitled Task'}
+        {tasks && tasks.length > 0 ? (
+          <ul className="space-y-4">
+            {tasks.map((task) => (
+              <li key={task.id} className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400">
+                      <CheckSquare className="h-5 w-5" />
+                   </div>
+                   <div>
+                    <Link href={`/dashboard/content/${task.content_id}`} className="font-semibold hover:underline">
+                      {task.content_title}
                     </Link>
-                    <p className="text-xs text-muted-foreground">
-                      Brand: {task.brand_name || 'N/A'} | Workflow: {task.workflow_name || 'N/A'}
-                      {task.workflow_step_name ? ` - Step: ${task.workflow_step_name}` : ''}
-                    </p>
+                    <div className="text-sm text-muted-foreground">
+                      <Badge 
+                        variant="outline" 
+                        style={task.brand_color ? { borderColor: task.brand_color, color: task.brand_color } : {}}
+                        className="mr-2 -translate-y-px"
+                      >
+                        {task.brand_name || 'No Brand'}
+                      </Badge>
+                       <span>› {task.workflow_step_name}</span>
+                       <span className="mx-1">·</span>
+                       <time>
+                        {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
+                       </time>
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Assigned</p>
-                  <p className="text-xs font-medium">{task.created_at ? new Date(task.created_at).toLocaleDateString('en-GB') : 'N/A'}</p>
-                </div>
+                <Link href={`/dashboard/content/${task.content_id}/edit`} className="text-sm hover:underline flex-shrink-0">View</Link>
               </li>
             ))}
           </ul>
+        ) : (
+          <div className="text-center text-muted-foreground py-8">
+            <p>You have no pending tasks.</p>
+          </div>
         )}
       </CardContent>
-      {tasks.length > 0 && (
-        <CardFooter>
-          <Button variant="outline" size="sm" asChild className="ml-auto">
-            <Link href="/dashboard/my-tasks">View All My Tasks</Link>
-          </Button>
-        </CardFooter>
-      )}
     </Card>
   );
 } 

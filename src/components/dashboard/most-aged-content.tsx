@@ -14,17 +14,18 @@ interface AgedItem {
 }
 
 interface MostAgedContentProps {
-  items: AgedItem[];
+  initialContent: AgedItem[];
 }
 
 const getAgeColor = (dateString: string): string => {
     const daysOld = differenceInDays(new Date(), new Date(dateString));
-    if (daysOld > 30) return 'text-red-500 font-semibold';
-    if (daysOld > 7) return 'text-yellow-600 dark:text-yellow-500 font-medium';
+    if (daysOld > 30) return 'text-red-500';
+    if (daysOld > 7) return 'text-yellow-600 dark:text-yellow-500';
     return 'text-muted-foreground';
 };
 
-export function MostAgedContent({ items }: MostAgedContentProps) {
+export function MostAgedContent({ initialContent }: MostAgedContentProps) {
+  const items = initialContent;
   return (
     <Card>
       <CardHeader>
@@ -41,18 +42,18 @@ export function MostAgedContent({ items }: MostAgedContentProps) {
                 <div className="flex items-center gap-4">
                   <Hourglass className="h-6 w-6 text-muted-foreground" />
                   <div>
-                    <Link href={`/dashboard/content/${item.id}`} className="font-semibold hover:underline">
+                    <Link href={`/dashboard/content/${item.id}`} className="text-sm font-medium hover:underline">
                       {item.title}
                     </Link>
-                    <div className={`text-sm ${getAgeColor(item.updated_at)}`}>
-                      {item.brands?.name ? <Badge variant="outline" className="mr-2 -translate-y-px">{item.brands.name}</Badge> : null}
-                      Last updated {formatDistanceToNow(new Date(item.updated_at), { addSuffix: true })}
+                    <div className="text-sm text-muted-foreground">
+                      <span className={getAgeColor(item.updated_at)}>
+                        {item.brands?.name ? <Badge variant="outline" className="mr-2 -translate-y-px">{item.brands.name}</Badge> : null}
+                        Last updated {formatDistanceToNow(new Date(item.updated_at), { addSuffix: true })}
+                      </span>
                     </div>
                   </div>
                 </div>
-                <Button asChild variant="ghost" size="sm">
-                  <Link href={`/dashboard/content/${item.id}`}>View</Link>
-                </Button>
+                <Link href={`/dashboard/content/${item.id}`} className="text-sm hover:underline">View</Link>
               </li>
             ))}
           </ul>
