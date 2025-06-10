@@ -1,62 +1,116 @@
 import { Suspense } from 'react';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { DashboardMetrics } from '@/components/dashboard/dashboard-metrics';
+import { getProfileWithAssignedBrands } from '@/lib/auth/user-profile';
+import { TeamActivityFeed } from '@/components/dashboard/team-activity-feed';
+import { MostAgedContent } from '@/components/dashboard/most-aged-content';
+import { TasksSkeleton } from '@/components/dashboard/dashboard-skeleton';
+import { Card } from '@/components/ui/card';
 import { MyTasks } from '@/components/dashboard/my-tasks';
-import { MetricsSkeleton, TasksSkeleton } from '@/components/dashboard/dashboard-skeleton';
 
-async function getDashboardMetrics(supabase: any) {
-  // This is inefficient and should be fixed per issue #9
-  const { data: brands, error: brandsError } = await supabase.from('brands').select('id');
-  const { data: content, error: contentError } = await supabase.from('content').select('id', { head: true });
-  const { data: workflows, error: workflowsError } = await supabase.from('workflows').select('id');
+async function getTeamActivity(supabase: any, profile: any) {
+  if (!profile) return [];
 
-  return {
-    totalBrands: brands?.length ?? 0,
-    totalContent: content?.length ?? 0,
-    totalWorkflows: workflows?.length ?? 0,
-  };
-}
+  let query = supabase
+    .from('content')
+    .select(`
+      id,
+      created_at,
+      title,
+      status,
+      created_by,
+      brand_id,
+      profiles ( id, full_name, avatar_url )
+    `);
 
-async function getMyTasks(supabase: any) {
-  const { data, error } = await supabase.rpc('get_user_tasks');
+  if (profile.role !== 'admin') {
+    if (!profile.assigned_brands || profile.assigned_brands.length === 0) return [];
+    query = query.in('brand_id', profile.assigned_brands);
+  }
+    
+  const { data, error } = await query
+    .order('created_at', { ascending: false })
+    .limit(10);
+
   if (error) {
-    console.error('Error fetching tasks:', error);
+    console.error('Error fetching team activity:', error);
     return [];
   }
-  return data;
+
+  return data.map(item => ({
+    id: item.id,
+    type: item.status === 'draft' ? 'content_created' : 'content_updated',
+    created_at: item.created_at,
+    user: item.profiles,
+    target: {
+      id: item.id,
+      name: item.title,
+      type: 'content' as 'content',
+    },
+  }));
+}
+
+async function getMostAgedContent(supabase: any, profile: any) {
+  if (!profile) return [];
+
+  let query = supabase
+    .from('content')
+    .select('id, title, updated_at, status, brand_id, brands ( name )')
+    .in('status', ['draft', 'pending_review']);
+
+  if (profile.role !== 'admin') {
+    if (!profile.assigned_brands || profile.assigned_brands.length === 0) return [];
+    query = query.in('brand_id', profile.assigned_brands);
+  }
+
+  const { data, error } = await query
+    .order('updated_at', { ascending: true })
+    .limit(5);
+
+  if (error) {
+    console.error('Error fetching most aged content:', error);
+    return [];
+  }
+
+  return data.map((item: any) => ({
+    ...item,
+    brandName: item.brand?.name || 'N/A',
+    brandColor: item.brand?.brand_color || '#888'
+  }));
 }
 
 export default async function DashboardPage() {
   const supabase = createSupabaseServerClient();
-  const metrics = getDashboardMetrics(supabase);
-  const tasks = getMyTasks(supabase);
+  const profile = await getProfileWithAssignedBrands(supabase);
+  
+  // Fetch data in parallel
+  const [
+    teamActivity,
+    mostAgedContent
+  ] = await Promise.all([
+    getTeamActivity(supabase, profile),
+    getMostAgedContent(supabase, profile)
+  ]);
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+      <div className="flex items-center justify-between space-y-2 mb-4">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Welcome back! Here's an overview of your workspace and tasks.
-        </p>
       </div>
-
-      <Suspense fallback={<MetricsSkeleton />}>
-        <DashboardMetricsWrapper metricsPromise={metrics} />
-      </Suspense>
-
-      <Suspense fallback={<TasksSkeleton />}>
-        <MyTasksWrapper tasksPromise={tasks} />
-      </Suspense>
+      <div className="grid gap-6 lg:grid-cols-5">
+        <div className="lg:col-span-3">
+          <Suspense fallback={<TasksSkeleton />}>
+            <TeamActivityFeed initialActivity={teamActivity} />
+          </Suspense>
+        </div>
+        <div className="lg:col-span-2 space-y-6">
+           <Suspense fallback={<TasksSkeleton />}>
+             <MostAgedContent initialContent={mostAgedContent} />
+           </Suspense>
+           <Suspense fallback={<TasksSkeleton />}>
+              <MyTasks />
+           </Suspense>
+        </div>
+      </div>
     </div>
   );
-}
-
-async function DashboardMetricsWrapper({ metricsPromise }: { metricsPromise: Promise<any> }) {
-  const metrics = await metricsPromise;
-  return <DashboardMetrics metrics={metrics} />;
-}
-
-async function MyTasksWrapper({ tasksPromise }: { tasksPromise: Promise<any[]> }) {
-  const tasks = await tasksPromise;
-  return <MyTasks tasks={tasks} />;
 } 
