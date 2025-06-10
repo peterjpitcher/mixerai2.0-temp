@@ -16,6 +16,34 @@ export default function ReleaseNotesPage() {
       
       <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
         
+        {/* LATEST RELEASE - DASHBOARD REDESIGN */}
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            This release introduces a complete redesign of the main dashboard, replacing the previous unhelpful metrics with a more actionable, insightful, and visually engaging command centre.
+          </p>
+
+          <h3>Key Features & Enhancements</h3>
+          <h4>Dashboard (<code>/dashboard</code>)</h4>
+          <ul>
+            <li>
+              <strong>New "Team Activity" Feed:</strong> The centrepiece of the new dashboard is a live feed showing significant events from across the platform, such as content creation and status changes. This provides a clear overview of team activity.
+            </li>
+            <li>
+              <strong>New "Stalled Content" Module:</strong> To help identify bottlenecks, this new module lists content that has not been updated in a while, ordered with the oldest items first. The age of the content is highlighted with colours to draw attention to the most critical items.
+            </li>
+            <li>
+              <strong>Correct Role-Based Permissions:</strong> Fixed a critical bug where the dashboard's data was not correctly filtered for non-admin users. The dashboard now correctly implements the application's RBAC rules, ensuring users only see activity and content related to their assigned brands.
+            </li>
+            <li>
+              <strong>Enhanced Visual Design:</strong> The new components feature more engaging icons and a colour-coded design to make the dashboard more intuitive and easier to scan.
+            </li>
+          </ul>
+          <p className="mt-4">
+            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+          </p>
+        </section>
+        
         {/* LATEST RELEASE - USER MANAGEMENT AND SVG FIXES */}
         <section className="mb-12">
           <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
