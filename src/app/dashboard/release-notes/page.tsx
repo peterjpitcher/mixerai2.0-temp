@@ -15,6 +15,37 @@ export default function ReleaseNotesPage() {
       <Separator className="my-6" />
       
       <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
+        
+        {/* LATEST RELEASE - USER MANAGEMENT AND SVG FIXES */}
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            This release resolves several critical bugs related to user management and image rendering, ensuring the user pages are stable, secure, and functional.
+          </p>
+
+          <h3>Key Fixes & Enhancements</h3>
+          <h4>User Management API & Database</h4>
+          <ul>
+            <li>
+              <strong>Database Functionality:</strong> Corrected multiple critical bugs in the database functions responsible for fetching and updating user details.
+              <ul>
+                <li>Fixed a bug where the `get_user_details` function was referencing a non-existent column (`raw_app_meta_data` instead of `raw_user_meta_data`), which caused the user detail page to fail with a 500 error.</li>
+                <li>Added the `SECURITY DEFINER` clause to the `get_user_details` function to resolve a "permission denied" error when reading from the `auth.users` table.</li>
+                 <li>Corrected the `update_user_details` function to use the proper `raw_user_meta_data` column name, fixing a 500 error on user profile updates.</li>
+                 <li>Aliased the user's role correctly as `globalRole` in the `get_user_details` function to match the frontend's expectation.</li>
+              </ul>
+            </li>
+          </ul>
+          <h4>Next.js Image Configuration</h4>
+           <ul>
+            <li>
+              <strong>SVG Image Support:</strong> Fixed an error that prevented user avatars from loading from `api.dicebear.com`. Updated `next.config.js` to use the modern `remotePatterns` configuration and enabled `dangerouslyAllowSVG` to correctly process SVG images.
+            </li>
+          </ul>
+          <p className="mt-4">
+            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+          </p>
+        </section>
 
         {/* LATEST RELEASE - ARCHITECTURAL REFACTOR */}
         <section className="mb-12">

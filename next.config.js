@@ -3,11 +3,24 @@ const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
   images: {
-    domains: [
-      'api.dicebear.com',
-      'images.unsplash.com',
-      'placehold.co',
-      'placeholder.com'
+    dangerouslyAllowSVG: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'api.dicebear.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+      },
+       {
+        protocol: 'https',
+        hostname: 'placeholder.com',
+      },
     ],
   },
   // Skip type checking during build
