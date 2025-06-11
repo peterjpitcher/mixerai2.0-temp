@@ -102,6 +102,7 @@ export default function DashboardLayout({
               height={52}
               priority 
             />
+            <span className="text-lg text-primary">Welcome to MixerAI Dashboard!</span>
           </Link>
           <div className="flex items-center space-x-2 sm:space-x-4">
             <Button
