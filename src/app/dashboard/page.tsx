@@ -92,9 +92,12 @@ export default async function DashboardPage() {
   ]);
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2 mb-4">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-4">
+      <div className="mb-4">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground mt-2">
+          Welcome to MixerAI. View recent activity and manage your content tasks.
+        </p>
       </div>
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="lg:col-span-3">

@@ -1,1 +1,0 @@
-ALTER TYPE content_status ADD VALUE 'cancelled'; 
