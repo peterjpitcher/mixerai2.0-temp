@@ -32,7 +32,9 @@ import {
   PlainTextOutputOptions,
   HtmlOutputOptions,
   ImageOutputOptions,
+  ProductSelectorOptions,
 } from '@/types/template';
+import { ProductSelectorOptionsComponent } from './product-selector-options';
 
 interface FieldDesignerProps {
   isOpen: boolean;
@@ -256,145 +258,131 @@ export function FieldDesigner({
   const inputFieldData = fieldType === 'input' ? fieldData as InputField : null;
   const outputFieldData = fieldType === 'output' ? fieldData as OutputField : null;
 
-  const inputFieldTypes: Array<{ value: InputField['type']; label: string }> = [
+  const fieldTypes: { value: GlobalFieldType; label: string }[] = [
     { value: 'shortText', label: 'Short Text' },
     { value: 'longText', label: 'Long Text' },
-    { value: 'richText', label: 'Rich Text Editor' },
-    { value: 'select', label: 'Select Dropdown' },
+    { value: 'richText', label: 'Rich Text (WYSIWYG)' },
+    { value: 'select', label: 'Select (Dropdown)' },
     { value: 'number', label: 'Number' },
-    { value: 'date', label: 'Date Picker' },
+    { value: 'date', label: 'Date' },
     { value: 'tags', label: 'Tags' },
     { value: 'url', label: 'URL' },
     { value: 'fileUpload', label: 'File Upload' },
+    { value: 'product-selector', label: 'Select from Brand Products' },
   ];
   
-  const outputFieldTypes: Array<{ value: OutputField['type']; label: string }> = [
+  const outputFieldTypes: { value: GlobalFieldType; label: string }[] = [
     { value: 'plainText', label: 'Plain Text' },
-    { value: 'richText', label: 'Rich Text Editor' },
-    { value: 'html', label: 'HTML Content' },
-    { value: 'image', label: 'Image (URL/Generation)' }, 
+    { value: 'richText', label: 'Rich Text (WYSIWYG)' },
+    { value: 'html', label: 'HTML' },
+    { value: 'image', label: 'Image' },
   ];
 
-  const currentFieldTypes = fieldType === 'input' ? inputFieldTypes : outputFieldTypes;
+  const currentFieldTypes = fieldType === 'input' ? fieldTypes : outputFieldTypes;
 
   const renderOptions = () => {
-    const options = fieldData.options;
     switch (fieldData.type) {
       case 'shortText':
-        const stOptions = options as ShortTextOptions | undefined;
-        return (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="minLength">Minimum Length</Label>
-              <Input id="minLength" type="number" value={stOptions?.minLength || ''} onChange={(e) => handleOptionsChange({ minLength: parseInt(e.target.value) || undefined })} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="maxLength">Maximum Length</Label>
-              <Input id="maxLength" type="number" value={stOptions?.maxLength || ''} onChange={(e) => handleOptionsChange({ maxLength: parseInt(e.target.value) || undefined })} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="placeholder_short_text">Placeholder</Label>
-              <Input id="placeholder_short_text" value={stOptions?.placeholder || ''} onChange={(e) => handleOptionsChange({ placeholder: e.target.value })} />
-            </div>
-          </>
-        );
+        return <ShortTextOptionsComponent options={fieldData.options as ShortTextOptions} onChange={handleOptionsChange} />;
       case 'longText':
-        const ltOptions = options as LongTextOptions | undefined;
-        return (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="minWords">Minimum Words</Label>
-              <Input id="minWords" type="number" value={ltOptions?.minWords || ''} onChange={(e) => handleOptionsChange({ minWords: parseInt(e.target.value) || undefined })} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="maxWords">Maximum Words</Label>
-              <Input id="maxWords" type="number" value={ltOptions?.maxWords || ''} onChange={(e) => handleOptionsChange({ maxWords: parseInt(e.target.value) || undefined })} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="placeholder_long_text">Placeholder</Label>
-              <Input id="placeholder_long_text" value={ltOptions?.placeholder || ''} onChange={(e) => handleOptionsChange({ placeholder: e.target.value })} />
-            </div>
-          </>
-        );
-      case 'tags':
-        const tagOptions = options as TagsOptions | undefined;
-        return (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="maxTags">Maximum Tags</Label>
-              <Input id="maxTags" type="number" value={tagOptions?.maxTags || ''} onChange={(e) => handleOptionsChange({ maxTags: parseInt(e.target.value) || undefined })} />
-            </div>
-             <div className="space-y-2">
-              <Label htmlFor="placeholder_tags">Placeholder</Label>
-              <Input id="placeholder_tags" value={tagOptions?.placeholder || ''} onChange={(e) => handleOptionsChange({ placeholder: e.target.value })} />
-            </div>
-          </>
-        );
-      case 'select':
-        const selOptions = options as SelectOptions | undefined;
-        const choices = selOptions?.choices || [];
-        return (
-          <>
-            <div className="space-y-2">
-              <Label>Choices</Label>
-              {choices.map((choice, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <Input 
-                    value={choice} 
-                    onChange={(e) => {
-                      const newChoices = [...choices];
-                      newChoices[index] = e.target.value;
-                      handleOptionsChange({ choices: newChoices });
-                    }}
-                    placeholder={`Choice ${index + 1}`}
-                  />
-                  <Button variant="ghost" size="sm" onClick={() => {
-                    const newChoices = choices.filter((_, i) => i !== index);
-                    handleOptionsChange({ choices: newChoices });
-                  }}>
-                    <Icons.trash className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              <Button type="button" variant="outline" size="sm" onClick={() => {
-                handleOptionsChange({ choices: [...choices, ''] });
-              }}>Add Choice</Button>
-            </div>
-            <div className="flex items-center space-x-2 mt-4">
-              <Checkbox 
-                id="allowMultiple"
-                checked={selOptions?.allowMultiple || false} 
-                onCheckedChange={(checked) => handleOptionsChange({ allowMultiple: !!checked })} 
-              />
-              <Label htmlFor="allowMultiple">Allow multiple selections</Label>
-            </div>
-          </>
-        );
-      case 'plainText':
-        const ptOutputOptions = options as PlainTextOutputOptions | undefined;
-        return (
-          <div className="space-y-2">
-            <Label htmlFor="maxLength_plain_text">Maximum Length (Optional)</Label>
-            <Input 
-              id="maxLength_plain_text" 
-              type="number" 
-              value={ptOutputOptions?.maxLength || ''} 
-              onChange={(e) => handleOptionsChange({ maxLength: parseInt(e.target.value) || undefined })} 
-              placeholder="e.g. 160 for meta description"
-            />
-          </div>
-        );
+        return <LongTextOptionsComponent options={fieldData.options as LongTextOptions} onChange={handleOptionsChange} />;
       case 'richText':
-         const rtOptions = options as RichTextOptions | undefined;
-         return (
-           <div className="space-y-2">
-             <Label htmlFor="placeholder_rich_text">Placeholder</Label>
-             <Input id="placeholder_rich_text" value={rtOptions?.placeholder || ''} onChange={(e) => handleOptionsChange({ placeholder: e.target.value })} />
-           </div>
-         );
+        return <RichTextOptionsComponent options={fieldData.options as RichTextOptions} onChange={handleOptionsChange} />;
+      case 'select':
+        return <SelectOptionsComponent options={fieldData.options as SelectOptions} onChange={handleOptionsChange} />;
+      case 'number':
+        return <NumberOptionsComponent options={fieldData.options as NumberOptions} onChange={handleOptionsChange} />;
+      case 'date':
+        return <DateOptionsComponent options={fieldData.options as DateOptions} onChange={handleOptionsChange} />;
+      case 'tags':
+        return <TagsOptionsComponent options={fieldData.options as TagsOptions} onChange={handleOptionsChange} />;
+      case 'url':
+        return <UrlOptionsComponent options={fieldData.options as UrlOptions} onChange={handleOptionsChange} />;
+      case 'fileUpload':
+        return <FileUploadOptionsComponent options={fieldData.options as FileUploadOptions} onChange={handleOptionsChange} />;
+      case 'product-selector':
+        return <ProductSelectorOptionsComponent options={fieldData.options as ProductSelectorOptions} onChange={handleOptionsChange} />;
+      case 'plainText':
+        return <PlainTextOutputOptionsComponent options={fieldData.options as PlainTextOutputOptions} onChange={handleOptionsChange} />;
+      case 'html':
+        return <HtmlOutputOptionsComponent options={fieldData.options as HtmlOutputOptions} onChange={handleOptionsChange} />;
+      case 'image':
+        return <ImageOutputOptionsComponent options={fieldData.options as ImageOutputOptions} onChange={handleOptionsChange} />;
       default:
-        return <p className="text-sm text-muted-foreground">No specific options for this field type.</p>;
+        return <p className="text-sm text-gray-500">No specific options for this field type.</p>;
     }
+  };
+
+  const renderAiPanel = () => {
+    if (fieldType === 'input' && inputFieldData && (
+            <div className="space-y-2">
+        <div className="flex items-center space-x-2">
+          <Checkbox 
+            id="aiSuggester" 
+            checked={inputFieldData.aiSuggester || false} 
+            onCheckedChange={(checked) => handleAIFeatureChange('aiSuggester', !!checked)} 
+          />
+          <Label htmlFor="aiSuggester">Enable AI Suggestions</Label>
+        </div>
+        {inputFieldData.aiSuggester && (
+          <div className="pl-6 space-y-1">
+             <p className="text-xs text-muted-foreground">
+              Uses AI to suggest values for this field during content creation.
+            </p>
+            </div>
+        )}
+            </div>
+    )) || (
+      fieldType === 'output' && outputFieldData && (
+        <>
+          <div className="pt-2">
+            <Label className="font-medium">Brand Context for AI (Output Fields)</Label>
+            <p className="text-xs text-muted-foreground pb-2">
+              Allow AI to use specific brand elements when generating content for this field.
+            </p>
+            <div className="space-y-1.5 pl-1">
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="useBrandIdentity"
+                  checked={outputFieldData.useBrandIdentity || false}
+                  onCheckedChange={(checked) => handleAIFeatureChange('useBrandIdentity', !!checked)}
+                />
+                <Label htmlFor="useBrandIdentity">Use Brand Identity</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="useToneOfVoice"
+                  checked={outputFieldData.useToneOfVoice || false}
+                  onCheckedChange={(checked) => handleAIFeatureChange('useToneOfVoice', !!checked)}
+                />
+                <Label htmlFor="useToneOfVoice">Use Tone of Voice</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="useGuardrails"
+                  checked={outputFieldData.useGuardrails || false}
+                  onCheckedChange={(checked) => handleAIFeatureChange('useGuardrails', !!checked)}
+                />
+                <Label htmlFor="useGuardrails">Use Guardrails</Label>
+              </div>
+               <div className="flex items-center space-x-2 pt-1">
+                  <Checkbox 
+                      id="useCombinedBrandContext"
+                      checked={!!(outputFieldData.useBrandIdentity && outputFieldData.useToneOfVoice && outputFieldData.useGuardrails)}
+                      onCheckedChange={(checked) => {
+                        const newCheckedState = !!checked;
+                        handleAIFeatureChange('useBrandIdentity', newCheckedState);
+                        handleAIFeatureChange('useToneOfVoice', newCheckedState);
+                        handleAIFeatureChange('useGuardrails', newCheckedState);
+                      }}
+                  />
+                  <Label htmlFor="useCombinedBrandContext">Enable All Brand Context</Label>
+            </div>
+            </div>
+          </div>
+        </>
+      )
+    );
   };
 
   return (
@@ -442,74 +430,7 @@ export function FieldDesigner({
               </TabsContent>
           
           <TabsContent value="ai" className="space-y-4">
-            {fieldType === 'input' && inputFieldData && (
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="aiSuggester" 
-                    checked={inputFieldData.aiSuggester || false} 
-                    onCheckedChange={(checked) => handleAIFeatureChange('aiSuggester', !!checked)} 
-                  />
-                  <Label htmlFor="aiSuggester">Enable AI Suggestions</Label>
-                </div>
-                {inputFieldData.aiSuggester && (
-                  <div className="pl-6 space-y-1">
-                     <p className="text-xs text-muted-foreground">
-                      Uses AI to suggest values for this field during content creation.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-            {fieldType === 'output' && outputFieldData && (
-              <>
-                <div className="pt-2">
-                  <Label className="font-medium">Brand Context for AI (Output Fields)</Label>
-                  <p className="text-xs text-muted-foreground pb-2">
-                    Allow AI to use specific brand elements when generating content for this field.
-                  </p>
-                  <div className="space-y-1.5 pl-1">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id="useBrandIdentity"
-                        checked={outputFieldData.useBrandIdentity || false}
-                        onCheckedChange={(checked) => handleAIFeatureChange('useBrandIdentity', !!checked)}
-                      />
-                      <Label htmlFor="useBrandIdentity">Use Brand Identity</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id="useToneOfVoice"
-                        checked={outputFieldData.useToneOfVoice || false}
-                        onCheckedChange={(checked) => handleAIFeatureChange('useToneOfVoice', !!checked)}
-                      />
-                      <Label htmlFor="useToneOfVoice">Use Tone of Voice</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id="useGuardrails"
-                        checked={outputFieldData.useGuardrails || false}
-                        onCheckedChange={(checked) => handleAIFeatureChange('useGuardrails', !!checked)}
-                      />
-                      <Label htmlFor="useGuardrails">Use Guardrails</Label>
-                    </div>
-                     <div className="flex items-center space-x-2 pt-1">
-                        <Checkbox 
-                            id="useCombinedBrandContext"
-                            checked={!!(outputFieldData.useBrandIdentity && outputFieldData.useToneOfVoice && outputFieldData.useGuardrails)}
-                            onCheckedChange={(checked) => {
-                              const newCheckedState = !!checked;
-                              handleAIFeatureChange('useBrandIdentity', newCheckedState);
-                              handleAIFeatureChange('useToneOfVoice', newCheckedState);
-                              handleAIFeatureChange('useGuardrails', newCheckedState);
-                            }}
-                        />
-                        <Label htmlFor="useCombinedBrandContext">Enable All Brand Context</Label>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
+            {renderAiPanel()}
             
             {((fieldType === 'input' && inputFieldData?.aiSuggester) || fieldType === 'output') && (
               <div className="pt-3 space-y-4">

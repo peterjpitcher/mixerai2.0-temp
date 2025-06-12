@@ -4,299 +4,297 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { toast } from 'sonner';
 import { Heading } from '@/components/ui/heading';
-import { Loader2 } from 'lucide-react';
-// ComboboxOption might still be needed if we use a combobox for countries/products later
-// import { ComboboxOption } from '@/components/ui/MultiSelectCheckboxCombobox'; 
-// ALL_COUNTRIES_CODE and ALL_COUNTRIES_NAME might not be needed if countries are purely dynamic
-// import { ALL_COUNTRIES_CODE, ALL_COUNTRIES_NAME } from "@/lib/constants/country-codes"; 
-import { fetchCountries, fetchProducts, fetchClaims } from '@/lib/api-utils';
+import { Loader2, Copy } from 'lucide-react';
+import { fetchCountries, fetchProducts } from '@/lib/api-utils';
 
-interface CountryAPI {
-    code: string;
-    name: string;
-}
-
-interface ProductAPI {
+// Types
+interface SelectOption {
     id: string;
     name: string;
 }
 
-// This interface represents a single styled claim item (both allowed and disallowed)
-interface StyledClaim {
-    id: string; 
-    text: string;
+interface CountryOption {
+    code: string;
+    name: string;
 }
 
-const ProductClaimsOutputPage = () => {
-  const [countries, setCountries] = useState<CountryAPI[]>([]);
-  const [products, setProducts] = useState<ProductAPI[]>([]);
-  const [selectedCountry, setSelectedCountry] = useState<string>('');
-  const [selectedProduct, setSelectedProduct] = useState<string>('');
-  
-  // New state variables for the API response
-  const [productNameForDisplay, setProductNameForDisplay] = useState<string>('');
-  const [countryNameForDisplay, setCountryNameForDisplay] = useState<string>('');
-  const [styledAllowedClaims, setStyledAllowedClaims] = useState<StyledClaim[]>([]);
-  const [styledDisallowedClaims, setStyledDisallowedClaims] = useState<StyledClaim[]>([]);
-  
-  const [isLoadingCountries, setIsLoadingCountries] = useState<boolean>(true);
-  const [isLoadingProducts, setIsLoadingProducts] = useState<boolean>(true);
-  const [isGeneratingClaims, setIsGeneratingClaims] = useState<boolean>(false);
-  const [hasGenerated, setHasGenerated] = useState<boolean>(false); // Track if generation has been attempted
+interface MandatoryClaim {
+  text: string;
+  level: string;
+}
 
-  useEffect(() => {
-    const loadCountries = async () => {
-      setIsLoadingCountries(true);
-      try {
-        const countriesData = await fetchCountries(); 
-        if (countriesData && countriesData.success && Array.isArray(countriesData.data)) {
-          setCountries(countriesData.data);
-        } else {
-          toast.error("Could not load countries. " + (countriesData?.error || ''));
-          setCountries([]);
+interface GroupedClaims {
+  level: string;
+  allowed_claims: string[];
+  disallowed_claims: string[];
+}
+
+interface StyledClaimsData {
+  introductory_sentence: string;
+  mandatory_claims: MandatoryClaim[];
+  grouped_claims: GroupedClaims[];
+}
+
+interface RawClaimForAI {
+  text: string;
+  type: string;
+  level: string;
+  market: string;
+}
+
+const BrandClaimsOutputPage = () => {
+    // State
+    const [brands, setBrands] = useState<SelectOption[]>([]);
+    const [products, setProducts] = useState<SelectOption[]>([]);
+    const [countries, setCountries] = useState<CountryOption[]>([]);
+    const [selectedBrand, setSelectedBrand] = useState<string>('');
+    const [selectedProduct, setSelectedProduct] = useState<string>('all');
+    const [selectedCountry, setSelectedCountry] = useState<string>('all');
+    const [brandNameForDisplay, setBrandNameForDisplay] = useState<string>('');
+    const [styledClaims, setStyledClaims] = useState<StyledClaimsData | null>(null);
+    const [rawClaimsForAI, setRawClaimsForAI] = useState<RawClaimForAI[]>([]);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [isGenerating, setIsGenerating] = useState<boolean>(false);
+    const [hasGenerated, setHasGenerated] = useState<boolean>(false);
+
+    // Effects
+    useEffect(() => {
+        const loadInitialData = async () => {
+            setIsLoading(true);
+            try {
+                const [brandsRes, productsRes, countriesRes] = await Promise.all([
+                    fetch('/api/master-claim-brands'),
+                    fetchProducts(),
+                    fetchCountries()
+                ]);
+                const brandsData = await brandsRes.json();
+                if (brandsData.success) setBrands(brandsData.data); else toast.error('Could not load brands.');
+                if (productsRes.success) setProducts(productsRes.data); else toast.error('Could not load products.');
+                if (countriesRes.success) setCountries(countriesRes.data); else toast.error('Could not load countries.');
+            } catch (error) {
+                toast.error('Failed to fetch initial page data.');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        loadInitialData();
+    }, []);
+
+    // Handlers
+    const handleGenerate = async () => {
+        if (!selectedBrand) {
+            toast.error('Please select a brand.');
+            return;
         }
-      } catch (error: any) {
-        console.error("Error fetching countries:", error);
-        toast.error("Failed to fetch countries: " + error.message);
-        setCountries([]);
-      } finally {
-        setIsLoadingCountries(false);
-      }
+        setIsGenerating(true);
+        setHasGenerated(true);
+        setStyledClaims(null);
+        setRawClaimsForAI([]);
+        setBrandNameForDisplay('');
+
+        try {
+            const response = await fetch('/api/ai/style-brand-claims', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    masterClaimBrandId: selectedBrand,
+                    productId: selectedProduct === 'all' ? null : selectedProduct,
+                    countryCode: selectedCountry === 'all' ? null : selectedCountry,
+                }),
+            });
+
+            if (!response.ok) throw new Error((await response.json()).error || 'Failed to generate styled claims.');
+            
+            const result = await response.json();
+
+            if (result.success) {
+                setBrandNameForDisplay(result.brandName);
+                setStyledClaims(result.styledClaims || null);
+                setRawClaimsForAI(result.rawClaimsForAI || []);
+                toast.success('Styled claims generated successfully!');
+                if (!result.styledClaims || (result.styledClaims.mandatory_claims.length === 0 && result.styledClaims.grouped_claims.every((g: GroupedClaims) => g.allowed_claims.length === 0 && g.disallowed_claims.length === 0))) {
+                   toast.info("No claims found for the selected criteria.");
+                }
+            } else {
+                toast.error(result.error || 'Could not generate styled claims.');
+            }
+        } catch (error: any) {
+            toast.error(error.message);
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
-    const loadProducts = async () => {
-      setIsLoadingProducts(true);
-      try {
-        const productsData = await fetchProducts(); 
-        if (productsData && productsData.success && Array.isArray(productsData.data)) {
-          setProducts(productsData.data);
-        } else {
-          toast.error("Could not load products. " + (productsData?.error || ''));
-          setProducts([]);
-        }
-      } catch (error: any) {
-        console.error("Error fetching products:", error);
-        toast.error("Failed to fetch products: " + error.message);
-        setProducts([]);
-      } finally {
-        setIsLoadingProducts(false);
-      }
-    };
+    const handleCopy = () => {
+        if (!styledClaims) return;
+        
+        const productName = selectedProduct === 'all' ? 'All Products' : products.find(p => p.id === selectedProduct)?.name;
+        const countryName = selectedCountry === 'all' ? 'All Markets' : countries.find(c => c.code === selectedCountry)?.name;
 
-    loadCountries();
-    loadProducts();
-  }, []);
+        let claimsText = `Claims for: ${brandNameForDisplay}\n`;
+        if (productName) claimsText += `Product: ${productName}\n`;
+        if (countryName) claimsText += `Market: ${countryName}\n\n`;
+        
+        claimsText += `${styledClaims.introductory_sentence}\n\n`;
 
-  const handleGenerateClaims = async () => {
-    if (!selectedCountry || !selectedProduct) {
-      toast.error('Please select both a country and a product.');
-      return;
-    }
-    setIsGeneratingClaims(true);
-    setHasGenerated(true); // Mark that generation has been attempted
-    // Reset previous results
-    setStyledAllowedClaims([]);
-    setStyledDisallowedClaims([]);
-    setProductNameForDisplay('');
-    setCountryNameForDisplay('');
-
-    try {
-      const claimsResponse = await fetchClaims(selectedProduct, selectedCountry);
-
-      if (claimsResponse && claimsResponse.success && Array.isArray(claimsResponse.data)) {
-        const rawClaims = claimsResponse.data;
-        if (rawClaims.length === 0) {
-          toast.info("No raw claims found for the selected product and country. AI styling will not proceed.");
-          // Still fetch product/country names for context even if no raw claims
-          const productInfo = products.find(p => p.id === selectedProduct);
-          const countryInfo = countries.find(c => c.code === selectedCountry);
-          setProductNameForDisplay(productInfo?.name || selectedProduct);
-          setCountryNameForDisplay(countryInfo?.name || selectedCountry);
-          setIsGeneratingClaims(false);
-          return;
+        if (styledClaims.mandatory_claims.length > 0) {
+            claimsText += '--- Mandatory Claims ---\n';
+            styledClaims.mandatory_claims.forEach(claim => claimsText += `- ${claim.text} (${claim.level})\n`);
+            claimsText += '\n';
         }
 
-        const openAIStylingResponse = await fetch('/api/ai/style-product-claims', { 
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ claims: rawClaims, productId: selectedProduct, countryCode: selectedCountry }),
+        styledClaims.grouped_claims.forEach(group => {
+            if (group.allowed_claims.length > 0 || group.disallowed_claims.length > 0) {
+                claimsText += `--- ${group.level} Claims ---\n`;
+                if (group.allowed_claims.length > 0) {
+                    claimsText += 'Allowed:\n';
+                    group.allowed_claims.forEach(claim => claimsText += `- ${claim}\n`);
+                }
+                if (group.disallowed_claims.length > 0) {
+                    claimsText += 'Disallowed:\n';
+                    group.disallowed_claims.forEach(claim => claimsText += `- ${claim}\n`);
+                }
+                claimsText += '\n';
+            }
         });
+        
+        claimsText += '---\nDisclaimer: This content has been exported from MixerAI and is now uncontrolled. For the most accurate and up-to-date information, please refer to the live database.';
 
-        if (!openAIStylingResponse.ok) {
-          const errorResult = await openAIStylingResponse.json().catch(() => ({ error: "Failed to process claims. Invalid server response." }));
-          throw new Error(errorResult.error || 'Failed to process claims with AI styling service.');
-        }
-
-        const styledResult = await openAIStylingResponse.json();
-        if (styledResult.success) {
-          setProductNameForDisplay(styledResult.productName || selectedProduct);
-          setCountryNameForDisplay(styledResult.countryName || selectedCountry);
-          setStyledAllowedClaims(Array.isArray(styledResult.styledAllowedClaims) ? styledResult.styledAllowedClaims : []);
-          setStyledDisallowedClaims(Array.isArray(styledResult.styledDisallowedClaims) ? styledResult.styledDisallowedClaims : []);
-          
-          if (styledResult.styledAllowedClaims.length === 0 && styledResult.styledDisallowedClaims.length === 0 && rawClaims.length > 0) {
-             toast.info("AI returned no styled claims, though raw claims were present.");
-          } else if (styledResult.styledAllowedClaims.length > 0 || styledResult.styledDisallowedClaims.length > 0) {
-            toast.success('Claims processed and styled successfully!');
-          }
-        } else {
-          toast.error(styledResult.error || 'Could not retrieve styled claims.');
-        }
-      } else {
-        toast.error(claimsResponse?.error || 'Could not fetch raw claims for the product.');
-      }
-    } catch (error: any) {
-      console.error('Error generating claims:', error);
-      toast.error(error.message || 'An error occurred while generating claims.');
-    } finally {
-      setIsGeneratingClaims(false);
-    }
-  };
-
-  const renderClaimsList = (claims: StyledClaim[], title: string) => {
-    if (claims.length === 0) {
-      return <p className="text-sm text-muted-foreground">No {title.toLowerCase()} to display.</p>;
-    }
-    return (
-      <div className="prose prose-sm max-w-none">
-        <h3 className="text-md font-semibold mb-2">{title}</h3>
-        <ul className="list-disc pl-5 space-y-1">
-          {claims.map((claim) => (
-            <li key={claim.id}>{claim.text}</li> 
-          ))}
+        navigator.clipboard.writeText(claimsText).then(() => {
+            toast.success('Styled claims copied to clipboard!');
+        }, () => {
+            toast.error('Failed to copy claims.');
+        });
+    };
+    
+    // Render Functions
+    const renderClaimsList = (claims: string[], listType: 'allowed' | 'disallowed') => (
+        <ul className={`list-disc pl-5 ${listType === 'disallowed' ? 'text-red-600' : ''}`}>
+            {claims.map((claim, index) => <li key={index} className="mb-1">{claim}</li>)}
         </ul>
-      </div>
     );
-  };
 
-  return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8">
-      <Heading title="Product Claims Output" description="Select a product and country to generate a styled list of applicable claims, categorized by allowed/disallowed status." />
+    const renderOutput = () => {
+        if (!hasGenerated) return null;
+        if (isGenerating) return <Loader2 className="mx-auto h-8 w-8 animate-spin" />;
+        if (!styledClaims) return <p className="text-center">No claims were generated for the selected criteria.</p>;
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Product and Market Selection</CardTitle>
-          <CardDescription>Choose a product and the target market (country) for which to generate claims.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-            <div>
-              <label htmlFor="country-select" className="block text-sm font-medium text-gray-700 mb-1">Market/Country</label>
-              <Select 
-                value={selectedCountry} 
-                onValueChange={setSelectedCountry} 
-                disabled={isLoadingCountries || isGeneratingClaims}
-              >
-                <SelectTrigger id="country-select">
-                  <SelectValue placeholder={isLoadingCountries ? "Loading countries..." : "Select country"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {isLoadingCountries ? (
-                    <SelectItem value="loading" disabled>Loading...</SelectItem>
-                  ) : countries.length > 0 ? (
-                    countries.map(country => (
-                      <SelectItem key={country.code} value={country.code}>
-                        <span className="truncate">{country.name}</span>
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="no-countries" disabled>No countries available</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
+        const productName = selectedProduct === 'all' ? '' : products.find(p => p.id === selectedProduct)?.name;
+        const countryName = selectedCountry === 'all' ? '' : countries.find(c => c.code === selectedCountry)?.name;
 
-            <div>
-              <label htmlFor="product-select" className="block text-sm font-medium text-gray-700 mb-1">Product</label>
-              <Select 
-                value={selectedProduct} 
-                onValueChange={setSelectedProduct} 
-                disabled={isLoadingProducts || isGeneratingClaims}
-              >
-                <SelectTrigger id="product-select">
-                  <SelectValue placeholder={isLoadingProducts ? "Loading products..." : "Select product"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {isLoadingProducts ? (
-                    <SelectItem value="loading" disabled>Loading...</SelectItem>
-                  ) : products.length > 0 ? (
-                    products.map(product => (
-                      <SelectItem key={product.id} value={product.id}>
-                        <span className="truncate">{product.name}</span>
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="no-products" disabled>No products available</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          <Button 
-            onClick={handleGenerateClaims} 
-            disabled={isGeneratingClaims || isLoadingCountries || isLoadingProducts || !selectedCountry || !selectedProduct} 
-            className="w-full mt-4"
-          >
-            {isGeneratingClaims ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating Claims...
-              </>
-            ) : (
-              'Generate Styled Claims'
+        return (
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                        <CardTitle>Styled Claims Output</CardTitle>
+                        <CardDescription>
+                            For: {brandNameForDisplay} {productName && `(${productName})`} {countryName && `- ${countryName}`}
+                        </CardDescription>
+                    </div>
+                    <Button onClick={handleCopy} size="sm" variant="outline"><Copy className="mr-2 h-4 w-4" />Copy</Button>
+                </CardHeader>
+                <CardContent>
+                    <p className="mb-6 text-sm text-gray-600 italic">{styledClaims.introductory_sentence}</p>
+                    
+                    {styledClaims.mandatory_claims.length > 0 && (
+                        <div className="mb-4">
+                            <h3 className="font-semibold text-lg mb-2">Mandatory Claims</h3>
+                            <ul className="list-disc pl-5">
+                                {styledClaims.mandatory_claims.map((claim, index) => (
+                                    <li key={index} className="mb-1">
+                                        {claim.text}
+                                        <span className="ml-2 text-xs text-gray-500 capitalize bg-gray-100 px-2 py-1 rounded-full">
+                                            {claim.level}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    <Accordion type="multiple" defaultValue={styledClaims.grouped_claims.map(g => g.level)}>
+                        {styledClaims.grouped_claims.map((group) => (
+                             (group.allowed_claims.length > 0 || group.disallowed_claims.length > 0) && (
+                                <AccordionItem value={group.level} key={group.level}>
+                                    <AccordionTrigger className="text-lg">{group.level} Claims</AccordionTrigger>
+                                    <AccordionContent>
+                                        {group.allowed_claims.length > 0 && (
+                                            <div className="mb-3">
+                                                <h4 className="font-semibold mb-1">Allowed Claims</h4>
+                                                {renderClaimsList(group.allowed_claims, 'allowed')}
+                                            </div>
+                                        )}
+                                        {group.disallowed_claims.length > 0 && (
+                                            <div>
+                                                <h4 className="font-semibold mb-1 text-red-700">Disallowed Claims</h4>
+                                                {renderClaimsList(group.disallowed_claims, 'disallowed')}
+                                            </div>
+                                        )}
+                                    </AccordionContent>
+                                </AccordionItem>
+                             )
+                        ))}
+                    </Accordion>
+                </CardContent>
+            </Card>
+        );
+    };
+
+    return (
+        <div className="container mx-auto p-4 md:p-6 lg:p-8">
+            <Heading title="Brand Claims Styler" description="Select a brand, and optionally a product and market, to generate a styled list of claims." />
+
+            <Card className="mb-6">
+                <CardHeader>
+                    <CardTitle>Selection Criteria</CardTitle>
+                    <CardDescription>Choose the brand, and optionally refine by product and market.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        <Select value={selectedBrand} onValueChange={setSelectedBrand} disabled={isLoading || isGenerating}>
+                            <SelectTrigger><SelectValue placeholder="Select Brand" /></SelectTrigger>
+                            <SelectContent>{brands.map(brand => (<SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>))}</SelectContent>
+                        </Select>
+                        <Select value={selectedProduct} onValueChange={setSelectedProduct} disabled={isLoading || isGenerating}>
+                            <SelectTrigger><SelectValue placeholder="Select a Product" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Products</SelectItem>
+                                {products.map(p => (<SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>))}
+                            </SelectContent>
+                        </Select>
+                        <Select value={selectedCountry} onValueChange={setSelectedCountry} disabled={isLoading || isGenerating}>
+                            <SelectTrigger><SelectValue placeholder="Select a Market" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Markets</SelectItem>
+                                {countries.map(c => (<SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <Button onClick={handleGenerate} disabled={isGenerating || isLoading || !selectedBrand} className="w-full mt-4">
+                        {isGenerating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</> : 'Generate Styled Claims'}
+                    </Button>
+                </CardContent>
+            </Card>
+
+            {renderOutput()}
+            
+            {rawClaimsForAI.length > 0 && !isGenerating && (
+                <details className="mt-4">
+                    <summary className="cursor-pointer text-sm font-medium">View Raw Claims Sent to AI</summary>
+                    <Card className="mt-2">
+                        <CardContent className="p-4">
+                            <pre className="text-xs whitespace-pre-wrap">
+                                {JSON.stringify(rawClaimsForAI, null, 2)}
+                            </pre>
+                        </CardContent>
+                    </Card>
+                </details>
             )}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {isGeneratingClaims && (
-        <div className="flex justify-center items-center my-8">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="ml-2 text-muted-foreground">Generating claims, please wait...</p>
         </div>
-      )}
-
-      {hasGenerated && !isGeneratingClaims && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Styled Product Claims Output</CardTitle>
-            {productNameForDisplay && countryNameForDisplay && (
-              <CardDescription>
-                Showing claims for product: <strong>{productNameForDisplay}</strong> in market: <strong>{countryNameForDisplay}</strong>.
-              </CardDescription>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              {renderClaimsList(styledAllowedClaims, "Allowed Claims")}
-            </div>
-            <div>
-              {renderClaimsList(styledDisallowedClaims, "Disallowed Claims")}
-            </div>
-            {(styledAllowedClaims.length === 0 && styledDisallowedClaims.length === 0) && (
-                 <p className="text-center text-muted-foreground">
-                    No styled claims were returned by the AI for this selection.
-                 </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Fallback message if generation hasn't been attempted yet, or if selectors are reset */}
-      {!hasGenerated && !isGeneratingClaims && (
-         <Card className="mt-6">
-            <CardContent className="pt-6">
-                <p className="text-center text-muted-foreground">
-                    Please select a product and country, then click "Generate Styled Claims".
-                </p>
-            </CardContent>
-         </Card>
-      )}
-    </div>
-  );
+    );
 };
 
-export default ProductClaimsOutputPage; 
+export default BrandClaimsOutputPage; 

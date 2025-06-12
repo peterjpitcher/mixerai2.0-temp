@@ -18,6 +18,7 @@ import { Loader2, ArrowLeft, PlusCircle, Sparkles, ShieldAlert, Info } from 'luc
 import { marked } from 'marked';
 import Link from 'next/link';
 import type { InputField, OutputField, ContentTemplate as Template, SelectOptions } from '@/types/template';
+import { ProductSelect } from './product-select';
 
 interface Brand {
   id: string;
@@ -618,65 +619,60 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
                   <h3 className="text-lg font-medium pt-2">Template Fields</h3>
                   {(template.inputFields || []).map((field) => (
                     <div key={field.id} className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                            <Label htmlFor={field.id}>{field.name}{field.required && <span className="text-destructive">*</span>}</Label>
-                            {field.aiSuggester && field.aiPrompt && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleGenerateSuggestion(field)}
-                                disabled={isGeneratingSuggestionFor !== null || !selectedBrand || !canGenerateContent}
-                                className="ml-2"
-                              >
-                                {isGeneratingSuggestionFor === field.id ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Sparkles className="mr-2 h-4 w-4" />
-                                )}
-                                {isGeneratingSuggestionFor === field.id ? 'Generating...' : 'Suggest'}
-                              </Button>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor={field.id}>{field.name}{field.required && <span className="text-destructive">*</span>}</Label>
+                        {field.aiSuggester && field.aiPrompt && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleGenerateSuggestion(field)}
+                            disabled={isGeneratingSuggestionFor !== null || !selectedBrand || !canGenerateContent}
+                            className="ml-2"
+                          >
+                            {isGeneratingSuggestionFor === field.id ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Sparkles className="mr-2 h-4 w-4" />
                             )}
-                        </div>
-                        {field.type === 'shortText' && (
-                        <Input 
-                            id={field.id} 
-                            value={templateFieldValues[field.id] || ''} 
-                            onChange={(e) => handleTemplateFieldChange(field.id, e.target.value)} 
-                            placeholder={`Enter ${field.name}`}
-                        />
+                            {isGeneratingSuggestionFor === field.id ? 'Generating...' : 'Suggest'}
+                          </Button>
                         )}
-                        {field.type === 'longText' && (
-                        <Textarea 
-                            id={field.id} 
-                            value={templateFieldValues[field.id] || ''} 
-                            onChange={(e) => handleTemplateFieldChange(field.id, e.target.value)} 
-                            placeholder={`Enter ${field.name}`}
-                        />
-                        )}
-                        {field.type === 'select' && field.options && (field.options as SelectOptions).choices && (
-                        <Select 
-                            value={templateFieldValues[field.id] || ''} 
-                            onValueChange={(value) => handleTemplateFieldChange(field.id, value)}
-                        >
-                            <SelectTrigger id={field.id}><SelectValue placeholder={`Select ${field.name}`} /></SelectTrigger>
-                            <SelectContent>
-                            {((field.options as SelectOptions).choices!).map(choice => (
-                                <SelectItem key={choice} value={choice}>{choice}</SelectItem>
-                            ))}
-                            </SelectContent>
-                        </Select>
-                        )}
-                        {field.type === 'tags' && (
-                            <Input 
-                            id={field.id} 
-                            value={templateFieldValues[field.id] || ''} 
-                            onChange={(e) => handleTemplateFieldChange(field.id, e.target.value)} 
-                            placeholder={`Enter ${field.name} (comma-separated)`}
-                        />
-                        )}
+                      </div>
+                      {(() => {
+                        switch (field.type) {
+                          case 'shortText':
+                            return <Input id={field.id} value={templateFieldValues[field.id] || ''} onChange={(e) => handleTemplateFieldChange(field.id, e.target.value)} placeholder={`Enter ${field.name}`} />;
+                          case 'longText':
+                            return <Textarea id={field.id} value={templateFieldValues[field.id] || ''} onChange={(e) => handleTemplateFieldChange(field.id, e.target.value)} placeholder={`Enter ${field.name}`} />;
+                          case 'richText':
+                            return <RichTextEditor value={templateFieldValues[field.id] || ''} onChange={(content) => handleTemplateFieldChange(field.id, content)} />;
+                          case 'select':
+                            const options = field.options as SelectOptions;
+                            return (
+                              <Select value={templateFieldValues[field.id] || ''} onValueChange={(value) => handleTemplateFieldChange(field.id, value)}>
+                                <SelectTrigger id={field.id}><SelectValue placeholder={`Select ${field.name}`} /></SelectTrigger>
+                                <SelectContent>
+                                  {(options.choices || []).map(choice => (<SelectItem key={choice} value={choice}>{choice}</SelectItem>))}
+                                </SelectContent>
+                              </Select>
+                            );
+                          case 'product-selector':
+                            return (
+                              <ProductSelect
+                                brandId={selectedBrand}
+                                value={templateFieldValues[field.id] || null}
+                                onChange={(value) => handleTemplateFieldChange(field.id, value || '')}
+                              />
+                            );
+                          case 'tags':
+                            return <Input id={field.id} value={templateFieldValues[field.id] || ''} onChange={(e) => handleTemplateFieldChange(field.id, e.target.value)} placeholder={`Enter ${field.name} (comma-separated)`} />;
+                          default:
+                            return <p className="text-sm text-muted-foreground">Unsupported field type: {field.type}</p>;
+                        }
+                      })()}
                     </div>
-                    ))}
+                  ))}
                 </>
               )}
             </div>

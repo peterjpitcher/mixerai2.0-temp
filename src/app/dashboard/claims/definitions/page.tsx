@@ -8,7 +8,12 @@ import Link from 'next/link';
 import { ClaimDefinitionForm, ClaimDefinitionData } from '@/components/dashboard/claims/ClaimDefinitionForm';
 import { toast } from 'sonner';
 import { Edit3, Trash2, PlusCircle } from 'lucide-react';
-import { ALL_COUNTRIES_CODE, ALL_COUNTRIES_NAME } from "@/lib/constants/country-codes"; // Import new constants
+import { ALL_COUNTRIES_CODE, ALL_COUNTRIES_NAME } from "@/lib/constants/country-codes";
+
+interface Country {
+  code: string;
+  name: string;
+}
 
 // Define types for the data we expect to list
 interface ClaimEntry extends ClaimDefinitionData { // Use ClaimDefinitionData for more complete type
@@ -16,7 +21,6 @@ interface ClaimEntry extends ClaimDefinitionData { // Use ClaimDefinitionData fo
   master_brand_name?: string; // Optional name field
   product_names?: string[];   // Optional name field
   ingredient_name?: string;   // Optional name field
-  // claim_grouping_id might be present if fetched
 }
 
 export default function DefineClaimsPage() {
@@ -24,6 +28,8 @@ export default function DefineClaimsPage() {
   const [claims, setClaims] = useState<ClaimEntry[]>([]);
   const [isFetchingClaims, setIsFetchingClaims] = useState(false);
   const [editingClaim, setEditingClaim] = useState<ClaimEntry | null>(null); // State for claim being edited
+  const [countries, setCountries] = useState<Country[]>([]);
+  const [countryMap, setCountryMap] = useState<Record<string, string>>({});
   
   const formRef = useRef<HTMLDivElement>(null); // Ref for scrolling to form
 
@@ -54,41 +60,45 @@ export default function DefineClaimsPage() {
     }
   };
 
+  const fetchCountries = async () => {
+    try {
+      const response = await fetch('/api/countries');
+      const result = await response.json();
+      if (result.success && Array.isArray(result.data)) {
+        setCountries(result.data);
+        const newMap: Record<string, string> = {};
+        result.data.forEach((country: Country) => {
+          newMap[country.code] = country.name;
+        });
+        setCountryMap(newMap);
+      } else {
+        toast.error('Could not load country list.');
+      }
+    } catch (error) {
+      toast.error('Failed to fetch countries.');
+    }
+  };
+
   useEffect(() => {
     fetchClaims();
+    fetchCountries();
   }, []);
 
   const handleFormSubmit = async (data: ClaimDefinitionData) => {
     setIsLoading(true);
     const isEditing = !!editingClaim;
-    const url = isEditing ? `/api/claims/${editingClaim.id}` : '/api/claims';
+    const url = isEditing ? `/api/claims/${editingClaim!.id}` : '/api/claims';
     const method = isEditing ? 'PUT' : 'POST';
 
-    // For PUT requests, the current API /api/claims/[id] expects a flat country_code,
-    // not an array. We'll send the first one if multiple are somehow selected,
-    // or the original one if not changed. This part of the API might need enhancement
-    // if editing multiple country versions of the *same base claim text/type/level*
-    // under a single ID is desired through this form. For now, it implies editing one specific claim record.
-    let submissionData = { ...data };
+    let submissionData: any = { ...data };
     if (isEditing && editingClaim) {
-      // The PUT API for a single claim ID likely expects a single country_code if it's updatable.
-      // If country_codes has multiple and it's an edit, this might be an issue for the current PUT.
-      // For now, let's assume the PUT /api/claims/[id] handles what it can.
-      // The API for PUT /api/claims/[id] currently expects only:
-      // claim_text, claim_type, description, country_code (singular)
-      // It does NOT update level or associated entities.
       submissionData = {
         claim_text: data.claim_text,
         claim_type: data.claim_type,
         description: data.description,
-        // Send only the first country_code for PUT if multiple are present,
-        // or if it's a single one from the form.
-        // This depends on how the API handles country_code on PUT.
-        // The existing PUT handler for /api/claims/[id] expects 'country_code' (singular).
         country_code: data.country_codes[0] || (editingClaim.country_codes && editingClaim.country_codes.length > 0 ? editingClaim.country_codes[0] : undefined),
-      } as any; // Cast to any to bypass strict ClaimDefinitionData type for API specific payload
+      };
     }
-
 
     try {
       const response = await fetch(url, {
@@ -106,8 +116,7 @@ export default function DefineClaimsPage() {
       
       toast.success(result.message || `Claim ${isEditing ? 'updated' : 'saved'} successfully!`);
       fetchClaims();
-      setEditingClaim(null); // Clear editing state
-      // Reset form via key change or a dedicated reset function in ClaimDefinitionForm if available
+      setEditingClaim(null);
     } catch (error: any) {
       console.error('Submit Error:', error);
       toast.error(error.message || `An error occurred while ${isEditing ? 'updating' : 'saving'} the claim.`);
@@ -131,7 +140,7 @@ export default function DefineClaimsPage() {
     if (!window.confirm("Are you sure you want to delete this claim? This might affect multiple entries if it's a Master claim used in overrides.")) {
         return;
     }
-    setIsLoading(true); // Use general loading or a specific deleting state
+    setIsLoading(true);
     try {
         const response = await fetch(`/api/claims/${claimId}`, { method: 'DELETE' });
         const result = await response.json();
@@ -139,7 +148,7 @@ export default function DefineClaimsPage() {
             throw new Error(result.error || 'Failed to delete claim');
         }
         toast.success('Claim deleted successfully');
-        fetchClaims(); // Refresh list
+        fetchClaims();
     } catch (error: any) {
         toast.error(error.message || 'Failed to delete claim');
     } finally {
@@ -147,10 +156,9 @@ export default function DefineClaimsPage() {
     }
   };
 
-
   return (
     <div className="flex-1 space-y-4 p-4 pt-6 md:p-8">
-      <div ref={formRef} className="flex items-center justify-between mb-6 scroll-mt-20"> {/* scroll-mt for when scrolling to form */}
+      <div ref={formRef} className="flex items-center justify-between mb-6 scroll-mt-20">
         <Heading
           title={editingClaim ? "Edit Claim" : "Define New Claim"}
           description={editingClaim ? "Modify the details of the existing claim." : "Create Master and Market-specific claims."}
@@ -164,7 +172,7 @@ export default function DefineClaimsPage() {
       <Separator className="mb-6"/>
       
       <ClaimDefinitionForm 
-        key={editingClaim ? editingClaim.id : 'new'} // Change key to force re-render and reset form state
+        key={editingClaim ? editingClaim.id : 'new'}
         onSubmit={handleFormSubmit} 
         isLoading={isLoading}
         initialData={editingClaim}
@@ -178,7 +186,7 @@ export default function DefineClaimsPage() {
             {isFetchingClaims ? "Refreshing..." : "Refresh List"}
         </Button>
       </div>
-      {isFetchingClaims && !claims.length ? ( // Show loading only if claims list is empty initially
+      {isFetchingClaims && !claims.length ? (
         <p>Loading claims...</p>
       ) : !isFetchingClaims && claims.length === 0 ? (
         <p>No claims defined yet, or failed to load claims.</p>
@@ -207,7 +215,10 @@ export default function DefineClaimsPage() {
                   <td className="px-4 py-3 whitespace-normal text-sm text-gray-900">{claim.claim_text}</td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 capitalize">{claim.claim_type}</td>
                   <td className="px-4 py-3 whitespace-normal text-sm text-gray-500">
-                    {claim.country_codes.map(cc => cc === ALL_COUNTRIES_CODE ? ALL_COUNTRIES_NAME : cc).join(', ')}
+                    {claim.country_codes.map(cc => {
+                      if (cc === ALL_COUNTRIES_CODE) return ALL_COUNTRIES_NAME;
+                      return countryMap[cc] || cc;
+                    }).join(', ')}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm font-medium space-x-1">
                     <Button variant="outline" size="sm" onClick={() => handleEdit(claim)} disabled={isLoading}>
@@ -226,4 +237,4 @@ export default function DefineClaimsPage() {
       {isFetchingClaims && claims.length > 0 && <p className="text-sm text-muted-foreground mt-2">Refreshing claims list...</p>}
     </div>
   );
-} 
+}

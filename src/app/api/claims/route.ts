@@ -83,11 +83,20 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
         const countryCodeFilter = searchParams.get('countryCode');
         const excludeGlobalFilter = searchParams.get('excludeGlobal') === 'true';
         const levelFilter = searchParams.get('level'); // e.g., 'product', 'brand', 'ingredient'
-        // Could also add filters for master_brand_id, product_id, ingredient_id if needed in future
+        const includeMasterBrandName = searchParams.get('includeMasterBrandName') === 'true';
+        const includeProductNames = searchParams.get('includeProductNames') === 'true';
+        const includeIngredientName = searchParams.get('includeIngredientName') === 'true';
 
         const supabase = createSupabaseAdminClient();
+        
+        let selectStatement = '*,';
+        if (includeMasterBrandName) selectStatement += 'master_claim_brands(name),';
+        if (includeProductNames) selectStatement += 'products(name),';
+        if (includeIngredientName) selectStatement += 'ingredients(name),';
+        selectStatement = selectStatement.slice(0, -1); // remove last ','
+
         // @ts-ignore
-        let query = supabase.from('claims').select('*');
+        let query = supabase.from('claims').select(selectStatement);
 
         if (countryCodeFilter) {
             // @ts-ignore
@@ -113,23 +122,24 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
             console.error('[API Claims GET] Error fetching claims:', error);
             return handleApiError(error, 'Failed to fetch claims');
         }
-        
-        const validatedData = Array.isArray(data) ? data.map((item: any) => ({
-            id: item.id,
-            claim_text: item.claim_text,
-            claim_type: item.claim_type,
-            level: item.level,
-            master_brand_id: item.master_brand_id,
-            product_id: item.product_id,
-            ingredient_id: item.ingredient_id,
-            country_code: item.country_code,
-            description: item.description,
-            created_by: item.created_by,
-            created_at: item.created_at,
-            updated_at: item.updated_at
-        })) : [];
 
-        return NextResponse.json({ success: true, data: validatedData as Claim[] });
+        // Process data to flatten joined names
+        const processedData = Array.isArray(data) ? data.map((claim: any) => ({
+            ...claim,
+            master_brand_name: claim.master_claim_brands ? claim.master_claim_brands.name : null,
+            product_names: claim.products ? [claim.products.name] : [],
+            ingredient_name: claim.ingredients ? claim.ingredients.name : null,
+            // Ensure country_codes is an array for client-side consistency.
+            // This API returns one record per country_code, so we set it up as an array of one.
+            country_codes: [claim.country_code]
+        })) : [];
+        
+        // The frontend component expects product_ids and groups claims by text, etc.
+        // The current API sends one record per claim definition.
+        // A more advanced implementation could group claims here, but for now we will let the client handle it.
+        // The old `validatedData` mapping was redundant as we are now processing the data.
+
+        return NextResponse.json({ success: true, data: processedData });
 
     } catch (error: any) {
         console.error('[API Claims GET] Catched error:', error);

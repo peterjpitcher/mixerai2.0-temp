@@ -16,7 +16,8 @@ export type FieldType =
   | 'fileUpload'
   | 'plainText'
   | 'html'
-  | 'image';
+  | 'image'
+  | 'product-selector';
 
 export interface ShortTextOptions { minLength?: number; maxLength?: number; placeholder?: string; }
 export interface LongTextOptions { minWords?: number; maxWords?: number; placeholder?: string; }
@@ -27,6 +28,7 @@ export interface DateOptions { disablePast?: boolean; disableFuture?: boolean; }
 export interface TagsOptions { maxTags?: number; placeholder?: string; }
 export interface UrlOptions { placeholder?: string; }
 export interface FileUploadOptions { maxSizeMB?: number; allowedTypes?: string[]; }
+export interface ProductSelectorOptions { allowMultiple?: boolean; }
 export interface PlainTextOutputOptions { maxLength?: number; }
 export interface HtmlOutputOptions {}
 export interface ImageOutputOptions {}
@@ -48,10 +50,11 @@ export type InputFieldOptionType =
   | ({ type: 'date'; options?: DateOptions })
   | ({ type: 'tags'; options?: TagsOptions })
   | ({ type: 'url'; options?: UrlOptions })
-  | ({ type: 'fileUpload'; options?: FileUploadOptions });
+  | ({ type: 'fileUpload'; options?: FileUploadOptions })
+  | ({ type: 'product-selector', options?: ProductSelectorOptions });
 
 export interface InputField extends BaseField {
-  type: Extract<FieldType, 'shortText' | 'longText' | 'richText' | 'select' | 'number' | 'date' | 'tags' | 'url' | 'fileUpload'>;
+  type: Extract<FieldType, 'shortText' | 'longText' | 'richText' | 'select' | 'number' | 'date' | 'tags' | 'url' | 'fileUpload' | 'product-selector'>;
   options?: InputFieldOptionType['options'];
   aiSuggester?: boolean;
 }
