@@ -225,6 +225,14 @@ export async function generateContentFromTemplate(
     systemPrompt += ` Generate content in ${brand.language}.`;
   }
   
+  // Add the new content rules
+  systemPrompt += `
+
+Content Rules:
+- NEVER mention the product's size or weight (e.g., '460 ml') in the generated content.
+- NEVER mention the brand's country of origin or the target country in the generated content.
+`;
+  
   // Only add global brand information if there are no field-specific settings
   const anyFieldUsesBrandIdentity = template.outputFields.some(field => field.useBrandIdentity);
   const anyFieldUsesToneOfVoice = template.outputFields.some(field => field.useToneOfVoice);
