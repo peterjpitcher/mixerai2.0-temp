@@ -164,6 +164,8 @@ ${JSON.stringify(claimsForAI, null, 2)}
       throw new Error(`Failed to parse AI response: ${e.message}`);
     }
 
+    console.log('[prepare-product-context] Successfully parsed AI response:', JSON.stringify(parsedAIResponse, null, 2));
+
     return NextResponse.json({
       success: true,
       productName,

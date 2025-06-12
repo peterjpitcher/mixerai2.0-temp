@@ -1,4 +1,5 @@
 import { OpenAI } from "openai";
+import type { StyledClaims } from "@/types/claims";
 
 // Initialize the Azure OpenAI client
 export const getAzureOpenAIClient = () => {
@@ -206,7 +207,7 @@ export async function generateContentFromTemplate(
   input?: {
     additionalInstructions?: string;
     templateFields?: Record<string, string>;
-    product_context?: { productName: string; styledClaims: any };
+    product_context?: { productName: string; styledClaims: StyledClaims | null };
   }
 ) {
   console.log(`Generating template-based content for brand: ${brand.name} using template: ${template.name}`);

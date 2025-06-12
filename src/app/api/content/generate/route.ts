@@ -3,6 +3,7 @@ import { generateContentFromTemplate } from '@/lib/azure/openai';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import type { StyledClaims } from '@/types/claims';
 
 // type ContentType = "article" | "retailer_pdp" | "owned_pdp" | string; // Removed
 
@@ -17,7 +18,7 @@ interface ContentGenerationRequest {
     additionalInstructions?: string;
     templateId?: string;
     templateFields?: Record<string, string>;
-    product_context?: { productName: string; styledClaims: any };
+    product_context?: { productName: string; styledClaims: StyledClaims | null };
   };
   template?: {
     id: string;

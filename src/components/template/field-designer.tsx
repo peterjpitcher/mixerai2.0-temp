@@ -314,26 +314,30 @@ export function FieldDesigner({
   };
 
   const renderAiPanel = () => {
-    if (fieldType === 'input' && inputFieldData && (
-            <div className="space-y-2">
-        <div className="flex items-center space-x-2">
-          <Checkbox 
-            id="aiSuggester" 
-            checked={inputFieldData.aiSuggester || false} 
-            onCheckedChange={(checked) => handleAIFeatureChange('aiSuggester', !!checked)} 
-          />
-          <Label htmlFor="aiSuggester">Enable AI Suggestions</Label>
+    if (fieldType === 'input' && inputFieldData) {
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="aiSuggester" 
+              checked={inputFieldData.aiSuggester || false} 
+              onCheckedChange={(checked) => handleAIFeatureChange('aiSuggester', !!checked)} 
+            />
+            <Label htmlFor="aiSuggester">Enable AI Suggestions</Label>
+          </div>
+          {inputFieldData.aiSuggester && (
+            <div className="pl-6 space-y-1">
+              <p className="text-xs text-muted-foreground">
+                Uses AI to suggest values for this field during content creation.
+              </p>
+            </div>
+          )}
         </div>
-        {inputFieldData.aiSuggester && (
-          <div className="pl-6 space-y-1">
-             <p className="text-xs text-muted-foreground">
-              Uses AI to suggest values for this field during content creation.
-            </p>
-            </div>
-        )}
-            </div>
-    )) || (
-      fieldType === 'output' && outputFieldData && (
+      );
+    }
+    
+    if (fieldType === 'output' && outputFieldData) {
+      return (
         <>
           <div className="pt-2">
             <Label className="font-medium">Brand Context for AI (Output Fields)</Label>
@@ -381,8 +385,10 @@ export function FieldDesigner({
             </div>
           </div>
         </>
-      )
-    );
+      );
+    }
+    
+    return null;
   };
 
   return (

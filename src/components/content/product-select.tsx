@@ -44,8 +44,10 @@ export function ProductSelect({ brandId, value, onChange }: ProductSelectProps) 
 
   // Reset selection when brandId changes
   useEffect(() => {
-    onChange(null);
-  }, [brandId]);
+    if (value !== null) {
+      onChange(null);
+    }
+  }, [brandId]); // Remove onChange from dependencies to prevent infinite loop
   
   const products: Product[] = data?.products || [];
   const selectedProduct = useMemo(() => products.find(p => p.id === value), [products, value]);

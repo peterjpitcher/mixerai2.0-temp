@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
 import { Input } from '@/components/input';
@@ -15,10 +15,10 @@ import { useRouter } from 'next/navigation';
 import { BrandIcon } from '@/components/brand-icon';
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft, PlusCircle, Sparkles, ShieldAlert, Info } from 'lucide-react';
-import { marked } from 'marked';
 import Link from 'next/link';
 import type { InputField, OutputField, ContentTemplate as Template, SelectOptions, FieldType } from '@/types/template';
 import { ProductSelect } from './product-select';
+import type { ProductContext } from '@/types/claims';
 
 interface Brand {
   id: string;
@@ -35,11 +35,6 @@ interface WorkflowSummary {
   template_id?: string | null;
   brand_id: string;
   brand_name: string;
-}
-
-interface ProductContext {
-  productName: string;
-  styledClaims: any; // Define a more specific type if you have one
 }
 
 interface ContentGeneratorFormProps {
@@ -100,6 +95,14 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
 
   const currentBrand = allBrands.find(b => b.id === selectedBrand);
 
+  // Memoize missing required fields calculation
+  const missingRequiredFields = useMemo(() => {
+    if (!template) return [];
+    return (template.inputFields || []).filter(
+      field => field.required && !templateFieldValues[field.id]
+    );
+  }, [template, templateFieldValues]);
+
   useEffect(() => {
     if (!templateId) {
       toast.error("No template ID specified. Cannot initialize content generator.");
@@ -116,9 +119,16 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
       setIsLoadingWorkflowsForTemplate(true);
       setInitialDataLoaded(false);
 
-      try {
-        const templateResponse = await fetch(`/api/content-templates/${templateId}`);
-        const templateData = await templateResponse.json();
+      // Parallel fetch all initial data
+      const [templateResult, brandsResult, workflowsResult] = await Promise.allSettled([
+        fetch(`/api/content-templates/${templateId}`).then(r => r.json()),
+        fetch('/api/brands').then(r => r.json()),
+        fetch(`/api/workflows?template_id=${templateId}`).then(r => r.json())
+      ]);
+
+      // Process template data
+      if (templateResult.status === 'fulfilled') {
+        const templateData = templateResult.value;
         if (templateData.success && templateData.template) {
           setTemplate(templateData.template as Template);
           const initialValues: Record<string, string> = {};
@@ -132,47 +142,45 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
           toast.error(templateData.error || "Failed to load content template.");
           setTemplate(null);
         }
-      } catch (error) {
+      } else {
         toast.error("Error fetching template details.");
-        console.error("Error fetching template details:", error);
+        console.error("Error fetching template details:", templateResult.reason);
         setTemplate(null);
-      } finally {
-        setIsLoadingTemplate(false);
       }
+      setIsLoadingTemplate(false);
 
-      try {
-        const brandsResponse = await fetch('/api/brands');
-        const brandsData = await brandsResponse.json();
+      // Process brands data
+      if (brandsResult.status === 'fulfilled') {
+        const brandsData = brandsResult.value;
         if (brandsData.success && Array.isArray(brandsData.data)) {
           setAllBrands(brandsData.data);
         } else {
           toast.error(brandsData.error || 'Failed to fetch brands');
           setAllBrands([]);
         }
-      } catch (error) {
+      } else {
         toast.error('Error fetching brands');
-        console.error('Error fetching brands:', error);
+        console.error('Error fetching brands:', brandsResult.reason);
         setAllBrands([]);
-      } finally {
-        setIsLoadingAllBrands(false);
       }
+      setIsLoadingAllBrands(false);
 
-      try {
-        const wfForTemplateResponse = await fetch(`/api/workflows?template_id=${templateId}`);
-        const wfForTemplateData = await wfForTemplateResponse.json();
+      // Process workflows data
+      if (workflowsResult.status === 'fulfilled') {
+        const wfForTemplateData = workflowsResult.value;
         if (wfForTemplateData.success && Array.isArray(wfForTemplateData.data)) {
           setWorkflowsForCurrentTemplate(wfForTemplateData.data);
         } else {
           toast.error(wfForTemplateData.error || 'Failed to load workflows for this template.');
           setWorkflowsForCurrentTemplate([]);
         }
-      } catch (error) {
+      } else {
         toast.error('Error loading workflows for this template.');
-        console.error('Error fetching workflows for template:', error);
+        console.error('Error fetching workflows for template:', workflowsResult.reason);
         setWorkflowsForCurrentTemplate([]);
-      } finally {
-        setIsLoadingWorkflowsForTemplate(false);
       }
+      setIsLoadingWorkflowsForTemplate(false);
+      
       setInitialDataLoaded(true);
     };
 
@@ -246,12 +254,21 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
       if (value) {
         setIsFetchingProductContext(true);
         setProductContext(null);
+        
+        const abortController = new AbortController();
+        
         try {
           const response = await fetch('/api/content/prepare-product-context', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ productId: value }),
+            signal: abortController.signal
           });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
           const data = await response.json();
           if (data.success) {
             setProductContext({
@@ -266,11 +283,17 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
           } else {
             toast.error(data.error || 'Failed to fetch product context.');
           }
-        } catch (error) {
-          toast.error('Error fetching product context.');
+        } catch (error: any) {
+          if (error.name !== 'AbortError') {
+            toast.error('Error fetching product context.');
+            console.error('Error fetching product context:', error);
+          }
         } finally {
           setIsFetchingProductContext(false);
         }
+        
+        // Cleanup function to abort if component unmounts or brand changes
+        return () => abortController.abort();
       } else {
         // Clear context if product is deselected
         setProductContext(null);
@@ -278,38 +301,52 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     }
   };
 
-  const interpolatePrompt = (prompt: string): string => {
-    let interpolated = prompt;
-    if (template) {
-      (template.inputFields || []).forEach(inputField => {
-        const placeholderByName = `{{${inputField.name}}}`;
-        const placeholderById = `{{${inputField.id}}}`;
-        const value = templateFieldValues[inputField.id] || '';
-        interpolated = interpolated.replace(new RegExp(placeholderByName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), value);
-        interpolated = interpolated.replace(new RegExp(placeholderById.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), value);
-      });
-    }
+  const interpolatePrompt = useMemo(() => {
+    return (prompt: string): string => {
+      let interpolated = prompt;
+      
+      // Build a single regex pattern for all field replacements
+      if (template && template.inputFields) {
+        const replacements = new Map<string, string>();
+        
+        template.inputFields.forEach(inputField => {
+          const value = templateFieldValues[inputField.id] || '';
+          replacements.set(`{{${inputField.name}}}`, value);
+          replacements.set(`{{${inputField.id}}}`, value);
+        });
+        
+        // Create a single regex that matches all placeholders
+        const pattern = Array.from(replacements.keys())
+          .map(key => key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+          .join('|');
+        
+        if (pattern) {
+          interpolated = interpolated.replace(
+            new RegExp(pattern, 'gi'),
+            (match) => replacements.get(match) || match
+          );
+        }
+      }
 
-    if (productContext) {
-      const contextString = `
+      if (productContext) {
+        const contextString = `
 Product Name: ${productContext.productName}
 
 Styled Claims:
 ${JSON.stringify(productContext.styledClaims, null, 2)}
-      `;
-      interpolated = interpolated.replace(/{{product_context}}/gi, contextString);
-    } else {
-      // If there's no product context, replace the placeholder with an empty string
-      interpolated = interpolated.replace(/{{product_context}}/gi, '');
-    }
+        `;
+        interpolated = interpolated.replace(/{{product_context}}/gi, contextString);
+      } else {
+        interpolated = interpolated.replace(/{{product_context}}/gi, '');
+      }
 
-    if (title) {
-      const articleTitlePlaceholder = /\{\{\s*article title\s*\}\}/gi;
-      interpolated = interpolated.replace(articleTitlePlaceholder, title);
-    }
-    
-    return interpolated;
-  };
+      if (title) {
+        interpolated = interpolated.replace(/\{\{\s*article title\s*\}\}/gi, title);
+      }
+      
+      return interpolated;
+    };
+  }, [template, templateFieldValues, productContext, title]);
 
   const handleGenerateSuggestion = async (field: InputField) => {
     if (!selectedBrand || !canGenerateContent) {
@@ -357,11 +394,9 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
       toast.error("Please select a brand and ensure a workflow is available for this template.");
       return;
     }
-    const missingFields = (template.inputFields || []).filter(
-      field => field.required && !templateFieldValues[field.id]
-    );
-    if (missingFields.length > 0) {
-      toast.error(`Please fill in all required fields: ${missingFields.map(f => f.name).join(', ')}`);
+    
+    if (missingRequiredFields.length > 0) {
+      toast.error(`Please fill in all required fields: ${missingRequiredFields.map(f => f.name).join(', ')}`);
       return;
     }
 
