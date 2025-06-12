@@ -1,120 +1,96 @@
 /**
- * API client utility for making authenticated requests
- * This implementation uses Supabase's cookie-based auth instead of localStorage
+ * API Client with built-in CSRF protection
+ * 
+ * This module provides a fetch wrapper that automatically includes
+ * CSRF tokens for state-changing operations.
  */
 
-import { createSupabaseClient } from '@/lib/supabase/client';
-
-interface FetchOptions extends RequestInit {
-  retries?: number;
+/**
+ * Get CSRF token from cookies
+ */
+function getCSRFToken(): string | null {
+  if (typeof document === 'undefined') return null;
+  
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; csrf-token=`);
+  if (parts.length === 2) {
+    return parts.pop()?.split(';').shift() || null;
+  }
+  return null;
 }
 
 /**
- * Fetches data from an API endpoint with authentication
- * Uses Supabase's cookie-based authentication
+ * Enhanced fetch that automatically includes CSRF token for protected methods
+ * 
+ * Usage: Same as regular fetch, but CSRF token is automatically included
+ * 
+ * @example
+ * // Instead of fetch('/api/brands', { method: 'POST', ... })
+ * // Use:
+ * const response = await apiFetch('/api/brands', { 
+ *   method: 'POST',
+ *   body: JSON.stringify(data)
+ * });
  */
-export async function fetchApi(url: string, options: FetchOptions = {}) {
-  const { retries = 1, ...fetchOptions } = options;
+export async function apiFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<Response> {
+  const method = init?.method?.toUpperCase() || 'GET';
+  const headers = new Headers(init?.headers);
   
-  // Create default headers and merge with provided ones
-  const headers = new Headers(fetchOptions.headers || {});
-  if (!headers.has('Content-Type') && !fetchOptions.body) {
-    headers.set('Content-Type', 'application/json');
-  }
-  
-  // Create fetch options with merged headers
-  const requestOptions: RequestInit = {
-    ...fetchOptions,
-    headers,
-  };
-  
-  // First attempt
-  let response = await fetch(url, requestOptions);
-  
-  // If response is 401 Unauthorized, try to refresh the session
-  if (response.status === 401 && retries > 0) {
-    console.log('Auth failed, attempting to refresh session...');
-    
-    try {
-      // Use Supabase to refresh the session
-      const supabase = createSupabaseClient();
-      const { error } = await supabase.auth.refreshSession();
-      
-      if (!error) {
-        console.log('Session refreshed, retrying request...');
-        // Retry the request with refreshed credentials
-        response = await fetch(url, requestOptions);
-      }
-    } catch (error) {
-      console.error('Error refreshing session:', error);
+  // Add CSRF token for state-changing methods
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+    const csrfToken = getCSRFToken();
+    if (csrfToken) {
+      headers.set('x-csrf-token', csrfToken);
     }
   }
   
-  return response;
-}
-
-/**
- * Fetches and parses JSON data from an API endpoint with authentication
- */
-export async function fetchApiJson<T = any>(url: string, options: FetchOptions = {}): Promise<T> {
-  const response = await fetchApi(url, options);
-  
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const error = new Error(
-      errorData.error || `API error: ${response.status} ${response.statusText}`
-    );
-    throw Object.assign(error, { status: response.status, data: errorData });
+  // Ensure JSON content type for JSON bodies
+  if (init?.body && typeof init.body === 'string' && !headers.has('content-type')) {
+    try {
+      JSON.parse(init.body);
+      headers.set('content-type', 'application/json');
+    } catch {
+      // Not JSON, don't set content-type
+    }
   }
   
-  return await response.json();
+  return fetch(input, {
+    ...init,
+    headers
+  });
 }
 
 /**
- * Posts data to an API endpoint with authentication
+ * Convenience methods for common HTTP operations
  */
-export async function postApiJson<T = any, D = any>(
-  url: string,
-  data: D,
-  options: FetchOptions = {}
-): Promise<T> {
-  const requestOptions: FetchOptions = {
-    method: 'POST',
-    body: JSON.stringify(data),
-    ...options,
-  };
-  
-  return fetchApiJson<T>(url, requestOptions);
-}
-
-/**
- * Puts data to an API endpoint with authentication
- */
-export async function putApiJson<T = any, D = any>(
-  url: string,
-  data: D,
-  options: FetchOptions = {}
-): Promise<T> {
-  const requestOptions: FetchOptions = {
-    method: 'PUT',
-    body: JSON.stringify(data),
-    ...options,
-  };
-  
-  return fetchApiJson<T>(url, requestOptions);
-}
-
-/**
- * Deletes a resource at an API endpoint with authentication
- */
-export async function deleteApiJson<T = any>(
-  url: string,
-  options: FetchOptions = {}
-): Promise<T> {
-  const requestOptions: FetchOptions = {
-    method: 'DELETE',
-    ...options,
-  };
-  
-  return fetchApiJson<T>(url, requestOptions);
-} 
+export const apiClient = {
+  get: (url: string, options?: RequestInit) => 
+    apiFetch(url, { ...options, method: 'GET' }),
+    
+  post: (url: string, body?: any, options?: RequestInit) => 
+    apiFetch(url, { 
+      ...options, 
+      method: 'POST', 
+      body: typeof body === 'string' ? body : JSON.stringify(body) 
+    }),
+    
+  put: (url: string, body?: any, options?: RequestInit) => 
+    apiFetch(url, { 
+      ...options, 
+      method: 'PUT', 
+      body: typeof body === 'string' ? body : JSON.stringify(body) 
+    }),
+    
+  patch: (url: string, body?: any, options?: RequestInit) => 
+    apiFetch(url, { 
+      ...options, 
+      method: 'PATCH', 
+      body: typeof body === 'string' ? body : JSON.stringify(body) 
+    }),
+    
+  delete: (url: string, options?: RequestInit) => 
+    apiFetch(url, { ...options, method: 'DELETE' })
+};
