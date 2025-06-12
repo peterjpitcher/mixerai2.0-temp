@@ -17,7 +17,7 @@ interface ContentGenerationRequest {
     additionalInstructions?: string;
     templateId?: string;
     templateFields?: Record<string, string>;
-    product_context?: any;
+    product_context?: { productName: string; styledClaims: any };
   };
   template?: {
     id: string;
@@ -92,7 +92,6 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
             finalInput.product_context = JSON.parse(data.input.product_context);
           } catch (e) {
             console.error("Failed to parse product_context:", e);
-            // Decide how to handle: maybe delete it or proceed without it
             delete finalInput.product_context;
           }
         }

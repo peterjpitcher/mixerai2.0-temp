@@ -72,6 +72,15 @@ export async function generateTextCompletion(
     console.log(`[generateTextCompletion] System Prompt: ${systemPrompt.substring(0, 100)}...`);
     console.log(`[generateTextCompletion] User Prompt: ${userPrompt.substring(0,100)}...`);
 
+    // --- LOGGING FINAL PROMPT ---
+    console.log("\n\n========================= FINAL PROMPT TO AI =========================");
+    console.log("--- SYSTEM PROMPT ---");
+    console.log(systemPrompt);
+    console.log("\n--- USER PROMPT ---");
+    console.log(userPrompt);
+    console.log("====================================================================\n\n");
+    // --- END LOGGING ---
+
     const completionRequest = {
       model: deploymentName, // Though model is in path, SDKs often still expect it
       messages: [
@@ -197,7 +206,7 @@ export async function generateContentFromTemplate(
   input?: {
     additionalInstructions?: string;
     templateFields?: Record<string, string>;
-    product_context?: string;
+    product_context?: { productName: string; styledClaims: any };
   }
 ) {
   console.log(`Generating template-based content for brand: ${brand.name} using template: ${template.name}`);
@@ -252,7 +261,17 @@ The product context is provided in the user prompt.
   let userPrompt = `Create content according to this template: "${template.name}".\n\n`;
   
   if (input?.product_context) {
-    userPrompt += `--- PRODUCT CONTEXT ---\n${input.product_context}\n-----------------------\n\n`;
+    // The context is now expected to be an object with productName and styledClaims
+    const { productName, styledClaims } = input.product_context as { productName: string; styledClaims: any };
+    
+    if (productName) {
+      userPrompt += `--- PRODUCT CONTEXT ---\n`;
+      userPrompt += `Product Name: ${productName}\n\n`;
+      if (styledClaims) {
+        userPrompt += `Styled Claims:\n${JSON.stringify(styledClaims, null, 2)}\n`;
+      }
+      userPrompt += `-----------------------\n\n`;
+    }
   }
 
   userPrompt += `Template input fields:\n`;
