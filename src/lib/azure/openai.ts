@@ -197,6 +197,7 @@ export async function generateContentFromTemplate(
   input?: {
     additionalInstructions?: string;
     templateFields?: Record<string, string>;
+    product_context?: string;
   }
 ) {
   console.log(`Generating template-based content for brand: ${brand.name} using template: ${template.name}`);
@@ -233,10 +234,27 @@ export async function generateContentFromTemplate(
     systemPrompt += ` Content guardrails: ${brand.guardrails}.`;
   }
   
+  if (input?.product_context) {
+    systemPrompt += `
+IMPORTANT PRODUCT CONTEXT: You have been provided with specific information and a set of pre-approved 'styled claims' for a product. This information is the absolute source of truth.
+Your generated content for all fields MUST strictly adhere to the provided claims.
+- Do NOT invent new claims.
+- Do NOT use claims marked as 'disallowed'.
+- You MUST use the 'mandatory' claims where appropriate.
+- You SHOULD incorporate the 'allowed' claims to enrich the content.
+The product context is provided in the user prompt.
+`;
+  }
+  
   systemPrompt += `\nYou are using a template called "${template.name}" to generate content. For any fields that are intended for rich text display (like a main article body), generate the content directly as well-formed HTML using common semantic tags (e.g., <p>, <h1>-<h6>, <ul>, <ol>, <li>, <strong>, <em>,<blockquote>). Do not use Markdown for these rich text fields. For other fields, follow their specific aiPrompt or generate plain text.`;
   
   // Build the user prompt using template fields and prompts
   let userPrompt = `Create content according to this template: "${template.name}".\n\n`;
+  
+  if (input?.product_context) {
+    userPrompt += `--- PRODUCT CONTEXT ---\n${input.product_context}\n-----------------------\n\n`;
+  }
+
   userPrompt += `Template input fields:\n`;
   
   // Add each input field with its value to the prompt

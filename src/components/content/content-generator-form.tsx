@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import { Loader2, ArrowLeft, PlusCircle, Sparkles, ShieldAlert, Info } from 'lucide-react';
 import { marked } from 'marked';
 import Link from 'next/link';
-import type { InputField, OutputField, ContentTemplate as Template, SelectOptions } from '@/types/template';
+import type { InputField, OutputField, ContentTemplate as Template, SelectOptions, FieldType } from '@/types/template';
 import { ProductSelect } from './product-select';
 
 interface Brand {
@@ -35,6 +35,11 @@ interface WorkflowSummary {
   template_id?: string | null;
   brand_id: string;
   brand_name: string;
+}
+
+interface ProductContext {
+  productName: string;
+  styledClaims: any; // Define a more specific type if you have one
 }
 
 interface ContentGeneratorFormProps {
@@ -89,6 +94,9 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
   
   const [canGenerateContent, setCanGenerateContent] = useState<boolean>(false);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+
+  const [productContext, setProductContext] = useState<ProductContext | null>(null);
+  const [isFetchingProductContext, setIsFetchingProductContext] = useState(false);
 
   const currentBrand = allBrands.find(b => b.id === selectedBrand);
 
@@ -231,8 +239,43 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     }
   }, [templateId, selectedBrand, displayableBrands, currentBrand?.name]);
 
-  const handleTemplateFieldChange = (fieldId: string, value: string) => {
+  const handleTemplateFieldChange = async (fieldId: string, value: string, fieldType?: FieldType) => {
     setTemplateFieldValues(prev => ({ ...prev, [fieldId]: value }));
+
+    if (fieldType === 'product-selector') {
+      if (value) {
+        setIsFetchingProductContext(true);
+        setProductContext(null);
+        try {
+          const response = await fetch('/api/content/prepare-product-context', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productId: value }),
+          });
+          const data = await response.json();
+          if (data.success) {
+            setProductContext({
+              productName: data.productName,
+              styledClaims: data.styledClaims,
+            });
+            if (data.styledClaims) {
+              toast.success(`Loaded context for product: ${data.productName}`);
+            } else {
+              toast.info(`No specific claims context found for ${data.productName}.`);
+            }
+          } else {
+            toast.error(data.error || 'Failed to fetch product context.');
+          }
+        } catch (error) {
+          toast.error('Error fetching product context.');
+        } finally {
+          setIsFetchingProductContext(false);
+        }
+      } else {
+        // Clear context if product is deselected
+        setProductContext(null);
+      }
+    }
   };
 
   const interpolatePrompt = (prompt: string): string => {
@@ -245,6 +288,19 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         interpolated = interpolated.replace(new RegExp(placeholderByName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), value);
         interpolated = interpolated.replace(new RegExp(placeholderById.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), value);
       });
+    }
+
+    if (productContext) {
+      const contextString = `
+Product Name: ${productContext.productName}
+
+Styled Claims:
+${JSON.stringify(productContext.styledClaims, null, 2)}
+      `;
+      interpolated = interpolated.replace(/{{product_context}}/gi, contextString);
+    } else {
+      // If there's no product context, replace the placeholder with an empty string
+      interpolated = interpolated.replace(/{{product_context}}/gi, '');
     }
 
     if (title) {
@@ -330,7 +386,9 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
             inputFields: input_fields_with_values,
             outputFields: template.outputFields || []
         },
-        input: { /* additionalInstructions can be added here if needed */ }
+        input: {
+          product_context: productContext ? JSON.stringify(productContext) : undefined,
+        }
       };
 
       const response = await fetch('/api/content/generate', { 
@@ -660,9 +718,11 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
                           case 'product-selector':
                             return (
                               <ProductSelect
+                                key={field.id}
                                 brandId={selectedBrand}
-                                value={templateFieldValues[field.id] || null}
-                                onChange={(value) => handleTemplateFieldChange(field.id, value || '')}
+                                value={(templateFieldValues[field.id] as string) || ''}
+                                onChange={(value) => handleTemplateFieldChange(field.id, value || '', field.type)}
+                                isMultiSelect={(field.options as any)?.isMultiSelect || false}
                               />
                             );
                           case 'tags':

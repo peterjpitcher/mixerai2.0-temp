@@ -17,6 +17,7 @@ interface ContentGenerationRequest {
     additionalInstructions?: string;
     templateId?: string;
     templateFields?: Record<string, string>;
+    product_context?: any;
   };
   template?: {
     id: string;
@@ -85,10 +86,21 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
           country: brandData.country,
         };
 
+        const finalInput = { ...data.input };
+        if (data.input?.product_context && typeof data.input.product_context === 'string') {
+          try {
+            finalInput.product_context = JSON.parse(data.input.product_context);
+          } catch (e) {
+            console.error("Failed to parse product_context:", e);
+            // Decide how to handle: maybe delete it or proceed without it
+            delete finalInput.product_context;
+          }
+        }
+
         const generatedContent = await generateContentFromTemplate(
           brandInfoForGeneration,
           data.template,
-          data.input
+          finalInput
         );
         return NextResponse.json({
           success: true,
