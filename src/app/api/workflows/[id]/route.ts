@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { handleApiError } from '@/lib/api-utils'; // Added for using in catch blocks
 import { verifyEmailTemplates } from '@/lib/auth/email-templates'; // Added for sending invites
 import { withAuth } from '@/lib/auth/api-auth'; // Import withAuth
+import type { User } from '@supabase/supabase-js';
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,7 @@ interface WorkflowStep {
  */
 export const GET = withAuth(async (
   request: NextRequest,
-  user: any, // The authenticated user object from withAuth
+  user: User,
   { params }: { params: { id: string } }
 ) => {
   try {
@@ -111,7 +112,7 @@ export const GET = withAuth(async (
       throw stepsError; 
     }
 
-    let processedSteps: any[] = [];
+    let processedSteps: WorkflowStep[] = [];
     if (dbSteps && dbSteps.length > 0) {
       const allUserIds = new Set<string>();
       dbSteps.forEach(step => {

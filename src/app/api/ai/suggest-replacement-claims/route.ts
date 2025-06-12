@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { handleApiError, isBuildPhase } from '@/lib/api-utils';
+import { isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
 import { generateTextCompletion } from '@/lib/azure/openai';

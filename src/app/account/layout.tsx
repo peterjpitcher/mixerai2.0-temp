@@ -20,7 +20,7 @@ export default function AccountLayout({
   useEffect(() => {
     async function checkAuth() {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const { data: { session } } = await supabase.auth.getSession();
         
         // If not authenticated, redirect to login
         if (!session) {

@@ -9,7 +9,6 @@ import {
   Search, 
   ArrowUp, 
   ArrowDown, 
-  ExternalLink, 
   Pencil, 
   Trash2, 
   AlertCircle,
@@ -87,7 +86,7 @@ interface UserSessionData {
  */
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
-  const [brands, setBrands] = useState<Brand[]>([]);
+  const [_brands, setBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState<'full_name' | 'role' | 'email' | 'company' | 'last_sign_in_at'>('role');
@@ -189,7 +188,7 @@ export default function UsersPage() {
           // Just set users without brand data
           setUsers(usersData.data || []);
         }
-      } catch (error) {
+      } catch (_error) {
         // console.error('Error loading data:', error);
         toast.error('Failed to load users. Please try again.');
       } finally {
@@ -267,7 +266,7 @@ export default function UsersPage() {
       } else {
         toast.error(data.error || 'Failed to delete user.');
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('An error occurred while deleting the user.');
     } finally {
       setIsDeleting(false);
@@ -291,7 +290,7 @@ export default function UsersPage() {
       } else {
         toast.error(data.error || 'Failed to resend invitation.');
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('An error occurred while resending the invitation.');
     } finally {
       setResendingInviteToUserId(null);

@@ -252,7 +252,7 @@ The product context is provided in the user prompt.
   
   if (input?.product_context) {
     // The context is now expected to be an object with productName and styledClaims
-    const { productName, styledClaims } = input.product_context as { productName: string; styledClaims: any };
+    const { productName, styledClaims } = input.product_context as { productName: string; styledClaims: StyledClaims | null };
     
     if (productName) {
       userPrompt += `--- PRODUCT CONTEXT ---\n`;
@@ -487,7 +487,7 @@ export async function generateBrandIdentityFromUrls(
           
           // Ensure guardrails are formatted properly
           if (Array.isArray(parsedResponse.guardrails)) {
-            parsedResponse.guardrails = parsedResponse.guardrails.map((item: string) => `- ${item}`).join('\n');
+            parsedResponse.guardrails = parsedResponse.guardrails.map((item: unknown) => `- ${String(item)}`).join('\n');
           }
           
           // console.log("Successfully parsed response and formatted guardrails");

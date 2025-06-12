@@ -18,7 +18,7 @@ interface MasterClaimBrand {
 }
 
 // GET handler for all master claim brands
-export const GET = withAuth(async (req: NextRequest, user: User) => {
+export const GET = withAuth(async (req: NextRequest, _user: User) => {
     try {
         if (isBuildPhase()) {
             console.log('[API MasterClaimBrands GET] Build phase: returning empty array.');

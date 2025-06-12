@@ -15,7 +15,7 @@ const pool = useDirectPostgres ? new Pool({
 
 // Test the connection on startup only if direct connection is enabled
 if (useDirectPostgres && pool) {
-  pool.query('SELECT NOW()', (err: Error | null, res: QueryResult<any>) => {
+  pool.query('SELECT NOW()', (err: Error | null, res: QueryResult<{ now: Date }>) => {
     if (err) {
       console.error('Error connecting to PostgreSQL database:', err);
     } else {
@@ -27,7 +27,7 @@ if (useDirectPostgres && pool) {
 }
 
 // Query function that returns a promise
-export async function query(text: string, params?: any[]): Promise<QueryResult> {
+export async function query(text: string, params?: unknown[]): Promise<QueryResult> {
   if (!useDirectPostgres || !pool) {
     throw new Error('Direct PostgreSQL connection is disabled. Use Supabase client instead.');
   }

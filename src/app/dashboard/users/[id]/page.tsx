@@ -4,20 +4,11 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/button';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from '@/components/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/card';
 import { 
   ArrowLeft, 
-  Pencil, 
   Trash2, 
-  Mail, 
-  Building, 
-  Briefcase, 
-  Calendar, 
-  Clock, 
-  Shield, 
   AlertCircle,
-  ChevronLeft,
   Edit,
   Loader2,
   UserCircle2
@@ -31,18 +22,11 @@ import {
   DialogTitle,
 } from "@/components/dialog";
 import { toast } from 'sonner';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-} from "@/components/alert-dialog";
 import { Badge } from '@/components/badge';
 import { BrandIcon } from '@/components/brand-icon';
-import { PageHeader } from '@/components/dashboard/page-header';
 import { Label } from '@/components/label';
 import { format as formatDateFns } from 'date-fns';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
-import type { Metadata } from 'next';
 
 interface Brand {
   id: string;

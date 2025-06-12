@@ -23,23 +23,29 @@ export const isBuildPhase = () => {
  * Check if an error is related to database connection
  * This is used to determine when we should fall back to mock data
  */
-export const isDatabaseConnectionError = (error: any): boolean => {
+export const isDatabaseConnectionError = (error: unknown): boolean => {
   if (!error) return false;
   
   // Check for common database connection error codes
-  if (
-    error.code === 'ECONNREFUSED' ||
-    error.code === 'ConnectionError' ||
-    error.code === 'ETIMEDOUT' ||
-    error.code === 'EAI_AGAIN' ||
-    error.code === '42P01' // Postgres undefined table error
-  ) {
-    return true;
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = error.code;
+    if (
+      code === 'ECONNREFUSED' ||
+      code === 'ConnectionError' ||
+      code === 'ETIMEDOUT' ||
+      code === 'EAI_AGAIN' ||
+      code === '42P01' // Postgres undefined table error
+    ) {
+      return true;
+    }
   }
   
   // Check for common error message patterns
-  if (error.message && typeof error.message === 'string') {
-    const errorMessage = error.message.toLowerCase();
+  const message = error instanceof Error ? error.message : 
+    (error && typeof error === 'object' && 'message' in error ? String(error.message) : '');
+    
+  if (message && typeof message === 'string') {
+    const errorMessage = message.toLowerCase();
     return (
       errorMessage.includes('connection') ||
       errorMessage.includes('connect to database') ||
@@ -58,16 +64,17 @@ export const isDatabaseConnectionError = (error: any): boolean => {
  * Safely handle database errors, with special handling for build/SSG
  */
 export const handleApiError = (
-  error: any, 
+  error: unknown, 
   message: string = 'An error occurred', 
   status: number = 500
 ) => {
   // Enhanced error object for logging
   const errorDetails = {
-    message: error?.message || 'Unknown error',
-    code: error?.code || 'UNKNOWN',
-    hint: error?.hint || '',
-    source: error?.source || 'unknown',
+    message: (error instanceof Error ? error.message : 
+              (error && typeof error === 'object' && 'message' in error ? String(error.message) : 'Unknown error')),
+    code: (error && typeof error === 'object' && 'code' in error ? String(error.code) : 'UNKNOWN'),
+    hint: (error && typeof error === 'object' && 'hint' in error ? String(error.hint) : ''),
+    source: (error && typeof error === 'object' && 'source' in error ? String(error.source) : 'unknown'),
     isDatabaseError: isDatabaseConnectionError(error)
   };
   
@@ -106,9 +113,11 @@ export const handleApiError = (
     { 
       success: false, 
       error: message,
-      details: isProduction() ? 'See server logs for details' : (error?.message || error?.toString()),
-      hint: error?.hint || '',
-      code: error?.code || ''
+      details: isProduction() ? 'See server logs for details' : 
+        (error instanceof Error ? error.message : 
+         (error && typeof error === 'object' && 'message' in error ? String(error.message) : String(error))),
+      hint: (error && typeof error === 'object' && 'hint' in error ? String(error.hint) : ''),
+      code: (error && typeof error === 'object' && 'code' in error ? String(error.code) : '')
     },
     { status }
   );

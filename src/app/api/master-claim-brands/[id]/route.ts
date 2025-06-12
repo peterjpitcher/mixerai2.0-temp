@@ -24,7 +24,7 @@ interface RequestContext {
 }
 
 // GET handler for a single master claim brand by ID
-export const GET = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
+export const GET = withAuth(async (req: NextRequest, _user: User, context: RequestContext) => {
     const { id } = context.params;
     if (!id) {
         return NextResponse.json({ success: false, error: 'Brand ID is required.' }, { status: 400 });

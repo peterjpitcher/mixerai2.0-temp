@@ -74,7 +74,7 @@ export default function DefineClaimsPage() {
       } else {
         toast.error('Could not load country list.');
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to fetch countries.');
     }
   };

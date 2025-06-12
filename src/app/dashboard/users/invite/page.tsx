@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/checkbox';
 import { 
   ArrowLeft, 
-  Send, 
   Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -118,7 +117,7 @@ export default function InviteUserPage() {
         } else {
           throw new Error(data.error || 'Failed to fetch brands');
         }
-      } catch (error) {
+      } catch (_error) {
         toast.error('Failed to load brands. You may not be able to assign the user to a brand.');
       } finally {
         setIsLoading(false);

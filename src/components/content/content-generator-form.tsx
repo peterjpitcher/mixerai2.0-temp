@@ -287,8 +287,8 @@ function ContentGeneratorFormOriginal({ templateId }: ContentGeneratorFormProps)
           } else {
             toast.error(data.error || 'Failed to fetch product context.');
           }
-        } catch (error: any) {
-          if (error.name !== 'AbortError') {
+        } catch (error: unknown) {
+          if (error instanceof Error && error.name !== 'AbortError') {
             toast.error('Error fetching product context.');
             console.error('Error fetching product context:', error);
           }
@@ -555,8 +555,9 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
       } else {
         toast.error(data.error || `Failed to regenerate content for '${outputField.name || 'field'}'.`);
       }
-    } catch (error: any) {
-      toast.error(`Error regenerating field: ${error.message || 'Unknown error'}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Error regenerating field: ${errorMessage}`);
       console.error(`Error regenerating field ${outputField.name}:`, error);
     } finally {
       setRetryingFieldId(null);

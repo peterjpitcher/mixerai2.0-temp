@@ -169,7 +169,6 @@ export async function getStackedClaimsForProduct(
     const productClaims = await fetchClaimsForLevel('product', [productId]);
 
     // 3. Fetch Ingredients for the product
-    // @ts-ignore
     const { data: productIngredientLinks, error: ingredientsError } = await supabase
       .from('product_ingredients')
       .select('ingredient_id')
@@ -179,7 +178,7 @@ export async function getStackedClaimsForProduct(
     if (ingredientsError) {
       console.error(`[getStackedClaimsForProduct] Error fetching ingredients for product ${productId}:`, ingredientsError);
     } else if (productIngredientLinks && productIngredientLinks.length > 0) {
-      const ingredientIds = productIngredientLinks.map((link: any) => link.ingredient_id);
+      const ingredientIds = productIngredientLinks.map((link: { ingredient_id: string }) => link.ingredient_id);
       // 4. Fetch Ingredient-specific claims (Master & Market)
       ingredientClaims = await fetchClaimsForLevel('ingredient', ingredientIds);
     }

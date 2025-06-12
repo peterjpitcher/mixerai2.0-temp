@@ -43,7 +43,7 @@ async function getClaimProperties(supabase: any, claimId: string): Promise<{ cou
 
 
 // POST handler for creating a new market claim override
-export const POST = withAuth(async (req: NextRequest, user: User) => {
+export const POST = withAuth(async (req: NextRequest, _user: User) => {
     try {
         const body: MarketClaimOverridePostPayload = await req.json();
         const { 
@@ -190,7 +190,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 });
 
 // GET handler for market claim overrides (optional - could be filtered)
-export const GET = withAuth(async (req: NextRequest, user: User) => {
+export const GET = withAuth(async (req: NextRequest, _user: User) => {
     try {
         if (isBuildPhase()) {
             return NextResponse.json({ success: true, isMockData: true, data: [] });

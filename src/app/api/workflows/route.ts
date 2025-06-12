@@ -21,6 +21,20 @@ interface WorkflowInvitation {
   status?: string;
 }
 
+// Define types for workflow steps and assignees
+interface WorkflowAssignee {
+  id?: string;
+  email: string;
+  name?: string;
+}
+
+interface WorkflowStepData {
+  id?: number | string | null;
+  role: string;
+  assignees: WorkflowAssignee[];
+  [key: string]: unknown;
+}
+
 // Fallback data function removed as per no-fallback policy
 // const getFallbackWorkflows = () => { ... };
 
@@ -258,13 +272,13 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     
     const rawSteps = body.steps || [];
     
-    const processedStepsForRPC: any[] = [];
+    const processedStepsForRPC: WorkflowStepData[] = [];
     const invitationItems: RpcInvitationItem[] = []; 
     const pendingInvites: string[] = [];
 
     for (const rawStep of rawSteps) {
         const stepRole = ['admin', 'editor', 'viewer'].includes(rawStep.role) ? rawStep.role : 'editor';
-        const processedAssigneesForStep: any[] = [];
+        const processedAssigneesForStep: WorkflowAssignee[] = [];
 
         let stepId = NaN;
         if (typeof rawStep.id === 'number') {

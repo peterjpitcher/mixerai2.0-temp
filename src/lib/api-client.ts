@@ -70,21 +70,21 @@ export const apiClient = {
   get: (url: string, options?: RequestInit) => 
     apiFetch(url, { ...options, method: 'GET' }),
     
-  post: (url: string, body?: any, options?: RequestInit) => 
+  post: (url: string, body?: unknown, options?: RequestInit) => 
     apiFetch(url, { 
       ...options, 
       method: 'POST', 
       body: typeof body === 'string' ? body : JSON.stringify(body) 
     }),
     
-  put: (url: string, body?: any, options?: RequestInit) => 
+  put: (url: string, body?: unknown, options?: RequestInit) => 
     apiFetch(url, { 
       ...options, 
       method: 'PUT', 
       body: typeof body === 'string' ? body : JSON.stringify(body) 
     }),
     
-  patch: (url: string, body?: any, options?: RequestInit) => 
+  patch: (url: string, body?: unknown, options?: RequestInit) => 
     apiFetch(url, { 
       ...options, 
       method: 'PATCH', 

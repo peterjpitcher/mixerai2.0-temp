@@ -10,6 +10,7 @@ import { Badge } from '@/components/badge';
 import { toast } from 'sonner';
 import { Loader2, PlusCircle, LayoutTemplate, Edit3, FileTextIcon, MoreVertical, FileCog, Eye, Trash2, ShieldAlert, Copy } from 'lucide-react';
 import type { Metadata } from 'next';
+import type { InputField, OutputField } from '@/types/template';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,8 +47,8 @@ interface Template {
   name: string;
   description: string;
   fields: {
-    inputFields: any[];
-    outputFields: any[];
+    inputFields: InputField[];
+    outputFields: OutputField[];
   };
   icon?: string | null;
   brand_id?: string | null;
@@ -207,7 +208,7 @@ export default function TemplatesPage() {
       } else {
         toast.error(data.error || 'Failed to delete template.');
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('An error occurred while deleting the template.');
     } finally {
       setIsDeleting(false);

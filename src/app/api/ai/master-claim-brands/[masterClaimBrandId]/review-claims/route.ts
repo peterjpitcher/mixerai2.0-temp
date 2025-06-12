@@ -22,26 +22,26 @@ export async function GET(request: Request, { params }: { params: { masterClaimB
 }
 
 // To prevent the 'No HTTP methods exported' error if other methods are expected or for future extension:
-export async function POST(request: Request) {
+export async function POST(_request: Request) {
     return NextResponse.json({ success: false, error: 'Method Not Allowed' }, { status: 405 });
 }
 
-export async function PUT(request: Request) {
+export async function PUT(_request: Request) {
     return NextResponse.json({ success: false, error: 'Method Not Allowed' }, { status: 405 });
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE(_request: Request) {
     return NextResponse.json({ success: false, error: 'Method Not Allowed' }, { status: 405 });
 }
 
-export async function PATCH(request: Request) {
+export async function PATCH(_request: Request) {
     return NextResponse.json({ success: false, error: 'Method Not Allowed' }, { status: 405 });
 }
 
-export async function HEAD(request: Request) {
+export async function HEAD(_request: Request) {
     return NextResponse.json({ success: false, error: 'Method Not Allowed' }, { status: 405 });
 }
 
-export async function OPTIONS(request: Request) {
+export async function OPTIONS(_request: Request) {
     return NextResponse.json({ success: false, error: 'Method Not Allowed' }, { status: 405 });
 } 

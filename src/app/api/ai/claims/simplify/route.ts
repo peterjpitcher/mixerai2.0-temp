@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import { generateTextCompletion } from '@/lib/azure/openai';
-import { EffectiveClaim } from '@/lib/claims-utils'; // Assuming EffectiveClaim is exported
 import { User } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';

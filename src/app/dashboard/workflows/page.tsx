@@ -216,7 +216,7 @@ export default function WorkflowsPage() {
       } else {
         toast.error(data.error || 'Failed to delete workflow.');
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('An error occurred while deleting the workflow.');
     } finally {
       setIsDeleting(false);

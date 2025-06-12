@@ -45,7 +45,7 @@ export default function AccountPage() {
         
         if (session) {
           // Get profile data
-          const { data: profile, error } = await supabase
+          const { data: profile } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', session.user.id)
