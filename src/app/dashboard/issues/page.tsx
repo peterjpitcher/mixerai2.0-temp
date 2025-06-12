@@ -22,7 +22,7 @@ interface PriorityLabel {
 
 export default function IssuesPage() {
   const [issues, setIssues] = useState<GitHubIssue[]>([]);
-  const [labels, setLabels] = useState<GitHubLabel[]>([]);
+  const [, setLabels] = useState<GitHubLabel[]>([]);
   const [priorityLabels, setPriorityLabels] = useState<PriorityLabel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +70,7 @@ export default function IssuesPage() {
       ];
 
       allLabels.forEach((label: GitHubLabel) => {
-        priorityPatterns.forEach(({ pattern, name, order, displayName }) => {
+        priorityPatterns.forEach(({ pattern, order, displayName }) => {
           if (pattern.test(label.name)) {
             priorities.push({
               name: label.name,
@@ -294,7 +294,7 @@ export default function IssuesPage() {
               </div>
               {/* Hidden select for state filter - always show open issues */}
               <input type="hidden" value="open" />
-              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+              <Select value={sortBy} onValueChange={(value: 'created' | 'updated' | 'comments') => setSortBy(value)}>
                 <SelectTrigger className="w-full sm:w-32 h-8 text-sm">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
@@ -340,9 +340,6 @@ export default function IssuesPage() {
                     <div className="space-y-1">
                       {grouped[priority].map((issue) => {
                         const isExpanded = expandedIssues.has(issue.id);
-                        const priorityLabel = issue.labels.find(label => 
-                          priority !== 'none' && label.name === priority
-                        );
                         const otherLabels = issue.labels.filter(label => 
                           priority === 'none' || label.name !== priority
                         );

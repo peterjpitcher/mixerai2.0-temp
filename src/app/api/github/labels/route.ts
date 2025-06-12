@@ -55,7 +55,7 @@ export async function GET() {
     const labels = await response.json();
     
     // Filter and categorize priority labels
-    const priorityLabels = labels.filter((label: any) => 
+    const priorityLabels = labels.filter((label: { name: string; color: string; id: number }) => 
       label.name.toLowerCase().includes('priority') ||
       label.name.toLowerCase() === 'critical' ||
       label.name.toLowerCase() === 'high' ||
