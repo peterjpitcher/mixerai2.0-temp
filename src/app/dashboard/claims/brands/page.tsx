@@ -225,7 +225,7 @@ export default function MasterClaimBrandsPage() {
                       <TableCell className="text-sm text-muted-foreground">{brand.created_at ? new Date(brand.created_at).toLocaleDateString() : '-'}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{brand.updated_at ? new Date(brand.updated_at).toLocaleDateString() : '-'}</TableCell>
                       <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="icon" asChild title="Edit Brand">
+                        <Button variant="ghost" size="icon" asChild title="Edit Brand" aria-label="Edit Brand">
                           <Link href={`/dashboard/claims/brands/${brand.id}/edit`} >
                             <Pencil className="h-4 w-4" />
                           </Link>
@@ -234,6 +234,7 @@ export default function MasterClaimBrandsPage() {
                           variant="ghost" 
                           size="icon"
                           title="Delete Brand"
+                          aria-label="Delete Brand"
                           onClick={() => openDeleteDialog(brand)}
                           // disabled={isDeleting && itemToDelete?.id === brand.id} 
                         >

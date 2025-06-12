@@ -213,10 +213,6 @@ export function UnifiedNavigation() {
       newExpandedState.content = true;
       changed = true;
     }
-    if ((pathname.includes('/feedback') || pathname.includes('/admin/feedback-log')) && !expandedSections.feedback) {
-      newExpandedState.feedback = true;
-      changed = true;
-    }
     if (changed) {
       setExpandedSections(newExpandedState);
     }
@@ -359,25 +355,11 @@ export function UnifiedNavigation() {
     },
     { type: 'divider', show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin) },
     {
-      label: 'Feedback',
+      href: '/dashboard/issues',
+      label: 'Issues',
       icon: <MessageSquareWarning className="h-5 w-5" />,
-      segment: 'feedback',
-      defaultOpen: false,
-      show: () => isAuthenticatedUser,
-      items: [
-        { 
-          href: '/dashboard/admin/feedback-log',
-          label: 'Submit Feedback',
-          icon: <FilePlus2 className="h-4 w-4" />,
-          segment: 'new'
-        },
-        { 
-          href: '/dashboard/admin/feedback-log',
-          label: 'Feedback Log',
-          icon: <ListChecks className="h-4 w-4" />,
-          segment: 'feedback-log'
-        }
-      ]
+      segment: 'issues',
+      show: () => isPlatformAdmin
     },
     {
       href: '/dashboard/users',

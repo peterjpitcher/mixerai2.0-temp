@@ -270,7 +270,7 @@ export default function ProductsPage() {
                       <TableCell className="text-sm text-muted-foreground">{product.created_at ? new Date(product.created_at).toLocaleDateString() : "-"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{product.updated_at ? new Date(product.updated_at).toLocaleDateString() : "-"}</TableCell>
                       <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="icon" asChild title="Edit Product">
+                        <Button variant="ghost" size="icon" asChild title="Edit Product" aria-label="Edit Product">
                           <Link href={`/dashboard/claims/products/${product.id}/edit`} >
                             <Pencil className="h-4 w-4" />
                           </Link>
@@ -279,6 +279,7 @@ export default function ProductsPage() {
                           variant="ghost" 
                           size="icon"
                           title="Delete Product"
+                          aria-label="Delete Product"
                           onClick={() => openDeleteDialog(product)}
                           // disabled={isDeleting && itemToDelete?.id === product.id} // Assuming itemToDelete is the state for the dialog
                         >

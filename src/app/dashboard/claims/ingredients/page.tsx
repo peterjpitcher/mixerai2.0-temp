@@ -227,7 +227,7 @@ export default function IngredientsPage() {
                       <TableCell className="text-sm text-muted-foreground">{ingredient.created_at ? new Date(ingredient.created_at).toLocaleDateString() : '-'}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{ingredient.updated_at ? new Date(ingredient.updated_at).toLocaleDateString() : '-'}</TableCell>
                       <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="icon" asChild title="Edit Ingredient">
+                        <Button variant="ghost" size="icon" asChild title="Edit Ingredient" aria-label="Edit Ingredient">
                           <Link href={`/dashboard/claims/ingredients/${ingredient.id}/edit`} >
                             <Pencil className="h-4 w-4" />
                           </Link>
@@ -236,6 +236,7 @@ export default function IngredientsPage() {
                           variant="ghost" 
                           size="icon"
                           title="Delete Ingredient"
+                          aria-label="Delete Ingredient"
                           onClick={() => openDeleteDialog(ingredient)}
                           // disabled={isDeleting && itemToDelete?.id === ingredient.id} 
                         >
