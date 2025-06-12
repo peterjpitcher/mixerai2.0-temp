@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
 import { Input } from '@/components/input';
@@ -15,9 +15,10 @@ import { useRouter } from 'next/navigation';
 import { BrandIcon } from '@/components/brand-icon';
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft, PlusCircle, Sparkles, ShieldAlert, Info } from 'lucide-react';
-import { marked } from 'marked';
 import Link from 'next/link';
-import type { InputField, OutputField, ContentTemplate as Template, SelectOptions } from '@/types/template';
+import type { InputField, OutputField, ContentTemplate as Template, SelectOptions, FieldType } from '@/types/template';
+import { ProductSelect } from './product-select';
+import type { ProductContext } from '@/types/claims';
 
 interface Brand {
   id: string;
@@ -59,7 +60,11 @@ const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) =
   </nav>
 );
 
-export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) {
+// Re-export the refactored version to maintain backward compatibility
+export { ContentGeneratorForm } from './content-generator-form-refactored';
+
+// Original implementation preserved below for reference
+function ContentGeneratorFormOriginal({ templateId }: ContentGeneratorFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
@@ -89,7 +94,18 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
   const [canGenerateContent, setCanGenerateContent] = useState<boolean>(false);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
+  const [productContext, setProductContext] = useState<ProductContext | null>(null);
+  const [isFetchingProductContext, setIsFetchingProductContext] = useState(false);
+
   const currentBrand = allBrands.find(b => b.id === selectedBrand);
+
+  // Memoize missing required fields calculation
+  const missingRequiredFields = useMemo(() => {
+    if (!template) return [];
+    return (template.inputFields || []).filter(
+      field => field.required && !templateFieldValues[field.id]
+    );
+  }, [template, templateFieldValues]);
 
   useEffect(() => {
     if (!templateId) {
@@ -107,9 +123,16 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
       setIsLoadingWorkflowsForTemplate(true);
       setInitialDataLoaded(false);
 
-      try {
-        const templateResponse = await fetch(`/api/content-templates/${templateId}`);
-        const templateData = await templateResponse.json();
+      // Parallel fetch all initial data
+      const [templateResult, brandsResult, workflowsResult] = await Promise.allSettled([
+        fetch(`/api/content-templates/${templateId}`).then(r => r.json()),
+        fetch('/api/brands').then(r => r.json()),
+        fetch(`/api/workflows?template_id=${templateId}`).then(r => r.json())
+      ]);
+
+      // Process template data
+      if (templateResult.status === 'fulfilled') {
+        const templateData = templateResult.value;
         if (templateData.success && templateData.template) {
           setTemplate(templateData.template as Template);
           const initialValues: Record<string, string> = {};
@@ -123,47 +146,45 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
           toast.error(templateData.error || "Failed to load content template.");
           setTemplate(null);
         }
-      } catch (error) {
+      } else {
         toast.error("Error fetching template details.");
-        console.error("Error fetching template details:", error);
+        console.error("Error fetching template details:", templateResult.reason);
         setTemplate(null);
-      } finally {
-        setIsLoadingTemplate(false);
       }
+      setIsLoadingTemplate(false);
 
-      try {
-        const brandsResponse = await fetch('/api/brands');
-        const brandsData = await brandsResponse.json();
+      // Process brands data
+      if (brandsResult.status === 'fulfilled') {
+        const brandsData = brandsResult.value;
         if (brandsData.success && Array.isArray(brandsData.data)) {
           setAllBrands(brandsData.data);
         } else {
           toast.error(brandsData.error || 'Failed to fetch brands');
           setAllBrands([]);
         }
-      } catch (error) {
+      } else {
         toast.error('Error fetching brands');
-        console.error('Error fetching brands:', error);
+        console.error('Error fetching brands:', brandsResult.reason);
         setAllBrands([]);
-      } finally {
-        setIsLoadingAllBrands(false);
       }
+      setIsLoadingAllBrands(false);
 
-      try {
-        const wfForTemplateResponse = await fetch(`/api/workflows?template_id=${templateId}`);
-        const wfForTemplateData = await wfForTemplateResponse.json();
+      // Process workflows data
+      if (workflowsResult.status === 'fulfilled') {
+        const wfForTemplateData = workflowsResult.value;
         if (wfForTemplateData.success && Array.isArray(wfForTemplateData.data)) {
           setWorkflowsForCurrentTemplate(wfForTemplateData.data);
         } else {
           toast.error(wfForTemplateData.error || 'Failed to load workflows for this template.');
           setWorkflowsForCurrentTemplate([]);
         }
-      } catch (error) {
+      } else {
         toast.error('Error loading workflows for this template.');
-        console.error('Error fetching workflows for template:', error);
+        console.error('Error fetching workflows for template:', workflowsResult.reason);
         setWorkflowsForCurrentTemplate([]);
-      } finally {
-        setIsLoadingWorkflowsForTemplate(false);
       }
+      setIsLoadingWorkflowsForTemplate(false);
+      
       setInitialDataLoaded(true);
     };
 
@@ -230,29 +251,106 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     }
   }, [templateId, selectedBrand, displayableBrands, currentBrand?.name]);
 
-  const handleTemplateFieldChange = (fieldId: string, value: string) => {
+  const handleTemplateFieldChange = async (fieldId: string, value: string, fieldType?: FieldType) => {
     setTemplateFieldValues(prev => ({ ...prev, [fieldId]: value }));
+
+    if (fieldType === 'product-selector') {
+      if (value) {
+        setIsFetchingProductContext(true);
+        setProductContext(null);
+        
+        const abortController = new AbortController();
+        
+        try {
+          const response = await fetch('/api/content/prepare-product-context', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productId: value }),
+            signal: abortController.signal
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          if (data.success) {
+            setProductContext({
+              productName: data.productName,
+              styledClaims: data.styledClaims,
+            });
+            if (data.styledClaims) {
+              toast.success(`Loaded context for product: ${data.productName}`);
+            } else {
+              toast.info(`No specific claims context found for ${data.productName}.`);
+            }
+          } else {
+            toast.error(data.error || 'Failed to fetch product context.');
+          }
+        } catch (error: any) {
+          if (error.name !== 'AbortError') {
+            toast.error('Error fetching product context.');
+            console.error('Error fetching product context:', error);
+          }
+        } finally {
+          setIsFetchingProductContext(false);
+        }
+        
+        // Cleanup function to abort if component unmounts or brand changes
+        return () => abortController.abort();
+      } else {
+        // Clear context if product is deselected
+        setProductContext(null);
+      }
+    }
   };
 
-  const interpolatePrompt = (prompt: string): string => {
-    let interpolated = prompt;
-    if (template) {
-      (template.inputFields || []).forEach(inputField => {
-        const placeholderByName = `{{${inputField.name}}}`;
-        const placeholderById = `{{${inputField.id}}}`;
-        const value = templateFieldValues[inputField.id] || '';
-        interpolated = interpolated.replace(new RegExp(placeholderByName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), value);
-        interpolated = interpolated.replace(new RegExp(placeholderById.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), value);
-      });
-    }
+  const interpolatePrompt = useMemo(() => {
+    return (prompt: string): string => {
+      let interpolated = prompt;
+      
+      // Build a single regex pattern for all field replacements
+      if (template && template.inputFields) {
+        const replacements = new Map<string, string>();
+        
+        template.inputFields.forEach(inputField => {
+          const value = templateFieldValues[inputField.id] || '';
+          replacements.set(`{{${inputField.name}}}`, value);
+          replacements.set(`{{${inputField.id}}}`, value);
+        });
+        
+        // Create a single regex that matches all placeholders
+        const pattern = Array.from(replacements.keys())
+          .map(key => key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+          .join('|');
+        
+        if (pattern) {
+          interpolated = interpolated.replace(
+            new RegExp(pattern, 'gi'),
+            (match) => replacements.get(match) || match
+          );
+        }
+      }
 
-    if (title) {
-      const articleTitlePlaceholder = /\{\{\s*article title\s*\}\}/gi;
-      interpolated = interpolated.replace(articleTitlePlaceholder, title);
-    }
-    
-    return interpolated;
-  };
+      if (productContext) {
+        const contextString = `
+Product Name: ${productContext.productName}
+
+Styled Claims:
+${JSON.stringify(productContext.styledClaims, null, 2)}
+        `;
+        interpolated = interpolated.replace(/{{product_context}}/gi, contextString);
+      } else {
+        interpolated = interpolated.replace(/{{product_context}}/gi, '');
+      }
+
+      if (title) {
+        interpolated = interpolated.replace(/\{\{\s*article title\s*\}\}/gi, title);
+      }
+      
+      return interpolated;
+    };
+  }, [template, templateFieldValues, productContext, title]);
 
   const handleGenerateSuggestion = async (field: InputField) => {
     if (!selectedBrand || !canGenerateContent) {
@@ -300,11 +398,9 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
       toast.error("Please select a brand and ensure a workflow is available for this template.");
       return;
     }
-    const missingFields = (template.inputFields || []).filter(
-      field => field.required && !templateFieldValues[field.id]
-    );
-    if (missingFields.length > 0) {
-      toast.error(`Please fill in all required fields: ${missingFields.map(f => f.name).join(', ')}`);
+    
+    if (missingRequiredFields.length > 0) {
+      toast.error(`Please fill in all required fields: ${missingRequiredFields.map(f => f.name).join(', ')}`);
       return;
     }
 
@@ -329,7 +425,9 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
             inputFields: input_fields_with_values,
             outputFields: template.outputFields || []
         },
-        input: { /* additionalInstructions can be added here if needed */ }
+        input: {
+          product_context: productContext ? JSON.stringify(productContext) : undefined,
+        }
       };
 
       const response = await fetch('/api/content/generate', { 
@@ -618,65 +716,62 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
                   <h3 className="text-lg font-medium pt-2">Template Fields</h3>
                   {(template.inputFields || []).map((field) => (
                     <div key={field.id} className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                            <Label htmlFor={field.id}>{field.name}{field.required && <span className="text-destructive">*</span>}</Label>
-                            {field.aiSuggester && field.aiPrompt && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleGenerateSuggestion(field)}
-                                disabled={isGeneratingSuggestionFor !== null || !selectedBrand || !canGenerateContent}
-                                className="ml-2"
-                              >
-                                {isGeneratingSuggestionFor === field.id ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Sparkles className="mr-2 h-4 w-4" />
-                                )}
-                                {isGeneratingSuggestionFor === field.id ? 'Generating...' : 'Suggest'}
-                              </Button>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor={field.id}>{field.name}{field.required && <span className="text-destructive">*</span>}</Label>
+                        {field.aiSuggester && field.aiPrompt && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleGenerateSuggestion(field)}
+                            disabled={isGeneratingSuggestionFor !== null || !selectedBrand || !canGenerateContent}
+                            className="ml-2"
+                          >
+                            {isGeneratingSuggestionFor === field.id ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Sparkles className="mr-2 h-4 w-4" />
                             )}
-                        </div>
-                        {field.type === 'shortText' && (
-                        <Input 
-                            id={field.id} 
-                            value={templateFieldValues[field.id] || ''} 
-                            onChange={(e) => handleTemplateFieldChange(field.id, e.target.value)} 
-                            placeholder={`Enter ${field.name}`}
-                        />
+                            {isGeneratingSuggestionFor === field.id ? 'Generating...' : 'Suggest'}
+                          </Button>
                         )}
-                        {field.type === 'longText' && (
-                        <Textarea 
-                            id={field.id} 
-                            value={templateFieldValues[field.id] || ''} 
-                            onChange={(e) => handleTemplateFieldChange(field.id, e.target.value)} 
-                            placeholder={`Enter ${field.name}`}
-                        />
-                        )}
-                        {field.type === 'select' && field.options && (field.options as SelectOptions).choices && (
-                        <Select 
-                            value={templateFieldValues[field.id] || ''} 
-                            onValueChange={(value) => handleTemplateFieldChange(field.id, value)}
-                        >
-                            <SelectTrigger id={field.id}><SelectValue placeholder={`Select ${field.name}`} /></SelectTrigger>
-                            <SelectContent>
-                            {((field.options as SelectOptions).choices!).map(choice => (
-                                <SelectItem key={choice} value={choice}>{choice}</SelectItem>
-                            ))}
-                            </SelectContent>
-                        </Select>
-                        )}
-                        {field.type === 'tags' && (
-                            <Input 
-                            id={field.id} 
-                            value={templateFieldValues[field.id] || ''} 
-                            onChange={(e) => handleTemplateFieldChange(field.id, e.target.value)} 
-                            placeholder={`Enter ${field.name} (comma-separated)`}
-                        />
-                        )}
+                      </div>
+                      {(() => {
+                        switch (field.type) {
+                          case 'shortText':
+                            return <Input id={field.id} value={templateFieldValues[field.id] || ''} onChange={(e) => handleTemplateFieldChange(field.id, e.target.value)} placeholder={`Enter ${field.name}`} />;
+                          case 'longText':
+                            return <Textarea id={field.id} value={templateFieldValues[field.id] || ''} onChange={(e) => handleTemplateFieldChange(field.id, e.target.value)} placeholder={`Enter ${field.name}`} />;
+                          case 'richText':
+                            return <RichTextEditor value={templateFieldValues[field.id] || ''} onChange={(content) => handleTemplateFieldChange(field.id, content)} />;
+                          case 'select':
+                            const options = field.options as SelectOptions;
+                            return (
+                              <Select value={templateFieldValues[field.id] || ''} onValueChange={(value) => handleTemplateFieldChange(field.id, value)}>
+                                <SelectTrigger id={field.id}><SelectValue placeholder={`Select ${field.name}`} /></SelectTrigger>
+                                <SelectContent>
+                                  {(options.choices || []).map(choice => (<SelectItem key={choice} value={choice}>{choice}</SelectItem>))}
+                                </SelectContent>
+                              </Select>
+                            );
+                          case 'product-selector':
+                            return (
+                              <ProductSelect
+                                key={field.id}
+                                brandId={selectedBrand}
+                                value={(templateFieldValues[field.id] as string) || ''}
+                                onChange={(value) => handleTemplateFieldChange(field.id, value || '', field.type)}
+                                isMultiSelect={(field.options as any)?.isMultiSelect || false}
+                              />
+                            );
+                          case 'tags':
+                            return <Input id={field.id} value={templateFieldValues[field.id] || ''} onChange={(e) => handleTemplateFieldChange(field.id, e.target.value)} placeholder={`Enter ${field.name} (comma-separated)`} />;
+                          default:
+                            return <p className="text-sm text-muted-foreground">Unsupported field type: {field.type}</p>;
+                        }
+                      })()}
                     </div>
-                    ))}
+                  ))}
                 </>
               )}
             </div>

@@ -138,7 +138,7 @@ export function MobileNotificationPanel() {
     <div className="block md:hidden">
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetTrigger asChild>
-          <Button variant="ghost" size="icon" className="relative">
+          <Button variant="ghost" size="icon" className="relative" aria-label="View notifications">
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
               <Badge className="absolute -top-1 -right-1 px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">

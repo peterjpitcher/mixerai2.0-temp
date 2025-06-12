@@ -378,7 +378,7 @@ export default function UsersPage() {
   // --- Main Page Content (shown if allowed and not loading users/brands) ---
 
   return (
-    <div className="space-y-8">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
       <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Users" }]} />
       <PageHeader
         title="Users"

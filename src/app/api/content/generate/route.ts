@@ -3,6 +3,7 @@ import { generateContentFromTemplate } from '@/lib/azure/openai';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import type { StyledClaims } from '@/types/claims';
 
 // type ContentType = "article" | "retailer_pdp" | "owned_pdp" | string; // Removed
 
@@ -17,6 +18,7 @@ interface ContentGenerationRequest {
     additionalInstructions?: string;
     templateId?: string;
     templateFields?: Record<string, string>;
+    product_context?: { productName: string; styledClaims: StyledClaims | null };
   };
   template?: {
     id: string;
@@ -85,10 +87,20 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
           country: brandData.country,
         };
 
+        const finalInput = { ...data.input };
+        if (data.input?.product_context && typeof data.input.product_context === 'string') {
+          try {
+            finalInput.product_context = JSON.parse(data.input.product_context);
+          } catch (e) {
+            console.error("Failed to parse product_context:", e);
+            delete finalInput.product_context;
+          }
+        }
+
         const generatedContent = await generateContentFromTemplate(
           brandInfoForGeneration,
           data.template,
-          data.input
+          finalInput
         );
         return NextResponse.json({
           success: true,

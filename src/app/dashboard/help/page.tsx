@@ -118,6 +118,9 @@ export default async function HelpPage({ searchParams }: HelpPageProps) {
         <h1 className="text-3xl font-bold tracking-tight text-foreground">
           Help Wiki
         </h1>
+        <p className="text-muted-foreground mt-2">
+          Find answers to common questions and learn how to use MixerAI effectively.
+        </p>
       </header>
 
       <div className="flex flex-col md:flex-row gap-8">

@@ -461,7 +461,7 @@ export default function MarketOverridesPage() {
                           <Button variant="outline" size="sm" onClick={() => openEditOverrideDialog(override)} disabled={isLoading} className="h-8 mr-1">
                             <Edit3 className="h-3 w-3 mr-1"/> Edit
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => openConfirmDeleteDialog(override)} title="Remove Override" disabled={isLoading} className="h-8 w-8">
+                          <Button variant="ghost" size="icon" onClick={() => openConfirmDeleteDialog(override)} title="Remove Override" aria-label="Remove Override" disabled={isLoading} className="h-8 w-8">
                             <Trash2 className="h-4 w-4"/>
                           </Button>
                         </TableCell>

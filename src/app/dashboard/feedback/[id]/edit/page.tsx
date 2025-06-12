@@ -302,7 +302,7 @@ export default function EditFeedbackPage() {
                   <CardTitle className="text-2xl">Edit Feedback Item</CardTitle>
                   <CardDescription>Update the details for feedback ID: {feedbackId}</CardDescription>
                 </div>
-                <Button variant="outline" size="icon" onClick={() => router.push(`/dashboard/feedback/${feedbackId}`)} title="Cancel and View Item">
+                <Button variant="outline" size="icon" onClick={() => router.push(`/dashboard/feedback/${feedbackId}`)} title="Cancel and View Item" aria-label="Cancel and View Item">
                   <XCircle className="h-5 w-5" />
                 </Button>
               </div>

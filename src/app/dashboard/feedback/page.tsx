@@ -177,13 +177,14 @@ export default function ViewFeedbackPage() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" onClick={() => router.back()} aria-label="Go back">
-              <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h1 className="text-3xl font-bold tracking-tight">Feedback & Known Issues</h1>
-        </div>
+      <div className="mb-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="icon" onClick={() => router.back()} aria-label="Go back">
+                <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <h1 className="text-3xl font-bold tracking-tight">Feedback & Known Issues</h1>
+          </div>
         {/* Button to trigger the modal for submitting new feedback */} 
         {session && supabase && currentUserForForm && (
           <Dialog open={showSubmitFormModal} onOpenChange={setShowSubmitFormModal}>
@@ -211,6 +212,10 @@ export default function ViewFeedbackPage() {
             </DialogContent>
           </Dialog>
         )}
+        </div>
+        <p className="text-muted-foreground mt-2">
+          Report bugs, suggest enhancements, and track the status of known issues in MixerAI.
+        </p>
       </div>
 
         <Card>

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { generateCSRFToken, validateCSRFToken, shouldProtectRoute, CSRF_ERROR_RESPONSE } from '@/lib/csrf';
 
 /**
  * This middleware adds security headers and handles authentication for protected routes
@@ -20,6 +21,38 @@ export async function middleware(request: NextRequest) {
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-XSS-Protection', '1; mode=block');
   response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+
+  // CSRF Protection for API routes
+  if (request.nextUrl.pathname.startsWith('/api/')) {
+    const isProtectedRoute = shouldProtectRoute(request.nextUrl.pathname);
+    
+    if (isProtectedRoute && !validateCSRFToken(request)) {
+      // Return 403 Forbidden for invalid CSRF token
+      return new NextResponse(
+        JSON.stringify(CSRF_ERROR_RESPONSE),
+        { 
+          status: 403, 
+          headers: { 
+            'content-type': 'application/json',
+            ...Object.fromEntries(response.headers.entries())
+          } 
+        }
+      );
+    }
+  }
+
+  // Generate and set CSRF token cookie if not present
+  if (!request.cookies.get('csrf-token')) {
+    const csrfToken = generateCSRFToken();
+    response.cookies.set({
+      name: 'csrf-token',
+      value: csrfToken,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/'
+    });
+  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
