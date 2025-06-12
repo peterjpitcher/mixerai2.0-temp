@@ -691,10 +691,10 @@ export async function generateAltText(
   // console.log(`[generateAltText] Generating alt text for: ${imageUrl} in ${brandLanguage} using deployment: ${deploymentName}`);
   if (brandContext) {
     // console.log(`[generateAltText] Using brand context:`, { 
-      identity: !!brandContext.brandIdentity, 
-      tone: !!brandContext.toneOfVoice,
-      guardrails: !!brandContext.guardrails
-    });
+    //   identity: !!brandContext.brandIdentity, 
+    //   tone: !!brandContext.toneOfVoice,
+    //   guardrails: !!brandContext.guardrails
+    // });
   }
 
   let systemPrompt = `You are an AI assistant specialized in generating concise and accurate alternative text for images.

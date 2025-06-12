@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/card';
+import DOMPurify from 'dompurify';
 
 interface MarkdownDisplayProps {
   markdown: string;
@@ -42,7 +43,13 @@ export function MarkdownDisplay({ markdown, className = '' }: MarkdownDisplayPro
       (match) => `<ul>${match}</ul>`
     );
     
-    setFormattedContent(wrappedWithUl);
+    // Sanitize HTML to prevent XSS attacks
+    const sanitized = DOMPurify.sanitize(wrappedWithUl, {
+      ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'strong', 'em', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'br'],
+      ALLOWED_ATTR: []
+    });
+    
+    setFormattedContent(sanitized);
   }, [markdown]);
   
   return (
