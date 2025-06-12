@@ -19,11 +19,7 @@ export const getAzureOpenAIClient = () => {
   // Get deployment name
   const deploymentName = getModelName();
   
-  console.log(`Initializing Azure OpenAI client with:
-  - Endpoint: ${endpoint}
-  - API Key: ${apiKey ? apiKey.substring(0, 5) + "..." : "undefined"}
-  - (Note: Deployment name "${deploymentName}" will be passed as 'model' parameter in API calls)
-  `);
+  // Removed API key logging for security
   
   return new OpenAI({
     apiKey: apiKey,
@@ -43,12 +39,10 @@ export function getModelName(): string {
   const deploymentName = process.env.AZURE_OPENAI_DEPLOYMENT_NAME || process.env.AZURE_OPENAI_DEPLOYMENT;
   
   if (deploymentName) {
-    console.log(`Using configured deployment name: ${deploymentName}`);
     return deploymentName;
   }
   
   // Default to gpt-4o which supports vision capabilities
-  console.log(`No deployment name configured, using default: gpt-4o`);
   return "gpt-4o";
 }
 
@@ -69,18 +63,7 @@ export async function generateTextCompletion(
       throw new Error("Azure OpenAI endpoint or API key is missing for direct fetch.");
     }
 
-    console.log(`[generateTextCompletion] Making API call to Azure OpenAI deployment: ${deploymentName}`);
-    console.log(`[generateTextCompletion] System Prompt: ${systemPrompt.substring(0, 100)}...`);
-    console.log(`[generateTextCompletion] User Prompt: ${userPrompt.substring(0,100)}...`);
-
-    // --- LOGGING FINAL PROMPT ---
-    console.log("\n\n========================= FINAL PROMPT TO AI =========================");
-    console.log("--- SYSTEM PROMPT ---");
-    console.log(systemPrompt);
-    console.log("\n--- USER PROMPT ---");
-    console.log(userPrompt);
-    console.log("====================================================================\n\n");
-    // --- END LOGGING ---
+    // Removed prompt logging for security and performance
 
     const completionRequest = {
       model: deploymentName, // Though model is in path, SDKs often still expect it
@@ -93,7 +76,6 @@ export async function generateTextCompletion(
     };
 
     const endpointUrl = `${azureOpenAIEndpoint}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
-    console.log(`[generateTextCompletion] Using direct fetch endpoint URL: ${endpointUrl}`);
 
     const response = await fetch(endpointUrl, {
       method: 'POST',
@@ -114,7 +96,6 @@ export async function generateTextCompletion(
 
     if (responseData.choices && responseData.choices.length > 0 && responseData.choices[0].message) {
       const content = responseData.choices[0].message.content;
-      console.log(`[generateTextCompletion] Successfully received content. Length: ${content?.length}`);
       return content;
     } else {
       console.error("[generateTextCompletion] No content in completion choices or choices array is empty.");
@@ -210,11 +191,11 @@ export async function generateContentFromTemplate(
     product_context?: { productName: string; styledClaims: StyledClaims | null };
   }
 ) {
-  console.log(`Generating template-based content for brand: ${brand.name} using template: ${template.name}`);
-  console.log(`Targeting Language: ${brand.language || 'not specified'}, Country: ${brand.country || 'not specified'}`);
+  // console.log(`Generating template-based content for brand: ${brand.name} using template: ${template.name}`);
+  // console.log(`Targeting Language: ${brand.language || 'not specified'}, Country: ${brand.country || 'not specified'}`);
   
   const deploymentName = getModelName();
-  console.log(`Using deployment name: "${deploymentName}"`);
+  // console.log(`Using deployment name: "${deploymentName}"`);
   
   // Build the system prompt with brand information
   let systemPrompt = `You are an expert content creator for the brand "${brand.name}".`;
@@ -336,7 +317,7 @@ The product context is provided in the user prompt.
   
   // Make the API call with error handling
   try {
-    console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
+    // console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
     
     // Prepare the request body
     const completionRequest = {
@@ -354,7 +335,7 @@ The product context is provided in the user prompt.
     
     // Specify the deployment in the URL path
     const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
-    console.log(`Using direct endpoint URL: ${endpoint}`);
+    // console.log(`Using direct endpoint URL: ${endpoint}`);
     
     // Make a direct fetch call
     const response = await fetch(endpoint, {
@@ -372,10 +353,10 @@ The product context is provided in the user prompt.
     }
     
     const responseData = await response.json();
-    console.log("API call successful");
+    // console.log("API call successful");
     
     let content = responseData.choices?.[0]?.message?.content || "";
-    console.log(`Received response with content length: ${content.length}`);
+    // console.log(`Received response with content length: ${content.length}`);
     
     // Remove Markdown code block delimiters like ```html ... ``` or ``` ... ```
     content = content.replace(/```[a-zA-Z]*\n?/g, "").replace(/\n?```/g, "");
@@ -389,7 +370,7 @@ The product context is provided in the user prompt.
     
     // Process each output field
     template.outputFields.forEach(field => {
-      console.log(`Processing output field: ${field.name} (${field.id})`);
+      // console.log(`Processing output field: ${field.name} (${field.id})`);
       
       const fieldRegex = new RegExp(`##FIELD_ID:${field.id}##\\s*([\\s\\S]*?)\\s*##END_FIELD_ID##`, 'i');
       let match = content.match(fieldRegex);
@@ -397,7 +378,7 @@ The product context is provided in the user prompt.
       if (match && match[1]) {
         result[field.id] = match[1].trim();
         fieldsParsed = true;
-        console.log(`Successfully parsed field ${field.id} with length ${result[field.id].length}`);
+        // console.log(`Successfully parsed field ${field.id} with length ${result[field.id].length}`);
       } else {
         // Attempt to match field name if markers are not found, for simpler AI responses
         // This is a fallback and might be less reliable for multiple fields.
@@ -407,21 +388,21 @@ The product context is provided in the user prompt.
         if (match && match[1]) {
           result[field.id] = match[1].trim();
           fieldsParsed = true;
-          console.log(`Parsed field ${field.id} using field name (fallback), length: ${result[field.id].length}`);
+          // console.log(`Parsed field ${field.id} using field name (fallback), length: ${result[field.id].length}`);
         }
       }
     });
     
     // If no fields were parsed correctly, use the entire content
     if (!fieldsParsed && template.outputFields.length > 0) {
-      console.log('No fields parsed using any format, using the full content');
+      // console.log('No fields parsed using any format, using the full content');
       const mainField = template.outputFields[0];
       result[mainField.id] = fullContent;
-      console.log(`Assigned full content (${fullContent.length} chars) to field ${mainField.id}`);
+      // console.log(`Assigned full content (${fullContent.length} chars) to field ${mainField.id}`);
     }
     
     // Log what fields we're returning
-    console.log('Returning template-based output fields:', Object.keys(result));
+    // console.log('Returning template-based output fields:', Object.keys(result));
     
     return result;
   } catch (error) {
@@ -445,14 +426,14 @@ export async function generateBrandIdentityFromUrls(
   suggestedAgencies: Array<{name: string, description: string, priority: 'high' | 'medium' | 'low'}>;
   brandColor: string;
 }> {
-    console.log(`Generating brand identity for ${brandName} from ${urls.length} URLs, Language: ${language}, Country: ${country}`);
+    // console.log(`Generating brand identity for ${brandName} from ${urls.length} URLs, Language: ${language}, Country: ${country}`);
     
     // Debug environment variables
-    console.log("Environment check:");
-    console.log("- NODE_ENV:", process.env.NODE_ENV);
-    console.log("- AZURE_OPENAI_API_KEY exists:", !!process.env.AZURE_OPENAI_API_KEY);
-    console.log("- AZURE_OPENAI_ENDPOINT exists:", !!process.env.AZURE_OPENAI_ENDPOINT);
-    console.log("- AZURE_OPENAI_DEPLOYMENT:", process.env.AZURE_OPENAI_DEPLOYMENT);
+    // console.log("Environment check:");
+    // console.log("- NODE_ENV:", process.env.NODE_ENV);
+    // console.log("- AZURE_OPENAI_API_KEY exists:", !!process.env.AZURE_OPENAI_API_KEY);
+    // console.log("- AZURE_OPENAI_ENDPOINT exists:", !!process.env.AZURE_OPENAI_ENDPOINT);
+    // console.log("- AZURE_OPENAI_DEPLOYMENT:", process.env.AZURE_OPENAI_DEPLOYMENT);
   
       const client = getAzureOpenAIClient();
   const deploymentName = getModelName();
@@ -480,12 +461,12 @@ export async function generateBrandIdentityFromUrls(
       
       // Make the API call
   try {
-      console.log("Sending request to Azure OpenAI API");
-      console.log(`Using deployment: ${deploymentName}`);
+      // console.log("Sending request to Azure OpenAI API");
+      // console.log(`Using deployment: ${deploymentName}`);
       
       const systemMessageContent = "You are a brand strategy expert that helps analyze and create detailed brand identities.";
-      console.log("---- System Prompt ----\n", systemMessageContent);
-      console.log("---- User Prompt for Brand Identity ----\n", prompt);
+      // console.log("---- System Prompt ----\n", systemMessageContent);
+      // console.log("---- User Prompt for Brand Identity ----\n", prompt);
 
       const completion = await client.chat.completions.create({
         model: deploymentName,
@@ -498,9 +479,9 @@ export async function generateBrandIdentityFromUrls(
         response_format: { type: "json_object" }
       });
       
-      console.log("Received response from Azure OpenAI API");
+      // console.log("Received response from Azure OpenAI API");
       const responseContent = completion.choices[0]?.message?.content || "{}";
-      console.log("Raw API response:", responseContent.substring(0, 100) + "...");
+      // console.log("Raw API response:", responseContent.substring(0, 100) + "...");
       
     const parsedResponse = JSON.parse(responseContent);
           
@@ -509,7 +490,7 @@ export async function generateBrandIdentityFromUrls(
             parsedResponse.guardrails = parsedResponse.guardrails.map((item: string) => `- ${item}`).join('\n');
           }
           
-          console.log("Successfully parsed response and formatted guardrails");
+          // console.log("Successfully parsed response and formatted guardrails");
           return {
             brandIdentity: parsedResponse.brandIdentity || "",
             toneOfVoice: parsedResponse.toneOfVoice || "",
@@ -540,7 +521,7 @@ export async function generateMetadata(
   metaTitle: string;
   metaDescription: string;
 }> {
-  console.log(`Generating metadata for ${url}`);
+  // console.log(`Generating metadata for ${url}`);
   
   try {
     const client = getAzureOpenAIClient();
@@ -626,9 +607,9 @@ export async function generateMetadata(
     Format as JSON with metaTitle and metaDescription keys. Do not include character counts in the actual values.`;
     
     try {
-      console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
-      console.log(`System prompt length: ${systemPrompt.length} characters`);
-      console.log(`User prompt length: ${userPrompt.length} characters`);
+      // console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
+      // console.log(`System prompt length: ${systemPrompt.length} characters`);
+      // console.log(`User prompt length: ${userPrompt.length} characters`);
       
       // Make the API call using the deployment name in the deployment_id parameter
       const completionRequest = {
@@ -644,7 +625,7 @@ export async function generateMetadata(
       
       // Specify the deployment in the URL path
       const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
-      console.log(`Using direct endpoint URL: ${endpoint}`);
+      // console.log(`Using direct endpoint URL: ${endpoint}`);
       
       // Make a direct fetch call instead
       const response = await fetch(endpoint, {
@@ -662,13 +643,13 @@ export async function generateMetadata(
       }
       
       const responseData = await response.json();
-      console.log("API call successful");
+      // console.log("API call successful");
       
       const content = responseData.choices?.[0]?.message?.content || "{}";
-      console.log(`Received response with content length: ${content.length}`);
+      // console.log(`Received response with content length: ${content.length}`);
       
       const parsedResponse = JSON.parse(content);
-      console.log(`Parsed response: ${JSON.stringify(parsedResponse, null, 2)}`);
+      // console.log(`Parsed response: ${JSON.stringify(parsedResponse, null, 2)}`);
       
       // Remove any character count annotations from the response
       const metaTitle = (parsedResponse.metaTitle || "").replace(/\s*\(\d+\s*chars?\)$/i, "");
@@ -707,9 +688,9 @@ export async function generateAltText(
 }> {
   const deploymentName = getModelName(); // Get the deployment/model name
 
-  console.log(`[generateAltText] Generating alt text for: ${imageUrl} in ${brandLanguage} using deployment: ${deploymentName}`);
+  // console.log(`[generateAltText] Generating alt text for: ${imageUrl} in ${brandLanguage} using deployment: ${deploymentName}`);
   if (brandContext) {
-    console.log(`[generateAltText] Using brand context:`, { 
+    // console.log(`[generateAltText] Using brand context:`, { 
       identity: !!brandContext.brandIdentity, 
       tone: !!brandContext.toneOfVoice,
       guardrails: !!brandContext.guardrails
@@ -736,10 +717,10 @@ If the image is decorative and doesn't convey information, you can indicate that
 
   const userTextMessage = "Generate alt text for the provided image based on the system instructions.";
   
-  console.log(`[generateAltText] System Prompt (first 200 chars): ${systemPrompt.substring(0,200)}...`);
-  // console.log(`[generateAltText] Full System Prompt: ${systemPrompt}`); // Uncomment for full prompt debugging
-  console.log(`[generateAltText] User Text Message for AI: ${userTextMessage}`);
-  console.log(`[generateAltText] Image URL for AI: ${imageUrl}`);
+  // console.log(`[generateAltText] System Prompt (first 200 chars): ${systemPrompt.substring(0,200)}...`);
+  // // console.log(`[generateAltText] Full System Prompt: ${systemPrompt}`); // Uncomment for full prompt debugging
+  // console.log(`[generateAltText] User Text Message for AI: ${userTextMessage}`);
+  // console.log(`[generateAltText] Image URL for AI: ${imageUrl}`);
 
   const completionRequest = {
     model: deploymentName, // This is often ignored when deployment is in URL, but good practice
@@ -773,7 +754,7 @@ If the image is decorative and doesn't convey information, you can indicate that
   
   // Construct the endpoint URL with the deployment name
   const endpointUrl = `${azureOpenAIEndpoint}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
-  console.log(`[generateAltText] Using direct fetch endpoint URL: ${endpointUrl}`);
+  // console.log(`[generateAltText] Using direct fetch endpoint URL: ${endpointUrl}`);
 
   try {
     const response = await fetch(endpointUrl, {
@@ -799,12 +780,12 @@ If the image is decorative and doesn't convey information, you can indicate that
       throw new Error('AI returned no content for alt text.');
     }
 
-    console.log(`[generateAltText] Received raw content from AI: ${content}`);
+    // console.log(`[generateAltText] Received raw content from AI: ${content}`);
 
     try {
       const parsedJson = JSON.parse(content.trim());
       if (typeof parsedJson.altText === 'string') {
-        console.log(`[generateAltText] Successfully parsed alt text: ${parsedJson.altText}`);
+        // console.log(`[generateAltText] Successfully parsed alt text: ${parsedJson.altText}`);
         return { altText: parsedJson.altText.trim() };
       } else {
         console.error('[generateAltText] Parsed JSON does not contain a valid "altText" string field.', { parsedJson });
@@ -835,10 +816,10 @@ export async function transCreateContent(
 ): Promise<{
   transCreatedContent: string;
 }> {
-  console.log(`Trans-creating content from ${sourceLanguage} to ${brandLanguage} for ${brandCountry}`);
+  // console.log(`Trans-creating content from ${sourceLanguage} to ${brandLanguage} for ${brandCountry}`);
   
   const deploymentName = getModelName();
-  console.log(`Using deployment name: "${deploymentName}"`);
+  // console.log(`Using deployment name: "${deploymentName}"`);
   
   // Language map with common names to help with prompting
   const languageNames: Record<string, string> = {
@@ -881,7 +862,7 @@ export async function transCreateContent(
   Format your response as JSON with a transCreatedContent key containing ONLY the translated content.`;
   
   try {
-    console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
+    // console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
     
     // Prepare the request body
     const completionRequest = {
@@ -897,7 +878,7 @@ export async function transCreateContent(
     
     // Specify the deployment in the URL path
     const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
-    console.log(`Using direct endpoint URL: ${endpoint}`);
+    // console.log(`Using direct endpoint URL: ${endpoint}`);
     
     // Make a direct fetch call
     const response = await fetch(endpoint, {
@@ -915,10 +896,10 @@ export async function transCreateContent(
     }
     
     const responseData = await response.json();
-    console.log("API call successful");
+    // console.log("API call successful");
     
     const responseContent = responseData.choices?.[0]?.message?.content || "{}";
-    console.log(`Received response with content length: ${responseContent.length}`);
+    // console.log(`Received response with content length: ${responseContent.length}`);
     
     const parsedResponse = JSON.parse(responseContent);
     return {
@@ -947,10 +928,10 @@ export async function generateSuggestions(
     };
   }
 ): Promise<string[]> {
-  console.log(`Generating suggestions of type: ${suggestionType}`);
+  // console.log(`Generating suggestions of type: ${suggestionType}`);
   // Updated console log to reflect new required fields if brandContext exists
   if (context.brandContext) {
-    console.log(`Targeting Language: ${context.brandContext.language}, Country: ${context.brandContext.country}`);
+    // console.log(`Targeting Language: ${context.brandContext.language}, Country: ${context.brandContext.country}`);
   }
 
   const client = getAzureOpenAIClient();
@@ -993,7 +974,7 @@ export async function generateSuggestions(
   userPrompt += `\n\n${expectedOutputFormat}`; // Add output format instruction
 
   try {
-    console.log(`Making API call to Azure OpenAI deployment: ${deploymentName} for ${suggestionType}`);
+    // console.log(`Making API call to Azure OpenAI deployment: ${deploymentName} for ${suggestionType}`);
 
     const completionRequest = {
       model: deploymentName,
@@ -1007,7 +988,7 @@ export async function generateSuggestions(
     };
 
     const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
-    console.log(`Using direct endpoint URL: ${endpoint}`);
+    // console.log(`Using direct endpoint URL: ${endpoint}`);
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -1024,10 +1005,10 @@ export async function generateSuggestions(
     }
 
     const responseData = await response.json();
-    console.log("API call successful");
+    // console.log("API call successful");
 
     const content = responseData.choices?.[0]?.message?.content || "[]"; // Default to empty array string
-    console.log(`Received response content for suggestions: ${content}`);
+    // console.log(`Received response content for suggestions: ${content}`);
 
     // Attempt to parse the JSON array directly from the content
     let suggestions: string[] = [];
@@ -1051,7 +1032,7 @@ export async function generateSuggestions(
         // Returning empty array for now
     }
 
-    console.log(`Returning ${suggestions.length} suggestions of type ${suggestionType}`);
+    // console.log(`Returning ${suggestions.length} suggestions of type ${suggestionType}`);
     return suggestions;
 
   } catch (error) {
@@ -1075,8 +1056,8 @@ export async function generateContentTitleFromContext(
     keywords?: string[] | null; // Optional keywords
   }
 ): Promise<string> {
-  console.log(`Generating content title for brand: ${brandContext.name || 'Unknown Brand'}`);
-  console.log(`Targeting Language: ${brandContext.language}, Country: ${brandContext.country}`);
+  // console.log(`Generating content title for brand: ${brandContext.name || 'Unknown Brand'}`);
+  // console.log(`Targeting Language: ${brandContext.language}, Country: ${brandContext.country}`);
 
   const client = getAzureOpenAIClient();
   const deploymentName = getModelName();
@@ -1103,7 +1084,7 @@ export async function generateContentTitleFromContext(
   userPrompt += `\n\nProvide just the title as a plain string, without any labels, quotes, or explanations. The title should be relatively short and impactful.`;
 
   try {
-    console.log(`Making API call to Azure OpenAI for title generation. Deployment: ${deploymentName}`);
+    // console.log(`Making API call to Azure OpenAI for title generation. Deployment: ${deploymentName}`);
     const completionRequest = {
       model: deploymentName,
       messages: [
@@ -1144,7 +1125,7 @@ export async function generateContentTitleFromContext(
         title = title.substring(1, title.length - 1);
     }
 
-    console.log(`Generated title (cleaned): "${title}"`);
+    // console.log(`Generated title (cleaned): "${title}"`);
     return title;
 
   } catch (error) {
