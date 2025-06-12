@@ -60,7 +60,11 @@ const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) =
   </nav>
 );
 
-export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) {
+// Re-export the refactored version to maintain backward compatibility
+export { ContentGeneratorForm } from './content-generator-form-refactored';
+
+// Original implementation preserved below for reference
+function ContentGeneratorFormOriginal({ templateId }: ContentGeneratorFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
