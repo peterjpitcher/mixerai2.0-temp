@@ -381,7 +381,7 @@ The product context is provided in the user prompt.
         // Attempt to match field name if markers are not found, for simpler AI responses
         // This is a fallback and might be less reliable for multiple fields.
         const escapedFieldName = field.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const fieldNameRegex = new RegExp(`(?:${escapedFieldName}\s*:\s*|##${escapedFieldName}##\s*)([\s\S]*?)(?:\n##FIELD_ID:|\n##[A-Z_]+##|$)`, 'i');
+        const fieldNameRegex = new RegExp(`(?:${escapedFieldName}\\s*:\\s*|##${escapedFieldName}##\\s*)([\\s\\S]*?)(?:\\n##FIELD_ID:|\\n##[A-Z_]+##|$)`, 'i');
         match = content.match(fieldNameRegex);
         if (match && match[1]) {
           result[field.id] = match[1].trim();

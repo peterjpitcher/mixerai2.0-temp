@@ -50,5 +50,17 @@ Go to Supabase Dashboard:
  */
 export function isDomainConfigured() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  return appUrl && appUrl.includes('mixerai.orangejely.co.uk');
+  const productionDomain = 'mixerai.orangejely.co.uk';
+  
+  if (!appUrl) {
+    return false;
+  }
+  
+  try {
+    const url = new URL(appUrl);
+    return url.hostname === productionDomain || url.hostname.endsWith(`.${productionDomain}`);
+  } catch {
+    // If URL parsing fails, fall back to simple string check
+    return appUrl.indexOf(`//${productionDomain}`) !== -1 || appUrl.indexOf(`//*.${productionDomain}`) !== -1;
+  }
 } 

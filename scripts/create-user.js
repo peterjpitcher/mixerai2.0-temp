@@ -82,7 +82,7 @@ async function createUser() {
 
     console.log('User setup completed successfully!');
     console.log(`Email: ${email}`);
-    console.log(`Password: ${password}`);
+    console.log(`Password: [REDACTED]`);
     console.log(`User ID: ${userId}`);
 
   } catch (error) {
