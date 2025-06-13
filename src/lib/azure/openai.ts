@@ -16,8 +16,6 @@ export const getAzureOpenAIClient = () => {
     throw new Error("Azure OpenAI endpoint is missing");
   }
   
-  // Get deployment name
-  const deploymentName = getModelName();
   
   // Removed API key logging for security
   
@@ -435,8 +433,8 @@ export async function generateBrandIdentityFromUrls(
     // console.log("- AZURE_OPENAI_ENDPOINT exists:", !!process.env.AZURE_OPENAI_ENDPOINT);
     // console.log("- AZURE_OPENAI_DEPLOYMENT:", process.env.AZURE_OPENAI_DEPLOYMENT);
   
-      const client = getAzureOpenAIClient();
   const deploymentName = getModelName();
+  const client = getAzureOpenAIClient();
       
       // Prepare the prompt
       const prompt = `
@@ -524,7 +522,6 @@ export async function generateMetadata(
   // console.log(`Generating metadata for ${url}`);
   
   try {
-    const client = getAzureOpenAIClient();
     const deploymentName = getModelName();
     
     // Prepare the prompt
@@ -677,7 +674,6 @@ export async function generateMetadata(
 export async function generateAltText(
   imageUrl: string,
   brandLanguage: string = 'en',
-  brandCountry: string = 'US', // Added for consistency, though less critical for alt text
   brandContext?: {
     brandIdentity?: string;
     toneOfVoice?: string;
@@ -934,7 +930,6 @@ export async function generateSuggestions(
     // console.log(`Targeting Language: ${context.brandContext.language}, Country: ${context.brandContext.country}`);
   }
 
-  const client = getAzureOpenAIClient();
   const deploymentName = getModelName();
 
   let systemPrompt = `You are an expert assistant skilled in generating content ideas and extracting information.`;
@@ -1059,7 +1054,6 @@ export async function generateContentTitleFromContext(
   // console.log(`Generating content title for brand: ${brandContext.name || 'Unknown Brand'}`);
   // console.log(`Targeting Language: ${brandContext.language}, Country: ${brandContext.country}`);
 
-  const client = getAzureOpenAIClient();
   const deploymentName = getModelName();
 
   let systemPrompt = `You are an expert content strategist specializing in creating compelling and SEO-friendly titles.`;

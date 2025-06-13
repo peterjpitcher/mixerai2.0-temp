@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     // Resend the signup confirmation email. 
     // This is suitable if the user was created (e.g., via inviteUserByEmail or direct creation)
     // but has not confirmed their email / signed up yet.
-    const { data, error } = await supabaseAdmin.auth.resend({
+    const { error } = await supabaseAdmin.auth.resend({
       type: 'signup', // Use 'signup' to resend the initial confirmation for an existing invited user
       email: email,
       options: {
@@ -49,8 +49,8 @@ export async function POST(request: Request) {
     // Success is implied if no error is thrown.
     return NextResponse.json({ success: true, message: 'Invitation resent successfully.' });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Unexpected error in resend-invite route:', error);
-    return NextResponse.json({ success: false, error: error.message || 'An unexpected error occurred.' }, { status: 500 });
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'An unexpected error occurred.' }, { status: 500 });
   }
 } 

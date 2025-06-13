@@ -1,23 +1,15 @@
 'use client';
 
 import React from 'react';
-import { Label } from '@/components/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
-
-interface BrandClaimsSelectProps {
-  // Props will be defined later, e.g.:
-  // brandId: string;
-  // selectedValue: string | string[];
-  // onSelectionChange: (value: string | string[]) => void;
-  // allowMultiple: boolean;
-}
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 /**
  * A component for selecting one or more brand claims.
  * This is a placeholder and will be fully implemented later.
  * It will handle fetching, caching, searching, and displaying claims.
  */
-export function BrandClaimsSelect(props: BrandClaimsSelectProps) {
+export function BrandClaimsSelect() {
   return (
     <div className="space-y-2">
       <Label htmlFor="brand-claims-select">Brand Claims</Label>

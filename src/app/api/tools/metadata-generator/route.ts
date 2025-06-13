@@ -121,7 +121,7 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
         await new Promise(resolve => setTimeout(resolve, 5000));
         console.log(`[Delay] Metadata Gen: Finished 5-second wait. Calling AI for ${url}...`);
 
-        const generatedMetadata: any = await generateMetadata(
+        const generatedMetadata = await generateMetadata(
           url,
           requestedLanguage,
           brandCountry,
@@ -135,14 +135,14 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
           url,
           metaTitle: generatedMetadata.metaTitle,
           metaDescription: generatedMetadata.metaDescription,
-          keywords: generatedMetadata.keywords && Array.isArray(generatedMetadata.keywords) ? generatedMetadata.keywords : [],
+          keywords: [], // generateMetadata doesn't return keywords
         });
 
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error(`[MetadataGen] Error processing URL ${url}:`, error);
         results.push({
           url,
-          error: error.message || 'Failed to generate metadata for this URL.',
+          error: error instanceof Error ? error.message : 'Failed to generate metadata for this URL.',
         });
         historyEntryStatus = 'failure'; // Mark overall run as failure if any URL fails
         if (!historyErrorMessage) historyErrorMessage = 'One or more URLs failed metadata generation.';
@@ -166,10 +166,10 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       ...(historyEntryStatus === 'failure' && historyErrorMessage && { error: historyErrorMessage })
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[MetadataGen] Global error in POST handler:', error);
     historyEntryStatus = 'failure';
-    historyErrorMessage = error.message || 'An unexpected error occurred.';
+    historyErrorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
     if (!apiInputs) apiInputs = { urls: [], language: 'unknown' };
     apiOutputs = { results: [{ url: 'unknown', error: historyErrorMessage }] };
     // Note: handleApiError already returns a NextResponse, so we don't return it directly here.

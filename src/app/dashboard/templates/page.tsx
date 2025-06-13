@@ -3,13 +3,11 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
-import { PageHeader } from '@/components/dashboard/page-header';
-import { Badge } from '@/components/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Loader2, PlusCircle, LayoutTemplate, Edit3, FileTextIcon, MoreVertical, FileCog, Eye, Trash2, ShieldAlert, Copy } from 'lucide-react';
-import type { Metadata } from 'next';
+import { Loader2, PlusCircle, LayoutTemplate, Edit3, Eye, Trash2, ShieldAlert, Copy } from 'lucide-react';
 import type { InputField, OutputField } from '@/types/template';
 import {
   AlertDialog,
@@ -20,7 +18,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/alert-dialog";
+} from '@/components/ui/alert-dialog';
 
 // Placeholder Breadcrumbs component - replace with actual implementation later
 const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
@@ -80,7 +78,7 @@ export default function TemplatesPage() {
   const router = useRouter();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  // const [searchTerm, setSearchTerm] = useState('');
   const [templateToDelete, setTemplateToDelete] = useState<Template | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -102,10 +100,10 @@ export default function TemplatesPage() {
           setCurrentUser(null);
           toast.error(data.error || 'Could not verify your session.');
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching current user:', err);
         setCurrentUser(null);
-        toast.error('Error fetching user data: ' + err.message);
+        toast.error('Error fetching user data: ' + (err instanceof Error ? err.message : 'Unknown error'));
       } finally {
         setIsLoadingUser(false);
       }
@@ -180,9 +178,9 @@ export default function TemplatesPage() {
       } else {
         throw new Error(result.error || 'Failed to duplicate template.');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error duplicating template:', error);
-      toast.error(error.message || 'An error occurred while duplicating the template.');
+      toast.error(error instanceof Error ? error.message : 'An error occurred while duplicating the template.');
     } finally {
       setIsDuplicating(null);
     }
@@ -208,7 +206,7 @@ export default function TemplatesPage() {
       } else {
         toast.error(data.error || 'Failed to delete template.');
       }
-    } catch (_error) {
+    } catch {
       toast.error('An error occurred while deleting the template.');
     } finally {
       setIsDeleting(false);
@@ -244,20 +242,22 @@ export default function TemplatesPage() {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
       <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Content Templates" }]} />
-      <PageHeader
-        title="Content Templates"
-        description="Create and manage your content templates for AI-powered content generation"
-        actions={
-          isGlobalAdmin ? (
-            <Link href="/dashboard/templates/new">
-              <Button>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Create Template
-              </Button>
-            </Link>
-          ) : null
-        }
-      />
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Content Templates</h1>
+          <p className="text-muted-foreground mt-2">
+            Create and manage your content templates for AI-powered content generation
+          </p>
+        </div>
+        {isGlobalAdmin && (
+          <Link href="/dashboard/templates/new">
+            <Button>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Create Template
+            </Button>
+          </Link>
+        )}
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {templates.map(template => (
@@ -355,7 +355,7 @@ export default function TemplatesPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure you want to delete this template?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action will permanently delete the template "{templateToDelete?.name}". 
+                This action will permanently delete the template &quot;{templateToDelete?.name}&quot;. 
                 Any content items using this template may need to be updated. This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>

@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 interface SuggestionRequest {
   prompt: string;
   fieldType: string;
-  formValues: Record<string, any>;
+  formValues: Record<string, unknown>;
   brand_id?: string;
   options?: {
     maxLength?: number;
@@ -22,7 +22,7 @@ interface SuggestionRequest {
 /**
  * POST: Generate suggestions for a field using AI
  */
-export const POST = withAuth(async (request: NextRequest, user) => {
+export const POST = withAuth(async (request: NextRequest) => {
   try {
     const body: SuggestionRequest = await request.json();
 
@@ -96,18 +96,18 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       suggestion: finalSuggestion,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API /ai/suggest] Error:', error);
     let errorMessage = 'Failed to generate suggestion';
     let statusCode = 500;
 
-    if (error.message?.includes('OpenAI') || error.message?.includes('Azure') || error.message?.includes('AI service')) {
+    if (error instanceof Error && (error.message?.includes('OpenAI') || error.message?.includes('Azure') || error.message?.includes('AI service'))) {
       errorMessage = 'The AI service is currently busy or unavailable. Please try again later.';
       statusCode = 503; // Service Unavailable
-    } else if (error.message?.includes('prompt is required')) {
+    } else if (error instanceof Error && error.message?.includes('prompt is required')) {
       errorMessage = 'A valid prompt is required.';
       statusCode = 400; // Bad Request
-    } else {
+    } else if (error instanceof Error) {
       errorMessage = error.message || errorMessage;
     }
     return handleApiError(new Error(errorMessage), 'Failed to generate suggestion.', statusCode);

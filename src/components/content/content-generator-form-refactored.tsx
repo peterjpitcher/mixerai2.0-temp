@@ -2,11 +2,10 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
-import { Input } from '@/components/input';
-import { Label } from '@/components/label';
-import { Separator } from '@/components/separator';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Loader2, Sparkles, ShieldAlert, Info } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -67,12 +66,12 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     toast.info('Title generation not yet implemented');
   };
 
-  const handleSuggestion = async (fieldId: string) => {
+  const handleSuggestion = async () => {
     // Implementation for AI suggestions
     toast.info('AI suggestions not yet implemented');
   };
 
-  const handleRetryField = async (fieldId: string) => {
+  const handleRetryField = async () => {
     // Implementation for retrying individual fields
     toast.info('Field retry not yet implemented');
   };
@@ -83,7 +82,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
       if (contentId) {
         router.push(`/dashboard/content/${contentId}/edit`);
       }
-    } catch (error) {
+    } catch {
       // Error already handled in hook
     }
   };
@@ -170,7 +169,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
                     <Loader2 className="h-8 w-8 animate-spin" />
                   </div>
                 ) : (
-                  template.fields.inputFields.map((field) => (
+                  (template.inputFields || []).map((field) => (
                     <TemplateFieldRenderer
                       key={field.id}
                       field={field}
@@ -224,7 +223,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
                 <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
                   <ShieldAlert className="h-4 w-4" />
                   <span>
-                    This content will follow the "{associatedWorkflowDetails.name}" workflow
+                    This content will follow the &quot;{associatedWorkflowDetails.name}&quot; workflow
                   </span>
                 </div>
               )}
@@ -277,7 +276,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
               {/* Generated Content */}
               <GeneratedContentPreview
                 generatedOutputs={generatedOutputs}
-                outputFields={template?.fields.outputFields || []}
+                outputFields={template?.outputFields || []}
                 onOutputChange={(fieldId, value) => 
                   setGeneratedOutputs(prev => ({ ...prev, [fieldId]: value }))
                 }

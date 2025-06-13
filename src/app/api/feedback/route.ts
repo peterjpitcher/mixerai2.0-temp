@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+// import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic'; // Ensure dynamic handling for auth
 
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
   let body: FeedbackPostBody;
   try {
     body = await request.json();
-  } catch (e) {
+  } catch {
     return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
   }
 

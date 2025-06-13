@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
-import type { InputField, OutputField, ContentTemplate as Template, FieldType } from '@/types/template';
+import type { InputField, ContentTemplate as Template, FieldType } from '@/types/template';
 import type { ProductContext } from '@/types/claims';
 
 interface Brand {
@@ -25,7 +25,7 @@ interface WorkflowSummary {
 export function useContentGenerator(templateId?: string | null) {
   // Core state
   const [isLoading, setIsLoading] = useState(false);
-  const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
+  const [isGeneratingTitle] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
   // Data state
@@ -50,7 +50,7 @@ export function useContentGenerator(templateId?: string | null) {
   const [retryingFieldId, setRetryingFieldId] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   
-  const [canGenerateContent, setCanGenerateContent] = useState<boolean>(false);
+  const [canGenerateContent] = useState<boolean>(false);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   
   const [productContext, setProductContext] = useState<ProductContext | null>(null);
@@ -180,7 +180,7 @@ export function useContentGenerator(templateId?: string | null) {
     setTemplateFieldValues(prev => ({ ...prev, [fieldId]: value }));
     
     // Handle product selection changes
-    if (fieldType === 'productSelect' && selectedBrand) {
+    if (fieldType === 'product-selector' && selectedBrand) {
       if (!value) {
         setProductContext(null);
         return;

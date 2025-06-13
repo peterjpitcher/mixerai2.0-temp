@@ -2,21 +2,22 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/card';
-import { Input } from '@/components/input';
+import Image from 'next/image';
+import { Button } from '@/components/ui/button';
+// import { } from '@/components/ui/card'; // Removed - empty import
+import { Input } from '@/components/ui/input';
 import { toast as sonnerToast } from "sonner";
 import { format as formatDateFns } from 'date-fns';
 import { useDebounce } from '@/lib/hooks/use-debounce';
 import { useSearchParams } from 'next/navigation';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/accordion";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { createBrowserClient } from '@supabase/ssr';
 
 // Added imports for PageHeader and lucide-react icons
 import { PageHeader } from "@/components/dashboard/page-header";
-import { BrandIcon, BrandIconProps } from '@/components/brand-icon'; 
-import { FileText, AlertTriangle, PlusCircle, Edit3, RefreshCw, CheckCircle, XCircle, ListFilter, Archive, Trash2 } from 'lucide-react';
-import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from "@/components/alert-dialog";
+import { BrandIcon,  } from '@/components/brand-icon'; 
+import { FileText, AlertTriangle, PlusCircle, Edit3, RefreshCw, CheckCircle, XCircle, ListFilter, Archive, Trash2, HelpCircle } from 'lucide-react';
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 
 // Define types
 type ContentFilterStatus = 'active' | 'approved' | 'rejected' | 'all';
@@ -91,9 +92,11 @@ export default function ContentPageClient() {
   const [statusFilter, setStatusFilter] = useState<ContentFilterStatus>('active');
   const searchParams = useSearchParams();
   const brandIdFromParams = searchParams?.get('brandId');
-  const [activeBrandData, setActiveBrandData] = useState<any>(null); 
+  const [activeBrandData, setActiveBrandData] = useState<{ id: string; name: string; brand_color?: string; logo_url?: string } | null>(null); 
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isLoadingUser, setIsLoadingUser] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [userError, setUserError] = useState<string | null>(null);
 
   // State for delete confirmation
@@ -124,11 +127,11 @@ export default function ContentPageClient() {
           setUserError(data.error || 'User data not found in session.');
           sonnerToast.error(data.error || 'Could not verify your session.');
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('[ContentPageClient] Error fetching current user:', error);
         setCurrentUser(null);
-        setUserError(error.message || 'An unexpected error occurred while fetching user data.');
-        sonnerToast.error('Error fetching user data: ' + (error.message || 'Please try again.'));
+        setUserError(error instanceof Error ? error.message : 'An unexpected error occurred while fetching user data.');
+        sonnerToast.error('Error fetching user data: ' + (error instanceof Error ? error.message : 'Please try again.'));
       } finally {
         setIsLoadingUser(false);
       }
@@ -162,7 +165,10 @@ export default function ContentPageClient() {
         if (!response.ok) throw new Error('Failed to fetch content data from API');
         const data = await response.json();
         if (data.success) {
-          setContent(data.data.map((item: any) => ({ ...item, assigned_to: item.assigned_to || null })) || []);
+          setContent(data.data.map((item: unknown) => {
+            const contentItem = item as Record<string, unknown>;
+            return { ...contentItem, assigned_to: contentItem.assigned_to || null } as ContentItem;
+          }) || []);
         } else {
           setContent([]);
           throw new Error(data.error || 'API returned error fetching content');
@@ -246,7 +252,7 @@ export default function ContentPageClient() {
 
   const handleDeleteClick = (item: ContentItem) => {
     if (!canDeleteContent(item)) {
-      sonnerToast.error("You don't have permission to delete this content item.");
+      sonnerToast.error("You don&apos;t have permission to delete this content item.");
       return;
     }
     setItemToDelete(item);
@@ -271,8 +277,8 @@ export default function ContentPageClient() {
       } else {
         sonnerToast.error(result.error || 'Failed to delete content.');
       }
-    } catch (err: any) {
-      sonnerToast.error('An error occurred during deletion: ' + err.message);
+    } catch (err: unknown) {
+      sonnerToast.error('An error occurred during deletion: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setIsDeleting(false);
       setShowDeleteDialog(false);
@@ -289,11 +295,22 @@ export default function ContentPageClient() {
         <p className="text-muted-foreground mb-6 max-w-md mx-auto">
           No content matches the current filters. Try adjusting your search or filter selection.
         </p>
-        {statusFilter !== 'all' && (
-          <Button variant="outline" onClick={() => setStatusFilter('all') }>
-            <ListFilter size={16} className="mr-2" /> Show All Content
-          </Button>
-        )}
+        <div className="space-y-3">
+          {statusFilter !== 'all' && (
+            <Button variant="outline" onClick={() => setStatusFilter('all') }>
+              <ListFilter size={16} className="mr-2" /> Show All Content
+            </Button>
+          )}
+          <div>
+            <Link 
+              href="/dashboard/help?article=03-content" 
+              className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+            >
+              <HelpCircle className="h-4 w-4" />
+              Learn how to create content
+            </Link>
+          </div>
+        </div>
       </div>
   );
   const ErrorState = () => ( 
@@ -417,10 +434,11 @@ export default function ContentPageClient() {
                                 <div className="flex items-center">
                                   <div className="relative h-6 w-6 rounded-full bg-muted overflow-hidden flex-shrink-0 mr-2">
                                     {item.assigned_to_avatar_url ? (
-                                      <img
+                                      <Image
                                         src={item.assigned_to_avatar_url}
                                         alt={item.assigned_to_name}
-                                        className="object-cover w-full h-full"
+                                        fill
+                                        className="object-cover"
                                         onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }}
                                       />
                                     ) : null}
@@ -439,11 +457,11 @@ export default function ContentPageClient() {
                                 <div className="flex items-center">
                                   <div className="relative h-6 w-6 rounded-full bg-muted overflow-hidden flex-shrink-0 mr-2">
                                     {item.creator_avatar_url ? (
-                                      <img
+                                      <Image
                                         src={item.creator_avatar_url}
                                         alt={item.created_by_name}
-                                        className="object-cover w-full h-full"
-                                        onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }}
+                                        fill
+                                        className="object-cover"
                                       />
                                     ) : null}
                                     <div className={`flex items-center justify-center h-full w-full text-xs font-semibold text-primary bg-muted-foreground/20 ${item.creator_avatar_url ? 'hidden' : ''}`}>
@@ -495,7 +513,7 @@ export default function ContentPageClient() {
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Content: "{itemToDelete.title}"?</AlertDialogTitle>
+              <AlertDialogTitle>Delete Content: &quot;{itemToDelete.title}&quot;?</AlertDialogTitle>
               <AlertDialogDescription>
                 Are you sure you want to delete this content item? This action cannot be undone.
               </AlertDialogDescription>

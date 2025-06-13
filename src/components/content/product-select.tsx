@@ -3,15 +3,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Button } from '@/components/button';
+import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/icons';
 import { useDebounce } from '@/lib/hooks/use-debounce';
 import useSWR from 'swr';
-
-interface Product {
-  id: string;
-  name: string;
-}
 
 interface ProductSelectProps {
   brandId: string | null;
@@ -47,9 +42,9 @@ export function ProductSelect({ brandId, value, onChange }: ProductSelectProps) 
     if (value !== null) {
       onChange(null);
     }
-  }, [brandId]); // Remove onChange from dependencies to prevent infinite loop
+  }, [brandId, onChange, value]);
   
-  const products: Product[] = data?.products || [];
+  const products = useMemo(() => data?.products || [], [data?.products]);
   const selectedProduct = useMemo(() => products.find(p => p.id === value), [products, value]);
 
   const renderContent = () => {

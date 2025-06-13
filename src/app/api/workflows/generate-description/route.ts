@@ -109,7 +109,8 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
           'Surrogate-Control': 'no-store'
         }
       });
-    } catch (aiError) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_aiError) {
       // Error from AI service call. Return a generic error to the client.
       // Specifics of aiError should be logged by a proper server-side logging solution if needed.
       return NextResponse.json(

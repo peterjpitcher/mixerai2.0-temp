@@ -1,58 +1,97 @@
-# Managing Brands in MixerAI
+# Working with Brands
 
-This section provides a detailed guide to understanding and effectively managing your brands within MixerAI. Properly defining your brands is crucial for generating AI content that is on-target, consistent, and resonates with your audience. You can directly access the [Brands section in the app here](https://mixerai.orangejelly.co.uk/dashboard/brands).
+Brands in MixerAI define how your content should look, sound, and feel. Each brand has its own voice, style guidelines, and approved language that the AI uses when generating content.
 
-## What are Brands in MixerAI?
+## Common Brand Tasks
 
-In MixerAI, a 'Brand' is a comprehensive profile that encapsulates a distinct brand identity. It's more than just a name; it includes all the key characteristics that define how a brand communicates. This information is used by MixerAI's AI engine to tailor content generation.
+### How do I create a new brand?
 
-Key elements of a Brand profile typically include:
+1. Click **Brands** in the left navigation
+2. Click **New Brand** button in the top right
+3. Fill in the brand information:
+   - **Brand Name** - The official brand name
+   - **Website URL** - Your brand's website
+   - **Country** - Primary market location
+   - **Language** - Primary language for content
+4. Add brand identity details:
+   - **Brand Identity** - What your brand stands for
+   - **Tone of Voice** - How your brand speaks
+   - **Guardrails** - What to always include or avoid
+   - **Target Audience** - Who you're speaking to
+5. Click **Save Brand**
 
-*   **Brand Name:** The official name of the brand.
-*   **Website URL:** The primary website for the brand.
-*   **Country & Language:** Helps tailor content to specific regions and languages.
-*   **Brand Identity:** A summary of what the brand stands for, its mission, values, and unique selling propositions.
-    *   *Example:* For an eco-friendly brand: "We provide sustainable and ethically sourced home goods for environmentally conscious consumers. Our mission is to make green living accessible and stylish."
-*   **Tone of Voice:** Describes the personality and style of the brand's communication.
-    *   *Example:* "Friendly, informative, and slightly witty. Avoid overly technical jargon. Aim for an inspiring and empowering tone."
-*   **Guardrails/Key Messages:** Specific phrases to include or avoid, core messages to emphasize, or topics that are off-limits.
-    *   *Example:* "Always mention our commitment to 100% recyclable packaging. Avoid comparisons with competitor X."
-*   **Target Audience:** A description of the ideal customer or audience segment.
-    *   *Example:* "Millennials and Gen Z, environmentally aware, active on social media, interested in sustainable living and DIY projects."
+### How do I edit brand settings?
 
-## How to Manage Brands:
+1. Click **Brands** in the left navigation
+2. Find your brand in the list
+3. Click on the brand name
+4. Click **Edit** button
+5. Make your changes
+6. Click **Save Changes**
 
-1.  **Navigate to the Brands Section:** From the main dashboard menu (usually on the left), click on "Brands" or use this [direct link to Brands](https://mixerai.orangejelly.co.uk/dashboard/brands).
+### How do I switch between brands when creating content?
 
-2.  **Viewing Your Brands:** You'll see a list or a grid of all existing brands you have access to. This overview might show key details like the brand name and when it was last updated.
+1. When creating new content, look for the **Brand** dropdown
+2. Select the brand you want to use
+3. The AI will automatically use that brand's voice and guidelines
 
-3.  **Adding a New Brand:**
-    *   Look for a button like "+ New Brand," "Create Brand," or "Add Brand" (usually found on the [main Brands page](https://mixerai.orangejelly.co.uk/dashboard/brands) or via a [direct link for new brands](https://mixerai.orangejelly.co.uk/dashboard/brands/new)).
-    *   You'll be presented with a form to fill in all the brand elements listed above (Name, Website, Identity, Tone, etc.).
-    *   **Tip:** Be as detailed and specific as possible in each field. The more information the AI has, the better it can match your brand's style.
-    *   Once you've filled in all the details, click "Save" or "Create Brand."
+### How do I know which brand I'm working with?
 
-4.  **Editing an Existing Brand:**
-    *   From the list of brands on the [Brands page](https://mixerai.orangejelly.co.uk/dashboard/brands), click on the name of the brand you wish to edit (or its edit icon).
-    *   This will take you to the brand's detail/edit page (e.g., `https://mixerai.orangejelly.co.uk/dashboard/brands/[ID]/edit`).
-    *   Make your desired changes to any of the brand elements.
-    *   **Remember to save your changes!**
+- The selected brand appears at the top of content creation forms
+- Brand avatars appear next to content in lists
+- The brand name shows in content details
 
-5.  **Deleting/Archiving a Brand (If Applicable):**
-    *   If you no longer need a brand, there might be an option to delete or archive it from its edit page or the main brand list.
-    *   Be cautious when deleting brands, especially if content has been created under them (see [Creating & Managing Content](./?article=03-content)).
+## Setting Up Your Brand Profile
 
-## Tips for Effective Brand Management:
+### What should I include in Brand Identity?
 
-*   **Be Specific:** Vague descriptions lead to generic AI content. The more detailed your Brand Identity, Tone of Voice, and Guardrails, the better the AI (detailed in [Using AI Tools](./?article=09-tools)) can assist you.
-*   **Use Examples:** If possible, provide short examples of good and bad communication styles for your brand within the Tone of Voice or Guardrails sections.
-*   **Consistency is Key:** Ensure all information is consistent across the brand profile.
-*   **Regularly Review and Update:** Brands evolve. Make it a practice to review your brand profiles in MixerAI periodically (e.g., quarterly or annually) and update them if there are any changes to your brand strategy, messaging, or target audience.
-*   **Collaborate with Your Team:** If multiple team members work on a brand, ensure everyone understands the defined brand profile in MixerAI.
+Write 2-3 sentences about:
+- What your company does
+- Your mission or values  
+- What makes you different
 
-## Need More Help?
+Example: "We create eco-friendly cleaning products for health-conscious families. Our mission is to make non-toxic cleaning accessible and affordable. We believe clean homes shouldn't come at the cost of our planet."
 
-If you have questions about setting up or managing your brands, or if you'd like advice on how to best define your brand elements for AI generation, please contact Peter Pitcher:
+### What should I include in Tone of Voice?
 
-*   **Email:** [peter.pitcher@genmills.com](mailto:peter.pitcher@genmills.com)
-*   **Microsoft Teams:** [peter.pitcher@genmills.com](https://teams.microsoft.com/l/chat/0/0?users=peter.pitcher@genmills.com) 
+Describe how your brand communicates:
+- Personality traits (friendly, professional, playful)
+- Writing style (formal, conversational, technical)
+- Things to avoid (jargon, negative language)
+
+Example: "Friendly and approachable, like talking to a knowledgeable neighbor. Use simple language, avoid chemical jargon. Be encouraging and positive."
+
+### What are Guardrails?
+
+Guardrails are specific rules for your content:
+- **Always mention**: Key messages or features
+- **Never mention**: Competitors or sensitive topics
+- **Required disclaimers**: Legal or compliance text
+
+Example: "Always mention our 30-day guarantee. Never compare to competitors by name. Include 'Safe for pets and children' when relevant."
+
+### How do I define Target Audience?
+
+Describe who you're writing for:
+- Demographics (age, location)
+- Interests and values
+- Problems they're trying to solve
+
+Example: "Parents aged 25-45 who care about their family's health and the environment. They want effective cleaning without harsh chemicals."
+
+## Troubleshooting
+
+### Why isn't the AI using my brand voice?
+
+1. Check that you've selected the correct brand
+2. Review your Tone of Voice section - add more specific examples
+3. Make sure Guardrails are clear and specific
+4. Try regenerating the content
+
+### Can I have multiple brands?
+
+Yes! You can create as many brands as needed. Users will see only the brands they have permission to access.
+
+### How do I delete a brand?
+
+Contact your administrator. Deleting brands affects all associated content, so this requires admin privileges.

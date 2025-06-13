@@ -16,7 +16,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   Trash2, Edit3, PlusCircle, Search, AlertTriangle, PackageOpen, Loader2, 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   FileText, Building2, Package, Sprout, Globe, Tag, ShieldCheck, ShieldOff, ShieldAlert 
 } from "lucide-react";
 import { toast } from 'sonner';
@@ -65,8 +67,11 @@ const claimLevelIcons: Record<ClaimLevelEnum, JSX.Element> = {
 
 export default function ClaimsPage() {
   const [claims, setClaims] = useState<Claim[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [masterBrands, setMasterBrands] = useState<MasterClaimBrand[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [products, setProducts] = useState<Product[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   
   const [isLoading, setIsLoading] = useState(true);

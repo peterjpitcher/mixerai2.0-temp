@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Input } from '@/components/input';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/card';
-import { Label } from '@/components/label';
-import { Alert, AlertDescription, AlertTitle } from '@/components/alert';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Spinner } from '@/components/spinner';
 import { CheckCheck, AlertTriangle } from 'lucide-react';
 import { createSupabaseClient } from '@/lib/supabase/client';

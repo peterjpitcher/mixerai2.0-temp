@@ -123,12 +123,11 @@ export async function getStackedClaimsForProduct(
 
   try {
     // 1. Fetch the product details to get its master_brand_id
-    // @ts-ignore
     const { data: product, error: productError } = await supabase
       .from('products')
       .select('id, name, master_brand_id')
       .eq('id', productId)
-      .single<Product>();
+      .single();
 
     if (productError || !product) {
       console.error(`[getStackedClaimsForProduct] Error fetching product ${productId}:`, productError);
@@ -149,7 +148,6 @@ export async function getStackedClaimsForProduct(
                        level === 'ingredient' ? 'ingredient_id' :
                        'master_brand_id';
       
-      // @ts-ignore
       const { data: fetchedClaims, error } = await supabase
         .from('claims')
         .select('*')
@@ -190,7 +188,6 @@ export async function getStackedClaimsForProduct(
     }
 
     // 6. Fetch Market Claim Overrides for this product and country
-    // @ts-ignore
     const { data: marketOverridesData, error: overridesError } = await supabase
         .from('market_claim_overrides')
         .select('*, replacement_claim:claims!replacement_claim_id(*)') // Eager load replacement claim details
@@ -201,7 +198,7 @@ export async function getStackedClaimsForProduct(
         console.error(`[getStackedClaimsForProduct] Error fetching market overrides for product ${productId}, country ${countryCode}:`, overridesError);
         // Continue, but overrides won't apply
     }
-    const marketOverrides: MarketClaimOverride[] = (marketOverridesData as any[]) || [];
+    const marketOverrides: MarketClaimOverride[] = (marketOverridesData as MarketClaimOverride[]) || [];
 
 
     // 7. Consolidate and determine effective claims
@@ -269,7 +266,7 @@ export async function getStackedClaimsForProduct(
                         original_claim_country_code: '__GLOBAL__', // Master claims are global
                     });
                 } else if (overrideApplied.replacement_claim_id) {
-                    // @ts-ignore - replacement_claim is joined
+                    // @ts-expect-error - replacement_claim is joined but types don't reflect it
                     const replacementClaim = overrideApplied.replacement_claim as Claim | null;
                     if (replacementClaim) {
                         effectiveClaimsMap.set(claim.claim_text, {

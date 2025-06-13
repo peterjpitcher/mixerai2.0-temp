@@ -1,0 +1,40 @@
+{
+  "overview": {
+    "totalIssues": 27,
+    "criticalIssues": 18,
+    "estimatedTotalTime": 260,
+    "agentCount": 4,
+    "averageTimePerAgent": 65
+  },
+  "agents": [
+    {
+      "id": "agent-1",
+      "assignmentFile": "agent-1-assignments.json",
+      "statusFile": "agent-1-status.json",
+      "issueCount": 7
+    },
+    {
+      "id": "agent-2",
+      "assignmentFile": "agent-2-assignments.json",
+      "statusFile": "agent-2-status.json",
+      "issueCount": 7
+    },
+    {
+      "id": "agent-3",
+      "assignmentFile": "agent-3-assignments.json",
+      "statusFile": "agent-3-status.json",
+      "issueCount": 7
+    },
+    {
+      "id": "agent-4",
+      "assignmentFile": "agent-4-assignments.json",
+      "statusFile": "agent-4-status.json",
+      "issueCount": 7
+    }
+  ],
+  "files": {
+    "mainReport": "code-issues-report.json",
+    "coordinationDashboard": "coordination-dashboard.json",
+    "progressTracker": "progress-tracker.json"
+  }
+}

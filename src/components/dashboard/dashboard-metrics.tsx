@@ -1,7 +1,7 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/card";
-import { Package, Users, GitBranch, Loader2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Package, Users, GitBranch } from "lucide-react";
 
 interface DashboardMetricsProps {
   metrics: {

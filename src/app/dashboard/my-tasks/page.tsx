@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/card';
-import { Eye, Edit, AlertCircle, ListChecks, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Edit, AlertCircle, ListChecks, Loader2, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { format as formatDateFns } from 'date-fns';
@@ -36,7 +36,7 @@ export default function MyTasksPage() {
   const [error, setError] = useState<string | null>(null);
   // currentUserId is not strictly needed anymore if API handles user-specific tasks,
   // but keeping it doesn't harm and might be useful for other client-side checks if any.
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null); 
+  // const [currentUserId, setCurrentUserId] = useState<string | null>(null); 
 
   useEffect(() => {
     async function initializePage() {
@@ -52,7 +52,7 @@ export default function MyTasksPage() {
         setIsLoading(false);
         return;
       }
-      setCurrentUserId(user.id);
+      // setCurrentUserId(user.id);
 
       try {
         // Fetch tasks directly from the /api/me/tasks endpoint
@@ -67,11 +67,11 @@ export default function MyTasksPage() {
         } else {
           throw new Error(apiData.error || 'Failed to process tasks data from API');
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching or processing tasks:', err);
-        setError(err.message || 'Failed to load tasks');
+        setError(err instanceof Error ? err.message : 'Failed to load tasks');
         toast.error("Failed to load your tasks. Please try again.", {
-          description: err.message || "Unknown error",
+          description: err instanceof Error ? err.message : "Unknown error",
         });
       } finally {
         setIsLoading(false);
@@ -118,6 +118,13 @@ export default function MyTasksPage() {
           <h1 className="text-3xl font-bold tracking-tight">My Tasks</h1>
           <p className="text-muted-foreground">Content items assigned to you that are currently active and require your action.</p>
         </div>
+        <Link 
+          href="/dashboard/help?article=08-my-tasks" 
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <HelpCircle className="h-4 w-4" />
+          Need help?
+        </Link>
       </div>
 
       {tasks.length === 0 ? (
@@ -126,6 +133,12 @@ export default function MyTasksPage() {
             <ListChecks className="mx-auto h-16 w-16 text-primary/70 mb-6" />
             <h3 className="text-xl font-semibold">All caught up!</h3>
             <p className="text-muted-foreground mt-2">You have no pending tasks assigned to you.</p>
+            <Link 
+              href="/dashboard/help?article=08-my-tasks" 
+              className="inline-block mt-4 text-sm text-primary hover:underline"
+            >
+              Learn about tasks →
+            </Link>
           </CardContent>
         </Card>
       ) : (

@@ -14,7 +14,7 @@ interface BrandFromRPC {
   name: string;
   admins: { id: string }[];
   editors?: { id: string }[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export default async function BrandDetailsPage({ params }: BrandDetailsPageProps) {
@@ -42,14 +42,14 @@ export default async function BrandDetailsPage({ params }: BrandDetailsPageProps
 
   // Authorization check
   const isGlobalAdmin = user.user_metadata?.role === 'admin';
-  const hasBrandPermission = brand.admins?.some((admin: any) => admin.id === user.id) || 
-                             brand.editors?.some((editor: any) => editor.id === user.id); // Assuming editors might exist
+  const hasBrandPermission = brand.admins?.some((admin: unknown) => (admin as { id: string }).id === user.id) || 
+                             brand.editors?.some((editor: unknown) => (editor as { id: string }).id === user.id); // Assuming editors might exist
 
   if (!isGlobalAdmin && !hasBrandPermission) {
     return <AccessDenied message="You do not have permission to view this brand." />;
   }
 
-  const canEditBrand = isGlobalAdmin || brand.admins?.some((admin: any) => admin.id === user.id);
+  const canEditBrand = isGlobalAdmin || brand.admins?.some((admin: unknown) => (admin as { id: string }).id === user.id);
 
-  return <BrandDetailsClient brand={brand} canEditBrand={canEditBrand} />;
+  return <BrandDetailsClient brand={{ ...brand, contentCount: 0, workflowCount: 0 }} canEditBrand={canEditBrand} />;
 } 

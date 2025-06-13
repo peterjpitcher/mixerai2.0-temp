@@ -15,15 +15,10 @@ interface IngredientDetails {
     // associated_at: string;
 }
 
-interface RequestContext {
-    params: {
-        productId: string; // Changed from id to productId
-    };
-}
-
 // GET handler for fetching all ingredients for a specific product
-export const GET = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
-    const { productId } = context.params; // Changed from id to productId
+export const GET = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+    const { params } = context as { params: { productId: string } };
+    const { productId } = params;
 
     if (!productId || typeof productId !== 'string') { // Changed from id to productId
         return NextResponse.json({ success: false, error: 'Product ID is required and must be a string.' }, { status: 400 });
@@ -35,7 +30,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
         const supabase = createSupabaseAdminClient();
 
         // Check if product exists first (optional, but good practice)
-        // @ts-ignore
+
         const { data: productData, error: productError } = await supabase.from('products')
             .select('id')
             .eq('id', productId) // Changed from id to productId
@@ -49,7 +44,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
         // Fetch associated ingredients
         // The query selects all columns from ingredients table by joining through product_ingredients
         // The result will be an array of ingredient objects
-        // @ts-ignore
+
         const { data, error } = await supabase.from('product_ingredients')
             .select('ingredients (*)') // This syntax fetches all columns from the related 'ingredients' table
             .eq('product_id', productId); // Changed from id to productId
@@ -62,7 +57,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
         // The data from Supabase with this type of join will be an array of objects like:
         // [{ ingredients: { id: '...', name: '...', ... } }, ... ]
         // We need to map this to an array of IngredientDetails
-        const ingredients: IngredientDetails[] = Array.isArray(data) ? data.map((item: any) => {
+        const ingredients: IngredientDetails[] = Array.isArray(data) ? data.map((item: {ingredients: {id: string; name: string; description: string | null}}) => {
             if (item.ingredients) { // Check if ingredients object exists
                 return {
                     id: item.ingredients.id,
@@ -76,7 +71,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
 
         return NextResponse.json({ success: true, data: ingredients });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`[API /products/${productId}/ingredients GET] Catched error:`, error); // Changed from id to productId
         return handleApiError(error, 'An unexpected error occurred.');
     }

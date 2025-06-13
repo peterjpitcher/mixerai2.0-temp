@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
-import { User } from '@supabase/supabase-js';
 import { generateTextCompletion } from '@/lib/azure/openai';
 import { withAuth } from '@/lib/auth/api-auth';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
@@ -12,19 +11,85 @@ type Claim = {
   country_code: string;
 };
 
-async function fetchAllBrandClaims(supabase: any, masterClaimBrandId: string, productId: string | null, countryCode: string | null): Promise<Claim[]> {
-  const { data, error } = await supabase.rpc('get_all_claims_for_master_brand', {
-    master_brand_id_param: masterClaimBrandId,
-    product_id_param: productId,
-    country_code_param: countryCode
-  });
+async function fetchAllBrandClaims(supabase: ReturnType<typeof createSupabaseAdminClient>, masterClaimBrandId: string, productId: string | null, countryCode: string | null): Promise<Claim[]> {
+  // Fetch brand-level claims
+  let brandQuery = supabase
+    .from('claims')
+    .select('claim_text, claim_type, level, country_code')
+    .eq('master_brand_id', masterClaimBrandId)
+    .eq('level', 'brand');
 
-  if (error) {
-    console.error('Error fetching all brand claims:', error);
-    throw new Error('Failed to fetch claims for the brand.');
+  // Fetch product-level claims if productId is provided
+  let productQuery = productId 
+    ? supabase
+        .from('claims')
+        .select('claim_text, claim_type, level, country_code')
+        .eq('product_id', productId)
+        .eq('level', 'product')
+    : null;
+
+  // Fetch ingredient-level claims if productId is provided
+  let ingredientClaims: Claim[] = [];
+  if (productId) {
+    // First get the ingredient IDs for this product
+    const { data: ingredients, error: ingredientError } = await supabase
+      .from('product_ingredients')
+      .select('ingredient_id')
+      .eq('product_id', productId);
+    
+    if (!ingredientError && ingredients && ingredients.length > 0) {
+      const ingredientIds = ingredients.map(i => i.ingredient_id);
+      const { data: ingredientClaimsData, error: claimsError } = await supabase
+        .from('claims')
+        .select('claim_text, claim_type, level, country_code')
+        .eq('level', 'ingredient')
+        .in('ingredient_id', ingredientIds);
+      
+      if (!claimsError && ingredientClaimsData) {
+        ingredientClaims = ingredientClaimsData as Claim[];
+      }
+    }
   }
 
-  return data as Claim[];
+  // Add country filter if provided
+  if (countryCode) {
+    brandQuery = brandQuery.or(`country_code.eq.${countryCode},country_code.eq.__GLOBAL__`);
+    if (productQuery) productQuery = productQuery.or(`country_code.eq.${countryCode},country_code.eq.__GLOBAL__`);
+    // Filter ingredient claims by country
+    ingredientClaims = ingredientClaims.filter(claim => 
+      claim.country_code === countryCode || claim.country_code === '__GLOBAL__'
+    );
+  }
+
+  // Execute queries
+  const allClaims: Claim[] = [];
+  
+  // Add brand claims
+  const { data: brandClaims, error: brandError } = await brandQuery;
+  if (brandError) {
+    console.error('Error fetching brand claims:', brandError);
+    throw new Error('Failed to fetch claims for the brand.');
+  }
+  if (brandClaims) {
+    allClaims.push(...(brandClaims as Claim[]));
+  }
+  
+  // Add product claims
+  if (productQuery) {
+    const { data: productClaims, error: productError } = await productQuery;
+    if (productError) {
+      console.error('Error fetching product claims:', productError);
+      throw new Error('Failed to fetch claims for the product.');
+    }
+    if (productClaims) {
+      allClaims.push(...(productClaims as Claim[]));
+    }
+  }
+  
+  // Add ingredient claims
+  allClaims.push(...ingredientClaims);
+
+  return allClaims;
 }
 
 function sortClaims(a: Claim, b: Claim): number {
@@ -48,7 +113,7 @@ function sortClaims(a: Claim, b: Claim): number {
   return 0;
 }
 
-async function prepareProductContextHandler(request: NextRequest, user: User) {
+async function prepareProductContextHandler(request: NextRequest) {
   try {
     const { productId } = await request.json();
 
@@ -160,8 +225,8 @@ ${JSON.stringify(claimsForAI, null, 2)}
     try {
       const cleanedAiData = aiData.replace(/^```json\n|```json|```$/g, '').trim();
       parsedAIResponse = JSON.parse(cleanedAiData);
-    } catch (e: any) {
-      throw new Error(`Failed to parse AI response: ${e.message}`);
+    } catch (e: unknown) {
+      throw new Error(`Failed to parse AI response: ${(e as Error).message}`);
     }
 
     console.log('[prepare-product-context] Successfully parsed AI response:', JSON.stringify(parsedAIResponse, null, 2));
@@ -172,9 +237,9 @@ ${JSON.stringify(claimsForAI, null, 2)}
       styledClaims: parsedAIResponse,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in /api/content/prepare-product-context handler:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 }
 

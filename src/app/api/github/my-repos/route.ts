@@ -1,5 +1,13 @@
 import { NextResponse } from 'next/server';
 
+interface GitHubRepo {
+  name: string;
+  full_name: string;
+  owner: { login: string };
+  private: boolean;
+  has_issues: boolean;
+}
+
 export async function GET() {
   const token = process.env.GITHUB_TOKEN;
 
@@ -19,21 +27,21 @@ export async function GET() {
 
     if (reposResponse.ok) {
       const repos = await reposResponse.json();
-      const mixerRepos = repos.filter((repo: any) => 
+      const mixerRepos = repos.filter((repo: GitHubRepo) => 
         repo.name.toLowerCase().includes('mixer') || 
         repo.name.toLowerCase().includes('mixerai')
       );
       
       return NextResponse.json({
         totalRepos: repos.length,
-        mixerRepos: mixerRepos.map((repo: any) => ({
+        mixerRepos: mixerRepos.map((repo: GitHubRepo) => ({
           name: repo.name,
           full_name: repo.full_name,
           owner: repo.owner.login,
           private: repo.private,
           has_issues: repo.has_issues
         })),
-        allRepos: repos.map((repo: any) => ({
+        allRepos: repos.map((repo: GitHubRepo) => ({
           name: repo.name,
           owner: repo.owner.login
         }))

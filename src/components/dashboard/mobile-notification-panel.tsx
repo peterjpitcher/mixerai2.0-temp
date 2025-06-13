@@ -2,14 +2,12 @@
 
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/sheet';
-import { Button } from '@/components/button';
+import { Button } from '@/components/ui/button';
 import { Bell, CheckCheck, Clock, AlertCircle, X } from 'lucide-react';
-import { ScrollArea } from '@/components/scroll-area';
-import { Badge } from '@/components/badge';
-import { Separator } from '@/components/separator';
-import { Card, CardContent } from '@/components/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 interface Notification {
@@ -217,7 +215,7 @@ export function MobileNotificationPanel() {
                 <div className="flex flex-col items-center justify-center py-12 text-center px-4">
                   <Bell className="h-12 w-12 text-muted-foreground mb-4" />
                   <p className="text-lg font-medium">No notifications</p>
-                  <p className="text-sm text-muted-foreground">You're all caught up!</p>
+                  <p className="text-sm text-muted-foreground">You&apos;re all caught up!</p>
                 </div>
               )}
             </div>

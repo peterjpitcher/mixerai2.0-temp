@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError } from '@/lib/api-utils'; // For consistent error handling
 // import { withAuth } from '@/lib/auth/api-auth'; // No longer used
 import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
+import { User } from '@supabase/supabase-js';
 
 // Template-based brand identity generation (Non-AI)
 function generateBrandIdentityTemplate(brandName: string, country: string, language: string) {
@@ -30,7 +31,8 @@ function generateBrandIdentityTemplate(brandName: string, country: string, langu
 }
 
 // Template-based content generation (Non-AI)
-function generateContentTemplate(title: string, contentType: string, brandIdentity: string) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function generateContentTemplate(title: string, contentType: string, _brandIdentity: string) {
   const templates: {[key: string]: string} = {
     blog: `# ${title}\n\nThis is placeholder text for a blog post about ${title.toLowerCase()}. ...`,
     social: `📣 ${title}\n\nThis is placeholder text for a social media post...`,
@@ -52,7 +54,8 @@ function generateContentTemplate(title: string, contentType: string, brandIdenti
  * NOTE: This endpoint is now protected by admin-only authorization.
  * It should be REMOVED or STRICTLY SECURED if kept in deployment.
  */
-export const POST = withAdminAuth(async (req: NextRequest, user: any) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const POST = withAdminAuth(async (req: NextRequest, _user: User) => {
   try {
     const payload = await req.json();
     const { type, brandName, country, language, contentType, title } = payload;
@@ -82,7 +85,7 @@ export const POST = withAdminAuth(async (req: NextRequest, user: any) => {
     else {
       return NextResponse.json({ success: false, error: 'Invalid generation type. Use "brand-identity" or "content"' }, { status: 400 });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     // console.error removed
     return handleApiError(error, `Template generation test failed`);
   }

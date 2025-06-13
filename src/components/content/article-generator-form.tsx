@@ -2,21 +2,18 @@
 
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
-import { Input } from '@/components/input';
-import { Label } from '@/components/label';
-import { Textarea } from '@/components/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
-import { Separator } from '@/components/separator';
-import { MarkdownDisplay } from './markdown-display';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useRouter } from 'next/navigation';
 import { toast as sonnerToast } from "sonner";
 import { BrandIcon } from '@/components/brand-icon';
 // import { RadioGroup, RadioGroupItem } from '@/components/radio-group'; // File not found, commenting out import
 import { scrapeUrlsFromText, extractUrls } from '@/lib/utils/url-scraper';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/tabs';
-import { SEOCheckItem } from '@/components/seo-check-item';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { RichTextEditor } from '@/components/content/rich-text-editor';
 import { ArticleDetailsSidebar } from './article-details-sidebar';
 import type { Brand } from '@/types/models'; // Import the new Brand type
@@ -55,11 +52,11 @@ export function ArticleGeneratorForm() {
   const [isScrapingUrls, setIsScrapingUrls] = useState(false);
   
   // State for SEO tracking
-  const [contentLastUpdated, setContentLastUpdated] = useState(Date.now());
-  const [hasKeywordInH1, setHasKeywordInH1] = useState(false);
-  const [hasKeywordInH2, setHasKeywordInH2] = useState(false);
-  const [hasKeywordInH3, setHasKeywordInH3] = useState(false);
-  const [hasKeywordInH4, setHasKeywordInH4] = useState(false);
+  // const [contentLastUpdated, setContentLastUpdated] = useState(Date.now());
+  // const [hasKeywordInH1, setHasKeywordInH1] = useState(false);
+  // const [hasKeywordInH2, setHasKeywordInH2] = useState(false);
+  // const [hasKeywordInH3, setHasKeywordInH3] = useState(false);
+  // const [hasKeywordInH4, setHasKeywordInH4] = useState(false);
   
   useEffect(() => {
     // Fetch brands
@@ -85,35 +82,35 @@ export function ArticleGeneratorForm() {
   }, []);
   
   // Check SEO criteria whenever content changes
-  useEffect(() => {
-    if (editableContent && focusKeyword) {
-      const lowercaseKeyword = focusKeyword.toLowerCase();
+  // useEffect(() => {
+  //   if (editableContent && focusKeyword) {
+  //     const lowercaseKeyword = focusKeyword.toLowerCase();
       
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = editableContent;
+  //     const tempDiv = document.createElement('div');
+  //     tempDiv.innerHTML = editableContent;
 
-      const checkKeywordInHeadings = (tag: string): boolean => {
-        const headings = tempDiv.getElementsByTagName(tag);
-        for (let i = 0; i < headings.length; i++) {
-          if (headings[i].textContent?.toLowerCase().includes(lowercaseKeyword)) {
-            return true;
-          }
-        }
-        return false;
-      };
+  //     const checkKeywordInHeadings = (tag: string): boolean => {
+  //       const headings = tempDiv.getElementsByTagName(tag);
+  //       for (let i = 0; i < headings.length; i++) {
+  //         if (headings[i].textContent?.toLowerCase().includes(lowercaseKeyword)) {
+  //           return true;
+  //         }
+  //       }
+  //       return false;
+  //     };
       
-      setHasKeywordInH1(checkKeywordInHeadings('h1'));
-      setHasKeywordInH2(checkKeywordInHeadings('h2'));
-      setHasKeywordInH3(checkKeywordInHeadings('h3'));
-      setHasKeywordInH4(checkKeywordInHeadings('h4'));
-    } else {
-      // Reset if no content or keyword
-      setHasKeywordInH1(false);
-      setHasKeywordInH2(false);
-      setHasKeywordInH3(false);
-      setHasKeywordInH4(false);
-    }
-  }, [editableContent, focusKeyword, contentLastUpdated]);
+  //     setHasKeywordInH1(checkKeywordInHeadings('h1'));
+  //     setHasKeywordInH2(checkKeywordInHeadings('h2'));
+  //     setHasKeywordInH3(checkKeywordInHeadings('h3'));
+  //     setHasKeywordInH4(checkKeywordInHeadings('h4'));
+  //   } else {
+  //     // Reset if no content or keyword
+  //     setHasKeywordInH1(false);
+  //     setHasKeywordInH2(false);
+  //     setHasKeywordInH3(false);
+  //     setHasKeywordInH4(false);
+  //   }
+  // }, [editableContent, focusKeyword, contentLastUpdated]);
   
   const handleGenerateTitles = async () => {
     if (!selectedBrand) {
@@ -1131,9 +1128,9 @@ export function ArticleGeneratorForm() {
       await handleAutoGenerateStimulus();
       
       sonnerToast.success("Auto-generation complete!", { description: "All fields have been populated." });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error during auto-generation chain:", error);
-      sonnerToast.error("Auto-generation Error", { description: error.message || "An error occurred while auto-generating fields." });
+      sonnerToast.error("Auto-generation Error", { description: error instanceof Error ? error.message : "An error occurred while auto-generating fields." });
     } finally {
       setIsGeneratingContent(false);
     }
@@ -1141,7 +1138,7 @@ export function ArticleGeneratorForm() {
   
   const handleContentChange = (newContent: string) => {
     setEditableContent(newContent);
-    setContentLastUpdated(Date.now()); // Trigger SEO check
+    // setContentLastUpdated(Date.now()); // Trigger SEO check
   };
   
   return (
@@ -1203,23 +1200,26 @@ export function ArticleGeneratorForm() {
                 </div>
               </div>
               
-              {/* Commenting out generated titles radio group due to missing RadioGroup component */}
-              {/*
+              {/* Generated titles selection */}
               {generatedTitles.length > 0 && (
                 <div className="space-y-4 mt-4 mb-4">
                   <Label>Select a Title</Label>
-                  <RadioGroup value={selectedTitle} className="space-y-2">
+                  <div className="space-y-2">
                     {generatedTitles.map((title, index) => (
                       <div key={index} className="flex items-start space-x-2">
-                        <RadioGroupItem
+                        <input
+                          type="radio"
+                          name="article-title"
                           value={title}
                           id={`title-${index}`}
-                          onClick={() => handleTitleSelect(title)}
+                          checked={selectedTitle === title}
+                          onChange={() => handleTitleSelect(title)}
+                          className="mt-1"
                         />
                         <Label htmlFor={`title-${index}`} className="cursor-pointer">{title}</Label>
                       </div>
                     ))}
-                  </RadioGroup>
+                  </div>
                   
                   <div className="mt-6 pt-4 border-t">
                     <Label htmlFor="custom-title">Or enter your own title</Label>
@@ -1233,7 +1233,6 @@ export function ArticleGeneratorForm() {
                   </div>
                 </div>
               )}
-              */}
               {/* User can still input title manually using the existing input field below if generatedTitles was the only place for RadioGroup */}
               {/* Ensure there's a way to set selectedTitle - the custom title input should still work */}
               {(generatedTitles.length === 0 || true) && ( // Always show custom title input for now
@@ -1450,7 +1449,7 @@ export function ArticleGeneratorForm() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  Please go back to the "Generate New Article" tab to create an article first.
+                  Please go back to the &quot;Generate New Article&quot; tab to create an article first.
                 </p>
                 <Button onClick={() => setActiveTab('generate')} className="mt-4">
                   Go to Generation Settings

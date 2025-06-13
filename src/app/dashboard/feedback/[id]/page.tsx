@@ -6,6 +6,7 @@ import {
   ArrowLeft, Loader2, AlertTriangle, UserCircle, Tag, List, MessageSquare, 
   CheckSquare, AlertCircle, /*Calendar, Hash, UserCheck, UserCog, Paperclip,*/ // Removed unused icons for cleaner imports
   ClipboardEdit, CheckCircle2, LinkIcon, Globe, Monitor, FileText, LayoutGrid, Bug, Puzzle, Edit3,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   ChevronRight, Calendar
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -20,13 +21,9 @@ import { Breadcrumbs } from '@/components/dashboard/breadcrumbs'; // Added impor
 // import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // ENUM types - should match other feedback files
-const feedbackTypes = ['bug', 'enhancement'] as const;
-const feedbackPriorities = ['low', 'medium', 'high', 'critical'] as const;
-const feedbackStatuses = ['open', 'in_progress', 'resolved', 'closed', 'wont_fix'] as const;
-
-type FeedbackType = typeof feedbackTypes[number];
-type FeedbackPriority = typeof feedbackPriorities[number];
-type FeedbackStatus = typeof feedbackStatuses[number];
+type FeedbackType = 'bug' | 'enhancement';
+type FeedbackPriority = 'low' | 'medium' | 'high' | 'critical';
+type FeedbackStatus = 'open' | 'in_progress' | 'resolved' | 'closed' | 'wont_fix';
 
 interface FeedbackItem {
   title?: string | null;
@@ -102,7 +99,7 @@ export default function FeedbackDetailPage() {
       // Fetch user and check admin status
       const { data: { user } } = await supabaseClient.auth.getUser();
       if (user) {
-        const userRole = (user.app_metadata as any)?.role || user.user_metadata?.role;
+        const userRole = user.app_metadata?.role || user.user_metadata?.role;
         if (userRole === 'admin') {
           setIsAdmin(true);
         }
@@ -119,8 +116,11 @@ export default function FeedbackDetailPage() {
         if (result.success && result.data) {
           const {
             // Destructure and rename as needed, ensure all fields for FeedbackItem are covered
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             id, /*created_at,*/ created_by, created_by_profile, /*updated_at,*/ 
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             assigned_to, assigned_to_profile, attachments_metadata, 
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             user_context,
             ...displayData
           } = result.data;

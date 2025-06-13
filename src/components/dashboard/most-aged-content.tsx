@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Hourglass } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow, differenceInDays } from 'date-fns';
@@ -31,7 +30,7 @@ export function MostAgedContent({ initialContent }: MostAgedContentProps) {
       <CardHeader>
         <CardTitle>Stalled Content</CardTitle>
         <CardDescription>
-          These items haven't been updated in a while and may need attention.
+          These items haven&apos;t been updated in a while and may need attention.
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -4,9 +4,9 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = "force-dynamic";
 
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
+import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
-import { Database, TablesInsert, Enums } from '@/types/supabase';
+import { TablesInsert, Enums } from '@/types/supabase';
 import { User } from '@supabase/supabase-js';
 
 // Define the specific type for content status using Enums if available, or define manually
@@ -141,7 +141,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       const relevantAuthUsers = allAuthUsers.filter(u => userIdsForAuthCheck.has(u.id));
       for (const authUser of relevantAuthUsers) {
         if (authUser.user_metadata && typeof authUser.user_metadata === 'object' && 'avatar_url' in authUser.user_metadata) {
-          const authAvatar = (authUser.user_metadata as any).avatar_url;
+          const authAvatar = (authUser.user_metadata as Record<string, unknown>).avatar_url;
           if (typeof authAvatar === 'string' && authAvatar.trim() !== '') {
             authAvatarsMap.set(authUser.id, authAvatar);
           }
@@ -159,7 +159,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       }
     });
 
-    let assigneeProfilesMap = new Map<string, { id: string, full_name: string | null, avatar_url: string | null }>();
+    const assigneeProfilesMap = new Map<string, { id: string, full_name: string | null, avatar_url: string | null }>();
     if (allAssigneeIdsFromContent.size > 0) {
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
@@ -177,7 +177,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
 
     // --- N+1 FIX: Efficiently fetch all required workflows and their steps ---
     const workflowIds = (contentItems || []).map(item => item.workflow_id).filter((id): id is string => !!id);
-    const workflowsMap = new Map<string, { id: string; name: string; steps: any[] }>();
+    const workflowsMap = new Map<string, { id: string; name: string; steps: unknown[] }>();
 
     if (workflowIds.length > 0) {
       // Fetch all relevant workflows
@@ -211,7 +211,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     }
     // --- END N+1 FIX ---
 
-    const formattedContent = (contentItems || []).map((item, index) => {
+    const formattedContent = (contentItems || []).map((item) => {
       let firstAssignedId: string | null = null;
       const assigneeNames: string[] = [];
       // let firstAssigneeAvatarUrl: string | null = null; // Will be determined with new logic
@@ -287,12 +287,12 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       data: formattedContent,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'Failed to fetch content');
   }
 });
 
-export const POST = withAuth(async (request: NextRequest, user) => {
+export const POST = withAuth(async (request: NextRequest, user: User) => {
   try {
     const data = await request.json();
     
@@ -304,7 +304,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     }
     
     const supabase = createSupabaseAdminClient();
-    const globalRole = user?.user_metadata?.role;
+    const globalRole = user.user_metadata?.role;
     const targetBrandId = data.brand_id;
 
     // Permission check for creating content

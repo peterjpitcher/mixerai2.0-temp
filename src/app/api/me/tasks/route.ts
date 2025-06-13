@@ -82,27 +82,33 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     }
 
     // Adapt the mapping to the TaskItem interface from my-tasks/page.tsx
-    const formattedTasks = contentItems.map((item: any) => ({
-      id: item.id, // Use content.id as the task identifier
-      task_status: item.status === 'pending_review' ? 'pending' : item.status, // Map content status to task status
-      due_date: null, // No direct due_date on content table
-      created_at: item.created_at, // content.created_at could serve as task creation time contextually
-      content_id: item.id,
-      content_title: item.title,
-      content_status: item.status,
-      brand_id: item.brand?.id,
-      brand_name: item.brand?.name,
-      brand_color: item.brand?.brand_color,
-      workflow_id: item.workflow?.id,
-      workflow_name: item.workflow?.name,
-      workflow_step_id: item.workflow_step_details?.id, 
-      workflow_step_name: item.workflow_step_details?.name || 'N/A',
-      workflow_step_order: item.workflow_step_details?.step_order
-    }));
+    const formattedTasks = contentItems.map((item: Record<string, unknown>) => {
+      const brand = item.brand as { id: string; name: string; brand_color: string } | undefined;
+      const workflow = item.workflow as { id: string; name: string } | undefined;
+      const workflow_step_details = item.workflow_step_details as { id: string; name: string; step_order: number } | undefined;
+      
+      return {
+        id: item.id, // Use content.id as the task identifier
+        task_status: item.status === 'pending_review' ? 'pending' : item.status, // Map content status to task status
+        due_date: null, // No direct due_date on content table
+        created_at: item.created_at, // content.created_at could serve as task creation time contextually
+        content_id: item.id,
+        content_title: item.title,
+        content_status: item.status,
+        brand_id: brand?.id,
+        brand_name: brand?.name,
+        brand_color: brand?.brand_color,
+        workflow_id: workflow?.id,
+        workflow_name: workflow?.name,
+        workflow_step_id: workflow_step_details?.id, 
+        workflow_step_name: workflow_step_details?.name || 'N/A',
+        workflow_step_order: workflow_step_details?.step_order
+      };
+    });
 
     return NextResponse.json({ success: true, data: formattedTasks });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'Failed to fetch user tasks');
   }
 }); 

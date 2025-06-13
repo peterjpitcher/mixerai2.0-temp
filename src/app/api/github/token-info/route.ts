@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
 
+interface GitHubOrg {
+  login: string;
+  description: string;
+}
+
 export async function GET() {
   const token = process.env.GITHUB_TOKEN;
 
@@ -44,7 +49,7 @@ export async function GET() {
         hasRepoScope: scopes.includes('repo'),
         hasPublicRepoScope: scopes.includes('public_repo')
       },
-      organizations: orgs.map((org: any) => ({
+      organizations: orgs.map((org: GitHubOrg) => ({
         login: org.login,
         description: org.description
       })),

@@ -7,7 +7,8 @@ import { withAuth } from '@/lib/auth/api-auth';
 export const dynamic = "force-dynamic";
 
 // Mock templates for fallback in development
-const mockTemplates = [
+/* 
+const _mockTemplates = [
   {
     id: "mock-template-1",
     name: "Blog Post Template",
@@ -108,14 +109,15 @@ const mockTemplates = [
     updated_at: "2024-05-08T12:30:15.123456+00:00",
   },
 ];
+*/
 
 /**
  * GET handler for templates, now wrapped with authentication.
  */
-export const GET = withAuth(async (request: NextRequest, user) => {
+export const GET = withAuth(async (request: NextRequest, user: unknown) => {
   try {
     // Role check: Allow Admins (Platform/Scoped) and Editors to list/view content templates
-    if (!(user.user_metadata?.role === 'admin' || user.user_metadata?.role === 'editor')) {
+    if (!((user as { user_metadata?: { role?: string } }).user_metadata?.role === 'admin' || (user as { user_metadata?: { role?: string } }).user_metadata?.role === 'editor')) {
       return NextResponse.json(
         { success: false, error: 'Forbidden: You do not have permission to access this resource.' },
         { status: 403 }
@@ -177,10 +179,10 @@ export const GET = withAuth(async (request: NextRequest, user) => {
 /**
  * POST: Create a new content template, withAuth applied directly.
  */
-export const POST = withAuth(async (request: NextRequest, user) => {
+export const POST = withAuth(async (request: NextRequest, user: unknown) => {
   try {
     // Role check: Only Global Admins can create content templates
-    if (user.user_metadata?.role !== 'admin') {
+    if ((user as { user_metadata?: { role?: string } }).user_metadata?.role !== 'admin') {
       return NextResponse.json(
         { success: false, error: 'Forbidden: You do not have permission to create this resource.' },
         { status: 403 }
@@ -201,8 +203,8 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     
     let generatedDescription = data.description || '';
     try {
-      const inputFieldNames = (data.inputFields || []).map((f: any) => f.name).filter(Boolean);
-      const outputFieldNames = (data.outputFields || []).map((f: any) => f.name).filter(Boolean);
+      const inputFieldNames = (data.inputFields || []).map((f: Record<string, unknown>) => f.name).filter(Boolean);
+      const outputFieldNames = (data.outputFields || []).map((f: Record<string, unknown>) => f.name).filter(Boolean);
 
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
       const aiDescriptionResponse = await fetch(`${baseUrl}/api/ai/generate-template-description`, {
@@ -221,7 +223,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
           generatedDescription = aiData.description;
         }
       }
-    } catch (aiError) {
+    } catch {
       // console.warn('Error calling AI template description generation service:', aiError);
     }
 
@@ -239,7 +241,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         icon: data.icon || null,
         fields: fieldsForDb, // Use the reconstructed fields object
         brand_id: data.brand_id || null,
-        created_by: user.id,
+        created_by: (user as { id: string }).id,
       })
       .select()
       .single();
@@ -260,10 +262,10 @@ export const POST = withAuth(async (request: NextRequest, user) => {
 /**
  * DELETE: Delete a content template, withAuth applied directly.
  */
-export const DELETE = withAuth(async (request: NextRequest, user) => {
+export const DELETE = withAuth(async (request: NextRequest, user: unknown) => {
   try {
     // Role check: Only Global Admins can delete content templates
-    if (user.user_metadata?.role !== 'admin') {
+    if ((user as { user_metadata?: { role?: string } }).user_metadata?.role !== 'admin') {
       return NextResponse.json(
         { success: false, error: 'Forbidden: You do not have permission to delete this resource.' },
         { status: 403 }

@@ -2,9 +2,7 @@
 
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
-import { BarChart, LineChart, PieChart } from '@/components/charts';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface AnalyticsData {
   contentCounts: {
@@ -205,7 +203,7 @@ export function AnalyticsOverview() {
               {/* This would be a real chart in a production app */}
               <div className="flex h-full items-center justify-center">
                 <div className="w-full max-w-md">
-                  {analyticsData.contentByTemplate.map((item, index) => (
+                  {analyticsData.contentByTemplate.map((item) => (
                     <div key={item.label} className="mb-4">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-medium">{item.label}</span>

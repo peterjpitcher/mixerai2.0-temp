@@ -7,15 +7,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { ComboboxOption } from '@/components/ui/MultiSelectCheckboxCombobox';
-import { EffectiveClaim, Claim, MarketClaimOverride, ClaimTypeEnum, ClaimLevelEnum } from '@/lib/claims-utils'; 
+import { Claim, MarketClaimOverride, ClaimTypeEnum } from '@/lib/claims-utils'; 
 import { Heading } from '@/components/ui/heading';
-import { PlusCircle, Edit3, XCircle, Trash2 } from 'lucide-react';
+import { Edit3, Trash2 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { ALL_COUNTRIES_CODE, ALL_COUNTRIES_NAME } from "@/lib/constants/country-codes";
+// import { } from "@/lib/constants/country-codes"; // Removed - empty import
 
 // Base Entity interface
 interface Entity {
@@ -145,9 +145,9 @@ export default function MarketOverridesPage() {
         toast.error(apiResponseOverrides.error ||'Could not load market overrides.'); 
         setMarketOverrides([]); 
       }
-    } catch (error: any) { 
+    } catch (error: unknown) { 
       console.error('Error fetching market overrides:', error); 
-      toast.error(error.message || 'Error fetching market overrides.'); 
+      toast.error(error instanceof Error ? error.message : 'Error fetching market overrides.'); 
       setMarketOverrides([]); 
     }
     finally { setIsLoadingOverrides(false); }
@@ -174,6 +174,7 @@ export default function MarketOverridesPage() {
     }
     const originalMasterClaimLevel = masterClaimDetails.level;
     // Get the specific entity ID from the masterClaimDetails, which should now be correctly populated
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const masterClaimEntityId = masterClaimDetails.product_id || masterClaimDetails.master_brand_id || masterClaimDetails.ingredient_id;
 
     if (isEditOverrideDialogOpen && currentOverrideToEdit) {
@@ -194,6 +195,7 @@ export default function MarketOverridesPage() {
             is_blocked: overrideActionType === 'block',
             replacement_claim_id: overrideActionType === 'replace_existing' && replacementClaimIdInput ? replacementClaimIdInput : null,
         };
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         masterClaimContextId = currentMasterClaimToOverride.id;
     } else {
         toast.error('Invalid state for saving override.'); setIsLoading(false); return;
@@ -240,8 +242,8 @@ export default function MarketOverridesPage() {
             }
             overridePayload.replacement_claim_id = claimResult.data.id;
             overridePayload.is_blocked = false; 
-        } catch (error: any) {
-            toast.error(`Error creating new replacement claim: ${error.message}`);
+        } catch (error: unknown) {
+            toast.error(`Error creating new replacement claim: ${error instanceof Error ? error.message : 'Unknown error'}`);
             setIsLoading(false); return;
         }
     }
@@ -253,7 +255,7 @@ export default function MarketOverridesPage() {
         toast.success(`Market override ${method === 'POST' ? 'created' : 'updated'} successfully!`);
         fetchMarketOverrides(); 
         setIsCreateOverrideDialogOpen(false); setIsEditOverrideDialogOpen(false);
-    } catch (error: any) { console.error(`Error ${method === 'POST' ? 'creating' : 'updating'} override:`, error); toast.error(error.message || `Failed to ${method === 'POST' ? 'create' : 'update'} override.`); }
+    } catch (error: unknown) { console.error(`Error ${method === 'POST' ? 'creating' : 'updating'} override:`, error); toast.error(error instanceof Error ? error.message : `Failed to ${method === 'POST' ? 'create' : 'update'} override.`); }
     finally { setIsLoading(false); }
   };
 
@@ -267,10 +269,11 @@ export default function MarketOverridesPage() {
         toast.success('Market override removed successfully!');
         fetchMarketOverrides(); 
         setIsConfirmDeleteDialogOpen(false); setOverrideToDelete(null);
-    } catch (error: any) { console.error('Error deleting override:', error); toast.error(error.message || 'Failed to remove override.'); }
+    } catch (error: unknown) { console.error('Error deleting override:', error); toast.error(error instanceof Error ? error.message : 'Failed to remove override.'); }
     finally { setIsLoading(false); setIsConfirmDeleteDialogOpen(false);}
   }
   
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const openCreateOverrideDialog = (masterClaim: Claim) => {
     setCurrentMasterClaimToOverride(masterClaim);
     setCurrentOverrideToEdit(null); 
@@ -302,7 +305,7 @@ export default function MarketOverridesPage() {
     setNewReplacementClaimText(override.replacement_claim_text || override.master_claim_text || ''); 
     setNewReplacementClaimType(override.replacement_claim_type || override.master_claim_type || 'allowed');
     // Description for a new replacement claim should probably be empty or from override.replacement_claim_description if we add that to UIMarketClaimOverride
-    setNewReplacementClaimDescription(override.replacement_claim_text && (override as any).replacement_claim_description ? (override as any).replacement_claim_description : ''); 
+    setNewReplacementClaimDescription(override.replacement_claim_text && (override as unknown as Record<string, unknown>).replacement_claim_description ? (override as unknown as Record<string, unknown>).replacement_claim_description as string : ''); 
     
     setIsEditOverrideDialogOpen(true);
     setIsCreateOverrideDialogOpen(false);
@@ -514,10 +517,10 @@ export default function MarketOverridesPage() {
             <DialogHeader>
                 <DialogTitle>Confirm Removal</DialogTitle>
                 <p className="text-sm text-muted-foreground">
-                    Are you sure you want to remove the override for master claim "<strong>{ overrideToDelete?.master_claim_text || 'this claim'}</strong>"?
+                    Are you sure you want to remove the override for master claim &quot;<strong>{ overrideToDelete?.master_claim_text || 'this claim'}</strong>&quot;?
                 </p>
                 <p className="text-sm text-muted-foreground pt-2">
-                     This action will revert its behavior in {availableCountries.find(c=>c.value === selectedCountryCode)?.label || 'the selected market'} for {products.find(p=>p.id === selectedProductId)?.name || 'the selected product'} to the Master claim's original status.
+                     This action will revert its behavior in {availableCountries.find(c=>c.value === selectedCountryCode)?.label || 'the selected market'} for {products.find(p=>p.id === selectedProductId)?.name || 'the selected product'} to the Master claim&apos;s original status.
                 </p>
             </DialogHeader>
             <DialogFooter className="sm:justify-end pt-4">

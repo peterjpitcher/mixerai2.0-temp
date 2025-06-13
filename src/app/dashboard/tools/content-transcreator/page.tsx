@@ -1,18 +1,17 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/card';
-import { Label } from '@/components/label';
-import { Textarea } from '@/components/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { copyToClipboard } from '@/lib/utils/clipboard';
 import { Loader2, ClipboardCopy, Globe, ArrowLeft, AlertTriangle, Briefcase, History, ExternalLink } from 'lucide-react';
-import type { Metadata } from 'next';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Skeleton } from "@/components/skeleton";
+import { Skeleton } from '@/components/ui/skeleton';
 import { BrandIcon } from '@/components/brand-icon';
 import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
@@ -68,8 +67,8 @@ interface ToolRunHistoryItem {
   user_id: string;
   tool_name: string;
   brand_id?: string | null;
-  inputs: any; 
-  outputs: any; 
+  inputs: Record<string, unknown>; 
+  outputs: Record<string, unknown>; 
   run_at: string; 
   status: 'success' | 'failure';
   error_message?: string | null;
@@ -145,10 +144,10 @@ export default function ContentTransCreatorPage() {
           setCurrentUser(null);
           setUserError(userData.error || 'User data not found in session.');
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('[ContentTransCreatorPage] Error fetching initial data:', error);
-        setUserError(error.message || 'An unexpected error occurred while fetching data.');
-        toast.error(error.message || 'Failed to load required data.');
+        setUserError((error as Error).message || 'An unexpected error occurred while fetching data.');
+        toast.error((error as Error).message || 'Failed to load required data.');
       } finally {
         setIsLoadingUser(false);
         setIsLoadingBrands(false);
@@ -164,7 +163,7 @@ export default function ContentTransCreatorPage() {
       const canAccess = userRole === 'admin' || userRole === 'editor';
       setIsAllowedToAccess(canAccess);
       if (!canAccess) {
-        toast.error("You don't have permission to access this tool.");
+        toast.error("You don&apos;t have permission to access this tool.");
       }
       setIsCheckingPermissions(false);
     } else if (!isLoadingUser && !currentUser) {
@@ -193,10 +192,10 @@ export default function ContentTransCreatorPage() {
           setRunHistory([]);
           setHistoryError(data.error || 'History data not found.');
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('[ContentTransCreatorPage] Error fetching run history:', error);
         setRunHistory([]);
-        setHistoryError(error.message || 'An unexpected error occurred while fetching history.');
+        setHistoryError((error as Error).message || 'An unexpected error occurred while fetching history.');
       } finally {
         setIsLoadingHistory(false);
       }
@@ -285,10 +284,10 @@ export default function ContentTransCreatorPage() {
                 setRunHistory([]);
                 setHistoryError(data.error || 'History data not found.');
                 }
-            } catch (error: any) {
+            } catch (error) {
                 console.error('[ContentTransCreatorPage] Error fetching run history post-submit:', error);
                 setRunHistory([]);
-                setHistoryError(error.message || 'An unexpected error occurred while fetching history.');
+                setHistoryError((error as Error).message || 'An unexpected error occurred while fetching history.');
             } finally {
                 setIsLoadingHistory(false);
             }

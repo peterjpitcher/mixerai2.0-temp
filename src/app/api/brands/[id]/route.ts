@@ -3,36 +3,11 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { isBrandAdmin } from '@/lib/auth/api-auth';
-import { getUserAuthByEmail, inviteNewUserWithAppMetadata } from '@/lib/auth/user-management';
-import { User } from '@supabase/supabase-js'; // Ensure User type is available
-import { extractCleanDomain } from '@/lib/utils/url-utils'; // Added import
+import { User } from '@supabase/supabase-js';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
 
-// Type for priority as it comes from Supabase (enum string values)
-// Define these types and helper here as well for this route file
-type SupabaseVettingAgencyPriority = "High" | "Medium" | "Low" | null;
-
-// Helper function to map Supabase priority strings to numbers
-function mapSupabasePriorityToNumber(priority: SupabaseVettingAgencyPriority): number {
-  switch (priority) {
-    case "High": return 1;
-    case "Medium": return 2;
-    case "Low": return 3;
-    default: return Number.MAX_SAFE_INTEGER; // Default for null or unexpected values
-  }
-}
-
-// Interface for vetting agency with numeric priority (for API response)
-interface VettingAgencyForResponse {
-  id: string;
-  name: string;
-  description: string | null;
-  country_code: string;
-  priority: number; // Numeric priority
-  // Add other fields if the original SupabaseVettingAgency had more that are needed.
-}
 
 interface BrandDetailsFromRPC {
   id: string;
@@ -40,15 +15,16 @@ interface BrandDetailsFromRPC {
   // Add all other fields returned by the RPC
   contentCount: number;
   workflowCount: number;
-  [key: string]: any; // Allow other properties
+  [key: string]: unknown; // Allow other properties
 }
 
 // GET a single brand by ID
 export const GET = withAuth(async (
   request: NextRequest,
-  user: any,
-  { params }: { params: { id: string } }
+  user: User,
+  context?: unknown
 ) => {
+  const { params } = context as { params: { id: string } };
   try {
     const supabase = createSupabaseAdminClient();
     const { id: brandId } = params;
@@ -121,7 +97,7 @@ export const GET = withAuth(async (
         'x-data-source': 'database (Supabase RPC)'
       }
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'Error fetching brand');
   }
 });
@@ -129,16 +105,18 @@ export const GET = withAuth(async (
 // PUT endpoint to update a brand
 export const PUT = withAuth(async (
   request: NextRequest,
-  authenticatedUser: any, 
-  context: { params: { id: string } }
+  authenticatedUser: User, 
+  context?: unknown
 ) => {
+  const { params } = context as { params: { id: string } };
+  const brandIdToUpdate = params.id;
   const supabase = createSupabaseAdminClient();
   try {
-    const brandIdToUpdate = context.params.id;
 
     const isGlobalAdmin = authenticatedUser.user_metadata?.role === 'admin';
     if (!isGlobalAdmin) {
-      const hasBrandAdminPermission = await isBrandAdmin(authenticatedUser.id, brandIdToUpdate, supabase);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const hasBrandAdminPermission = await isBrandAdmin(authenticatedUser.id, brandIdToUpdate, supabase as any);
       if (!hasBrandAdminPermission) {
         return NextResponse.json(
           { success: false, error: 'Forbidden: You do not have admin rights for this brand.' },
@@ -163,7 +141,7 @@ export const PUT = withAuth(async (
       p_website_url: body.website_url || null,
       // Ensure additional_website_urls is an array of strings
       p_additional_website_urls: Array.isArray(body.additional_website_urls) 
-        ? body.additional_website_urls.filter((url: any) => typeof url === 'string') 
+        ? body.additional_website_urls.filter((url: unknown) => typeof url === 'string') 
         : [],
       p_country: body.country || null,
       p_language: body.language || null,
@@ -174,17 +152,18 @@ export const PUT = withAuth(async (
       p_master_claim_brand_id: body.master_claim_brand_id === "@none@" || body.master_claim_brand_id === "" ? null : body.master_claim_brand_id,
       // Ensure selected_agency_ids is an array of strings (UUIDs)
       p_selected_agency_ids: Array.isArray(body.selected_agency_ids) 
-        ? body.selected_agency_ids.filter((id: any) => typeof id === 'string') 
+        ? body.selected_agency_ids.filter((id: unknown) => typeof id === 'string') 
         : [],
       // Ensure new_custom_agency_names is an array of strings
       p_new_custom_agency_names: Array.isArray(body.new_custom_agency_names) 
-        ? body.new_custom_agency_names.filter((name: any) => typeof name === 'string') 
+        ? body.new_custom_agency_names.filter((name: unknown) => typeof name === 'string') 
         : [],
       p_user_id: authenticatedUser.id // Pass the authenticated user's ID
     };
 
+
     const { data: updatedBrandData, error: rpcError } = await supabase.rpc(
-      'update_brand_with_agencies' as any, // Cast to any to bypass TS error for new RPC
+      'update_brand_with_agencies',
       rpcParams
     );
 
@@ -197,18 +176,18 @@ export const PUT = withAuth(async (
               if(parsedError.error) {
                 return handleApiError({ message: parsedError.error, details: rpcError }, 'Failed to update brand via RPC.');
               }
-          } catch (e) { /* Fall through to generic error */ }
+          } catch { /* Fall through to generic error */ }
       }
       return handleApiError(rpcError, 'Failed to update brand via RPC.');
     }
 
     // The RPC function is designed to return a JSON object representing the updated brand
     // or an object like { success: false, error: 'message' } if it failed internally
-    if (updatedBrandData && typeof updatedBrandData === 'object' && (updatedBrandData as any).error) {
+    if (updatedBrandData && typeof updatedBrandData === 'object' && (updatedBrandData as { error?: string }).error) {
         // Error explicitly returned from the RPC function's EXCEPTION block
-        console.error(`[API Brands PUT /${brandIdToUpdate}] Error from RPC function:`, (updatedBrandData as any).error);
+        console.error(`[API Brands PUT /${brandIdToUpdate}] Error from RPC function:`, (updatedBrandData as { error?: string }).error);
         return NextResponse.json(
-          { success: false, error: (updatedBrandData as any).error },
+          { success: false, error: (updatedBrandData as { error?: string }).error },
           { status: 500 }
         );
     }
@@ -239,8 +218,8 @@ export const PUT = withAuth(async (
       }
     });
 
-  } catch (error: any) {
-    console.error(`[API Brands PUT /${context.params.id}] General error:`, error);
+  } catch (error: unknown) {
+    console.error(`[API Brands PUT /${brandIdToUpdate}] General error:`, error);
     return handleApiError(error, 'Error updating brand');
   }
 });
@@ -248,12 +227,13 @@ export const PUT = withAuth(async (
 // DELETE a brand by ID (logic remains largely unchanged as it was already Supabase-centric)
 export const DELETE = withAuth(async (
   request: NextRequest,
-  user: any,
-  context: { params: { id: string } }
+  user: User,
+  context?: unknown
 ) => {
+  const { params } = context as { params: { id: string } };
   try {
     const supabase = createSupabaseAdminClient();
-    const brandIdToDelete = context.params.id;
+    const brandIdToDelete = params.id;
     
     // Role check: Only Global Admins can delete brands
     if (user.user_metadata?.role !== 'admin') {
@@ -337,7 +317,7 @@ export const DELETE = withAuth(async (
            return NextResponse.json({ success: false, error: 'Brand not found or already deleted.' }, { status: 404 });
       }
       const detailedError = new Error(`RPC Error: ${rpcError.message} (Code: ${rpcError.code}) Details: ${rpcError.details} Hint: ${rpcError.hint}`);
-      (detailedError as any).cause = rpcError;
+      (detailedError as { cause?: unknown }).cause = rpcError;
       throw detailedError;
     }
     

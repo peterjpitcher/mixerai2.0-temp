@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError } from '@/lib/api-utils'; // Import for consistent error handling
 // import { withAuth } from '@/lib/auth/api-auth'; // No longer used
 import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
+import { User } from '@supabase/supabase-js';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -82,7 +83,8 @@ const mockTemplates = [
  * GET: Returns mock templates for testing. Admin-only access required.
  * This endpoint should be REMOVED or STRICTLY SECURED if kept in deployment.
  */
-export const GET = withAdminAuth(async (request: NextRequest, user: any) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const GET = withAdminAuth(async (request: NextRequest, _user: User) => {
   // Console.log removed
   try {
     const url = new URL(request.url);

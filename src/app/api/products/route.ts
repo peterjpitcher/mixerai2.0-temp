@@ -16,7 +16,7 @@ interface Product {
 }
 
 // GET handler for all products
-export const GET = withAuth(async (req: NextRequest, user: User) => {
+export const GET = withAuth(async () => {
     // TODO: Implement filtering by master_brand_id if needed as a query param
     // TODO: Implement permission checks - user might only see products for brands they have access to.
     try {
@@ -26,7 +26,6 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
         }
 
         const supabase = createSupabaseAdminClient();
-        // @ts-ignore
         const { data, error } = await supabase.from('products')
             .select('*') // Consider selecting specific fields or related data like brand name
             .order('name');
@@ -36,18 +35,18 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
             return handleApiError(error, 'Failed to fetch products');
         }
         
-        const validatedData = Array.isArray(data) ? data.map((item: any) => ({
+        const validatedData = Array.isArray(data) ? data.map((item) => ({
             id: item.id,
             name: item.name,
             description: item.description,
-            master_brand_id: item.master_brand_id, // Renamed
+            master_brand_id: item.master_brand_id || '', // Handle nullable master_brand_id
             created_at: item.created_at,
             updated_at: item.updated_at
-        })) : [];
+        })).filter(item => item.master_brand_id !== '') : []; // Filter out products without master_brand_id
 
         return NextResponse.json({ success: true, data: validatedData as Product[] });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[API Products GET] Catched error:', error);
         return handleApiError(error, 'An unexpected error occurred while fetching products.');
     }
@@ -84,7 +83,6 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
         let hasPermission = user?.user_metadata?.role === 'admin';
 
         if (!hasPermission && master_brand_id) { // Renamed
-            // @ts-ignore
             const { data: mcbData, error: mcbError } = await supabase // Renamed gcbData to mcbData
                 .from('master_claim_brands') // Renamed table
                 .select('mixerai_brand_id')
@@ -95,7 +93,6 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
                 console.error(`[API Products POST] Error fetching MCB or MCB not linked for permissions (MCB ID: ${master_brand_id}):`, mcbError);
                 // Deny if MCB not found or not linked to a core MixerAI brand
             } else {
-                // @ts-ignore
                 const { data: permissionsData, error: permissionsError } = await supabase
                     .from('user_brand_permissions')
                     .select('role')
@@ -129,7 +126,6 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
             master_brand_id: master_brand_id // Renamed
         };
 
-        // @ts-ignore
         const { data, error } = await supabase.from('products')
             .insert(newRecord)
             .select()
@@ -137,13 +133,16 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 
         if (error) {
             console.error('[API Products POST] Error creating product:', error);
-            if ((error as any).code === '23505') { // Unique violation for (master_brand_id, name)
+            interface PostgresError extends Error {
+                code?: string;
+            }
+            if ((error as PostgresError).code === '23505') { // Unique violation for (master_brand_id, name)
                  return NextResponse.json(
                     { success: false, error: 'A product with this name already exists for this brand.' },
                     { status: 409 } // Conflict
                 );
             }
-            if ((error as any).code === '23503') { // Foreign key violation for master_brand_id
+            if ((error as PostgresError).code === '23503') { // Foreign key violation for master_brand_id
                 return NextResponse.json(
                    { success: false, error: 'Invalid Master Brand ID. The specified brand does not exist.' }, // Renamed
                    { status: 400 } // Bad request
@@ -152,7 +151,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
             return handleApiError(error, 'Failed to create product.');
         }
 
-        const singleDataObject = data as any;
+        const singleDataObject = data as Product;
         const validatedData: Product = {
             id: singleDataObject.id,
             name: singleDataObject.name,
@@ -164,9 +163,9 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 
         return NextResponse.json({ success: true, data: validatedData }, { status: 201 });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[API Products POST] Catched error:', error);
-        if (error.name === 'SyntaxError') { // JSON parsing error
+        if (error instanceof Error && error.name === 'SyntaxError') { // JSON parsing error
             return NextResponse.json({ success: false, error: 'Invalid JSON payload.' }, { status: 400 });
         }
         return handleApiError(error, 'An unexpected error occurred while creating the product.');

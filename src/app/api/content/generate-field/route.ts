@@ -1,13 +1,14 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server'; // For DB access with RLS
+// import { createSupabaseServerClient } from '@/lib/supabase/server'; // For DB access with RLS
 import { generateTextCompletion } from '@/lib/azure/openai';
 import { withAuth } from '@/lib/auth/api-auth'; // Use the withAuth wrapper
-import type { OutputField, ContentTemplate as Template } from '@/types/template';
+import type { ContentTemplate as Template } from '@/types/template';
 import type { Brand } from '@/types/models'; // Corrected Brand type import
 import { User } from '@supabase/supabase-js';
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
 
 // Helper function to get template details
-async function getTemplateDetails(templateId: string, supabaseClient: any): Promise<Template | null> {
+async function getTemplateDetails(templateId: string, supabaseClient: ReturnType<typeof createSupabaseAdminClient>): Promise<Template | null> {
   const { data: template, error } = await supabaseClient
     .from('content_templates')
     .select('*, inputFields:content_template_input_fields(*), outputFields:content_template_output_fields(*)')
@@ -18,11 +19,12 @@ async function getTemplateDetails(templateId: string, supabaseClient: any): Prom
     console.error('[generate-field] Error fetching template details:', error);
     return null;
   }
-  return template as Template;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return template as any as Template;
 }
 
 // Helper function to get brand details
-async function getBrandDetails(brandId: string, supabaseClient: any): Promise<Brand | null> {
+async function getBrandDetails(brandId: string, supabaseClient: ReturnType<typeof createSupabaseAdminClient>): Promise<Brand | null> {
   const { data: brand, error } = await supabaseClient
     .from('brands')
     .select('*')
@@ -72,7 +74,9 @@ function interpolatePrompt(
   return interpolated;
 }
 
-export const POST = withAuth(async (req: NextRequest, user: User, supabase: any) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const POST = withAuth(async (req: NextRequest, _user: User) => {
+  const supabase = createSupabaseAdminClient();
   try {
     const body = await req.json();
     const {
@@ -170,12 +174,12 @@ export const POST = withAuth(async (req: NextRequest, user: User, supabase: any)
       field_name: outputFieldToGenerate.name
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[generate-field] Error:', error);
-    return NextResponse.json({ success: false, error: error.message || 'An unexpected error occurred' }, { status: 500 });
+    return NextResponse.json({ success: false, error: (error as Error).message || 'An unexpected error occurred' }, { status: 500 });
   }
 });
 
-export async function OPTIONS(request: NextRequest) {
+export async function OPTIONS() {
   return NextResponse.json({}, { status: 200 });
 } 

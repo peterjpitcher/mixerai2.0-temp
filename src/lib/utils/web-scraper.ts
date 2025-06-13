@@ -68,7 +68,7 @@ function extractTextFromHtml(html: string): string {
     $('script, style, nav, footer, aside, header, [role="navigation"], [role="banner"], [role="contentinfo"] ').remove();
 
     // Attempt to get text from common main content containers first
-    let mainContentText = $('main, article, [role="main"], .content, #content, .main, #main').text();
+    const mainContentText = $('main, article, [role="main"], .content, #content, .main, #main').text();
 
     let extractedText = '';
 

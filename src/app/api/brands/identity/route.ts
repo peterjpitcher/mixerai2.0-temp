@@ -19,7 +19,7 @@ const getOpenAIClientOrThrow = () => {
         defaultQuery: { 'api-version': process.env.AZURE_OPENAI_API_VERSION || '2023-05-15' },
         defaultHeaders: { 'api-key': process.env.AZURE_OPENAI_API_KEY },
       });
-    } catch (azureError) {
+    } catch {
       // Log actual azureError to a secure server-side logging system in production
       // Fall through to check standard OpenAI if Azure init fails but standard one is configured
     }
@@ -27,7 +27,7 @@ const getOpenAIClientOrThrow = () => {
   if (process.env.OPENAI_API_KEY) {
     try {
       return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    } catch (openAIError) {
+    } catch {
       // Log actual openAIError to a secure server-side logging system in production
       throw new Error('Standard OpenAI client initialization failed. Check API key.');
     }
@@ -40,7 +40,7 @@ function isValidUrl(url: string): boolean {
   try {
     new URL(url);
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 }
@@ -70,6 +70,7 @@ function getLanguageName(languageCode: string): string {
 // Function to extract website content from a URL
 async function scrapeWebsiteContent(url: string): Promise<string> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const axios = require('axios');
     const response = await axios.get(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 compatible MixerAIContentScraper/1.0', 'Accept': 'text/html', 'Accept-Language': 'en-GB,en;q=0.5' },
@@ -87,14 +88,14 @@ async function scrapeWebsiteContent(url: string): Promise<string> {
       .trim();
     
     return textContent;
-  } catch (error: any) {
+  } catch {
     // Log scraping errors to a secure server-side log in production.
     // Return an empty string or a specific marker if content extraction fails, rather than error string in content.
     return ''; // Or throw a specific error to be handled upstream
   }
 }
 
-export const POST = withAuthAndMonitoring(async (req: NextRequest, user) => {
+export const POST = withAuthAndMonitoring(async (req: NextRequest) => {
   // Rate limiting logic remains as is for now.
   const ip = req.headers.get('x-forwarded-for') || req.ip || 'unknown'; // Enhanced IP detection
   const now = Date.now();
@@ -228,7 +229,7 @@ Remember that ALL text fields (except potentially within agency names) must be w
       let jsonData;
       try {
         jsonData = JSON.parse(completion);
-      } catch (e) {
+      } catch {
         // Log this parsing error securely on server-side in production
         throw new Error('AI service returned malformed JSON. Please try again.');
       }
@@ -247,7 +248,7 @@ Remember that ALL text fields (except potentially within agency names) must be w
       const requiredKeys = ['brandIdentity', 'toneOfVoice', 'guardrails', 'suggestedAgencies', 'brandColor'];
       for (const key of requiredKeys) {
         if (!(key in result) || result[key as keyof typeof result] === undefined) {
-          (result as any)[key] = null; // Set to null if undefined or missing
+          (result as Record<string, unknown>)[key] = null; // Set to null if undefined or missing
         }
       }
 

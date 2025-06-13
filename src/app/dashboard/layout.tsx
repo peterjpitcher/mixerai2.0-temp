@@ -1,14 +1,14 @@
 'use client';
 
 import Link from "next/link";
-import { Button } from "@/components/button";
+import { Button } from '@/components/ui/button';
 // import { NotificationCenter } from "@/components/dashboard/notification-center";
 import { UnifiedNavigation } from "@/components/layout/unified-navigation";
 import { BottomMobileNavigation } from "@/components/layout/BottomMobileNavigation";
 import { useRouter } from "next/navigation";
 import { createSupabaseClient } from "@/lib/supabase/client";
 import { toast as sonnerToast } from "sonner";
-import { LogOut, UserCircle2, ChevronDown, Loader2 } from "lucide-react";
+import { LogOut, UserCircle2, Loader2 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
 import Image from 'next/image';
 import { DevelopmentOnly } from "@/components/development-only";
@@ -62,7 +62,7 @@ export default function DashboardLayout({
           // console.error("[DashboardLayout] Failed to get user data from /api/me:", data.error);
           // Potentially redirect to login if user is null and not on a public part of dashboard
         }
-      } catch (error) {
+      } catch {
         // console.error('[DashboardLayout] Error fetching current user:', error);
         setCurrentUser(null);
       } finally {
@@ -82,8 +82,8 @@ export default function DashboardLayout({
 
       router.push('/auth/login');
       router.refresh(); // Ensures the layout re-evaluates auth state
-    } catch (error: any) {
-      sonnerToast.error(error?.message || "There was a problem signing out. Please try again.");
+    } catch (error) {
+      sonnerToast.error((error as Error)?.message || "There was a problem signing out. Please try again.");
     }
   };
 

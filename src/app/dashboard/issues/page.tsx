@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, ExternalLink, MessageSquare, User, Search, AlertCircle, ChevronDown, ChevronRight, Tag } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface PriorityLabel {
   name: string;
@@ -399,13 +400,15 @@ export default function IssuesPage() {
                                     {issue.assignees && issue.assignees.length > 0 && (
                                       <div className="flex -space-x-1">
                                         {issue.assignees.slice(0, 3).map((assignee) => (
-                                          <img
-                                            key={assignee.id}
-                                            src={assignee.avatar_url}
-                                            alt={assignee.login}
-                                            className="h-4 w-4 rounded-full border border-background"
-                                            title={assignee.login}
-                                          />
+                                          <div key={assignee.id} className="relative h-4 w-4 rounded-full border border-background overflow-hidden">
+                                            <Image
+                                              src={assignee.avatar_url}
+                                              alt={assignee.login}
+                                              fill
+                                              className="object-cover"
+                                              title={assignee.login}
+                                            />
+                                          </div>
                                         ))}
                                         {issue.assignees.length > 3 && (
                                           <span className="h-4 px-1 text-xs bg-muted rounded-full border border-background flex items-center">

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from 'sonner';
-import { Loader2, ArrowLeft, Save, AlertTriangle, Sprout } from "lucide-react";
+import { Loader2, ArrowLeft, Save, AlertTriangle,  } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 import { Checkbox } from "@/components/ui/checkbox";

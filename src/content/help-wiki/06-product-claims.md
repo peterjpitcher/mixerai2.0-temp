@@ -1,66 +1,102 @@
-# Product Claims Management
+# Working with Product Claims
 
-MixerAI 2.0 provides a comprehensive system for managing product claims across different markets and regulatory environments. This allows you to define master claims, create market-specific variations, and ensure compliance.
+Claims are approved statements about your products that can be used in marketing content. MixerAI ensures you only use verified claims that meet regulatory requirements.
 
-## Key Concepts
+## Using Claims in Content
 
-Understanding these terms is crucial for effectively using the Product Claims features:
+### How do claims work in my content?
 
-*   **Master Claims**: These are foundational claims defined at a central level. They represent the core messaging for a product or ingredient. You manage these under "Claim Brands" (previously Master Claim Brands).
-*   **Market Claims**: These are claims specific to a particular country or market. They can be variations of Master Claims or entirely new claims tailored to local regulations and consumer understanding.
-*   **Claim Levels**: Claims can be associated with different levels in your product hierarchy:
-    *   **Brand Level**: General claims applicable to an entire MixerAI Brand (linked via a "Claim Brand").
-    *   **Product Level**: Claims specific to individual products.
-    *   **Ingredient Level**: Claims related to specific ingredients within products.
-*   **Claim Stacking & Precedence**: When determining the final, effective claims for a product in a specific market, a "stacking" logic applies:
-    *   **Specificity Wins**: Product-level claims take precedence over Ingredient-level claims, which in turn take precedence over Brand-level claims.
-    *   **Market Wins**: Claims specific to a country override global (All Countries) claims.
-    *   **Disallowed Overrides Allowed**: A "Disallowed" claim will always override an "Allowed" claim if they are at the same or higher level of precedence for the given market.
-*   **"All Countries" Scope**: A special market scope used to define claims that are generally applicable unless a more specific country override exists.
+1. When you select products in a template, their claims are automatically included
+2. The AI uses these claims when generating content
+3. Claims appear formatted according to your brand guidelines
+4. You cannot edit claim text directly (for compliance reasons)
 
-## Core Features & UI Navigation
+### How do I see what claims a product has?
 
-### 1. Claims Matrix (Preview)
-*   **Navigation**: `Dashboard > Product Claims > Claims Matrix` (typically linked from `/dashboard/claims/preview`)
-*   **Purpose**: This is the central hub for viewing the "stacked" or effective claims for all your products across various markets. It shows you exactly what claim will apply to a product in a selected country.
-*   **Functionality**:
-    *   Select products and markets to view their claim status.
-    *   Identify master claims and any market-specific overrides.
-    *   Initiate market overrides (block a master claim or replace it).
+1. Click **Claims** → **Products** in navigation
+2. Find your product in the list
+3. Click on the product name
+4. View all associated claims
 
-### 2. Defining Claims
-*   **Navigation**: `Dashboard > Product Claims > Define Claims` (typically linked from `/dashboard/claims/definitions`)
-*   **Purpose**: Create and manage both Master Claims and Market-Specific claims.
-*   **Functionality**:
-    *   Specify claim text, type (Allowed, Disallowed, Mandatory), level (Brand, Product, Ingredient), and associated entities (products, ingredients, claim brands).
-    *   Assign claims to specific markets (countries) or "All Countries".
+### What if I need different claim wording?
 
-### 3. Managing Core Entities
-To support the claims system, you'll also manage:
-*   **Claim Brands**: `Dashboard > Product Claims > Claim Brands` (previously Master Claim Brands). These group master claims, often linked to a primary MixerAI Brand.
-*   **Products**: `Dashboard > Product Claims > Products`. Define your product catalog.
-*   **Ingredients**: `Dashboard > Product Claims > Ingredients`. Manage the list of ingredients used in your products.
+Contact your admin or legal team. Claims must be approved before use. They can:
+- Create brand-specific versions
+- Add market-specific overrides
+- Update claim language
 
-### 4. Market Overrides
-*   **Navigation**: `Dashboard > Product Claims > Market Overrides`. You can view and manage existing overrides here, though overrides are typically created via the Claims Matrix.
-*   **Purpose**: To explicitly change how a Master Claim applies to a specific product in a particular market.
-*   **Actions**:
-    *   **Block**: Prevent a Master Claim from applying.
-    *   **Block and Replace**: Prevent a Master Claim and select an existing Market Claim as its replacement.
+## Managing Claims (Admin)
 
-### 5. AI-Powered Replacement Claim Suggestions
-*   **Context**: When creating a "Block and Replace" market override via the Claims Matrix.
-*   **Functionality**: An "Get AI Suggestions" button appears in the override modal.
-    *   The system sends the master claim text, product details, brand context, and target market to an AI.
-    *   The AI suggests suitable replacement claims, along with reasoning.
-    *   This helps you quickly find or formulate compliant and contextually appropriate claims. The AI suggestions are for guidance; you still select or create the final replacement claim.
+### How do I assign claims to products?
 
-## General Workflow
-1.  Define your **Products**, **Ingredients**, and **Claim Brands**.
-2.  Create **Master Claims** under `Define Claims`, associating them with the relevant Claim Brands, Products, or Ingredients and setting their scope (e.g., "All Countries").
-3.  Use the **Claims Matrix** to review how these Master Claims apply across different products and markets.
-4.  If a Master Claim is unsuitable for a specific product in a specific market, create a **Market Override** directly from the Matrix.
-    *   You might block it entirely.
-    *   Or, block it and replace it with an existing Market Claim (which you might have created in `Define Claims`) or use AI suggestions to help you choose/create a suitable replacement.
+1. Go to **Claims** → **Products**
+2. Click on a product
+3. Click **Edit Claims**
+4. Check boxes next to claims to add
+5. Uncheck to remove
+6. Click **Save Changes**
 
-By leveraging these tools, you can maintain a clear, compliant, and effective claims strategy for your products globally. 
+### How do I create brand-specific claims?
+
+1. Go to **Claims** → **Brand Claims**
+2. Click **New Brand Claim**
+3. Select the master claim to customize
+4. Choose your brand
+5. Enter the brand-specific wording
+6. Select applicable markets
+7. Click **Save**
+
+### How do I handle different markets?
+
+1. Go to **Claims** → **Overrides**
+2. Click **New Override**
+3. Select the claim and market
+4. Enter market-specific text
+5. Add any compliance notes
+6. Click **Save**
+
+## Claims Tools
+
+### Simplifying Claims
+
+To make claims more consumer-friendly:
+1. Go to **Claims** → **Brand Claims**
+2. Select a claim
+3. Click **Simplify with AI**
+4. Review the suggestion
+5. Edit if needed
+6. Save the simplified version
+
+### Styling Claims for Brand Voice
+
+1. Select multiple claims
+2. Click **Style for Brand**
+3. Choose your brand
+4. AI adapts claims to brand voice
+5. Review and approve changes
+
+## Common Questions
+
+### Why can't I edit claim text in my content?
+
+Claims are legally approved text that cannot be modified to ensure compliance. If you need different wording, request a new claim version through proper channels.
+
+### How do I know which claims to use?
+
+- Your template may preselect products with claims
+- The AI automatically includes relevant claims
+- Check with your brand manager for guidance
+
+### What's the difference between product and ingredient claims?
+
+- **Product claims**: Specific to that product
+- **Ingredient claims**: Apply to all products with that ingredient
+
+Both types are included when you select a product.
+
+## Best Practices
+
+- Always verify claims are current before using
+- Don't paraphrase claims in your content
+- Let the AI handle claim integration
+- Report any claim issues to your admin

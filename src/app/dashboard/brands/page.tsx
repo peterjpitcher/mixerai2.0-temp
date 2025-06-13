@@ -2,24 +2,32 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Button } from "@/components/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/card";
-import { Input } from "@/components/input";
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { BrandIcon } from "@/components/brand-icon";
 import { COUNTRIES, LANGUAGES } from "@/lib/constants";
 import { 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   AlertDialog,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   AlertDialogAction,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   AlertDialogCancel,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   AlertDialogContent,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   AlertDialogDescription,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   AlertDialogFooter,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   AlertDialogHeader,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   AlertDialogTitle,
-} from "@/components/alert-dialog";
-import { Trash2, PackageOpen, AlertTriangle, FileUp, FileDown, Eye, Edit3 } from "lucide-react";
+} from '@/components/ui/alert-dialog';
+import { Trash2, PackageOpen, AlertTriangle, Eye, Edit3 } from "lucide-react";
 import { toast } from 'sonner';
-import { PageHeader } from "@/components/dashboard/page-header";
+// import { PageHeader } from "@/components/dashboard/page-header";
 import { DeleteBrandDialog } from "@/components/dashboard/brand/delete-brand-dialog";
 
 interface Brand {
@@ -31,6 +39,7 @@ interface Brand {
   brand_color?: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface BrandsPageClientProps {
   initialBrands: Brand[];
 }

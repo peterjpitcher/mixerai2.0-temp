@@ -1,79 +1,133 @@
-# Understanding & Managing Workflows in MixerAI
+# Understanding Workflows
 
-Workflows in MixerAI are essential for standardising your [content](./?article=03-content) approval process, ensuring quality control, and facilitating collaboration among team members. This guide explains what workflows are, how they function, and how to manage them. You can typically [manage workflow templates here](https://mixerai.orangejelly.co.uk/dashboard/workflows).
+Workflows are approval processes that ensure content is reviewed before publication. Each workflow has steps that must be completed in order.
 
-## What are Workflows?
+## Following a Workflow
 
-A Workflow is a pre-defined sequence of steps that a piece of [content](./?article=03-content) must go through from its initial draft to final approval (and sometimes beyond, to publication). Each step can be assigned to a specific user or a user role (e.g., "Legal Team Reviewer" - see [User Management](./?article=07-users) for roles).
+### How do I submit content to a workflow?
 
-Think of a workflow as an assembly line for your content. It ensures that:
-*   The right people review the content at the right time.
-*   All necessary checks (e.g., editorial, legal, [brand](./?article=02-brands) compliance) are completed.
-*   There's a clear path for content to move forward or be sent back for revisions.
+When you create content:
+1. Select a template
+2. Choose a brand
+3. The workflow is automatically assigned based on the brand and template combination
+4. Content enters the workflow when you save it
 
-## How Workflows Function in MixerAI:
+**Note**: You cannot manually select a workflow - it's determined by your brand and template selection.
 
-1.  **Workflow Assignment:**
-    *   When a new piece of [content is created](./?article=03-content), it is often automatically assigned a specific workflow. This assignment can be based on the **Brand** the content belongs to or its **Content Type** (which might be linked to a [Template](./?article=04-templates)).
-    *   In some cases, users might be able to manually select a workflow for a piece of content if multiple workflows are applicable.
+### How do I track my content through workflow?
 
-2.  **Workflow Steps & Statuses:**
-    *   Each workflow consists of one or more ordered **steps**. Examples of steps:
-        *   Step 1: Content Draft
-        *   Step 2: Editorial Review
-        *   Step 3: SEO Check
-        *   Step 4: Legal Approval
-        *   Step 5: Final Marketing Sign-off
-    *   A piece of content will always be at a **current step** within its assigned workflow.
-    *   As a step is completed (e.g., an editor approves the content), the content automatically moves to the **next step** in the sequence.
-    *   If a reviewer at a certain step requests changes, the content might be moved **back to a previous step** (e.g., back to "Content Draft").
+1. Open your content from the Content list
+2. Look for workflow information in the content details
+3. You'll see:
+   - Current workflow step
+   - Who's assigned to review
+   - Workflow status
 
-3.  **Task Assignment & Notifications:**
-    *   When content arrives at a workflow step, the user(s) responsible for that step are typically notified (e.g., via email or an in-app notification in their ["My Tasks" section](./?article=06-my-tasks)).
-    *   This user then reviews the content and takes an action (e.g., "Approve," "Request Revisions," "Reject").
+### What happens after I submit?
 
-4.  **Tracking Workflow Progress:**
-    *   Users can usually see the current workflow status and step of any piece of content by viewing its details within the [Content section](https://mixerai.orangejelly.co.uk/dashboard/content).
-    *   There might also be visual indicators in content lists showing which workflow step the content is currently in.
+1. Content goes to the first workflow step
+2. Assigned reviewer gets the task in their My Tasks
+3. They can either:
+   - **Approve** - Moves to next step
+   - **Reject** - Workflow stops, you get notified
+4. Process continues until all steps complete
 
-## Managing Workflow Templates (Usually for Admins or Senior Roles):
+## Reviewing Content
 
-If you have the necessary permissions, you can typically create and manage the workflow templates that are used across MixerAI:
+### How do I review content assigned to me?
 
-1.  **Accessing Workflow Management:** Look for a "Workflows" or "Workflow Templates" section in the main dashboard navigation, or use the [direct link to Workflows](https://mixerai.orangejelly.co.uk/dashboard/workflows).
+1. Click **My Tasks** in navigation
+2. Find content awaiting your review
+3. Click to open the content
+4. Review the content
+5. Choose an action:
+   - **Approve** - Content advances
+   - **Reject** - Workflow stops (must provide feedback)
 
-2.  **Viewing Existing Workflow Templates:** You'll see a list of all defined workflow templates. This might show the workflow name, a description, and the number of steps.
+### Important limitations:
 
-3.  **Creating a New Workflow Template:**
-    *   Click on "+ New Workflow" or a similar button (e.g., on the [Workflows page](https://mixerai.orangejelly.co.uk/dashboard/workflows) or via a [direct link to create new workflows](https://mixerai.orangejelly.co.uk/dashboard/workflows/new)).
-    *   **Name & Description:** Give your workflow a clear name (e.g., "Standard Blog Post Approval") and a brief description.
-    *   **Defining Steps:** This is the core of creating a workflow.
-        *   Add steps in the desired order.
-        *   For each step, you'll define:
-            *   **Step Name:** (e.g., "First Draft Review," "Compliance Check").
-            *   **Assignee(s):** Specify which user(s) or user role(s) are responsible for completing this step. (e.g., assign to "Jane Doe" or to anyone with the "Editor" role - roles defined in [User Management](./?article=07-users)).
-            *   **Allowed Actions:** Define what actions the assignee can take (e.g., "Approve and send to next step," "Send back to previous step for revision," "Reject content").
-            *   **Notifications:** Configure who gets notified when content reaches or leaves this step (see [Managing Your Account](./?article=08-account) for notification preferences).
-    *   Save the workflow template.
+- No "Request Changes" option - only approve or reject
+- Cannot reassign to another reviewer
+- Cannot skip workflow steps
+- If changes are needed, you must reject with feedback
 
-4.  **Editing an Existing Workflow Template:**
-    *   Select a workflow template from the list to modify it (e.g., `https://mixerai.orangejelly.co.uk/dashboard/workflows/[ID]/edit`).
-    *   You can usually reorder steps, edit step details (name, assignees, actions), add new steps, or remove steps.
-    *   **Caution:** Modifying an active workflow template can impact content currently in that workflow. Some systems might only apply changes to new content, while others might try to adapt existing content (this can be complex).
+## Creating Workflows (Admin)
 
-5.  **Duplicating/Deleting Workflows:** Similar to templates, you might be able to duplicate an existing workflow to make a new similar one, or delete workflows that are no longer in use.
+### How do I create a new workflow?
 
-## Benefits of Using Workflows:
+1. Click **Workflows** in navigation
+2. Click **New Workflow**
+3. Enter workflow details:
+   - **Name** - Clear, descriptive name
+   - **Description** - When to use this workflow
+   - **Brand** - Which brand this workflow is for
+   - **Template** - Which template triggers this workflow
+4. Add workflow steps (see below)
+5. Click **Save Workflow**
 
-*   **Standardisation:** Ensures a consistent process for all content.
-*   **Accountability:** Clearly defines who is responsible at each stage.
-*   **Efficiency:** Automates the hand-off between team members, reducing delays.
-*   **Quality Assurance:** Incorporates necessary review and approval stages.
-*   **Transparency:** Everyone can see where a piece of content is in the approval process.
+### How do I add steps to a workflow?
 
-## Need More Help?
+1. In the workflow editor, click **Add Step**
+2. Configure the step:
+   - **Step Name** - What happens here (e.g., "Editor Review")
+   - **Assigned Users** - Select specific users who can review
+   - **Order** - Steps execute in this sequence
+3. Add more steps as needed
+4. Save the workflow
 
-If you need assistance understanding how workflows function, creating effective workflow templates, or managing content within its workflow, please contact Peter Pitcher:
+### Workflow Assignment Rules
 
-*   **Email:** [peter.pitcher@genmills.com](mailto:peter.pitcher@genmills.com)
-*   **Microsoft Teams:** [peter.pitcher@genmills.com](https://teams.microsoft.com/l/chat/0/0?users=peter.pitcher@genmills.com) 
+- Each brand can have multiple workflows
+- Each workflow is tied to a specific template
+- When content is created with that template for that brand, the workflow is automatically applied
+- Users must be explicitly assigned to workflow steps
+
+## Common Workflow Patterns
+
+### Basic Review
+1. Editor Review - Check quality
+2. Publish
+
+### Multi-step Approval
+1. Editor Review - Content quality
+2. Manager Approval - Final check
+3. Publish
+
+## Troubleshooting
+
+### My content doesn't have a workflow
+
+- Check if a workflow exists for your brand/template combination
+- Contact your admin to create the needed workflow
+
+### Content is stuck in workflow
+
+- Check who's assigned to the current step
+- They are the only ones who can approve/reject
+- Contact them directly for status
+
+### I can't approve content
+
+Make sure:
+- You're assigned to the current workflow step
+- You're viewing the content through My Tasks
+- The content is actually at your step
+
+## Best Practices
+
+### For Content Creators
+- Understand which template triggers which workflow
+- Make content as complete as possible before saving
+- Respond quickly to rejection feedback
+
+### For Reviewers
+- Check My Tasks daily
+- Review thoroughly before approving
+- Provide specific feedback when rejecting
+- Communicate directly with creators about needed changes
+
+### For Workflow Admins
+- Keep workflows simple (2-3 steps maximum)
+- Assign multiple users to each step for coverage
+- Name steps clearly (what's being reviewed)
+- Test workflows before activating

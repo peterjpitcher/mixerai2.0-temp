@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { Card, CardContent } from '@/components/card';
 import { cn } from "@/lib/utils";
 
 interface ChartProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -24,7 +23,7 @@ export function BarChart({
   return (
     <div className={cn("w-full", className)} style={{ height }} {...props}>
       <div className="flex h-full items-end justify-between">
-        {data.map((item, index) => (
+        {data.map((item) => (
           <div key={item.label} className="flex flex-col items-center">
             <div
               className="bg-primary w-12 rounded-t-md"

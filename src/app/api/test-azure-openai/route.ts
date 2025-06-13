@@ -7,7 +7,8 @@ import { handleApiError } from '@/lib/api-utils';
 /**
  * GET: Test basic Azure OpenAI connectivity (admin only).
  */
-export const GET = withAdminAuth(async (req: NextRequest, user) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const GET = withAdminAuth(async (_req: NextRequest, _user) => {
   try {
     const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
     const azureApiKey = process.env.AZURE_OPENAI_API_KEY;
@@ -57,7 +58,7 @@ export const GET = withAdminAuth(async (req: NextRequest, user) => {
       apiVersion: azureApiVersion
     });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, `Azure OpenAI GET test failed`);
   }
 });
@@ -65,7 +66,8 @@ export const GET = withAdminAuth(async (req: NextRequest, user) => {
 /**
  * POST: Test Azure OpenAI with custom prompt (admin only).
  */
-export const POST = withAdminAuth(async (req: NextRequest, user) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const POST = withAdminAuth(async (req: NextRequest, _user) => {
   try {
     const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
     const azureApiKey = process.env.AZURE_OPENAI_API_KEY;
@@ -120,7 +122,7 @@ export const POST = withAdminAuth(async (req: NextRequest, user) => {
       apiVersion: azureApiVersion
     });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, `Azure OpenAI POST test failed`);
   }
 }); 

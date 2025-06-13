@@ -7,36 +7,8 @@ import { z } from 'zod';
 
 export const dynamic = "force-dynamic";
 
-// ENUM types mirroring the database
-type ClaimTypeEnum = 'allowed' | 'disallowed' | 'mandatory';
-type ClaimLevelEnum = 'brand' | 'product' | 'ingredient';
 
-interface Claim {
-    id: string;
-    claim_text: string;
-    claim_type: ClaimTypeEnum;
-    level: ClaimLevelEnum;
-    master_brand_id?: string | null;
-    product_id?: string | null;
-    ingredient_id?: string | null;
-    country_code: string; // Can be '__GLOBAL__' or ISO country code
-    description?: string | null;
-    created_by?: string | null;
-    created_at?: string;
-    updated_at?: string;
-}
 
-// For POST request, allowing multiple product_ids and country_codes
-interface ClaimPostRequestData {
-    claim_text: string;
-    claim_type: ClaimTypeEnum;
-    level: ClaimLevelEnum;
-    master_brand_id?: string; // Required if level is 'brand'
-    product_ids?: string[];   // Required if level is 'product', can be multiple
-    ingredient_id?: string; // Required if level is 'ingredient'
-    country_codes: string[]; // Can be multiple, including '__GLOBAL__'
-    description?: string;
-}
 
 // Define the expected schema for a single claim entry in the database
 const dbClaimSchema = z.object({
@@ -72,7 +44,7 @@ const requestBodySchema = z.object({
 });
 
 // GET handler for all claims
-export const GET = withAuth(async (req: NextRequest, user: User) => {
+export const GET = withAuth(async (req: NextRequest) => {
     try {
         if (isBuildPhase()) {
             console.log('[API Claims GET] Build phase: returning empty array.');
@@ -108,7 +80,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
         }
 
         if (levelFilter && ['brand', 'product', 'ingredient'].includes(levelFilter)) {
-            query = query.eq('level', levelFilter);
+            query = query.eq('level', levelFilter as 'brand' | 'product' | 'ingredient');
         }
         
         const { data, error } = await query.order('created_at', { ascending: false });
@@ -119,7 +91,8 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
         }
 
         // Process data to flatten joined names
-        const processedData = Array.isArray(data) ? data.map((claim: Record<string, unknown>) => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const processedData = Array.isArray(data) ? data.map((claim: any) => ({
             ...claim,
             master_brand_name: (claim.master_claim_brands && typeof claim.master_claim_brands === 'object' && claim.master_claim_brands !== null && 'name' in claim.master_claim_brands) ? claim.master_claim_brands.name : null,
             product_names: (claim.products && typeof claim.products === 'object' && claim.products !== null && 'name' in claim.products) ? [claim.products.name] : [],
@@ -149,7 +122,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
     let rawBody;
     try {
         rawBody = await req.json();
-    } catch (e) {
+    } catch {
         return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
     }
     

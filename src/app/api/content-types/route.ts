@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
  * GET: Retrieve all content types.
  * Requires authentication.
  */
-export const GET = withAuth(async (request: NextRequest, user: any) => {
+export const GET = withAuth(async () => {
   try {
     const supabase = createSupabaseAdminClient();
 

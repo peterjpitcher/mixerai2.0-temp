@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from 'sonner';
 import { 
   Loader2, ArrowLeft, Save, AlertTriangle, Package, Building2, FileText,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   Globe, Tag, ShieldCheck, ShieldOff, ShieldAlert, Sprout, Info, Search
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -218,7 +219,7 @@ export default function EditProductPage() {
     }
 
     fetchProductRelatedData();
-  }, [id]);
+  }, [id, error]);
 
   // Effect for fetching stacked claims
   useEffect(() => {
@@ -507,7 +508,7 @@ export default function EditProductPage() {
             </ScrollArea>
           ) : (
             <p className="text-sm text-muted-foreground">
-              No ingredients available to associate. You can add ingredients from the 'Ingredients' section.
+              No ingredients available to associate. You can add ingredients from the &apos;Ingredients&apos; section.
             </p>
           )}
         </CardContent>
@@ -529,9 +530,9 @@ export default function EditProductPage() {
                 </SelectTrigger>
                 <SelectContent className="max-h-72">
                   <SelectItem value={ALL_COUNTRIES_CODE}><span className="truncate">{ALL_COUNTRIES_NAME} (Effective Total)</span></SelectItem>
-                  {Array.isArray(countries) ? countries.map((country: any) => {
-                    const countryCode = typeof country === 'object' && country.code ? country.code : typeof country === 'string' ? country : 'unknown';
-                    const countryName = typeof country === 'object' && country.name ? country.name : typeof country === 'string' ? country : 'Unknown Country';
+                  {Array.isArray(countries) ? countries.map((country: unknown) => {
+                    const countryCode = typeof country === 'object' && country !== null && (country as { code?: string }).code ? (country as { code: string }).code : typeof country === 'string' ? country : 'unknown';
+                    const countryName = typeof country === 'object' && country !== null && (country as { name?: string }).name ? (country as { name: string }).name : typeof country === 'string' ? country : 'Unknown Country';
                     return (
                       <SelectItem key={countryCode} value={countryCode}>
                         <span className="truncate">{countryName}</span>

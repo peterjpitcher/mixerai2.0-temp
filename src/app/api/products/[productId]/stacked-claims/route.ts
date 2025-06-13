@@ -9,7 +9,8 @@ interface RouteParams {
   productId: string;
 }
 
-export const GET = withAuth(async (req: NextRequest, user: User, { params }: { params: RouteParams }) => {
+export const GET = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+  const { params } = context as { params: RouteParams };
   const { productId } = params;
   const { searchParams } = new URL(req.url);
   const countryCode = searchParams.get('countryCode');
@@ -31,7 +32,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, { params }: { p
 
     if (!hasPermission) {
       // Fetch the product to get its master_brand_id for permission validation
-      // @ts-ignore
+
       const { data: productData, error: productFetchError } = await supabase
         .from('products')
         .select('master_brand_id')
@@ -53,7 +54,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, { params }: { p
       const productMasterBrandId = productData.master_brand_id;
 
       // Now fetch the master_claim_brand to get its mixerai_brand_id
-      // @ts-ignore
+
       const { data: masterClaimBrandData, error: mcbError } = await supabase
         .from('master_claim_brands')
         .select('id, mixerai_brand_id')
@@ -71,7 +72,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, { params }: { p
         // hasPermission remains false
       } else {
         const coreBrandId = masterClaimBrandData.mixerai_brand_id;
-        // @ts-ignore
+
         const { data: permissionsData, error: permissionsError } = await supabase
           .from('user_brand_permissions')
           .select('brand_id, role') // Select necessary fields
@@ -112,7 +113,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, { params }: { p
 
     return NextResponse.json({ success: true, data: effectiveClaims });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`[API /products/${productId}/stacked-claims] Error:`, error);
     let errorMessage = 'An unexpected error occurred while fetching stacked claims.';
     if (error instanceof Error) {

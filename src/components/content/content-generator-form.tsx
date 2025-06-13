@@ -2,19 +2,18 @@
 
 import * as React from 'react';
 import { useState, useEffect, useMemo } from 'react';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
-import { Input } from '@/components/input';
-import { Label } from '@/components/label';
-import { Textarea } from '@/components/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
-import { Separator } from '@/components/separator';
-import { MarkdownDisplay } from './markdown-display';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { RichTextEditor } from './rich-text-editor';
 import { useRouter } from 'next/navigation';
 import { BrandIcon } from '@/components/brand-icon';
 import { toast } from 'sonner';
-import { Loader2, ArrowLeft, PlusCircle, Sparkles, ShieldAlert, Info } from 'lucide-react';
+import { Loader2, ArrowLeft, Sparkles, Info, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 import type { InputField, OutputField, ContentTemplate as Template, SelectOptions, FieldType } from '@/types/template';
 import { ProductSelect } from './product-select';
@@ -64,6 +63,7 @@ const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) =
 export { ContentGeneratorForm } from './content-generator-form-refactored';
 
 // Original implementation preserved below for reference
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ContentGeneratorFormOriginal({ templateId }: ContentGeneratorFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -95,7 +95,6 @@ function ContentGeneratorFormOriginal({ templateId }: ContentGeneratorFormProps)
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
   const [productContext, setProductContext] = useState<ProductContext | null>(null);
-  const [isFetchingProductContext, setIsFetchingProductContext] = useState(false);
 
   const currentBrand = allBrands.find(b => b.id === selectedBrand);
 
@@ -237,7 +236,7 @@ function ContentGeneratorFormOriginal({ templateId }: ContentGeneratorFormProps)
             setAssociatedWorkflowDetails(null);
             setCanGenerateContent(false);
           }
-        } catch (error) {
+        } catch {
           toast.error('Error fetching specific workflow details.');
           setAssociatedWorkflowDetails(null);
           setCanGenerateContent(false);
@@ -256,7 +255,6 @@ function ContentGeneratorFormOriginal({ templateId }: ContentGeneratorFormProps)
 
     if (fieldType === 'product-selector') {
       if (value) {
-        setIsFetchingProductContext(true);
         setProductContext(null);
         
         const abortController = new AbortController();
@@ -293,7 +291,7 @@ function ContentGeneratorFormOriginal({ templateId }: ContentGeneratorFormProps)
             console.error('Error fetching product context:', error);
           }
         } finally {
-          setIsFetchingProductContext(false);
+          // Product context fetching completed
         }
         
         // Cleanup function to abort if component unmounts or brand changes
@@ -619,7 +617,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
       } else {
         toast.error(data.error || 'Failed to save content.');
       }
-    } catch (error) { toast.error('Error saving content.'); }
+    } catch { toast.error('Error saving content.'); }
     finally { setIsSaving(false); }
   };
   
@@ -653,6 +651,13 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
             </p>
           </div>
         </div>
+        <Link 
+          href="/dashboard/help?article=03-content" 
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <HelpCircle className="h-4 w-4" />
+          Need help?
+        </Link>
       </div>
       
       {isLoadingCoreData && !initialDataLoaded && (
@@ -751,7 +756,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
                               <Select value={templateFieldValues[field.id] || ''} onValueChange={(value) => handleTemplateFieldChange(field.id, value)}>
                                 <SelectTrigger id={field.id}><SelectValue placeholder={`Select ${field.name}`} /></SelectTrigger>
                                 <SelectContent>
-                                  {(options.choices || []).map(choice => (<SelectItem key={choice} value={choice}>{choice}</SelectItem>))}
+                                  {(options.choices || []).map(choice => (<SelectItem key={choice.value} value={choice.value}>{choice.label}</SelectItem>))}
                                 </SelectContent>
                               </Select>
                             );
@@ -762,7 +767,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
                                 brandId={selectedBrand}
                                 value={(templateFieldValues[field.id] as string) || ''}
                                 onChange={(value) => handleTemplateFieldChange(field.id, value || '', field.type)}
-                                isMultiSelect={(field.options as any)?.isMultiSelect || false}
+                                isMultiSelect={(field.options as SelectOptions & { isMultiSelect?: boolean })?.isMultiSelect ? false : undefined}
                               />
                             );
                           case 'tags':

@@ -1,54 +1,207 @@
-# Managing Your Tasks in MixerAI
+# My Tasks
 
-The "My Tasks" section in MixerAI is your personalised action centre. It aggregates all [content pieces](./?article=03-content) and [workflow steps](./?article=05-workflows) that specifically require your input, helping you stay organised and on top of your responsibilities. You can [access your tasks here](https://mixerai.orangejelly.co.uk/dashboard/my-tasks).
+## Overview
 
-## What is "My Tasks"?
+My Tasks is your personal command center in MixerAI, showing all content and workflow items that need your attention. It helps you stay organized, meet deadlines, and ensure nothing falls through the cracks.
 
-Think of "My Tasks" as your dynamic to-do list within the MixerAI platform. Whenever a piece of [content](./?article=03-content) reaches a [workflow step](./?article=05-workflows) where you are an assigned reviewer or editor, or if a specific action is delegated to you, it will appear here. This ensures you don't miss important items that are pending your action.
+## Accessing My Tasks
 
-Key functions of the "My Tasks" section:
-*   **Centralised View:** See all items needing your attention in one place.
-*   **Action-Oriented:** Clearly indicates what action is expected from you.
-*   **Workflow Integration:** Directly linked to the [content](./?article=03-content) and its current position in the approval [workflow](./?article=05-workflows).
+### Quick Access
+- Click **My Tasks** in the main navigation menu
+- Look for the task count badge showing pending items
+- Access via dashboard widget (if configured)
+- Use keyboard shortcut: `Ctrl/Cmd + Shift + T`
 
-## How to Use "My Tasks" Effectively:
+## Understanding Your Task List
 
-1.  **Accessing Your Tasks:**
-    *   Look for a "My Tasks," "Tasks," or sometimes an icon like a checkmark or list in the main dashboard navigation menu. Or, use the [direct link to My Tasks](https://mixerai.orangejelly.co.uk/dashboard/my-tasks).
-    *   Clicking this will take you to your tasks list.
+### Task Types
 
-2.  **Understanding the Task List:** Your task list will typically display several pieces of information for each item:
-    *   **Content Title:** The name of the blog post, social media update, etc., that requires your attention. Often, this is a clickable link that takes you directly to the content item (e.g., `https://mixerai.orangejelly.co.uk/dashboard/content/[ID]/edit`).
-    *   **Assigned Action/Step:** What you need to do (e.g., "Review Draft," "Approve Legal Compliance," "Edit for SEO"). This relates to a step in a [Workflow](./?article=05-workflows).
-    *   **Brand:** The [brand](./?article=02-brands) associated with the content.
-    *   **Due Date (if applicable):** Some tasks might have a deadline.
-    *   **Date Assigned:** When the task appeared on your list.
-    *   **Priority (if applicable):** Some systems might allow tasks to be prioritised.
+1. **Workflow Tasks**
+   - Content awaiting your review/approval
+   - Assigned workflow steps
+   - Shows current workflow stage
 
-3.  **Actioning a Task:**
-    *   **Click on the Task:** Select a task from your list. This will usually navigate you directly to the relevant content item within the editor or a specific review interface.
-    *   **Perform the Required Action:** Review the content, make edits if necessary, and then use the workflow action buttons (e.g., "Approve," "Request Revisions," "Submit for Next Step").
-    *   *Example:* If your task is "Review Editorial Draft," you would read the content, potentially make edits or leave comments, and then click an "Approve" button to move it to the next [workflow step](./?article=05-workflows), or a "Request Revisions" button to send it back to the author with your feedback.
+2. **Content Assignments**
+   - Content assigned to you for creation
+   - Editing assignments
+   - Collaboration requests
 
-4.  **Task Completion and Removal:**
-    *   Once you successfully complete the required action (e.g., approve a review, submit your edits), the task will typically be automatically removed from your "My Tasks" list or marked as complete.
-    *   This keeps your list clean and focused on pending items.
+3. **Revision Requests**
+   - Content returned for changes
+   - Feedback to address
+   - Required updates
 
-## Staying Organised with "My Tasks":
+### Task Information
 
-*   **Check Regularly:** Make it a habit to check your ["My Tasks" section](https://mixerai.orangejelly.co.uk/dashboard/my-tasks) at least once a day, or more frequently if you handle a high volume of content.
-*   **Prioritise:** If your list is long, pay attention to due dates or any priority indicators to tackle the most urgent items first.
-*   **Don't Let Tasks Pile Up:** Addressing tasks promptly helps keep the entire content workflow moving smoothly for your team.
-*   **Understand the Context:** Before actioning a task, make sure you understand what is expected of you at that particular [workflow step](./?article=05-workflows). Refer to the main [Workflows article](./?article=05-workflows) if needed.
+Each task displays:
+- **Title**: Content name or task description
+- **Type**: Workflow step, assignment, or revision
+- **Brand**: Associated brand (with avatar)
+- **Due Date**: When action is needed
+- **Priority**: High, medium, or low
+- **Status**: New, in progress, overdue
+- **Requester**: Who assigned or submitted
 
-## Troubleshooting Common Task Issues:
+## Task Views and Filters
 
-*   **Task not appearing?** Ensure you are correctly assigned to the relevant [workflow step](./?article=05-workflows) for that [content type](./?article=04-templates) or [brand](./?article=02-brands). Check with your administrator (see [User Management](./?article=07-users)) if you believe you should be seeing a task but aren't.
-*   **Unsure what to do?** If the task description is unclear, refer to the [workflow definition](./?article=05-workflows) or ask the person who assigned the task (or your manager) for clarification.
+### Default Views
 
-## Need More Help?
+1. **All Tasks**: Everything assigned to you
+2. **Due Today**: Tasks due within 24 hours
+3. **Overdue**: Past due date tasks
+4. **High Priority**: Urgent items only
+5. **By Brand**: Grouped by brand
 
-If you have questions about how to use your "My Tasks" section, what a specific task requires, or if you encounter any issues, please contact Peter Pitcher:
+### Filtering Options
 
-*   **Email:** [peter.pitcher@genmills.com](mailto:peter.pitcher@genmills.com)
-*   **Microsoft Teams:** [peter.pitcher@genmills.com](https://teams.microsoft.com/l/chat/0/0?users=peter.pitcher@genmills.com) 
+- **By Status**: New, in progress, completed
+- **By Type**: Workflow, assignment, revision
+- **By Brand**: Specific brand tasks
+- **By Date**: Due date ranges
+- **By Priority**: High, medium, low
+
+### Sorting
+
+- Due date (default)
+- Priority
+- Date assigned
+- Brand name
+- Content type
+
+## Managing Tasks
+
+### Taking Action
+
+1. **Click on a task** to open detail view
+2. **Review** the content or request
+3. **Take action**:
+   - Approve/Reject (workflow tasks)
+   - Complete (assignments)
+   - Submit (revisions)
+4. **Add comments** if needed
+5. **Update status** automatically on action
+
+### Task Actions
+
+**For Workflow Tasks:**
+- ✅ **Approve**: Move to next workflow step
+- 🔄 **Request Changes**: Send back with feedback
+- ❌ **Reject**: Stop workflow with reason
+- ➡️ **Reassign**: Transfer to another user
+
+**For Assignments:**
+- ✏️ **Start/Edit**: Begin working on content
+- ✅ **Complete**: Mark as done
+- 💬 **Comment**: Add notes or questions
+- 🔄 **Request Help**: Ask for clarification
+
+**For Revisions:**
+- 👀 **Review Feedback**: See what needs changing
+- ✏️ **Make Changes**: Edit the content
+- ✅ **Resubmit**: Send back for re-review
+- 💬 **Respond**: Reply to feedback
+
+### Bulk Actions
+
+1. Select multiple tasks using checkboxes
+2. Choose bulk action:
+   - Mark as read/unread
+   - Change priority
+   - Reassign to team member
+   - Add tags
+
+## Task Notifications
+
+### Email Notifications
+- New task assignments
+- Due date reminders
+- Overdue alerts
+- Task completions
+
+### In-App Notifications
+- Real-time task updates
+- Browser notifications (if enabled)
+- Dashboard alerts
+- Mobile app push (if available)
+
+### Notification Settings
+1. Go to **Account Settings**
+2. Click **Notifications**
+3. Configure:
+   - Email frequency
+   - Notification types
+   - Quiet hours
+   - Digest preferences
+
+## Best Practices
+
+### Daily Task Management
+
+1. **Morning Review**: Check tasks first thing
+2. **Prioritize**: Focus on urgent/important items
+3. **Time Block**: Allocate time for complex tasks
+4. **Update Progress**: Keep status current
+5. **End of Day**: Clear completed, plan tomorrow
+
+### Staying Organized
+
+1. **Use Filters**: Don't get overwhelmed by all tasks
+2. **Set Realistic Deadlines**: When creating content
+3. **Communicate**: Use comments for clarity
+4. **Delegate**: Reassign when appropriate
+5. **Regular Cleanup**: Archive completed tasks
+
+### Avoiding Overdue Tasks
+
+1. **Check Daily**: Don't let tasks pile up
+2. **Set Reminders**: Use calendar integration
+3. **Ask for Extensions**: Communicate early if needed
+4. **Break Down Large Tasks**: Make them manageable
+5. **Use Priority Levels**: Focus on what matters
+
+## Troubleshooting
+
+### Not Seeing Expected Tasks?
+- Refresh the page
+- Check your filters
+- Verify brand permissions
+- Look in completed/archived
+- Contact task creator
+
+### Can't Complete a Task?
+- Ensure all required fields are filled
+- Check for validation errors
+- Verify you have permission
+- Look for system messages
+- Try in a different browser
+
+### Overloaded with Tasks?
+- Talk to your manager about workload
+- Request deadline adjustments
+- Delegate where possible
+- Focus on priorities
+- Use bulk actions efficiently
+
+## Tips for Power Users
+
+### Keyboard Shortcuts
+- `J/K`: Navigate up/down task list
+- `Enter`: Open selected task
+- `A`: Approve (in workflow)
+- `R`: Request changes
+- `C`: Add comment
+- `?`: Show all shortcuts
+
+### Advanced Features
+- **Save Custom Filters**: Create your views
+- **Export Tasks**: Download task list
+- **Calendar Sync**: See tasks in calendar
+- **API Access**: Integrate with other tools
+- **Custom Notifications**: Set complex rules
+
+### Productivity Tips
+1. **Batch Similar Tasks**: Review all blog posts together
+2. **Use Templates**: For common feedback
+3. **Quick Actions**: Learn keyboard shortcuts
+4. **Focus Mode**: Hide non-urgent tasks
+5. **Time Tracking**: Monitor task duration

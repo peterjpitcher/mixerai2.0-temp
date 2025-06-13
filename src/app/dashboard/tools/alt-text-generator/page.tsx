@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/card';
-import { Label } from '@/components/label';
-import { Textarea } from "@/components/textarea";
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Loader2, ClipboardCopy, Image as ImageIcon, ArrowLeft, Info, AlertTriangle, ExternalLink, Languages, History } from 'lucide-react';
+import { Loader2, ClipboardCopy, Image as ImageIcon, ArrowLeft, AlertTriangle, ExternalLink, Languages, History } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -17,7 +17,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/table";
+} from '@/components/ui/table';
 import { Progress } from "@/components/ui/progress";
 import {
   Select,
@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/skeleton";
+import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
@@ -95,7 +95,7 @@ const getLanguageFromDomain = (url: string): string => {
       }
     }
     return 'en';
-  } catch (error) {
+  } catch {
     return 'en'; 
   }
 };
@@ -106,8 +106,8 @@ interface ToolRunHistoryItem {
   user_id: string;
   tool_name: string;
   brand_id?: string | null;
-  inputs: any; // Consider defining a more specific type if inputs structure is consistent
-  outputs: any; // Consider defining a more specific type if outputs structure is consistent
+  inputs: Record<string, unknown>; // Consider defining a more specific type if inputs structure is consistent
+  outputs: Record<string, unknown>; // Consider defining a more specific type if outputs structure is consistent
   run_at: string; // Assuming TIMESTAMPTZ comes as string
   status: 'success' | 'failure';
   error_message?: string | null;
@@ -158,10 +158,10 @@ export default function AltTextGeneratorPage() {
           setCurrentUser(null);
           setUserError(data.error || 'User data not found in session.');
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('[AltTextGeneratorPage] Error fetching current user:', error);
         setCurrentUser(null);
-        setUserError(error.message || 'An unexpected error occurred while fetching user data.');
+        setUserError((error as Error).message || 'An unexpected error occurred while fetching user data.');
       } finally {
         setIsLoadingUser(false);
       }
@@ -223,10 +223,10 @@ export default function AltTextGeneratorPage() {
           setRunHistory([]);
           setHistoryError(data.error || 'History data not found.');
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('[AltTextGeneratorPage] Error fetching run history:', error);
         setRunHistory([]);
-        setHistoryError(error.message || 'An unexpected error occurred while fetching history.');
+        setHistoryError((error as Error).message || 'An unexpected error occurred while fetching history.');
       } finally {
         setIsLoadingHistory(false);
       }
@@ -341,10 +341,10 @@ export default function AltTextGeneratorPage() {
                 setRunHistory([]);
                 setHistoryError(data.error || 'History data not found.');
                 }
-            } catch (error: any) {
+            } catch (error) {
                 console.error('[AltTextGeneratorPage] Error fetching run history post-submit:', error);
                 setRunHistory([]);
-                setHistoryError(error.message || 'An unexpected error occurred while fetching history.');
+                setHistoryError((error as Error).message || 'An unexpected error occurred while fetching history.');
             } finally {
                 setIsLoadingHistory(false);
             }
@@ -370,7 +370,7 @@ export default function AltTextGeneratorPage() {
     }
   };
 
-  const successfulResults = results.filter(r => !r.error && r.altText);
+  // const successfulResults = results.filter(r => !r.error && r.altText);
   // const errorResults = results.filter(r => r.error); // This variable is not used
 
   // --- Loading and Access Denied States ---
@@ -600,7 +600,7 @@ export default function AltTextGeneratorPage() {
                 <div className="text-center text-muted-foreground py-8">
                   <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                   <p className="text-lg font-medium">No alt text generated yet.</p>
-                  <p>Enter image URLs above and click "Generate Alt Text" to see results here.</p>
+                  <p>Enter image URLs above and click &quot;Generate Alt Text&quot; to see results here.</p>
                 </div>
               )}
               {isLoading && totalCount > 0 && results.length === 0 && (

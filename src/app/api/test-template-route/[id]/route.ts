@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError } from '@/lib/api-utils'; // Import for consistent error handling
 // import { withAuth } from '@/lib/auth/api-auth'; // No longer used
 import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
+import { User } from '@supabase/supabase-js';
 
 export const dynamic = "force-dynamic";
 
@@ -10,9 +11,10 @@ export const dynamic = "force-dynamic";
  * NOTE: This route is for development/testing purposes only and should be REMOVED
  * or STRICTLY SECURED if kept in deployment.
  */
-export const GET = withAdminAuth(async (request: NextRequest, user: any, context: { params: { id: string } }) => {
+export const GET = withAdminAuth(async (_request: NextRequest, _user: User, context?: unknown) => {
+  const { params } = context as { params: { id: string } };
   try {
-    const id = context?.params?.id;
+    const id = params?.id;
     
     if (!id) {
       return NextResponse.json(

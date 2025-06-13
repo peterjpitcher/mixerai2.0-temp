@@ -8,8 +8,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/dialog";
-import { Button } from "@/components/button";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { AlertTriangle } from "lucide-react";
 
 interface ConfirmDialogProps {

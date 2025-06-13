@@ -27,7 +27,7 @@ export const GET = withAuthAndMonitoring(async (request: NextRequest) => {
     let parsedUrl: URL;
     try {
       parsedUrl = new URL(urlToProxy);
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { success: false, error: 'Invalid URL format provided' },
         { status: 400 }
@@ -48,7 +48,7 @@ export const GET = withAuthAndMonitoring(async (request: NextRequest) => {
     try {
       const lookupResult = await dns.promises.lookup(parsedUrl.hostname);
       resolvedIp = lookupResult.address;
-    } catch (dnsError: any) {
+    } catch (dnsError) {
       console.error(`DNS lookup failed for ${parsedUrl.hostname}:`, dnsError);
       return NextResponse.json(
         { success: false, error: `Could not resolve hostname: ${parsedUrl.hostname}` },
@@ -96,8 +96,8 @@ export const GET = withAuthAndMonitoring(async (request: NextRequest) => {
         'Content-Type': contentType,
       },
     });
-  } catch (error: any) {
-     if (error.name === 'TimeoutError') {
+  } catch (error) {
+     if (error instanceof Error && error.name === 'TimeoutError') {
         return NextResponse.json(
             { success: false, error: 'Request to the target URL timed out after 10 seconds.' },
             { status: 504 } // Gateway Timeout

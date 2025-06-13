@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client'; // Import Supabase client
 import { handleApiError } from '@/lib/api-utils'; // For consistent error handling
 import { withAuth } from '@/lib/auth/api-auth';
@@ -34,7 +34,7 @@ interface VettingAgencyForApiResponse {
   // original_priority_string: SupabaseVettingAgencyPriority; 
 }
 
-export const GET = withAuth(async (request: Request, user: any) => {
+export const GET = withAuth(async () => {
   try {
     const supabase = createSupabaseAdminClient();
 
@@ -72,7 +72,7 @@ export const GET = withAuth(async (request: Request, user: any) => {
 
     return NextResponse.json({ success: true, data: processedAgencies });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'Error fetching content vetting agencies');
   }
 }); 

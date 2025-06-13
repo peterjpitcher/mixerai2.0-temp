@@ -11,10 +11,10 @@ import { User } from '@supabase/supabase-js';
  * @param handler The API route handler function that requires authentication
  * @returns A new route handler with authentication
  */
-export function withRouteAuth<T>(
-  handler: (req: NextRequest, user: User, context: any) => Promise<Response>
+export function withRouteAuth(
+  handler: (req: NextRequest, user: User, context: Record<string, unknown>) => Promise<Response>
 ) {
-  return async (req: NextRequest, context: any) => {
+  return async (req: NextRequest, context: Record<string, unknown>) => {
     try {
       const cookieStore = cookies();
       

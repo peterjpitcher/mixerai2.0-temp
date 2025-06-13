@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea"; // Added for description
 import { toast } from 'sonner';
-import { Loader2, ArrowLeft, Save, Sprout } from "lucide-react";
+import { Loader2, ArrowLeft, Save,  } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 
 interface IngredientFormData {

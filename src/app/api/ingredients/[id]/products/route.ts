@@ -16,15 +16,11 @@ interface ProductDetails {
     // associated_at: string;
 }
 
-interface RequestContext {
-    params: {
-        id: string;
-    };
-}
 
 // GET handler for fetching all products for a specific ingredient
-export const GET = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
-    const { id } = context.params;
+export const GET = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+    const { params } = context as { params: { id: string } };
+    const { id } = params;
 
     if (!id || typeof id !== 'string') {
         return NextResponse.json({ success: false, error: 'Ingredient ID is required and must be a string.' }, { status: 400 });
@@ -36,7 +32,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
         const supabase = createSupabaseAdminClient();
 
         // Check if ingredient exists first (optional, but good practice)
-        // @ts-ignore
+
         const { data: ingredientData, error: ingredientError } = await supabase.from('ingredients')
             .select('id')
             .eq('id', id)
@@ -49,7 +45,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
 
         // Fetch associated products
         // The query selects all columns from products table by joining through product_ingredients
-        // @ts-ignore
+
         const { data, error } = await supabase.from('product_ingredients')
             .select('products (*)') // Fetches all columns from the related 'products' table
             .eq('ingredient_id', id);
@@ -60,13 +56,14 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
         }
 
         // Data structure: [{ products: { id: '...', name: '...', ... } }, ... ]
-        const products: ProductDetails[] = Array.isArray(data) ? data.map((item: any) => {
-            if (item.products) { // Check if products object exists
+        const products: ProductDetails[] = Array.isArray(data) ? data.map((item: unknown) => {
+            const itemTyped = item as { products?: ProductDetails };
+            if (itemTyped.products) { // Check if products object exists
                 return {
-                    id: item.products.id,
-                    name: item.products.name,
-                    description: item.products.description,
-                    master_brand_id: item.products.master_brand_id,
+                    id: itemTyped.products.id,
+                    name: itemTyped.products.name,
+                    description: itemTyped.products.description,
+                    master_brand_id: itemTyped.products.master_brand_id,
                     // associated_at: item.created_at // from product_ingredients table if needed
                 };
             }
@@ -75,7 +72,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
 
         return NextResponse.json({ success: true, data: products });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`[API /ingredients/${id}/products GET] Catched error:`, error);
         return handleApiError(error, 'An unexpected error occurred.');
     }

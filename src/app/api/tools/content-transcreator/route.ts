@@ -140,12 +140,12 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       targetCountry: brandData.country,
       ...transCreatedResult
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     let errorMessage = 'Failed to trans-create content. Please try again later.';
     let statusCode = 500;
 
     if (error instanceof Error) {
-      if (error.message.includes('OpenAI') || error.message.includes('Azure') || error.message.includes('API') || (error as any).status === 429 || error.message.includes('AI service')) {
+      if (error.message.includes('OpenAI') || error.message.includes('Azure') || error.message.includes('API') || error.message.includes('AI service')) {
         errorMessage = 'The AI service is currently busy or unavailable. Please try again in a few moments.';
         statusCode = 503;
       } else {

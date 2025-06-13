@@ -2,7 +2,6 @@ import { NextResponse, NextRequest } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
-import { User } from '@supabase/supabase-js';
 import { generateTextCompletion } from '@/lib/azure/openai';
 import { ClaimTypeEnum, Product, MasterClaimBrand as MasterClaimBrandSummary } from '@/lib/claims-utils';
 
@@ -41,14 +40,12 @@ interface SuggestReplacementClaimsResponse {
     error?: string; // Optional error field
 }
 
-async function getProductAndFullBrandDetails(supabase: any, productId: string): Promise<{ product: Product | null, brandDetails: BrandDetails | null }> {
+async function getProductAndFullBrandDetails(supabase: ReturnType<typeof createSupabaseAdminClient>, productId: string): Promise<{ product: Product | null, brandDetails: BrandDetails | null }> {
     let product: Product | null = null;
     let brandDetails: BrandDetails | null = null;
 
-    // @ts-ignore
     const { data: productData, error: productError } = await supabase
         .from('products')
-        // @ts-ignore 
         .select('*, master_brand_id(*)') // Renamed from global_claim_brand_id
         .eq('id', productId)
         .single();
@@ -60,12 +57,10 @@ async function getProductAndFullBrandDetails(supabase: any, productId: string): 
 
     if (productData) {
         product = productData as Product;
-        // @ts-ignore 
         const masterClaimBrandSummary = productData.master_brand_id as MasterClaimBrandSummary; // Renamed
 
         if (masterClaimBrandSummary && masterClaimBrandSummary.mixerai_brand_id) {
             // 2. Fetch full brand details from 'brands' table using mixerai_brand_id
-            // @ts-ignore
             const { data: fullBrandData, error: brandError } = await supabase
                 .from('brands') // The main brands table
                 .select('id, name, website_url, country, language, brand_identity, tone_of_voice, guardrails')
@@ -83,7 +78,7 @@ async function getProductAndFullBrandDetails(supabase: any, productId: string): 
     return { product, brandDetails };
 }
 
-export const POST = withAuth(async (req: NextRequest, user: User) => {
+export const POST = withAuth(async (req: NextRequest) => {
     try {
         const body: SuggestReplacementClaimsRequest = await req.json();
         const {
@@ -141,7 +136,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
                     const parsed = JSON.parse(aiResponse);
                     if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
                         suggestions = parsed.suggestions.filter(
-                            (s: any) => s.claim_text && s.claim_type && ['allowed', 'disallowed', 'mandatory'].includes(s.claim_type)
+                            (s: AISuggestion) => s.claim_text && s.claim_type && ['allowed', 'disallowed', 'mandatory'].includes(s.claim_type)
                         ).slice(0, maxSuggestions) as AISuggestion[];
                          console.log(`[AI Suggest] Parsed ${suggestions.length} valid suggestions for ${productId}.`);
                     } else {
@@ -160,15 +155,15 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 
         return NextResponse.json<SuggestReplacementClaimsResponse>({ success: true, suggestions });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[AI Suggest] Catched error in POST handler:', error);
-        if (error.message && error.message.includes("Azure OpenAI endpoint or API key is missing")) {
+        if (error instanceof Error && error.message && error.message.includes("Azure OpenAI endpoint or API key is missing")) {
              return NextResponse.json<SuggestReplacementClaimsResponse>({ success: false, error: "AI service is not configured." }, { status: 503 });
         }
         // Use handleApiError but ensure its response shape is SuggestReplacementClaimsResponse if needed, or construct manually.
         // For now, assuming handleApiError returns a structure that might not perfectly match {success: false, error: string}.
         // So, it might be better to return a known shape directly for consistency if handleApiError is too generic.
-        const errorMessage = error.message || 'An unexpected error occurred while suggesting replacement claims.';
+        const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred while suggesting replacement claims.';
         return NextResponse.json<SuggestReplacementClaimsResponse>({ success: false, error: errorMessage }, { status: 500 });
     }
 }); 

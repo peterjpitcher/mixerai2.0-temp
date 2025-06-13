@@ -5,14 +5,14 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 // import { notFound } from 'next/navigation'; // notFound can be used if needed based on API response
-import { Button } from '@/components/button';
-import { Input } from '@/components/input';
-import { Textarea } from '@/components/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/card';
-import { Label } from '@/components/label';
-import { Switch } from '@/components/switch';
-import { Badge } from '@/components/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2, ArrowLeft, ShieldAlert, UserPlus, Info } from 'lucide-react'; // Added Info
 import debounce from 'lodash.debounce';
@@ -188,10 +188,10 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
           setCurrentUser(null);
           toast.error(data.error || 'Could not verify your session.');
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching current user:', err);
         setCurrentUser(null);
-        toast.error('Error fetching user data: ' + err.message);
+        toast.error('Error fetching user data: ' + (err as Error).message);
       } finally {
         setIsLoadingUser(false);
       }
@@ -234,9 +234,9 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
         if (!templatesData.success) throw new Error(templatesData.error || 'Failed to process content templates data');
         setContentTemplates(Array.isArray(templatesData.templates) ? templatesData.templates : []);
 
-      } catch (err: any) {
-        setError(err.message || 'Failed to load workflow data.');
-        toast.error(err.message || 'Failed to load workflow data.');
+      } catch (err) {
+        setError((err as Error).message || 'Failed to load workflow data.');
+        toast.error((err as Error).message || 'Failed to load workflow data.');
       } finally {
         setIsLoading(false);
       }
@@ -278,9 +278,9 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
           setOtherBrandWorkflows([]);
           toast.error(data.error || 'Could not load other workflows for the brand.');
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('Error fetching other brand workflows:', error);
-        toast.error(error.message || 'Failed to load other workflows for brand.');
+        toast.error((error as Error).message || 'Failed to load other workflows for brand.');
         setOtherBrandWorkflows([]);
       } finally {
         setIsLoadingBrandWorkflows(false);
@@ -308,27 +308,30 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
   const canEditThisWorkflow = workflow && (isGlobalAdmin || (workflow.brand_id && userBrandAdminPermissions.includes(workflow.brand_id)));
 
   const debouncedUserSearch = useCallback(
-    debounce(async (searchTerm: string, stepIndex: number) => {
-      if (searchTerm.trim().length < 2) {
-        setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
-      return;
-    }
-      setUserSearchLoading(prev => ({ ...prev, [stepIndex]: true }));
-      try {
-        const response = await fetch(`/api/users/search?query=${encodeURIComponent(searchTerm)}`);
-        const data = await response.json();
-        if (data.success && Array.isArray(data.users)) {
-          setUserSearchResults(prev => ({ ...prev, [stepIndex]: data.users }));
-        } else {
-          setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
+    (searchTerm: string, stepIndex: number) => {
+      const debouncedFn = debounce(async (term: string, index: number) => {
+        if (term.trim().length < 2) {
+          setUserSearchResults(prev => ({ ...prev, [index]: [] }));
+          return;
         }
-      } catch (error) {
-        console.error('User search error:', error);
-        setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
-      } finally {
-        setUserSearchLoading(prev => ({ ...prev, [stepIndex]: false }));
-      }
-    }, 300),
+        setUserSearchLoading(prev => ({ ...prev, [index]: true }));
+        try {
+          const response = await fetch(`/api/users/search?query=${encodeURIComponent(term)}`);
+          const data = await response.json();
+          if (data.success && Array.isArray(data.users)) {
+            setUserSearchResults(prev => ({ ...prev, [index]: data.users }));
+          } else {
+            setUserSearchResults(prev => ({ ...prev, [index]: [] }));
+          }
+        } catch (error) {
+          console.error('User search error:', error);
+          setUserSearchResults(prev => ({ ...prev, [index]: [] }));
+        } finally {
+          setUserSearchLoading(prev => ({ ...prev, [index]: false }));
+        }
+      }, 300);
+      debouncedFn(searchTerm, stepIndex);
+    },
     []
   );
 
@@ -494,9 +497,9 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
         } else {
         throw new Error(data.error || 'AI service did not return a description.');
         }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error generating step description:', error);
-      toast.error(error.message || 'Could not generate step description.');
+      toast.error((error as Error).message || 'Could not generate step description.');
       } finally {
       setStepDescLoading(prev => ({ ...prev, [index]: false }));
       }
@@ -647,9 +650,9 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
       }
       toast.success('Workflow updated successfully!');
       router.push(`/dashboard/workflows/${id}`); // Or to list: /dashboard/workflows
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving workflow:', error);
-      toast.error(error.message || 'An unexpected error occurred.');
+      toast.error((error as Error).message || 'An unexpected error occurred.');
     } finally {
       setIsSaving(false);
     }
@@ -669,9 +672,9 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
       } else {
         throw new Error(data.error || 'Failed to delete workflow.');
       }
-    } catch (error: any) {
+    } catch (error) {
       toast.error(
-        error.message || 'An unexpected error occurred.',
+        (error as Error).message || 'An unexpected error occurred.',
         { description: 'Please check if content items are using this workflow.' }
       );
     } finally {
@@ -874,7 +877,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
           <CardContent>
             {(!workflow.steps || workflow.steps.length === 0) ? (
               <div className="text-center py-8 text-muted-foreground">
-                No steps defined for this workflow. Click "Add Step" to create your first workflow step.
+                No steps defined for this workflow. Click &quot;Add Step&quot; to create your first workflow step.
               </div>
             ) : (
               <div className="space-y-6">
@@ -1018,7 +1021,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                             </Card>
                           )}
                         {assigneeInputs[index] && userSearchResults[index]?.length === 0 && !userSearchLoading[index] && assigneeInputs[index].length >=2 && (
-                             <p className="text-sm text-muted-foreground py-2">No users found matching "{assigneeInputs[index]}". You can still add by full email address.</p>
+                             <p className="text-sm text-muted-foreground py-2">No users found matching &quot;{assigneeInputs[index]}&quot;. You can still add by full email address.</p>
                         )}
 
                         {step.assignees.length > 0 && (

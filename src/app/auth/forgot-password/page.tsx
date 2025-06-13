@@ -4,12 +4,12 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { createSupabaseClient } from '@/lib/supabase/client';
-import { Button } from '@/components/button';
-import { Input } from '@/components/input';
-import { Label } from '@/components/label';
-import { Alert, AlertDescription, AlertTitle } from '@/components/alert';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Spinner } from '@/components/spinner';
-import { Mail, CheckCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle, AlertTriangle } from 'lucide-react';
 
 // Initialize the Supabase client outside the component to ensure it's a stable singleton instance.
 // This is critical for the PKCE flow's state to be preserved in sessionStorage.

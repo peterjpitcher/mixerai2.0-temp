@@ -8,32 +8,40 @@ export { NumberOptionsComponent } from './number-options';
 // Placeholder components for other field types
 // These should be implemented as separate files when needed
 
-import { DateOptions, TagsOptions, UrlOptions, FileUploadOptions, PlainTextOutputOptions, HtmlOutputOptions, ImageOutputOptions } from '@/types/template';
+// Import removed - unused types
 
-export function DateOptionsComponent({ options, onChange }: { options: DateOptions; onChange: (options: DateOptions) => void }) {
+interface PlaceholderOptionsProps {
+  options: Record<string, unknown>;
+  onChange: (options: Record<string, unknown>) => void;
+}
+
+export function DateOptionsComponent({ }: PlaceholderOptionsProps) {
   return <div className="text-sm text-muted-foreground">Date options configuration coming soon</div>;
 }
 
-export function TagsOptionsComponent({ options, onChange }: { options: TagsOptions; onChange: (options: TagsOptions) => void }) {
+export function TagsOptionsComponent({ }: PlaceholderOptionsProps) {
   return <div className="text-sm text-muted-foreground">Tags options configuration coming soon</div>;
 }
 
-export function UrlOptionsComponent({ options, onChange }: { options: UrlOptions; onChange: (options: UrlOptions) => void }) {
+export function UrlOptionsComponent({ }: PlaceholderOptionsProps) {
   return <div className="text-sm text-muted-foreground">URL options configuration coming soon</div>;
 }
 
-export function FileUploadOptionsComponent({ options, onChange }: { options: FileUploadOptions; onChange: (options: FileUploadOptions) => void }) {
+export function FileUploadOptionsComponent({ }: PlaceholderOptionsProps) {
   return <div className="text-sm text-muted-foreground">File upload options configuration coming soon</div>;
 }
 
-export function PlainTextOutputOptionsComponent({ options, onChange }: { options: PlainTextOutputOptions; onChange: (options: PlainTextOutputOptions) => void }) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function PlainTextOutputOptionsComponent(_props: PlaceholderOptionsProps) {
   return <div className="text-sm text-muted-foreground">Plain text output options configuration coming soon</div>;
 }
 
-export function HtmlOutputOptionsComponent({ options, onChange }: { options: HtmlOutputOptions; onChange: (options: HtmlOutputOptions) => void }) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function HtmlOutputOptionsComponent(_props: PlaceholderOptionsProps) {
   return <div className="text-sm text-muted-foreground">HTML output options configuration coming soon</div>;
 }
 
-export function ImageOutputOptionsComponent({ options, onChange }: { options: ImageOutputOptions; onChange: (options: ImageOutputOptions) => void }) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function ImageOutputOptionsComponent(_props: PlaceholderOptionsProps) {
   return <div className="text-sm text-muted-foreground">Image output options configuration coming soon</div>;
 }

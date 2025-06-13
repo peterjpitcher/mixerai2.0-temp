@@ -24,10 +24,11 @@ const mockResponse = {
 };
 
 /**
- * API route to test field mapping between the brand identity generation and frontend.
- * NOTE: This test endpoint is admin-only.
+ * Test endpoint to verify Azure OpenAI Brand Identity Prompt functionality
+ * Admin only
  */
-export const GET = withAdminAuth(async (request: NextRequest, user) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const GET = withAdminAuth(async (_request: NextRequest, _user) => {
   try {
     // Check if we're in a build environment and use mock data
     if (isBuildEnvironment) {
@@ -77,7 +78,7 @@ export const GET = withAdminAuth(async (request: NextRequest, user) => {
       message: "GET test successful. Fetched brand identity with hardcoded values.",
       data: identityData
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'Test brand identity generation failed');
   }
 }); 

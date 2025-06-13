@@ -20,20 +20,20 @@ export default function ReleaseNotesPage() {
         <section className="mb-12">
           <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            This release introduces a complete overhaul of the main dashboard, replacing the previous workflow matrix with a more dynamic and insightful interface. It also includes critical bug fixes to stabilize the application's data-fetching and permission systems.
+            This release introduces a complete overhaul of the main dashboard, replacing the previous workflow matrix with a more dynamic and insightful interface. It also includes critical bug fixes to stabilize the application&apos;s data-fetching and permission systems.
           </p>
 
           <h3>Key Features & Enhancements</h3>
           <h4>Dashboard (<code>/dashboard</code>)</h4>
           <ul>
             <li>
-              <strong>New "Team Activity" Feed:</strong> The centrepiece of the new dashboard is a live feed showing significant events from across the platform, such as content creation, updates, and approvals. This provides a clear, at-a-glance overview of team activity.
+              <strong>New &quot;Team Activity&quot; Feed:</strong> The centrepiece of the new dashboard is a live feed showing significant events from across the platform, such as content creation, updates, and approvals. This provides a clear, at-a-glance overview of team activity.
             </li>
             <li>
-              <strong>New "Stalled Content" Module:</strong> To help identify bottlenecks, this module lists content that has not been updated in a while. The age of the content is highlighted with colours (yellow for over 7 days, red for over 30 days) to draw attention to the most urgent items.
+              <strong>New &quot;Stalled Content&quot; Module:</strong> To help identify bottlenecks, this module lists content that has not been updated in a while. The age of the content is highlighted with colours (yellow for over 7 days, red for over 30 days) to draw attention to the most urgent items.
             </li>
              <li>
-              <strong>New "My Tasks" Module:</strong> The "My Tasks" component has been re-introduced as a robust, client-side component that fetches data safely from a dedicated API endpoint (<code>/api/me/tasks</code>), resolving the previous server-side rendering errors.
+              <strong>New &quot;My Tasks&quot; Module:</strong> The &quot;My Tasks&quot; component has been re-introduced as a robust, client-side component that fetches data safely from a dedicated API endpoint (<code>/api/me/tasks</code>), resolving the previous server-side rendering errors.
             </li>
             <li>
               <strong>Visual & Layout Polish:</strong> The dashboard layout and typography have been meticulously adjusted to match the design specification, ensuring a clean, professional, and consistent user interface.
@@ -43,7 +43,7 @@ export default function ReleaseNotesPage() {
           <h4>Bug Fixes</h4>
            <ul>
             <li>
-              <strong>Permissions Fix (<code>getProfileWithAssignedBrands</code>):</strong> Fixed a critical bug where brand-specific users could not see any data. The helper function was incorrectly looking for the user's role in the `profiles` table instead of the correct `user.user_metadata`. This fix ensures RBAC rules are correctly applied for all user types.
+              <strong>Permissions Fix (<code>getProfileWithAssignedBrands</code>):</strong> Fixed a critical bug where brand-specific users could not see any data. The helper function was incorrectly looking for the user&apos;s role in the `profiles` table instead of the correct `user.user_metadata`. This fix ensures RBAC rules are correctly applied for all user types.
             </li>
              <li>
               <strong>Database Function Fix (<code>getMyTasks</code>):</strong> Removed all calls to a non-existent and faulty database function (`get_user_details`) from the dashboard, eliminating the last of the startup errors.
@@ -68,9 +68,9 @@ export default function ReleaseNotesPage() {
               <strong>Database Functionality:</strong> Corrected multiple critical bugs in the database functions responsible for fetching and updating user details.
               <ul>
                 <li>Fixed a bug where the `get_user_details` function was referencing a non-existent column (`raw_app_meta_data` instead of `raw_user_meta_data`), which caused the user detail page to fail with a 500 error.</li>
-                <li>Added the `SECURITY DEFINER` clause to the `get_user_details` function to resolve a "permission denied" error when reading from the `auth.users` table.</li>
+                <li>Added the `SECURITY DEFINER` clause to the `get_user_details` function to resolve a &quot;permission denied&quot; error when reading from the `auth.users` table.</li>
                  <li>Corrected the `update_user_details` function to use the proper `raw_user_meta_data` column name, fixing a 500 error on user profile updates.</li>
-                 <li>Aliased the user's role correctly as `globalRole` in the `get_user_details` function to match the frontend's expectation.</li>
+                 <li>Aliased the user&apos;s role correctly as `globalRole` in the `get_user_details` function to match the frontend&apos;s expectation.</li>
               </ul>
             </li>
           </ul>
@@ -147,7 +147,7 @@ export default function ReleaseNotesPage() {
             <li>
               <strong>Root Cause Identified:</strong> The brand creation process was failing due to two separate issues in the <code>POST /api/brands</code> endpoint.
               <ol>
-                <li>An initial error was caused by a faulty RPC (<code>create_brand_and_set_admin</code>) that attempted to assign a <code>'brand_admin'</code> role, which was an invalid value for the database's <code>user_brand_role_enum</code> type.</li>
+                <li>An initial error was caused by a faulty RPC (<code>create_brand_and_set_admin</code>) that attempted to assign a <code>&apos;brand_admin&apos;</code> role, which was an invalid value for the database&apos;s <code>user_brand_role_enum</code> type.</li>
                 <li>A subsequent fix attempt introduced a second error by trying to write to a non-existent <code>created_by</code> column in the <code>brands</code> table.</li>
               </ol>
             </li>
@@ -158,7 +158,7 @@ export default function ReleaseNotesPage() {
                 <li>The process now uses two direct Supabase calls:
                   <ol>
                     <li>First, a new record is inserted into the <code>brands</code> table with the core brand details.</li>
-                    <li>Second, a permission record is inserted into the <code>user_brand_permissions</code> table, explicitly granting the creator the correct <code>'admin'</code> role for the new brand.</li>
+                    <li>Second, a permission record is inserted into the <code>user_brand_permissions</code> table, explicitly granting the creator the correct <code>&apos;admin&apos;</code> role for the new brand.</li>
                   </ol>
                 </li>
                 <li>This direct approach bypasses the faulty RPC and aligns with the database schema, resolving both errors.</li>
@@ -184,16 +184,16 @@ export default function ReleaseNotesPage() {
           <h4>Secure Password Reset Flow (PKCE)</h4>
           <ul>
             <li>
-              <strong>Root Cause Identified:</strong> Addressed a critical issue where the password reset process failed with a misleading "Token Expired" error. The investigation confirmed that the Next.js/React environment was interfering with the Supabase client's ability to persist the necessary <code>code_verifier</code> across redirects, which is a key part of the secure PKCE authentication flow.
+              <strong>Root Cause Identified:</strong> Addressed a critical issue where the password reset process failed with a misleading &quot;Token Expired&quot; error. The investigation confirmed that the Next.js/React environment was interfering with the Supabase client&apos;s ability to persist the necessary <code>code_verifier</code> across redirects, which is a key part of the secure PKCE authentication flow.
             </li>
             <li>
               <strong>Resolution Implemented:</strong>
               <ol>
                 <li>
-                  A dedicated, client-side-only callback page was created at <code>/auth/confirm</code>. This page's sole responsibility is to handle the callback from Supabase, securely exchange the authorization code for a user session, and store it in a cookie.
+                  A dedicated, client-side-only callback page was created at <code>/auth/confirm</code>. This page&apos;s sole responsibility is to handle the callback from Supabase, securely exchange the authorization code for a user session, and store it in a cookie.
                 </li>
                 <li>
-                  The "Update Password" page was simplified to use the secure session from the cookie, removing all complex token-parsing logic.
+                  The &quot;Update Password&quot; page was simplified to use the secure session from the cookie, removing all complex token-parsing logic.
                 </li>
                 <li>
                   This new approach isolates the sensitive authentication handshake from the React component lifecycle, ensuring a reliable and secure password reset experience.
@@ -222,7 +222,7 @@ export default function ReleaseNotesPage() {
             <li>Resolved errors during template creation and updates caused by inconsistent payload structures for <code>inputFields</code> and <code>outputFields</code>.</li>
             <li>The <code>TemplateForm</code> component now consistently sends <code>inputFields</code> and <code>outputFields</code> as top-level arrays in the payload.</li>
             <li>The <code>POST /api/content-templates</code> API endpoint has been updated to accept this flat structure and internally reconstruct the nested <code>fields</code> object for database storage, aligning it with the <code>PUT</code> endpoint for template updates.</li>
-            <li>This prevents errors such as "Name and fields are required" or "Name, inputFields, and outputFields are required" during template management.</li>
+            <li>This prevents errors such as &quot;Name and fields are required&quot; or &quot;Name, inputFields, and outputFields are required&quot; during template management.</li>
           </ul>
           <p className="mt-4">
             For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
@@ -243,16 +243,16 @@ export default function ReleaseNotesPage() {
               <li>
                 <strong>Resolved TypeError for Template Fields:</strong>
                 <ul>
-                  <li>Fixed a <code>TypeError: Cannot read properties of undefined (reading 'outputFields')</code> that occurred when the page attempted to access <code>template.fields.outputFields</code> but the <code>template.fields</code> object itself was undefined.</li>
+                  <li>Fixed a <code>TypeError: Cannot read properties of undefined (reading &apos;outputFields&apos;)</code> that occurred when the page attempted to access <code>template.fields.outputFields</code> but the <code>template.fields</code> object itself was undefined.</li>
                   <li>Enhanced conditional checks to ensure <code>template.fields</code> exists before accessing its nested properties, preventing the error and allowing the page to proceed with rendering.</li>
                 </ul>
               </li>
               <li>
                 <strong>Corrected Template Data Structure Handling:</strong>
                 <ul>
-                  <li>Addressed an issue where the "Generated Output Fields" card was not appearing. This was due to a mismatch between the component's expected <code>Template</code> interface (requiring fields to be nested under a <code>fields</code> property, e.g., <code>template.fields.outputFields</code>) and the actual flat structure returned by the <code>/api/content-templates/[id]</code> endpoint (e.g., <code>template.outputFields</code>).</li>
-                  <li>Implemented a transformation step within the data fetching logic to reshape the API response for content templates. The fetched <code>inputFields</code> and <code>outputFields</code> are now correctly nested under a <code>fields</code> object before being set into the component's state.</li>
-                  <li>This ensures the data structure aligns with the component's expectations, allowing the conditional rendering logic to pass and all template-based output fields (including those using <code>Textarea</code> and <code>RichTextEditor</code>) to be displayed correctly.</li>
+                  <li>Addressed an issue where the &quot;Generated Output Fields&quot; card was not appearing. This was due to a mismatch between the component&apos;s expected <code>Template</code> interface (requiring fields to be nested under a <code>fields</code> property, e.g., <code>template.fields.outputFields</code>) and the actual flat structure returned by the <code>/api/content-templates/[id]</code> endpoint (e.g., <code>template.outputFields</code>).</li>
+                  <li>Implemented a transformation step within the data fetching logic to reshape the API response for content templates. The fetched <code>inputFields</code> and <code>outputFields</code> are now correctly nested under a <code>fields</code> object before being set into the component&apos;s state.</li>
+                  <li>This ensures the data structure aligns with the component&apos;s expectations, allowing the conditional rendering logic to pass and all template-based output fields (including those using <code>Textarea</code> and <code>RichTextEditor</code>) to be displayed correctly.</li>
                 </ul>
               </li>
             </ul>
@@ -291,13 +291,13 @@ export default function ReleaseNotesPage() {
             <h4>Navigation and Permissions (<code>UnifiedNavigation.tsx</code>)</h4>
             <ul>
               <li>
-                <strong>Editor Role Permissions:</strong> Corrected navigation item visibility for users with the "Editor" role. Editors will no longer see links for "Brands," "Workflows," and "Content Templates," aligning with the permissions outlined in <code>NAVIGATION_PERMISSIONS.md</code>.
+                <strong>Editor Role Permissions:</strong> Corrected navigation item visibility for users with the &quot;Editor&quot; role. Editors will no longer see links for &quot;Brands,&quot; &quot;Workflows,&quot; and &quot;Content Templates,&quot; aligning with the permissions outlined in <code>NAVIGATION_PERMISSIONS.md</code>.
               </li>
               <li>
-                <strong>"Create Content" Sub-menu Filtering:</strong>
+                <strong>&quot;Create Content&quot; Sub-menu Filtering:</strong>
                 <ul>
-                  <li>Platform Administrators continue to see all "Create Content" sub-items (derived from all available templates).</li>
-                  <li>Scoped Administrators and Editors will now only see "Create Content" sub-items for templates that have at least one workflow associated with one of their assigned brands.</li>
+                  <li>Platform Administrators continue to see all &quot;Create Content&quot; sub-items (derived from all available templates).</li>
+                  <li>Scoped Administrators and Editors will now only see &quot;Create Content&quot; sub-items for templates that have at least one workflow associated with one of their assigned brands.</li>
                 </ul>
               </li>
             </ul>
@@ -331,26 +331,26 @@ export default function ReleaseNotesPage() {
                 <strong>Individual Field Retry:</strong>
                 <ul>
                   <li>Implemented a new API endpoint (<code>src/app/api/content/generate-field/route.ts</code>) to allow regeneration of content for a single output field if the initial attempt fails or if users wish to retry.</li>
-                  <li>Added "Retry Generation" buttons next to each output field in the Content Generator Form (<code>src/components/content/content-generator-form.tsx</code>).</li>
+                  <li>Added &quot;Retry Generation&quot; buttons next to each output field in the Content Generator Form (<code>src/components/content/content-generator-form.tsx</code>).</li>
                   <li>These buttons are now always visible after the initial content generation attempt, allowing users to regenerate any field.</li>
                   <li>Enhanced the retry mechanism to include comprehensive brand context (name, identity, tone of voice, guardrails) and detailed task instructions, ensuring the AI has sufficient information for high-quality, brand-aligned regeneration. This addresses issues where retried content was too generic.</li>
                   <li>Improved placeholder interpolation in AI prompts for retries to correctly use brand details and other field values.</li>
                 </ul>
               </li>
               <li>
-                <strong>"Regenerate All Content" Button:</strong> Added a button to allow users to re-trigger the entire content generation process for all fields, including the title, after an initial generation.
+                <strong>&quot;Regenerate All Content&quot; Button:</strong> Added a button to allow users to re-trigger the entire content generation process for all fields, including the title, after an initial generation.
               </li>
             </ul>
 
             <h4>AI-Generated Template Descriptions</h4>
             <ul>
               <li>
-                <strong>Real AI Implementation:</strong> Replaced the mock AI call in the API route for generating content template descriptions (<code>src/app/api/ai/generate-template-description/route.ts</code>) with a call to the actual Azure OpenAI service using the project's standard <code>generateTextCompletion</code> utility.
+                <strong>Real AI Implementation:</strong> Replaced the mock AI call in the API route for generating content template descriptions (<code>src/app/api/ai/generate-template-description/route.ts</code>) with a call to the actual Azure OpenAI service using the project&apos;s standard <code>generateTextCompletion</code> utility.
               </li>
               <li>
                 <strong>Improved Prompting:</strong>
                 <ul>
-                  <li>Removed the "AI Template Description: " prefix from the generated output.</li>
+                  <li>Removed the &quot;AI Template Description: &quot; prefix from the generated output.</li>
                   <li>Updated the system and user prompts to encourage clear, concise, helpful, and complete descriptions, avoiding truncation.</li>
                 </ul>
               </li>
@@ -365,7 +365,7 @@ export default function ReleaseNotesPage() {
                 <strong>Toast Notification Appearance:</strong> Updated toast notifications to have a solid white background and dark text for improved readability, addressing issues with transparency.
               </li>
               <li>
-                <strong>Navigation Highlighting:</strong> Adjusted active state logic in <code>src/components/layout/unified-navigation.tsx</code> to correctly highlight "Create Content" sub-items in red and ensure "All Content" is not highlighted when a sub-item is active.
+                <strong>Navigation Highlighting:</strong> Adjusted active state logic in <code>src/components/layout/unified-navigation.tsx</code> to correctly highlight &quot;Create Content&quot; sub-items in red and ensure &quot;All Content&quot; is not highlighted when a sub-item is active.
               </li>
             </ul>
 

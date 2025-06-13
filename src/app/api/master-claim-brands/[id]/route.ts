@@ -17,15 +17,10 @@ interface MasterClaimBrand {
     updated_at?: string;
 }
 
-interface RequestContext {
-    params: {
-        id: string;
-    };
-}
-
 // GET handler for a single master claim brand by ID
-export const GET = withAuth(async (req: NextRequest, _user: User, context: RequestContext) => {
-    const { id } = context.params;
+export const GET = withAuth(async (req: NextRequest, _user: User, context?: unknown) => {
+    const { params } = context as { params: { id: string } };
+    const { id } = params;
     if (!id) {
         return NextResponse.json({ success: false, error: 'Brand ID is required.' }, { status: 400 });
     }
@@ -33,7 +28,7 @@ export const GET = withAuth(async (req: NextRequest, _user: User, context: Reque
     try {
         const supabase = createSupabaseAdminClient();
         // Assuming table will be renamed to 'master_claim_brands'
-        // @ts-ignore
+
         const { data, error } = await supabase.from('master_claim_brands') 
             .select('*')
             .eq('id', id)
@@ -51,7 +46,7 @@ export const GET = withAuth(async (req: NextRequest, _user: User, context: Reque
             return NextResponse.json({ success: false, error: 'Master claim brand not found.' }, { status: 404 });
         }
 
-        const singleDataObject = data as any;
+        const singleDataObject = data as MasterClaimBrand;
         const validatedData: MasterClaimBrand = {
             id: singleDataObject.id,
             name: singleDataObject.name,
@@ -62,15 +57,16 @@ export const GET = withAuth(async (req: NextRequest, _user: User, context: Reque
 
         return NextResponse.json({ success: true, data: validatedData });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`[API MasterClaimBrands GET /${id}] Catched error:`, error);
         return handleApiError(error, 'An unexpected error occurred while fetching the master claim brand.');
     }
 });
 
 // PUT handler for updating a master claim brand by ID
-export const PUT = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
-    const { id } = context.params;
+export const PUT = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+    const { params } = context as { params: { id: string } };
+    const { id } = params;
     if (!id) {
         return NextResponse.json({ success: false, error: 'Brand ID is required for update.' }, { status: 400 });
     }
@@ -98,7 +94,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
         let hasPermission = user?.user_metadata?.role === 'admin';
 
         if (!hasPermission) {
-            // @ts-ignore
+
             const { data: mcbData, error: mcbFetchError } = await supabase // Renamed variable
                 .from('master_claim_brands') // Renamed table
                 .select('mixerai_brand_id')
@@ -112,7 +108,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
             } else if (!mcbData.mixerai_brand_id) {
                 console.warn(`[API MasterClaimBrands PUT /${id}] MCB ${id} is not linked to any MixerAI brand. Only global admin can manage.`);
             } else {
-                // @ts-ignore
+
                 const { data: permissionsData, error: permissionsError } = await supabase
                     .from('user_brand_permissions')
                     .select('role')
@@ -156,7 +152,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
         
         const updateData = { ...baseUpdateData };
 
-        // @ts-ignore
+
         const { data, error } = await supabase.from('master_claim_brands') // Renamed table
             .update(updateData)
             .eq('id', id)
@@ -165,7 +161,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
 
         if (error) {
             console.error(`[API MasterClaimBrands PUT /${id}] Error updating master claim brand:`, error);
-            if ((error as any).code === '23505') { 
+            if ((error as {code?: string}).code === '23505') { 
                 return NextResponse.json(
                    { success: false, error: 'A master claim brand with this name already exists.' },
                    { status: 409 } 
@@ -178,7 +174,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
             return NextResponse.json({ success: false, error: 'Master claim brand not found or update failed.' }, { status: 404 });
         }
         
-        const singleDataObject = data as any;
+        const singleDataObject = data as MasterClaimBrand;
         const validatedData: MasterClaimBrand = {
             id: singleDataObject.id,
             name: singleDataObject.name,
@@ -189,9 +185,9 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
 
         return NextResponse.json({ success: true, data: validatedData });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`[API MasterClaimBrands PUT /${id}] Catched error:`, error);
-        if (error.name === 'SyntaxError') { 
+        if (error instanceof Error && error.name === 'SyntaxError') { 
             return NextResponse.json({ success: false, error: 'Invalid JSON payload.' }, { status: 400 });
         }
         return handleApiError(error, 'An unexpected error occurred while updating the master claim brand.');
@@ -199,8 +195,9 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
 });
 
 // DELETE handler for a master claim brand by ID
-export const DELETE = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
-    const { id } = context.params;
+export const DELETE = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+    const { params } = context as { params: { id: string } };
+    const { id } = params;
     if (!id) {
         return NextResponse.json({ success: false, error: 'Brand ID is required for deletion.' }, { status: 400 });
     }
@@ -212,7 +209,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
         let hasPermission = user?.user_metadata?.role === 'admin';
 
         if (!hasPermission) {
-            // @ts-ignore
+
             const { data: mcbData, error: mcbFetchError } = await supabase // Renamed variable
                 .from('master_claim_brands') // Renamed table
                 .select('mixerai_brand_id')
@@ -226,7 +223,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
             } else if (!mcbData.mixerai_brand_id) {
                 console.warn(`[API MasterClaimBrands DELETE /${id}] MCB ${id} is not linked to any MixerAI brand. Only global admin can manage.`);
             } else {
-                // @ts-ignore
+
                 const { data: permissionsData, error: permissionsError } = await supabase
                     .from('user_brand_permissions')
                     .select('role')
@@ -251,7 +248,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
         }
         // --- Permission Check End ---
 
-        // @ts-ignore
+
         const { error, count } = await supabase.from('master_claim_brands') // Renamed table
             .delete({ count: 'exact' })
             .eq('id', id);
@@ -267,7 +264,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
 
         return NextResponse.json({ success: true, message: 'Master claim brand deleted successfully.' });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`[API MasterClaimBrands DELETE /${id}] Catched error:`, error);
         return handleApiError(error, 'An unexpected error occurred while deleting the master claim brand.');
     }

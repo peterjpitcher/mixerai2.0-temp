@@ -4,6 +4,7 @@ import { fetchWebPageContent } from '@/lib/utils/web-scraper';
 import { handleApiError } from '@/lib/api-utils'; // Import for consistent error handling
 // import { withAuth } from '@/lib/auth/api-auth'; // No longer used
 import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
+import { User } from '@supabase/supabase-js';
 
 // WARNING: This is a test endpoint that allows calls to Azure OpenAI services.
 // It is now protected by admin-only authorization.
@@ -19,7 +20,8 @@ interface MetadataGenerationRequest {
   guardrails?: string;
 }
 
-export const POST = withAdminAuth(async (request: NextRequest, user: any) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const POST = withAdminAuth(async (request: NextRequest, _user: User) => {
   // console.log removed
   try {
     const data: MetadataGenerationRequest = await request.json();
@@ -42,7 +44,8 @@ export const POST = withAdminAuth(async (request: NextRequest, user: any) => {
     
     try {
       new URL(data.url);
-    } catch (error) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_error) {
       return NextResponse.json(
         { success: false, error: 'Invalid URL format' },
         { status: 400 }
@@ -62,7 +65,8 @@ export const POST = withAdminAuth(async (request: NextRequest, user: any) => {
     try {
       pageContent = await fetchWebPageContent(data.url);
       // console.log removed
-    } catch (fetchError) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_fetchError) {
       // console.warn removed. Proceeding without pageContent is acceptable for this test.
     }
     
@@ -89,7 +93,7 @@ export const POST = withAdminAuth(async (request: NextRequest, user: any) => {
       ...generatedMetadata,
       keywords: [] // Retained for now
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     // console.error removed
     // Simplified error handling for this test route
     return handleApiError(error, 'Test metadata generation failed');
@@ -97,6 +101,7 @@ export const POST = withAdminAuth(async (request: NextRequest, user: any) => {
 });
 
 // Function to validate metadata length requirements (copied from main tool, but not used in this test route)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function validateMetadata(metaTitle: string, metaDescription: string): { 
   isValid: boolean; 
   reason?: string;

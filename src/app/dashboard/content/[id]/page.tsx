@@ -3,16 +3,16 @@
 import * as React from 'react';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { notFound, usePathname, useRouter } from 'next/navigation';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MarkdownDisplay } from '@/components/content/markdown-display';
 import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
 import { toast } from 'sonner';
 import { createBrowserClient } from '@supabase/ssr';
 import { PageHeader } from "@/components/dashboard/page-header";
-import { BrandIcon, BrandIconProps } from '@/components/brand-icon';
+import { BrandIcon,  } from '@/components/brand-icon';
 import { ArrowLeft, Edit3, MessageSquare, CheckCircle, XCircle, Clock, UserCircle } from 'lucide-react';
 import { format as formatDateFns } from 'date-fns';
 
@@ -23,7 +23,7 @@ interface TemplateOutputField {
 }
 
 interface TemplateFields {
-  inputFields: any[];
+  inputFields: unknown[];
   outputFields: TemplateOutputField[];
 }
 
@@ -45,14 +45,14 @@ interface ContentData {
   brand_name?: string;
   brand_color?: string;
   brand_avatar_url?: string;
-  brands?: any;
+  brands?: unknown;
   template_name?: string;
-  content_templates?: any;
+  content_templates?: unknown;
   template_id?: string;
-  content_data?: Record<string, any>;
+  content_data?: Record<string, unknown>;
   created_at: string;
   workflow_id?: string;
-  workflow?: { id: string; name: string; steps: any[] };
+  workflow?: { id: string; name: string; steps: unknown[] };
   current_step: number;
   versions?: ContentVersion[];
 }
@@ -67,7 +67,10 @@ interface ContentVersion {
   reviewer_id?: string;
   reviewer?: { id: string; full_name?: string; avatar_url?: string };
   created_at: string;
-  content_json?: any;
+  content_json?: {
+    generatedOutputs?: Record<string, string>;
+    body_snapshot?: string;
+  } | null;
 }
 
 interface ContentDetailPageProps {
@@ -101,7 +104,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   const [versions, setVersions] = useState<ContentVersion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [activeBrandData, setActiveBrandData] = useState<any>(null);
+  const [activeBrandData, setActiveBrandData] = useState<{ name: string; brand_color?: string; logo_url?: string; icon_url?: string; avatar_url?: string } | null>(null);
   const [template, setTemplate] = useState<Template | null>(null);
   const [expandedVersions, setExpandedVersions] = useState<Record<string, boolean>>({});
   const router = useRouter();
@@ -211,10 +214,10 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
           throw new Error(contentResult.error || 'Failed to load content data.');
         }
 
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error fetching page data:', error);
-        toast.error(error.message || 'Failed to load page data. Please try again.');
-        if (error.message.includes('404') || (error.response && error.response.status === 404)) {
+        toast.error(error instanceof Error ? error.message : 'Failed to load page data. Please try again.');
+        if (error instanceof Error && (error.message.includes('404') || (error as unknown as Record<string, unknown>).response && (error as unknown as Record<string, { status?: number }>).response.status === 404)) {
            notFound();
         }
       } finally {
@@ -258,9 +261,9 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
           throw new Error(contentResult.error || 'Failed to load content data.');
         }
 
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error refetching page data:', error);
-        toast.error(error.message || 'Failed to reload page data. Please try again.');
+        toast.error(error instanceof Error ? error.message : 'Failed to reload page data. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -291,14 +294,14 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   let currentStepObject: WorkflowStep | undefined = undefined;
   if (content.workflow && content.workflow.steps && content.current_step) {
     currentStepObject = content.workflow.steps.find(
-      (step: any) => step.id === content.current_step
+      (step: unknown) => (step as { id?: unknown }).id === content.current_step
     ) as WorkflowStep | undefined;
   }
 
   let isCurrentUserStepOwner = false;
   if (currentStepObject && currentUserId) {
     if (Array.isArray(currentStepObject.assignees)) {
-      isCurrentUserStepOwner = currentStepObject.assignees.some((assignee: any) => assignee.id === currentUserId);
+      isCurrentUserStepOwner = currentStepObject.assignees.some((assignee: unknown) => (assignee as { id?: string }).id === currentUserId);
     }
   }
 
@@ -321,7 +324,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     }
   };
 
-  const brandForHeader = activeBrandData || content.brands;
+  const brandForHeader = activeBrandData || (content.brands as { name?: string; brand_color?: string; logo_url?: string; icon_url?: string; avatar_url?: string } | undefined);
   const brandName = brandForHeader?.name || 'Brand';
   const brandColor = brandForHeader?.brand_color || '#cccccc';
   const brandIcon = brandForHeader?.logo_url || brandForHeader?.icon_url || brandForHeader?.avatar_url;
@@ -366,7 +369,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-6 gap-4">
         <div className="flex items-center gap-3">
           {brandIcon ? (
-            <img src={brandIcon} alt={`${brandName} logo`} className="h-10 w-10 rounded-full object-cover" />
+            <Image src={brandIcon} alt={`${brandName} logo`} width={40} height={40} className="h-10 w-10 rounded-full object-cover" />
           ) : (
             <BrandIcon name={brandName} color={brandColor} size="md" />
           )}
@@ -448,11 +451,11 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
                         <div className="flex items-center mt-1 mb-1">
                           <div className="relative h-6 w-6 rounded-full bg-muted overflow-hidden flex-shrink-0 mr-2">
                             {version.reviewer.avatar_url ? (
-                              <img
+                              <Image
                                 src={version.reviewer.avatar_url}
                                 alt={version.reviewer.full_name || 'Reviewer avatar'}
-                                className="object-cover w-full h-full"
-                                onError={(e) => (e.currentTarget.style.display = 'none')}
+                                fill
+                                className="object-cover"
                               />
                             ) : null}
                             {(!version.reviewer.avatar_url) && (
@@ -504,7 +507,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
                                   }
                                   return null;
                                 })
-                                .filter(field => field !== null) as { id: string; name: string; value: any }[];
+                                .filter(field => field !== null) as { id: string; name: string; value: unknown }[];
 
                               // --- Start Diagnostic Logging for displayableFields (now fieldsToRender) ---
                               if (process.env.NODE_ENV === 'development') {

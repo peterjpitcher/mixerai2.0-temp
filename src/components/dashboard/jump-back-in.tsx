@@ -22,7 +22,7 @@ export function JumpBackIn({ items }: JumpBackInProps) {
       <CardHeader>
         <CardTitle>Jump Back In</CardTitle>
         <CardDescription>
-          Continue where you left off. Here are the items you've recently worked on.
+          Continue where you left off. Here are the items you&apos;ve recently worked on.
         </CardDescription>
       </CardHeader>
       <CardContent>

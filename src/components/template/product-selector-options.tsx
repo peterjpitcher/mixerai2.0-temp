@@ -1,7 +1,7 @@
 'use client';
 
-import { Checkbox } from '@/components/checkbox';
-import { Label } from '@/components/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { ProductSelectorOptions } from '@/types/template';
 
 interface ProductSelectorOptionsProps {

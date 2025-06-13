@@ -32,8 +32,9 @@ interface RequestContext {
 }
 
 // GET handler for a single claim by ID
-export const GET = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
-    const { id } = context.params;
+export const GET = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+    const { params } = context as RequestContext;
+    const { id } = params;
     if (!id) {
         return NextResponse.json({ success: false, error: 'Claim ID is required.' }, { status: 400 });
     }
@@ -41,7 +42,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
 
     try {
         const supabase = createSupabaseAdminClient();
-        // @ts-ignore
+
         const { data, error } = await supabase.from('claims')
             .select('*')
             .eq('id', id)
@@ -59,33 +60,34 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
             return NextResponse.json({ success: false, error: 'Claim not found.' }, { status: 404 });
         }
         
-        const singleDataObject = data as any;
+        const singleDataObject = data as Record<string, unknown>;
         const validatedData: Claim = {
-            id: singleDataObject.id,
-            claim_text: singleDataObject.claim_text,
-            claim_type: singleDataObject.claim_type,
-            level: singleDataObject.level,
-            master_brand_id: singleDataObject.master_brand_id,
-            product_id: singleDataObject.product_id,
-            ingredient_id: singleDataObject.ingredient_id,
-            country_code: singleDataObject.country_code,
-            description: singleDataObject.description,
-            created_by: singleDataObject.created_by,
-            created_at: singleDataObject.created_at,
-            updated_at: singleDataObject.updated_at
+            id: singleDataObject.id as string,
+            claim_text: singleDataObject.claim_text as string,
+            claim_type: singleDataObject.claim_type as ClaimTypeEnum,
+            level: singleDataObject.level as ClaimLevelEnum,
+            master_brand_id: singleDataObject.master_brand_id as string | null,
+            product_id: singleDataObject.product_id as string | null,
+            ingredient_id: singleDataObject.ingredient_id as string | null,
+            country_code: singleDataObject.country_code as string,
+            description: singleDataObject.description as string | null,
+            created_by: singleDataObject.created_by as string | null,
+            created_at: singleDataObject.created_at as string,
+            updated_at: singleDataObject.updated_at as string
         };
 
         return NextResponse.json({ success: true, data: validatedData });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`[API Claims GET /${id}] Catched error:`, error);
         return handleApiError(error, 'An unexpected error occurred while fetching the claim.');
     }
 });
 
 // PUT handler for updating a claim by ID
-export const PUT = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
-    const { id } = context.params;
+export const PUT = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+    const { params } = context as RequestContext;
+    const { id } = params;
     if (!id) {
         return NextResponse.json({ success: false, error: 'Claim ID is required for update.' }, { status: 400 });
     }
@@ -138,7 +140,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
 
         if (!hasPermission) {
             // Fetch the claim to determine its context for permission checking
-            // @ts-ignore
+
             const { data: claimData, error: claimFetchError } = await supabase
                 .from('claims')
                 .select('level, master_brand_id, product_id, created_by')
@@ -158,7 +160,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
             if (!hasPermission && claimData) { 
                 let coreBrandId: string | null = null;
                 if (claimData.level === 'brand' && claimData.master_brand_id) { 
-                    // @ts-ignore
+
                     const { data: mcbData, error: mcbError } = await supabase 
                         .from('master_claim_brands') 
                         .select('mixerai_brand_id')
@@ -170,7 +172,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
                         coreBrandId = mcbData.mixerai_brand_id;
                     }
                 } else if (claimData.level === 'product' && claimData.product_id) {
-                    // @ts-ignore
+
                     const { data: productData, error: productError } = await supabase
                         .from('products')
                         .select('master_brand_id') 
@@ -179,7 +181,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
                     if (productError || !productData || !productData.master_brand_id) {
                         console.error(`[API Claims PUT /${id}] Error fetching product/MCB for product-level claim permissions:`, productError);
                     } else {
-                        // @ts-ignore
+
                         const { data: mcbData, error: mcbError } = await supabase 
                             .from('master_claim_brands') 
                             .select('mixerai_brand_id')
@@ -197,7 +199,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
                 }
 
                 if (coreBrandId) {
-                    // @ts-ignore
+
                     const { data: permissionsData, error: permissionsError } = await supabase
                         .from('user_brand_permissions')
                         .select('role')
@@ -219,7 +221,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
         }
         // --- Permission Check End ---
 
-        // @ts-ignore
+
         const { data, error } = await supabase.from('claims')
             .update(updatePayload)
             .eq('id', id)
@@ -228,7 +230,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
 
         if (error) {
             console.error(`[API Claims PUT /${id}] Error updating claim:`, error);
-            if ((error as any).code === '23505') { // Unique constraint violation
+            if ((error as unknown as { code?: string }).code === '23505') { // Unique constraint violation
                 return NextResponse.json(
                    { success: false, error: 'This update would result in a duplicate claim (text, type, level, entity, country combination).' },
                    { status: 409 }
@@ -242,27 +244,27 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
             return NextResponse.json({ success: false, error: 'Claim not found or update failed.' }, { status: 404 });
         }
 
-        const singleDataObject = data as any;
+        const singleDataObject = data as Record<string, unknown>;
         const validatedData: Claim = {
-            id: singleDataObject.id,
-            claim_text: singleDataObject.claim_text,
-            claim_type: singleDataObject.claim_type,
-            level: singleDataObject.level,
-            master_brand_id: singleDataObject.master_brand_id,
-            product_id: singleDataObject.product_id,
-            ingredient_id: singleDataObject.ingredient_id,
-            country_code: singleDataObject.country_code,
-            description: singleDataObject.description,
-            created_by: singleDataObject.created_by,
-            created_at: singleDataObject.created_at,
-            updated_at: singleDataObject.updated_at
+            id: singleDataObject.id as string,
+            claim_text: singleDataObject.claim_text as string,
+            claim_type: singleDataObject.claim_type as ClaimTypeEnum,
+            level: singleDataObject.level as ClaimLevelEnum,
+            master_brand_id: singleDataObject.master_brand_id as string | null,
+            product_id: singleDataObject.product_id as string | null,
+            ingredient_id: singleDataObject.ingredient_id as string | null,
+            country_code: singleDataObject.country_code as string,
+            description: singleDataObject.description as string | null,
+            created_by: singleDataObject.created_by as string | null,
+            created_at: singleDataObject.created_at as string,
+            updated_at: singleDataObject.updated_at as string
         };
 
         return NextResponse.json({ success: true, data: validatedData });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`[API Claims PUT /${id}] Catched error:`, error);
-        if (error.name === 'SyntaxError') { 
+        if ((error as Error).name === 'SyntaxError') { 
             return NextResponse.json({ success: false, error: 'Invalid JSON payload.' }, { status: 400 });
         }
         return handleApiError(error, 'An unexpected error occurred while updating the claim.');
@@ -270,8 +272,9 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
 });
 
 // DELETE handler for a claim by ID
-export const DELETE = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
-    const { id } = context.params;
+export const DELETE = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+    const { params } = context as RequestContext;
+    const { id } = params;
     if (!id) {
         return NextResponse.json({ success: false, error: 'Claim ID is required for deletion.' }, { status: 400 });
     }
@@ -284,7 +287,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
 
         if (!hasPermission) {
             // Fetch the claim to determine its context for permission checking
-            // @ts-ignore
+
             const { data: claimData, error: claimFetchError } = await supabase
                 .from('claims')
                 .select('level, master_brand_id, product_id, created_by')
@@ -305,7 +308,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
                 if (!hasPermission && claimData) { 
                     let coreBrandId: string | null = null;
                     if (claimData.level === 'brand' && claimData.master_brand_id) { 
-                        // @ts-ignore
+
                         const { data: mcbData, error: mcbError } = await supabase 
                             .from('master_claim_brands') 
                             .select('mixerai_brand_id')
@@ -317,7 +320,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
                             coreBrandId = mcbData.mixerai_brand_id;
                         }
                     } else if (claimData.level === 'product' && claimData.product_id) {
-                        // @ts-ignore
+
                         const { data: productData, error: productError } = await supabase
                             .from('products')
                             .select('master_brand_id') 
@@ -326,7 +329,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
                         if (productError || !productData || !productData.master_brand_id) {
                             console.error(`[API Claims DELETE /${id}] Error fetching product/MCB for product-level claim permissions:`, productError);
                         } else {
-                            // @ts-ignore
+
                             const { data: mcbData, error: mcbError } = await supabase 
                                 .from('master_claim_brands') 
                                 .select('mixerai_brand_id')
@@ -341,7 +344,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
                     } 
 
                     if (coreBrandId) {
-                        // @ts-ignore
+
                         const { data: permissionsData, error: permissionsError } = await supabase
                             .from('user_brand_permissions')
                             .select('role')
@@ -364,7 +367,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
         }
         // --- Permission Check End ---
 
-        // @ts-ignore
+
         const { error, count } = await supabase.from('claims')
             .delete({ count: 'exact' })
             .eq('id', id);
@@ -380,7 +383,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
 
         return NextResponse.json({ success: true, message: 'Claim deleted successfully.' });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`[API Claims DELETE /${id}] Catched error:`, error);
         return handleApiError(error, 'An unexpected error occurred while deleting the claim.');
     }

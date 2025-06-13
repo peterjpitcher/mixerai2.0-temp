@@ -52,7 +52,9 @@ export async function getClient() {
   return await pool.connect();
 }
 
-export default {
+const db = {
   query,
   getClient
-}; 
+};
+
+export default db; 

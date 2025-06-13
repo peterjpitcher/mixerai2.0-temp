@@ -100,12 +100,61 @@ const nextConfig = {
         permanent: true 
       },
       
-      // Special case: Redirect dashboard content root to itself - REMOVED as redundant
-      // {
-      //   source: '/dashboard/content',
-      //   destination: '/dashboard/content',
-      //   permanent: true,
-      // }
+      // Redirect account page to dashboard
+      {
+        source: '/account',
+        destination: '/dashboard/account',
+        permanent: true,
+      },
+      
+      // Redirect legacy marketing pages to dashboard
+      {
+        source: '/contact',
+        destination: '/dashboard/help',
+        permanent: true,
+      },
+      {
+        source: '/overview',
+        destination: '/dashboard',
+        permanent: true,
+      },
+      {
+        source: '/specifics',
+        destination: '/dashboard',
+        permanent: true,
+      },
+      {
+        source: '/deep-dive/:path*',
+        destination: '/dashboard',
+        permanent: true,
+      },
+      
+      // Redirect test pages to dashboard (these shouldn't exist in production)
+      {
+        source: '/test-page',
+        destination: '/dashboard',
+        permanent: true,
+      },
+      {
+        source: '/openai-test',
+        destination: '/dashboard',
+        permanent: true,
+      },
+      {
+        source: '/test-brand-identity',
+        destination: '/dashboard',
+        permanent: true,
+      },
+      {
+        source: '/test-template/:path*',
+        destination: '/dashboard',
+        permanent: true,
+      },
+      {
+        source: '/ui-showcase',
+        destination: '/dashboard',
+        permanent: true,
+      },
     ];
   },
 };

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Security Verification Required - MixerAI</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background-color: #13599f;
+            padding: 30px;
+            text-align: center;
+        }
+        .header img {
+            width: auto;
+            max-width: 250px;
+            height: auto;
+            max-height: 60px;
+            display: block;
+            margin: 0 auto 20px;
+        }
+        .header h1 {
+            color: #ffffff;
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 30px;
+        }
+        .footer {
+            background-color: #f9f9f9;
+            padding: 15px 30px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }
+        .button {
+            display: inline-block;
+            background-color: #13599f;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-weight: 600;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .secondary-link {
+            display: block;
+            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+        .warning {
+            background-color: #fff8e1;
+            border-left: 4px solid #ffc107;
+            padding: 10px 15px;
+            margin: 15px 0;
+        }
+        h1 { /* This h1 style is for the .header h1, might be redundant if scoped properly or if no other h1s exist */
+            margin: 0;
+            font-size: 24px;
+        }
+        p {
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Preview Text -->
+    <div style="display:none;font-size:1px;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;mso-hide:all;">
+        Security verification required for your MixerAI account - Please confirm your identity
+    </div>
+    <div class="container">
+        <div class="header">
+            <img src="https://mixerai.orangejelly.co.uk/Mixerai2.0Logo.png" alt="MixerAI Logo" />
+            <h1>Security Verification</h1>
+        </div>
+        <div class="content">
+            <p>Hi there,</p>
+            <p>For your security, we need to verify your identity before completing a sensitive action on your MixerAI account. This is an important security measure to protect your account.</p>
+            <p>Please click the button below to verify and proceed:</p>
+            <div style="text-align: center;">
+                <a href="{{ .ConfirmationURL }}" class="button">Confirm Action</a>
+            </div>
+            <p style="margin-top: 20px; font-size: 14px; color: #666;">Can't click the button? Copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; font-size: 12px; color: #999; background-color: #f5f5f5; padding: 10px; border-radius: 4px;">
+                {{ .ConfirmationURL }}
+            </p>
+            
+            <div class="warning">
+                <p style="margin: 0;"><strong>Time-Sensitive:</strong> This verification link expires in 60 minutes and can only be used once for security purposes.</p>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+            
+            <h3 style="font-size: 16px; margin-bottom: 10px;">Why am I receiving this?</h3>
+            <p style="font-size: 14px; line-height: 1.5; color: #666;">You're receiving this email because a sensitive action was requested on your account, such as:</p>
+            <ul style="font-size: 14px; line-height: 1.8; color: #666;">
+                <li>Changing account security settings</li>
+                <li>Accessing sensitive data</li>
+                <li>Modifying critical configurations</li>
+                <li>Performing administrative actions</li>
+            </ul>
+            
+            <div style="background-color: #fee; border-left: 4px solid #dc3545; padding: 10px 15px; margin: 20px 0;">
+                <p style="margin: 0; font-size: 13px; color: #721c24;"><strong>Security Alert:</strong> If you did NOT attempt this action, your account may be compromised. Please:</p>
+                <ol style="margin: 10px 0 0 20px; font-size: 13px; color: #721c24;">
+                    <li>Do not click the verification link</li>
+                    <li>Change your password immediately</li>
+                    <li>Contact support at peter.pitcher@genmills.com</li>
+                </ol>
+            </div>
+            
+            <p style="margin-top: 30px;">Stay secure,</p>
+            <p>The MixerAI Security Team<br>
+            <a href="https://mixerai.orangejelly.co.uk" style="color: #13599f; text-decoration: none;">mixerai.orangejelly.co.uk</a></p>
+        </div>
+        <div class="footer">
+            <p style="margin-bottom: 10px;">This security verification was sent to {{ .Email }} for an action attempted on your MixerAI account.</p>
+            <p style="margin-bottom: 10px;">MixerAI - AI-Powered Content Creation Platform</p>
+            <p style="margin-bottom: 10px;">&copy; {{ .Now.Year }} MixerAI. All rights reserved.</p>
+            <p style="font-size: 11px; color: #999;">Security concerns? Reply to this email immediately or contact us at peter.pitcher@genmills.com</p>
+        </div>
+    </div>
+</body>
+</html> 

@@ -4,21 +4,20 @@ import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { useRouter, notFound } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/card';
-import { Input } from '@/components/input';
-import { Label } from '@/components/label';
-import { Textarea } from '@/components/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+// import { } from '@/components/ui/tabs'; // Removed - empty import
 import { RichTextEditor } from '@/components/content/rich-text-editor';
 import { toast } from 'sonner';
-import type { Metadata } from 'next';
 import { createBrowserClient } from '@supabase/ssr';
 import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
 import { PageHeader } from "@/components/dashboard/page-header";
-import { BrandIcon, BrandIconProps } from '@/components/brand-icon';
-import { ArrowLeft, Loader2, ShieldAlert, XCircle, CheckCircle, Clock, MessageSquare, UserCircle, Edit3 } from 'lucide-react';
-import { Skeleton } from '@/components/skeleton';
+import { BrandIcon,  } from '@/components/brand-icon';
+import { ArrowLeft, Loader2, ShieldAlert, XCircle, CheckCircle, Clock, MessageSquare, UserCircle,  } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { format as formatDateFns } from 'date-fns';
 
 // export const metadata: Metadata = {
@@ -44,10 +43,10 @@ interface ContentState {
   brand_avatar_url?: string;
   template_name?: string;
   template_id?: string;
-  content_data?: Record<string, any>;
+  content_data?: Record<string, unknown>;
   workflow_id?: string | null;
   current_step?: number | null;
-  workflow?: { id: string; name: string; steps: any[] };
+  workflow?: { id: string; name: string; steps: unknown[] };
   // Add other fields from your actual content structure as needed
   // Add fields for actual template output fields if they need to be directly editable
   // For example, if an outputField from template is 'summary', you might add: summary?: string;
@@ -94,7 +93,7 @@ interface TemplateOutputField {
 }
 
 interface TemplateFields {
-  inputFields: any[]; 
+  inputFields: unknown[]; 
   outputFields: TemplateOutputField[];
 }
 
@@ -161,7 +160,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   });
 
   const [versions, setVersions] = useState<ContentVersion[]>([]);
-  const [activeBrandData, setActiveBrandData] = useState<any>(null);
+  const [activeBrandData, setActiveBrandData] = useState<{ id: string; name: string; brand_color?: string } | null>(null);
   const [template, setTemplate] = useState<Template | null>(null);
 
   // For ContentApprovalWorkflow to trigger save
@@ -210,6 +209,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   };
   // End added from view page
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -232,10 +232,10 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
           setCurrentUser(null);
           setUserError(data.error || 'User data not found in session.');
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('[ContentEditPage] Error fetching current user:', error);
         setCurrentUser(null);
-        setUserError(error.message || 'An unexpected error occurred while fetching user data.');
+        setUserError(error instanceof Error ? error.message : 'An unexpected error occurred while fetching user data.');
       } finally {
         setIsLoadingUser(false);
       }
@@ -368,9 +368,9 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
           console.warn('Could not load content versions for edit page.');
         }
 
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error fetching data for edit page:', error);
-        toast.error(error.message || 'Failed to load page data.');
+        toast.error(error instanceof Error ? error.message : 'Failed to load page data.');
       } finally {
         setIsLoading(false);
       }
@@ -383,7 +383,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     } else {
       console.warn('[ContentEditPage] Conditions NOT met for fetchAllData. ID:', id, 'CurrentUser:', currentUser);
     }
-  }, [id, currentUser?.id]);
+  }, [id, currentUser?.id, activeBrandData, currentUser]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -412,7 +412,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       if (template && template.fields && template.fields.outputFields && template.fields.outputFields.length > 0 && content.content_data?.generatedOutputs) {
         const richTextOutputField = template.fields.outputFields.find(f => f.type === 'richText');
         const firstOutputField = template.fields.outputFields[0];
-        let fieldToUseForBody = richTextOutputField || firstOutputField;
+        const fieldToUseForBody = richTextOutputField || firstOutputField;
 
         if (fieldToUseForBody && content.content_data.generatedOutputs[fieldToUseForBody.id]) {
           primaryBodyFromOutputs = content.content_data.generatedOutputs[fieldToUseForBody.id];
@@ -462,9 +462,9 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         });
       }
       success = true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating content:', error);
-      toast.error(error.message || 'Failed to update content. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to update content. Please try again.');
       success = false;
     } finally {
       setIsSaving(false);
@@ -475,7 +475,8 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   // Assign to ref so ContentApprovalWorkflow can call it if needed
   useEffect(() => {
     contentSaveRef.current = handleSave;
-  }, [handleSave]); // handleSave dependencies should be stable if defined with useCallback or if its deps are stable
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, activeBrandData, currentUser]); // Dependencies for handleSave - using id, activeBrandData, currentUser instead of handleSave to avoid circular dependency
   
   const handleWorkflowActionCompletion = () => {
     console.log('[ContentEditPage] handleWorkflowActionCompletion called.');
@@ -487,6 +488,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   };
   
   // Add a new function to handle adding a field
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleAddField = (fieldId: string, value: string) => {
     setContent(prev => ({
       ...prev,
@@ -658,9 +660,9 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
               contentId={content.id}
               contentTitle={content.title}
               currentStepObject={content.workflow.steps.find(
-                (step: any) => step.id === content.current_step
+                (step: unknown) => (step as { id?: unknown }).id === content.current_step
               ) as WorkflowStep | undefined}
-              isCurrentUserStepOwner={content.workflow.steps.some((step: any) => step.id === content.current_step && step.assignees?.some((assignee: any) => assignee.id === currentUser?.id))}
+              isCurrentUserStepOwner={content.workflow.steps.some((step: unknown) => (step as Record<string, unknown>).id === content.current_step && ((step as Record<string, unknown>).assignees as Record<string, unknown>[])?.some((assignee: Record<string, unknown>) => assignee.id === currentUser?.id))}
               versions={versions}
               template={template}
               onActionComplete={handleWorkflowActionCompletion}

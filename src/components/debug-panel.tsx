@@ -2,11 +2,30 @@
 
 import { useState, useEffect } from 'react';
 
+interface EnvironmentInfo {
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+  nodeEnv?: string;
+  vercelEnv?: string;
+  debugMode?: string;
+  buildDate: string;
+}
+
+interface TestResult {
+  status: 'pending' | 'testing' | 'success' | 'error';
+  statusCode?: number;
+  statusText?: string;
+  responseTime?: number;
+  message?: string;
+  stack?: string;
+  data?: unknown;
+}
+
 export function DebugPanel() {
-  const [envInfo, setEnvInfo] = useState<any>(null);
-  const [apiTest, setApiTest] = useState<any>({ status: 'pending' });
+  const [envInfo, setEnvInfo] = useState<EnvironmentInfo | null>(null);
+  const [apiTest, setApiTest] = useState<TestResult>({ status: 'pending' });
   const [expandedSections, setExpandedSections] = useState<string[]>([]);
-  const [connectionTest, setConnectionTest] = useState<any>({ status: 'pending' });
+  const [connectionTest, setConnectionTest] = useState<TestResult>({ status: 'pending' });
 
   useEffect(() => {
     // Check if debug panel is enabled
@@ -56,11 +75,11 @@ export function DebugPanel() {
             debug: data.debug
           }
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         setApiTest({
           status: 'error',
-          message: error.message,
-          stack: error.stack?.split('\n')[0]
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack?.split('\n')[0] : undefined
         });
       }
     }
@@ -92,11 +111,11 @@ export function DebugPanel() {
           responseTime,
           data: data
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         setConnectionTest({
           status: 'error',
-          message: error.message,
-          stack: error.stack?.split('\n')[0]
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack?.split('\n')[0] : undefined
         });
       }
     }

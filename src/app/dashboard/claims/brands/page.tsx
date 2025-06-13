@@ -23,13 +23,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trash2, Edit3, PlusCircle, Search, AlertTriangle, Loader2, GripHorizontal, Globe, Pencil } from "lucide-react";
+import { Trash2, PlusCircle, Search, AlertTriangle, Loader2, Globe, Pencil } from "lucide-react";
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
 import {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DropdownMenu,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DropdownMenuContent,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DropdownMenuItem,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 

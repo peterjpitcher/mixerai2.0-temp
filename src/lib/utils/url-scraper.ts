@@ -1,5 +1,3 @@
-import { parse } from 'url';
-
 /**
  * Extracts URLs from a text string
  */

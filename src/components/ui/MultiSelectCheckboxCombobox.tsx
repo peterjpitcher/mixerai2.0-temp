@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { X, Check, ChevronsUpDown } from 'lucide-react';
-import { Command as CommandPrimitive } from 'cmdk';
 
 import { Badge } from '@/components/ui/badge';
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -37,7 +36,6 @@ export const MultiSelectCheckboxCombobox: React.FC<MultiSelectCheckboxComboboxPr
   triggerClassName,
   disabled = false,
 }) => {
-  const inputRef = React.useRef<HTMLInputElement>(null);
   const [isOpen, setIsOpen] = React.useState(false);
   const [inputValue, setInputValue] = React.useState(''); // For filtering the list
 

@@ -4,6 +4,7 @@ import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { v4 as uuidv4 } from 'uuid';
 import { verifyEmailTemplates } from '@/lib/auth/email-templates';
+import { User } from '@supabase/supabase-js';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -14,6 +15,7 @@ interface AssigneeData {
   id?: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface StepData {
   id: number;
   name: string;
@@ -21,7 +23,7 @@ interface StepData {
   role?: string;
   approvalRequired?: boolean;
   assignees?: AssigneeData[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // Extract company name from email domain
@@ -38,24 +40,23 @@ const extractCompanyFromEmail = (email: string) => {
       .split(/[-_]/)
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
-  } catch (error) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (_error) {
     return '';
   }
 };
 
 // The context for route handlers like POST, GET should include params for dynamic routes.
 // The user object is injected by withAuth wrapper.
-interface RouteContext {
-  params: { id?: string }; // workflowId will be in params.id
-}
 
 /**
  * POST endpoint to invite users to a workflow step
  * This handles sending new invitations for users who don't yet have accounts
  */
-export const POST = withAuth(async (request: NextRequest, user: any, context: RouteContext) => {
+export const POST = withAuth(async (request: NextRequest, user: User, context?: unknown) => {
+  const { params } = context as { params: { id: string } };
   try {
-    const workflowId = context?.params?.id;
+    const workflowId = params?.id;
 
     if (!workflowId) {
       return NextResponse.json(
@@ -88,9 +89,9 @@ export const POST = withAuth(async (request: NextRequest, user: any, context: Ro
       );
     }
     
-    let step: any = undefined;
+    let step: Record<string, unknown> | undefined = undefined;
     if (workflow.steps && Array.isArray(workflow.steps)) {
-      step = (workflow.steps as any[]).find((s: any) => 
+      step = (workflow.steps as Record<string, unknown>[]).find((s: Record<string, unknown>) => 
         s && typeof s === 'object' && 
         typeof s.id === 'number' && 
         s.id === parseInt(body.stepId)
@@ -126,10 +127,10 @@ export const POST = withAuth(async (request: NextRequest, user: any, context: Ro
     const { data: invitation, error: invitationDbError } = await supabase
       .from('workflow_invitations')
       .insert({
-        workflow_id: workflowId,
+        workflow_id: String(workflowId),
         step_id: body.stepId,
         email: body.email,
-        role: step.role || 'editor',
+        role: (step.role && typeof step.role === 'string') ? step.role : 'editor',
         invite_token: inviteToken,
         expires_at: expiresAt,
         status: 'pending'
@@ -148,7 +149,7 @@ export const POST = withAuth(async (request: NextRequest, user: any, context: Ro
         await verifyEmailTemplates();
         let userRole = 'viewer';
         if (step.role === 'admin') userRole = 'admin';
-        else if (['editor', 'brand', 'legal'].includes(step.role)) userRole = 'editor';
+        else if (typeof step.role === 'string' && ['editor', 'brand', 'legal'].includes(step.role)) userRole = 'editor';
         
         await supabase.auth.admin.inviteUserByEmail(body.email, {
           data: {
@@ -160,7 +161,8 @@ export const POST = withAuth(async (request: NextRequest, user: any, context: Ro
             invited_from_workflow: workflowId
           }
         });
-      } catch (emailError) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (_emailError) {
         // Non-critical: Invitation record created, but email failed. Log to monitoring.
       }
     }
@@ -177,9 +179,11 @@ export const POST = withAuth(async (request: NextRequest, user: any, context: Ro
 /**
  * GET endpoint to get all invitations for a workflow
  */
-export const GET = withAuth(async (request: NextRequest, user: any, context: RouteContext) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const GET = withAuth(async (_request: NextRequest, _user: User, context?: unknown) => {
+  const { params } = context as { params: { id: string } };
   try {
-    const workflowId = context?.params?.id;
+    const workflowId = params?.id;
 
     if (!workflowId) {
       return NextResponse.json(

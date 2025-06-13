@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Button } from "@/components/button";
+import { Button } from '@/components/ui/button';
 import { NotificationCenter } from "@/components/dashboard/notification-center";
-import { User, LogOut, LayoutDashboard, Tags, Users2, GitFork, FileText, Settings, HelpCircle } from "lucide-react";
+import { User, LayoutDashboard, Tags, Users2, GitFork, FileText, Settings, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import React from "react";
 

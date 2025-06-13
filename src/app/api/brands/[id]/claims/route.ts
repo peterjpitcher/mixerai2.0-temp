@@ -29,7 +29,7 @@ export async function GET(
 
   // TODO: Add permission check to ensure user can access this brand.
   // For now, we'll proceed with the validated brandId.
-  const { id: _brandId } = validation.data;
+  // Brand ID is validated
 
   // In a real implementation, you would fetch claims for the given brandId from the database.
   // For example:
