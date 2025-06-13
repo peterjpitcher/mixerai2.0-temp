@@ -7,36 +7,8 @@ import { z } from 'zod';
 
 export const dynamic = "force-dynamic";
 
-// ENUM types mirroring the database
-type ClaimTypeEnum = 'allowed' | 'disallowed' | 'mandatory';
-type ClaimLevelEnum = 'brand' | 'product' | 'ingredient';
 
-interface Claim {
-    id: string;
-    claim_text: string;
-    claim_type: ClaimTypeEnum;
-    level: ClaimLevelEnum;
-    master_brand_id?: string | null;
-    product_id?: string | null;
-    ingredient_id?: string | null;
-    country_code: string; // Can be '__GLOBAL__' or ISO country code
-    description?: string | null;
-    created_by?: string | null;
-    created_at?: string;
-    updated_at?: string;
-}
 
-// For POST request, allowing multiple product_ids and country_codes
-interface ClaimPostRequestData {
-    claim_text: string;
-    claim_type: ClaimTypeEnum;
-    level: ClaimLevelEnum;
-    master_brand_id?: string; // Required if level is 'brand'
-    product_ids?: string[];   // Required if level is 'product', can be multiple
-    ingredient_id?: string; // Required if level is 'ingredient'
-    country_codes: string[]; // Can be multiple, including '__GLOBAL__'
-    description?: string;
-}
 
 // Define the expected schema for a single claim entry in the database
 const dbClaimSchema = z.object({
@@ -72,7 +44,7 @@ const requestBodySchema = z.object({
 });
 
 // GET handler for all claims
-export const GET = withAuth(async (req: NextRequest, user: User) => {
+export const GET = withAuth(async (req: NextRequest) => {
     try {
         if (isBuildPhase()) {
             console.log('[API Claims GET] Build phase: returning empty array.');
@@ -95,27 +67,22 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
         if (includeIngredientName) selectStatement += 'ingredients(name),';
         selectStatement = selectStatement.slice(0, -1); // remove last ','
 
-        // @ts-ignore
         let query = supabase.from('claims').select(selectStatement);
 
         if (countryCodeFilter) {
-            // @ts-ignore
             query = query.eq('country_code', countryCodeFilter);
         }
 
         if (excludeGlobalFilter) {
             // If countryCodeFilter is also __GLOBAL__, this excludeGlobal would make it return nothing.
             // This logic is fine: if user says exclude global, we exclude global.
-            // @ts-ignore
             query = query.not('country_code', 'eq', '__GLOBAL__');
         }
 
         if (levelFilter && ['brand', 'product', 'ingredient'].includes(levelFilter)) {
-            // @ts-ignore
-            query = query.eq('level', levelFilter);
+            query = query.eq('level', levelFilter as 'brand' | 'product' | 'ingredient');
         }
         
-        // @ts-ignore
         const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) {
@@ -124,11 +91,12 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
         }
 
         // Process data to flatten joined names
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const processedData = Array.isArray(data) ? data.map((claim: any) => ({
             ...claim,
-            master_brand_name: claim.master_claim_brands ? claim.master_claim_brands.name : null,
-            product_names: claim.products ? [claim.products.name] : [],
-            ingredient_name: claim.ingredients ? claim.ingredients.name : null,
+            master_brand_name: (claim.master_claim_brands && typeof claim.master_claim_brands === 'object' && claim.master_claim_brands !== null && 'name' in claim.master_claim_brands) ? claim.master_claim_brands.name : null,
+            product_names: (claim.products && typeof claim.products === 'object' && claim.products !== null && 'name' in claim.products) ? [claim.products.name] : [],
+            ingredient_name: (claim.ingredients && typeof claim.ingredients === 'object' && claim.ingredients !== null && 'name' in claim.ingredients) ? claim.ingredients.name : null,
             // Ensure country_codes is an array for client-side consistency.
             // This API returns one record per country_code, so we set it up as an array of one.
             country_codes: [claim.country_code]
@@ -141,7 +109,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
 
         return NextResponse.json({ success: true, data: processedData });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[API Claims GET] Catched error:', error);
         return handleApiError(error, 'An unexpected error occurred while fetching claims.');
     }
@@ -154,7 +122,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
     let rawBody;
     try {
         rawBody = await req.json();
-    } catch (e) {
+    } catch {
         return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
     }
     
@@ -185,7 +153,6 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 
     if (!hasPermission) {
         if (level === 'brand' && master_brand_id) {
-            // @ts-ignore
             const { data: mcbData, error: mcbError } = await supabase
                 .from('master_claim_brands')
                 .select('mixerai_brand_id')
@@ -195,7 +162,6 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
                 console.error(`[API Claims POST] Error fetching MCB or MCB not linked for brand-level claim creation permissions (MCB ID: ${master_brand_id}):`, mcbError);
                 // Deny permission if MCB not found or not linked
             } else {
-                // @ts-ignore
                 const { data: permissionsData, error: permissionsError } = await supabase
                     .from('user_brand_permissions')
                     .select('role')
@@ -214,7 +180,6 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
             let allProductsPermitted = true;
             for (const product_id of product_ids) {
                 let currentProductPermitted = false;
-                // @ts-ignore
                 const { data: productData, error: productError } = await supabase
                     .from('products')
                     .select('master_brand_id')
@@ -224,7 +189,6 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
                     console.error(`[API Claims POST] Error fetching product/MCB for product-level claim creation (Product ID: ${product_id}):`, productError);
                     allProductsPermitted = false; break;
                 }
-                // @ts-ignore
                 const { data: mcbData, error: mcbError } = await supabase
                     .from('master_claim_brands')
                     .select('mixerai_brand_id')
@@ -234,7 +198,6 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
                     console.error(`[API Claims POST] Error fetching MCB or MCB not linked for product-level claim (Product ID: ${product_id}, MCB ID: ${productData.master_brand_id}):`, mcbError);
                     allProductsPermitted = false; break;
                 }
-                // @ts-ignore
                 const { data: permissionsData, error: permissionsError } = await supabase
                     .from('user_brand_permissions')
                     .select('role')
@@ -329,7 +292,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
     });
 
     try {
-        const { data, error } = await supabase.from('claims').insert(validatedClaimsToInsert as any).select();
+        const { data, error } = await supabase.from('claims').insert(validatedClaimsToInsert).select();
 
         if (error) {
             console.error('Supabase error inserting claims:', error);
@@ -340,11 +303,12 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
         }
 
         return NextResponse.json({ success: true, message: `${data ? data.length : 0} claim(s) created successfully.`, claims: data });
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error('Catch block error in POST /api/claims:', e);
-        if (e.message === "Internal validation error before database operation.") {
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        if (errorMessage === "Internal validation error before database operation.") {
             return NextResponse.json({ success: false, error: 'Internal server error during data validation.' }, { status: 500 });
         }
-        return NextResponse.json({ success: false, error: 'An unexpected error occurred.', details: e.message }, { status: 500 });
+        return NextResponse.json({ success: false, error: 'An unexpected error occurred.', details: errorMessage }, { status: 500 });
     }
 }); 

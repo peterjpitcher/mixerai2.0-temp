@@ -2,29 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/card';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertTriangle, ArrowLeft, Info, FileText, PlayCircle, CheckCircle2, XCircle, UserCircle, Tag, ExternalLink, Eye, EyeOff } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, Info, FileText, PlayCircle, CheckCircle2, XCircle, Eye, EyeOff } from 'lucide-react';
 import { format } from 'date-fns';
-import { Skeleton } from '@/components/skeleton';
 import { Table, TableHeader, TableRow, TableCell, TableBody, TableHead } from "@/components/ui/table";
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
-// Define UserSessionData interface (can be shared if not already)
-interface UserSessionData {
-  id: string;
-  email?: string;
-  user_metadata?: {
-    role?: string; 
-    full_name?: string;
-  };
-  error_message?: string | null;
-  // Potentially add user_email or brand_name if fetched/joined by API in future
-}
 
 // Define ToolRunHistoryItem interface (can be shared if not already)
 interface ToolRunHistoryItem {
@@ -32,8 +19,8 @@ interface ToolRunHistoryItem {
   user_id: string;
   tool_name: 'alt_text_generator' | 'metadata_generator' | 'content_transcreator' | string; // More specific for known tools
   brand_id?: string | null;
-  inputs: any; 
-  outputs: any; 
+  inputs: Record<string, unknown>; 
+  outputs: Record<string, unknown>; 
   run_at: string; 
   status: 'success' | 'failure';
   error_message?: string | null;
@@ -48,7 +35,7 @@ const formatToolName = (toolName: string) => {
     .join(' ');
 };
 
-const JsonViewer = ({ jsonData }: { jsonData: any }) => {
+const JsonViewer = ({ jsonData }: { jsonData: unknown }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   try {
     const formattedJson = JSON.stringify(jsonData, null, 2);
@@ -87,7 +74,7 @@ const JsonViewer = ({ jsonData }: { jsonData: any }) => {
         </pre>
       </div>
     );
-  } catch (e) {
+  } catch {
     return <p className="text-red-500">Error displaying JSON data.</p>;
   }
 };
@@ -370,7 +357,6 @@ export default function ToolRunHistoryDetailPage() {
   const [historyItem, setHistoryItem] = useState<ToolRunHistoryItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
 
   useEffect(() => {
@@ -385,14 +371,14 @@ export default function ToolRunHistoryDetailPage() {
         const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
         if (sessionError) throw sessionError;
         if (session?.user) {
-          setCurrentUser({
-            id: session.user.id,
-            email: session.user.email,
-            user_metadata: session.user.user_metadata
-          });
+          // setCurrentUser({
+          //   id: session.user.id,
+          //   email: session.user.email,
+          //   user_metadata: session.user.user_metadata
+          // });
         } else {
           // No active session, or user is null
-          setCurrentUser(null);
+          // setCurrentUser(null);
           // Optionally redirect if user is required to view this page, or handle in UI
            setError("User not authenticated."); // Set error if user is required
            toast.error("User not authenticated. Please login.");
@@ -404,7 +390,7 @@ export default function ToolRunHistoryDetailPage() {
       } catch (userError) {
         console.error("Error fetching user session:", userError);
         setError(userError instanceof Error ? userError.message : "Error fetching user data.");
-        setCurrentUser(null);
+        // setCurrentUser(null);
         setIsLoading(false); // Stop general loading
         setIsLoadingUser(false);
         return;
@@ -580,11 +566,11 @@ export default function ToolRunHistoryDetailPage() {
           )}
           
           {historyItem.tool_name === 'alt_text_generator' && historyItem.inputs && historyItem.outputs ? (
-            <AltTextHistoryDisplay inputs={historyItem.inputs as AltTextInputs} outputs={historyItem.outputs as AltTextOutputs} />
+            <AltTextHistoryDisplay inputs={historyItem.inputs as unknown as AltTextInputs} outputs={historyItem.outputs as unknown as AltTextOutputs} />
           ) : historyItem.tool_name === 'metadata_generator' && historyItem.inputs && historyItem.outputs ? (
-            <MetadataHistoryDisplay inputs={historyItem.inputs as MetadataInputs} outputs={historyItem.outputs as MetadataOutputs} />
+            <MetadataHistoryDisplay inputs={historyItem.inputs as unknown as MetadataInputs} outputs={historyItem.outputs as unknown as MetadataOutputs} />
           ) : historyItem.tool_name === 'content_transcreator' && historyItem.inputs && historyItem.outputs ? (
-            <ContentTranscreatorHistoryDisplay inputs={historyItem.inputs as ContentTranscreatorInputs} outputs={historyItem.outputs as ContentTranscreatorOutputs} status={historyItem.status as 'success' | 'failure'}/>
+            <ContentTranscreatorHistoryDisplay inputs={historyItem.inputs as unknown as ContentTranscreatorInputs} outputs={historyItem.outputs as unknown as ContentTranscreatorOutputs} status={historyItem.status as 'success' | 'failure'}/>
           ) : (
             <>
               <div>

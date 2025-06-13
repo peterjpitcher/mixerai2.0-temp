@@ -15,7 +15,7 @@ interface Ingredient {
 }
 
 // GET handler for all ingredients
-export const GET = withAuth(async (req: NextRequest, user: User) => {
+export const GET = withAuth(async () => {
     try {
         if (isBuildPhase()) {
             console.log('[API Ingredients GET] Build phase: returning empty array.');
@@ -23,7 +23,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
         }
 
         const supabase = createSupabaseAdminClient();
-        // @ts-ignore
+
         const { data, error } = await supabase.from('ingredients')
             .select('*')
             .order('name');
@@ -33,17 +33,17 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
             return handleApiError(error, 'Failed to fetch ingredients');
         }
         
-        const validatedData = Array.isArray(data) ? data.map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            description: item.description,
-            created_at: item.created_at,
-            updated_at: item.updated_at
+        const validatedData = Array.isArray(data) ? data.map((item: unknown) => ({
+            id: (item as Ingredient).id,
+            name: (item as Ingredient).name,
+            description: (item as Ingredient).description,
+            created_at: (item as Ingredient).created_at,
+            updated_at: (item as Ingredient).updated_at
         })) : [];
 
         return NextResponse.json({ success: true, data: validatedData as Ingredient[] });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[API Ingredients GET] Catched error:', error);
         return handleApiError(error, 'An unexpected error occurred while fetching ingredients.');
     }
@@ -84,7 +84,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
             description: description?.trim() || null
         };
 
-        // @ts-ignore
+
         const { data, error } = await supabase.from('ingredients')
             .insert(newRecord)
             .select()
@@ -92,7 +92,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 
         if (error) {
             console.error('[API Ingredients POST] Error creating ingredient:', error);
-            if ((error as any).code === '23505') { // Unique violation for name
+            if ((error as { code?: string }).code === '23505') { // Unique violation for name
                  return NextResponse.json(
                     { success: false, error: 'An ingredient with this name already exists.' },
                     { status: 409 } // Conflict
@@ -101,7 +101,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
             return handleApiError(error, 'Failed to create ingredient.');
         }
 
-        const singleDataObject = data as any;
+        const singleDataObject = data as Ingredient;
         const validatedData: Ingredient = {
             id: singleDataObject.id,
             name: singleDataObject.name,
@@ -112,9 +112,9 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 
         return NextResponse.json({ success: true, data: validatedData }, { status: 201 });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[API Ingredients POST] Catched error:', error);
-        if (error.name === 'SyntaxError') { // JSON parsing error
+        if ((error as Error).name === 'SyntaxError') { // JSON parsing error
             return NextResponse.json({ success: false, error: 'Invalid JSON payload.' }, { status: 400 });
         }
         return handleApiError(error, 'An unexpected error occurred while creating the ingredient.');

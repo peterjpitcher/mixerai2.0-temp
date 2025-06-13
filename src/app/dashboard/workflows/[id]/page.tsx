@@ -4,13 +4,11 @@ import * as React from 'react';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Separator } from '@/components/separator';
-import { Badge } from '@/components/badge';
-import type { Metadata } from 'next';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { BrandIcon } from '@/components/brand-icon';
 import { ArrowLeft, Edit3, AlertTriangle, Loader2 } from 'lucide-react';
 import { format as formatDateFns } from 'date-fns';
@@ -19,6 +17,39 @@ import { format as formatDateFns } from 'date-fns';
 //   title: 'Workflow Details | MixerAI 2.0',
 //   description: 'View the details, steps, and configuration of a specific content workflow.',
 // };
+
+interface WorkflowAssignee {
+  id: string;
+  email: string;
+  name?: string;
+}
+
+interface WorkflowStep {
+  id: string;
+  name: string;
+  description?: string;
+  role: string;
+  assignees: WorkflowAssignee[];
+  approvalRequired: boolean;
+}
+
+interface WorkflowWithDetails {
+  id: string;
+  name: string;
+  description?: string;
+  brand_id?: string;
+  brand_name?: string;
+  brand_color?: string;
+  template_name?: string;
+  status: string;
+  steps: WorkflowStep[];
+  created_at: string;
+  updated_at: string;
+  createdBy?: {
+    name: string;
+  };
+  contentCount?: number;
+}
 
 interface WorkflowDetailPageProps {
   params: {
@@ -33,7 +64,7 @@ interface WorkflowDetailPageProps {
  */
 export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) {
   const { id } = params;
-  const [workflow, setWorkflow] = useState<any>(null);
+  const [workflow, setWorkflow] = useState<WorkflowWithDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -217,7 +248,7 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
                 </div>
               ) : (
                 <ol className="space-y-4">
-                  {workflowSteps.map((step: any, index: number) => (
+                  {workflowSteps.map((step: WorkflowStep, index: number) => (
                     <li key={step.id || index} className="border rounded-lg p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center">
@@ -238,7 +269,7 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
                         <p className="text-sm font-medium">Assignees:</p>
                         <div className="flex flex-wrap gap-2 mt-1">
                           {Array.isArray(step.assignees) && step.assignees.length > 0 ? (
-                            step.assignees.map((assignee: any) => (
+                            step.assignees.map((assignee: WorkflowAssignee) => (
                               <Badge key={assignee.id || assignee.email} variant="outline" className="text-xs">
                                 {assignee.email || 'No email'}
                               </Badge>

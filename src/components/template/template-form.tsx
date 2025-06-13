@@ -1,28 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
-import { Button } from '@/components/button';
-import { Input } from '@/components/input';
-import { Label } from '@/components/label';
-import { Textarea } from '@/components/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
-import { ScrollArea } from '@/components/scroll-area';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FieldDesigner } from './field-designer';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Icons } from '@/components/icons';
 import { toast } from 'sonner';
 import { Menu } from 'lucide-react';
 import { 
-  FieldType as GlobalFieldType,
   GenericField as Field,
   InputField, 
   OutputField, 
   ContentTemplate 
 } from '@/types/template';
 
-interface TemplateData extends ContentTemplate {}
+type TemplateData = ContentTemplate;
 
 interface TemplateFormProps {
   initialData?: TemplateData;
@@ -187,9 +185,9 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
       
       router.push('/dashboard/templates');
       router.refresh();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving template:', error);
-      toast.error(error.message || 'Failed to save template');
+      toast.error(error instanceof Error ? error.message : 'Failed to save template');
     } finally {
       setIsSubmitting(false);
     }

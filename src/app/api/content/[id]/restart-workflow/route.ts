@@ -7,8 +7,9 @@ import { TablesUpdate } from '@/types/supabase';
 
 export const dynamic = "force-dynamic";
 
-export const POST = withAuth(async (request: NextRequest, user: User, context: { params: { id: string } }) => {
-  const contentId = context.params.id;
+export const POST = withAuth(async (request: NextRequest, user: User, context?: unknown) => {
+  const { params } = context as { params: { id: string } };
+  const contentId = params.id;
 
   const supabase = createSupabaseAdminClient();
 
@@ -101,7 +102,7 @@ export const POST = withAuth(async (request: NextRequest, user: User, context: {
 
     return NextResponse.json({ success: true, message: 'Workflow restarted successfully.', data: updatedContent });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'Error restarting workflow');
   }
 }); 

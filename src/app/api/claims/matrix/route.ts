@@ -1,7 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { Product, ClaimTypeEnum, EffectiveClaim, FinalClaimTypeEnum, Claim, MasterClaimBrand, Ingredient, ProductIngredientAssociation, MarketClaimOverride, ClaimLevelEnum } from '@/lib/claims-utils';
+import { Product, ClaimTypeEnum, EffectiveClaim, FinalClaimTypeEnum, Claim, ProductIngredientAssociation, MarketClaimOverride, ClaimLevelEnum } from '@/lib/claims-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { SupabaseClient, User } from '@supabase/supabase-js';
 import { handleApiError, isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 
@@ -47,20 +46,8 @@ interface ClaimsMatrixApiResponseData {
   cellData: Record<string, Record<string, MatrixCell | null>>; // Keyed by claimText.text, then by product.id
 }
 
-// Helper to fetch replacement claim details (can remain similar, or be integrated into bulk fetching)
-// For now, keeping it separate. Can be optimized to fetch in bulk later.
-async function getReplacementClaimDetails(supabase: SupabaseClient, claimId: string | null | undefined): Promise<Claim | null> {
-    if (!claimId) return null;
-    // @ts-ignore
-    const { data, error } = await supabase.from('claims').select('id, claim_text, claim_type, country_code, level').eq('id', claimId).single<Claim>();
-    if (error || !data) {
-        console.warn(`[API Claims Matrix] Could not fetch replacement claim details for ID ${claimId}:`, error?.message);
-        return null;
-    }
-    return data;
-}
 
-export const GET = withAuth(async (req: NextRequest, user: User) => {
+export const GET = withAuth(async (req: NextRequest) => {
   try {
     const { searchParams } = new URL(req.url);
     const targetCountryCode = searchParams.get('countryCode');
@@ -89,7 +76,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
     if (masterBrandIdFilter) {
       productsQuery = productsQuery.eq('master_brand_id', masterBrandIdFilter);
     }
-    // @ts-ignore
+
     const { data: productsData, error: productsError } = await productsQuery.order('name');
 
     if (productsError) {
@@ -111,7 +98,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
     const uniqueMasterBrandIds = Array.from(new Set(products.map(p => p.master_brand_id)));
 
     // 2. Bulk Fetch Claims Data
-    // @ts-ignore
+
     const { data: brandLevelClaimsData, error: brandClaimsError } = await supabase
       .from('claims')
       .select('*')
@@ -121,7 +108,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
     if (brandClaimsError) return handleApiError(brandClaimsError, 'Failed to fetch brand claims.');
     const brandLevelClaims: Claim[] = (brandLevelClaimsData || []).filter(c => c.country_code !== null) as Claim[];
 
-    // @ts-ignore
+
     const { data: productLevelClaimsData, error: productClaimsError } = await supabase
       .from('claims')
       .select('*')
@@ -131,7 +118,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
     if (productClaimsError) return handleApiError(productClaimsError, 'Failed to fetch product claims.');
     const productLevelClaims: Claim[] = (productLevelClaimsData || []).filter(c => c.country_code !== null) as Claim[];
     
-    // @ts-ignore
+
     const { data: productIngredientLinksData, error: piError } = await supabase
         .from('product_ingredients')
         .select('product_id, ingredient_id')
@@ -142,7 +129,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
     const uniqueIngredientIds = Array.from(new Set(productIngredientLinks.map(link => link.ingredient_id)));
     let ingredientLevelClaims: Claim[] = [];
     if (uniqueIngredientIds.length > 0) {
-        // @ts-ignore
+
         const { data: ingredientClaimsData, error: ingredientClaimsError } = await supabase
             .from('claims')
             .select('*')
@@ -154,7 +141,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
     }
 
     // 3. Bulk Fetch Market Overrides
-    // @ts-ignore
+
     const { data: marketOverridesData, error: overridesError } = await supabase
         .from('market_claim_overrides')
         .select('*') // Fetch all columns for now, can be optimized
@@ -169,9 +156,9 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
         .filter((id): id is string => id !== null && id !== undefined);
     
     const uniqueReplacementClaimIds = Array.from(new Set(replacementClaimIds));
-    let replacementClaimsMap: Map<string, Claim> = new Map();
+    const replacementClaimsMap: Map<string, Claim> = new Map();
     if (uniqueReplacementClaimIds.length > 0) {
-        // @ts-ignore
+
         const { data: replacementClaimsData, error: rcError } = await supabase
             .from('claims')
             .select('*') // Fetch all columns for now
@@ -371,7 +358,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
 
     return NextResponse.json({ success: true, data: responseData });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`[API Claims Matrix GET] Caught error:`, error);
     return handleApiError(error, 'An unexpected error occurred while fetching the claims matrix.');
   }

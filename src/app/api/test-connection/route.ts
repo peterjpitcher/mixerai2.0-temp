@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { isDatabaseConnectionError, handleApiError } from '@/lib/api-utils';
+import { handleApiError } from '@/lib/api-utils';
 // import { withAuth } from '@/lib/auth/api-auth'; // No longer used
 import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
 
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
  * WARNING: This endpoint uses an admin Supabase client and is now protected by admin-only authorization.
  * It should be REMOVED or STRICTLY SECURED if kept in deployment.
  */
-export const GET = withAdminAuth(async (request: NextRequest, user) => {
+export const GET = withAdminAuth(async (_request: NextRequest, user) => {
   const startTime = Date.now();
   
   try {
@@ -38,11 +38,7 @@ export const GET = withAdminAuth(async (request: NextRequest, user) => {
         authenticatedUserId: user.id
       }
     });
-  } catch (error: any) {
-    const elapsed = Date.now() - startTime;
-    // Diagnostics can be part of the error object if needed by handleApiError or server-side logging
-    // For now, simplifying the call to handleApiError.
-    // const diagnostics = { ... }; 
+  } catch (error: unknown) {
     return handleApiError(error, 'Database connection test failed', 500);
   }
 });

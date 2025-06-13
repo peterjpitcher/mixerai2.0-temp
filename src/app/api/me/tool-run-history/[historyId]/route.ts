@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { Database } from '@/types/supabase';
+import { User } from '@supabase/supabase-js';
 
 interface RouteParams {
   params: {
@@ -9,7 +9,8 @@ interface RouteParams {
   };
 }
 
-export const GET = withAuthAndMonitoring(async (request: NextRequest, user, { params }: RouteParams) => {
+export const GET = withAuthAndMonitoring(async (request: NextRequest, user: User, context?: unknown) => {
+  const { params } = context as RouteParams;
   try {
     const supabase = createSupabaseServerClient();
     const { historyId } = params;
@@ -64,10 +65,10 @@ export const GET = withAuthAndMonitoring(async (request: NextRequest, user, { pa
 
     return NextResponse.json({ success: true, historyItem });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[ToolRunHistoryItemAPI] Unexpected error:', error);
     return NextResponse.json(
-      { success: false, error: 'An unexpected error occurred.', details: error.message },
+      { success: false, error: 'An unexpected error occurred.', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

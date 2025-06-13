@@ -1,8 +1,8 @@
 'use client';
 
 import { BrandIcon } from '@/components/brand-icon';
-import { Label } from '@/components/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Brand {
   id: string;

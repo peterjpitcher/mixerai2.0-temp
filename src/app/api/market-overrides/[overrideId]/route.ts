@@ -31,8 +31,8 @@ interface RouteParams {
 }
 
 // Helper to validate claim properties
-async function getClaimProperties(supabase: any, claimId: string): Promise<{ country_code: string; id: string } | null> {
-    // @ts-ignore
+async function getClaimProperties(supabase: ReturnType<typeof createSupabaseAdminClient>, claimId: string): Promise<{ country_code: string; id: string } | null> {
+
     const { data, error } = await supabase
         .from('claims')
         .select('id, country_code')
@@ -46,7 +46,8 @@ async function getClaimProperties(supabase: any, claimId: string): Promise<{ cou
 }
 
 // PUT handler for updating an existing market claim override
-export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { params: RouteParams }) => {
+export const PUT = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+    const { params } = context as { params: RouteParams };
     const { overrideId } = params;
     try {
         const body: MarketClaimOverridePutPayload = await req.json();
@@ -67,7 +68,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { p
 
         if (!hasPermission) {
             // Fetch the existing override to get its target_product_id and created_by for permission checking
-            // @ts-ignore
+
             const { data: fetchedOverride, error: fetchPermError } = await supabase
                 .from('market_claim_overrides')
                 .select('id, market_country_code, master_claim_id, target_product_id, created_by') // Added target_product_id and created_by
@@ -92,10 +93,10 @@ export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { p
                 }
 
                 if (!hasPermission && fetchedOverride.target_product_id) { // If not creator, check brand admin permissions
-                    // @ts-ignore
+
                     const { data: productData, error: productError } = await supabase
                         .from('products')
-                        // @ts-ignore
+
                         .select('master_brand_id') // Renamed
                         .eq('id', fetchedOverride.target_product_id)
                         .single();
@@ -103,18 +104,18 @@ export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { p
                     if (productError || !productData || !productData.master_brand_id) { // Renamed
                         console.error(`[API MarketOverrides PUT /${overrideId}] Error fetching product/MCB for permissions:`, productError);
                     } else {
-                        // @ts-ignore
+
                         const { data: mcbData, error: mcbError } = await supabase // Renamed
                             .from('master_claim_brands') // Renamed
                             .select('mixerai_brand_id')
-                            // @ts-ignore
+
                             .eq('id', productData.master_brand_id) // Renamed
                             .single();
                         
                         if (mcbError || !mcbData || !mcbData.mixerai_brand_id) {
                             console.error(`[API MarketOverrides PUT /${overrideId}] Error fetching MCB or MCB not linked for permissions (MCB ID: ${productData.master_brand_id}):`, mcbError);
                         } else {
-                            // @ts-ignore
+
                             const { data: permissionsData, error: permissionsError } = await supabase
                                 .from('user_brand_permissions')
                                 .select('role')
@@ -142,14 +143,14 @@ export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { p
         // This is to get its market_country_code for validation if replacement_claim_id is changing
         const existingOverrideToUse = existingOverrideForPermissionCheck && existingOverrideForPermissionCheck.id === overrideId 
             ? existingOverrideForPermissionCheck 
-            // @ts-ignore
+
             : (await supabase.from('market_claim_overrides').select('id, market_country_code, master_claim_id').eq('id', overrideId).single<MarketClaimOverride>()).data;
 
         if (!existingOverrideToUse) {
             return NextResponse.json({ success: false, error: `Market override with ID ${overrideId} not found.` }, { status: 404 });
         }
         
-        // @ts-ignore - existingOverrideToUse might be partial if only from perm check, but master_claim_id should be there
+
         if (replacement_claim_id === existingOverrideToUse.master_claim_id) {
             return NextResponse.json({ success: false, error: 'Replacement claim cannot be the same as the master claim.'}, { status: 400 });
         }
@@ -160,7 +161,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { p
             if (!replacementClaimProps) {
                 return NextResponse.json({ success: false, error: `Replacement claim with ID ${replacement_claim_id} not found.` }, { status: 400 });
             }
-            // @ts-ignore - existingOverrideToUse might be partial if only from perm check, but market_country_code should be there
+
             if (replacementClaimProps.country_code !== existingOverrideToUse.market_country_code) {
                 return NextResponse.json({ success: false, error: `Replacement claim ID ${replacement_claim_id} is for country ${replacementClaimProps.country_code}, not for the market ${existingOverrideToUse.market_country_code} of this override.` }, { status: 400 });
             }
@@ -170,7 +171,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { p
         if (typeof is_blocked !== 'undefined') updatePayload.is_blocked = is_blocked;
         if (typeof replacement_claim_id !== 'undefined') updatePayload.replacement_claim_id = replacement_claim_id; // This handles null correctly
 
-        // @ts-ignore
+
         const { data, error } = await supabase
             .from('market_claim_overrides')
             .update(updatePayload)
@@ -181,14 +182,14 @@ export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { p
         if (error) {
             console.error(`[API MarketOverrides PUT] Error updating market override ${overrideId}:`, error);
              // Foreign key violation for replacement_claim_id
-            if ((error as any).code === '23503') { 
+            if ((error as { code?: string }).code === '23503') { 
                 return NextResponse.json(
                    { success: false, error: 'Invalid replacement_claim_id. Ensure it exists.' },
                    { status: 400 }
                );
             }
             // chk_replacement_claim_is_market (Postgres error code 23514)
-            if ((error as any).code === '23514') {
+            if ((error as { code?: string }).code === '23514') {
                  return NextResponse.json(
                     { success: false, error: 'Database check constraint violated: Replacement claim does not match market country.' },
                     { status: 400 }
@@ -199,9 +200,9 @@ export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { p
 
         return NextResponse.json({ success: true, data: data as MarketClaimOverride });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`[API MarketOverrides PUT /${overrideId}] Catched error:`, error);
-        if (error.name === 'SyntaxError') { 
+        if (error instanceof Error && error.name === 'SyntaxError') { 
             return NextResponse.json({ success: false, error: 'Invalid JSON payload.' }, { status: 400 });
         }
         return handleApiError(error, `An unexpected error occurred while updating market override ${overrideId}.`);
@@ -209,7 +210,8 @@ export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { p
 });
 
 // DELETE handler for removing a market claim override
-export const DELETE = withAuth(async (req: NextRequest, user: User, { params }: { params: RouteParams }) => {
+export const DELETE = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+    const { params } = context as { params: RouteParams };
     const { overrideId } = params;
     try {
         const supabase = createSupabaseAdminClient();
@@ -219,7 +221,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, { params }: 
 
         if (!hasPermission) {
             // Fetch the existing override to get its target_product_id and created_by for permission checking
-            // @ts-ignore
+
             const { data: fetchedOverride, error: fetchPermError } = await supabase
                 .from('market_claim_overrides')
                 .select('target_product_id, created_by') // Select fields needed for permission
@@ -238,10 +240,10 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, { params }: 
                 }
 
                 if (!hasPermission && fetchedOverride.target_product_id) {
-                    // @ts-ignore
+
                     const { data: productData, error: productError } = await supabase
                         .from('products')
-                        // @ts-ignore
+
                         .select('master_brand_id') // Renamed
                         .eq('id', fetchedOverride.target_product_id)
                         .single();
@@ -249,18 +251,18 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, { params }: 
                     if (productError || !productData || !productData.master_brand_id) { // Renamed
                         console.error(`[API MarketOverrides DELETE /${overrideId}] Error fetching product/MCB for permissions:`, productError);
                     } else {
-                        // @ts-ignore
+
                         const { data: mcbData, error: mcbError } = await supabase // Renamed
                             .from('master_claim_brands') // Renamed
                             .select('mixerai_brand_id')
-                            // @ts-ignore
+
                             .eq('id', productData.master_brand_id) // Renamed
                             .single();
                         
                         if (mcbError || !mcbData || !mcbData.mixerai_brand_id) {
                             console.error(`[API MarketOverrides DELETE /${overrideId}] Error fetching MCB or MCB not linked for permissions (MCB ID: ${productData.master_brand_id}):`, mcbError);
                         } else {
-                            // @ts-ignore
+
                             const { data: permissionsData, error: permissionsError } = await supabase
                                 .from('user_brand_permissions')
                                 .select('role')
@@ -284,7 +286,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, { params }: 
         }
         // --- Permission Check End ---
 
-        // @ts-ignore
+
         const { error, count } = await supabase
             .from('market_claim_overrides')
             .delete({ count: 'exact' })
@@ -304,7 +306,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, { params }: 
 
         return NextResponse.json({ success: true, message: `Market claim override ${overrideId} deleted successfully.` });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`[API MarketOverrides DELETE /${overrideId}] Catched error:`, error);
         return handleApiError(error, `An unexpected error occurred while deleting market override ${overrideId}.`);
     }

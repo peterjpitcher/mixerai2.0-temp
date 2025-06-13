@@ -4,18 +4,16 @@ import * as React from 'react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/button';
-import { Input } from '@/components/input';
-import { Textarea } from '@/components/textarea';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
-import { Label } from '@/components/label';
-import { Switch } from '@/components/switch';
-import { Badge } from '@/components/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2, ArrowLeft, ShieldAlert, UserPlus, Search } from 'lucide-react';
-import type { Metadata } from 'next';
-import { ConfirmDialog } from '@/components/confirm-dialog';
+import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2, ArrowLeft, ShieldAlert, UserPlus } from 'lucide-react';
 import { debounce } from 'lodash';
 import { cn } from '@/lib/utils';
 import { BrandIcon } from '@/components/brand-icon';
@@ -98,10 +96,9 @@ const roles = [
 interface RoleSelectionCardsProps {
   selectedRole: string;
   onRoleSelect: (roleId: string) => void;
-  stepIndex: number;
 }
 
-const RoleSelectionCards: React.FC<RoleSelectionCardsProps> = ({ selectedRole, onRoleSelect, stepIndex }) => {
+const RoleSelectionCards: React.FC<RoleSelectionCardsProps> = ({ selectedRole, onRoleSelect }) => {
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -180,10 +177,10 @@ export default function NewWorkflowPage() {
           setCurrentUser(null);
           toast.error(data.error || 'Could not verify your session.');
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching current user:', err);
         setCurrentUser(null);
-        toast.error('Error fetching user data: ' + err.message);
+        toast.error('Error fetching user data: ' + (err as Error).message);
       } finally {
         setIsLoadingUser(false);
       }
@@ -224,9 +221,9 @@ export default function NewWorkflowPage() {
         if (!templatesData.success) throw new Error(templatesData.error || 'Failed to fetch content templates data');
         setContentTemplates(Array.isArray(templatesData.templates) ? templatesData.templates : []);
 
-      } catch (error: any) {
+      } catch (error) {
         console.error('Error fetching initial data for new workflow page:', error);
-        toast.error(error.message || 'Failed to load initial data.');
+        toast.error((error as Error).message || 'Failed to load initial data.');
       } finally {
         setIsLoading(false); 
       }
@@ -275,9 +272,9 @@ export default function NewWorkflowPage() {
           setBrandWorkflows([]);
           toast.error(data.error || 'Could not load workflows for the selected brand.');
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('Error fetching brand workflows:', error);
-        toast.error(error.message || 'Failed to load workflows for brand.');
+        toast.error((error as Error).message || 'Failed to load workflows for brand.');
         setBrandWorkflows([]);
       } finally {
         setIsLoadingBrandWorkflows(false);
@@ -302,29 +299,32 @@ export default function NewWorkflowPage() {
   }, [contentTemplates, brandWorkflows, workflow.brand_id, isLoadingBrandWorkflows]);
 
   const debouncedUserSearch = useCallback(
-    debounce(async (searchTerm: string, stepIndex: number) => {
-      if (searchTerm.trim().length < 2) {
-        setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
-        return;
-      }
-      setUserSearchLoading(prev => ({ ...prev, [stepIndex]: true }));
-      try {
-        const response = await fetch(`/api/users/search?query=${encodeURIComponent(searchTerm)}`);
-        const data = await response.json();
-        if (data.success) {
-          setUserSearchResults(prev => ({ ...prev, [stepIndex]: data.users }));
-        } else {
-          setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
-          // Optionally toast an error: toast.error(`Search failed: ${data.error}`);
+    (searchTerm: string, stepIndex: number) => {
+      const debouncedFn = debounce(async (term: string, index: number) => {
+        if (term.trim().length < 2) {
+          setUserSearchResults(prev => ({ ...prev, [index]: [] }));
+          return;
         }
-      } catch (error) {
-        console.error('User search error:', error);
-        setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
-        // Optionally toast an error: toast.error('Failed to search users.');
-      } finally {
-        setUserSearchLoading(prev => ({ ...prev, [stepIndex]: false }));
-      }
-    }, 300),
+        setUserSearchLoading(prev => ({ ...prev, [index]: true }));
+        try {
+          const response = await fetch(`/api/users/search?query=${encodeURIComponent(term)}`);
+          const data = await response.json();
+          if (data.success) {
+            setUserSearchResults(prev => ({ ...prev, [index]: data.users }));
+          } else {
+            setUserSearchResults(prev => ({ ...prev, [index]: [] }));
+            // Optionally toast an error: toast.error(`Search failed: ${data.error}`);
+          }
+        } catch (error) {
+          console.error('User search error:', error);
+          setUserSearchResults(prev => ({ ...prev, [index]: [] }));
+          // Optionally toast an error: toast.error('Failed to search users.');
+        } finally {
+          setUserSearchLoading(prev => ({ ...prev, [index]: false }));
+        }
+      }, 300);
+      debouncedFn(searchTerm, stepIndex);
+    },
     []
   );
 
@@ -485,9 +485,9 @@ export default function NewWorkflowPage() {
       } else {
         throw new Error(data.error || 'No description returned from AI');
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error generating step description:', error);
-      toast.error(error.message || 'Could not generate step description.');
+      toast.error((error as Error).message || 'Could not generate step description.');
     } finally {
       setStepDescLoading(prev => ({ ...prev, [stepIndex]: false }));
     }
@@ -626,9 +626,9 @@ export default function NewWorkflowPage() {
       }
       toast.success('Workflow created successfully!');
       router.push(`/dashboard/workflows`); // Navigate to workflows list page
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating workflow:', error);
-      toast.error(error.message || 'An unexpected error occurred.');
+      toast.error((error as Error).message || 'An unexpected error occurred.');
     } finally {
       setIsSaving(false);
     }
@@ -817,7 +817,7 @@ export default function NewWorkflowPage() {
           <CardContent>
             {workflow.steps.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No steps defined for this workflow. Click "Add Step" to create your first workflow step.
+                No steps defined for this workflow. Click &quot;Add Step&quot; to create your first workflow step.
               </div>
             ) : (
               <div className="space-y-6">
@@ -875,7 +875,6 @@ export default function NewWorkflowPage() {
                       <RoleSelectionCards
                         selectedRole={step.role}
                         onRoleSelect={(roleId) => handleUpdateStepRole(index, roleId)}
-                        stepIndex={index}
                       />
                     </div>
 
@@ -962,7 +961,7 @@ export default function NewWorkflowPage() {
                             </Card>
                         )}
                         {assigneeInputs[index] && userSearchResults[index]?.length === 0 && !userSearchLoading[index] && assigneeInputs[index].length >=2 && (
-                             <p className="text-sm text-muted-foreground py-2">No users found matching "{assigneeInputs[index]}". You can still add by full email address.</p>
+                             <p className="text-sm text-muted-foreground py-2">No users found matching &quot;{assigneeInputs[index]}&quot;. You can still add by full email address.</p>
                         )}
 
 

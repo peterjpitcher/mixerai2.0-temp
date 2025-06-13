@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
-import type { InputField, OutputField, ContentTemplate as Template, FieldType } from '@/types/template';
+import type { InputField, ContentTemplate as Template, FieldType } from '@/types/template';
 import type { ProductContext } from '@/types/claims';
 
 interface Brand {
@@ -25,7 +25,7 @@ interface WorkflowSummary {
 export function useContentGenerator(templateId?: string | null) {
   // Core state
   const [isLoading, setIsLoading] = useState(false);
-  const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
+  const [isGeneratingTitle] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
   // Data state
@@ -50,7 +50,7 @@ export function useContentGenerator(templateId?: string | null) {
   const [retryingFieldId, setRetryingFieldId] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   
-  const [canGenerateContent, setCanGenerateContent] = useState<boolean>(false);
+  const [canGenerateContent] = useState<boolean>(false);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   
   const [productContext, setProductContext] = useState<ProductContext | null>(null);
@@ -62,11 +62,11 @@ export function useContentGenerator(templateId?: string | null) {
   const missingRequiredFields = useMemo(() => {
     if (!template) return [];
     
-    const required = template.fields.inputFields
-      .filter(field => field.validation?.required)
+    const required = template.inputFields
+      ?.filter(field => field.required)
       .filter(field => !templateFieldValues[field.id] || templateFieldValues[field.id].trim() === '');
     
-    return required.map(field => field.name);
+    return required?.map(field => field.name) || [];
   }, [template, templateFieldValues]);
   
   // Fetch initial data
@@ -89,10 +89,10 @@ export function useContentGenerator(templateId?: string | null) {
         const templateData = templateResult.value;
         setTemplate(templateData.template);
         
-        if (templateData.template?.fields?.inputFields) {
+        if (templateData.template?.inputFields) {
           const initialValues: Record<string, string> = {};
-          templateData.template.fields.inputFields.forEach((field: InputField) => {
-            initialValues[field.id] = field.defaultValue || '';
+          templateData.template.inputFields.forEach((field: InputField) => {
+            initialValues[field.id] = '';
           });
           setTemplateFieldValues(initialValues);
         }
@@ -180,7 +180,7 @@ export function useContentGenerator(templateId?: string | null) {
     setTemplateFieldValues(prev => ({ ...prev, [fieldId]: value }));
     
     // Handle product selection changes
-    if (fieldType === 'productSelect' && selectedBrand) {
+    if (fieldType === 'product-selector' && selectedBrand) {
       if (!value) {
         setProductContext(null);
         return;
@@ -206,8 +206,8 @@ export function useContentGenerator(templateId?: string | null) {
         if (data.success && data.context) {
           setProductContext(data.context);
         }
-      } catch (error: any) {
-        if (error.name !== 'AbortError') {
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name !== 'AbortError') {
           console.error('Error fetching product context:', error);
           toast.error('Failed to load product information');
         }
@@ -253,10 +253,11 @@ export function useContentGenerator(templateId?: string | null) {
       } else {
         throw new Error(data.error || 'No content was generated');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Generation error:', error);
-      setAiError(error.message);
-      toast.error(error.message || 'Failed to generate content');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate content';
+      setAiError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -296,9 +297,10 @@ export function useContentGenerator(templateId?: string | null) {
         toast.success('Content saved successfully!');
         return data.data?.id;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Save error:', error);
-      toast.error(error.message || 'Failed to save content');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save content';
+      toast.error(errorMessage);
       throw error;
     } finally {
       setIsSaving(false);

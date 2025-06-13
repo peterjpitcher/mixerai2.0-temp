@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@/components/button';
-import { PageHeader } from '@/components/dashboard/page-header';
+import { Button } from '@/components/ui/button';
 import { TemplateForm } from '@/components/template/template-form';
 import { Loader2, ChevronLeft, Trash2, ShieldAlert } from 'lucide-react';
 import {
@@ -16,10 +15,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/alert-dialog";
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
-import type { Metadata } from 'next';
+import type { ContentTemplate } from '@/types/template';
 
 // Define UserSessionData interface
 interface UserSessionData {
@@ -172,14 +171,14 @@ const defaultTemplates = {
  * The core editing functionality is provided by the `TemplateForm` component.
  */
 export default function TemplateEditPage() {
-  const params = useParams<{ id: string }>();
-  const id = params?.id || '';
+  const params = useParams();
+  const id = String(params?.id || '');
   const router = useRouter();
-  const [template, setTemplate] = useState<any>(null);
+  const [template, setTemplate] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  // const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
@@ -197,10 +196,10 @@ export default function TemplateEditPage() {
           setCurrentUser(null);
           toast.error(data.error || 'Could not verify your session.');
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching current user:', err);
         setCurrentUser(null);
-        toast.error('Error fetching user data: ' + err.message);
+        toast.error('Error fetching user data: ' + (err as Error).message);
       } finally {
         setIsLoadingUser(false);
       }
@@ -293,7 +292,7 @@ export default function TemplateEditPage() {
 
   const handleOpenDeleteDialog = () => {
     if (!isGlobalAdmin || isSystemTemplate) {
-        toast.error(isSystemTemplate ? "System templates cannot be deleted." : "You don't have permission to delete templates.");
+        toast.error(isSystemTemplate ? "System templates cannot be deleted." : "You don&apos;t have permission to delete templates.");
         return;
     }
     setShowDeleteDialog(true);
@@ -301,7 +300,7 @@ export default function TemplateEditPage() {
 
   const handleConfirmDelete = async () => {
     if (!isGlobalAdmin || isSystemTemplate) {
-        toast.error(isSystemTemplate ? "System templates cannot be deleted." : "You don't have permission to delete templates.");
+        toast.error(isSystemTemplate ? "System templates cannot be deleted." : "You don&apos;t have permission to delete templates.");
         setIsDeleting(false);
         setShowDeleteDialog(false);
         return;
@@ -320,7 +319,7 @@ export default function TemplateEditPage() {
       } else {
         toast.error(data.error || 'Failed to delete template.');
       }
-    } catch (error) {
+    } catch {
       toast.error('An error occurred during deletion.');
     } finally {
       setIsDeleting(false);
@@ -333,7 +332,7 @@ export default function TemplateEditPage() {
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" }, 
         { label: "Content Templates", href: "/dashboard/templates" }, 
-        { label: template?.name || id }
+        { label: String(template?.name || id) }
       ]} />
       
       <div className="flex items-center justify-between mb-6">
@@ -344,7 +343,7 @@ export default function TemplateEditPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">{template?.name || 'Edit Template'}</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{String(template?.name || 'Edit Template')}</h1>
             <p className="text-muted-foreground mt-1">Modify the fields and settings for this template.</p>
           </div>
         </div>
@@ -361,7 +360,7 @@ export default function TemplateEditPage() {
           Alternatively, TemplateForm needs its own internal permission checks or relies on API for saves
       */}
       <TemplateForm 
-        initialData={template} 
+        initialData={template as unknown as ContentTemplate | undefined} 
         // If TemplateForm supports a readOnly prop for system templates, it would be like:
         // isReadOnly={!!isSystemTemplate}
       />
@@ -372,7 +371,7 @@ export default function TemplateEditPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action will permanently delete the template "{template?.name}". This cannot be undone.
+                This action will permanently delete the template &quot;{String(template?.name || 'this template')}&quot;. This cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

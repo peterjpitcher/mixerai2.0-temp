@@ -1,17 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
-import { Input } from '@/components/input';
-import { Label } from '@/components/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
-import { Switch } from '@/components/switch';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
 import { createBrowserClient } from '@supabase/ssr';
 import { Spinner } from '@/components/spinner';
-import type { Metadata } from 'next';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { HelpCircle } from 'lucide-react';
 
 // Page metadata should ideally be exported from a server component or the page file if it's RSC.
 // For client components, this is more of a placeholder for what should be set.
@@ -107,10 +107,11 @@ export default function AccountPage() {
         // TODO: Fetch actual notification settings for the user from an API
         // setNotificationSettings(fetchedSettings || defaultNotificationSettings);
         
-      } catch (error: any) {
+      } catch (error: unknown) {
         // console.error removed
+        const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
         toast.error(
-          error?.message || 'Failed to load your profile data. Please try again later.',
+          errorMessage || 'Failed to load your profile data. Please try again later.',
           { description: 'Error Loading Profile' }
         );
       } finally {
@@ -160,9 +161,10 @@ export default function AccountPage() {
       }
       
       toast('Your profile information has been successfully updated.', { description: 'Profile Updated' });
-    } catch (error: any) {
+    } catch (error: unknown) {
       // console.error removed
-      toast.error(error?.message || 'Failed to update your profile. Please try again.', { description: 'Profile Update Error' });
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      toast.error(errorMessage || 'Failed to update your profile. Please try again.', { description: 'Profile Update Error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -198,9 +200,10 @@ export default function AccountPage() {
       if (error) throw error;
       toast('Your password has been changed successfully.', { description: 'Password Updated' });
       form.reset();
-    } catch (error: any) {
+    } catch (error: unknown) {
       // console.error removed
-      toast.error(error?.message || 'Failed to update your password. Please try again.', { description: 'Password Update Error' });
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      toast.error(errorMessage || 'Failed to update your password. Please try again.', { description: 'Password Update Error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -214,9 +217,10 @@ export default function AccountPage() {
       // Example: await fetch('/api/user/notification-settings', { method: 'POST', body: JSON.stringify(notificationSettings) });
       await new Promise(resolve => setTimeout(resolve, 750)); // Simulate API delay
       toast('Your notification preferences have been updated.', { description: 'Preferences Saved' });
-    } catch (error: any) {
+    } catch (error: unknown) {
       // console.error removed
-      toast.error(error?.message || 'Failed to save your notification preferences.', { description: 'Save Error' });
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      toast.error(errorMessage || 'Failed to save your notification preferences.', { description: 'Save Error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -236,11 +240,20 @@ export default function AccountPage() {
   return (
     <div className="space-y-8">
       <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Account Settings" }]} />
-      <header>
-        <h1 className="text-3xl font-bold tracking-tight">Account Settings</h1>
-        <p className="text-muted-foreground">
-          Manage your profile, password, and notification preferences.
-        </p>
+      <header className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Account Settings</h1>
+          <p className="text-muted-foreground">
+            Manage your profile, password, and notification preferences.
+          </p>
+        </div>
+        <Link 
+          href="/dashboard/help?article=12-account" 
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <HelpCircle className="h-4 w-4" />
+          Need help?
+        </Link>
       </header>
 
       <Tabs defaultValue="profile" className="w-full">

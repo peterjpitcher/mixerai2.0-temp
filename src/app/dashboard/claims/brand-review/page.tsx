@@ -74,7 +74,8 @@ const BrandClaimsOutputPage = () => {
                 if (brandsData.success) setBrands(brandsData.data); else toast.error('Could not load brands.');
                 if (productsRes.success) setProducts(productsRes.data); else toast.error('Could not load products.');
                 if (countriesRes.success) setCountries(countriesRes.data); else toast.error('Could not load countries.');
-            } catch (error) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            } catch (_error) {
                 toast.error('Failed to fetch initial page data.');
             } finally {
                 setIsLoading(false);
@@ -121,8 +122,8 @@ const BrandClaimsOutputPage = () => {
             } else {
                 toast.error(result.error || 'Could not generate styled claims.');
             }
-        } catch (error: any) {
-            toast.error(error.message);
+        } catch (error: unknown) {
+            toast.error(error instanceof Error ? error.message : 'An error occurred');
         } finally {
             setIsGenerating(false);
         }

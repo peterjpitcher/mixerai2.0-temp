@@ -1,0 +1,50 @@
+{
+  "startTime": "2025-06-13T10:27:01.171Z",
+  "totalIssues": 27,
+  "resolvedIssues": 16,
+  "inProgressIssues": 0,
+  "blockedIssues": 0,
+  "agents": [
+    {
+      "id": "agent-1",
+      "assignmentFile": "agent-1-assignments.json",
+      "statusFile": "agent-1-status.json",
+      "issueCount": 7,
+      "status": "ready",
+      "completedCount": 0,
+      "currentIssue": null,
+      "lastUpdate": "2025-06-13T10:27:01.168Z"
+    },
+    {
+      "id": "agent-2",
+      "assignmentFile": "agent-2-assignments.json",
+      "statusFile": "agent-2-status.json",
+      "issueCount": 7,
+      "status": "active",
+      "completedCount": 0,
+      "currentIssue": null,
+      "lastUpdate": "2025-06-13T10:27:10.535Z"
+    },
+    {
+      "id": "agent-3",
+      "assignmentFile": "agent-3-assignments.json",
+      "statusFile": "agent-3-status.json",
+      "issueCount": 7,
+      "status": "completed",
+      "completedCount": 16,
+      "currentIssue": null,
+      "lastUpdate": "2025-06-13T10:30:00.000Z"
+    },
+    {
+      "id": "agent-4",
+      "assignmentFile": "agent-4-assignments.json",
+      "statusFile": "agent-4-status.json",
+      "issueCount": 7,
+      "status": "ready",
+      "completedCount": 0,
+      "currentIssue": null,
+      "lastUpdate": "2025-06-13T10:27:01.170Z"
+    }
+  ],
+  "lastUpdate": "2025-06-13T10:29:03.833Z"
+}

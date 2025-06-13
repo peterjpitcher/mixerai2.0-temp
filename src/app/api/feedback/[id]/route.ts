@@ -99,7 +99,7 @@ export async function PATCH(
   let body: FeedbackUpdateBody;
   try {
     body = await request.json();
-  } catch (e) {
+  } catch {
     return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
   }
 

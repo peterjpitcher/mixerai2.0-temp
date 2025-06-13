@@ -16,19 +16,15 @@ import {
   Wrench,
   Code,
   Image as LucideImage,
-  Globe,
   Folder,
   ListChecks,
   Loader2,
   MessageSquareWarning,
   Info,
   ClipboardList,
-  FilePlus2,
   Package,
   FlaskConical,
   ShieldCheck,
-  Settings2,
-  ClipboardEdit,
   Globe2,
   SearchCheck,
   LayoutGrid
@@ -100,7 +96,7 @@ export function UnifiedNavigation() {
     'product-claims': false,
   });
 
-  const [userTemplates, setUserTemplates] = useState<any[]>([]);
+  const [userTemplates, setUserTemplates] = useState<{ id: string; name: string }[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const templatesFetched = useRef(false);
 
@@ -269,7 +265,7 @@ export function UnifiedNavigation() {
   
   const isAuthenticatedUser = currentUser != null;
 
-  let navItemsDefinition: (NavItem | NavGroupItem | NavSpacer & { show?: boolean | (() => boolean) })[] = [
+  const navItemsDefinition: (NavItem | NavGroupItem | NavSpacer & { show?: boolean | (() => boolean) })[] = [
     {
       href: '/dashboard',
       label: 'Dashboard',
@@ -409,7 +405,7 @@ export function UnifiedNavigation() {
 
     if (item.segment) {
       const currentTopSegment = segments[0] || '';
-      let currentSecondSegment = segments[1] || '';
+      const currentSecondSegment = segments[1] || '';
 
       if ('items' in item) {
         return item.segment === currentTopSegment;

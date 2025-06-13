@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, ExternalLink, MessageSquare, User, Search, AlertCircle, ChevronDown, ChevronRight, Tag } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface PriorityLabel {
   name: string;
@@ -22,7 +23,7 @@ interface PriorityLabel {
 
 export default function IssuesPage() {
   const [issues, setIssues] = useState<GitHubIssue[]>([]);
-  const [labels, setLabels] = useState<GitHubLabel[]>([]);
+  const [, setLabels] = useState<GitHubLabel[]>([]);
   const [priorityLabels, setPriorityLabels] = useState<PriorityLabel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +71,7 @@ export default function IssuesPage() {
       ];
 
       allLabels.forEach((label: GitHubLabel) => {
-        priorityPatterns.forEach(({ pattern, name, order, displayName }) => {
+        priorityPatterns.forEach(({ pattern, order, displayName }) => {
           if (pattern.test(label.name)) {
             priorities.push({
               name: label.name,
@@ -294,7 +295,7 @@ export default function IssuesPage() {
               </div>
               {/* Hidden select for state filter - always show open issues */}
               <input type="hidden" value="open" />
-              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+              <Select value={sortBy} onValueChange={(value: 'created' | 'updated' | 'comments') => setSortBy(value)}>
                 <SelectTrigger className="w-full sm:w-32 h-8 text-sm">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
@@ -340,9 +341,6 @@ export default function IssuesPage() {
                     <div className="space-y-1">
                       {grouped[priority].map((issue) => {
                         const isExpanded = expandedIssues.has(issue.id);
-                        const priorityLabel = issue.labels.find(label => 
-                          priority !== 'none' && label.name === priority
-                        );
                         const otherLabels = issue.labels.filter(label => 
                           priority === 'none' || label.name !== priority
                         );
@@ -402,13 +400,15 @@ export default function IssuesPage() {
                                     {issue.assignees && issue.assignees.length > 0 && (
                                       <div className="flex -space-x-1">
                                         {issue.assignees.slice(0, 3).map((assignee) => (
-                                          <img
-                                            key={assignee.id}
-                                            src={assignee.avatar_url}
-                                            alt={assignee.login}
-                                            className="h-4 w-4 rounded-full border border-background"
-                                            title={assignee.login}
-                                          />
+                                          <div key={assignee.id} className="relative h-4 w-4 rounded-full border border-background overflow-hidden">
+                                            <Image
+                                              src={assignee.avatar_url}
+                                              alt={assignee.login}
+                                              fill
+                                              className="object-cover"
+                                              title={assignee.login}
+                                            />
+                                          </div>
                                         ))}
                                         {issue.assignees.length > 3 && (
                                           <span className="h-4 px-1 text-xs bg-muted rounded-full border border-background flex items-center">

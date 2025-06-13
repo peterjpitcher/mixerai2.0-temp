@@ -47,7 +47,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
             ingredient_id
         };
 
-        // @ts-ignore
+
         const { data, error } = await supabase.from('product_ingredients')
             .insert(newAssociation)
             .select()
@@ -55,13 +55,13 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 
         if (error) {
             console.error('[API ProductIngredients POST] Error creating association:', error);
-            if ((error as any).code === '23505') { // Unique PK violation
+            if ((error as {code?: string}).code === '23505') { // Unique PK violation
                  return NextResponse.json(
                     { success: false, error: 'This product-ingredient association already exists.' },
                     { status: 409 } // Conflict
                 );
             }
-            if ((error as any).code === '23503') { // Foreign key violation
+            if ((error as {code?: string}).code === '23503') { // Foreign key violation
                 return NextResponse.json(
                    { success: false, error: 'Invalid Product ID or Ingredient ID. Ensure both exist.' },
                    { status: 400 } // Bad request - one of the FKs is bad
@@ -70,7 +70,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
             return handleApiError(error, 'Failed to create product-ingredient association.');
         }
 
-        const singleDataObject = data as any;
+        const singleDataObject = data as ProductIngredientAssociation;
         const validatedData: ProductIngredientAssociation = {
             product_id: singleDataObject.product_id,
             ingredient_id: singleDataObject.ingredient_id,
@@ -79,9 +79,9 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 
         return NextResponse.json({ success: true, data: validatedData }, { status: 201 });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[API ProductIngredients POST] Catched error:', error);
-        if (error.name === 'SyntaxError') {
+        if (error instanceof Error && error.name === 'SyntaxError') {
             return NextResponse.json({ success: false, error: 'Invalid JSON payload.' }, { status: 400 });
         }
         return handleApiError(error, 'An unexpected error occurred.');
@@ -118,7 +118,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User) => {
             );
         }
 
-        // @ts-ignore
+
         const { error, count } = await supabase.from('product_ingredients')
             .delete({ count: 'exact' })
             .eq('product_id', product_id)
@@ -138,9 +138,9 @@ export const DELETE = withAuth(async (req: NextRequest, user: User) => {
 
         return NextResponse.json({ success: true, message: 'Product-ingredient association deleted successfully.' });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[API ProductIngredients DELETE] Catched error:', error);
-        if (error.name === 'SyntaxError') {
+        if (error instanceof Error && error.name === 'SyntaxError') {
             return NextResponse.json({ success: false, error: 'Invalid JSON payload.' }, { status: 400 });
         }
         return handleApiError(error, 'An unexpected error occurred.');

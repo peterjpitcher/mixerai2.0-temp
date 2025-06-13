@@ -3,21 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@/components/button';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from '@/components/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
+import Image from 'next/image';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
 import { 
   ArrowLeft, 
-  Pencil, 
   Trash2, 
-  Mail, 
-  Building, 
-  Briefcase, 
-  Calendar, 
-  Clock, 
-  Shield, 
   AlertCircle,
-  ChevronLeft,
   Edit,
   Loader2,
   UserCircle2
@@ -29,25 +21,25 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/dialog";
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-} from "@/components/alert-dialog";
-import { Badge } from '@/components/badge';
+import { Badge } from '@/components/ui/badge';
 import { BrandIcon } from '@/components/brand-icon';
-import { PageHeader } from '@/components/dashboard/page-header';
-import { Label } from '@/components/label';
+import { Label } from '@/components/ui/label';
 import { format as formatDateFns } from 'date-fns';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
-import type { Metadata } from 'next';
 
 interface Brand {
   id: string;
   name: string;
   brand_color?: string;
+}
+
+interface BrandPermission {
+  id: string;
+  brand_id: string;
+  role: string;
+  brand?: Brand;
 }
 
 interface User {
@@ -58,12 +50,7 @@ interface User {
   role: string;
   created_at: string;
   last_sign_in_at?: string;
-  brand_permissions?: {
-    id: string;
-    brand_id: string;
-    role: string;
-    brand?: Brand;
-  }[];
+  brand_permissions?: BrandPermission[];
   job_title?: string;
   company?: string;
 }
@@ -127,7 +114,7 @@ export default function UserDetailPage() {
         
         if (brandsData.success && Array.isArray(brandsData.data) && data.user.brand_permissions?.length > 0) {
           // Enhance brand permissions with brand details
-          data.user.brand_permissions = data.user.brand_permissions.map((permission: any) => {
+          data.user.brand_permissions = data.user.brand_permissions.map((permission) => {
             const brand = brandsData.data.find((b: Brand) => b.id === permission.brand_id);
             return {
               ...permission,
@@ -257,14 +244,13 @@ export default function UserDetailPage() {
           {user && (
             <div className="relative h-16 w-16 rounded-full bg-muted overflow-hidden flex-shrink-0">
               {user.avatar_url ? (
-                <img
+                <Image
                   src={user.avatar_url}
                   alt={user.full_name || 'User avatar'}
-                  className="object-cover w-full h-full"
-                  onError={(e) => (e.currentTarget.style.display = 'none')}
+                  fill
+                  className="object-cover"
                 />
-              ) : null}
-              {(!user.avatar_url) && (
+              ) : (
                 <div className="flex items-center justify-center h-full w-full text-xl font-semibold text-primary bg-muted-foreground/20">
                   {(user.full_name || user.email || 'U').charAt(0).toUpperCase()}
                 </div>
@@ -348,19 +334,21 @@ export default function UserDetailPage() {
           <DialogHeader>
             <DialogTitle>Are you sure you want to delete this user?</DialogTitle>
             <DialogDescription>
-              This action will permanently delete the user "{user.full_name || user.email}" and all associated data. This cannot be undone.
+              This action will permanently delete the user &quot;{user.full_name || user.email}&quot; and all associated data. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button
               onClick={handleConfirmDelete}
               disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
             >
               {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {isDeleting ? 'Deleting...' : 'Delete User'}
-            </AlertDialogAction>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

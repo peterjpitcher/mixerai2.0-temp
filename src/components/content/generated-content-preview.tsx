@@ -1,10 +1,9 @@
 'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/card';
-import { Button } from '@/components/button';
-import { Label } from '@/components/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { RichTextEditor } from './rich-text-editor';
-import { MarkdownDisplay } from './markdown-display';
 import type { OutputField } from '@/types/template';
 
 interface GeneratedContentPreviewProps {
@@ -71,16 +70,10 @@ export function GeneratedContentPreview({
                   onChange={(content) => onOutputChange(field.id, content)}
                   placeholder="Generated content will appear here"
                 />
-              ) : field.type === 'markdown' ? (
-                <MarkdownDisplay markdown={value} />
               ) : (
                 <div className="p-4 border rounded-md bg-muted/50">
                   <p className="text-sm whitespace-pre-wrap">{value || 'No content generated'}</p>
                 </div>
-              )}
-              
-              {field.helpText && (
-                <p className="text-sm text-muted-foreground">{field.helpText}</p>
               )}
             </div>
           );

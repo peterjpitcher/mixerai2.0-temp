@@ -1,12 +1,10 @@
 'use client';
 
-import { Metadata } from 'next';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/button';
-import { PageHeader } from '@/components/dashboard/page-header';
+import { Button } from '@/components/ui/button';
 import { TemplateForm } from '@/components/template/template-form';
-import { ChevronLeft, Loader2, ShieldAlert } from 'lucide-react';
+import { ChevronLeft, Loader2, ShieldAlert, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
@@ -41,10 +39,10 @@ export default function NewTemplatePage() {
           setCurrentUser(null);
           toast.error(data.error || 'Could not verify your session.');
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching current user:', err);
         setCurrentUser(null);
-        toast.error('Error fetching user data: ' + err.message);
+        toast.error('Error fetching user data: ' + (err as Error).message);
       } finally {
         setIsLoadingUser(false);
       }
@@ -97,6 +95,13 @@ export default function NewTemplatePage() {
                 <p className="text-muted-foreground mt-1">Design a new content template with custom fields.</p>
             </div>
         </div>
+        <Link 
+          href="/dashboard/help?article=04-templates" 
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <HelpCircle className="h-4 w-4" />
+          Need help?
+        </Link>
       </div>
 
       <TemplateForm />

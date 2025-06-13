@@ -10,8 +10,9 @@ import { withAuth } from '@/lib/auth/api-auth';
 export const GET = withAuth(async (
   req: NextRequest,
   currentUser: User,
-  { params }: { params: { id: string } }
+  context?: unknown
 ) => {
+  const { params } = context as { params: { id: string } };
   try {
     const brandId = params.id;
     if (!brandId) {
@@ -84,7 +85,7 @@ export const GET = withAuth(async (
 
     return response;
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('API error in /api/brands/[id]/products:', error);
     return handleApiError(error, 'Error fetching products for brand');
   }

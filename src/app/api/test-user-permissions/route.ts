@@ -54,8 +54,8 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     
     // Get all direct database records to examine structure
     const usersWithPermissions = authUsers.users.map(authUser => {
-      const profile = profiles.find((p: any) => p.id === authUser.id);
-      const userPermissions = allPermissions.filter((p: any) => p.user_id === authUser.id);
+      const profile = profiles.find((p: Record<string, unknown>) => p.id === authUser.id);
+      const userPermissions = allPermissions.filter((p: Record<string, unknown>) => p.user_id === authUser.id);
       
       return {
         id: authUser.id,
@@ -64,7 +64,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         metadata_role: authUser.user_metadata?.role || null,
         permissions: userPermissions,
         permission_count: userPermissions.length,
-        has_admin_role: userPermissions.some((p: any) => p.role === 'admin')
+        has_admin_role: userPermissions.some((p: Record<string, unknown>) => p.role === 'admin')
       };
     });
 

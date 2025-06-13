@@ -3,11 +3,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/card';
-import { Input } from '@/components/input';
-import { Plus, Search, Trash2, Eye, Edit3, AlertTriangle, WorkflowIcon, ShieldAlert, Loader2, Copy } from 'lucide-react';
-import type { Metadata } from 'next';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Plus, Trash2, Eye, Edit3, AlertTriangle, WorkflowIcon, ShieldAlert, Loader2, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandIcon } from '@/components/brand-icon';
@@ -20,7 +19,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/alert-dialog";
+} from '@/components/ui/alert-dialog';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 interface UserSessionData {
@@ -44,7 +43,13 @@ interface WorkflowFromAPI {
   brand_color?: string;
   template_id?: string | null;
   template_name?: string | null;
-  steps: any[];
+  steps: Array<{
+    id: string;
+    name: string;
+    description?: string;
+    role: string;
+    approvalRequired: boolean;
+  }>;
   steps_count: number;
   content_count: number;
   created_at: string;
@@ -97,10 +102,10 @@ export default function WorkflowsPage() {
           setCurrentUser(null);
           toast.error(data.error || 'Could not verify your session.');
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching current user:', err);
         setCurrentUser(null);
-        toast.error('Error fetching user data: ' + err.message);
+        toast.error('Error fetching user data: ' + (err as Error).message);
       } finally {
         setIsLoadingUser(false);
       }
@@ -159,9 +164,9 @@ export default function WorkflowsPage() {
       } else {
         throw new Error(result.error || 'Failed to duplicate workflow.');
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error duplicating workflow:', error);
-      toast.error(error.message || 'An error occurred while duplicating the workflow.');
+      toast.error((error as Error).message || 'An error occurred while duplicating the workflow.');
     } finally {
       setIsDuplicating(null);
     }
@@ -216,7 +221,7 @@ export default function WorkflowsPage() {
       } else {
         toast.error(data.error || 'Failed to delete workflow.');
       }
-    } catch (error) {
+    } catch {
       toast.error('An error occurred while deleting the workflow.');
     } finally {
       setIsDeleting(false);
@@ -390,7 +395,7 @@ export default function WorkflowsPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action will permanently delete the workflow "{workflowToDelete.name}".
+                This action will permanently delete the workflow &quot;{workflowToDelete.name}&quot;.
                 This cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>

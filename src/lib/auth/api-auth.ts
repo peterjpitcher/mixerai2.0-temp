@@ -9,10 +9,10 @@ import { User } from '@supabase/supabase-js';
  * @param handler The API route handler function to be protected
  * @returns A new handler function that first checks authentication
  */
-export function withAuth<T>(
-  handler: (req: NextRequest, user: User, context?: any) => Promise<Response>
+export function withAuth(
+  handler: (req: NextRequest, user: User, context?: unknown) => Promise<Response>
 ) {
-  return async (req: NextRequest, context?: any) => {
+  return async (req: NextRequest, context?: unknown) => {
     try {
       const cookieStore = cookies();
       
@@ -84,10 +84,10 @@ export function withAuth<T>(
  * @param handler The API route handler function to be protected and monitored
  * @returns A new handler function with auth checks and monitoring
  */
-export function withAuthAndMonitoring<T>(
-  handler: (req: NextRequest, user: User, context?: any) => Promise<Response>
+export function withAuthAndMonitoring(
+  handler: (req: NextRequest, user: User, context?: unknown) => Promise<Response>
 ) {
-  return async (req: NextRequest, context?: any) => {
+  return async (req: NextRequest, context?: unknown) => {
     const startTime = Date.now();
     const path = req.nextUrl.pathname;
     
@@ -144,7 +144,7 @@ export function withAuthAndMonitoring<T>(
       console.log(`API ${path} completed in ${duration}ms`);
       
       return response;
-    } catch (error: any) {
+    } catch (error) {
       // Log error with details
       const duration = Date.now() - startTime;
       console.error(`API ${path} error after ${duration}ms:`, error);
@@ -155,7 +155,7 @@ export function withAuthAndMonitoring<T>(
           success: false,
           error: 'Internal server error',
           code: 'SERVER_ERROR',
-          message: process.env.NODE_ENV === 'development' ? error.message : undefined,
+          message: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined,
         }),
         {
           status: 500,
@@ -174,10 +174,10 @@ export function withAuthAndMonitoring<T>(
  * @param handler The API route handler function to be protected
  * @returns A new handler function that first checks authentication and admin role
  */
-export function withAdminAuth<T>(
-  handler: (req: NextRequest, user: User, context?: any) => Promise<Response>
+export function withAdminAuth(
+  handler: (req: NextRequest, user: User, context?: unknown) => Promise<Response>
 ) {
-  return async (req: NextRequest, context?: any) => {
+  return async (req: NextRequest, context?: unknown) => {
     try {
       const cookieStore = cookies();
       
@@ -274,7 +274,7 @@ export function withAdminAuth<T>(
 export async function isBrandAdmin(
   userId: string,
   brandId: string,
-  supabase: any // SupabaseClient from @supabase/supabase-js, but using any to avoid import cycle if used in HOFs
+  supabase: ReturnType<typeof createServerClient> // SupabaseClient from @supabase/supabase-js
 ): Promise<boolean> {
   if (!userId || !brandId) {
     return false;

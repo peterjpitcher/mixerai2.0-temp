@@ -38,7 +38,7 @@ interface ContentVersionWithReviewer {
   workflow_step_identifier: string;
   step_name: string | null;
   version_number: number;
-  content_json: any; // Or a more specific type if known for content_json
+  content_json: unknown; // Or a more specific type if known for content_json
   action_status: string;
   feedback: string | null;
   reviewer_id: string | null;
@@ -49,8 +49,9 @@ interface ContentVersionWithReviewer {
   } | null;
 }
 
-export const GET = withAuth(async (request: NextRequest, user: User, context: { params: { id: string } }) => {
-  const { id } = context.params;
+export const GET = withAuth(async (request: NextRequest, user: User, context?: unknown) => {
+  const { params } = context as { params: { id: string } };
+  const { id } = params;
 
   if (!id) {
     return NextResponse.json({ success: false, error: 'Content ID is required' }, { status: 400 });
@@ -151,7 +152,7 @@ export const GET = withAuth(async (request: NextRequest, user: User, context: { 
             }
           });
 
-          let assigneeProfilesMap = new Map<string, AssigneeProfile>();
+          const assigneeProfilesMap = new Map<string, AssigneeProfile>();
           if (allAssigneeIds.size > 0) {
             const { data: profilesData, error: profilesError } = await supabase
               .from('profiles')
@@ -202,13 +203,14 @@ export const GET = withAuth(async (request: NextRequest, user: User, context: { 
       data: formattedContent 
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, `Failed to fetch content with ID: ${id}`);
   }
 });
 
-export const PUT = withAuth(async (request: NextRequest, user: User, context: { params: { id: string } }) => {
-  const id = context.params.id;
+export const PUT = withAuth(async (request: NextRequest, user: User, context?: unknown) => {
+  const { params } = context as { params: { id: string } };
+  const id = params.id;
   
   if (!id) {
     return NextResponse.json({ success: false, error: 'Content ID is required' }, { status: 400 });
@@ -283,7 +285,7 @@ export const PUT = withAuth(async (request: NextRequest, user: User, context: { 
 
     // Define allowed fields for update
     const allowedFields = ['title', 'body', 'meta_title', 'meta_description', 'status', 'content_data'];
-    const updateData: Record<string, any> = {};
+    const updateData: Record<string, unknown> = {};
 
     // Filter request body to include only allowed fields
     for (const key of allowedFields) {
@@ -343,13 +345,14 @@ export const PUT = withAuth(async (request: NextRequest, user: User, context: { 
       data: updatedContent 
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, `Failed to update content with ID: ${id}`);
   }
 });
 
-export const DELETE = withAuth(async (request: NextRequest, user: User, context: { params: { id: string } }) => {
-  const { id } = context.params;
+export const DELETE = withAuth(async (request: NextRequest, user: User, context?: unknown) => {
+  const { params } = context as { params: { id: string } };
+  const { id } = params;
 
   if (!id) {
     return NextResponse.json({ success: false, error: 'Content ID is required' }, { status: 400 });
@@ -439,7 +442,7 @@ export const DELETE = withAuth(async (request: NextRequest, user: User, context:
       message: 'Content deleted successfully' 
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, `Failed to delete content with ID: ${id}`);
   }
 });

@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { createSupabaseServerClient } from '@/lib/supabase/server'; // Using server client for RLS with user context
-import { Database } from '@/types/supabase';
 
 export const dynamic = 'force-dynamic';
 
-export const GET = withAuthAndMonitoring(async (request: NextRequest, user) => {
+export const GET = withAuthAndMonitoring(async (request: NextRequest) => {
   try {
     const supabase = createSupabaseServerClient();
     const { searchParams } = new URL(request.url);
@@ -35,10 +34,10 @@ export const GET = withAuthAndMonitoring(async (request: NextRequest, user) => {
 
     return NextResponse.json({ success: true, history });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[ToolRunHistoryAPI] Unexpected error:', error);
     return NextResponse.json(
-      { success: false, error: 'An unexpected error occurred.', details: error.message },
+      { success: false, error: 'An unexpected error occurred.', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

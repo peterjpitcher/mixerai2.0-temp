@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
-import { Database } from '@/types/supabase'; // For stricter typing
+// import { Database } from '@/types/supabase'; // For stricter typing
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";

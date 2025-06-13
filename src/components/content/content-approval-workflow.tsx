@@ -2,12 +2,12 @@
 
 import * as React from 'react';
 import { useState } from 'react';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
-import { Separator } from '@/components/separator';
-import { Badge } from '@/components/badge';
-import { Textarea } from '@/components/textarea';
-import { CheckCircle, XCircle, AlertCircle, Clock, ArrowRight } from 'lucide-react';
+import Image from 'next/image';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
+import { CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -104,7 +104,7 @@ export function ContentApprovalWorkflow({
           setIsSubmitting(false);
           return;
         }
-      } catch (saveError: any) {
+      } catch (saveError) {
         console.error('[ContentApprovalWorkflow] Error during pre-action save:', saveError);
         toast.error('An error occurred while saving pending changes. Please try again.');
         setIsSubmitting(false);
@@ -130,9 +130,10 @@ export function ContentApprovalWorkflow({
       console.log('[ContentApprovalWorkflow] Action successful:', action);
       setFeedback('');
       onActionComplete();
-    } catch (error: any) {
-      console.error(`[ContentApprovalWorkflow] Error ${action}ing content:`, error.message, error);
-      toast.error(error.message || `Failed to ${action} content.`);
+    } catch (error) {
+      const err = error as Error;
+      console.error(`[ContentApprovalWorkflow] Error ${action}ing content:`, err.message, err);
+      toast.error(err.message || `Failed to ${action} content.`);
     } finally {
       console.log('[ContentApprovalWorkflow] Finished submitting action:', action);
       setIsSubmitting(false);
@@ -176,11 +177,11 @@ export function ContentApprovalWorkflow({
                 <div key={assignee.id || assignee.email || index} className="flex items-center p-1.5 bg-muted/50 rounded-md text-xs">
                   <div className="relative h-5 w-5 rounded-full bg-muted overflow-hidden flex-shrink-0 mr-1.5">
                     {assignee.avatar_url ? (
-                      <img
+                      <Image
                         src={assignee.avatar_url}
                         alt={assignee.name || assignee.email || 'Assignee'}
-                        className="object-cover w-full h-full"
-                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                        fill
+                        className="object-cover"
                       />
                     ) : null}
                     {(!assignee.avatar_url) && (
@@ -232,15 +233,15 @@ export function ContentApprovalWorkflow({
                   {v.reviewer?.full_name && (
                     <div className="flex items-center mt-1">
                       <div className="relative h-5 w-5 rounded-full bg-muted overflow-hidden flex-shrink-0 mr-1.5">
-                        {(v.reviewer as any).avatar_url ? (
-                          <img
-                            src={(v.reviewer as any).avatar_url}
+                        {'avatar_url' in v.reviewer && v.reviewer.avatar_url ? (
+                          <Image
+                            src={v.reviewer.avatar_url as string}
                             alt={v.reviewer.full_name || 'Reviewer avatar'}
-                            className="object-cover w-full h-full"
-                            onError={(e) => (e.currentTarget.style.display = 'none')}
+                            fill
+                            className="object-cover"
                           />
                         ) : null}
-                        {!(v.reviewer as any).avatar_url && (
+                        {!('avatar_url' in v.reviewer && v.reviewer.avatar_url) && (
                           <div className="flex items-center justify-center h-full w-full text-xxs font-semibold text-primary bg-muted-foreground/20">
                             {(v.reviewer.full_name || 'R').charAt(0).toUpperCase()}
                           </div>

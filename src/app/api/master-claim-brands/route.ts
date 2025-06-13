@@ -18,7 +18,7 @@ interface MasterClaimBrand {
 }
 
 // GET handler for all master claim brands
-export const GET = withAuth(async (req: NextRequest, user: User) => {
+export const GET = withAuth(async () => {
     try {
         if (isBuildPhase()) {
             console.log('[API MasterClaimBrands GET] Build phase: returning empty array.');
@@ -27,7 +27,6 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
 
         const supabase = createSupabaseAdminClient();
         // Assuming table will be renamed to 'master_claim_brands'
-        // @ts-ignore
         const { data, error } = await supabase.from('master_claim_brands') 
             .select('*')
             .order('name');
@@ -37,7 +36,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
             return handleApiError(error, 'Failed to fetch master claim brands');
         }
 
-        const validatedData = Array.isArray(data) ? data.map((item: any) => ({
+        const validatedData = Array.isArray(data) ? data.map((item: MasterClaimBrand) => ({
             id: item.id,
             name: item.name,
             mixerai_brand_id: item.mixerai_brand_id,
@@ -47,7 +46,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
 
         return NextResponse.json({ success: true, data: validatedData as MasterClaimBrand[] });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[API MasterClaimBrands GET] Catched error:', error);
         return handleApiError(error, 'An unexpected error occurred while fetching master claim brands.');
     }
@@ -78,7 +77,6 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
         let hasPermission = user?.user_metadata?.role === 'admin';
 
         if (!hasPermission && mixerai_brand_id) { 
-            // @ts-ignore
             const { data: permissionsData, error: permissionsError } = await supabase
                 .from('user_brand_permissions')
                 .select('role')
@@ -111,7 +109,6 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
         };
 
         // Assuming table will be renamed to 'master_claim_brands'
-        // @ts-ignore
         const { data, error } = await supabase.from('master_claim_brands') 
             .insert(newRecord)
             .select()
@@ -119,7 +116,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 
         if (error) {
             console.error('[API MasterClaimBrands POST] Error creating master claim brand:', error);
-            if ((error as any).code === '23505') { 
+            if ((error as {code?: string}).code === '23505') { 
                  return NextResponse.json(
                     { success: false, error: 'A master claim brand with this name already exists.' },
                     { status: 409 } 
@@ -128,7 +125,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
             return handleApiError(error, 'Failed to create master claim brand.');
         }
 
-        const singleDataObject = data as any;
+        const singleDataObject = data as MasterClaimBrand;
         const validatedSingleData = singleDataObject ? {
             id: singleDataObject.id,
             name: singleDataObject.name,
@@ -139,9 +136,9 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 
         return NextResponse.json({ success: true, data: validatedSingleData as MasterClaimBrand }, { status: 201 });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[API MasterClaimBrands POST] Catched error:', error);
-        if (error.name === 'SyntaxError') { 
+        if (error instanceof Error && error.name === 'SyntaxError') { 
             return NextResponse.json({ success: false, error: 'Invalid JSON payload.' }, { status: 400 });
         }
         return handleApiError(error, 'An unexpected error occurred while creating the master claim brand.');

@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import type { InputField, OutputField } from '@/types/template'; // Import field types
+import { User } from '@supabase/supabase-js';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -18,9 +19,10 @@ interface TemplateFieldsColumn {
  */
 export const GET = withAuth(async (
   request: NextRequest,
-  user: any,
-  context: { params: { id: string } }
+  user: User,
+  context?: unknown
 ) => {
+  const { params } = context as { params: { id: string } };
   try {
     // Role check: Allow Admins (Platform/Scoped) and Editors to fetch a specific content template
     const userRole = user.user_metadata?.role;
@@ -32,7 +34,7 @@ export const GET = withAuth(async (
     }
 
     // console.log('API Route - GET template - Context:', context);
-    const id = context.params.id;
+    const id = params.id;
     // console.log('API Route - Template ID from params:', id);
     
     if (!id) {
@@ -90,9 +92,10 @@ export const GET = withAuth(async (
  */
 export const PUT = withAuth(async (
   request: NextRequest,
-  user: any,
-  context: { params: { id: string } }
+  user: User,
+  context?: unknown
 ) => {
+  const { params } = context as { params: { id: string } };
   try {
     // Role check: Only Global Admins can update content templates
     if (user.user_metadata?.role !== 'admin') {
@@ -103,7 +106,7 @@ export const PUT = withAuth(async (
     }
 
     // console.log('API Route - PUT template - Context:', context);
-    const id = context.params.id;
+    const id = params.id;
     // console.log('API Route - Template ID from params:', id);
     
     const data = await request.json();
@@ -133,8 +136,8 @@ export const PUT = withAuth(async (
 
     if (shouldRegenerateDescription) {
       try {
-        const inputFieldNames = (data.inputFields || []).map((f: any) => f.name).filter(Boolean);
-        const outputFieldNames = (data.outputFields || []).map((f: any) => f.name).filter(Boolean);
+        const inputFieldNames = (data.inputFields || []).map((f: Record<string, unknown>) => f.name).filter(Boolean);
+        const outputFieldNames = (data.outputFields || []).map((f: Record<string, unknown>) => f.name).filter(Boolean);
 
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
         const aiDescriptionResponse = await fetch(`${baseUrl}/api/ai/generate-template-description`, {
@@ -155,7 +158,7 @@ export const PUT = withAuth(async (
         } else {
           // console.warn('Failed to generate AI description for template update.');
         }
-      } catch (aiError) {
+      } catch {
         // console.warn('Error calling AI template description generation service on update:', aiError);
       }
     }
@@ -166,7 +169,7 @@ export const PUT = withAuth(async (
       outputFields: data.outputFields || []
     };
 
-    const updatePayload: any = {
+    const updatePayload: Record<string, unknown> = {
       name: data.name,
       description: generatedDescription,
       icon: data.icon || null,
@@ -219,9 +222,10 @@ export const PUT = withAuth(async (
  */
 export const DELETE = withAuth(async (
   request: NextRequest,
-  user: any,
-  context: { params: { id: string } }
+  user: User,
+  context?: unknown
 ) => {
+  const { params } = context as { params: { id: string } };
   try {
     // Role check: Only Global Admins can delete content templates
     if (user.user_metadata?.role !== 'admin') {
@@ -231,7 +235,7 @@ export const DELETE = withAuth(async (
       );
     }
 
-    const templateIdToDelete = context.params.id;
+    const templateIdToDelete = params.id;
     // console.log('API Route - DELETE template - Template ID from params:', templateIdToDelete);
     
     if (!templateIdToDelete) {

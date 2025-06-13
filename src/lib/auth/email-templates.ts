@@ -4,7 +4,6 @@
  * These utilities help verify that Supabase email templates
  * have been properly configured for the production domain.
  */
-import { createSupabaseAdminClient } from '../supabase/client';
 
 /**
  * Verifies if email templates contain the correct domain
@@ -20,7 +19,7 @@ export async function verifyEmailTemplates() {
       return;
     }
     
-    const supabase = createSupabaseAdminClient();
+    // const supabase = createSupabaseAdminClient();
     
     // This operation requires admin access to email templates
     // Note: As of the current Supabase JS client, there is no direct API

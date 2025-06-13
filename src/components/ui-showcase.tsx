@@ -2,9 +2,9 @@
 
 import React from 'react';
 import { colors } from '@/lib/constants/colors';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
-import { Badge } from '@/components/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 /**
  * Component to showcase the new UI color system

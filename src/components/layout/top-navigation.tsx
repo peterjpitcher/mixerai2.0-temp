@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { UserCircle, Menu, Bell } from 'lucide-react';
-import { Button } from '@/components/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/avatar';
+import { UserCircle, Menu } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
 /**

@@ -12,7 +12,7 @@ interface WorkflowActionRequest {
   feedback?: string;
 }
 
-async function getNextVersionNumber(supabase: any, contentId: string): Promise<number> {
+async function getNextVersionNumber(supabase: ReturnType<typeof createSupabaseAdminClient>, contentId: string): Promise<number> {
   const { data, error } = await supabase
     .from('content_versions')
     .select('version_number')
@@ -27,13 +27,14 @@ async function getNextVersionNumber(supabase: any, contentId: string): Promise<n
   return (data?.version_number || 0) + 1;
 }
 
-export const POST = withAuth(async (request: NextRequest, user: User, context: { params: { id: string } }) => {
-  const contentId = context.params.id;
+export const POST = withAuth(async (request: NextRequest, user: User, context?: unknown) => {
+  const { params } = context as { params: { id: string } };
+  const contentId = params.id;
   let requestData: WorkflowActionRequest;
 
   try {
     requestData = await request.json();
-  } catch (e) {
+  } catch {
     return NextResponse.json({ success: false, error: 'Invalid request body' }, { status: 400 });
   }
 
@@ -111,7 +112,7 @@ export const POST = withAuth(async (request: NextRequest, user: User, context: {
     }
 
     // 4. Determine Next Step & Prepare Content Update Payload
-    let updatePayload: TablesUpdate<'content'> = {
+    const updatePayload: TablesUpdate<'content'> = {
         updated_at: new Date().toISOString(),
     };
     
@@ -184,7 +185,7 @@ export const POST = withAuth(async (request: NextRequest, user: User, context: {
 
     return NextResponse.json({ success: true, message: `Content ${action}d successfully.`, data: updatedContent });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'Error processing workflow action');
   }
 }); 

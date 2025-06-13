@@ -8,7 +8,7 @@ interface InviteUserOptions {
   intendedRole: 'admin' | 'editor' | 'viewer'; // Or your specific UserRoles type
   invitedFrom: 'workflow' | 'user_invite_page' | 'brand_assignment'; // More specific sources
   inviterUserId?: string; // ID of the user performing the invitation
-  appMetadata?: Record<string, any>; // Base app_metadata
+  appMetadata?: Record<string, unknown>; // Base app_metadata
   workflowId?: string;
   stepId?: string | number; // This should ideally be the DB UUID of the step if available
   actualWorkflowBrandId?: string; // The actual brand_id of the workflow if invitedFrom is 'workflow'
@@ -51,7 +51,7 @@ export async function inviteUser(options: InviteUserOptions): Promise<InviteUser
   try {
     // 1. Check if user already exists (this might be redundant if the calling API route already did this)
     //    However, a central service should be robust.
-    let { data: existingUser, error: fetchError } = await supabase
+    const { data: existingUser, error: fetchError } = await supabase
       .from('profiles') // Assuming you have a 'profiles' table linked to auth.users
       .select('id, email, full_name')
       .eq('email', email)
@@ -76,7 +76,7 @@ export async function inviteUser(options: InviteUserOptions): Promise<InviteUser
     }
 
     // 2. User does not exist, proceed with invitation
-    const finalAppMetadata: Record<string, any> = {
+    const finalAppMetadata: Record<string, unknown> = {
       ...appMetadata,
       invited_by: inviterUserId,
       source: invitedFrom, 
@@ -150,8 +150,8 @@ export async function inviteUser(options: InviteUserOptions): Promise<InviteUser
       userId: inviteData.user.id 
     };
 
-  } catch (error: any) {
+  } catch (error) {
     console.error(`[invitationService] Unexpected error during invitation process for ${email}:`, error);
-    return { success: false, error: error.message || 'An unexpected error occurred.' };
+    return { success: false, error: (error as Error).message || 'An unexpected error occurred.' };
   }
 } 

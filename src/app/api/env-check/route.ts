@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { handleApiError, isDatabaseConnectionError } from '@/lib/api-utils';
+import { handleApiError } from '@/lib/api-utils';
 // import { withAuth } from '@/lib/auth/api-auth'; // No longer used
 import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
 
@@ -11,8 +11,7 @@ export const dynamic = "force-dynamic"; // Ensures the route is always dynamic
  * WARNING: This endpoint is now protected by admin-only authorization.
  * It should be REMOVED or STRICTLY SECURED if kept in deployment.
  */
-export const GET = withAdminAuth(async (request: NextRequest, user) => {
-  const startTime = Date.now();
+export const GET = withAdminAuth(async (_request: NextRequest, user) => {
   
   try {
     // Check environment variables
@@ -38,8 +37,8 @@ export const GET = withAdminAuth(async (request: NextRequest, user) => {
         } else {
             supabaseConnected = true;
         }
-      } catch (error: any) {
-        supabaseTestQueryError = error.message || 'Unknown Supabase client error';
+      } catch (error: unknown) {
+        supabaseTestQueryError = (error as Error).message || 'Unknown Supabase client error';
       }
     }
 
@@ -76,8 +75,8 @@ export const GET = withAdminAuth(async (request: NextRequest, user) => {
         checkedByUserId: user.id
       }
     });
-  } catch (error: any) {
-    return handleApiError(error, `Failed to check environment: ${error.message}`);
+  } catch (error: unknown) {
+    return handleApiError(error, `Failed to check environment: ${(error as Error).message}`);
   }
 });
 

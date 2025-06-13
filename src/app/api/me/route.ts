@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server'; // Use server client for route handlers
 import { handleApiError } from '@/lib/api-utils';
 import { withRouteAuth } from '@/lib/auth/route-handlers';
+import { User } from '@supabase/supabase-js';
 
 export const dynamic = "force-dynamic"; // Ensure fresh data on every request
 
@@ -11,7 +12,7 @@ interface UserProfileResponse {
   email?: string;
   user_metadata?: { 
     role?: string; // Role is an optional property within user_metadata, expected from authUser
-    [key: string]: any; 
+    [key: string]: unknown; 
   };
   brand_permissions?: Array<{
     brand_id: string; // Assuming brand_id will always be present if the permission exists
@@ -25,7 +26,7 @@ interface UserProfileResponse {
   avatar_url?: string | null; // Allow null
 }
 
-export const GET = withRouteAuth(async (request: NextRequest, authUser: any) => {
+export const GET = withRouteAuth(async (request: NextRequest, authUser: User) => {
   // authUser is the user object from Supabase Auth, provided by withRouteAuth
   if (!authUser || !authUser.id) {
     return NextResponse.json({ success: false, error: 'Authentication required.' }, { status: 401 });

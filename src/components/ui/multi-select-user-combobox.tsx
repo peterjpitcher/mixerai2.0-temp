@@ -58,33 +58,37 @@ export const MultiSelectUserCombobox: React.FC<MultiSelectUserComboboxProps> = (
   );
   
   const debouncedSearch = React.useCallback(
-    debounce(async (query: string) => {
-      if (!query.trim()) {
-        setSearchResults([]);
-        setIsLoading(false);
-        return;
-      }
-      setIsLoading(true);
-      try {
-        const response = await fetch(`/api/users/search?query=${encodeURIComponent(query)}&limit=10`);
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to fetch users');
-        }
-        const data = await response.json();
-        if (data.success && Array.isArray(data.users)) {
-          setSearchResults(data.users);
-        } else {
+    (query: string) => {
+      const debouncedFn = debounce(async (q: string) => {
+        if (!q.trim()) {
           setSearchResults([]);
+          setIsLoading(false);
+          return;
         }
-      } catch (error: any) {
-        console.error('Error searching users:', error);
-        toast.error(`Error searching users: ${error.message}`);
-        setSearchResults([]);
-      } finally {
-        setIsLoading(false);
-      }
-    }, 300),
+        setIsLoading(true);
+        try {
+          const response = await fetch(`/api/users/search?query=${encodeURIComponent(q)}&limit=10`);
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to fetch users');
+          }
+          const data = await response.json();
+          if (data.success && Array.isArray(data.users)) {
+            setSearchResults(data.users);
+          } else {
+            setSearchResults([]);
+          }
+        } catch (error) {
+          console.error('Error searching users:', error);
+          const errorMessage = error instanceof Error ? error.message : 'Failed to search users';
+          toast.error(`Error searching users: ${errorMessage}`);
+          setSearchResults([]);
+        } finally {
+          setIsLoading(false);
+        }
+      }, 300);
+      debouncedFn(query);
+    },
     []
   );
 

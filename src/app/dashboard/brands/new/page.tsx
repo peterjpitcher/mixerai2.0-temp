@@ -3,21 +3,21 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@/components/button';
-import { Input } from '@/components/input';
-import { Textarea } from '@/components/textarea';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
-import { Label } from '@/components/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, X, PlusCircle, ArrowLeft, Info } from 'lucide-react';
+import { Loader2, X, PlusCircle, ArrowLeft, Info, HelpCircle } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
-import { Checkbox } from "@/components/checkbox";
+import { Checkbox } from '@/components/ui/checkbox';
 import { v4 as uuidv4 } from 'uuid';
-import { Badge } from "@/components/badge";
-import { cn } from "@/lib/utils";
+// import { Badge } from '@/components/ui/badge';
+// import { cn } from "@/lib/utils";
 
 // Define UserSessionData interface (can be moved to a shared types file later)
 interface UserSessionData {
@@ -78,6 +78,7 @@ const getPriorityAgencyStyles = (priority: 'High' | 'Medium' | 'Low' | null | un
   return 'font-normal text-gray-700 dark:text-gray-300';
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface UserSearchResult {
   id: string;
   full_name: string | null;
@@ -120,6 +121,7 @@ export default function NewBrandPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(false); 
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [isForbidden, setIsForbidden] = useState(false);
@@ -139,6 +141,7 @@ export default function NewBrandPage() {
   });
 
   const [allVettingAgencies, setAllVettingAgencies] = useState<VettingAgency[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [customAgencyInput, setCustomAgencyInput] = useState('');
   const priorityOrder: Array<'High' | 'Medium' | 'Low'> = ['High', 'Medium', 'Low'];
 
@@ -346,7 +349,7 @@ export default function NewBrandPage() {
       const data = await response.json();
       if (data.success && data.data) {
         const generatedAgencies = Array.isArray(data.data.suggestedAgencies) 
-                                    ? data.data.suggestedAgencies.map((a: any) => a.id || a.name)
+                                    ? data.data.suggestedAgencies.map((a: unknown) => (a as { id?: string; name?: string }).id || (a as { id?: string; name?: string }).name)
                                     : [];
         setFormData(prev => ({
           ...prev,
@@ -376,7 +379,7 @@ export default function NewBrandPage() {
     }
     setIsSaving(true);
     try {
-      const payload: any = { 
+      const payload: Record<string, unknown> = { 
         ...formData,
         selected_agency_ids: formData.content_vetting_agencies,
       };
@@ -387,8 +390,9 @@ export default function NewBrandPage() {
         }
       });
       if (payload.additional_website_urls && Array.isArray(payload.additional_website_urls)){
-        payload.additional_website_urls = payload.additional_website_urls.map((item: {id:string, value:string}) => item.value).filter(Boolean);
-        if(payload.additional_website_urls.length === 0) payload.additional_website_urls = null;
+        const urls = payload.additional_website_urls as Array<{id:string, value:string}>;
+        payload.additional_website_urls = urls.map((item) => item.value).filter(Boolean);
+        if((payload.additional_website_urls as string[]).length === 0) payload.additional_website_urls = null;
       }
       if (payload.master_claim_brand_id === 'NO_SELECTION') {
         payload.master_claim_brand_id = null;
@@ -429,6 +433,13 @@ export default function NewBrandPage() {
             <p className="text-muted-foreground">Define the details for your new brand.</p>
           </div>
         </div>
+        <Link 
+          href="/dashboard/help?article=02-brands" 
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <HelpCircle className="h-4 w-4" />
+          Need help?
+        </Link>
        </div>
        
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
@@ -579,11 +590,11 @@ export default function NewBrandPage() {
                                   </div>
                                 );
                               })}
-                              {filteredAgenciesByIdentityTab.filter(a => !priorityOrder.includes(a.priority as any) && a.priority != null).length > 0 && (
+                              {filteredAgenciesByIdentityTab.filter(a => !priorityOrder.includes(a.priority as ('High' | 'Medium' | 'Low')) && a.priority != null).length > 0 && (
                                 <div key="other-priority" className="mt-3">
                                   <h4 className={`text-md font-semibold mb-2 ${getPriorityAgencyStyles(null)}`}>Other Priority</h4>
                                   <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
-                                    {filteredAgenciesByIdentityTab.filter(a => !priorityOrder.includes(a.priority as any) && a.priority != null).map(agency => (
+                                    {filteredAgenciesByIdentityTab.filter(a => !priorityOrder.includes(a.priority as ('High' | 'Medium' | 'Low')) && a.priority != null).map(agency => (
                                       <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
                                         <Checkbox
                                           id={`new-agency-${agency.id}`}

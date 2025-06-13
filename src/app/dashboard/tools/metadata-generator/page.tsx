@@ -1,13 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
-import { Input } from '@/components/input';
-import { Label } from '@/components/label';
-import { Textarea } from "@/components/textarea";
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Loader2, ClipboardCopy, Globe, ArrowLeft, Info, AlertTriangle, ExternalLink, Languages, History } from 'lucide-react';
+import { Loader2, Globe, ArrowLeft, AlertTriangle, ExternalLink, Languages, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -18,7 +17,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/table";
+} from '@/components/ui/table';
 import { Progress } from "@/components/ui/progress";
 import {
   Select,
@@ -27,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/skeleton";
+import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
@@ -65,8 +64,8 @@ interface ToolRunHistoryItem {
   user_id: string;
   tool_name: string;
   brand_id?: string | null;
-  inputs: any; 
-  outputs: any; 
+  inputs: Record<string, unknown>; 
+  outputs: Record<string, unknown>; 
   run_at: string; 
   status: 'success' | 'failure';
   error_message?: string | null;
@@ -162,10 +161,10 @@ export default function MetadataGeneratorPage() {
           setCurrentUser(null);
           setUserError(data.error || 'User data not found in session.');
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('[MetadataGeneratorPage] Error fetching current user:', error);
         setCurrentUser(null);
-        setUserError(error.message || 'An unexpected error occurred while fetching user data.');
+        setUserError((error as Error).message || 'An unexpected error occurred while fetching user data.');
       } finally {
         setIsLoadingUser(false);
       }
@@ -228,10 +227,10 @@ export default function MetadataGeneratorPage() {
           setRunHistory([]);
           setHistoryError(data.error || 'History data not found.');
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('[MetadataGeneratorPage] Error fetching run history:', error);
         setRunHistory([]);
-        setHistoryError(error.message || 'An unexpected error occurred while fetching history.');
+        setHistoryError((error as Error).message || 'An unexpected error occurred while fetching history.');
       } finally {
         setIsLoadingHistory(false);
       }
@@ -345,10 +344,10 @@ export default function MetadataGeneratorPage() {
                 setRunHistory([]);
                 setHistoryError(data.error || 'History data not found.');
                 }
-            } catch (error: any) {
+            } catch (error) {
                 console.error('[MetadataGeneratorPage] Error fetching run history post-submit:', error);
                 setRunHistory([]);
-                setHistoryError(error.message || 'An unexpected error occurred while fetching history.');
+                setHistoryError((error as Error).message || 'An unexpected error occurred while fetching history.');
             } finally {
                 setIsLoadingHistory(false);
             }
@@ -357,6 +356,7 @@ export default function MetadataGeneratorPage() {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleCopyToClipboard = (text: string, type: string, url: string) => {
     if (text) {
       copyToClipboard(text);
@@ -364,6 +364,7 @@ export default function MetadataGeneratorPage() {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const errorResults = results.filter(r => r.error);
 
   // --- Loading and Access Denied States ---
@@ -549,7 +550,7 @@ export default function MetadataGeneratorPage() {
                 <div className="text-center text-muted-foreground py-8">
                   <Globe className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                   <p className="text-lg font-medium">No results to display yet.</p>
-                  <p>Enter URLs above and click "Generate Metadata" to see results here.</p>
+                  <p>Enter URLs above and click &quot;Generate Metadata&quot; to see results here.</p>
                 </div>
               )}
                {isLoading && totalCount > 0 && results.length === 0 && (

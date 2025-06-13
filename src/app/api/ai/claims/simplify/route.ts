@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import { generateTextCompletion } from '@/lib/azure/openai';
-import { EffectiveClaim } from '@/lib/claims-utils'; // Assuming EffectiveClaim is exported
 import { User } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
@@ -45,7 +44,6 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 
       if (!hasPermission) {
         const supabase = createSupabaseAdminClient(); // Create client if not admin and needs check
-        // @ts-ignore
         const { data: permissionsData, error: permissionsError } = await supabase
           .from('user_brand_permissions')
           .select('brand_id, role')
@@ -88,7 +86,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
     // --- Permission Check End ---
 
     // Construct the prompt for the AI
-    let systemPrompt = "You are an expert marketing copywriter and legal compliance assistant. " +
+    const systemPrompt = "You are an expert marketing copywriter and legal compliance assistant. " +
                        "Your task is to simplify a list of marketing claims into a concise, human-readable summary. " +
                        "Focus on clarity and accuracy. The summary should be easy for a brand manager to understand quickly.";
 
@@ -124,7 +122,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 
     return NextResponse.json({ success: true, summary: simplifiedSummary });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[API /ai/claims/simplify] Error:", error);
     return handleApiError(error, "Failed to simplify claims.");
   }

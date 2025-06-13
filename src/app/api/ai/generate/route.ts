@@ -10,7 +10,7 @@ interface GenerationRequest {
   templateId: string;
   outputFieldId: string;
   prompt: string;
-  formValues: Record<string, any>;
+  formValues: Record<string, unknown>;
   options?: {
     maxTokens?: number;
     temperature?: number;
@@ -21,7 +21,7 @@ interface GenerationRequest {
 /**
  * POST: Generate content for output fields using AI
  */
-export const POST = withAuth(async (request: NextRequest, user) => {
+export const POST = withAuth(async (request: NextRequest) => {
   try {
     const data: GenerationRequest = await request.json();
     
@@ -80,7 +80,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       });
       
       if (!response.ok) {
-        const errorText = await response.text();
+        await response.text();
         throw new Error(`AI service request failed with status ${response.status}`);
       }
       
@@ -93,15 +93,15 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         content: content,
         fieldId: data.outputFieldId
       });
-    } catch (aiError: any) {
+    } catch (aiError: unknown) {
       throw aiError;
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     let errorMessage = 'Failed to generate AI content. Please try again later.';
     let statusCode = 500;
 
     if (error instanceof Error) {
-      if (error.message.includes('OpenAI') || error.message.includes('Azure') || error.message.includes('API') || (error as any).status === 429 || error.message.includes('Azure OpenAI') || error.message.includes('AI service request failed')) {
+      if (error.message.includes('OpenAI') || error.message.includes('Azure') || error.message.includes('API') || (error as { status?: number }).status === 429 || error.message.includes('Azure OpenAI') || error.message.includes('AI service request failed')) {
         errorMessage = 'The AI service is currently busy or unavailable. Please try again in a few moments.';
         statusCode = 503;
       } else {

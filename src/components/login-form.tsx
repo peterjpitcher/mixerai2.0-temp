@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button } from "@/components/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/card";
-import { Input } from "@/components/input";
-import { Label } from "@/components/label";
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { createSupabaseClient } from "@/lib/supabase/client";
 import { toast } from 'sonner';
 
@@ -44,9 +44,9 @@ export function LoginForm() {
         router.push("/dashboard");
         router.refresh();
       }
-    } catch (err: any) {
+    } catch (err) {
       setError("An unexpected error occurred. Please try again.");
-      toast.error(err?.message || "An unexpected error occurred. Please try again.");
+      toast.error(err instanceof Error ? err.message : "An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }

@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+// import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from 'sonner';
-import { Loader2, ArrowLeft, Save, FileText, Building2, Package, Sprout, Globe, Info } from "lucide-react";
+import { Loader2, ArrowLeft, Save,  } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ALL_COUNTRIES_CODE, ALL_COUNTRIES_NAME } from "@/lib/constants/country-codes";
 
@@ -145,7 +145,7 @@ export default function NewClaimPage() {
     }
     setIsSaving(true);
 
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       claim_text: formData.claim_text.trim(),
       claim_type: formData.claim_type,
       level: formData.level,

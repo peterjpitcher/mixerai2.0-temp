@@ -1,15 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import { Label } from '@/components/label';
-import { Input } from '@/components/input';
-import { Textarea } from '@/components/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
-import { Button } from '@/components/button';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { RichTextEditor } from './rich-text-editor';
 import { ProductSelect } from './product-select';
-import type { InputField, FieldType, SelectOptions } from '@/types/template';
+import type { InputField, FieldType, SelectOptions, ShortTextOptions, LongTextOptions, RichTextOptions, UrlOptions } from '@/types/template';
 import type { ProductContext } from '@/types/claims';
 
 interface TemplateFieldRendererProps {
@@ -31,35 +30,32 @@ export function TemplateFieldRenderer({
   onGenerateSuggestion,
   productContext
 }: TemplateFieldRendererProps) {
-  const isRequired = field.validation?.required || false;
-  const maxLength = field.validation?.maxLength;
+  const isRequired = field.required || false;
   
   const renderField = () => {
     switch (field.type) {
-      case 'text':
+      case 'shortText':
       case 'url':
-      case 'email':
         return (
           <Input
             id={field.id}
-            type={field.type}
+            type={field.type === 'url' ? 'url' : 'text'}
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
-            placeholder={field.placeholder}
-            maxLength={maxLength}
+            placeholder={(field.options as ShortTextOptions | UrlOptions)?.placeholder}
+            maxLength={(field.options as ShortTextOptions)?.maxLength}
             required={isRequired}
           />
         );
         
-      case 'textarea':
+      case 'longText':
         return (
           <Textarea
             id={field.id}
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
-            placeholder={field.placeholder}
-            rows={4}
-            maxLength={maxLength}
+            placeholder={(field.options as LongTextOptions)?.placeholder}
+            rows={(field.options as LongTextOptions)?.rows || 4}
             required={isRequired}
           />
         );
@@ -69,7 +65,7 @@ export function TemplateFieldRenderer({
           <RichTextEditor
             value={value}
             onChange={(content) => onChange(field.id, content)}
-            placeholder={field.placeholder}
+            placeholder={(field.options as RichTextOptions)?.placeholder}
           />
         );
         
@@ -81,10 +77,10 @@ export function TemplateFieldRenderer({
             onValueChange={(val) => onChange(field.id, val)}
           >
             <SelectTrigger id={field.id}>
-              <SelectValue placeholder={field.placeholder || "Select an option"} />
+              <SelectValue placeholder={"Select an option"} />
             </SelectTrigger>
             <SelectContent>
-              {options.choices.map((choice) => (
+              {(options.choices || []).map((choice) => (
                 <SelectItem key={choice.value} value={choice.value}>
                   {choice.label}
                 </SelectItem>
@@ -93,7 +89,7 @@ export function TemplateFieldRenderer({
           </Select>
         );
         
-      case 'multiselect':
+      case 'select':  // multiselect handled with options.allowMultiple
         // Simplified multiselect - in production would need proper multiselect component
         return (
           <div className="space-y-2">
@@ -103,13 +99,12 @@ export function TemplateFieldRenderer({
           </div>
         );
         
-      case 'productSelect':
+      case 'product-selector':
         return (
           <ProductSelect
             value={value}
-            onChange={(val) => onChange(field.id, val, 'productSelect')}
-            brandId={brandId}
-            placeholder={field.placeholder}
+            onChange={(val) => onChange(field.id, val || '', 'product-selector')}
+            brandId={brandId || null}
           />
         );
         
@@ -120,7 +115,7 @@ export function TemplateFieldRenderer({
             type="text"
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
-            placeholder={field.placeholder}
+            placeholder={(field.options as ShortTextOptions | UrlOptions)?.placeholder}
             required={isRequired}
           />
         );
@@ -133,7 +128,7 @@ export function TemplateFieldRenderer({
         <Label htmlFor={field.id}>
           {field.name} {isRequired && '*'}
         </Label>
-        {field.aiEnabled && onGenerateSuggestion && (
+        {field.aiSuggester && onGenerateSuggestion && (
           <Button
             type="button"
             variant="ghost"
@@ -153,11 +148,7 @@ export function TemplateFieldRenderer({
       
       {renderField()}
       
-      {field.helpText && (
-        <p className="text-sm text-muted-foreground mt-1">{field.helpText}</p>
-      )}
-      
-      {productContext && field.type === 'productSelect' && (
+      {productContext && field.type === 'product-selector' && (
         <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
           <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
             Selected: {productContext.productName}

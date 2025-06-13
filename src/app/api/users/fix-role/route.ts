@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 // import { withAuth } from '@/lib/auth/api-auth'; // No longer used
 import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth for global admin check
+import { User } from '@supabase/supabase-js';
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,8 @@ export const dynamic = "force-dynamic";
  * - role: 'admin' | 'editor' | 'viewer' (required)
  * REQUIRES GLOBAL ADMIN PRIVILEGES.
  */
-export const POST = withAdminAuth(async (request: NextRequest, adminUser: any) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const POST = withAdminAuth(async (request: NextRequest, _adminUser: User) => {
   try {
     // adminUser is the authenticated global admin from withAdminAuth
     const supabase = createSupabaseAdminClient();
@@ -65,7 +67,7 @@ export const POST = withAdminAuth(async (request: NextRequest, adminUser: any) =
     // If user has existing permissions, update them all to the new role using RPC
     if (existingPermissions && existingPermissions.length > 0) {
       const { data: updatedCount, error: rpcError } = await supabase.rpc(
-        'set_user_role_for_all_assigned_brands' as any, // TODO: Regenerate types
+        'set_user_role_for_all_assigned_brands', // TODO: Regenerate types
         {
           target_user_id: userId,
           new_role: role

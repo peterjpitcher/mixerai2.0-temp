@@ -15,7 +15,7 @@ interface RequestBody {
  * POST: Generate keyword suggestions based on provided content.
  * Requires authentication.
  */
-export const POST = withAuth(async (request: NextRequest, user: any) => {
+export const POST = withAuth(async (request: NextRequest) => {
   try {
     const body: RequestBody = await request.json();
 
@@ -26,7 +26,13 @@ export const POST = withAuth(async (request: NextRequest, user: any) => {
       );
     }
 
-    let brandContextForSuggestions: any = {};
+    let brandContextForSuggestions: {
+      name?: string;
+      brand_identity?: string | null;
+      tone_of_voice?: string | null;
+      language: string;
+      country: string;
+    } | undefined = undefined;
 
     if (body.brand_id) {
       const supabase = createSupabaseAdminClient();
@@ -67,9 +73,9 @@ export const POST = withAuth(async (request: NextRequest, user: any) => {
       suggestions: suggestions,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error generating keywords:', error);
-    if (error.message && error.message.includes('API request failed')) {
+    if (error instanceof Error && error.message && error.message.includes('API request failed')) {
         return handleApiError(error, 'AI service failed to generate keywords', 503);
     }
     return handleApiError(error, 'Failed to generate keywords');

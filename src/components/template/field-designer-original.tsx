@@ -1,20 +1,18 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
-import { Button } from '@/components/button';
-import { Input } from '@/components/input';
-import { Label } from '@/components/label';
-import { Checkbox } from '@/components/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
-import { Textarea } from '@/components/textarea';
-import { Icons } from '@/components/icons';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 import { v4 as uuidv4 } from 'uuid';
 import { toast as sonnerToast } from 'sonner';
-import { Badge } from '@/components/badge';
-import { Rocket, Info } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { 
   FieldType as GlobalFieldType,
   GenericField as Field,
@@ -36,12 +34,315 @@ import {
 } from '@/types/template';
 import { ProductSelectorOptionsComponent } from './product-selector-options';
 
+// Type guards to ensure type safety
+function isInputField(field: Field): field is InputField {
+  const inputTypes = ['shortText', 'longText', 'richText', 'select', 'number', 'date', 'tags', 'url', 'fileUpload', 'product-selector'];
+  return inputTypes.includes(field.type);
+}
+
+function isOutputField(field: Field): field is OutputField {
+  const outputTypes = ['plainText', 'richText', 'html', 'image'];
+  return outputTypes.includes(field.type);
+}
+
+// Placeholder components for field options
+const ShortTextOptionsComponent = ({ options, onChange }: { options: ShortTextOptions; onChange: (options: Partial<ShortTextOptions>) => void }) => (
+  <div className="space-y-4">
+    <div>
+      <Label htmlFor="placeholder">Placeholder</Label>
+      <Input
+        id="placeholder"
+        value={options.placeholder || ''}
+        onChange={(e) => onChange({ placeholder: e.target.value })}
+        placeholder="Enter placeholder text"
+      />
+    </div>
+    <div>
+      <Label htmlFor="maxLength">Max Length</Label>
+      <Input
+        id="maxLength"
+        type="number"
+        value={options.maxLength || ''}
+        onChange={(e) => onChange({ maxLength: parseInt(e.target.value) || undefined })}
+        placeholder="Maximum characters"
+      />
+    </div>
+  </div>
+);
+
+const LongTextOptionsComponent = ({ options, onChange }: { options: LongTextOptions; onChange: (options: Partial<LongTextOptions>) => void }) => (
+  <div className="space-y-4">
+    <div>
+      <Label htmlFor="placeholder">Placeholder</Label>
+      <Textarea
+        id="placeholder"
+        value={options.placeholder || ''}
+        onChange={(e) => onChange({ placeholder: e.target.value })}
+        placeholder="Enter placeholder text"
+      />
+    </div>
+    <div>
+      <Label htmlFor="rows">Rows</Label>
+      <Input
+        id="rows"
+        type="number"
+        value={options.rows || ''}
+        onChange={(e) => onChange({ rows: parseInt(e.target.value) || undefined })}
+        placeholder="Number of rows"
+      />
+    </div>
+  </div>
+);
+
+const RichTextOptionsComponent = ({ options, onChange }: { options: RichTextOptions; onChange: (options: Partial<RichTextOptions>) => void }) => (
+  <div className="space-y-4">
+    <div>
+      <Label htmlFor="placeholder">Placeholder</Label>
+      <Input
+        id="placeholder"
+        value={options.placeholder || ''}
+        onChange={(e) => onChange({ placeholder: e.target.value })}
+        placeholder="Enter placeholder text"
+      />
+    </div>
+    <div className="flex items-center space-x-2">
+      <Checkbox
+        id="allowImages"
+        checked={options.allowImages || false}
+        onCheckedChange={(checked) => onChange({ allowImages: !!checked })}
+      />
+      <Label htmlFor="allowImages">Allow Images</Label>
+    </div>
+  </div>
+);
+
+const SelectOptionsComponent = ({ options, onChange }: { options: SelectOptions; onChange: (options: Partial<SelectOptions>) => void }) => (
+  <div className="space-y-4">
+    <div>
+      <Label htmlFor="choices">Choices (one per line)</Label>
+      <Textarea
+        id="choices"
+        value={(options.choices || []).map(choice => choice.label).join('\n')}
+        onChange={(e) => onChange({ choices: e.target.value.split('\n').filter(Boolean).map((label) => ({ label, value: label })) })}
+        placeholder="Option 1\nOption 2\nOption 3"
+        rows={5}
+      />
+    </div>
+    <div className="flex items-center space-x-2">
+      <Checkbox
+        id="multiple"
+        checked={options.multiple || false}
+        onCheckedChange={(checked) => onChange({ multiple: !!checked })}
+      />
+      <Label htmlFor="multiple">Allow Multiple Selection</Label>
+    </div>
+  </div>
+);
+
+const NumberOptionsComponent = ({ options, onChange }: { options: NumberOptions; onChange: (options: Partial<NumberOptions>) => void }) => (
+  <div className="space-y-4">
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <Label htmlFor="min">Min Value</Label>
+        <Input
+          id="min"
+          type="number"
+          value={options.min ?? ''}
+          onChange={(e) => onChange({ min: e.target.value ? parseFloat(e.target.value) : undefined })}
+        />
+      </div>
+      <div>
+        <Label htmlFor="max">Max Value</Label>
+        <Input
+          id="max"
+          type="number"
+          value={options.max ?? ''}
+          onChange={(e) => onChange({ max: e.target.value ? parseFloat(e.target.value) : undefined })}
+        />
+      </div>
+    </div>
+    <div>
+      <Label htmlFor="step">Step</Label>
+      <Input
+        id="step"
+        type="number"
+        value={options.step ?? ''}
+        onChange={(e) => onChange({ step: e.target.value ? parseFloat(e.target.value) : undefined })}
+        placeholder="Step increment"
+      />
+    </div>
+  </div>
+);
+
+const DateOptionsComponent = ({ options, onChange }: { options: DateOptions; onChange: (options: Partial<DateOptions>) => void }) => (
+  <div className="space-y-4">
+    <div>
+      <Label htmlFor="format">Date Format</Label>
+      <Select
+        value={options.format || 'MM/DD/YYYY'}
+        onValueChange={(value) => onChange({ format: value })}
+      >
+        <SelectTrigger id="format">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
+          <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
+          <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+    <div className="flex items-center space-x-2">
+      <Checkbox
+        id="includeTime"
+        checked={options.includeTime || false}
+        onCheckedChange={(checked) => onChange({ includeTime: !!checked })}
+      />
+      <Label htmlFor="includeTime">Include Time</Label>
+    </div>
+  </div>
+);
+
+const TagsOptionsComponent = ({ options, onChange }: { options: TagsOptions; onChange: (options: Partial<TagsOptions>) => void }) => (
+  <div className="space-y-4">
+    <div>
+      <Label htmlFor="maxTags">Max Tags</Label>
+      <Input
+        id="maxTags"
+        type="number"
+        value={options.maxTags || ''}
+        onChange={(e) => onChange({ maxTags: parseInt(e.target.value) || undefined })}
+        placeholder="Maximum number of tags"
+      />
+    </div>
+    <div>
+      <Label htmlFor="suggestions">Suggestions (one per line)</Label>
+      <Textarea
+        id="suggestions"
+        value={(options.suggestions || []).join('\n')}
+        onChange={(e) => onChange({ suggestions: e.target.value.split('\n').filter(Boolean) })}
+        placeholder="Tag 1\nTag 2\nTag 3"
+        rows={5}
+      />
+    </div>
+  </div>
+);
+
+const UrlOptionsComponent = ({ options, onChange }: { options: UrlOptions; onChange: (options: Partial<UrlOptions>) => void }) => (
+  <div className="space-y-4">
+    <div className="flex items-center space-x-2">
+      <Checkbox
+        id="validateUrl"
+        checked={options.validateUrl !== false}
+        onCheckedChange={(checked) => onChange({ validateUrl: !!checked })}
+      />
+      <Label htmlFor="validateUrl">Validate URL Format</Label>
+    </div>
+    <div>
+      <Label htmlFor="placeholder">Placeholder</Label>
+      <Input
+        id="placeholder"
+        value={options.placeholder || ''}
+        onChange={(e) => onChange({ placeholder: e.target.value })}
+        placeholder="https://example.com"
+      />
+    </div>
+  </div>
+);
+
+const FileUploadOptionsComponent = ({ options, onChange }: { options: FileUploadOptions; onChange: (options: Partial<FileUploadOptions>) => void }) => (
+  <div className="space-y-4">
+    <div>
+      <Label htmlFor="acceptedTypes">Accepted File Types</Label>
+      <Input
+        id="acceptedTypes"
+        value={options.acceptedTypes || ''}
+        onChange={(e) => onChange({ acceptedTypes: e.target.value })}
+        placeholder=".pdf,.doc,.docx"
+      />
+    </div>
+    <div>
+      <Label htmlFor="maxSize">Max File Size (MB)</Label>
+      <Input
+        id="maxSize"
+        type="number"
+        value={options.maxSize || ''}
+        onChange={(e) => onChange({ maxSize: parseInt(e.target.value) || undefined })}
+        placeholder="10"
+      />
+    </div>
+  </div>
+);
+
+const PlainTextOutputOptionsComponent = ({ options, onChange }: { options: PlainTextOutputOptions; onChange: (options: Partial<PlainTextOutputOptions>) => void }) => (
+  <div className="space-y-4">
+    <div>
+      <Label htmlFor="maxLength">Max Length</Label>
+      <Input
+        id="maxLength"
+        type="number"
+        value={options.maxLength || ''}
+        onChange={(e) => onChange({ maxLength: parseInt(e.target.value) || undefined })}
+        placeholder="Maximum characters"
+      />
+    </div>
+  </div>
+);
+
+const HtmlOutputOptionsComponent = ({ options, onChange }: { options: HtmlOutputOptions; onChange: (options: Partial<HtmlOutputOptions>) => void }) => (
+  <div className="space-y-4">
+    <div className="flex items-center space-x-2">
+      <Checkbox
+        id="sanitize"
+        checked={options.sanitize !== false}
+        onCheckedChange={(checked) => onChange({ sanitize: !!checked })}
+      />
+      <Label htmlFor="sanitize">Sanitize HTML</Label>
+    </div>
+  </div>
+);
+
+const ImageOutputOptionsComponent = ({ options, onChange }: { options: ImageOutputOptions; onChange: (options: Partial<ImageOutputOptions>) => void }) => (
+  <div className="space-y-4">
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <Label htmlFor="width">Width</Label>
+        <Input
+          id="width"
+          type="number"
+          value={options.width || ''}
+          onChange={(e) => onChange({ width: parseInt(e.target.value) || undefined })}
+          placeholder="800"
+        />
+      </div>
+      <div>
+        <Label htmlFor="height">Height</Label>
+        <Input
+          id="height"
+          type="number"
+          value={options.height || ''}
+          onChange={(e) => onChange({ height: parseInt(e.target.value) || undefined })}
+          placeholder="600"
+        />
+      </div>
+    </div>
+    <div>
+      <Label htmlFor="altText">Alt Text</Label>
+      <Input
+        id="altText"
+        value={options.altText || ''}
+        onChange={(e) => onChange({ altText: e.target.value })}
+        placeholder="Image description"
+      />
+    </div>
+  </div>
+);
+
 interface FieldDesignerProps {
   isOpen: boolean;
   fieldType: 'input' | 'output';
   initialData: Field | null;
   availableInputFields?: Array<{ id: string; name: string | null }>;
-  templateId?: string;
   onSave: (field: Field, isNew: boolean) => void;
   onCancel: () => void;
 }
@@ -72,36 +373,77 @@ const getDefaultField = (type: 'input' | 'output', id?: string): Field => {
   }
 };
 
+// Helper function to safely initialize field data
+const initializeFieldData = (fieldType: 'input' | 'output', initialData: Field | null): Field => {
+  if (!initialData) {
+    return getDefaultField(fieldType);
+  }
+  
+  // Ensure the initialData matches the expected field type
+  if (fieldType === 'input' && isInputField(initialData)) {
+    const inputData: InputField = {
+      id: initialData.id,
+      name: initialData.name,
+      type: initialData.type,
+      required: initialData.required,
+      options: initialData.options || {},
+      aiPrompt: initialData.aiPrompt || '',
+      aiSuggester: initialData.aiSuggester || false,
+      description: initialData.description,
+      helpText: initialData.helpText
+    };
+    return inputData;
+  } else if (fieldType === 'output' && isOutputField(initialData)) {
+    const outputData: OutputField = {
+      id: initialData.id,
+      name: initialData.name,
+      type: initialData.type,
+      required: initialData.required,
+      options: initialData.options || {},
+      aiPrompt: initialData.aiPrompt || '',
+      aiAutoComplete: initialData.aiAutoComplete ?? true,
+      useBrandIdentity: initialData.useBrandIdentity || false,
+      useToneOfVoice: initialData.useToneOfVoice || false,
+      useGuardrails: initialData.useGuardrails || false,
+      description: initialData.description,
+      helpText: initialData.helpText
+    };
+    return outputData;
+  }
+  
+  // If there's a type mismatch, create a new field with the correct type
+  return getDefaultField(fieldType);
+};
+
 export function FieldDesigner({ 
   isOpen, 
   fieldType, 
   initialData, 
   availableInputFields = [], 
-  templateId, 
   onSave, 
   onCancel 
 }: FieldDesignerProps) {
   const isNew = !initialData;
-  const [fieldData, setFieldData] = useState<Field>(
-    initialData ? 
-      {...initialData, options: initialData.options || {}} : 
-      getDefaultField(fieldType)
+  const [fieldData, setFieldData] = useState<Field>(() => 
+    initializeFieldData(fieldType, initialData)
   );
   
   const [activeTab, setActiveTab] = useState('basic');
   const aiPromptRef = useRef<HTMLTextAreaElement>(null);
   
   useEffect(() => {
-    if (initialData) {
-      setFieldData({...initialData, options: initialData.options || {}});
-    } else {
-      setFieldData(getDefaultField(fieldType));
-    }
+    setFieldData(initializeFieldData(fieldType, initialData));
   }, [initialData, fieldType]);
   
   const handleBasicInfoChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFieldData(prev => ({ ...prev, [name]: value } as Field));
+    setFieldData(prev => {
+      if (isInputField(prev)) {
+        return { ...prev, [name]: value } as InputField;
+      } else {
+        return { ...prev, [name]: value } as OutputField;
+      }
+    });
   };
   
   const handleTypeChange = (value: string) => {
@@ -134,7 +476,13 @@ export function FieldDesigner({
   };
   
   const handleRequiredChange = (checked: boolean) => {
-    setFieldData(prev => ({ ...prev, required: checked } as Field));
+    setFieldData(prev => {
+      if (isInputField(prev)) {
+        return { ...prev, required: checked } as InputField;
+      } else {
+        return { ...prev, required: checked } as OutputField;
+      }
+    });
   };
   
   const handleAIFeatureChange = (
@@ -161,7 +509,13 @@ export function FieldDesigner({
   };
   
   const handleAIPromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-     setFieldData(prev => ({ ...prev, aiPrompt: e.target.value } as Field));
+    setFieldData(prev => {
+      if (isInputField(prev)) {
+        return { ...prev, aiPrompt: e.target.value } as InputField;
+      } else {
+        return { ...prev, aiPrompt: e.target.value } as OutputField;
+      }
+    });
   };
   
   const insertTextIntoPrompt = (textToInsert: string) => {
@@ -177,7 +531,13 @@ export function FieldDesigner({
       textToInsert + 
       currentPrompt.substring(selectionEnd);
     
-    setFieldData(prev => ({ ...prev, aiPrompt: newPrompt } as Field));
+    setFieldData(prev => {
+      if (isInputField(prev)) {
+        return { ...prev, aiPrompt: newPrompt } as InputField;
+      } else {
+        return { ...prev, aiPrompt: newPrompt } as OutputField;
+      }
+    });
     
     // After inserting, set cursor to the end of the inserted text
     const newCursorPosition = selectionStart + textToInsert.length;
@@ -219,13 +579,25 @@ export function FieldDesigner({
   // }, [fieldData.aiPrompt]); // This specific dependency might need adjustment if prompt changes externally
   
   const handleOptionsChange = (newOptions: Partial<Field['options']>) => {
-    setFieldData(prev => ({
-      ...prev,
-      options: {
-        ...(prev.options || {}),
-        ...newOptions
+    setFieldData(prev => {
+      if (isInputField(prev)) {
+        return {
+          ...prev,
+          options: {
+            ...(prev.options || {}),
+            ...newOptions
+          }
+        } as InputField;
+      } else {
+        return {
+          ...prev,
+          options: {
+            ...(prev.options || {}),
+            ...newOptions
+          }
+        } as OutputField;
       }
-    }));
+    });
   };
   
   const validateField = () => {
@@ -480,7 +852,7 @@ export function FieldDesigner({
                 <p className="text-xs text-muted-foreground flex items-center">
                   <Info size={14} className="mr-1.5 text-blue-500" />
                   You can use placeholders like <code>{`{{inputFieldName}}`}</code> to reference other input fields. 
-                  <Link href="/docs/templating-guide#ai-prompts" target="_blank" className="ml-1 text-blue-600 hover:underline text-xs">Learn more.</Link>
+                  <Link href="/dashboard/help?article=04-templates" className="ml-1 text-blue-600 hover:underline text-xs">Learn more.</Link>
                 </p>
 
                 <div className="space-y-1 pt-3">

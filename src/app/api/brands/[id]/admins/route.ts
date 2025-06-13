@@ -13,8 +13,9 @@ interface BrandAdmin {
 export const GET = withAuth(async (
   req: NextRequest,
   currentUser: User, // User object provided by withAuth
-  { params }: { params: { id: string } } // id is brand_id from the path
+  context?: unknown // Context parameter
 ) => {
+  const { params } = context as { params: { id: string } };
   try {
     const brandId = params.id;
     if (!brandId) {
@@ -50,7 +51,7 @@ export const GET = withAuth(async (
 
     return NextResponse.json({ success: true, admins: formattedAdmins });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('API error in /api/brands/[id]/admins:', error);
     return handleApiError(error, 'Error fetching brand administrators');
   }

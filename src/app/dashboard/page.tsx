@@ -4,10 +4,9 @@ import { getProfileWithAssignedBrands } from '@/lib/auth/user-profile';
 import { TeamActivityFeed } from '@/components/dashboard/team-activity-feed';
 import { MostAgedContent } from '@/components/dashboard/most-aged-content';
 import { TasksSkeleton } from '@/components/dashboard/dashboard-skeleton';
-import { Card } from '@/components/ui/card';
 import { MyTasks } from '@/components/dashboard/my-tasks';
 
-async function getTeamActivity(supabase: any, profile: any) {
+async function getTeamActivity(supabase: ReturnType<typeof createSupabaseServerClient>, profile: { role?: string; assigned_brands?: string[] } | null) {
   if (!profile) return [];
 
   let query = supabase
@@ -38,23 +37,23 @@ async function getTeamActivity(supabase: any, profile: any) {
 
   return data.map(item => ({
     id: item.id,
-    type: item.status === 'draft' ? 'content_created' : 'content_updated',
-    created_at: item.created_at,
+    type: item.status === 'draft' ? 'content_created' as const : 'content_updated' as const,
+    created_at: item.created_at || new Date().toISOString(),
     user: item.profiles,
     target: {
       id: item.id,
       name: item.title,
-      type: 'content' as 'content',
+      type: 'content' as const,
     },
   }));
 }
 
-async function getMostAgedContent(supabase: any, profile: any) {
+async function getMostAgedContent(supabase: ReturnType<typeof createSupabaseServerClient>, profile: { role?: string; assigned_brands?: string[] } | null) {
   if (!profile) return [];
 
   let query = supabase
     .from('content')
-    .select('id, title, updated_at, status, brand_id, brands ( name )')
+    .select('id, title, updated_at, status, brand_id, brands ( name, brand_color )')
     .in('status', ['draft', 'pending_review']);
 
   if (profile.role !== 'admin') {
@@ -71,11 +70,14 @@ async function getMostAgedContent(supabase: any, profile: any) {
     return [];
   }
 
-  return data.map((item: any) => ({
-    ...item,
-    brandName: item.brand?.name || 'N/A',
-    brandColor: item.brand?.brand_color || '#888'
-  }));
+  return data
+    .filter(item => item.updated_at !== null)
+    .map((item) => ({
+      ...item,
+      updated_at: item.updated_at!,
+      brandName: item.brands?.name || 'N/A',
+      brandColor: item.brands?.brand_color || '#888'
+    }));
 }
 
 export default async function DashboardPage() {

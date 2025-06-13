@@ -1,0 +1,46 @@
+{
+  "timestamp": "2025-06-13T08:10:12.945Z",
+  "success": false,
+  "totalErrors": 1,
+  "errorsByCategory": {
+    "Type Mismatch": [
+      {
+        "file": "src/app/api/workflows/[id]/route.ts",
+        "line": 143,
+        "column": 7,
+        "error": "Type '{ id: string; name: string; description: string | null; role: string | null; approvalRequired: boolean | null; assignees: WorkflowAssignee[]; step_order: number; }[]' is not assignable to type 'WorkflowStep[]'.",
+        "category": "Type Mismatch"
+      }
+    ]
+  },
+  "errors": [
+    {
+      "file": "src/app/api/workflows/[id]/route.ts",
+      "line": 143,
+      "column": 7,
+      "error": "Type '{ id: string; name: string; description: string | null; role: string | null; approvalRequired: boolean | null; assignees: WorkflowAssignee[]; step_order: number; }[]' is not assignable to type 'WorkflowStep[]'.",
+      "category": "Type Mismatch"
+    }
+  ],
+  "fullErrors": [
+    {
+      "file": "./src/app/api/workflows/[id]/route.ts:143:7",
+      "filePath": "src/app/api/workflows/[id]/route.ts",
+      "line": 143,
+      "column": 7,
+      "message": "Type '{ id: string; name: string; description: string | null; role: string | null; approvalRequired: boolean | null; assignees: WorkflowAssignee[]; step_order: number; }[]' is not assignable to type 'WorkflowStep[]'.",
+      "fullError": "Type error: Type '{ id: string; name: string; description: string | null; role: string | null; approvalRequired: boolean | null; assignees: WorkflowAssignee[]; step_order: number; }[]' is not assignable to type 'WorkflowStep[]'.",
+      "context": [
+        "  Type '{ id: string; name: string; description: string | null; role: string | null; approvalRequired: boolean | null; assignees: WorkflowAssignee[]; step_order: number; }' is not assignable to type 'WorkflowStep'.",
+        "    Types of property 'id' are incompatible.",
+        "      Type 'string' is not assignable to type 'number'.",
+        "\u001b[0m \u001b[90m 141 |\u001b[39m       }\u001b[0m",
+        "\u001b[0m \u001b[90m 142 |\u001b[39m\u001b[0m",
+        "\u001b[0m\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 143 |\u001b[39m       processedSteps \u001b[33m=\u001b[39m dbSteps\u001b[33m.\u001b[39mmap(step \u001b[33m=>\u001b[39m {\u001b[0m",
+        "\u001b[0m \u001b[90m     |\u001b[39m       \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\u001b[0m",
+        "\u001b[0m \u001b[90m 144 |\u001b[39m         \u001b[36mlet\u001b[39m currentStepAssignees\u001b[33m:\u001b[39m \u001b[33mWorkflowAssignee\u001b[39m[] \u001b[33m=\u001b[39m []\u001b[33m;\u001b[39m\u001b[0m",
+        "\u001b[0m \u001b[90m 145 |\u001b[39m         \u001b[36mif\u001b[39m (step\u001b[33m.\u001b[39massigned_user_ids \u001b[33m&&\u001b[39m \u001b[33mArray\u001b[39m\u001b[33m.\u001b[39misArray(step\u001b[33m.\u001b[39massigned_user_ids)) {\u001b[0m"
+      ]
+    }
+  ]
+}

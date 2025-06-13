@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Button } from '@/components/button';
-import { Input } from '@/components/input';
+import Image from 'next/image';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { 
   Plus, 
   Search, 
   ArrowUp, 
   ArrowDown, 
-  ExternalLink, 
   Pencil, 
   Trash2, 
   AlertCircle,
@@ -23,7 +23,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/table";
+} from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -31,13 +31,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/dialog";
-import type { Metadata } from 'next';
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Badge } from '@/components/badge';
+import { Badge } from '@/components/ui/badge';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { format as formatDateFns } from 'date-fns';
-import { Skeleton } from "@/components/skeleton";
+import { Skeleton } from '@/components/ui/skeleton';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 // export const metadata: Metadata = {
@@ -87,7 +86,6 @@ interface UserSessionData {
  */
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
-  const [brands, setBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState<'full_name' | 'role' | 'email' | 'company' | 'last_sign_in_at'>('role');
@@ -121,10 +119,10 @@ export default function UsersPage() {
           setCurrentUser(null);
           setUserSessionError(data.error || 'User data not found in session.');
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('[UsersPage] Error fetching current user:', error);
         setCurrentUser(null);
-        setUserSessionError(error.message || 'An unexpected error occurred.');
+        setUserSessionError((error as Error).message || 'An unexpected error occurred.');
       } finally {
         setIsLoadingUser(false);
       }
@@ -168,7 +166,6 @@ export default function UsersPage() {
         
         if (brandsData.success) {
           const fetchedBrands = brandsData.data || [];
-          setBrands(fetchedBrands);
           
           // Merge brand data with user permissions
           const usersWithBrands = (usersData.data || []).map((user: User) => {
@@ -190,7 +187,7 @@ export default function UsersPage() {
           setUsers(usersData.data || []);
         }
       } catch (error) {
-        // console.error('Error loading data:', error);
+        console.error('Error loading data:', error);
         toast.error('Failed to load users. Please try again.');
       } finally {
         setIsLoading(false);
@@ -268,6 +265,7 @@ export default function UsersPage() {
         toast.error(data.error || 'Failed to delete user.');
       }
     } catch (error) {
+      console.error('Error deleting user:', error);
       toast.error('An error occurred while deleting the user.');
     } finally {
       setIsDeleting(false);
@@ -292,6 +290,7 @@ export default function UsersPage() {
         toast.error(data.error || 'Failed to resend invitation.');
       }
     } catch (error) {
+      console.error('Error resending invite:', error);
       toast.error('An error occurred while resending the invitation.');
     } finally {
       setResendingInviteToUserId(null);
@@ -473,10 +472,11 @@ export default function UsersPage() {
                   <TableCell>
                     <div className="relative h-8 w-8 rounded-full bg-primary/10 overflow-hidden">
                       {user.avatar_url ? (
-                        <img
+                        <Image
                           src={user.avatar_url}
                           alt={user.full_name || 'User'}
-                          className="object-cover w-full h-full"
+                          fill
+                          className="object-cover"
                         />
                       ) : (
                         <div className="flex items-center justify-center h-full w-full text-sm font-semibold text-primary">

@@ -3,19 +3,18 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@/components/button';
-import { Input } from '@/components/input';
-import { Label } from '@/components/label';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from '@/components/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
-import { Checkbox } from '@/components/checkbox';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   ArrowLeft, 
-  Send, 
   Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Skeleton } from "@/components/skeleton";
+import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle } from 'lucide-react';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
@@ -78,10 +77,10 @@ export default function InviteUserPage() {
           setCurrentUserSession(null);
           setUserSessionError(data.error || 'User data not found in session.');
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('[InviteUserPage] Error fetching current user session:', error);
         setCurrentUserSession(null);
-        setUserSessionError(error.message || 'An unexpected error occurred.');
+        setUserSessionError((error as Error).message || 'An unexpected error occurred.');
       } finally {
         setIsLoadingUserSession(false);
       }
@@ -119,6 +118,7 @@ export default function InviteUserPage() {
           throw new Error(data.error || 'Failed to fetch brands');
         }
       } catch (error) {
+        console.error('Error fetching brands:', error);
         toast.error('Failed to load brands. You may not be able to assign the user to a brand.');
       } finally {
         setIsLoading(false);

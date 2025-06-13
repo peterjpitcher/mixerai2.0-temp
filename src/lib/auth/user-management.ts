@@ -57,9 +57,9 @@ export async function getUserAuthByEmail(
  */
 export async function inviteNewUserWithAppMetadata(
   email: string,
-  appMetadata: object,
+  appMetadata: Record<string, unknown>,
   supabaseAdmin: SupabaseClient,
-  userMetadata?: object // userMetadata is now optional and last
+  userMetadata?: Record<string, unknown> // userMetadata is now optional and last
 ): Promise<{ user: User | null; error: Error | null }> { // Return type refined
   if (!email || !appMetadata || !supabaseAdmin) {
     console.error('[inviteNewUserWithAppMetadata] Email, appMetadata, and Supabase admin client are required.');
@@ -86,11 +86,11 @@ export async function inviteNewUserWithAppMetadata(
       // Check if this is a rate limit error from Supabase
       // Supabase errors often have a 'status' property. 429 is 'Too Many Requests'.
       // Specific error messages can also indicate rate limiting, e.g., "rate limit exceeded"
-      if ((inviteError as any).status === 429 || inviteError.message?.toLowerCase().includes('rate limit')) {
+      if ((inviteError as { status?: number }).status === 429 || inviteError.message?.toLowerCase().includes('rate limit')) {
         // Augment the error or create a new one to signify it's a rate limit issue
         const rateLimitError = new Error('User invitation rate limit exceeded. Please try again later.');
-        (rateLimitError as any).status = 429; // Ensure status is set for downstream handlers
-        (rateLimitError as any).originalError = inviteError; // Keep original error for logging if needed
+        (rateLimitError as { status?: number; originalError?: unknown }).status = 429; // Ensure status is set for downstream handlers
+        (rateLimitError as { status?: number; originalError?: unknown }).originalError = inviteError; // Keep original error for logging if needed
         return { user: null, error: rateLimitError };
       }
       // It's possible the user already exists. The calling function should have already checked this.
@@ -130,9 +130,9 @@ export async function inviteNewUserWithAppMetadata(
     // The updatedUserData.user might contain the merged metadata, return that if preferred.
     return { user: updatedUserData.user || invitedUser, error: null };
 
-  } catch (e: any) {
+  } catch (e) {
     console.error(`[inviteNewUserWithAppMetadata] Unexpected exception for email ${email}:`, e);
-    return { user: invitedUser, error: e }; // Return partially successful state if user was created before exception
+    return { user: invitedUser, error: e instanceof Error ? e : new Error(String(e)) }; // Return partially successful state if user was created before exception
   }
 }
 

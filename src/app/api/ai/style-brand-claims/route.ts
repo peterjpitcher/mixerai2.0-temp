@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
-import { User } from '@supabase/supabase-js';
 import { generateTextCompletion } from '@/lib/azure/openai';
 import { withAuth } from '@/lib/auth/api-auth';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
@@ -13,7 +12,8 @@ type Claim = {
 };
 
 // Function to fetch all claims related to a master claim brand
-async function fetchAllBrandClaims(supabase: any, masterClaimBrandId: string, productId: string | null, countryCode: string | null): Promise<Claim[]> {
+async function fetchAllBrandClaims(supabase: ReturnType<typeof createSupabaseAdminClient>, masterClaimBrandId: string, productId: string | null, countryCode: string | null): Promise<Claim[]> {
+  // @ts-expect-error RPC function type not yet in generated types
   const { data, error } = await supabase.rpc('get_all_claims_for_master_brand', {
     master_brand_id_param: masterClaimBrandId,
     product_id_param: productId,
@@ -53,7 +53,7 @@ function sortClaims(a: Claim, b: Claim): number {
   return 0;
 }
 
-async function styleBrandClaimsHandler(request: NextRequest, user: User) {
+async function styleBrandClaimsHandler(request: NextRequest) {
   try {
     const body = await request.json();
     const { masterClaimBrandId, productId, countryCode } = body;
@@ -153,8 +153,8 @@ ${JSON.stringify(claimsForAI, null, 2)}
     try {
       const cleanedAiData = aiData.replace(/^```json\n|```json|```$/g, '').trim();
       parsedAIResponse = JSON.parse(cleanedAiData);
-    } catch (e: any) {
-      throw new Error(`Failed to parse AI response: ${e.message}`);
+    } catch (e: unknown) {
+      throw new Error(`Failed to parse AI response: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
 
     const { data: brandData } = await supabase
@@ -170,9 +170,9 @@ ${JSON.stringify(claimsForAI, null, 2)}
       rawClaimsForAI: claimsForAI
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in /api/ai/style-brand-claims handler:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Unknown error occurred' }, { status: 500 });
   }
 }
 

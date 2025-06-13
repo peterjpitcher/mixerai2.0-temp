@@ -6,8 +6,9 @@ import { User } from '@supabase/supabase-js';
 
 export const dynamic = "force-dynamic";
 
-export const GET = withAuth(async (request: NextRequest, user: User, context: { params: { id: string } }) => {
-  const brandId = context.params.id;
+export const GET = withAuth(async (request: NextRequest, user: User, context?: unknown) => {
+  const { params } = context as { params: { id: string } };
+  const brandId = params.id;
 
   if (!user) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
@@ -53,7 +54,7 @@ export const GET = withAuth(async (request: NextRequest, user: User, context: { 
 
     return NextResponse.json({ success: true, data: rejectedContent || [] });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, `Failed to fetch rejected content for brand ID: ${brandId}`);
   }
 }); 

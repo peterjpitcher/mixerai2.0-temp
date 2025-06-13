@@ -1,6 +1,6 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/card";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from "next/link";
-import { Button } from "@/components/button";
+import { Button } from '@/components/ui/button';
 import { requireAuth } from '@/lib/auth/server';
 import fs from 'fs/promises';
 import path from 'path';

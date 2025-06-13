@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Alert, AlertTitle, AlertDescription } from './alert';
+import { Alert, AlertTitle, AlertDescription } from './ui/alert';
 import { Icons } from '@/components/icons';
 
 /**
@@ -38,7 +38,7 @@ export function DomainVerification() {
         The application is not configured to use the production domain <strong>{productionDomain}</strong>.
         <br />
         Run <code className="bg-muted px-1 rounded">./scripts/update-domain-config.sh</code> to configure the application,
-        or see <a href="/docs/domain-configuration" className="underline">Domain Configuration Documentation</a> for manual setup.
+        or see <a href="/dashboard/help?article=01-overview" className="underline">the help documentation</a> for manual setup.
       </AlertDescription>
     </Alert>
   );

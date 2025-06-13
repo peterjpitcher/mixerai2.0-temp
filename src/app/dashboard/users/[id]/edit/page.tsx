@@ -3,23 +3,20 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@/components/button';
-import { Input } from '@/components/input';
-import { Label } from '@/components/label';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from '@/components/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/select';
-import { Checkbox } from '@/components/checkbox';
+import Image from 'next/image';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   ArrowLeft, 
-  Save, 
   Loader2,
   AlertCircle
 } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
-import type { Metadata } from 'next';
 import { toast } from 'sonner';
-import { Separator } from '@/components/separator';
-import { Skeleton } from '@/components/skeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 // export const metadata: Metadata = {
@@ -109,10 +106,10 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
           setCurrentUserSession(null);
           setUserSessionError(data.error || 'User data not found in session.');
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('[EditUserPage] Error fetching current user session:', error);
         setCurrentUserSession(null);
-        setUserSessionError(error.message || 'An unexpected error occurred.');
+        setUserSessionError((error as Error).message || 'An unexpected error occurred.');
       } finally {
         setIsLoadingUserSession(false);
       }
@@ -203,7 +200,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
           globalRole: userData.user.globalRole || 'viewer' // Initialize globalRole
         });
       } catch (error) {
-        // console.error('Error loading data:', error);
+        console.error('Error loading data:', error);
         toast.error('Failed to load user information. Please try again.');
       } finally {
         setIsLoading(false);
@@ -297,7 +294,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
         throw new Error(data.error || 'Failed to update user.');
       }
     } catch (error) {
-      // console.error('Error updating user:', error);
+      console.error('Error updating user:', error);
       toast.error('Failed to update user. Please try again.');
     } finally {
       setIsSaving(false);
@@ -375,14 +372,13 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
           {user && (
             <div className="relative h-12 w-12 rounded-full bg-muted overflow-hidden flex-shrink-0">
               {user.avatar_url ? (
-                <img
+                <Image
                   src={user.avatar_url}
                   alt={user.full_name || 'User avatar'}
-                  className="object-cover w-full h-full"
-                  onError={(e) => (e.currentTarget.style.display = 'none')} // Hide img on error, initial will show
+                  fill
+                  className="object-cover"
                 />
-              ) : null}
-              {(!user.avatar_url) && (
+              ) : (
                 <div className="flex items-center justify-center h-full w-full text-lg font-semibold text-primary bg-muted-foreground/20">
                   {(user.full_name || user.email || 'U').charAt(0).toUpperCase()}
                 </div>
@@ -402,7 +398,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
         <Card>
           <CardHeader>
             <CardTitle>User Profile</CardTitle>
-            <CardDescription>Update the user's basic information and global system role.</CardDescription>
+            <CardDescription>Update the user&apos;s basic information and global system role.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -438,7 +434,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">
-                Determines the user's base level of access across the system.
+                Determines the user&apos;s base level of access across the system.
               </p>
             </div>
           </CardContent>

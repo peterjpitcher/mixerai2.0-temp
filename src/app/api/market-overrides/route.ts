@@ -27,8 +27,8 @@ interface MarketClaimOverridePostPayload {
 }
 
 // Helper to validate claim properties via a Supabase call
-async function getClaimProperties(supabase: any, claimId: string): Promise<{ country_code: string; id: string } | null> {
-    // @ts-ignore
+async function getClaimProperties(supabase: ReturnType<typeof createSupabaseAdminClient>, claimId: string): Promise<{ country_code: string; id: string } | null> {
+
     const { data, error } = await supabase
         .from('claims')
         .select('id, country_code')
@@ -71,7 +71,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
         let hasPermission = user?.user_metadata?.role === 'admin';
 
         if (!hasPermission && target_product_id) {
-            // @ts-ignore
+
             const { data: productData, error: productError } = await supabase
                 .from('products')
                 .select('master_brand_id')
@@ -82,7 +82,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
                 console.error(`[API MarketOverrides POST] Error fetching product/MCB for permissions (Product ID: ${target_product_id}):`, productError);
                 // Deny permission if product or its MCB link is not found
             } else {
-                // @ts-ignore
+
                 const { data: mcbData, error: mcbError } = await supabase
                     .from('master_claim_brands')
                     .select('mixerai_brand_id')
@@ -93,7 +93,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
                     console.error(`[API MarketOverrides POST] Error fetching MCB or MCB not linked for permissions (MCB ID: ${productData.master_brand_id}):`, mcbError);
                     // Deny permission if MCB not found or not linked to a core MixerAI brand
                 } else {
-                    // @ts-ignore
+
                     const { data: permissionsData, error: permissionsError } = await supabase
                         .from('user_brand_permissions')
                         .select('role')
@@ -148,13 +148,13 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
             created_by: user.id,
         };
 
-        // @ts-ignore
+
         const { data, error } = await supabase.from('market_claim_overrides').insert(newRecord).select().single();
 
         if (error) {
             console.error('[API MarketOverrides POST] Error creating market override:', error);
             // Foreign key violation for master_claim_id or target_product_id or replacement_claim_id
-            if ((error as any).code === '23503') { 
+            if ((error as { code?: string }).code === '23503') { 
                 return NextResponse.json(
                    { success: false, error: 'Invalid master_claim_id, target_product_id, or replacement_claim_id. Ensure they exist.' },
                    { status: 400 }
@@ -162,14 +162,14 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
             }
             // Unique constraint chk_master_claim_is_global, chk_replacement_claim_is_market (Postgres error code for check constraint is 23514)
             // These should be caught by application logic above, but as a fallback:
-            if ((error as any).code === '23514') {
+            if ((error as { code?: string }).code === '23514') {
                  return NextResponse.json(
                     { success: false, error: 'Database check constraint violated. This might be due to master claim not being global or replacement claim not matching market.' },
                     { status: 400 }
                 );
             }
              // Unique constraint violation for (master_claim_id, market_country_code, target_product_id)
-            if ((error as any).code === '23505') {
+            if ((error as { code?: string }).code === '23505') {
                  return NextResponse.json(
                     { success: false, error: 'An override for this master claim, market, and product already exists.' },
                     { status: 409 } // Conflict
@@ -180,9 +180,9 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 
         return NextResponse.json({ success: true, data: data as MarketClaimOverride }, { status: 201 });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[API MarketOverrides POST] Catched error:', error);
-        if (error.name === 'SyntaxError') { 
+        if (error instanceof Error && error.name === 'SyntaxError') { 
             return NextResponse.json({ success: false, error: 'Invalid JSON payload.' }, { status: 400 });
         }
         return handleApiError(error, 'An unexpected error occurred while creating the market claim override.');
@@ -190,7 +190,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 });
 
 // GET handler for market claim overrides (optional - could be filtered)
-export const GET = withAuth(async (req: NextRequest, user: User) => {
+export const GET = withAuth(async (req: NextRequest) => {
     try {
         if (isBuildPhase()) {
             return NextResponse.json({ success: true, isMockData: true, data: [] });
@@ -216,19 +216,19 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
             replacement_claim:claims!left!replacement_claim_id(claim_text, claim_type)
         `;
 
-        // @ts-ignore supabase client query typing
+
         let query = supabase.from('market_claim_overrides').select(selectQuery);
 
         if (target_product_id) {
-            // @ts-ignore
+
             query = query.eq('target_product_id', target_product_id);
         }
         if (market_country_code) {
-            // @ts-ignore
+
             query = query.eq('market_country_code', market_country_code);
         }
         
-        // @ts-ignore
+
         const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) {
@@ -237,20 +237,27 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
         }
 
         // Transform data to include flattened claim texts and types
-        const enrichedData = data.map((override: any) => ({
-            ...override,
-            master_claim_text: override.master_claim?.claim_text,
-            master_claim_type: override.master_claim?.claim_type,
-            replacement_claim_text: override.replacement_claim?.claim_text,
-            replacement_claim_type: override.replacement_claim?.claim_type,
-            // Remove nested objects if they are not needed by client directly
-            master_claim: undefined,
-            replacement_claim: undefined,
-        }));
+        const enrichedData = data.map((override: unknown) => {
+            const o = override as { 
+                master_claim?: { claim_text: string; claim_type: string }; 
+                replacement_claim?: { claim_text: string; claim_type: string };
+                [key: string]: unknown;
+            };
+            return {
+                ...(override as Record<string, unknown>),
+                master_claim_text: o.master_claim?.claim_text,
+                master_claim_type: o.master_claim?.claim_type,
+                replacement_claim_text: o.replacement_claim?.claim_text,
+                replacement_claim_type: o.replacement_claim?.claim_type,
+                // Remove nested objects if they are not needed by client directly
+                master_claim: undefined,
+                replacement_claim: undefined,
+            };
+        });
 
         return NextResponse.json({ success: true, data: enrichedData });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[API MarketOverrides GET] Catched error:', error);
         return handleApiError(error, 'An unexpected error occurred while fetching market overrides.');
     }

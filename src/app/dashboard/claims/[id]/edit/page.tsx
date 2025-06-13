@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input"; // Though not directly used, kept for consistency
+// import { Input } from "@/components/ui/input"; // Though not directly used, kept for consistency
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -122,8 +122,8 @@ export default function EditClaimPage() {
           });
 
           // Determine and fetch associated entity name for display
-          let entityPromise: Promise<any> | null = null;
-          let entityType: ClaimLevelEnum | null = claim.level;
+          let entityPromise: Promise<unknown> | null = null;
+          const entityType: ClaimLevelEnum | null = claim.level;
 
           if (claim.level === 'brand' && claim.global_brand_id) {
             entityPromise = fetch(`/api/global-claim-brands/${claim.global_brand_id}`).then(res => res.json());
@@ -134,7 +134,7 @@ export default function EditClaimPage() {
           }
 
           if (entityPromise) {
-            const entityRes = await entityPromise;
+            const entityRes = await entityPromise as { success: boolean; data?: { id: string; name: string }; error?: string };
             if (entityRes.success && entityRes.data) {
               setAssociatedEntity({ id: entityRes.data.id, name: entityRes.data.name, type: entityType });
             } else {
@@ -345,7 +345,7 @@ export default function EditClaimPage() {
                     This market-specific claim is currently used as a replacement in {linkedOverrides.length} market override(s).
                   </p>
                   <p className="text-xs text-blue-600">
-                    Editing its text or type will affect these overrides. The country code cannot be changed while it's linked.
+                    Editing its text or type will affect these overrides. The country code cannot be changed while it&apos;s linked.
                   </p>
                   {/* Optionally list the overrides or link to them if a UI exists */}
                 </div>

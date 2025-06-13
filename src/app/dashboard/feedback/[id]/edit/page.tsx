@@ -10,9 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { ArrowLeft, Loader2, AlertTriangle, Save, XCircle, ChevronRight } from 'lucide-react';
-import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
-import Link from 'next/link';
+import { Loader2, AlertTriangle, Save, XCircle } from 'lucide-react';
+import type { SupabaseClient, User } from '@supabase/supabase-js';
+// import Link from 'next/link';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 // ENUM types - should match other feedback files
@@ -43,6 +43,7 @@ interface FeedbackFormState {
   resolution_details: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface BreadcrumbItemDef { name: string; href?: string; }
 
 const initialFormState: FeedbackFormState = {
@@ -68,7 +69,7 @@ export default function EditFeedbackPage() {
   const params = useParams();
   const feedbackId = params?.id as string | undefined;
 
-  const [supabase, setSupabase] = useState<SupabaseClient<any, "public", any> | null>(null);
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -87,7 +88,7 @@ export default function EditFeedbackPage() {
       const { data: { user } } = await supabaseClient.auth.getUser();
       setCurrentUser(user);
       if (user) {
-        const userRole = user.user_metadata?.role || (user.app_metadata as any)?.role;
+        const userRole = user.user_metadata?.role || user.app_metadata?.role;
         if (userRole === 'admin') {
           setIsAdmin(true);
         } else {

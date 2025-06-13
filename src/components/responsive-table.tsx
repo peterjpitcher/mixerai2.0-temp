@@ -3,19 +3,19 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-interface Column {
+interface Column<T = Record<string, unknown>> {
   header: string;
   accessorKey: string;
-  cell?: (value: any, row: any) => React.ReactNode;
+  cell?: (value: unknown, row: T) => React.ReactNode;
 }
 
-interface ResponsiveTableProps {
-  data: any[];
-  columns: Column[];
+interface ResponsiveTableProps<T = Record<string, unknown>> {
+  data: T[];
+  columns: Column<T>[];
   className?: string;
 }
 
-export function ResponsiveTable({ data, columns, className }: ResponsiveTableProps) {
+export function ResponsiveTable<T = Record<string, unknown>>({ data, columns, className }: ResponsiveTableProps<T>) {
   return (
     <div className={cn('w-full overflow-hidden', className)}>
       {/* Desktop view */}

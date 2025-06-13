@@ -26,7 +26,7 @@ interface AIBrandContext {
     keywords?: string[] | null;
 }
 
-export const POST = withAuth(async (request: NextRequest, user) => {
+export const POST = withAuth(async (request: NextRequest) => {
   try {
     const body: TitleGenerationRequest = await request.json();
 
@@ -99,14 +99,14 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       detection_source: body.brand_id ? 'brand_id' : (body.websiteUrlForBrandDetection && brandForContext ? 'url_detection' : 'none')
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in generate-title API:', error);
     let errorMessage = 'Failed to generate content title';
     let statusCode = 500;
-    if (error.message?.includes('OpenAI') || error.message?.includes('Azure') || error.message?.includes('AI service') || (error as any).status === 429) {
+    if (error instanceof Error && (error.message?.includes('OpenAI') || error.message?.includes('Azure') || error.message?.includes('AI service')) || (error as { status?: number }).status === 429) {
       errorMessage = 'The AI service is currently busy or unavailable. Please try again later.';
       statusCode = 503;
-    } else {
+    } else if (error instanceof Error) {
         errorMessage = error.message || errorMessage;
     }
     return handleApiError(new Error(errorMessage), 'Failed to generate content title', statusCode);

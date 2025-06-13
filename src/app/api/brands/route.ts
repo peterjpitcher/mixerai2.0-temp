@@ -1,11 +1,11 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
+import { handleApiError, isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { Pool } from 'pg'; // Import Pool for direct DB access
 import { getUserAuthByEmail, inviteNewUserWithAppMetadata } from '@/lib/auth/user-management';
-import { User } from '@supabase/supabase-js';
 import { extractCleanDomain } from '@/lib/utils/url-utils'; // Added import
+import { User } from '@supabase/supabase-js';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -52,13 +52,13 @@ interface BrandFromSupabase {
   tone_of_voice?: string | null;
   brand_summary?: string | null;
   brand_color?: string | null;
-  approved_content_types?: any; 
+  approved_content_types?: unknown; 
   created_at: string | null;
   updated_at: string | null;
   content_count?: { count: number }[] | null; 
   // Updated to use SupabaseVettingAgency for the raw data
   selected_vetting_agencies?: { agency_id: string; content_vetting_agencies: SupabaseVettingAgency | null }[] | null; 
-  [key: string]: any; 
+  [key: string]: unknown; 
 }
 
 // Helper function to map Supabase priority strings to numbers
@@ -81,12 +81,12 @@ interface FormattedBrand {
   tone_of_voice?: string | null;
   brand_summary?: string | null;
   brand_color?: string | null;
-  approved_content_types?: any;
+  approved_content_types?: unknown;
   created_at?: string | null;
   updated_at?: string | null;
   content_count: number;
   selected_vetting_agencies: VettingAgency[]; // Uses VettingAgency with numeric priority
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // Sample fallback data for when DB connection fails
@@ -240,7 +240,7 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       success: true, 
       data: formattedBrands 
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     // console.error('Error fetching brands:', error);
     return handleApiError(error, 'Error fetching brands');
   }
@@ -284,7 +284,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
           if (Array.isArray(guardrailsArray)) {
             formattedGuardrails = guardrailsArray.map((item:string) => `- ${item}`).join('\\n');
           }
-        } catch (e) { /* ignore */ }
+        } catch { /* ignore */ }
       }
     }
 
@@ -346,7 +346,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
     if (body.master_claim_brand_id) {
       const { error: updateMasterClaimError } = await supabase
         .from('brands')
-        .update({ master_claim_brand_id: body.master_claim_brand_id } as any)
+        .update({ master_claim_brand_id: body.master_claim_brand_id } as Record<string, unknown>)
         .eq('id', newBrandId);
       
       if (updateMasterClaimError) {
@@ -500,8 +500,9 @@ export const POST = withAuth(async (req: NextRequest, user) => {
     }
 
     const finalSelectedVettingAgencies: VettingAgency[] = (finalSelectedSupabaseAgencies || [])
-      .map((item: any) => {
-        const sa = item.content_vetting_agencies;
+      .map((item: unknown) => {
+        const itemTyped = item as { content_vetting_agencies?: SupabaseVettingAgency | null };
+        const sa = itemTyped.content_vetting_agencies;
         if (!sa) return null;
         return {
           id: sa.id,

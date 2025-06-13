@@ -79,7 +79,7 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
   const supabaseAdmin = createSupabaseAdminClient();
   let historyEntryStatus: 'success' | 'failure' = 'success';
   let historyErrorMessage: string | undefined = undefined;
-  const requestStartTime = Date.now(); // For logging overall request time if needed
+  // const requestStartTime = Date.now(); // For logging overall request time if needed
   let apiInputs: AltTextGenerationRequest | null = null;
   let apiOutputs: { results: AltTextResultItem[] } | null = null;
 
@@ -147,7 +147,7 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
     const results: AltTextResultItem[] = [];
 
     for (const imageUrl of data.imageUrls) {
-      let requestedLanguage = data.language; // Get language from request if provided
+      const requestedLanguage = data.language; // Get language from request if provided
       let language = 'en';
       let country = 'US';
       let processingError: string | undefined = undefined;
@@ -176,7 +176,7 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
           country = defaultLangCountry.country;
         }
 
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error(`[AltTextGen] Invalid image URL format for TLD processing: ${imageUrl}:`, e);
         processingError = `Invalid image URL format.`;
         const defaultLangCountry = getDefaultLangCountry();
@@ -210,7 +210,6 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
         const generatedAltTextResult = await generateAltText(
           imageUrl,
           language,
-          country,
           brandContext
         );
         
@@ -220,11 +219,11 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
           // error: generatedAltTextResult.error, // If your generateAltText can return partial errors
         });
 
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error(`[AltTextGen] Error calling generateAltText for ${imageUrl} (lang: ${language}, country: ${country}):`, error);
         results.push({
           imageUrl,
-          error: error.message || 'Failed to generate alt text for this image.',
+          error: error instanceof Error ? error.message : 'Failed to generate alt text for this image.',
         });
         historyEntryStatus = 'failure'; // Mark overall run as failure if any image fails
         if (!historyErrorMessage) historyErrorMessage = 'One or more images failed AI generation.'; 
@@ -249,10 +248,10 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       ...(historyEntryStatus === 'failure' && historyErrorMessage && { error: historyErrorMessage })
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[AltTextGen] Global error in POST handler:', error);
     historyEntryStatus = 'failure';
-    historyErrorMessage = error.message || 'An unexpected error occurred.';
+    historyErrorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
     // Ensure apiInputs is at least an empty object if error happened before parsing request body
     if (!apiInputs) apiInputs = {imageUrls: [], language: 'unknown'}; 
     apiOutputs = { results: [{ imageUrl: 'unknown', error: historyErrorMessage }] };

@@ -43,14 +43,13 @@ const initialFormState: FeedbackFormState = {
 };
 
 interface FeedbackSubmitFormProps {
-  supabase: SupabaseClient<any, "public", any>;
+  supabase: SupabaseClient;
   currentUser: User | null; // Or a more specific user session type if available
   onFeedbackSubmitted?: () => void; // Callback for parent component
   cardMode?: boolean; // Optional: if true, wraps form in a Card
 }
 
 export function FeedbackSubmitForm({ 
-    supabase, 
     currentUser, 
     onFeedbackSubmitted, 
     cardMode = true 

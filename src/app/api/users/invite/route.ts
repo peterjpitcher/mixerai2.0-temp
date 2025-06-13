@@ -91,7 +91,7 @@ export const POST = withAdminAuth(async (request: NextRequest, adminUser) => {
       // inviteNewUserWithAppMetadata handles internal errors, but we check its return
       
       // Check for our custom rate limit error
-      if (inviteError && (inviteError as any).status === 429) {
+      if (inviteError && inviteError.message && inviteError.message.includes('rate limit')) {
         return NextResponse.json(
           { success: false, error: inviteError.message || 'Rate limit exceeded. Please try again shortly.' },
           { status: 429 }
@@ -114,7 +114,7 @@ export const POST = withAdminAuth(async (request: NextRequest, adminUser) => {
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API /api/users/invite] Unhandled error in POST handler:', error);
     return handleApiError(error, 'Failed to process user invitation');
   }

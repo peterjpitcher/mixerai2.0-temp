@@ -15,15 +15,10 @@ interface Product {
     updated_at?: string;
 }
 
-interface RequestContext {
-    params: {
-        productId: string;
-    };
-}
-
 // GET handler for a single product by ID
-export const GET = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
-    const { productId } = context.params;
+export const GET = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+    const { params } = context as { params: { productId: string } };
+    const { productId } = params;
     if (!productId) {
         return NextResponse.json({ success: false, error: 'Product ID is required.' }, { status: 400 });
     }
@@ -31,7 +26,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
 
     try {
         const supabase = createSupabaseAdminClient();
-        // @ts-ignore
+
         const { data, error } = await supabase.from('products')
             .select('*')
             .eq('id', productId)
@@ -49,7 +44,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
             return NextResponse.json({ success: false, error: 'Product not found.' }, { status: 404 });
         }
         
-        const singleDataObject = data as any;
+        const singleDataObject = data as Product;
         const validatedData: Product = {
             id: singleDataObject.id,
             name: singleDataObject.name,
@@ -61,15 +56,16 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
 
         return NextResponse.json({ success: true, data: validatedData });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`[API Products GET /${productId}] Catched error:`, error);
         return handleApiError(error, 'An unexpected error occurred while fetching the product.');
     }
 });
 
 // PUT handler for updating a product by ID
-export const PUT = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
-    const { productId } = context.params;
+export const PUT = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+    const { params } = context as { params: { productId: string } };
+    const { productId } = params;
     if (!productId) {
         return NextResponse.json({ success: false, error: 'Product ID is required for update.' }, { status: 400 });
     }
@@ -101,7 +97,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
 
         if (!hasPermission) {
             // Fetch the product to get its master_brand_id for permission checking
-            // @ts-ignore
+
             const { data: productData, error: productFetchError } = await supabase
                 .from('products')
                 .select('master_brand_id')
@@ -121,7 +117,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
                 // hasPermission remains false.
             } else {
                 // Product found and has a master_brand_id, proceed to check MCB link
-                // @ts-ignore
+
                 const { data: mcbData, error: mcbError } = await supabase
                     .from('master_claim_brands')
                     .select('mixerai_brand_id')
@@ -139,7 +135,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
                     // hasPermission remains false.
                 } else {
                     // MCB found and linked to mixerai_brand_id, check user_brand_permissions
-                    // @ts-ignore
+
                     const { data: permissionsData, error: permissionsError } = await supabase
                         .from('user_brand_permissions')
                         .select('role')
@@ -176,7 +172,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
             updateData.description = description === null ? null : description?.trim();
         }
 
-        // @ts-ignore
+
         const { data, error } = await supabase.from('products')
             .update(updateData)
             .eq('id', productId)
@@ -189,7 +185,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
             // This requires fetching the product first to get its master_brand_id if name is changing.
             // For simplicity, if a unique error occurs, we give a general message.
             // A more specific check would involve first fetching the product to see if name is being changed to one that conflicts within its existing brand.
-            if ((error as any).code === '23505') { 
+            if ((error as {code?: string}).code === '23505') { 
                 return NextResponse.json(
                    { success: false, error: 'A product with this name may already exist for the associated brand.' },
                    { status: 409 } // Conflict
@@ -202,7 +198,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
             return NextResponse.json({ success: false, error: 'Product not found or update failed.' }, { status: 404 });
         }
 
-        const singleDataObject = data as any;
+        const singleDataObject = data as Product;
         const validatedData: Product = {
             id: singleDataObject.id,
             name: singleDataObject.name,
@@ -214,9 +210,9 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
 
         return NextResponse.json({ success: true, data: validatedData });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`[API Products PUT /${productId}] Catched error:`, error);
-        if (error.name === 'SyntaxError') { // JSON parsing error
+        if (error instanceof Error && error.name === 'SyntaxError') { // JSON parsing error
             return NextResponse.json({ success: false, error: 'Invalid JSON payload.' }, { status: 400 });
         }
         return handleApiError(error, 'An unexpected error occurred while updating the product.');
@@ -224,8 +220,9 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
 });
 
 // DELETE handler for a product by ID
-export const DELETE = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
-    const { productId } = context.params;
+export const DELETE = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+    const { params } = context as { params: { productId: string } };
+    const { productId } = params;
     if (!productId) {
         return NextResponse.json({ success: false, error: 'Product ID is required for deletion.' }, { status: 400 });
     }
@@ -236,10 +233,9 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
         let hasPermission = user?.user_metadata?.role === 'admin';
 
         if (!hasPermission) {
-            // @ts-ignore
+
             const { data: productData, error: productFetchError } = await supabase
                 .from('products')
-                // @ts-ignore
                 .select('master_brand_id') 
                 .eq('id', productId) 
                 .single();
@@ -257,7 +253,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
                 console.warn(`[API Products DELETE /${productId}] Product ${productId} is missing master_brand_id, cannot verify non-admin permission.`); 
                  // hasPermission remains false
             } else {
-                // @ts-ignore
+
                 const { data: mcbData, error: mcbError } = await supabase 
                     .from('master_claim_brands') 
                     .select('mixerai_brand_id')
@@ -271,7 +267,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
                 } else if (!mcbData.mixerai_brand_id) {
                     console.warn(`[API Products DELETE /${productId}] MCB (ID: ${productData.master_brand_id}) is not linked to a mixerai_brand_id. Cannot verify non-admin permission.`); 
                 } else {
-                    // @ts-ignore
+
                     const { data: permissionsData, error: permissionsError } = await supabase
                         .from('user_brand_permissions')
                         .select('role')
@@ -297,7 +293,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
             );
         }
 
-        // @ts-ignore
+
         const { error, count } = await supabase.from('products')
             .delete({ count: 'exact' })
             .eq('id', productId); 
@@ -313,7 +309,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
 
         return NextResponse.json({ success: true, message: 'Product deleted successfully.' });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`[API Products DELETE /${productId}] Catched error:`, error);
         return handleApiError(error, 'An unexpected error occurred while deleting the product.');
     }

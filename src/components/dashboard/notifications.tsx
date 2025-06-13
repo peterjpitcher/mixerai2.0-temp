@@ -3,12 +3,12 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Bell, X, CheckCheck, Clock, AlertCircle } from 'lucide-react';
-import { Button } from '@/components/button';
-import { Card, CardContent } from '@/components/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/dialog';
-import { ScrollArea } from '@/components/scroll-area';
-import { Badge } from '@/components/badge';
+import { Bell, CheckCheck, Clock, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 interface Notification {

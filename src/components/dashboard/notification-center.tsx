@@ -1,14 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { NotificationsButton } from '@/components/dashboard/notifications';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/card';
-import { Button } from '@/components/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Bell, Settings, Clock } from 'lucide-react';
-import { Switch } from '@/components/switch';
-import { Label } from '@/components/label';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 interface NotificationSetting {
   id: string;

@@ -1,5 +1,14 @@
 import { NextResponse } from 'next/server';
 
+interface GitHubRepo {
+  name: string;
+  full_name: string;
+  private: boolean;
+  has_issues: boolean;
+  open_issues_count: number;
+  updated_at: string;
+}
+
 export async function GET() {
   const token = process.env.GITHUB_TOKEN;
   const owner = process.env.GITHUB_OWNER;
@@ -43,7 +52,7 @@ export async function GET() {
         tokenUser,
         owner: owner || tokenUser,
         count: repos.length,
-        repositories: repos.map((repo: any) => ({
+        repositories: repos.map((repo: GitHubRepo) => ({
           name: repo.name,
           full_name: repo.full_name,
           private: repo.private,

@@ -1,14 +1,17 @@
 // Import the uuid package for generating unique workflow invitation tokens
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { v4 as uuidv4 } from 'uuid';
+// import { v4 as uuidv4 } from 'uuid';
 import { handleApiError } from '@/lib/api-utils'; // Added for using in catch blocks
-import { verifyEmailTemplates } from '@/lib/auth/email-templates'; // Added for sending invites
+// import { verifyEmailTemplates } from '@/lib/auth/email-templates'; // Added for sending invites
 import { withAuth } from '@/lib/auth/api-auth'; // Import withAuth
+import type { User } from '@supabase/supabase-js';
+import type { Json } from '@/types/supabase';
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
 
 // Define types for the workflow invitation
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface WorkflowInvitation {
   workflow_id: string;
   step_id: number;
@@ -41,9 +44,10 @@ interface WorkflowStep {
  */
 export const GET = withAuth(async (
   request: NextRequest,
-  user: any, // The authenticated user object from withAuth
-  { params }: { params: { id: string } }
+  user: User,
+  context?: unknown
 ) => {
+  const { params } = context as { params: { id: string } };
   try {
     const supabase = createSupabaseAdminClient();
     const workflowId = params.id;
@@ -111,7 +115,7 @@ export const GET = withAuth(async (
       throw stepsError; 
     }
 
-    let processedSteps: any[] = [];
+    let processedSteps: WorkflowStep[] = [];
     if (dbSteps && dbSteps.length > 0) {
       const allUserIds = new Set<string>();
       dbSteps.forEach(step => {
@@ -122,7 +126,7 @@ export const GET = withAuth(async (
         }
       });
 
-      let userProfilesMap = new Map<string, { id: string; email: string | null; full_name: string | null }>();
+      const userProfilesMap = new Map<string, { id: string; email: string | null; full_name: string | null }>();
       if (allUserIds.size > 0) {
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
@@ -151,15 +155,12 @@ export const GET = withAuth(async (
           }).filter(assignee => assignee !== null) as WorkflowAssignee[]; // Filter out any nulls from skipped user IDs
         }
         return {
-          id: step.id, // This is workflow_steps.id (the step's own UUID)
+          id: typeof step.id === 'string' ? parseInt(step.id, 10) : step.id, // Convert string id to number
           name: step.name,
-          description: step.description,
-          role: step.role,
-          approvalRequired: step.approval_required,
-          assignees: currentStepAssignees,
-          step_order: step.step_order 
-          // The frontend step object might not use step_order directly if relying on array index,
-          // but good to have it if backend mutations need it.
+          description: step.description || '', // Provide empty string if null
+          role: step.role || '', // Provide empty string if null
+          approvalRequired: step.approval_required ?? undefined, // Convert null to undefined
+          assignees: currentStepAssignees
         };
       });
     }
@@ -167,18 +168,18 @@ export const GET = withAuth(async (
     const formattedWorkflow = {
       id: workflowData.id,
       name: workflowData.name,
-      description: (workflowData as any).description || null, // Cast to any for these potentially untyped fields
+      description: (workflowData as Record<string, unknown>).description || null, // Cast to Record for these potentially untyped fields
       brand_id: workflowData.brand_id,
       brand_name: workflowData.brands?.name || null,
       brand_color: workflowData.brands?.brand_color || null,
-      template_id: (workflowData as any).template_id || null, 
-      status: (workflowData as any).status || null, 
+      template_id: (workflowData as Record<string, unknown>).template_id || null, 
+      status: (workflowData as Record<string, unknown>).status || null, 
       steps: processedSteps, 
       steps_count: processedSteps.length,
       template_name: workflowData.content_templates?.name || null,
       created_at: workflowData.created_at,
       updated_at: workflowData.updated_at,
-      created_by: (workflowData as any).created_by || null 
+      created_by: (workflowData as Record<string, unknown>).created_by || null 
     };
 
     return NextResponse.json({ 
@@ -195,9 +196,10 @@ export const GET = withAuth(async (
  */
 export const PUT = withAuth(async (
   request: NextRequest,
-  user: any, // The authenticated user object from withAuth
-  { params }: { params: { id: string } }
+  user: User, // The authenticated user object from withAuth
+  context?: unknown
 ) => {
+  const { params } = context as { params: { id: string } };
   try {
     const supabase = createSupabaseAdminClient();
     const workflowId = params.id;
@@ -271,8 +273,8 @@ export const PUT = withAuth(async (
           console.warn('Could not fetch current workflow data for AI description regeneration:', fetchError.message);
         } else if (currentWorkflowData) {
           const wfName = body.name || currentWorkflowData.name;
-          const brandIdForDesc = body.brand_id || currentWorkflowData.brand_id;
-          const templateIdForDesc = body.template_id !== undefined ? body.template_id : currentWorkflowData.template_id;
+          // const brandIdForDesc = body.brand_id || currentWorkflowData.brand_id;
+          // const templateIdForDesc = body.template_id !== undefined ? body.template_id : currentWorkflowData.template_id;
           const stepsForDesc = body.steps || currentWorkflowData.steps || [];
 
           let brandNameForDesc = currentWorkflowData.brands?.name;
@@ -291,7 +293,7 @@ export const PUT = withAuth(async (
              }
           }
 
-          const stepNamesForDesc = (Array.isArray(stepsForDesc) ? stepsForDesc.map((step: any) => step.name) : []).filter(Boolean);
+          const stepNamesForDesc = (Array.isArray(stepsForDesc) ? stepsForDesc.map((step: Record<string, unknown>) => step.name) : []).filter(Boolean);
           
           const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
           const aiDescriptionResponse = await fetch(`${baseUrl}/api/ai/generate-workflow-description`, {
@@ -328,7 +330,7 @@ export const PUT = withAuth(async (
     }
     
     const stepsFromClient = body.steps || [];
-    const processedStepsForRpc: any[] = [];
+    const processedStepsForRpc: Record<string, unknown>[] = [];
     
     // Ensure step_order is present, using array index as a fallback
     for (let i = 0; i < stepsFromClient.length; i++) {
@@ -386,12 +388,12 @@ export const PUT = withAuth(async (
 
     const paramsToPass = {
       p_workflow_id: workflowId,
-      p_name: body.name,
-      p_brand_id: body.brand_id,
-      p_steps: processedStepsForRpc, // Use the processed steps with resolved assignee IDs
-      p_template_id: body.template_id !== undefined ? body.template_id : null, 
-      p_description: body.description ?? workflowDescriptionToUpdate ?? null,
-      p_new_invitation_items: newInvitationItemsForRpc // This will be null
+      p_name: String(body.name || ''),
+      p_brand_id: String(body.brand_id || ''),
+      p_steps: processedStepsForRpc as Json, // Cast to Json type
+      p_template_id: body.template_id ? String(body.template_id) : '',
+      p_description: String(body.description ?? workflowDescriptionToUpdate ?? ''),
+      p_new_invitation_items: newInvitationItemsForRpc as Json // Cast to Json type
     };
 
     console.log('Calling RPC update_workflow_and_handle_invites with params:', JSON.stringify(paramsToPass, null, 2));
@@ -443,7 +445,7 @@ export const PUT = withAuth(async (
       workflow: finalWorkflowData 
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     // General error catching for unexpected issues before or after RPC
     console.error('General error in PUT /api/workflows/[id]:', error);
     return handleApiError(error, 'Error updating workflow');
@@ -454,10 +456,11 @@ export const PUT = withAuth(async (
  * DELETE endpoint to remove a specific workflow
  */
 export const DELETE = withAuth(async (
-  request: NextRequest,
-  user: any, // The authenticated user object from withAuth
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  user: User, // The authenticated user object from withAuth
+  context?: unknown
 ) => {
+  const { params } = context as { params: { id: string } };
   try {
     const supabase = createSupabaseAdminClient();
     const workflowId = params.id;

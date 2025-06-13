@@ -12,14 +12,14 @@ interface InviteMetadata {
   stepIdForAssignment: number | string | null;
 }
 
-function parseInviteMetadata(appMetadata: any): InviteMetadata {
+function parseInviteMetadata(appMetadata: Record<string, unknown>): InviteMetadata {
   const metadata = appMetadata || {};
   // Logic to determine source, role, brandId, workflowId, stepId
   if (metadata.invite_type === 'direct_user_invite' && metadata.intended_role) {
     return {
       source: 'direct_admin',
       intendedRole: metadata.intended_role as UserRoles,
-      brandIdForPermission: metadata.invited_to_brand_id || null,
+      brandIdForPermission: (metadata.invited_to_brand_id as string) || null,
       workflowIdForContext: null,
       stepIdForAssignment: null,
     };
@@ -27,7 +27,7 @@ function parseInviteMetadata(appMetadata: any): InviteMetadata {
     return {
       source: 'brand_assignment',
       intendedRole: metadata.intended_role as UserRoles,
-      brandIdForPermission: metadata.assigned_as_brand_admin_for_brand_id,
+      brandIdForPermission: metadata.assigned_as_brand_admin_for_brand_id as string,
       workflowIdForContext: null,
       stepIdForAssignment: null,
     };
@@ -35,23 +35,14 @@ function parseInviteMetadata(appMetadata: any): InviteMetadata {
     return {
       source: 'workflow_assignment',
       intendedRole: metadata.role as UserRoles,
-      brandIdForPermission: metadata.invited_to_brand_id || null, // Assuming brand context is available
-      workflowIdForContext: metadata.invited_from_workflow,
-      stepIdForAssignment: metadata.step_id_for_assignment || null,
+      brandIdForPermission: (metadata.invited_to_brand_id as string) || null, // Assuming brand context is available
+      workflowIdForContext: metadata.invited_from_workflow as string,
+      stepIdForAssignment: (metadata.step_id_for_assignment as string | number) || null,
     };
   }
   return { source: 'unknown', intendedRole: null, brandIdForPermission: null, workflowIdForContext: null, stepIdForAssignment: null };
 }
 
-async function assignSuperadminRole(userId: string, existingUserMetadata: any, supabase: SupabaseClient<Database>) {
-  console.log(`[InviteService] Assigning Superadmin role to user ${userId}`);
-  const { error } = await supabase.auth.admin.updateUserById(
-    userId,
-    { user_metadata: { ...existingUserMetadata, role: 'admin' } }
-  );
-  if (error) throw new Error(`DB_SUPERADMIN_ROLE_FAIL: ${error.message}`);
-  console.log(`[InviteService] Successfully set user_metadata.role = 'admin' for Superadmin ${userId}`);
-}
 
 async function assignBrandPermissions(userId: string, brandId: string, role: UserRoles, supabase: SupabaseClient<Database>) {
   console.log(`[InviteService] Assigning role '${role}' to user ${userId} for brand ${brandId}`);
@@ -100,7 +91,7 @@ async function finalizeWorkflowUser(
   }
 }
 
-async function cleanupAppMetadata(userId: string, appMetadata: any, supabase: SupabaseClient<Database>) {
+async function cleanupAppMetadata(userId: string, appMetadata: Record<string, unknown>, supabase: SupabaseClient<Database>) {
     const metadataToClear: Record<string, undefined> = {
         intended_role: undefined, invited_to_brand_id: undefined, invite_type: undefined,
         assigned_as_brand_admin_for_brand_id: undefined, invited_from_workflow: undefined, role: undefined,
@@ -120,9 +111,9 @@ async function cleanupAppMetadata(userId: string, appMetadata: any, supabase: Su
 
 // Main function to be called by the API route
 export async function processInviteCompletion(
-    user: any, // Supabase user object
+    user: { id: string; email?: string; app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown> },
     supabase: SupabaseClient<Database>
-): Promise<{ success: boolean; message: string; httpStatus?: number; data?: any }> {
+): Promise<{ success: boolean; message: string; httpStatus?: number; data?: Record<string, unknown> }> {
     const userId = user.id;
     const userEmail = user.email;
     const appMetadata = user.app_metadata || {};
@@ -192,12 +183,14 @@ export async function processInviteCompletion(
         await cleanupAppMetadata(userId, appMetadata, supabase);
         return { success: true, message: 'Invite process completed successfully. Permissions assigned.', httpStatus: 200 };
 
-    } catch (error: any) {
-        console.error(`[InviteService] Error processing invite for user ${userId}:`, error.message, error.stack);
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        console.error(`[InviteService] Error processing invite for user ${userId}:`, errorMessage, errorStack);
         // Do not cleanup metadata on error, as it might be needed for reprocessing or debugging
-        if (error.message?.startsWith('DB_')) {
-             return { success: false, message: `Database operation failed: ${error.message}`, httpStatus: 500 };
+        if (errorMessage.startsWith('DB_')) {
+             return { success: false, message: `Database operation failed: ${errorMessage}`, httpStatus: 500 };
         }
-        return { success: false, message: `Failed to complete invite process: ${error.message}`, httpStatus: 500 };
+        return { success: false, message: `Failed to complete invite process: ${errorMessage}`, httpStatus: 500 };
     }
 } 

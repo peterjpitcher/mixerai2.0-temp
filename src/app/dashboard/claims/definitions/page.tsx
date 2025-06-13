@@ -4,10 +4,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Heading } from '@/components/ui/heading';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import Link from 'next/link';
+// import Link from 'next/link';
 import { ClaimDefinitionForm, ClaimDefinitionData } from '@/components/dashboard/claims/ClaimDefinitionForm';
 import { toast } from 'sonner';
-import { Edit3, Trash2, PlusCircle } from 'lucide-react';
+import { Edit3, Trash2,  } from 'lucide-react';
 import { ALL_COUNTRIES_CODE, ALL_COUNTRIES_NAME } from "@/lib/constants/country-codes";
 
 interface Country {
@@ -28,6 +28,7 @@ export default function DefineClaimsPage() {
   const [claims, setClaims] = useState<ClaimEntry[]>([]);
   const [isFetchingClaims, setIsFetchingClaims] = useState(false);
   const [editingClaim, setEditingClaim] = useState<ClaimEntry | null>(null); // State for claim being edited
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [countries, setCountries] = useState<Country[]>([]);
   const [countryMap, setCountryMap] = useState<Record<string, string>>({});
   
@@ -43,17 +44,17 @@ export default function DefineClaimsPage() {
       }
       const result = await response.json();
       if (result.success && Array.isArray(result.data)) {
-        setClaims(result.data.map((claim: any) => ({
+        setClaims(result.data.map((claim: ClaimEntry) => ({
           ...claim,
           // Ensure country_codes is always an array, as ClaimDefinitionForm expects it
-          country_codes: Array.isArray(claim.country_codes) ? claim.country_codes : (claim.country_code ? [claim.country_code] : [])
+          country_codes: Array.isArray(claim.country_codes) ? claim.country_codes : []
         })));
       } else {
         setClaims([]);
         throw new Error(result.error || 'Unexpected data structure for claims');
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Could not fetch existing claims.');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Could not fetch existing claims.');
       setClaims([]);
     } finally {
       setIsFetchingClaims(false);
@@ -74,7 +75,8 @@ export default function DefineClaimsPage() {
       } else {
         toast.error('Could not load country list.');
       }
-    } catch (error) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_error) {
       toast.error('Failed to fetch countries.');
     }
   };
@@ -90,13 +92,13 @@ export default function DefineClaimsPage() {
     const url = isEditing ? `/api/claims/${editingClaim!.id}` : '/api/claims';
     const method = isEditing ? 'PUT' : 'POST';
 
-    let submissionData: any = { ...data };
+    let submissionData: Partial<ClaimDefinitionData> = { ...data };
     if (isEditing && editingClaim) {
       submissionData = {
         claim_text: data.claim_text,
         claim_type: data.claim_type,
         description: data.description,
-        country_code: data.country_codes[0] || (editingClaim.country_codes && editingClaim.country_codes.length > 0 ? editingClaim.country_codes[0] : undefined),
+        country_codes: data.country_codes,
       };
     }
 
@@ -117,9 +119,9 @@ export default function DefineClaimsPage() {
       toast.success(result.message || `Claim ${isEditing ? 'updated' : 'saved'} successfully!`);
       fetchClaims();
       setEditingClaim(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Submit Error:', error);
-      toast.error(error.message || `An error occurred while ${isEditing ? 'updating' : 'saving'} the claim.`);
+      toast.error(error instanceof Error ? error.message : `An error occurred while ${isEditing ? 'updating' : 'saving'} the claim.`);
     } finally {
       setIsLoading(false);
     }
@@ -149,8 +151,8 @@ export default function DefineClaimsPage() {
         }
         toast.success('Claim deleted successfully');
         fetchClaims();
-    } catch (error: any) {
-        toast.error(error.message || 'Failed to delete claim');
+    } catch (error: unknown) {
+        toast.error(error instanceof Error ? error.message : 'Failed to delete claim');
     } finally {
         setIsLoading(false);
     }

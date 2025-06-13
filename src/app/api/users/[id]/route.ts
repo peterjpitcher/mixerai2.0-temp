@@ -2,16 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withRouteAuth } from '@/lib/auth/route-handlers';
+import { User } from '@supabase/supabase-js';
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
 
-interface Params {
-  params: { id: string }
-}
-
 // GET a single user by ID
-export const GET = withRouteAuth(async (request: NextRequest, user: any, context: Params) => {
-  const { params } = context;
+export const GET = withRouteAuth(async (_request: NextRequest, user: User, context: Record<string, unknown>) => {
+  const { params } = context as { params: { id: string } };
   try {
     const supabase = createSupabaseAdminClient();
     const isViewingOwnProfile = user.id === params.id;
@@ -49,8 +46,8 @@ export const GET = withRouteAuth(async (request: NextRequest, user: any, context
 });
 
 // Update user
-export const PUT = withRouteAuth(async (request: NextRequest, user: any, context: Params) => {
-  const { params } = context;
+export const PUT = withRouteAuth(async (request: NextRequest, user: User, context: Record<string, unknown>) => {
+  const { params } = context as { params: { id: string } };
   try {
     const supabase = createSupabaseAdminClient();
     const body = await request.json();
@@ -99,8 +96,8 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: any, context
 });
 
 // Delete user
-export const DELETE = withRouteAuth(async (request: NextRequest, user: any, context: Params) => {
-  const { params } = context;
+export const DELETE = withRouteAuth(async (_request: NextRequest, user: User, context: Record<string, unknown>) => {
+  const { params } = context as { params: { id: string } };
   try {
     const supabase = createSupabaseAdminClient();
 

@@ -1,20 +1,19 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, X, PlusCircle, ArrowLeft, Trash2, AlertTriangle, Users, Link2, ExternalLink, Sparkles, Info } from 'lucide-react';
+import { Loader2, X, PlusCircle, ArrowLeft, AlertTriangle, Sparkles, Info } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
-import { Checkbox } from "@/components/checkbox";
-import { Badge } from "@/components/badge";
+import { Checkbox } from '@/components/ui/checkbox';
 import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -28,14 +27,6 @@ interface BrandEditPageProps {
   params: {
     id: string;
   };
-}
-
-interface UserSearchResult {
-  id: string;
-  full_name: string | null;
-  email: string | null;
-  avatar_url: string | null;
-  job_title?: string | null;
 }
 
 interface VettingAgency {
@@ -54,6 +45,7 @@ interface VettingAgencyFromAPI {
   priority: 'High' | 'Medium' | 'Low' | number | null;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface UserSessionData {
   id: string;
   email?: string;
@@ -111,14 +103,14 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   const router = useRouter();
   const { id } = params;
   
-  const [brand, setBrand] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [brand, setBrand] = useState<Record<string, unknown> | null>(null);
   const [isLoadingBrand, setIsLoadingBrand] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
 
-  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [isForbidden, setIsForbidden] = useState(false);
   
@@ -157,7 +149,6 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         if (!response.ok) throw new Error('Failed to fetch user session');
         const data = await response.json();
         if (data.success && data.user) {
-          setCurrentUser(data.user);
           const userRole = data.user.user_metadata?.role;
           let hasBrandAdminPermission = false;
           if (data.user.brand_permissions) {
@@ -171,13 +162,11 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
             toast.error("Access Denied", { description: "You do not have permission to edit this brand." });
           }
         } else {
-          setCurrentUser(null);
           setIsForbidden(true);
           toast.error('Your session could not be verified.');
         }
       } catch (err) {
         console.error('Error fetching current user:', err);
-        setCurrentUser(null);
         setIsForbidden(true);
         toast.error('Could not verify your permissions.');
       } finally {
@@ -228,7 +217,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
           tone_of_voice: data.brand.tone_of_voice || '',
           guardrails: data.brand.guardrails || '',
           content_vetting_agencies: Array.isArray(data.brand.selected_vetting_agencies) 
-                                      ? data.brand.selected_vetting_agencies.map((agency: any) => agency.id)
+                                      ? data.brand.selected_vetting_agencies.map((agency: unknown) => (agency as { id: string }).id)
                                       : [],
           master_claim_brand_id: data.brand.master_claim_brand_id || null,
         });
@@ -377,7 +366,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       const data = await response.json();
       if (data.success && data.data) {
         const generatedAgencies = Array.isArray(data.data.suggestedAgencies) 
-                                    ? data.data.suggestedAgencies.map((a: any) => a.id || a.name)
+                                    ? data.data.suggestedAgencies.map((a: { id?: string; name: string }) => a.id || a.name)
                                     : [];
         setFormData(prev => ({
           ...prev,
@@ -407,7 +396,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     }
     setIsSaving(true);
     try {
-      const payload: any = { 
+      const payload: Record<string, unknown> = { 
       ...formData,
         selected_agency_ids: formData.content_vetting_agencies,
       };
@@ -418,8 +407,9 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         }
       });
       if (payload.additional_website_urls && Array.isArray(payload.additional_website_urls)){
-        payload.additional_website_urls = payload.additional_website_urls.map((item: {id:string, value:string}) => item.value).filter(Boolean);
-        if(payload.additional_website_urls.length === 0) payload.additional_website_urls = null;
+        const urls = payload.additional_website_urls as Array<{id:string, value:string}>;
+        payload.additional_website_urls = urls.map((item) => item.value).filter(Boolean);
+        if((payload.additional_website_urls as string[]).length === 0) payload.additional_website_urls = null;
       }
       if (payload.master_claim_brand_id === 'NO_SELECTION') {
         payload.master_claim_brand_id = null;
@@ -442,34 +432,6 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       setIsSaving(false);
     }
   };
-
-  const ErrorDisplay = ({ message }: { message: string | null }) => (
-    message ? (
-      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-        <strong className="font-bold">Error: </strong>
-        <span className="block sm:inline">{message}</span>
-      </div>
-    ) : null
-  );
-
-  const NotFoundDisplay = () => (
-    <div className="text-center py-10">
-      <AlertTriangle className="mx-auto h-12 w-12 text-orange-400" />
-      <h2 className="mt-2 text-xl font-semibold">Brand Not Found</h2>
-      <p className="mt-1 text-gray-500">The brand you are looking for does not exist or could not be loaded.</p>
-      <Button onClick={() => router.push('/dashboard/brands')} className="mt-4">Go to Brands List</Button>
-    </div>
-  );
-
-  const ForbiddenDisplay = () => (
-    <div className="text-center py-10">
-      <AlertTriangle className="mx-auto h-12 w-12 text-red-500" />
-      <h2 className="mt-2 text-xl font-semibold">Access Denied</h2>
-      <p className="mt-1 text-gray-500">You do not have permission to edit this brand.</p>
-      <p className="mt-1 text-gray-500">Contact your administrator if you believe this is an error.</p>
-      <Button onClick={() => router.push('/dashboard/brands')} className="mt-4">Go to Brands List</Button>
-    </div>
-  );
 
   const countryName = COUNTRIES.find(c => c.value === formData.country)?.label || formData.country || 'Select country';
   const languageName = LANGUAGES.find(l => l.value === formData.language)?.label || formData.language || 'Select language';
@@ -717,11 +679,11 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                           </div>
                         );
                     })}
-                              {filteredAgenciesByIdentityTab.filter(a => !priorityOrder.includes(a.priority as any) && a.priority != null).length > 0 && (
+                              {filteredAgenciesByIdentityTab.filter(a => !priorityOrder.includes(a.priority as ('High' | 'Medium' | 'Low')) && a.priority != null).length > 0 && (
                                 <div key="other-priority" className="mt-3">
                                   <h4 className={cn("text-md font-semibold mb-2", getPriorityAgencyStyles(null))}>Other Priority</h4>
                                    <div className="space-y-2 pl-3 border-l-2 border-gray-200 dark:border-gray-700">
-                                    {filteredAgenciesByIdentityTab.filter(a => !priorityOrder.includes(a.priority as any) && a.priority != null).map(agency => (
+                                    {filteredAgenciesByIdentityTab.filter(a => !priorityOrder.includes(a.priority as ('High' | 'Medium' | 'Low')) && a.priority != null).map(agency => (
                                       <div key={`agency-checkbox-${agency.id}`} className="flex items-center space-x-2">
                                         <Checkbox id={`edit-agency-${agency.id}-other`} checked={formData.content_vetting_agencies.includes(agency.id)} onCheckedChange={(checked) => handleAgencyCheckboxChange(agency.id, !!checked)} />
                                         <Label htmlFor={`edit-agency-${agency.id}-other`} className={getPriorityAgencyStyles(agency.priority)}>{agency.name}</Label>

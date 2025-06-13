@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/card';
+import { Card, CardContent } from '@/components/ui/card';
 import DOMPurify from 'dompurify';
 
 interface MarkdownDisplayProps {

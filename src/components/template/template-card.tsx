@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/card';
-import { Button } from '@/components/button';
-import { Badge } from '@/components/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/dropdown-menu';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/alert-dialog';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 
 interface TemplateCardProps {
@@ -41,10 +41,11 @@ export function TemplateCard({ id, name, description, inputFieldCount, outputFie
       
       // Refresh the page
       window.location.reload();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error deleting template:', error);
       
-      toast(`Delete failed: ${error.message || 'Failed to delete template'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete template';
+      toast(`Delete failed: ${errorMessage}`);
     } finally {
       setIsDeleting(false);
       setIsDeleteDialogOpen(false);

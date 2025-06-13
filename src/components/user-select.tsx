@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Input } from './input';
-import { Button } from './button';
-import { PlusIcon, UserIcon, XIcon } from 'lucide-react';
+import Image from 'next/image';
+import { Input } from './ui/input';
+import { Button } from './ui/button';
+import { PlusIcon, UserIcon } from 'lucide-react';
 import { useDebounce } from '@/lib/hooks';
 
 interface User {
@@ -131,12 +132,13 @@ export function UserSelect({ onSelect, placeholder = "Search users or enter emai
                   className="w-full px-4 py-2 text-left hover:bg-accent flex items-center gap-3"
                   onClick={() => handleUserSelect(user)}
                 >
-                  <div className="h-8 w-8 rounded-full overflow-hidden bg-muted flex items-center justify-center">
+                  <div className="h-8 w-8 rounded-full overflow-hidden bg-muted flex items-center justify-center relative">
                     {user.avatar_url ? (
-                      <img
+                      <Image
                         src={user.avatar_url}
                         alt={user.full_name}
-                        className="h-full w-full object-cover"
+                        fill
+                        className="object-cover"
                       />
                     ) : (
                       <UserIcon className="h-4 w-4 text-muted-foreground" />

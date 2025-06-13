@@ -5,20 +5,24 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = "force-dynamic";
 
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
+import { handleApiError } from '@/lib/api-utils';
 import { v4 as uuidv4 } from 'uuid';
 import { withAuth } from '@/lib/auth/api-auth';
 import { verifyEmailTemplates } from '@/lib/auth/email-templates';
+import type { Json } from '@/types/supabase';
 
-// Define types for the workflow invitation
-interface WorkflowInvitation {
-  workflow_id: string;
-  step_id: number;
+// Define types for workflow steps and assignees
+interface WorkflowAssignee {
+  id?: string;
   email: string;
+  name?: string;
+}
+
+interface WorkflowStepData {
+  id?: number | string | null;
   role: string;
-  invite_token: string;
-  expires_at: string;
-  status?: string;
+  assignees: WorkflowAssignee[];
+  [key: string]: unknown;
 }
 
 // Fallback data function removed as per no-fallback policy
@@ -105,19 +109,26 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     
     if (error) throw error;
     
-    const formattedWorkflows = workflows.map((workflow: any) => ({
-      id: workflow.id,
-      name: workflow.name,
-      brand_id: workflow.brand_id,
-      brand_name: workflow.brands?.name || null,
-      brand_color: workflow.brands?.brand_color || null,
-      template_id: workflow.template_id,
-      template_name: workflow.content_templates?.name || null,
-      steps_count: workflow.workflow_steps && workflow.workflow_steps.length > 0 ? workflow.workflow_steps[0].count : 0,
-      content_count: workflow.content && workflow.content.length > 0 ? workflow.content[0].count : 0,
-      created_at: workflow.created_at,
-      updated_at: workflow.updated_at
-    }));
+    const formattedWorkflows = workflows.map((workflow: Record<string, unknown>) => {
+      const brands = workflow.brands as { name?: string; brand_color?: string } | undefined;
+      const content_templates = workflow.content_templates as { name?: string } | undefined;
+      const workflow_steps = workflow.workflow_steps as Array<{ count?: number }> | undefined;
+      const content = workflow.content as Array<{ count?: number }> | undefined;
+      
+      return {
+        id: workflow.id,
+        name: workflow.name,
+        brand_id: workflow.brand_id,
+        brand_name: brands?.name || null,
+        brand_color: brands?.brand_color || null,
+        template_id: workflow.template_id,
+        template_name: content_templates?.name || null,
+        steps_count: workflow_steps && workflow_steps.length > 0 ? workflow_steps[0].count : 0,
+        content_count: content && content.length > 0 ? content[0].count : 0,
+        created_at: workflow.created_at,
+        updated_at: workflow.updated_at
+      };
+    });
     
     return NextResponse.json({ 
       success: true, 
@@ -217,7 +228,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         templateNameForDesc = templateData?.name;
       }
       
-      const stepNamesForDesc = stepsForAIDescription.map((step: any) => step.name).filter(Boolean);
+      const stepNamesForDesc = stepsForAIDescription.map((step: Record<string, unknown>) => step.name).filter(Boolean);
 
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
       const aiDescriptionResponse = await fetch(`${baseUrl}/api/ai/generate-workflow-description`, {
@@ -258,13 +269,13 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     
     const rawSteps = body.steps || [];
     
-    const processedStepsForRPC: any[] = [];
+    const processedStepsForRPC: WorkflowStepData[] = [];
     const invitationItems: RpcInvitationItem[] = []; 
     const pendingInvites: string[] = [];
 
     for (const rawStep of rawSteps) {
         const stepRole = ['admin', 'editor', 'viewer'].includes(rawStep.role) ? rawStep.role : 'editor';
-        const processedAssigneesForStep: any[] = [];
+        const processedAssigneesForStep: WorkflowAssignee[] = [];
 
         let stepId = NaN;
         if (typeof rawStep.id === 'number') {
@@ -327,15 +338,15 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     }
     
     const rpcParams = {
-      p_name: body.name,
-      p_brand_id: body.brand_id,
-      p_steps_definition: processedStepsForRPC,
+      p_name: String(body.name),
+      p_brand_id: String(body.brand_id),
+      p_steps_definition: processedStepsForRPC as unknown as Json,
       p_created_by: user.id,
-      p_invitation_items: invitationItems
+      p_invitation_items: invitationItems as unknown as Json
     };
 
     const { data: newWorkflowId, error: rpcError } = await supabase.rpc(
-      'create_workflow_and_log_invitations' as any,
+      'create_workflow_and_log_invitations',
       rpcParams
     );
 
@@ -385,7 +396,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
             }
           }
           
-          const appMetadataPayload: Record<string, any> = {
+          const appMetadataPayload: Record<string, unknown> = {
             full_name: '',
             role: highestRole,
             invited_by: user.id,

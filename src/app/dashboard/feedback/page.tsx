@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button'; // Assuming shadcn/ui components are here
@@ -14,7 +14,7 @@ import type { Session, SupabaseClient, User as SupabaseUser } from '@supabase/su
 import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 import { FeedbackSubmitForm } from '@/components/feedback/FeedbackSubmitForm'; // Import the new form
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/dialog"; // Import Dialog components
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'; // Import Dialog components
 
 // Matches ENUMs in DB (copied from admin page for consistency)
 const feedbackTypes = ['bug', 'enhancement'] as const;
@@ -47,7 +47,7 @@ interface Filters {
 
 export default function ViewFeedbackPage() {
   const router = useRouter();
-  const [supabase, setSupabase] = useState<SupabaseClient<any, "public", any> | null>(null);
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   
@@ -90,18 +90,7 @@ export default function ViewFeedbackPage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!isLoadingUser && session) { // Fetch items once user is confirmed authenticated
-        fetchFeedbackItems(currentPage, filters);
-    }
-     if (!isLoadingUser && !session) {
-        toast.error('Access Denied: You are not authenticated to view this page.');
-        setIsLoadingItems(false); // Stop loading if user not authenticated
-        // router.push('/auth/login');
-    }
-  }, [session, isLoadingUser, currentPage, filters]);
-
-  const fetchFeedbackItems = async (page: number, currentFilters: Filters) => {
+  const fetchFeedbackItems = useCallback(async (page: number, currentFilters: Filters) => {
     if (!supabase) return;
     setIsLoadingItems(true);
     setError(null);
@@ -137,7 +126,18 @@ export default function ViewFeedbackPage() {
       toast.error(errorMessage);
     }
     setIsLoadingItems(false);
-  };
+  }, [supabase, itemsPerPage]);
+
+  useEffect(() => {
+    if (!isLoadingUser && session) { // Fetch items once user is confirmed authenticated
+        fetchFeedbackItems(currentPage, filters);
+    }
+     if (!isLoadingUser && !session) {
+        toast.error('Access Denied: You are not authenticated to view this page.');
+        setIsLoadingItems(false); // Stop loading if user not authenticated
+        // router.push('/auth/login');
+    }
+  }, [session, isLoadingUser, currentPage, filters, fetchFeedbackItems]);
 
   const handleFilterChange = (filterName: keyof Omit<Filters, 'searchTerm'>, value: string) => {
     setFilters(prev => ({ ...prev, [filterName]: value }));

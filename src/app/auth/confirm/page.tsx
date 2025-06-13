@@ -15,7 +15,7 @@ function ConfirmLogic() {
         return;
     }
     const code = searchParams.get('code');
-    const next = searchParams.get('next') ?? '/';
+    // const next = searchParams.get('next') ?? '/';
 
     if (code) {
       const supabase = createSupabaseClient();
@@ -50,7 +50,7 @@ function ConfirmLogic() {
         <Spinner className="h-8 w-8 text-primary" />
         <p className="text-xl text-foreground">Finalising security checks...</p>
       </div>
-      <p className="mt-4 text-sm text-muted-foreground">Please wait, we're confirming your request. Do not close this window.</p>
+      <p className="mt-4 text-sm text-muted-foreground">Please wait, we&apos;re confirming your request. Do not close this window.</p>
     </div>
   );
 }

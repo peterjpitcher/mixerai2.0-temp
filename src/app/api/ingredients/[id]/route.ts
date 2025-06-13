@@ -14,22 +14,18 @@ interface Ingredient {
     updated_at?: string;
 }
 
-interface RequestContext {
-    params: {
-        id: string;
-    };
-}
 
 // GET handler for a single ingredient by ID
-export const GET = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
-    const { id } = context.params;
+export const GET = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+    const { params } = context as { params: { id: string } };
+    const { id } = params;
     if (!id) {
         return NextResponse.json({ success: false, error: 'Ingredient ID is required.' }, { status: 400 });
     }
 
     try {
         const supabase = createSupabaseAdminClient();
-        // @ts-ignore
+
         const { data, error } = await supabase.from('ingredients')
             .select('*')
             .eq('id', id)
@@ -47,7 +43,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
             return NextResponse.json({ success: false, error: 'Ingredient not found.' }, { status: 404 });
         }
         
-        const singleDataObject = data as any;
+        const singleDataObject = data as Ingredient;
         const validatedData: Ingredient = {
             id: singleDataObject.id,
             name: singleDataObject.name,
@@ -58,15 +54,16 @@ export const GET = withAuth(async (req: NextRequest, user: User, context: Reques
 
         return NextResponse.json({ success: true, data: validatedData });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`[API Ingredients GET /${id}] Catched error:`, error);
         return handleApiError(error, 'An unexpected error occurred while fetching the ingredient.');
     }
 });
 
 // PUT handler for updating an ingredient by ID
-export const PUT = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
-    const { id } = context.params;
+export const PUT = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+    const { params } = context as { params: { id: string } };
+    const { id } = params;
     if (!id) {
         return NextResponse.json({ success: false, error: 'Ingredient ID is required for update.' }, { status: 400 });
     }
@@ -109,7 +106,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
             updateData.description = description === null ? null : description?.trim();
         }
 
-        // @ts-ignore
+
         const { data, error } = await supabase.from('ingredients')
             .update(updateData)
             .eq('id', id)
@@ -118,7 +115,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
 
         if (error) {
             console.error(`[API Ingredients PUT /${id}] Error updating ingredient:`, error);
-            if ((error as any).code === '23505') { // Unique violation for name
+            if ((error as { code?: string }).code === '23505') { // Unique violation for name
                 return NextResponse.json(
                    { success: false, error: 'An ingredient with this name already exists.' },
                    { status: 409 } // Conflict
@@ -131,7 +128,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
             return NextResponse.json({ success: false, error: 'Ingredient not found or update failed.' }, { status: 404 });
         }
 
-        const singleDataObject = data as any;
+        const singleDataObject = data as Ingredient;
         const validatedData: Ingredient = {
             id: singleDataObject.id,
             name: singleDataObject.name,
@@ -142,9 +139,9 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
 
         return NextResponse.json({ success: true, data: validatedData });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`[API Ingredients PUT /${id}] Catched error:`, error);
-        if (error.name === 'SyntaxError') { // JSON parsing error
+        if (error instanceof Error && error.name === 'SyntaxError') { // JSON parsing error
             return NextResponse.json({ success: false, error: 'Invalid JSON payload.' }, { status: 400 });
         }
         return handleApiError(error, 'An unexpected error occurred while updating the ingredient.');
@@ -152,8 +149,9 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Reques
 });
 
 // DELETE handler for an ingredient by ID
-export const DELETE = withAuth(async (req: NextRequest, user: User, context: RequestContext) => {
-    const { id } = context.params;
+export const DELETE = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+    const { params } = context as { params: { id: string } };
+    const { id } = params;
     if (!id) {
         return NextResponse.json({ success: false, error: 'Ingredient ID is required for deletion.' }, { status: 400 });
     }
@@ -170,7 +168,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
         }
         // --- Permission Check End ---
 
-        // @ts-ignore
+
         const { error, count } = await supabase.from('ingredients')
             .delete({ count: 'exact' })
             .eq('id', id);
@@ -186,7 +184,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context: Req
 
         return NextResponse.json({ success: true, message: 'Ingredient deleted successfully.' });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`[API Ingredients DELETE /${id}] Catched error:`, error);
         return handleApiError(error, 'An unexpected error occurred while deleting the ingredient.');
     }

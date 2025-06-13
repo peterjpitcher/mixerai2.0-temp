@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = "force-dynamic";
 
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { handleApiError, isBuildPhase, isDatabaseConnectionError } from '@/lib/api-utils';
+import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 
 // Define the shape of user profiles returned from Supabase
@@ -27,7 +27,7 @@ interface ProfileRecord {
 /**
  * GET endpoint to retrieve all users with profile information
  */
-export const GET = withAuth(async (req: NextRequest, user) => {
+export const GET = withAuth(async (_req: NextRequest, user) => {
   try {
     // Role check: Only Global Admins can list all users
     if (user.user_metadata?.role !== 'admin') {
@@ -106,7 +106,7 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       success: true, 
       data: mergedUsers 
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'Error fetching users');
   }
 }); 

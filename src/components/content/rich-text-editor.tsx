@@ -15,7 +15,7 @@ interface RichTextEditorProps {
   placeholder?: string;
   className?: string;
   editorClassName?: string;
-  modules?: Record<string, any>;
+  modules?: Record<string, unknown>;
   formats?: string[];
 }
 

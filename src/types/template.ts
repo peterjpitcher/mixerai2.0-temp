@@ -20,18 +20,18 @@ export type FieldType =
   | 'product-selector';
 
 export interface ShortTextOptions { minLength?: number; maxLength?: number; placeholder?: string; }
-export interface LongTextOptions { minWords?: number; maxWords?: number; placeholder?: string; }
-export interface RichTextOptions { placeholder?: string; }
-export interface SelectOptions { choices?: string[]; allowMultiple?: boolean; }
+export interface LongTextOptions { minWords?: number; maxWords?: number; placeholder?: string; rows?: number; maxLength?: number; }
+export interface RichTextOptions { placeholder?: string; allowImages?: boolean; toolbarOptions?: string[]; }
+export interface SelectOptions { choices?: Array<{ label: string; value: string }>; allowMultiple?: boolean; multiple?: boolean; }
 export interface NumberOptions { min?: number; max?: number; step?: number; placeholder?: string; }
-export interface DateOptions { disablePast?: boolean; disableFuture?: boolean; }
-export interface TagsOptions { maxTags?: number; placeholder?: string; }
-export interface UrlOptions { placeholder?: string; }
-export interface FileUploadOptions { maxSizeMB?: number; allowedTypes?: string[]; }
+export interface DateOptions { disablePast?: boolean; disableFuture?: boolean; format?: string; includeTime?: boolean; }
+export interface TagsOptions { maxTags?: number; placeholder?: string; suggestions?: string[]; }
+export interface UrlOptions { placeholder?: string; validateUrl?: boolean; }
+export interface FileUploadOptions { maxSizeMB?: number; allowedTypes?: string[]; acceptedTypes?: string; maxSize?: number; }
 export interface ProductSelectorOptions { allowMultiple?: boolean; }
 export interface PlainTextOutputOptions { maxLength?: number; }
-export interface HtmlOutputOptions {}
-export interface ImageOutputOptions {}
+export interface HtmlOutputOptions { maxLength?: number; sanitize?: boolean; }
+export interface ImageOutputOptions { format?: string; width?: number; height?: number; altText?: string; }
 
 interface BaseField {
   id: string;
@@ -39,6 +39,8 @@ interface BaseField {
   type: FieldType; // Use the full FieldType again
   required: boolean;
   aiPrompt?: string;
+  description?: string;
+  helpText?: string;
 }
 
 export type InputFieldOptionType =

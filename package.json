@@ -8,7 +8,10 @@
     "build": "NODE_OPTIONS=\"--max_old_space_size=4096\" next build",
     "start": "next start",
     "lint": "next lint",
-    "test:openai": "node scripts/verify-openai-integration.js"
+    "test:openai": "node scripts/verify-openai-integration.js",
+    "check": "next lint && tsc --noEmit",
+    "review": "node scripts/code-review.js",
+    "review:fix": "next lint --fix && npm run review"
   },
   "keywords": [
     "wrapper"

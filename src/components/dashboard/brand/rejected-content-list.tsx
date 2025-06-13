@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Button } from '@/components/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/card';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Eye, AlertCircle, Inbox } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -47,10 +47,11 @@ export default function RejectedContentList({ brandId }: RejectedContentListProp
         } else {
           throw new Error(data.error || 'Failed to process rejected content data.');
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching rejected content:', err);
-        setError(err.message || 'Failed to load rejected content.');
-        toast.error(err.message || 'Failed to load rejected content.');
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load rejected content.';
+        setError(errorMessage);
+        toast.error(errorMessage);
       } finally {
         setIsLoading(false);
       }

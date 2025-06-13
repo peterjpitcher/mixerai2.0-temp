@@ -1,6 +1,6 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function TermsPage() {
   return (
@@ -43,7 +43,7 @@ export default function TermsPage() {
           
           <h2>Limitation of Liability</h2>
           <p>
-            MixerAI 2.0 is provided "as is" without warranties of any kind. We shall not be liable for any
+            MixerAI 2.0 is provided &quot;as is&quot; without warranties of any kind. We shall not be liable for any
             direct, indirect, incidental, or consequential damages resulting from your use of our services.
           </p>
           

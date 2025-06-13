@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BrandIcon } from '@/components/brand-icon';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 import { FileText as ContentIcon, GitFork as WorkflowIcon, Users, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
@@ -12,7 +11,28 @@ import RejectedContentList from '@/components/dashboard/brand/rejected-content-l
 import { PageHeader } from '@/components/dashboard/page-header';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
-export function BrandDetailsClient({ brand, canEditBrand }: { brand: any, canEditBrand: boolean }) {
+interface Brand {
+  id: string;
+  name: string;
+  country?: string;
+  language?: string;
+  admins?: Array<{
+    id: string;
+    full_name?: string;
+    email?: string;
+  }>;
+  company?: string;
+  website_url?: string;
+  brand_color?: string;
+  master_claim_brand_name?: string;
+  contentCount: number;
+  workflowCount: number;
+  brand_identity?: string;
+  tone_of_voice?: string;
+  guardrails?: string;
+}
+
+export function BrandDetailsClient({ brand, canEditBrand }: { brand: Brand, canEditBrand: boolean }) {
   const router = useRouter();
   const countryName = COUNTRIES.find(c => c.value === brand.country)?.label || brand.country || 'Not specified';
   const languageName = LANGUAGES.find(l => l.value === brand.language)?.label || brand.language || 'Not specified';
@@ -77,7 +97,7 @@ export function BrandDetailsClient({ brand, canEditBrand }: { brand: any, canEdi
           <CardContent>
             {brandAdmins.length > 0 ? (
               <ul className="space-y-2">
-                {brandAdmins.map((admin: any) => (
+                {brandAdmins.map((admin) => (
                   <li key={admin.id} className="flex items-center justify-between p-3 border rounded-md bg-muted/30 hover:bg-muted/60">
                     <div><span className="font-medium">{admin.full_name || 'N/A'}</span><span className="text-sm text-muted-foreground ml-2">({admin.email || 'No email'})</span></div>
                     <Button variant="outline" size="sm" asChild><Link href={`/dashboard/users/${admin.id}/edit`}>View User <ExternalLink className="ml-1.5 h-3.5 w-3.5" /></Link></Button>
