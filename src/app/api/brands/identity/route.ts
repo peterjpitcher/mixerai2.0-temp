@@ -78,14 +78,15 @@ async function scrapeWebsiteContent(url: string): Promise<string> {
     });
     const htmlContent = response.data;
     
-    // Very basic HTML to text conversion
-    const textContent = htmlContent
-      .toString()
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
-      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
-      .replace(/<[^>]*>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    // Use sanitize-html for proper HTML sanitization and text extraction
+    const sanitizeHtml = require('sanitize-html');
+    const textContent = sanitizeHtml(htmlContent, {
+      allowedTags: [], // Remove all HTML tags
+      allowedAttributes: {},
+      textFilter: function(text) {
+        return text.replace(/\s+/g, ' ').trim();
+      }
+    });
     
     return textContent;
   } catch {

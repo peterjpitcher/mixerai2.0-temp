@@ -21,8 +21,21 @@ export function DomainVerification() {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL;
     
     // Check if the APP_URL is set to the production domain
-    if (!appUrl || !appUrl.includes(productionDomain)) {
+    if (!appUrl) {
       setShowWarning(true);
+      return;
+    }
+    
+    try {
+      const url = new URL(appUrl);
+      if (url.hostname !== productionDomain && !url.hostname.endsWith(`.${productionDomain}`)) {
+        setShowWarning(true);
+      }
+    } catch {
+      // If URL parsing fails, fall back to simple check
+      if (appUrl.indexOf(`//${productionDomain}`) === -1 && appUrl.indexOf(`//*.${productionDomain}`) === -1) {
+        setShowWarning(true);
+      }
     }
   }, []);
 
