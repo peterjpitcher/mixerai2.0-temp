@@ -3,6 +3,8 @@ import OpenAI from 'openai';
 import { COUNTRIES } from '@/lib/constants';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
+import axios from 'axios';
+import sanitizeHtml from 'sanitize-html';
 
 // In-memory rate limiting - consider a more robust solution for production
 const rateLimit = new Map<string, { count: number, timestamp: number }>();
@@ -70,8 +72,6 @@ function getLanguageName(languageCode: string): string {
 // Function to extract website content from a URL
 async function scrapeWebsiteContent(url: string): Promise<string> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const axios = require('axios');
     const response = await axios.get(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 compatible MixerAIContentScraper/1.0', 'Accept': 'text/html', 'Accept-Language': 'en-GB,en;q=0.5' },
       timeout: 8000 // 8 second timeout
@@ -79,11 +79,10 @@ async function scrapeWebsiteContent(url: string): Promise<string> {
     const htmlContent = response.data;
     
     // Use sanitize-html for proper HTML sanitization and text extraction
-    const sanitizeHtml = require('sanitize-html');
     const textContent = sanitizeHtml(htmlContent, {
       allowedTags: [], // Remove all HTML tags
       allowedAttributes: {},
-      textFilter: function(text) {
+      textFilter: function(text: string) {
         return text.replace(/\s+/g, ' ').trim();
       }
     });
