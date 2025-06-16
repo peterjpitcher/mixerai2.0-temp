@@ -44,6 +44,10 @@ interface Claim {
   description?: string | null;
   created_at?: string;
   updated_at?: string;
+  // Workflow fields
+  workflow_id?: string | null;
+  workflow_status?: string | null;
+  current_workflow_step?: string | null;
   // For display
   entity_name?: string;
   entity_icon?: JSX.Element;
@@ -282,6 +286,19 @@ export default function ClaimsPage() {
                   <Badge variant="outline" className="flex items-center w-fit text-xs">
                     <Globe className="mr-1 h-3 w-3" /> Country: {claim.country_code === '__GLOBAL__' ? 'Global' : claim.country_code}
                   </Badge>
+                  {claim.workflow_status && (
+                    <Badge 
+                      variant={
+                        claim.workflow_status === 'approved' ? 'default' :
+                        claim.workflow_status === 'rejected' ? 'destructive' :
+                        claim.workflow_status === 'pending_review' ? 'secondary' :
+                        'outline'
+                      } 
+                      className="flex items-center w-fit text-xs"
+                    >
+                      Status: {claim.workflow_status}
+                    </Badge>
+                  )}
                 </CardDescription>
               </CardHeader>
               {claim.description && (

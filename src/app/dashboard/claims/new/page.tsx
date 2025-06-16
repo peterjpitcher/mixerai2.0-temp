@@ -27,12 +27,14 @@ interface ClaimFormData {
   ingredient_id: string | null;
   country_code: string; // Single country code for now
   description: string | null;
+  workflow_id: string | null; // Added for workflow support
 }
 
 interface MasterClaimBrand { id: string; name: string; }
 interface Product { id: string; name: string; master_brand_id?: string; master_brand_name?: string; }
 interface Ingredient { id: string; name: string; }
 interface CountryOption { code: string; name: string; }
+interface Workflow { id: string; name: string; brand_id: string; brand_name?: string; }
 
 const initialFormData: ClaimFormData = {
   claim_text: "",
@@ -43,6 +45,7 @@ const initialFormData: ClaimFormData = {
   ingredient_id: null,
   country_code: "", // Default to empty, user must select
   description: null,
+  workflow_id: null, // Default to null - optional
 };
 
 export default function NewClaimPage() {
@@ -53,11 +56,13 @@ export default function NewClaimPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [availableCountries, setAvailableCountries] = useState<CountryOption[]>([]);
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
 
   const [isLoadingBrands, setIsLoadingBrands] = useState(false);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [isLoadingIngredients, setIsLoadingIngredients] = useState(false);
   const [isLoadingCountries, setIsLoadingCountries] = useState(true);
+  const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
   const [errors, setErrors] = useState<Partial<Record<keyof ClaimFormData, string>>>({});
@@ -69,12 +74,14 @@ export default function NewClaimPage() {
       setIsLoadingProducts(true);
       setIsLoadingIngredients(true);
       setIsLoadingCountries(true);
+      setIsLoadingWorkflows(true);
       try {
-        const [brandsRes, productsRes, ingredientsRes, countriesRes] = await Promise.allSettled([
+        const [brandsRes, productsRes, ingredientsRes, countriesRes, workflowsRes] = await Promise.allSettled([
           fetch('/api/master-claim-brands').then(res => res.json()),
           fetch('/api/products').then(res => res.json()),
           fetch('/api/ingredients').then(res => res.json()),
           fetch('/api/countries').then(res => res.json()),
+          fetch('/api/workflows').then(res => res.json()),
         ]);
 
         if (brandsRes.status === 'fulfilled' && brandsRes.value.success) setMasterBrands(brandsRes.value.data || []);
@@ -89,6 +96,9 @@ export default function NewClaimPage() {
         if (countriesRes.status === 'fulfilled' && countriesRes.value.success) setAvailableCountries(countriesRes.value.data || []);
         else console.error("Failed to load countries:", countriesRes.status === 'rejected' ? countriesRes.reason : countriesRes.value.error);
 
+        if (workflowsRes.status === 'fulfilled' && workflowsRes.value.success) setWorkflows(workflowsRes.value.data || []);
+        else console.error("Failed to load workflows:", workflowsRes.status === 'rejected' ? workflowsRes.reason : workflowsRes.value.error);
+
       } catch (error) {
         toast.error("Failed to load some selection data. Please refresh.");
         console.error("Error fetching entities for claim form:", error);
@@ -97,6 +107,7 @@ export default function NewClaimPage() {
         setIsLoadingProducts(false);
         setIsLoadingIngredients(false);
         setIsLoadingCountries(false);
+        setIsLoadingWorkflows(false);
       }
     }
     fetchEntitiesForSelect();
@@ -151,6 +162,7 @@ export default function NewClaimPage() {
       level: formData.level,
       country_codes: [formData.country_code], // API expects an array
       description: formData.description ? formData.description.trim() : null,
+      workflow_id: formData.workflow_id, // Add workflow support
     };
 
     if (formData.level === 'brand') payload.master_brand_id = formData.master_brand_id;
@@ -303,6 +315,25 @@ export default function NewClaimPage() {
             <div className="space-y-2">
               <Label htmlFor="description">Description (Optional)</Label>
               <Textarea id="description" name="description" value={formData.description || ''} onChange={handleInputChange} placeholder="Provide additional context or notes for this claim" rows={3}/>
+            </div>
+
+            {/* Workflow (Optional) */}
+            <div className="space-y-2">
+              <Label htmlFor="workflow_id">Approval Workflow (Optional)</Label>
+              <Select name="workflow_id" value={formData.workflow_id || ""} onValueChange={(value) => handleSelectChange('workflow_id', value)} disabled={isLoadingWorkflows}>
+                <SelectTrigger>
+                  <SelectValue placeholder={isLoadingWorkflows ? "Loading workflows..." : "Select workflow (optional)"} />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  <SelectItem value="">No workflow</SelectItem>
+                  {workflows.map(workflow => (
+                    <SelectItem key={workflow.id} value={workflow.id}>
+                      <span className="truncate">{workflow.name} {workflow.brand_name ? `(${workflow.brand_name})` : ""}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Choose a workflow if this claim requires approval before use.</p>
             </div>
 
           </CardContent>

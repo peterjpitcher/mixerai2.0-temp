@@ -33,6 +33,7 @@ const requestBodySchema = z.object({
   ingredient_id: z.string().uuid().optional().nullable(),
   product_ids: z.array(z.string().uuid()).optional().default([]),
   country_codes: z.array(z.string().min(2)).min(1, "At least one country/market must be selected."),
+  workflow_id: z.string().uuid().optional().nullable(), // Added for workflow support
 }).refine(data => {
   if (data.level === 'brand' && !data.master_brand_id) return false;
   if (data.level === 'product' && (!data.product_ids || data.product_ids.length === 0)) return false;
@@ -61,7 +62,7 @@ export const GET = withAuth(async (req: NextRequest) => {
 
         const supabase = createSupabaseAdminClient();
         
-        let selectStatement = '*,';
+        let selectStatement = '*, workflow_id, workflow_status, current_workflow_step,';
         if (includeMasterBrandName) selectStatement += 'master_claim_brands(name),';
         if (includeProductNames) selectStatement += 'products(name),';
         if (includeIngredientName) selectStatement += 'ingredients(name),';
@@ -145,7 +146,8 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
         master_brand_id,
         ingredient_id,
         product_ids,
-        country_codes 
+        country_codes,
+        workflow_id 
     } = parsedBody.data;
 
     // --- Permission Check Start ---
@@ -300,6 +302,25 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
                 return NextResponse.json({ success: false, error: 'One or more claims already exist with the same text, level, entity, country, and type.', details: error.message }, { status: 409 });
             }
             return NextResponse.json({ success: false, error: 'Failed to save claims to database.', details: error.message }, { status: 500 });
+        }
+
+        // If workflow_id is provided, assign workflow to each created claim
+        if (workflow_id && data && data.length > 0) {
+            console.log(`[API Claims POST] Assigning workflow ${workflow_id} to ${data.length} claim(s)`);
+            
+            for (const claim of data) {
+                const { data: workflowResult, error: workflowError } = await supabase.rpc('assign_workflow_to_claim', {
+                    p_claim_id: claim.id,
+                    p_workflow_id: workflow_id
+                });
+
+                if (workflowError) {
+                    console.error(`[API Claims POST] Error assigning workflow to claim ${claim.id}:`, workflowError);
+                    // Continue with other claims even if one fails
+                } else {
+                    console.log(`[API Claims POST] Workflow assigned to claim ${claim.id}:`, workflowResult);
+                }
+            }
         }
 
         return NextResponse.json({ success: true, message: `${data ? data.length : 0} claim(s) created successfully.`, claims: data });
