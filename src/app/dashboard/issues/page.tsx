@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { GitHubIssue, GitHubLabel } from '@/types/github';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, ExternalLink, MessageSquare, User, Search, AlertCircle, ChevronDown, ChevronRight, Tag } from 'lucide-react';
+import { ArrowLeft, ExternalLink, MessageSquare, User, Search, AlertCircle, ChevronDown, ChevronRight, Tag, AlertTriangle, MinusCircle, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -33,6 +33,7 @@ export default function IssuesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const stateFilter = 'open'; // Always show open issues only
   const [sortBy, setSortBy] = useState<'created' | 'updated' | 'comments'>('created');
+  const [selectedPriorities, setSelectedPriorities] = useState<Set<string>>(new Set());
 
   // Fetch labels to understand priority structure
   const fetchLabels = useCallback(async () => {
@@ -138,11 +139,27 @@ export default function IssuesPage() {
 
   // Filter and group issues
   const filteredAndGroupedIssues = () => {
-    const filtered = issues.filter(issue => 
+    let filtered = issues.filter(issue => 
       searchQuery === '' || 
       issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       issue.body?.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    // Apply priority filter if any priorities are selected
+    if (selectedPriorities.size > 0) {
+      filtered = filtered.filter(issue => {
+        // Find if issue has any of the selected priority labels
+        const issuePriority = issue.labels.find(label => 
+          priorityLabels.some(p => p.name === label.name)
+        );
+        
+        if (!issuePriority && selectedPriorities.has('none')) {
+          return true; // Include issues with no priority if 'none' is selected
+        }
+        
+        return issuePriority && selectedPriorities.has(issuePriority.name);
+      });
+    }
 
     // Group by priority
     const grouped = filtered.reduce((acc, issue) => {
@@ -184,6 +201,39 @@ export default function IssuesPage() {
 
   const getStateColor = (state: string) => {
     return state === 'open' ? 'bg-green-500' : 'bg-purple-500';
+  };
+
+  const getPriorityConfig = (priorityInfo: PriorityLabel | undefined) => {
+    if (!priorityInfo) return null;
+    
+    const configs = {
+      1: { // Critical/P0
+        borderColor: '#DC2626',
+        bgColor: '#DC262610',
+        icon: AlertCircle,
+        iconColor: '#DC2626'
+      },
+      2: { // High/P1
+        borderColor: '#C2410C', // Darkened for better contrast
+        bgColor: '#EA580C10',
+        icon: AlertTriangle,
+        iconColor: '#C2410C'
+      },
+      3: { // Medium/P2
+        borderColor: '#A16207', // Darkened for better contrast
+        bgColor: '#CA8A0410',
+        icon: MinusCircle,
+        iconColor: '#A16207'
+      },
+      4: { // Low/P3
+        borderColor: '#16A34A',
+        bgColor: '#16A34A10',
+        icon: Info,
+        iconColor: '#16A34A'
+      }
+    };
+    
+    return configs[priorityInfo.order as keyof typeof configs] || null;
   };
 
   const toggleIssueExpanded = (issueId: number) => {
@@ -279,6 +329,51 @@ export default function IssuesPage() {
               </Button>
             )}
           </div>
+          
+          {/* Priority Distribution Summary */}
+          {!loading && issues.length > 0 && (
+            <div className="mt-3 p-3 bg-muted/30 rounded-md">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">Priority Distribution:</span>
+                <div className="flex items-center gap-3">
+                  {priorityLabels.map(priority => {
+                    const count = issues.filter(issue => 
+                      issue.labels.some(label => label.name === priority.name)
+                    ).length;
+                    const config = getPriorityConfig(priority);
+                    if (count === 0) return null;
+                    
+                    return (
+                      <div key={priority.name} className="flex items-center gap-1">
+                        {config && React.createElement(config.icon, { 
+                          className: "h-3 w-3",
+                          style: { color: config.iconColor }
+                        })}
+                        <span style={{ color: config?.iconColor }}>{priority.displayName}:</span>
+                        <span className="font-semibold">{count}</span>
+                      </div>
+                    );
+                  })}
+                  {(() => {
+                    const noPriorityCount = issues.filter(issue => 
+                      !issue.labels.some(label => 
+                        priorityLabels.some(p => p.name === label.name)
+                      )
+                    ).length;
+                    if (noPriorityCount > 0) {
+                      return (
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">No Priority:</span>
+                          <span className="font-semibold">{noPriorityCount}</span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {/* Filters */}
@@ -306,6 +401,78 @@ export default function IssuesPage() {
                 </SelectContent>
               </Select>
             </div>
+            
+            {/* Priority Filters */}
+            {priorityLabels.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                <span className="text-sm font-medium flex items-center">Filter by priority:</span>
+                {priorityLabels.map(priority => {
+                  const config = getPriorityConfig(priority);
+                  const isSelected = selectedPriorities.has(priority.name);
+                  
+                  return (
+                    <Button
+                      key={priority.name}
+                      variant={isSelected ? "default" : "outline"}
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => {
+                        setSelectedPriorities(prev => {
+                          const newSet = new Set(prev);
+                          if (newSet.has(priority.name)) {
+                            newSet.delete(priority.name);
+                          } else {
+                            newSet.add(priority.name);
+                          }
+                          return newSet;
+                        });
+                      }}
+                      style={{
+                        ...(isSelected && config ? {
+                          backgroundColor: config.borderColor,
+                          borderColor: config.borderColor,
+                        } : {}),
+                        ...((!isSelected && config) ? {
+                          color: config.iconColor,
+                          borderColor: config.borderColor,
+                        } : {})
+                      }}
+                    >
+                      {config && React.createElement(config.icon, { className: "h-3 w-3 mr-1" })}
+                      {priority.displayName}
+                    </Button>
+                  );
+                })}
+                <Button
+                  variant={selectedPriorities.has('none') ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => {
+                    setSelectedPriorities(prev => {
+                      const newSet = new Set(prev);
+                      if (newSet.has('none')) {
+                        newSet.delete('none');
+                      } else {
+                        newSet.add('none');
+                      }
+                      return newSet;
+                    });
+                  }}
+                >
+                  No Priority
+                </Button>
+                {selectedPriorities.size > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setSelectedPriorities(new Set())}
+                  >
+                    Clear filters
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
 
           {error && (
@@ -344,11 +511,17 @@ export default function IssuesPage() {
                         const otherLabels = issue.labels.filter(label => 
                           priority === 'none' || label.name !== priority
                         );
+                        const priorityConfig = getPriorityConfig(priorityInfo);
                         
                         return (
                           <div
                             key={issue.id}
-                            className="border rounded overflow-hidden"
+                            className="border rounded overflow-hidden relative"
+                            style={{
+                              borderColor: priorityConfig?.borderColor || '#e5e7eb',
+                              borderLeftWidth: priorityConfig ? '4px' : '1px',
+                              backgroundColor: priorityConfig?.bgColor || 'transparent'
+                            }}
                           >
                             <div 
                               className="p-2 hover:bg-accent/5 transition-colors cursor-pointer"
@@ -378,6 +551,19 @@ export default function IssuesPage() {
                                     >
                                       {issue.state}
                                     </Badge>
+                                    {priorityConfig && (
+                                      <Badge
+                                        variant="outline"
+                                        className="px-1.5 py-0 text-xs h-5 flex items-center gap-1"
+                                        style={{
+                                          borderColor: priorityConfig.borderColor,
+                                          color: priorityConfig.iconColor
+                                        }}
+                                      >
+                                        {React.createElement(priorityConfig.icon, { className: "h-3 w-3" })}
+                                        {priorityInfo?.displayName}
+                                      </Badge>
+                                    )}
                                     <h4 className="font-medium text-sm truncate flex-1">
                                       {issue.title}
                                     </h4>
@@ -497,6 +683,38 @@ export default function IssuesPage() {
               })
             )}
           </div>
+          
+          {/* Priority Legend */}
+          {priorityLabels.length > 0 && (
+            <div className="mt-6 p-3 bg-muted/20 rounded-md">
+              <h4 className="text-sm font-medium mb-2">Priority Legend:</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {priorityLabels.map(priority => {
+                  const config = getPriorityConfig(priority);
+                  if (!config) return null;
+                  
+                  return (
+                    <div key={priority.name} className="flex items-center gap-2">
+                      <div 
+                        className="w-4 h-4 rounded border-2" 
+                        style={{ 
+                          borderColor: config.borderColor,
+                          backgroundColor: config.bgColor
+                        }}
+                      />
+                      <div className="flex items-center gap-1">
+                        {React.createElement(config.icon, { 
+                          className: "h-3 w-3",
+                          style: { color: config.iconColor }
+                        })}
+                        <span className="text-sm">{priority.displayName}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

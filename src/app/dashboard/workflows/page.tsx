@@ -346,7 +346,7 @@ export default function WorkflowsPage() {
                         <p>Steps: {workflow.steps_count}</p>
                         <p>In Use: {workflow.content_count} content item{workflow.content_count !== 1 ? 's' : ''}</p>
                       </CardContent>
-                      <CardFooter className="border-t pt-3 pb-3 flex justify-end gap-2">
+                      <CardFooter className="border-t pt-3 pb-3 flex flex-wrap justify-end gap-2">
                         <Button variant="outline" size="sm" asChild>
                           <Link href={`/dashboard/workflows/${workflow.id}`}><Eye className="mr-1.5 h-4 w-4" />View</Link>
                         </Button>
