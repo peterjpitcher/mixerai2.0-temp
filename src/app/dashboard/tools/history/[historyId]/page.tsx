@@ -265,6 +265,7 @@ const AltTextHistoryDisplay = ({ inputs, outputs }: { inputs: AltTextInputs, out
 interface MetadataInputs {
   urls: string[];
   language?: string;
+  error?: string; // For rate limit errors
 }
 interface MetadataOutputItem {
   url: string;
@@ -275,13 +276,66 @@ interface MetadataOutputItem {
 }
 interface MetadataOutputs {
   results: MetadataOutputItem[];
+  error?: string; // For overall errors
 }
 
 const MetadataHistoryDisplay = ({ inputs, outputs }: { inputs: MetadataInputs, outputs: MetadataOutputs }) => {
+  // Helper function to extract domain from URL
+  const getDomainFromUrl = (url: string) => {
+    try {
+      const domain = new URL(url).hostname;
+      return domain;
+    } catch {
+      return 'Invalid URL';
+    }
+  };
+
+  const successCount = outputs.results?.filter(r => r.metaTitle && !r.error).length || 0;
+  const errorCount = outputs.results?.filter(r => r.error).length || 0;
+  const totalCount = inputs.urls?.length || 0;
+
+  // Calculate character lengths for SEO insights
+  const getCharacterLengthBadge = (text: string | undefined, type: 'title' | 'description') => {
+    if (!text) return null;
+    const length = text.length;
+    let variant: "default" | "secondary" | "destructive" | "outline" = "secondary";
+    
+    if (type === 'title') {
+      if (length > 60) variant = "destructive"; // Too long
+      else if (length < 30) variant = "outline"; // Too short
+      else variant = "default"; // Optimal
+    } else if (type === 'description') {
+      if (length > 160) variant = "destructive"; // Too long
+      else if (length < 70) variant = "outline"; // Too short
+      else variant = "default"; // Optimal
+    }
+    
+    return <Badge variant={variant}>{length} chars</Badge>;
+  };
+
   return (
     <div className="space-y-4">
+      {/* Summary Statistics */}
+      <div className="bg-muted/50 rounded-lg p-4">
+        <h4 className="font-semibold mb-2 text-base">Run Summary</h4>
+        <div className="grid grid-cols-3 gap-4 text-sm">
+          <div>
+            <span className="text-muted-foreground">Total URLs:</span>
+            <p className="font-semibold text-lg">{totalCount}</p>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Successful:</span>
+            <p className="font-semibold text-lg text-green-600">{successCount}</p>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Failed:</span>
+            <p className="font-semibold text-lg text-red-600">{errorCount}</p>
+          </div>
+        </div>
+      </div>
+
       <div>
-        <h4 className="font-semibold mb-2 text-base">Inputs</h4>
+        <h4 className="font-semibold mb-2 text-base">Input Details</h4>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -292,55 +346,112 @@ const MetadataHistoryDisplay = ({ inputs, outputs }: { inputs: MetadataInputs, o
             </TableHeader>
             <TableBody>
               <TableRow>
-                <TableCell>Page URLs</TableCell>
+                <TableCell>Number of URLs</TableCell>
+                <TableCell>{totalCount}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Language</TableCell>
+                <TableCell className="font-medium">{inputs.language || 'en (default)'}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Domains Processed</TableCell>
                 <TableCell>
-                  {inputs.urls.map((url, idx) => (
-                    <div key={idx} className="truncate" title={url}>{url}</div>
+                  {[...new Set(inputs.urls?.map(url => getDomainFromUrl(url)) || [])].map((domain, idx) => (
+                    <Badge key={idx} variant="secondary" className="mr-1 mb-1">{domain}</Badge>
                   ))}
                 </TableCell>
               </TableRow>
-              {inputs.language && (
+              {inputs.error && (
                 <TableRow>
-                  <TableCell>Language</TableCell>
-                  <TableCell>{inputs.language}</TableCell>
+                  <TableCell>Input Error</TableCell>
+                  <TableCell className="text-destructive">{inputs.error}</TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </div>
       </div>
+
       <div>
-        <h4 className="font-semibold mb-2 text-base">Outputs</h4>
+        <h4 className="font-semibold mb-2 text-base">SEO Metadata Results</h4>
+        <p className="text-xs text-muted-foreground mb-2">
+          Title: 30-60 chars optimal | Description: 70-160 chars optimal
+        </p>
         {outputs.results && outputs.results.length > 0 ? (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead scope="col">URL</TableHead>
-                  <TableHead scope="col">Meta Title</TableHead>
-                  <TableHead scope="col">Meta Description</TableHead>
-                  <TableHead scope="col">Keywords</TableHead>
-                  <TableHead scope="col">Error</TableHead>
+                  <TableHead scope="col" className="w-[20%]">URL</TableHead>
+                  <TableHead scope="col" className="w-[25%]">Meta Title</TableHead>
+                  <TableHead scope="col" className="w-[30%]">Meta Description</TableHead>
+                  <TableHead scope="col" className="w-[15%]">Keywords</TableHead>
+                  <TableHead scope="col" className="w-[10%]">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {outputs.results.map((item, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell className="truncate" title={item.url}>{item.url}</TableCell>
-                    <TableCell className="whitespace-pre-wrap">{item.metaTitle || 'N/A'}</TableCell>
-                    <TableCell className="whitespace-pre-wrap">{item.metaDescription || 'N/A'}</TableCell>
+                  <TableRow key={idx} className={item.error ? "bg-destructive/5" : ""}>
                     <TableCell>
-                      {item.keywords && item.keywords.length > 0 
-                        ? item.keywords.map(kw => <Badge key={kw} variant="secondary" className="mr-1 mb-1">{kw}</Badge>) 
-                        : 'N/A'}
+                      <div className="space-y-1">
+                        <p className="truncate text-sm" title={item.url}>
+                          {getDomainFromUrl(item.url)}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate" title={item.url}>
+                          {item.url.length > 40 ? `${item.url.substring(0, 37)}...` : item.url}
+                        </p>
+                      </div>
                     </TableCell>
-                    <TableCell className="whitespace-pre-wrap text-destructive">{item.error || 'N/A'}</TableCell>
+                    <TableCell>
+                      {item.metaTitle ? (
+                        <div className="space-y-1">
+                          <p className="text-sm">{item.metaTitle}</p>
+                          {getCharacterLengthBadge(item.metaTitle, 'title')}
+                        </div>
+                      ) : (item.error ? '—' : 'N/A')}
+                    </TableCell>
+                    <TableCell>
+                      {item.metaDescription ? (
+                        <div className="space-y-1">
+                          <p className="text-sm line-clamp-3">{item.metaDescription}</p>
+                          {getCharacterLengthBadge(item.metaDescription, 'description')}
+                        </div>
+                      ) : (item.error ? '—' : 'N/A')}
+                    </TableCell>
+                    <TableCell>
+                      {item.keywords && item.keywords.length > 0 ? (
+                        <div className="space-y-1">
+                          {item.keywords.slice(0, 3).map(kw => (
+                            <Badge key={kw} variant="secondary" className="mr-1 mb-1 text-xs">{kw}</Badge>
+                          ))}
+                          {item.keywords.length > 3 && (
+                            <span className="text-xs text-muted-foreground">+{item.keywords.length - 3} more</span>
+                          )}
+                        </div>
+                      ) : 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      {item.error ? (
+                        <div className="space-y-1">
+                          <Badge variant="destructive" className="mb-1">Failed</Badge>
+                          <p className="text-xs text-destructive">{item.error}</p>
+                        </div>
+                      ) : (
+                        <Badge variant="default">Success</Badge>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
         ) : <p className="text-sm text-muted-foreground">No output results found.</p>}
+        
+        {outputs.error && (
+          <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+            <p className="text-sm text-destructive font-medium">Overall Error: {outputs.error}</p>
+          </div>
+        )}
       </div>
     </div>
   );
