@@ -66,6 +66,9 @@ interface User {
   }[];
   job_title?: string;
   company?: string;
+  invitation_status?: string | null;
+  invitation_expires_at?: string | null;
+  user_status?: string;
 }
 
 // Define UserSessionData interface
@@ -501,13 +504,13 @@ export default function UsersPage() {
                   <TableCell>{user.job_title || '-'}</TableCell>
                   <TableCell>{formatDate(user.last_sign_in_at)}</TableCell>
                   <TableCell className="text-right space-x-1">
-                    {!user.last_sign_in_at && (
+                    {(!user.last_sign_in_at || user.user_status === 'expired') && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleResendInvite(user.id, user.email)}
                         disabled={resendingInviteToUserId === user.id}
-                        title="Resend Invite"
+                        title={user.user_status === 'expired' ? "Resend Expired Invite" : "Resend Invite"}
                       >
                         {resendingInviteToUserId === user.id ? (
                           <>
