@@ -31,12 +31,13 @@ import {
   HtmlOutputOptions,
   ImageOutputOptions,
   ProductSelectorOptions,
+  RecipeUrlOptions,
 } from '@/types/template';
 import { ProductSelectorOptionsComponent } from './product-selector-options';
 
 // Type guards to ensure type safety
 function isInputField(field: Field): field is InputField {
-  const inputTypes = ['shortText', 'longText', 'richText', 'select', 'number', 'date', 'tags', 'url', 'fileUpload', 'product-selector'];
+  const inputTypes = ['shortText', 'longText', 'richText', 'select', 'number', 'date', 'tags', 'url', 'fileUpload', 'product-selector', 'recipeUrl'];
   return inputTypes.includes(field.type);
 }
 
@@ -270,6 +271,44 @@ const FileUploadOptionsComponent = ({ options, onChange }: { options: FileUpload
         onChange={(e) => onChange({ maxSize: parseInt(e.target.value) || undefined })}
         placeholder="10"
       />
+    </div>
+  </div>
+);
+
+const RecipeUrlOptionsComponent = ({ options, onChange }: { options: RecipeUrlOptions; onChange: (options: Partial<RecipeUrlOptions>) => void }) => (
+  <div className="space-y-4">
+    <div className="flex items-center space-x-2">
+      <Checkbox
+        id="autoPopulateFields"
+        checked={options.autoPopulateFields !== false}
+        onCheckedChange={(checked) => onChange({ autoPopulateFields: !!checked })}
+      />
+      <Label htmlFor="autoPopulateFields">Auto-populate other fields with extracted data</Label>
+    </div>
+    <div className="flex items-center space-x-2">
+      <Checkbox
+        id="extractImages"
+        checked={options.extractImages || false}
+        onCheckedChange={(checked) => onChange({ extractImages: !!checked })}
+      />
+      <Label htmlFor="extractImages">Extract recipe images</Label>
+    </div>
+    <div className="flex items-center space-x-2">
+      <Checkbox
+        id="includeNutrition"
+        checked={options.includeNutrition || false}
+        onCheckedChange={(checked) => onChange({ includeNutrition: !!checked })}
+      />
+      <Label htmlFor="includeNutrition">Include nutrition information</Label>
+    </div>
+    <div>
+      <Label className="text-sm font-medium">Field Mapping</Label>
+      <p className="text-xs text-muted-foreground mb-2">
+        Map extracted recipe data to other fields in your template
+      </p>
+      <div className="space-y-2 text-sm">
+        <p className="text-xs italic">Field mapping configuration would be shown here once other fields are created.</p>
+      </div>
     </div>
   </div>
 );
@@ -641,6 +680,7 @@ export function FieldDesigner({
     { value: 'url', label: 'URL' },
     { value: 'fileUpload', label: 'File Upload' },
     { value: 'product-selector', label: 'Select from Brand Products' },
+    { value: 'recipeUrl', label: 'Recipe URL (with scraping)' },
   ];
   
   const outputFieldTypes: { value: GlobalFieldType; label: string }[] = [
@@ -674,6 +714,8 @@ export function FieldDesigner({
         return <FileUploadOptionsComponent options={fieldData.options as FileUploadOptions} onChange={handleOptionsChange} />;
       case 'product-selector':
         return <ProductSelectorOptionsComponent options={fieldData.options as ProductSelectorOptions} onChange={handleOptionsChange} />;
+      case 'recipeUrl':
+        return <RecipeUrlOptionsComponent options={fieldData.options as RecipeUrlOptions} onChange={handleOptionsChange} />;
       case 'plainText':
         return <PlainTextOutputOptionsComponent options={fieldData.options as PlainTextOutputOptions} onChange={handleOptionsChange} />;
       case 'html':

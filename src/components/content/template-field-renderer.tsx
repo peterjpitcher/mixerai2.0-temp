@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { RichTextEditor } from './rich-text-editor';
 import { ProductSelect } from './product-select';
-import type { InputField, FieldType, SelectOptions, ShortTextOptions, LongTextOptions, RichTextOptions, UrlOptions } from '@/types/template';
+import { RecipeUrlField } from './recipe-url-field';
+import type { InputField, FieldType, SelectOptions, ShortTextOptions, LongTextOptions, RichTextOptions, UrlOptions, RecipeUrlOptions } from '@/types/template';
 
 interface TemplateFieldRendererProps {
   field: InputField;
@@ -18,6 +19,7 @@ interface TemplateFieldRendererProps {
   isGeneratingSuggestion?: boolean;
   onGenerateSuggestion?: (fieldId: string) => void;
   productContext?: unknown;
+  onRecipeDataExtracted?: (data: Record<string, string>) => void;
 }
 
 export function TemplateFieldRenderer({
@@ -26,7 +28,8 @@ export function TemplateFieldRenderer({
   onChange,
   brandId,
   isGeneratingSuggestion = false,
-  onGenerateSuggestion
+  onGenerateSuggestion,
+  onRecipeDataExtracted
 }: TemplateFieldRendererProps) {
   const isRequired = field.required || false;
   
@@ -105,6 +108,20 @@ export function TemplateFieldRenderer({
             brandId={brandId || null}
           />
         );
+
+      case 'recipeUrl':
+        return (
+          <RecipeUrlField
+            id={field.id}
+            label={field.name}
+            value={value}
+            onChange={(val) => onChange(field.id, val, 'recipeUrl')}
+            required={isRequired}
+            options={field.options as RecipeUrlOptions}
+            helpText={field.helpText}
+            onRecipeDataExtracted={onRecipeDataExtracted}
+          />
+        );
         
       default:
         return (
@@ -120,6 +137,11 @@ export function TemplateFieldRenderer({
     }
   };
   
+  // RecipeUrlField renders its own label, so we skip the label for this field type
+  if (field.type === 'recipeUrl') {
+    return renderField();
+  }
+
   return (
     <div key={field.id}>
       <div className="flex items-center justify-between mb-2">

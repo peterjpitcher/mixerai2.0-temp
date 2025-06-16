@@ -515,6 +515,28 @@ export default function AltTextGeneratorPage() {
                 </div>
             </CardHeader>
             <CardContent>
+              {results.length > 0 && !isLoading && (
+                <div className="bg-muted/50 rounded-lg p-4 mb-4">
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div className="text-center">
+                      <span className="text-muted-foreground">Total Processed</span>
+                      <p className="font-semibold text-lg">{results.length}</p>
+                    </div>
+                    <div className="text-center">
+                      <span className="text-muted-foreground">Successful</span>
+                      <p className="font-semibold text-lg text-green-600">
+                        {results.filter(r => r.altText && !r.error).length}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <span className="text-muted-foreground">Failed</span>
+                      <p className="font-semibold text-lg text-red-600">
+                        {results.filter(r => r.error).length}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="overflow-x-auto rounded-md border">
                 <Table>
                   <TableHeader>

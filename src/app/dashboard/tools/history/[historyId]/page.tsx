@@ -85,6 +85,7 @@ const JsonViewer = ({ jsonData }: { jsonData: unknown }) => {
 interface AltTextInputs {
   imageUrls: string[];
   language?: string;
+  error?: string; // For rate limit errors
 }
 interface AltTextOutputItem {
   imageUrl: string;
@@ -93,13 +94,69 @@ interface AltTextOutputItem {
 }
 interface AltTextOutputs {
   results: AltTextOutputItem[];
+  error?: string; // For overall errors
 }
 
 const AltTextHistoryDisplay = ({ inputs, outputs }: { inputs: AltTextInputs, outputs: AltTextOutputs }) => {
+  // Helper function to extract domain from URL
+  const getDomainFromUrl = (url: string) => {
+    try {
+      if (url.startsWith('data:')) return 'Data URL (uploaded image)';
+      const domain = new URL(url).hostname;
+      return domain;
+    } catch {
+      return 'Invalid URL';
+    }
+  };
+
+  // Helper to detect language from TLD (matching API logic)
+  const getDetectedLanguageFromUrl = (url: string) => {
+    try {
+      if (url.startsWith('data:')) return 'en (default)';
+      const hostname = new URL(url).hostname;
+      
+      // Common TLD to language mappings
+      if (hostname.endsWith('.fr')) return 'fr (French)';
+      if (hostname.endsWith('.de')) return 'de (German)';
+      if (hostname.endsWith('.es')) return 'es (Spanish)';
+      if (hostname.endsWith('.it')) return 'it (Italian)';
+      if (hostname.endsWith('.nl')) return 'nl (Dutch)';
+      if (hostname.endsWith('.co.uk')) return 'en (UK)';
+      if (hostname.endsWith('.com.au')) return 'en (AU)';
+      
+      return 'en (default)';
+    } catch {
+      return 'en (default)';
+    }
+  };
+
+  const successCount = outputs.results?.filter(r => r.altText && !r.error).length || 0;
+  const errorCount = outputs.results?.filter(r => r.error).length || 0;
+  const totalCount = inputs.imageUrls?.length || 0;
+
   return (
     <div className="space-y-4">
+      {/* Summary Statistics */}
+      <div className="bg-muted/50 rounded-lg p-4">
+        <h4 className="font-semibold mb-2 text-base">Run Summary</h4>
+        <div className="grid grid-cols-3 gap-4 text-sm">
+          <div>
+            <span className="text-muted-foreground">Total Images:</span>
+            <p className="font-semibold text-lg">{totalCount}</p>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Successful:</span>
+            <p className="font-semibold text-lg text-green-600">{successCount}</p>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Failed:</span>
+            <p className="font-semibold text-lg text-red-600">{errorCount}</p>
+          </div>
+        </div>
+      </div>
+
       <div>
-        <h4 className="font-semibold mb-2 text-base">Inputs</h4>
+        <h4 className="font-semibold mb-2 text-base">Input Details</h4>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -110,47 +167,95 @@ const AltTextHistoryDisplay = ({ inputs, outputs }: { inputs: AltTextInputs, out
             </TableHeader>
             <TableBody>
               <TableRow>
-                <TableCell>Image URLs</TableCell>
-                <TableCell>
-                  {inputs.imageUrls.map((url, idx) => (
-                    <div key={idx} className="truncate" title={url}>{url}</div>
-                  ))}
-                </TableCell>
+                <TableCell>Number of Images</TableCell>
+                <TableCell>{totalCount}</TableCell>
               </TableRow>
               {inputs.language && (
                 <TableRow>
-                  <TableCell>Language</TableCell>
-                  <TableCell>{inputs.language}</TableCell>
+                  <TableCell>Requested Language</TableCell>
+                  <TableCell className="font-medium">{inputs.language}</TableCell>
+                </TableRow>
+              )}
+              <TableRow>
+                <TableCell>Image Domains</TableCell>
+                <TableCell>
+                  {[...new Set(inputs.imageUrls?.map(url => getDomainFromUrl(url)) || [])].map((domain, idx) => (
+                    <Badge key={idx} variant="secondary" className="mr-1 mb-1">{domain}</Badge>
+                  ))}
+                </TableCell>
+              </TableRow>
+              {inputs.error && (
+                <TableRow>
+                  <TableCell>Input Error</TableCell>
+                  <TableCell className="text-destructive">{inputs.error}</TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </div>
       </div>
+
       <div>
-        <h4 className="font-semibold mb-2 text-base">Outputs</h4>
+        <h4 className="font-semibold mb-2 text-base">Processing Results</h4>
         {outputs.results && outputs.results.length > 0 ? (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead scope="col">Image URL</TableHead>
-                  <TableHead scope="col">Generated Alt Text</TableHead>
-                  <TableHead scope="col">Error</TableHead>
+                  <TableHead scope="col" className="w-[25%]">Image</TableHead>
+                  <TableHead scope="col" className="w-[15%]">Detected Language</TableHead>
+                  <TableHead scope="col" className="w-[35%]">Generated Alt Text</TableHead>
+                  <TableHead scope="col" className="w-[10%]">Character Count</TableHead>
+                  <TableHead scope="col" className="w-[15%]">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {outputs.results.map((item, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell className="truncate" title={item.imageUrl}>{item.imageUrl}</TableCell>
-                    <TableCell className="whitespace-pre-wrap">{item.altText || 'N/A'}</TableCell>
-                    <TableCell className="whitespace-pre-wrap text-destructive">{item.error || 'N/A'}</TableCell>
+                  <TableRow key={idx} className={item.error ? "bg-destructive/5" : ""}>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <p className="truncate text-sm" title={item.imageUrl}>
+                          {getDomainFromUrl(item.imageUrl)}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate" title={item.imageUrl}>
+                          {item.imageUrl.length > 50 ? `${item.imageUrl.substring(0, 47)}...` : item.imageUrl}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {!inputs.language && getDetectedLanguageFromUrl(item.imageUrl)}
+                      {inputs.language && <span className="text-muted-foreground">→ {inputs.language}</span>}
+                    </TableCell>
+                    <TableCell className="whitespace-pre-wrap text-sm">
+                      {item.altText || (item.error ? '—' : 'N/A')}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {item.altText ? (
+                        <Badge variant="secondary">{item.altText.length}</Badge>
+                      ) : '—'}
+                    </TableCell>
+                    <TableCell>
+                      {item.error ? (
+                        <div className="space-y-1">
+                          <Badge variant="destructive" className="mb-1">Failed</Badge>
+                          <p className="text-xs text-destructive">{item.error}</p>
+                        </div>
+                      ) : (
+                        <Badge variant="default">Success</Badge>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
         ) : <p className="text-sm text-muted-foreground">No output results found.</p>}
+        
+        {outputs.error && (
+          <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+            <p className="text-sm text-destructive font-medium">Overall Error: {outputs.error}</p>
+          </div>
+        )}
       </div>
     </div>
   );

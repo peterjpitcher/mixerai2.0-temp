@@ -18,7 +18,8 @@ export type FieldType =
   | 'plainText'
   | 'html'
   | 'image'
-  | 'product-selector';
+  | 'product-selector'
+  | 'recipeUrl';
 
 export interface ShortTextOptions { minLength?: number; maxLength?: number; placeholder?: string; }
 export interface LongTextOptions { minWords?: number; maxWords?: number; placeholder?: string; rows?: number; maxLength?: number; }
@@ -30,6 +31,22 @@ export interface TagsOptions { maxTags?: number; placeholder?: string; suggestio
 export interface UrlOptions { placeholder?: string; validateUrl?: boolean; }
 export interface FileUploadOptions { maxSizeMB?: number; allowedTypes?: string[]; acceptedTypes?: string; maxSize?: number; }
 export interface ProductSelectorOptions { allowMultiple?: boolean; }
+export interface RecipeUrlOptions { 
+  autoPopulateFields?: boolean; 
+  extractImages?: boolean; 
+  includeNutrition?: boolean;
+  fieldsMapping?: {
+    title?: string;
+    description?: string;
+    ingredients?: string;
+    instructions?: string;
+    prepTime?: string;
+    cookTime?: string;
+    totalTime?: string;
+    servings?: string;
+    nutrition?: string;
+  };
+}
 export interface PlainTextOutputOptions { maxLength?: number; }
 export interface HtmlOutputOptions { maxLength?: number; sanitize?: boolean; }
 export interface ImageOutputOptions { format?: string; width?: number; height?: number; altText?: string; }
@@ -55,10 +72,11 @@ export type InputFieldOptionType =
   | ({ type: 'tags'; options?: TagsOptions })
   | ({ type: 'url'; options?: UrlOptions })
   | ({ type: 'fileUpload'; options?: FileUploadOptions })
-  | ({ type: 'product-selector', options?: ProductSelectorOptions });
+  | ({ type: 'product-selector', options?: ProductSelectorOptions })
+  | ({ type: 'recipeUrl'; options?: RecipeUrlOptions });
 
 export interface InputField extends BaseField {
-  type: Extract<FieldType, 'shortText' | 'longText' | 'richText' | 'select' | 'multiselect' | 'number' | 'date' | 'tags' | 'url' | 'fileUpload' | 'product-selector'>;
+  type: Extract<FieldType, 'shortText' | 'longText' | 'richText' | 'select' | 'multiselect' | 'number' | 'date' | 'tags' | 'url' | 'fileUpload' | 'product-selector' | 'recipeUrl'>;
   options?: InputFieldOptionType['options'];
   aiSuggester?: boolean;
 }
