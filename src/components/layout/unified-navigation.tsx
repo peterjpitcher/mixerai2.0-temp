@@ -33,7 +33,7 @@ import { cn } from '@/lib/utils';
 import { useState, useEffect, useRef } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { TokenUsage } from './token-usage';
+import { ActivityMeter } from './activity-meter';
 
 interface UserSessionData {
   id: string;
@@ -533,7 +533,7 @@ export function UnifiedNavigation() {
           </ul>
         </nav>
       </div>
-      <TokenUsage />
+      <ActivityMeter />
     </aside>
   );
 }
