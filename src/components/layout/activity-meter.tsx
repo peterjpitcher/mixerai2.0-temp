@@ -22,8 +22,6 @@ export function ActivityMeter() {
     averageResponseTime: 0,
     rateLimitStatus: 'normal'
   });
-  const [isVisible, setIsVisible] = useState(false);
-
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -32,8 +30,6 @@ export function ActivityMeter() {
         
         if (data.success && data.stats) {
           setStats(data.stats);
-          // Show the meter if there's any activity
-          setIsVisible(data.stats.activeRequests > 0 || data.stats.requestsPerMinute > 0);
         }
       } catch (err) {
         // Silently fail - this is just monitoring
@@ -45,8 +41,6 @@ export function ActivityMeter() {
     
     return () => clearInterval(interval);
   }, []);
-
-  if (!isVisible) return null;
 
   // Calculate meter levels (0-10 bars)
   const activityLevel = Math.min(10, Math.floor((stats.requestsPerMinute / 60) * 10));
