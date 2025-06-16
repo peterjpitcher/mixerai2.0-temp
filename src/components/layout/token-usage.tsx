@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { Loader2, Zap } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 
 interface TokenUsage {
@@ -10,6 +9,8 @@ interface TokenUsage {
   tokens_limit: number;
   period: string;
   reset_date: string;
+  cost_usd?: number;
+  request_count?: number;
 }
 
 export function TokenUsage() {
@@ -80,6 +81,17 @@ export function TokenUsage() {
           <span>{remaining.toLocaleString()} tokens left</span>
           <span>Resets in {daysUntilReset}d</span>
         </div>
+        
+        {(usage.cost_usd !== undefined || usage.request_count !== undefined) && (
+          <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
+            {usage.cost_usd !== undefined && (
+              <span>${usage.cost_usd.toFixed(2)} spent</span>
+            )}
+            {usage.request_count !== undefined && (
+              <span>{usage.request_count} requests</span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
