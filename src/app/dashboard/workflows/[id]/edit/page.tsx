@@ -613,6 +613,10 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
         toast.error(`Step "${step.name}" must have an assigned role.`);
         return false;
       }
+      if (!step.assignees || step.assignees.length === 0) {
+        toast.error(`Step "${step.name}" must have at least one assignee.`);
+        return false;
+      }
     }
     return true;
   };
@@ -980,7 +984,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                       </div>
                       
                     <div className="space-y-3">
-                        <Label htmlFor={`assignee-input-${index}`} className="text-sm font-medium">Assign Users (Optional)</Label>
+                        <Label htmlFor={`assignee-input-${index}`} className="text-sm font-medium">Assign Users <span className="text-destructive">*</span></Label>
                         <div className="flex items-center gap-2">
                           <Input
                                 id={`assignee-input-${index}`}
@@ -1024,7 +1028,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                              <p className="text-sm text-muted-foreground py-2">No users found matching &quot;{assigneeInputs[index]}&quot;. You can still add by full email address.</p>
                         )}
 
-                        {step.assignees.length > 0 && (
+                        {step.assignees.length > 0 ? (
                             <div className="mt-2 space-y-1">
                                 <p className="text-xs text-muted-foreground">Assigned:</p>
                                 <div className="flex flex-wrap gap-1.5">
@@ -1044,6 +1048,10 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
                                     ))}
                         </div>
                       </div>
+                        ) : (
+                            <div className="mt-2 p-3 border border-destructive/50 rounded-md bg-destructive/10">
+                                <p className="text-sm text-destructive">No assignees added. At least one assignee is required for this step.</p>
+                            </div>
                         )}
                     </div>
                   </div>
