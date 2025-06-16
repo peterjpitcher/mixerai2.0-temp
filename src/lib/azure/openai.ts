@@ -270,12 +270,13 @@ The product context is provided in the user prompt.
     userPrompt += `- ${field.name}: ${fieldValue}\n`;
   });
   
-  userPrompt += `\nGenerate the following output fields:\n`;
+  userPrompt += `\nIMPORTANT: You MUST generate content for ALL ${template.outputFields.length} output fields listed below. Each field must be clearly marked and separated.\n\n`;
+  userPrompt += `Generate the following ${template.outputFields.length} output fields:\n`;
   
   // Include output field requirements with their prompts
-  template.outputFields.forEach(field => {
-    userPrompt += `- For the field named \"${field.name}\" (with ID \"${field.id}\"):\n`;
-    userPrompt += `  BEGIN CONTENT FOR THIS FIELD HERE (ID: ${field.id}):\n`;
+  template.outputFields.forEach((field, index) => {
+    userPrompt += `\n${index + 1}. Field: \"${field.name}\" (ID: ${field.id})\n`;
+    userPrompt += `   This field MUST be generated and wrapped with the markers below:\n`;
     
     let fieldSpecificInstruction = "";
     if (field.type === 'richText') {
@@ -284,34 +285,87 @@ The product context is provided in the user prompt.
 
     let fieldAIPrompt = "";
     if (field.aiPrompt) {
-      const processedPrompt = field.aiPrompt.replace(/\{\{(\w+)\}\}/g, (match, inputFieldIdOrName) => {
-        const inputField = template.inputFields.find(f => f.id === inputFieldIdOrName || f.name === inputFieldIdOrName);
-        return inputField && inputField.value ? inputField.value : match;
+      console.log(`[Field ${field.id}] Original AI prompt: ${field.aiPrompt}`);
+      console.log(`[Field ${field.id}] Available input fields:`, template.inputFields.map(f => ({ id: f.id, name: f.name, value: f.value ? f.value.substring(0, 50) + '...' : 'NO VALUE' })));
+      
+      const processedPrompt = field.aiPrompt.replace(/\{\{([^}]+)\}\}/g, (match, inputFieldIdOrName) => {
+        console.log(`[Field ${field.id}] Processing placeholder: ${match}, extracted name: "${inputFieldIdOrName}"`);
+        
+        // Handle special placeholders
+        if (inputFieldIdOrName === 'Rules') {
+          // Combine product context rules if available
+          if (input?.product_context?.styledClaims) {
+            console.log(`[Field ${field.id}] Replaced {{Rules}} with product context`);
+            return 'Follow the product claims and guidelines provided in the product context.';
+          }
+          console.log(`[Field ${field.id}] Replaced {{Rules}} with default guidelines`);
+          return 'Create engaging, accurate content following brand guidelines.';
+        }
+        
+        if (inputFieldIdOrName === 'Product Name' && input?.product_context?.productName) {
+          console.log(`[Field ${field.id}] Replaced {{Product Name}} with: ${input.product_context.productName}`);
+          return input.product_context.productName;
+        }
+        
+        // Find by ID or name (trimmed to handle spaces)
+        const fieldName = inputFieldIdOrName.trim();
+        const inputField = template.inputFields.find(f => 
+          f.id === fieldName || f.name === fieldName
+        );
+        
+        if (inputField) {
+          if (inputField.value && inputField.value.trim() !== '') {
+            console.log(`[Field ${field.id}] Found matching input field for "${fieldName}": ${inputField.value.substring(0, 50)}...`);
+            return inputField.value;
+          } else {
+            console.log(`[Field ${field.id}] Found input field "${fieldName}" but it has no value, removing placeholder`);
+            // For empty values, return empty string to remove the placeholder
+            return '';
+          }
+        } else {
+          console.log(`[Field ${field.id}] No matching input field found for "${fieldName}", keeping placeholder`);
+          return match;
+        }
       });
-      fieldAIPrompt = processedPrompt;
+      
+      console.log(`[Field ${field.id}] Processed AI prompt: ${processedPrompt}`);
+      
+      // Clean up the prompt if we removed placeholders
+      // Remove phrases that reference empty placeholders
+      fieldAIPrompt = processedPrompt
+        .replace(/that includes these priority keywords \(\s*\)/g, '') // Remove empty priority keywords phrase
+        .replace(/\(\s*\)/g, '') // Remove any remaining empty parentheses
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .trim();
     }
     
     if (fieldAIPrompt || fieldSpecificInstruction) {
-        userPrompt += `  Instructions: ${fieldSpecificInstruction}${fieldAIPrompt}\n`;
+        userPrompt += `   Instructions: ${fieldSpecificInstruction}${fieldAIPrompt}\n`;
     }
 
     if (field.useBrandIdentity && brand.brand_identity) {
-      userPrompt += `  Apply Brand Identity: ${brand.brand_identity}\n`;
+      userPrompt += `   Apply Brand Identity: ${brand.brand_identity}\n`;
     }
     if (field.useToneOfVoice && brand.tone_of_voice) {
-      userPrompt += `  Apply Tone of Voice: ${brand.tone_of_voice}\n`;
+      userPrompt += `   Apply Tone of Voice: ${brand.tone_of_voice}\n`;
     }
     if (field.useGuardrails && brand.guardrails) {
-      userPrompt += `  Apply Guardrails: ${brand.guardrails}\n`;
+      userPrompt += `   Apply Guardrails: ${brand.guardrails}\n`;
     }
 
-    userPrompt += `  WRAP THE ENTIRE GENERATED CONTENT FOR THIS SPECIFIC FIELD \"${field.name}\" (ID: ${field.id}) WITH THE MARKERS: ##FIELD_ID:${field.id}## ... ##END_FIELD_ID##\n\n`;
+    userPrompt += `   REQUIRED FORMAT: Wrap all content for this field with these exact markers:\n`;
+    userPrompt += `   ##FIELD_ID:${field.id}##\n`;
+    userPrompt += `   [Your generated content for "${field.name}" goes here]\n`;
+    userPrompt += `   ##END_FIELD_ID##\n`;
   });
   
   // Add additional instructions if provided
   if (input?.additionalInstructions) {
-    userPrompt += `\nAdditional instructions: ${input.additionalInstructions}`;
+    userPrompt += `\nAdditional instructions: ${input.additionalInstructions}\n`;
   }
+  
+  // Final reminder
+  userPrompt += `\nREMINDER: You must generate content for ALL ${template.outputFields.length} fields listed above. Each field must be wrapped with its specific ##FIELD_ID:...## markers.`;
   
   // Make the API call with error handling
   try {
@@ -366,9 +420,12 @@ The product context is provided in the user prompt.
     const result: Record<string, string> = {};
     let fieldsParsed = false;
     
+    console.log(`Parsing AI response for ${template.outputFields.length} output fields`);
+    console.log('Full AI response:', content.substring(0, 500) + '...');
+    
     // Process each output field
-    template.outputFields.forEach(field => {
-      // console.log(`Processing output field: ${field.name} (${field.id})`);
+    template.outputFields.forEach((field, index) => {
+      console.log(`Processing output field ${index + 1}/${template.outputFields.length}: ${field.name} (${field.id})`);
       
       const fieldRegex = new RegExp(`##FIELD_ID:${field.id}##\\s*([\\s\\S]*?)\\s*##END_FIELD_ID##`, 'i');
       let match = content.match(fieldRegex);
@@ -376,27 +433,59 @@ The product context is provided in the user prompt.
       if (match && match[1]) {
         result[field.id] = match[1].trim();
         fieldsParsed = true;
-        // console.log(`Successfully parsed field ${field.id} with length ${result[field.id].length}`);
+        console.log(`✓ Successfully parsed field ${field.id} with markers, length: ${result[field.id].length}`);
       } else {
-        // Attempt to match field name if markers are not found, for simpler AI responses
-        // This is a fallback and might be less reliable for multiple fields.
-        const escapedFieldName = field.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const fieldNameRegex = new RegExp(`(?:${escapedFieldName}\\s*:\\s*|##${escapedFieldName}##\\s*)([\\s\\S]*?)(?:\\n##FIELD_ID:|\\n##[A-Z_]+##|$)`, 'i');
-        match = content.match(fieldNameRegex);
-        if (match && match[1]) {
-          result[field.id] = match[1].trim();
-          fieldsParsed = true;
-          // console.log(`Parsed field ${field.id} using field name (fallback), length: ${result[field.id].length}`);
+        // Try multiple fallback patterns
+        const patterns = [
+          // Pattern 1: Field name with colon
+          new RegExp(`${field.name}\\s*:\\s*([\\s\\S]*?)(?=\\n\\n[A-Z]|\\n##|$)`, 'i'),
+          // Pattern 2: Field name in brackets or quotes
+          new RegExp(`\\[${field.name}\\]\\s*:?\\s*([\\s\\S]*?)(?=\\n\\n[A-Z]|\\n##|$)`, 'i'),
+          new RegExp(`"${field.name}"\\s*:?\\s*([\\s\\S]*?)(?=\\n\\n[A-Z]|\\n##|$)`, 'i'),
+          // Pattern 3: BEGIN/END markers with field name
+          new RegExp(`BEGIN\\s+${field.name}\\s*:?\\s*([\\s\\S]*?)\\s*END\\s+${field.name}`, 'i'),
+          // Pattern 4: Field ID in various formats
+          new RegExp(`##${field.id}##\\s*([\\s\\S]*?)(?=##\\w+##|$)`, 'i'),
+        ];
+        
+        for (const pattern of patterns) {
+          match = content.match(pattern);
+          if (match && match[1]) {
+            result[field.id] = match[1].trim();
+            fieldsParsed = true;
+            console.log(`✓ Parsed field ${field.id} using fallback pattern, length: ${result[field.id].length}`);
+            break;
+          }
+        }
+        
+        if (!result[field.id]) {
+          console.log(`✗ Could not parse field ${field.id} (${field.name})`);
         }
       }
     });
     
-    // If no fields were parsed correctly, use the entire content
+    // If no fields were parsed correctly but we have multiple fields, try to split content
+    if (!fieldsParsed && template.outputFields.length > 1) {
+      console.log('No fields parsed using patterns, attempting to split content for multiple fields');
+      
+      // Look for any section headers or natural breaks
+      const sections = content.split(/\n\n+/);
+      if (sections.length >= template.outputFields.length) {
+        template.outputFields.forEach((field, index) => {
+          if (sections[index]) {
+            result[field.id] = sections[index].trim();
+            console.log(`✓ Assigned section ${index + 1} to field ${field.id}`);
+          }
+        });
+        fieldsParsed = true;
+      }
+    }
+    
+    // Last resort: assign full content to first field only
     if (!fieldsParsed && template.outputFields.length > 0) {
-      // console.log('No fields parsed using any format, using the full content');
+      console.log('WARNING: Could not parse individual fields, assigning full content to first field only');
       const mainField = template.outputFields[0];
       result[mainField.id] = fullContent;
-      // console.log(`Assigned full content (${fullContent.length} chars) to field ${mainField.id}`);
     }
     
     // Log what fields we're returning

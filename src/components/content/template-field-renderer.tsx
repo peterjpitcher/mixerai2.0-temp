@@ -9,7 +9,6 @@ import { Sparkles, Loader2 } from 'lucide-react';
 import { RichTextEditor } from './rich-text-editor';
 import { ProductSelect } from './product-select';
 import type { InputField, FieldType, SelectOptions, ShortTextOptions, LongTextOptions, RichTextOptions, UrlOptions } from '@/types/template';
-import type { ProductContext } from '@/types/claims';
 
 interface TemplateFieldRendererProps {
   field: InputField;
@@ -18,7 +17,7 @@ interface TemplateFieldRendererProps {
   brandId?: string;
   isGeneratingSuggestion?: boolean;
   onGenerateSuggestion?: (fieldId: string) => void;
-  productContext?: ProductContext | null;
+  productContext?: unknown;
 }
 
 export function TemplateFieldRenderer({
@@ -27,8 +26,7 @@ export function TemplateFieldRenderer({
   onChange,
   brandId,
   isGeneratingSuggestion = false,
-  onGenerateSuggestion,
-  productContext
+  onGenerateSuggestion
 }: TemplateFieldRendererProps) {
   const isRequired = field.required || false;
   
@@ -89,7 +87,7 @@ export function TemplateFieldRenderer({
           </Select>
         );
         
-      case 'select':  // multiselect handled with options.allowMultiple
+      case 'multiselect':
         // Simplified multiselect - in production would need proper multiselect component
         return (
           <div className="space-y-2">
@@ -148,18 +146,6 @@ export function TemplateFieldRenderer({
       
       {renderField()}
       
-      {productContext && field.type === 'product-selector' && (
-        <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-          <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-            Selected: {productContext.productName}
-          </p>
-          {productContext.styledClaims && (
-            <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-              {Object.keys(productContext.styledClaims).length} claims loaded
-            </p>
-          )}
-        </div>
-      )}
     </div>
   );
 }

@@ -88,12 +88,18 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
         };
 
         const finalInput = { ...data.input };
-        if (data.input?.product_context && typeof data.input.product_context === 'string') {
-          try {
-            finalInput.product_context = JSON.parse(data.input.product_context);
-          } catch (e) {
-            console.error("Failed to parse product_context:", e);
-            delete finalInput.product_context;
+        // Product context can come as either a string or object
+        if (data.input?.product_context) {
+          if (typeof data.input.product_context === 'string') {
+            try {
+              finalInput.product_context = JSON.parse(data.input.product_context);
+            } catch (e) {
+              console.error("Failed to parse product_context string:", e);
+              delete finalInput.product_context;
+            }
+          } else {
+            // It's already an object, use it as is
+            finalInput.product_context = data.input.product_context;
           }
         }
 

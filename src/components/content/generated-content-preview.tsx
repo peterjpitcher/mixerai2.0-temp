@@ -1,9 +1,9 @@
 'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RichTextEditor } from './rich-text-editor';
+import { RefreshCw, AlertCircle } from 'lucide-react';
 import type { OutputField } from '@/types/template';
 
 interface GeneratedContentPreviewProps {
@@ -28,57 +28,64 @@ export function GeneratedContentPreview({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Generated Content</CardTitle>
-        <CardDescription>
-          Review and edit the AI-generated content below
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {aiError && (
-          <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-md">
+    <div className="space-y-6">
+      {aiError && (
+        <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-md flex items-start gap-2">
+          <AlertCircle className="h-5 w-5 mt-0.5" />
+          <div>
             <p className="text-sm font-medium">Generation Error</p>
             <p className="text-sm mt-1">{aiError}</p>
           </div>
-        )}
+        </div>
+      )}
+      
+      {outputFields.map((field) => {
+        const value = generatedOutputs[field.id] || '';
+        const isRetrying = retryingFieldId === field.id;
+        const hasContent = value && value.trim().length > 0;
         
-        {outputFields.map((field) => {
-          const value = generatedOutputs[field.id] || '';
-          const isRetrying = retryingFieldId === field.id;
-          
-          return (
-            <div key={field.id} className="space-y-2">
-              <div className="flex items-center justify-between">
+        return (
+          <div key={field.id} className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
                 <Label>{field.name}</Label>
-                {field.aiAutoComplete && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onRetry(field.id)}
-                    disabled={isRetrying}
-                  >
-                    {isRetrying ? "Regenerating..." : "Regenerate"}
-                  </Button>
+                {!hasContent && field.aiAutoComplete && (
+                  <span className="text-xs text-amber-600 dark:text-amber-400">• Missing content</span>
                 )}
               </div>
-              
-              {field.type === 'richText' ? (
-                <RichTextEditor
-                  value={value}
-                  onChange={(content) => onOutputChange(field.id, content)}
-                  placeholder="Generated content will appear here"
-                />
-              ) : (
-                <div className="p-4 border rounded-md bg-muted/50">
-                  <p className="text-sm whitespace-pre-wrap">{value || 'No content generated'}</p>
-                </div>
-              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onRetry(field.id)}
+                disabled={isRetrying}
+                className="gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`} />
+                {isRetrying ? "Regenerating..." : "Regenerate"}
+              </Button>
             </div>
-          );
-        })}
-      </CardContent>
-    </Card>
+            
+            {field.type === 'richText' ? (
+              <RichTextEditor
+                value={value}
+                onChange={(content) => onOutputChange(field.id, content)}
+                placeholder="Generated content will appear here"
+              />
+            ) : (
+              <div className={`p-4 border rounded-md ${hasContent ? 'bg-muted/50' : 'bg-amber-50/50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800'}`}>
+                <p className="text-sm whitespace-pre-wrap">
+                  {value || (
+                    <span className="text-muted-foreground italic">
+                      No content generated - click Regenerate to generate this field
+                    </span>
+                  )}
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }

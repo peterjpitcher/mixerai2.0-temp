@@ -42,9 +42,13 @@ export function ProductSelect({ brandId, value, onChange }: ProductSelectProps) 
     if (value !== null) {
       onChange(null);
     }
-  }, [brandId, onChange, value]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brandId]); // Only reset when brandId changes, not value
   
-  const products = useMemo(() => data?.products || [], [data?.products]);
+  const products = useMemo(() => {
+    const productList = data?.products || [];
+    return [...productList].sort((a, b) => a.name.localeCompare(b.name));
+  }, [data?.products]);
   const selectedProduct = useMemo(() => products.find(p => p.id === value), [products, value]);
 
   const renderContent = () => {

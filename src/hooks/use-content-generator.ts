@@ -50,7 +50,7 @@ export function useContentGenerator(templateId?: string | null) {
   const [retryingFieldId, setRetryingFieldId] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   
-  const [canGenerateContent] = useState<boolean>(false);
+  const [canGenerateContent] = useState<boolean>(true);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   
   const [productContext, setProductContext] = useState<ProductContext | null>(null);
@@ -203,8 +203,16 @@ export function useContentGenerator(templateId?: string | null) {
         if (!response.ok) throw new Error('Failed to fetch product context');
         
         const data = await response.json();
-        if (data.success && data.context) {
-          setProductContext(data.context);
+        if (data.success && (data.productName || data.styledClaims)) {
+          setProductContext({
+            productName: data.productName,
+            styledClaims: data.styledClaims
+          });
+          if (data.styledClaims) {
+            toast.success(`Loaded claims for: ${data.productName}`);
+          } else {
+            toast.info(`No claims found for: ${data.productName}`);
+          }
         }
       } catch (error: unknown) {
         if (error instanceof Error && error.name !== 'AbortError') {
@@ -228,16 +236,29 @@ export function useContentGenerator(templateId?: string | null) {
     
     setIsLoading(true);
     setAiError(null);
+    setGeneratedOutputs({}); // Clear previous outputs
     
     try {
+      // Prepare input fields with values for the API
+      const input_fields_with_values = (template.inputFields || []).map(field => ({
+        ...field,
+        value: templateFieldValues[field.id] || ''
+      }));
+
       const response = await fetch('/api/content/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          brandId: selectedBrand,
-          templateId: template.id,
-          templateFields: templateFieldValues,
-          product_context: productContext
+          brand_id: selectedBrand,
+          template: {
+            id: template.id,
+            name: template.name,
+            inputFields: input_fields_with_values,
+            outputFields: template.outputFields || []
+          },
+          input: {
+            product_context: productContext,
+          }
         }),
       });
       
@@ -247,9 +268,20 @@ export function useContentGenerator(templateId?: string | null) {
         throw new Error(data.error || 'Failed to generate content');
       }
       
-      if (data.success && data.generatedOutputs) {
-        setGeneratedOutputs(data.generatedOutputs);
-        toast.success('Content generated successfully!');
+      if (data.success) {
+        // Extract the generated outputs from the response
+        // The API returns the fields directly in the response object
+        const { success, userId, error, ...generatedFields } = data;
+        
+        if (Object.keys(generatedFields).length > 0) {
+          setGeneratedOutputs(generatedFields);
+          toast.success('Content generated successfully!');
+          
+          // Log for debugging
+          console.log('Generated outputs:', generatedFields);
+        } else {
+          throw new Error('No content fields were generated');
+        }
       } else {
         throw new Error(data.error || 'No content was generated');
       }
@@ -265,7 +297,7 @@ export function useContentGenerator(templateId?: string | null) {
   
   // Save content
   const saveContent = useCallback(async () => {
-    if (!selectedBrand || !template || !title.trim()) {
+    if (!selectedBrand || !template) {
       toast.error('Please complete all required fields');
       return;
     }
@@ -273,17 +305,35 @@ export function useContentGenerator(templateId?: string | null) {
     setIsSaving(true);
     
     try {
+      // Auto-generate title if not set
+      const autoTitle = title.trim() || `${template.name} - ${new Date().toLocaleDateString()}`;
+      // Get primary body content from generated outputs
+      let primaryBodyContent = '';
+      if (template && (template.outputFields || []).length > 0) {
+        const richTextOutput = (template.outputFields || []).find(f => f.type === 'richText' && generatedOutputs[f.id]);
+        if (richTextOutput) {
+          primaryBodyContent = generatedOutputs[richTextOutput.id];
+        } else {
+          const firstOutputField = (template.outputFields || [])[0];
+          if (firstOutputField && generatedOutputs[firstOutputField.id]) {
+            primaryBodyContent = generatedOutputs[firstOutputField.id];
+          }
+        }
+      }
+
       const response = await fetch('/api/content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title,
-          brandId: selectedBrand,
-          templateId: template.id,
-          generatedOutputs,
-          status: 'draft',
-          templateInputs: templateFieldValues,
-          workflowId: associatedWorkflowDetails?.id
+          brand_id: selectedBrand,
+          template_id: template.id,
+          title: autoTitle,
+          workflow_id: associatedWorkflowDetails?.id,
+          body: primaryBodyContent,
+          content_data: {
+            templateInputValues: templateFieldValues,
+            generatedOutputs: generatedOutputs
+          }
         }),
       });
       
@@ -305,7 +355,7 @@ export function useContentGenerator(templateId?: string | null) {
     } finally {
       setIsSaving(false);
     }
-  }, [selectedBrand, template, title, generatedOutputs, templateFieldValues, associatedWorkflowDetails]);
+  }, [selectedBrand, template, generatedOutputs, templateFieldValues, associatedWorkflowDetails]);
   
   return {
     // State
@@ -341,6 +391,7 @@ export function useContentGenerator(templateId?: string | null) {
     setTemplateFieldValues,
     setIsGeneratingSuggestionFor,
     setRetryingFieldId,
+    setAiError,
     handleTemplateFieldChange,
     generateContent,
     saveContent,
