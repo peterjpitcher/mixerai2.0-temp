@@ -1,9 +1,0 @@
-{
-  "agentId": "agent-1",
-  "status": "ready",
-  "currentIssue": null,
-  "completedIssues": [],
-  "blockedIssues": [],
-  "startedAt": null,
-  "lastUpdate": "2025-06-13T10:27:01.168Z"
-}

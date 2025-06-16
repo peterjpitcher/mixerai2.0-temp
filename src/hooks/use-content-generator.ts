@@ -271,7 +271,7 @@ export function useContentGenerator(templateId?: string | null) {
       if (data.success) {
         // Extract the generated outputs from the response
         // The API returns the fields directly in the response object
-        const { success, userId, error, ...generatedFields } = data;
+        const { ...generatedFields } = data;
         
         if (Object.keys(generatedFields).length > 0) {
           setGeneratedOutputs(generatedFields);
@@ -355,7 +355,7 @@ export function useContentGenerator(templateId?: string | null) {
     } finally {
       setIsSaving(false);
     }
-  }, [selectedBrand, template, generatedOutputs, templateFieldValues, associatedWorkflowDetails]);
+  }, [selectedBrand, template, generatedOutputs, templateFieldValues, associatedWorkflowDetails, title]);
   
   return {
     // State
