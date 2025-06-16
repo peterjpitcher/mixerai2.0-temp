@@ -86,7 +86,7 @@ MixerAI2.0/
 
 ## Architecture Overview
 
-MixerAI 2.0 is a Next.js 14 application using the App Router for AI-powered content generation. Key architectural decisions:
+MixerAI 2.0 is a Next.js 14 application using the App Router for AI-powered content generation. Users can manage branded content through a flexible workflow interface powered by Supabase for backend services and PostgreSQL. Key architectural decisions:
 
 ### Technology Stack
 - **Framework**: Next.js 14 with App Router, React 18
@@ -136,6 +136,7 @@ MixerAI 2.0 is a Next.js 14 application using the App Router for AI-powered cont
 5. **Loading States**: Skeleton screens and loading indicators throughout
 6. **Form Handling**: React Hook Form with Zod schema validation
 7. **State Management**: React Context for global state, local state for components
+8. **Database Connections**: Can use either Supabase (default) or direct PostgreSQL connection for local development
 
 ## Critical Implementation Details
 
@@ -198,6 +199,13 @@ GITHUB_OWNER=                   # GitHub organization/user
 GITHUB_REPO=                    # GitHub repository name
 NEXT_PUBLIC_GITHUB_OWNER=       # GitHub organization/user (for client-side links)
 NEXT_PUBLIC_GITHUB_REPO=        # GitHub repository name (for client-side links)
+
+# Local Development (Optional)
+POSTGRES_HOST=                  # PostgreSQL host for direct connection
+POSTGRES_PORT=                  # PostgreSQL port
+POSTGRES_USER=                  # PostgreSQL user
+POSTGRES_PASSWORD=              # PostgreSQL password
+POSTGRES_DB=                    # PostgreSQL database name
 ```
 
 ## UI Standards Compliance
@@ -249,10 +257,16 @@ Follow the established design system documented in `/docs/UI_STANDARDS.md`:
 - TypeScript configured with `noImplicitAny: false` (allows implicit any)
 
 ### Error Handling
-- NO FALLBACKS for AI generation failures
-- Always propagate actual errors to users
+- **NO FALLBACKS for AI generation failures** - This is a strict policy
+- In `src/lib/azure/openai.ts`, AI generation functions must NEVER fall back to template-based content when API calls fail
+- No default or pre-written content should be returned if the Azure OpenAI API is unavailable
+- Always propagate actual errors to users with transparent reporting
+- Error states should suggest trying again later rather than using fallbacks
 - Log errors with appropriate context
 - Use try-catch in all async operations
+- Always validate data before using string methods or object properties
+- Use optional chaining (`?.`) for nested object access
+- Check if strings exist before calling methods like `.trim()`, `.includes()`, etc.
 
 ### Performance
 - Implement code splitting for large components
@@ -362,6 +376,18 @@ touch migrations/$(date +%Y%m%d)_description.sql
 
 # Reset database (caution: destroys data)
 ./scripts/reset-database.sh
+```
+
+### Local Development with PostgreSQL
+```bash
+# Run with local database instead of Supabase
+./scripts/use-local-db.sh
+
+# Clean database (removes test data)
+./scripts/clean-database.sh
+
+# Add test user for authentication
+./scripts/add-test-user.sh
 ```
 
 ## License

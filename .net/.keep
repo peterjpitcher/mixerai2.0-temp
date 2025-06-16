@@ -1,2 +1,0 @@
-# This file exists to ensure the .net directory is included in Git and available during build
-# The .net directory is required for the routes-manifest.json file that Vercel needs 

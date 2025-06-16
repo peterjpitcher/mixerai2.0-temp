@@ -9,6 +9,7 @@ export type FieldType =
   | 'longText' 
   | 'richText'
   | 'select' 
+  | 'multiselect'
   | 'number' 
   | 'date' 
   | 'tags' 
@@ -48,6 +49,7 @@ export type InputFieldOptionType =
   | ({ type: 'longText'; options?: LongTextOptions })
   | ({ type: 'richText'; options?: RichTextOptions })
   | ({ type: 'select'; options?: SelectOptions })
+  | ({ type: 'multiselect'; options?: SelectOptions })
   | ({ type: 'number'; options?: NumberOptions })
   | ({ type: 'date'; options?: DateOptions })
   | ({ type: 'tags'; options?: TagsOptions })
@@ -56,7 +58,7 @@ export type InputFieldOptionType =
   | ({ type: 'product-selector', options?: ProductSelectorOptions });
 
 export interface InputField extends BaseField {
-  type: Extract<FieldType, 'shortText' | 'longText' | 'richText' | 'select' | 'number' | 'date' | 'tags' | 'url' | 'fileUpload' | 'product-selector'>;
+  type: Extract<FieldType, 'shortText' | 'longText' | 'richText' | 'select' | 'multiselect' | 'number' | 'date' | 'tags' | 'url' | 'fileUpload' | 'product-selector'>;
   options?: InputFieldOptionType['options'];
   aiSuggester?: boolean;
 }
