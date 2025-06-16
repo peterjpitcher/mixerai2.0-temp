@@ -106,8 +106,7 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
         const generatedContent = await generateContentFromTemplate(
           brandInfoForGeneration,
           data.template,
-          finalInput,
-          { userId: user.id, brandId: data.brand_id }
+          finalInput
         );
         return NextResponse.json({
           success: true,

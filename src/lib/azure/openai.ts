@@ -1,6 +1,6 @@
 import { OpenAI } from "openai";
 import type { StyledClaims } from "@/types/claims";
-import { trackTokenUsage, extractTokenCounts } from "./token-tracking";
+import { activityTracker } from "./activity-tracker";
 
 // Initialize the Azure OpenAI client
 export const getAzureOpenAIClient = () => {
@@ -50,8 +50,7 @@ export async function generateTextCompletion(
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number = 250, // Sensible default for descriptions
-  temperature: number = 0.7,
-  context?: { userId?: string; brandId?: string; endpoint?: string }
+  temperature: number = 0.7
 ): Promise<string | null> {
   try {
     const deploymentName = getModelName(); // Use the centralized model/deployment name
@@ -77,49 +76,57 @@ export async function generateTextCompletion(
 
     const endpointUrl = `${azureOpenAIEndpoint}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
 
-    const response = await fetch(endpointUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': apiKey,
-      },
-      body: JSON.stringify(completionRequest),
-    });
+    // Start tracking the request
+    const requestId = activityTracker.startRequest('generateTextCompletion');
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[generateTextCompletion] API request failed with status ${response.status}: ${errorText}`);
-      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
-    }
-
-    const responseData = await response.json();
-
-    // Track token usage if context is provided
-    if (context?.userId) {
-      const tokenCounts = extractTokenCounts(responseData);
-      await trackTokenUsage({
-        userId: context.userId,
-        brandId: context.brandId,
-        endpoint: context.endpoint || 'generateTextCompletion',
-        model: deploymentName,
-        promptTokens: tokenCounts.promptTokens,
-        completionTokens: tokenCounts.completionTokens,
-        totalTokens: tokenCounts.totalTokens,
-        metadata: {
-          maxTokens,
-          temperature
-        }
+    try {
+      const response = await fetch(endpointUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': apiKey,
+        },
+        body: JSON.stringify(completionRequest),
       });
-    }
 
-    if (responseData.choices && responseData.choices.length > 0 && responseData.choices[0].message) {
-      const content = responseData.choices[0].message.content;
-      return content;
-    } else {
-      console.error("[generateTextCompletion] No content in completion choices or choices array is empty.");
-      // Consistent with original logic, though an error was thrown above for !response.ok
-      // This case implies a 200 OK but unexpected payload.
-      return null; 
+      // Extract rate limit headers
+      const rateLimitHeaders = {
+        'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests'),
+        'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests'),
+        'retry-after': response.headers.get('retry-after')
+      };
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[generateTextCompletion] API request failed with status ${response.status}: ${errorText}`);
+        
+        // Check if it's a rate limit error
+        const status = response.status === 429 ? 'rate_limited' : 'error';
+        activityTracker.completeRequest(requestId, status, rateLimitHeaders);
+        
+        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+      }
+
+      // Mark request as successful
+      activityTracker.completeRequest(requestId, 'success', rateLimitHeaders);
+
+      const responseData = await response.json();
+
+      if (responseData.choices && responseData.choices.length > 0 && responseData.choices[0].message) {
+        const content = responseData.choices[0].message.content;
+        return content;
+      } else {
+        console.error("[generateTextCompletion] No content in completion choices or choices array is empty.");
+        // Consistent with original logic, though an error was thrown above for !response.ok
+        // This case implies a 200 OK but unexpected payload.
+        return null; 
+      }
+    } catch (requestError) {
+      // Make sure to mark the request as failed if it wasn't already
+      if (requestId) {
+        activityTracker.completeRequest(requestId, 'error');
+      }
+      throw requestError;
     }
   } catch (error) {
     console.error("[generateTextCompletion] Error calling Azure OpenAI:", error);
@@ -207,8 +214,7 @@ export async function generateContentFromTemplate(
     additionalInstructions?: string;
     templateFields?: Record<string, string>;
     product_context?: { productName: string; styledClaims: StyledClaims | null };
-  },
-  context?: { userId?: string; brandId?: string }
+  }
 ) {
   // console.log(`Generating template-based content for brand: ${brand.name} using template: ${template.name}`);
   // console.log(`Targeting Language: ${brand.language || 'not specified'}, Country: ${brand.country || 'not specified'}`);
@@ -410,6 +416,9 @@ The product context is provided in the user prompt.
     const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
     // console.log(`Using direct endpoint URL: ${endpoint}`);
     
+    // Start tracking the request
+    const requestId = activityTracker.startRequest('generateContentFromTemplate');
+    
     // Make a direct fetch call
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -420,32 +429,25 @@ The product context is provided in the user prompt.
       body: JSON.stringify(completionRequest)
     });
     
+    // Extract rate limit headers
+    const rateLimitHeaders = {
+      'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests'),
+      'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests'),
+      'retry-after': response.headers.get('retry-after')
+    };
+    
     if (!response.ok) {
       const errorText = await response.text();
+      const status = response.status === 429 ? 'rate_limited' : 'error';
+      activityTracker.completeRequest(requestId, status, rateLimitHeaders);
       throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
     
+    // Mark request as successful
+    activityTracker.completeRequest(requestId, 'success', rateLimitHeaders);
+    
     const responseData = await response.json();
     // console.log("API call successful");
-    
-    // Track token usage if context is provided
-    if (context?.userId) {
-      const tokenCounts = extractTokenCounts(responseData);
-      await trackTokenUsage({
-        userId: context.userId,
-        brandId: context.brandId,
-        endpoint: 'generateContentFromTemplate',
-        model: deploymentName,
-        promptTokens: tokenCounts.promptTokens,
-        completionTokens: tokenCounts.completionTokens,
-        totalTokens: tokenCounts.totalTokens,
-        metadata: {
-          templateId: template.id,
-          templateName: template.name,
-          brandName: brand.name
-        }
-      });
-    }
     
     let content = responseData.choices?.[0]?.message?.content || "";
     // console.log(`Received response with content length: ${content.length}`);
@@ -587,6 +589,9 @@ export async function generateBrandIdentityFromUrls(
       `;
       
       // Make the API call
+      // Start tracking the request
+      const requestId = activityTracker.startRequest('generateBrandIdentityFromUrls');
+      
   try {
       // console.log("Sending request to Azure OpenAI API");
       // console.log(`Using deployment: ${deploymentName}`);
@@ -624,25 +629,12 @@ export async function generateBrandIdentityFromUrls(
 
       const responseData = await response.json();
       
-      // Track token usage if context is provided
-      if (context?.userId) {
-        const tokenCounts = extractTokenCounts(responseData);
-        await trackTokenUsage({
-          userId: context.userId,
-          brandId: context.brandId,
-          endpoint: 'generateBrandIdentityFromUrls',
-          model: deploymentName,
-          promptTokens: tokenCounts.promptTokens,
-          completionTokens: tokenCounts.completionTokens,
-          totalTokens: tokenCounts.totalTokens,
-          metadata: {
-            brandName,
-            language,
-            country,
-            urlCount: urls.length
-          }
-        });
-      }
+      // Complete the request tracking
+      activityTracker.completeRequest(requestId, 'success', {
+        'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests'),
+        'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests'),
+        'retry-after': response.headers.get('retry-after')
+      });
       
       // console.log("Received response from Azure OpenAI API");
       const responseContent = responseData.choices[0]?.message?.content || "{}";
@@ -665,6 +657,8 @@ export async function generateBrandIdentityFromUrls(
           };
         } catch (error) {
     console.error("Error generating brand identity with Azure OpenAI:", error);
+    // Mark request as failed
+    activityTracker.completeRequest(requestId, 'error');
     throw new Error(`Failed to generate brand identity: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
