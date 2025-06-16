@@ -1,25 +1,22 @@
 import { NextResponse } from 'next/server';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
+import { getUserTokenUsage } from '@/lib/azure/token-tracking';
+
+export const dynamic = 'force-dynamic';
 
 export const GET = withAuthAndMonitoring(async (request, user) => {
   try {
-    // Azure OpenAI doesn't provide direct token usage APIs
-    // We'll need to implement our own tracking or use Azure Monitor
-    // For now, return mock data structure
-    
-    // TODO: Implement actual usage tracking
-    // Options:
-    // 1. Track usage in database after each API call
-    // 2. Use Azure Monitor API to get usage metrics
-    // 3. Parse usage from API responses and aggregate
+    const usage = await getUserTokenUsage(user.id);
     
     return NextResponse.json({
       success: true,
       usage: {
-        tokens_used: 0,
-        tokens_limit: 1000000, // 1M tokens as example
+        tokens_used: usage.currentMonth.totalTokens,
+        tokens_limit: usage.limit,
         period: 'monthly',
-        reset_date: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString()
+        reset_date: usage.resetDate.toISOString(),
+        cost_usd: usage.currentMonth.totalCost,
+        request_count: usage.currentMonth.requestCount
       }
     });
   } catch (error) {

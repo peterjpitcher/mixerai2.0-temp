@@ -1,5 +1,6 @@
 import { OpenAI } from "openai";
 import type { StyledClaims } from "@/types/claims";
+import { trackTokenUsage, extractTokenCounts } from "./token-tracking";
 
 // Initialize the Azure OpenAI client
 export const getAzureOpenAIClient = () => {
@@ -49,7 +50,8 @@ export async function generateTextCompletion(
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number = 250, // Sensible default for descriptions
-  temperature: number = 0.7
+  temperature: number = 0.7,
+  context?: { userId?: string; brandId?: string; endpoint?: string }
 ): Promise<string | null> {
   try {
     const deploymentName = getModelName(); // Use the centralized model/deployment name
@@ -91,6 +93,24 @@ export async function generateTextCompletion(
     }
 
     const responseData = await response.json();
+
+    // Track token usage if context is provided
+    if (context?.userId) {
+      const tokenCounts = extractTokenCounts(responseData);
+      await trackTokenUsage({
+        userId: context.userId,
+        brandId: context.brandId,
+        endpoint: context.endpoint || 'generateTextCompletion',
+        model: deploymentName,
+        promptTokens: tokenCounts.promptTokens,
+        completionTokens: tokenCounts.completionTokens,
+        totalTokens: tokenCounts.totalTokens,
+        metadata: {
+          maxTokens,
+          temperature
+        }
+      });
+    }
 
     if (responseData.choices && responseData.choices.length > 0 && responseData.choices[0].message) {
       const content = responseData.choices[0].message.content;
@@ -187,7 +207,8 @@ export async function generateContentFromTemplate(
     additionalInstructions?: string;
     templateFields?: Record<string, string>;
     product_context?: { productName: string; styledClaims: StyledClaims | null };
-  }
+  },
+  context?: { userId?: string; brandId?: string }
 ) {
   // console.log(`Generating template-based content for brand: ${brand.name} using template: ${template.name}`);
   // console.log(`Targeting Language: ${brand.language || 'not specified'}, Country: ${brand.country || 'not specified'}`);
@@ -407,6 +428,25 @@ The product context is provided in the user prompt.
     const responseData = await response.json();
     // console.log("API call successful");
     
+    // Track token usage if context is provided
+    if (context?.userId) {
+      const tokenCounts = extractTokenCounts(responseData);
+      await trackTokenUsage({
+        userId: context.userId,
+        brandId: context.brandId,
+        endpoint: 'generateContentFromTemplate',
+        model: deploymentName,
+        promptTokens: tokenCounts.promptTokens,
+        completionTokens: tokenCounts.completionTokens,
+        totalTokens: tokenCounts.totalTokens,
+        metadata: {
+          templateId: template.id,
+          templateName: template.name,
+          brandName: brand.name
+        }
+      });
+    }
+    
     let content = responseData.choices?.[0]?.message?.content || "";
     // console.log(`Received response with content length: ${content.length}`);
     
@@ -505,7 +545,8 @@ export async function generateBrandIdentityFromUrls(
   brandName: string,
   urls: string[],
   language: string,
-  country: string
+  country: string,
+  context?: { userId?: string; brandId?: string }
 ): Promise<{
   brandIdentity: string;
   toneOfVoice: string;
@@ -523,7 +564,6 @@ export async function generateBrandIdentityFromUrls(
     // console.log("- AZURE_OPENAI_DEPLOYMENT:", process.env.AZURE_OPENAI_DEPLOYMENT);
   
   const deploymentName = getModelName();
-  const client = getAzureOpenAIClient();
       
       // Prepare the prompt
       const prompt = `
@@ -555,7 +595,7 @@ export async function generateBrandIdentityFromUrls(
       // console.log("---- System Prompt ----\n", systemMessageContent);
       // console.log("---- User Prompt for Brand Identity ----\n", prompt);
 
-      const completion = await client.chat.completions.create({
+      const completionRequest = {
         model: deploymentName,
         messages: [
           { role: "system", content: systemMessageContent },
@@ -564,10 +604,48 @@ export async function generateBrandIdentityFromUrls(
         temperature: 0.7,
         max_tokens: 1000,
         response_format: { type: "json_object" }
+      };
+
+      const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': process.env.AZURE_OPENAI_API_KEY || ''
+        },
+        body: JSON.stringify(completionRequest)
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+      }
+
+      const responseData = await response.json();
+      
+      // Track token usage if context is provided
+      if (context?.userId) {
+        const tokenCounts = extractTokenCounts(responseData);
+        await trackTokenUsage({
+          userId: context.userId,
+          brandId: context.brandId,
+          endpoint: 'generateBrandIdentityFromUrls',
+          model: deploymentName,
+          promptTokens: tokenCounts.promptTokens,
+          completionTokens: tokenCounts.completionTokens,
+          totalTokens: tokenCounts.totalTokens,
+          metadata: {
+            brandName,
+            language,
+            country,
+            urlCount: urls.length
+          }
+        });
+      }
       
       // console.log("Received response from Azure OpenAI API");
-      const responseContent = completion.choices[0]?.message?.content || "{}";
+      const responseContent = responseData.choices[0]?.message?.content || "{}";
       // console.log("Raw API response:", responseContent.substring(0, 100) + "...");
       
     const parsedResponse = JSON.parse(responseContent);
