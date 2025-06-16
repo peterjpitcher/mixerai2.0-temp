@@ -80,17 +80,12 @@ async function styleBrandClaimsHandler(request: NextRequest) {
     // 2. Sort claims to establish precedence
     const sortedClaims = allClaims.sort(sortClaims);
 
-    // 3. Deduplicate, keeping the highest-precedence claim for each text
-    const uniqueClaimsMap = new Map<string, Claim>();
-    for (const claim of sortedClaims) {
-      if (!uniqueClaimsMap.has(claim.claim_text)) {
-        uniqueClaimsMap.set(claim.claim_text, claim);
-      }
-    }
-    const uniqueClaims = Array.from(uniqueClaimsMap.values());
+    // 3. Use all claims without deduplication to preserve exact database values
+    // Note: Keeping all claims as requested in issue #107
+    const allClaimsToDisplay = sortedClaims;
 
     // Prepare for AI
-    const claimsForAI = uniqueClaims.map(claim => ({
+    const claimsForAI = allClaimsToDisplay.map(claim => ({
       text: claim.claim_text,
       type: claim.claim_type,
       level: claim.level,
@@ -126,11 +121,11 @@ The final output must be a single JSON object with the following structure:
 }
 
 Instructions:
-1.  **Rewrite Each Claim**: Rewrite the "text" of each input claim to be more natural and readable for a marketing professional.
+1.  **Preserve Exact Claim Text**: DO NOT modify or rewrite any claim text. Use the exact "text" value from each input claim without any changes.
 2.  **Populate the Structure**:
     - Create a concise introductory sentence.
-    - For 'mandatory' claims, place them in the \`mandatory_claims\` array as objects, including both the rewritten \`text\` and the original \`level\`.
-    - For all other claims, place them in the correct \`allowed_claims\` or \`disallowed_claims\` array within the object that matches their \`level\`.
+    - For 'mandatory' claims, place them in the \`mandatory_claims\` array as objects, including the exact \`text\` (unmodified) and the original \`level\`.
+    - For all other claims, place them in the correct \`allowed_claims\` or \`disallowed_claims\` array within the object that matches their \`level\`, using the exact claim text.
     - Ensure every level group ('Product', 'Ingredient', 'Brand') is present in the \`grouped_claims\` array, even if its claim arrays are empty.
 3.  **Return ONLY JSON**: The final output must be only the JSON object. Do not include any other text, formatting, or explanations.`;
     

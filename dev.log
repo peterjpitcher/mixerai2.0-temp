@@ -19,3 +19,5 @@
  ✓ Compiled /api/env-check in 1296ms (1000 modules)
  GET /api/env-check 401 in 1451ms
  ✓ Compiled in 917ms (400 modules)
+ ✓ Compiled in 1561ms (400 modules)
+ ✓ Compiled in 526ms (400 modules)
