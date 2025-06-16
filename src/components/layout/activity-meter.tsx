@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Activity, AlertCircle, Zap } from 'lucide-react';
+import { Gauge, AlertCircle, Zap, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ActivityStats {
@@ -11,8 +11,10 @@ interface ActivityStats {
   rateLimitStatus: 'normal' | 'warning' | 'critical';
   rateLimitInfo?: {
     remaining: number;
+    limit: number;
     resetIn: number;
   };
+  lastUpdated?: number;
 }
 
 export function ActivityMeter() {
@@ -42,16 +44,31 @@ export function ActivityMeter() {
     return () => clearInterval(interval);
   }, []);
 
-  // Calculate meter levels (0-10 bars)
-  const activityLevel = Math.min(10, Math.floor((stats.requestsPerMinute / 60) * 10));
+  // Calculate capacity level (0-10 bars based on remaining rate limit)
+  const capacityLevel = stats.rateLimitInfo 
+    ? Math.ceil((stats.rateLimitInfo.remaining / stats.rateLimitInfo.limit) * 10)
+    : 10; // Default to full if no rate limit info
   
-  // Determine color based on status
+  // Determine color based on capacity (inverse of activity - more capacity = good)
   const getBarColor = (index: number) => {
-    if (stats.rateLimitStatus === 'critical') return 'bg-red-500';
-    if (stats.rateLimitStatus === 'warning' && index >= 7) return 'bg-yellow-500';
-    if (index < 3) return 'bg-green-500';
-    if (index < 7) return 'bg-yellow-500';
+    if (index >= capacityLevel) return ''; // Empty bars
+    
+    const percentageRemaining = stats.rateLimitInfo 
+      ? (stats.rateLimitInfo.remaining / stats.rateLimitInfo.limit) * 100
+      : 100;
+    
+    if (percentageRemaining >= 70) return 'bg-green-500';
+    if (percentageRemaining >= 30) return 'bg-yellow-500';
     return 'bg-red-500';
+  };
+  
+  // Format time since last update
+  const getTimeSinceUpdate = () => {
+    if (!stats.lastUpdated) return null;
+    const seconds = Math.floor((Date.now() - stats.lastUpdated) / 1000);
+    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    return `${Math.floor(seconds / 3600)}h ago`;
   };
 
   return (
@@ -60,38 +77,37 @@ export function ActivityMeter() {
         {/* Header */}
         <div className="flex items-center justify-between text-xs">
           <div className="flex items-center gap-1.5">
-            <Activity className={cn(
+            <Gauge className={cn(
               "h-3.5 w-3.5",
-              stats.activeRequests > 0 ? "animate-pulse" : "",
               stats.rateLimitStatus === 'critical' ? "text-red-500" : 
               stats.rateLimitStatus === 'warning' ? "text-yellow-500" : 
               "text-green-500"
             )} />
-            <span className="font-medium">AI Activity</span>
+            <span className="font-medium">AI Capacity</span>
           </div>
           <div className="flex items-center gap-2">
-            {stats.activeRequests > 0 && (
-              <span className="text-muted-foreground">
-                {stats.activeRequests} active
+            {getTimeSinceUpdate() && (
+              <span className="flex items-center gap-1 text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                {getTimeSinceUpdate()}
               </span>
             )}
-            {stats.rateLimitStatus !== 'normal' && (
-              <AlertCircle className={cn(
-                "h-3 w-3",
-                stats.rateLimitStatus === 'critical' ? "text-red-500" : "text-yellow-500"
-              )} />
+            {stats.activeRequests > 0 && (
+              <span className="text-primary animate-pulse">
+                {stats.activeRequests} active
+              </span>
             )}
           </div>
         </div>
         
-        {/* Activity Meter */}
+        {/* Capacity Meter */}
         <div className="flex items-end gap-0.5 h-8">
           {Array.from({ length: 10 }).map((_, i) => (
             <div
               key={i}
               className={cn(
                 "flex-1 rounded-sm transition-all duration-200",
-                i < activityLevel
+                i < capacityLevel
                   ? getBarColor(i)
                   : "bg-muted",
                 "h-" + (i < 3 ? "2" : i < 7 ? "4" : "8")
@@ -102,9 +118,13 @@ export function ActivityMeter() {
         
         {/* Stats */}
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>{stats.requestsPerMinute} req/min</span>
-          {stats.averageResponseTime > 0 && (
-            <span>{stats.averageResponseTime}ms avg</span>
+          {stats.rateLimitInfo ? (
+            <>
+              <span>{stats.rateLimitInfo.remaining}/{stats.rateLimitInfo.limit} requests</span>
+              <span>{Math.round((stats.rateLimitInfo.remaining / stats.rateLimitInfo.limit) * 100)}% available</span>
+            </>
+          ) : (
+            <span>No rate limit data</span>
           )}
         </div>
         
@@ -117,11 +137,14 @@ export function ActivityMeter() {
               : "bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400"
           )}>
             <div className="flex items-center gap-1">
-              <Zap className="h-3 w-3" />
-              <span className="font-medium">Rate limit approaching</span>
+              <AlertCircle className="h-3 w-3" />
+              <span className="font-medium">
+                {stats.rateLimitStatus === 'critical' ? 'Critical: ' : 'Warning: '}
+                Low capacity
+              </span>
             </div>
             <span className="block mt-0.5">
-              {stats.rateLimitInfo.remaining} requests left, resets in {Math.ceil(stats.rateLimitInfo.resetIn / 60)}m
+              {stats.rateLimitInfo.remaining} requests remaining, resets in {Math.ceil(stats.rateLimitInfo.resetIn / 60)}m
             </span>
           </div>
         )}

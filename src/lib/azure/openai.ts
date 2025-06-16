@@ -89,12 +89,17 @@ export async function generateTextCompletion(
         body: JSON.stringify(completionRequest),
       });
 
-      // Extract rate limit headers
+      // Extract rate limit headers (Azure OpenAI format)
       const rateLimitHeaders = {
-        'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests'),
-        'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests'),
-        'retry-after': response.headers.get('retry-after')
+        'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
+        'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
+        'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
       };
+      
+      // Debug: Log all headers to understand what Azure returns
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Azure OpenAI] Response headers:', Object.fromEntries(response.headers.entries()));
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -624,17 +629,31 @@ export async function generateBrandIdentityFromUrls(
 
       if (!response.ok) {
         const errorText = await response.text();
+        
+        // Extract rate limit headers even on error
+        const rateLimitHeaders = {
+          'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
+          'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
+          'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
+        };
+        
+        const status = response.status === 429 ? 'rate_limited' : 'error';
+        activityTracker.completeRequest(requestId, status, rateLimitHeaders);
+        
         throw new Error(`API request failed with status ${response.status}: ${errorText}`);
       }
 
       const responseData = await response.json();
       
+      // Extract rate limit headers (Azure OpenAI format)
+      const rateLimitHeaders = {
+        'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
+        'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
+        'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
+      };
+      
       // Complete the request tracking
-      activityTracker.completeRequest(requestId, 'success', {
-        'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests'),
-        'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests'),
-        'retry-after': response.headers.get('retry-after')
-      });
+      activityTracker.completeRequest(requestId, 'success', rateLimitHeaders);
       
       // console.log("Received response from Azure OpenAI API");
       const responseContent = responseData.choices[0]?.message?.content || "{}";

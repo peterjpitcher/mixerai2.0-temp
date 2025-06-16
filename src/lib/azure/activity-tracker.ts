@@ -21,8 +21,10 @@ export interface ActivityStats {
   rateLimitStatus: 'normal' | 'warning' | 'critical';
   rateLimitInfo?: {
     remaining: number;
+    limit: number;
     resetIn: number; // seconds
   };
+  lastUpdated?: number; // timestamp of last rate limit info
 }
 
 class ActivityTracker {
@@ -83,29 +85,37 @@ class ActivityTracker {
       ? recentRequests.reduce((sum, r) => sum + (r.duration || 0), 0) / recentRequests.length
       : 0;
 
-    // Get latest rate limit info
-    const latestRequest = recentRequests
+    // Get latest rate limit info from any request (not just recent)
+    const allRequests = [...this.completedRequests, ...Array.from(this.requests.values())];
+    const latestRequest = allRequests
       .filter(r => r.rateLimitHeaders?.remaining)
       .sort((a, b) => b.timestamp - a.timestamp)[0];
 
     let rateLimitStatus: 'normal' | 'warning' | 'critical' = 'normal';
     let rateLimitInfo;
+    let lastUpdated;
 
     if (latestRequest?.rateLimitHeaders?.remaining) {
       const remaining = parseInt(latestRequest.rateLimitHeaders.remaining);
+      // Azure OpenAI typically has limits of 1000 requests per minute for GPT-4
+      const limit = 1000; // Default limit, could be made configurable
+      const percentageRemaining = (remaining / limit) * 100;
       
-      if (remaining < 10) {
+      if (percentageRemaining < 10) {
         rateLimitStatus = 'critical';
-      } else if (remaining < 50) {
+      } else if (percentageRemaining < 30) {
         rateLimitStatus = 'warning';
       }
 
       rateLimitInfo = {
         remaining,
+        limit,
         resetIn: latestRequest.rateLimitHeaders.reset 
           ? parseInt(latestRequest.rateLimitHeaders.reset) 
           : 60
       };
+      
+      lastUpdated = latestRequest.timestamp;
     }
 
     // Also check if we're getting rate limited
@@ -119,7 +129,8 @@ class ActivityTracker {
       requestsPerMinute,
       averageResponseTime: Math.round(avgResponseTime),
       rateLimitStatus,
-      rateLimitInfo
+      rateLimitInfo,
+      lastUpdated
     };
   }
 
