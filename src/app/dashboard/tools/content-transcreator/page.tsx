@@ -459,7 +459,42 @@ export default function ContentTransCreatorPage() {
                   Content successfully trans-created for {selectedBrandDetails?.name} ({results.targetLanguage.toUpperCase()}-{results.targetCountry.toUpperCase()}).
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {/* Summary Statistics */}
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Source:</span>
+                      <p className="font-semibold">{sourceLanguage.toUpperCase()}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Target:</span>
+                      <p className="font-semibold">{results.targetLanguage.toUpperCase()}-{results.targetCountry.toUpperCase()}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Original:</span>
+                      <p className="font-semibold">{content.trim().split(/\s+/).length} words</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Trans-created:</span>
+                      <p className="font-semibold">{results.transCreatedContent.trim().split(/\s+/).length} words</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 pt-2 border-t">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Length Change:</span>
+                      <Badge variant={
+                        Math.abs(((results.transCreatedContent.length - content.length) / content.length) * 100) > 20 
+                          ? "outline" 
+                          : "secondary"
+                      }>
+                        {results.transCreatedContent.length > content.length ? '+' : ''}
+                        {Math.round(((results.transCreatedContent.length - content.length) / content.length) * 100)}%
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+                
                 <Textarea value={results.transCreatedContent} readOnly rows={10} className="min-h-[200px]" />
               </CardContent>
               <CardFooter>

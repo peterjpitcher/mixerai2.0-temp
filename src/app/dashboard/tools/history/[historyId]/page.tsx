@@ -480,10 +480,108 @@ type ContentTranscreatorOutputs = ContentTranscreatorSuccessOutputs | ContentTra
 
 
 const ContentTranscreatorHistoryDisplay = ({ inputs, outputs, status }: { inputs: ContentTranscreatorInputs, outputs: ContentTranscreatorOutputs, status: 'success' | 'failure' }) => {
+  // Helper function to get language name from code
+  const getLanguageName = (code: string) => {
+    const languages: Record<string, string> = {
+      'en': 'English',
+      'fr': 'French',
+      'es': 'Spanish',
+      'de': 'German',
+      'it': 'Italian',
+      'pt': 'Portuguese',
+      'nl': 'Dutch',
+      'ja': 'Japanese',
+      'zh': 'Chinese',
+      'ko': 'Korean',
+      'ar': 'Arabic',
+      'ru': 'Russian',
+      'hi': 'Hindi'
+    };
+    return languages[code] || code.toUpperCase();
+  };
+
+  // Helper function to get country name from code
+  const getCountryName = (code: string) => {
+    const countries: Record<string, string> = {
+      'US': 'United States',
+      'GB': 'United Kingdom',
+      'FR': 'France',
+      'DE': 'Germany',
+      'ES': 'Spain',
+      'IT': 'Italy',
+      'PT': 'Portugal',
+      'NL': 'Netherlands',
+      'JP': 'Japan',
+      'CN': 'China',
+      'KR': 'South Korea',
+      'IN': 'India',
+      'BR': 'Brazil',
+      'MX': 'Mexico',
+      'CA': 'Canada',
+      'AU': 'Australia'
+    };
+    return countries[code] || code;
+  };
+
+  // Calculate content lengths
+  const originalLength = inputs.content?.length || 0;
+  const transCreatedLength = status === 'success' && outputs.transCreatedContent ? 
+    (outputs as ContentTranscreatorSuccessOutputs).transCreatedContent.length : 0;
+  const lengthChange = transCreatedLength - originalLength;
+  const lengthChangePercent = originalLength > 0 ? Math.round((lengthChange / originalLength) * 100) : 0;
+
+  // Count words for better content analysis
+  const countWords = (text: string) => text.trim().split(/\s+/).filter(word => word.length > 0).length;
+  const originalWords = inputs.content ? countWords(inputs.content) : 0;
+  const transCreatedWords = status === 'success' && outputs.transCreatedContent ? 
+    countWords((outputs as ContentTranscreatorSuccessOutputs).transCreatedContent) : 0;
+
   return (
     <div className="space-y-4">
+      {/* Summary Statistics */}
+      {status === 'success' && outputs.transCreatedContent && (
+        <div className="bg-muted/50 rounded-lg p-4">
+          <h4 className="font-semibold mb-2 text-base">Trans-creation Summary</h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <span className="text-muted-foreground">Source Language:</span>
+              <p className="font-semibold">{getLanguageName(inputs.sourceLanguage || 'en')}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Target Language:</span>
+              <p className="font-semibold">{getLanguageName((outputs as ContentTranscreatorSuccessOutputs).targetLanguage)}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Target Market:</span>
+              <p className="font-semibold">{getCountryName((outputs as ContentTranscreatorSuccessOutputs).targetCountry)}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Status:</span>
+              <Badge variant="default" className="mt-1">Success</Badge>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4 text-sm mt-3 pt-3 border-t">
+            <div>
+              <span className="text-muted-foreground">Original Content:</span>
+              <p className="font-semibold">{originalWords} words ({originalLength} chars)</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Trans-created Content:</span>
+              <p className="font-semibold">
+                {transCreatedWords} words ({transCreatedLength} chars)
+                {lengthChangePercent !== 0 && (
+                  <span className={`ml-2 text-xs ${lengthChangePercent > 0 ? 'text-green-600' : 'text-orange-600'}`}>
+                    ({lengthChangePercent > 0 ? '+' : ''}{lengthChangePercent}%)
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
-        <h4 className="font-semibold mb-2 text-base">Inputs</h4>
+        <h4 className="font-semibold mb-2 text-base">Input Details</h4>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -494,25 +592,43 @@ const ContentTranscreatorHistoryDisplay = ({ inputs, outputs, status }: { inputs
             </TableHeader>
             <TableBody>
               <TableRow>
-                <TableCell>Original Content</TableCell>
-                <TableCell className="whitespace-pre-wrap">{inputs.content}</TableCell>
+                <TableCell>Source Language</TableCell>
+                <TableCell className="font-medium">
+                  {getLanguageName(inputs.sourceLanguage || 'en')} ({inputs.sourceLanguage || 'en'})
+                </TableCell>
               </TableRow>
-              {inputs.sourceLanguage && (
-                <TableRow>
-                  <TableCell>Source Language</TableCell>
-                  <TableCell>{inputs.sourceLanguage}</TableCell>
-                </TableRow>
-              )}
               <TableRow>
                 <TableCell>Target Brand ID</TableCell>
-                <TableCell>{inputs.brand_id}</TableCell>
+                <TableCell className="font-mono text-sm">{inputs.brand_id}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Content Statistics</TableCell>
+                <TableCell>
+                  <div className="space-y-1">
+                    <p>{originalWords} words</p>
+                    <p className="text-sm text-muted-foreground">{originalLength} characters</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Original Content Preview</TableCell>
+                <TableCell>
+                  <div className="max-h-32 overflow-y-auto">
+                    <p className="whitespace-pre-wrap text-sm">
+                      {inputs.content.length > 500 ? 
+                        `${inputs.content.substring(0, 500)}...` : 
+                        inputs.content}
+                    </p>
+                  </div>
+                </TableCell>
               </TableRow>
             </TableBody>
           </Table>
         </div>
       </div>
+
       <div>
-        <h4 className="font-semibold mb-2 text-base">Outputs</h4>
+        <h4 className="font-semibold mb-2 text-base">Output Results</h4>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -525,23 +641,56 @@ const ContentTranscreatorHistoryDisplay = ({ inputs, outputs, status }: { inputs
               {status === 'success' && outputs.transCreatedContent && (
                 <>
                   <TableRow>
-                    <TableCell>Trans-created Content</TableCell>
-                    <TableCell className="whitespace-pre-wrap">{(outputs as ContentTranscreatorSuccessOutputs).transCreatedContent}</TableCell>
-                  </TableRow>
-                  <TableRow>
                     <TableCell>Target Language</TableCell>
-                    <TableCell>{(outputs as ContentTranscreatorSuccessOutputs).targetLanguage}</TableCell>
+                    <TableCell className="font-medium">
+                      {getLanguageName((outputs as ContentTranscreatorSuccessOutputs).targetLanguage)} 
+                      ({(outputs as ContentTranscreatorSuccessOutputs).targetLanguage})
+                    </TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell>Target Country</TableCell>
-                    <TableCell>{(outputs as ContentTranscreatorSuccessOutputs).targetCountry}</TableCell>
+                    <TableCell>Target Market</TableCell>
+                    <TableCell className="font-medium">
+                      {getCountryName((outputs as ContentTranscreatorSuccessOutputs).targetCountry)} 
+                      ({(outputs as ContentTranscreatorSuccessOutputs).targetCountry})
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Trans-created Statistics</TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <p>{transCreatedWords} words</p>
+                        <p className="text-sm text-muted-foreground">{transCreatedLength} characters</p>
+                        {lengthChangePercent !== 0 && (
+                          <Badge variant={lengthChangePercent > 20 || lengthChangePercent < -20 ? "outline" : "secondary"}>
+                            {lengthChangePercent > 0 ? '+' : ''}{lengthChangePercent}% length change
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={2}>
+                      <div className="space-y-2">
+                        <p className="font-medium">Trans-created Content:</p>
+                        <div className="bg-muted/30 rounded-md p-4 max-h-64 overflow-y-auto">
+                          <p className="whitespace-pre-wrap text-sm">
+                            {(outputs as ContentTranscreatorSuccessOutputs).transCreatedContent}
+                          </p>
+                        </div>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 </>
               )}
               {status === 'failure' && outputs.error && (
                 <TableRow>
                   <TableCell>Error</TableCell>
-                  <TableCell className="whitespace-pre-wrap text-destructive">{(outputs as ContentTranscreatorFailureOutputs).error}</TableCell>
+                  <TableCell>
+                    <div className="space-y-2">
+                      <Badge variant="destructive">Failed</Badge>
+                      <p className="text-sm text-destructive">{(outputs as ContentTranscreatorFailureOutputs).error}</p>
+                    </div>
+                  </TableCell>
                 </TableRow>
               )}
                {status === 'success' && !outputs.transCreatedContent && !outputs.error && (
