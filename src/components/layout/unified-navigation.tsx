@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils';
 import { useState, useEffect, useRef } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import { TokenUsage } from './token-usage';
 
 interface UserSessionData {
   id: string;
@@ -440,10 +441,11 @@ export function UnifiedNavigation() {
   }
 
   return (
-    <aside className="sticky top-16 h-[calc(100vh-4rem)] hidden w-64 flex-col border-r bg-muted/40 sm:flex overflow-y-auto">
-      <nav className="flex-1 px-4 py-4">
-        <ul className="space-y-1">
-          {navItemsDefinition.map((navElement, index) => {
+    <aside className="sticky top-16 h-[calc(100vh-4rem)] hidden w-64 flex-col border-r bg-muted/40 sm:flex">
+      <div className="flex-1 overflow-y-auto">
+        <nav className="px-4 py-4">
+          <ul className="space-y-1">
+            {navItemsDefinition.map((navElement, index) => {
             const showItem = !('show' in navElement && navElement.show !== undefined) || (typeof navElement.show === 'function' ? navElement.show() : navElement.show);
             if (!showItem) return null;
 
@@ -528,8 +530,10 @@ export function UnifiedNavigation() {
               );
             }
           })}
-        </ul>
-      </nav>
+          </ul>
+        </nav>
+      </div>
+      <TokenUsage />
     </aside>
   );
 }
