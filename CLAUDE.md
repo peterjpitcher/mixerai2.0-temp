@@ -28,6 +28,7 @@ node scripts/test-azure-openai.js      # Test Azure OpenAI connectivity
 node scripts/verify-openai-integration.js # Verify OpenAI integration
 node scripts/test-db-connection.js     # Test database connectivity
 node scripts/diagnose-brand-generation.js # Diagnose brand identity generation
+node scripts/test-title-generation.js  # Test AI title generation feature
 node scripts/code-review.js            # Run comprehensive code review
 node scripts/code-review-simple.js     # Run simplified code review
 
@@ -120,6 +121,9 @@ MixerAI 2.0 is a Next.js 14 application using the App Router for AI-powered cont
 - **Supabase** provides PostgreSQL database and authentication
 - **Row-Level Security (RLS)** policies enforce multi-tenant data isolation
 - **User roles**: admin, editor, viewer (stored in user_metadata)
+  - **Viewer**: Read-only access to assigned brands
+  - **Editor**: Can create/edit content for assigned brands
+  - **Admin**: Platform-wide access if no brand assignments, otherwise scoped to assigned brands
 - **Brand-based permissions**: Users can have different roles per brand
 - **Profile system**: Extended user profiles linked to auth.users
 
@@ -178,6 +182,12 @@ MixerAI 2.0 is a Next.js 14 application using the App Router for AI-powered cont
 - AI-powered claim simplification and styling
 - Claim preview matrix for visualization
 - Integration with content generation prompts
+
+### AI Title Generation
+- Automatic title generation for content when not provided by user
+- Uses Azure OpenAI to create contextual, brand-appropriate titles
+- Integrated into content creation workflow
+- Test with `node scripts/test-title-generation.js`
 
 ### Environment Configuration
 Required environment variables:
@@ -340,7 +350,7 @@ Follow the established design system documented in `/docs/UI_STANDARDS.md`:
 ### Core Documentation
 - `/docs/README.md` - Documentation hub with quick start guide
 - `/docs/ARCHITECTURE.md` - Detailed technical architecture
-- `/docs/UI_STANDARDS.md` - Comprehensive UI/UX standards (Version 1.0)
+- `/docs/UI_STANDARDS.md` - Comprehensive UI/UX standards (Version 2.0)
 - `/docs/api_reference.md` - Complete API endpoint documentation
 - `/docs/user_guide.md` - End-user documentation for all features
 - `/docs/database.md` - Database schema and relationships
@@ -349,6 +359,8 @@ Follow the established design system documented in `/docs/UI_STANDARDS.md`:
 - `/USER_FLOW_DIAGRAMS.md` - Visual user flow diagrams
 - `/TESTING_REPORT.md` & `/TESTING_SUMMARY.md` - Testing documentation
 - `/docs/workflow-assignee-mandatory-changes.md` - Workflow assignee implementation
+- `/docs/AI_TITLE_GENERATION.md` - AI-powered title generation feature
+- `/docs/NAVIGATION_PERMISSIONS.md` - Detailed role-based navigation permissions
 
 ### Security & Operations
 - `/SECURITY.md` - Security policies and vulnerability reporting
