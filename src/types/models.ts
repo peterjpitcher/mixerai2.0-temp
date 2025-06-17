@@ -21,6 +21,7 @@ export interface Brand {
   brand_color?: string | null;
   brand_summary?: string | null;
   brand_admin_id?: string | null;
+  logo_url?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
   // Optional fields often joined or calculated in APIs:

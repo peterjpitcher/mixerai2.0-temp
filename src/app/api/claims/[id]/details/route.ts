@@ -41,17 +41,17 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
     console.log('[API Claims Details] Found claim:', claim.id);
 
     // Get all workflow steps for this workflow
-    let workflowSteps = [];
+    let workflowSteps: Record<string, unknown>[] = [];
     if (claim.workflow_id) {
-      const { data: steps, error: stepsError } = await (supabase as any)
-        .from('claims_workflow_steps')
+      const { data: steps, error: stepsError } = await supabase
+        .from('claims_workflow_steps' as never)
         .select('*')
         .eq('workflow_id', claim.workflow_id)
         .order('step_order', { ascending: true });
 
       if (!stepsError && steps) {
         // Fetch user details for all assigned users
-        const allUserIds = steps.flatMap(step => step.assigned_user_ids || []);
+        const allUserIds = (steps as Array<{assigned_user_ids?: string[]}>).flatMap(step => step.assigned_user_ids || []);
         const uniqueUserIds = [...new Set(allUserIds)];
         
         const userMap = new Map();
@@ -67,8 +67,8 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
         }
         
         // Map steps to include assigned users
-        workflowSteps = steps.map(step => {
-          const assignedUsers = step.assigned_user_ids?.map(userId => {
+        workflowSteps = steps.map((step: Record<string, unknown>) => {
+          const assignedUsers = (step.assigned_user_ids as string[] | undefined)?.map(userId => {
             return userMap.get(userId) || { id: userId, email: 'Unknown', full_name: 'Unknown User' };
           }) || [];
           
@@ -76,14 +76,14 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
             ...step,
             assigned_users: assignedUsers,
             is_current: step.id === claim.current_workflow_step,
-            is_completed: (claim as any).completed_workflow_steps?.includes(step.id) || false
+            is_completed: ((claim as Record<string, unknown>).completed_workflow_steps as string[] | undefined)?.includes(step.id as string) || false
           };
         });
       }
     }
 
     // Get workflow history
-    const { data: history, error: historyError } = await supabase
+    const { data: history } = await supabase
       .from('claim_workflow_history')
       .select(`
         *,

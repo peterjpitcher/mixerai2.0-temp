@@ -6,7 +6,7 @@ set -e
 echo "Setting up MixerAI 2.0 local database..."
 
 # Create directories if they don't exist
-mkdir -p scripts migrations
+mkdir -p scripts supabase/migrations
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null
@@ -47,8 +47,8 @@ EOL
     echo "Created docker-compose.yml"
 fi
 
-if [ ! -f migrations/001_initial_schema.sql ]; then
-    cat > migrations/001_initial_schema.sql << EOL
+if [ ! -f supabase/migrations/20240101_initial_schema.sql ]; then
+    cat > supabase/migrations/20240101_initial_schema.sql << EOL
 -- Create schema
 CREATE SCHEMA IF NOT EXISTS public;
 
@@ -159,11 +159,11 @@ VALUES (
 )
 ON CONFLICT DO NOTHING;
 EOL
-    echo "Created migrations/001_initial_schema.sql"
+    echo "Created supabase/migrations/20240101_initial_schema.sql"
 fi
 
-if [ ! -f migrations/002_test_data.sql ]; then
-    cat > migrations/002_test_data.sql << EOL
+if [ ! -f supabase/migrations/20240102_test_data.sql ]; then
+    cat > supabase/migrations/20240102_test_data.sql << EOL
 -- Insert test admin user
 INSERT INTO profiles (id, full_name, avatar_url)
 VALUES (
@@ -275,7 +275,7 @@ VALUES
   )
 ON CONFLICT DO NOTHING;
 EOL
-    echo "Created migrations/002_test_data.sql"
+    echo "Created supabase/migrations/20240102_test_data.sql"
 fi
 
 if [ ! -f scripts/init-database.sh ]; then
@@ -293,8 +293,8 @@ sleep 5
 
 # Connect to the database and run the migrations
 echo "Running migrations..."
-PGPASSWORD=postgres psql -h localhost -U postgres -d mixerai -f migrations/001_initial_schema.sql
-PGPASSWORD=postgres psql -h localhost -U postgres -d mixerai -f migrations/002_test_data.sql
+PGPASSWORD=postgres psql -h localhost -U postgres -d mixerai -f supabase/migrations/20240101_initial_schema.sql
+PGPASSWORD=postgres psql -h localhost -U postgres -d mixerai -f supabase/migrations/20240102_test_data.sql
 
 echo "Database initialization complete!"
 EOL

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 
-export const GET = withAuthAndMonitoring(async (request, user) => {
+export const GET = withAuthAndMonitoring(async () => {
   try {
     // Azure OpenAI doesn't provide direct token usage APIs
     // We'll need to implement our own tracking or use Azure Monitor

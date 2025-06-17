@@ -65,7 +65,7 @@ export const GET = withAuth(async (
     }
 
     console.log('[API Brands GET] Brand details from RPC:', brandDetails);
-    console.log('[API Brands GET] Logo URL from RPC:', (brandDetails as any)?.logo_url);
+    console.log('[API Brands GET] Logo URL from RPC:', (brandDetails as Record<string, unknown>)?.logo_url);
 
     if (!brandDetails) {
       return NextResponse.json(

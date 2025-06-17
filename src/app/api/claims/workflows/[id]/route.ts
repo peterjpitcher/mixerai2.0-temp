@@ -7,13 +7,14 @@ import { User } from '@supabase/supabase-js';
 export const dynamic = "force-dynamic";
 
 // GET handler for fetching a single claims workflow
-export const GET = withAuth(async (req: NextRequest, user: User, { params }: { params: { id: string } }) => {
+export const GET = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+    const { params } = context as { params: { id: string } };
     try {
         const { id } = params;
         const supabase = createSupabaseAdminClient();
 
         const { data, error } = await supabase
-            .from('claims_workflows')
+            .from('claims_workflows' as never)
             .select(`
                 *,
                 claims_workflow_steps(
@@ -24,7 +25,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, { params }: { p
                     role,
                     assigned_user_ids
                 )
-            `)
+            ` as never)
             .eq('id', id)
             .single();
 
@@ -41,9 +42,10 @@ export const GET = withAuth(async (req: NextRequest, user: User, { params }: { p
         }
 
         // Get user details for assigned users
-        if (data.claims_workflow_steps && data.claims_workflow_steps.length > 0) {
-            const allUserIds = data.claims_workflow_steps
-                .flatMap((step: any) => step.assigned_user_ids || [])
+        const workflowData = data as Record<string, unknown>;
+        if (workflowData.claims_workflow_steps && Array.isArray(workflowData.claims_workflow_steps) && workflowData.claims_workflow_steps.length > 0) {
+            const allUserIds = (workflowData.claims_workflow_steps as Array<Record<string, unknown>>)
+                .flatMap((step) => (step.assigned_user_ids as string[]) || [])
                 .filter((id: string, index: number, self: string[]) => self.indexOf(id) === index);
 
             if (allUserIds.length > 0) {
@@ -54,8 +56,8 @@ export const GET = withAuth(async (req: NextRequest, user: User, { params }: { p
 
                 if (!usersError && users) {
                     // Map users to each step
-                    data.claims_workflow_steps.forEach((step: any) => {
-                        step.assigned_users = (step.assigned_user_ids || []).map((userId: string) => {
+                    (workflowData.claims_workflow_steps as Array<Record<string, unknown>>).forEach((step) => {
+                        step.assigned_users = ((step.assigned_user_ids as string[]) || []).map((userId: string) => {
                             const user = users.find(u => u.id === userId);
                             return user || { id: userId, email: 'Unknown', full_name: null };
                         });
@@ -71,15 +73,15 @@ export const GET = withAuth(async (req: NextRequest, user: User, { params }: { p
             .eq('workflow_id', id);
 
         // Sort steps by order
-        data.steps = data.claims_workflow_steps
-            ?.sort((a: any, b: any) => a.step_order - b.step_order) || [];
-        delete data.claims_workflow_steps;
+        workflowData.steps = (workflowData.claims_workflow_steps as Array<Record<string, unknown>>)
+            ?.sort((a: Record<string, unknown>, b: Record<string, unknown>) => (a.step_order as number) - (b.step_order as number)) || [];
+        delete workflowData.claims_workflow_steps;
 
-        data.claims_count = claimsCount || 0;
+        workflowData.claims_count = claimsCount || 0;
 
         return NextResponse.json({ 
             success: true, 
-            data 
+            data: workflowData 
         });
 
     } catch (error: unknown) {
@@ -89,7 +91,8 @@ export const GET = withAuth(async (req: NextRequest, user: User, { params }: { p
 });
 
 // PUT handler for updating a claims workflow
-export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { params: { id: string } }) => {
+export const PUT = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+    const { params } = context as { params: { id: string } };
     try {
         const { id } = params;
         const body = await req.json();
@@ -106,7 +109,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { p
 
         // Check if user has admin permission for the workflow's brand
         const { data: workflow } = await supabase
-            .from('claims_workflows')
+            .from('claims_workflows' as never)
             .select('brand_id')
             .eq('id', id)
             .single();
@@ -123,12 +126,12 @@ export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { p
 
         // Update the workflow
         const { error: updateError } = await supabase
-            .from('claims_workflows')
+            .from('claims_workflows' as never)
             .update({
                 name,
                 description,
                 updated_at: new Date().toISOString()
-            })
+            } as never)
             .eq('id', id);
 
         if (updateError) {
@@ -140,12 +143,12 @@ export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { p
         if (steps && Array.isArray(steps)) {
             // Delete existing steps
             await supabase
-                .from('claims_workflow_steps')
+                .from('claims_workflow_steps' as never)
                 .delete()
                 .eq('workflow_id', id);
 
             // Insert new steps
-            const stepsToInsert = steps.map((step: any, index: number) => ({
+            const stepsToInsert = steps.map((step: Record<string, unknown>, index: number) => ({
                 workflow_id: id,
                 step_order: index + 1,
                 name: step.name,
@@ -156,8 +159,8 @@ export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { p
             }));
 
             const { error: stepsError } = await supabase
-                .from('claims_workflow_steps')
-                .insert(stepsToInsert);
+                .from('claims_workflow_steps' as never)
+                .insert(stepsToInsert as never);
 
             if (stepsError) {
                 console.error('[API Claims Workflow PUT] Error updating workflow steps:', stepsError);
@@ -167,7 +170,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { p
 
         // Fetch the updated workflow
         const { data: updatedWorkflow } = await supabase
-            .from('claims_workflows')
+            .from('claims_workflows' as never)
             .select(`
                 *,
                 claims_workflow_steps(
@@ -194,14 +197,15 @@ export const PUT = withAuth(async (req: NextRequest, user: User, { params }: { p
 });
 
 // DELETE handler for deleting a claims workflow
-export const DELETE = withAuth(async (req: NextRequest, user: User, { params }: { params: { id: string } }) => {
+export const DELETE = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+    const { params } = context as { params: { id: string } };
     try {
         const { id } = params;
         const supabase = createSupabaseAdminClient();
 
         // Check if user has admin permission for the workflow's brand
         const { data: workflow } = await supabase
-            .from('claims_workflows')
+            .from('claims_workflows' as never)
             .select('brand_id')
             .eq('id', id)
             .single();
@@ -232,7 +236,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, { params }: 
 
         // Delete the workflow (steps will be cascade deleted)
         const { error: deleteError } = await supabase
-            .from('claims_workflows')
+            .from('claims_workflows' as never)
             .delete()
             .eq('id', id);
 

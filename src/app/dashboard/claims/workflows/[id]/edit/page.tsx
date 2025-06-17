@@ -3,7 +3,6 @@
 import * as React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,9 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Save, Plus, Trash2, Loader2, Sparkles, X, ChevronDown, ChevronUp, XCircle, UserPlus } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Loader2, ChevronDown, ChevronUp, XCircle, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
-import { PageHeader } from '@/components/dashboard/page-header';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { cn } from '@/lib/utils';
 import { debounce } from 'lodash';
@@ -110,6 +108,7 @@ export default function EditClaimsWorkflowPage() {
     if (workflowId) {
       fetchWorkflow();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workflowId]);
 
   const fetchWorkflow = async () => {
@@ -177,7 +176,8 @@ export default function EditClaimsWorkflowPage() {
         setUserSearchLoading(prev => ({ ...prev, [stepIndex]: false }));
       }
     }, 300),
-    [steps]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   );
 
   const handleAssigneeInputChange = (stepIndex: number, value: string) => {
@@ -524,7 +524,7 @@ export default function EditClaimsWorkflowPage() {
             <CardContent>
               {steps.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  No steps defined for this workflow. Click "Add Step" to create your first workflow step.
+                  No steps defined for this workflow. Click &quot;Add Step&quot; to create your first workflow step.
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -663,7 +663,7 @@ export default function EditClaimsWorkflowPage() {
                           </Card>
                         )}
                         {assigneeInputs[index] && userSearchResults[index]?.length === 0 && !userSearchLoading[index] && assigneeInputs[index].length >= 2 && (
-                          <p className="text-sm text-muted-foreground py-2">No users found matching "{assigneeInputs[index]}". You can still add by full email address.</p>
+                          <p className="text-sm text-muted-foreground py-2">No users found matching &quot;{assigneeInputs[index]}&quot;. You can still add by full email address.</p>
                         )}
 
                         {/* Added Assignees Badges */}

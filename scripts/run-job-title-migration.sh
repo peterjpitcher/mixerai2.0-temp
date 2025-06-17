@@ -21,7 +21,7 @@ if [ -n "$SUPABASE_SERVICE_ROLE_KEY" ]; then
   # Instructions for Supabase
   echo "For Supabase, please run this SQL in the Supabase dashboard SQL editor:"
   echo "------------------------"
-  cat migrations/add_job_title_if_missing.sql
+  cat supabase/migrations/20240118_add_job_title_if_missing.sql
   echo "------------------------"
   echo "Alternatively, use the Supabase CLI to run migrations."
   exit 0
@@ -36,7 +36,7 @@ fi
 echo "Running job_title migration script..."
 
 # Run the SQL file
-PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/add_job_title_if_missing.sql
+PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f supabase/migrations/20240118_add_job_title_if_missing.sql
 
 # Check if the migration was successful
 if [ $? -eq 0 ]; then

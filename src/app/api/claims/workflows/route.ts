@@ -7,7 +7,7 @@ import { User } from '@supabase/supabase-js';
 export const dynamic = "force-dynamic";
 
 // GET handler for fetching claims workflows
-export const GET = withAuth(async (req: NextRequest, user: User) => {
+export const GET = withAuth(async (req: NextRequest) => {
     try {
         if (isBuildPhase()) {
             console.log('[API Claims Workflows GET] Build phase: returning empty array.');
@@ -20,7 +20,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
 
         // Build query
         let query = supabase
-            .from('claims_workflows')
+            .from('claims_workflows' as never)
             .select(`
                 *,
                 brands(name, brand_color),
@@ -33,7 +33,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
                     approval_required,
                     assigned_user_ids
                 )
-            `)
+            ` as never)
             .eq('is_active', true)
             .order('created_at', { ascending: false });
 
@@ -50,15 +50,15 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
         }
 
         // Format the response
-        const formattedData = (data || []).map(workflow => ({
+        const formattedData = (data || []).map((workflow: Record<string, unknown>) => ({
             id: workflow.id,
             name: workflow.name,
             description: workflow.description,
             brand_id: workflow.brand_id,
-            brand_name: workflow.brands?.name || '',
-            brand_color: workflow.brands?.brand_color || null,
+            brand_name: (workflow.brands as Record<string, unknown>)?.name || '',
+            brand_color: (workflow.brands as Record<string, unknown>)?.brand_color || null,
             steps: workflow.claims_workflow_steps || [],
-            steps_count: workflow.claims_workflow_steps?.length || 0,
+            steps_count: (workflow.claims_workflow_steps as Array<unknown>)?.length || 0,
             created_at: workflow.created_at,
             updated_at: workflow.updated_at,
             created_by: workflow.created_by
@@ -121,7 +121,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
         }
 
         // Create the workflow
-        const workflowData: any = {
+        const workflowData: Record<string, unknown> = {
             name,
             description,
             created_by: user.id,
@@ -134,8 +134,8 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
         }
 
         const { data: workflow, error: workflowError } = await supabase
-            .from('claims_workflows')
-            .insert(workflowData)
+            .from('claims_workflows' as never)
+            .insert(workflowData as never)
             .select()
             .single();
 
@@ -145,8 +145,8 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
         }
 
         // Create the workflow steps
-        const stepsToInsert = steps.map((step: any, index: number) => ({
-            workflow_id: workflow.id,
+        const stepsToInsert = steps.map((step: Record<string, unknown>, index: number) => ({
+            workflow_id: (workflow as Record<string, unknown>).id,
             step_order: index + 1,
             name: step.name,
             description: step.description,
@@ -156,15 +156,15 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
         }));
 
         const { error: stepsError } = await supabase
-            .from('claims_workflow_steps')
-            .insert(stepsToInsert);
+            .from('claims_workflow_steps' as never)
+            .insert(stepsToInsert as never);
 
         if (stepsError) {
             // Rollback workflow creation on steps error
             await supabase
-                .from('claims_workflows')
+                .from('claims_workflows' as never)
                 .delete()
-                .eq('id', workflow.id);
+                .eq('id', (workflow as Record<string, unknown>).id as string);
 
             console.error('[API Claims Workflows POST] Error creating workflow steps:', stepsError);
             return handleApiError(stepsError, 'Failed to create workflow steps');
@@ -172,7 +172,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 
         // Fetch the complete workflow with steps
         const { data: completeWorkflow } = await supabase
-            .from('claims_workflows')
+            .from('claims_workflows' as never)
             .select(`
                 *,
                 brands(name, brand_color),
@@ -185,8 +185,8 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
                     approval_required,
                     assigned_user_ids
                 )
-            `)
-            .eq('id', workflow.id)
+            ` as never)
+            .eq('id', (workflow as Record<string, unknown>).id as string)
             .single();
 
         return NextResponse.json({

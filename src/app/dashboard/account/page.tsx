@@ -50,7 +50,7 @@ const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) =
 export default function AccountPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Record<string, unknown> | null>(null);
   
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -84,7 +84,7 @@ export default function AccountPage() {
           window.location.href = '/auth/login'; // Redirect if not logged in
           return;
         }
-        setSession(userSession);
+        setSession(userSession as unknown as Record<string, unknown>);
         
         const userId = userSession.user.id;
         const userEmail = userSession.user.email || '';
@@ -317,7 +317,7 @@ export default function AccountPage() {
                   <AvatarUpload
                     currentAvatarUrl={profileData.avatarUrl}
                     onAvatarChange={(url) => setProfileData(prev => ({ ...prev, avatarUrl: url }))}
-                    userId={session?.user.id || ''}
+                    userId={((session as Record<string, unknown>)?.user as Record<string, unknown>)?.id as string || ''}
                     fullName={profileData.fullName}
                     email={profileData.email}
                   />

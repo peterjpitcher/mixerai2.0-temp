@@ -1,7 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { BrandDetailsClient } from '@/components/dashboard/brand/brand-details-client';
 import { AccessDenied } from '@/components/access-denied';
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 
 interface BrandDetailsPageProps {
   params: {

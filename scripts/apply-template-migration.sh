@@ -18,7 +18,7 @@ if [ -z "$DATABASE_URL" ]; then
 fi
 
 # Apply the migration
-cat migrations/content-template-system.sql | psql $DATABASE_URL
+cat supabase/migrations/20241212_fix_template_fields_structure.sql | psql $DATABASE_URL
 
 # Check if the migration was successful
 if [ $? -eq 0 ]; then

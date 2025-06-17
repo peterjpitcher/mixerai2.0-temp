@@ -21,7 +21,7 @@ if [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] && [ -n "$NEXT_PUBLIC_SUPABASE_URL" ]; th
   # Use supabase CLI if available
   if command -v supabase &> /dev/null; then
     echo "Applying RLS policies using Supabase CLI..."
-    supabase db execute -f ./migrations/rls_policies.sql
+    supabase db execute -f ./supabase/migrations/20241212_initial_complete_schema.sql
   else
     echo "Supabase CLI not found. Please install it or use PostgreSQL connection details."
     exit 1
@@ -41,7 +41,7 @@ else
   export PGPASSWORD=$POSTGRES_PASSWORD
   
   # Run the SQL script
-  psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -f ./migrations/rls_policies.sql
+  psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -f ./supabase/migrations/20241212_initial_complete_schema.sql
 fi
 
 echo "✅ RLS policies have been applied successfully!"

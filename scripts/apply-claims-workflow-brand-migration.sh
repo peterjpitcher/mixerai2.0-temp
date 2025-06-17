@@ -19,7 +19,7 @@ echo "Applying claims workflow brand migration..."
 
 # Run the migration to remove brand requirement
 echo "Making brand_id optional for claims workflows..."
-psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f migrations/20250117_remove_brand_from_claims_workflows.sql
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f supabase/migrations/20250117_remove_brand_from_claims_workflows.sql
 
 echo "Claims workflow brand migration completed successfully!"
 echo "Claims workflows are now global and do not require brand association."

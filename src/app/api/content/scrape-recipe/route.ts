@@ -135,7 +135,7 @@ function parseDuration(duration?: string): string | undefined {
         return `${minutes} minute${minutes > 1 ? 's' : ''}`;
       }
     }
-  } catch (e) {
+  } catch {
     console.warn('Failed to parse duration:', duration);
   }
   
@@ -174,7 +174,7 @@ function parseRecipeFromHtml(html: string, url: string): RecipeData | null {
 }
 
 // POST /api/content/scrape-recipe
-export const POST = withAuth(async (req: NextRequest, _user: User) => {
+export const POST = withAuth(async (req: NextRequest) => {
   try {
     const body = await req.json();
     const validatedData = scrapeRecipeSchema.parse(body);
@@ -221,7 +221,7 @@ export const POST = withAuth(async (req: NextRequest, _user: User) => {
       totalTime: recipeData.totalTime || '',
       servings: recipeData.servings || '',
       nutrition: recipeData.nutrition ? Object.entries(recipeData.nutrition)
-        .filter(([_, value]) => value)
+        .filter(([, value]) => value)
         .map(([key, value]) => `${key}: ${value}`)
         .join(', ') : '',
       imageUrl: recipeData.imageUrl || '',

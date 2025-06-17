@@ -420,7 +420,6 @@ export default function ClaimsPage() {
           data={filteredClaims}
           searchKey="claim_text"
           searchPlaceholder="Search claims..."
-          showSearch={false}
           onRowClick={(row) => router.push(`/dashboard/claims/${row.id}`)}
           emptyState={
             <div className="flex flex-col items-center justify-center py-8">

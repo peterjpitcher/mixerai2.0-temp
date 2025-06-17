@@ -207,7 +207,7 @@ export default function ClaimWorkflowDetailPage() {
               variant="destructive" 
               size="sm"
               onClick={() => setShowDeleteDialog(true)}
-              disabled={isDeleting || (workflow.claims_count && workflow.claims_count > 0)}
+              disabled={isDeleting || (!!workflow.claims_count && workflow.claims_count > 0)}
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
@@ -349,7 +349,7 @@ export default function ClaimWorkflowDetailPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              disabled={isDeleting || (workflow.claims_count && workflow.claims_count > 0)}
+              disabled={isDeleting || (!!workflow.claims_count && workflow.claims_count > 0)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isDeleting ? (

@@ -6,10 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { 
   Loader2, 
@@ -17,13 +13,9 @@ import {
   XCircle, 
   AlertCircle, 
   ClipboardList,
-  Clock,
   User,
-  ChevronRight,
   FileText,
   MessageSquare,
-  ArrowRight,
-  ArrowLeft,
   Edit2
 } from 'lucide-react';
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -81,6 +73,7 @@ export default function ClaimsPendingApprovalPage() {
 
   useEffect(() => {
     fetchPendingClaims();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -188,7 +181,7 @@ export default function ClaimsPendingApprovalPage() {
     }
   };
 
-  const getLevelIcon = (level: string) => {
+  const _getLevelIcon = (level: string) => {
     switch (level) {
       case 'brand': return '🏢';
       case 'product': return '📦';
@@ -425,14 +418,14 @@ export default function ClaimsPendingApprovalPage() {
                           </h3>
                           <div className="relative">
                             {claimDetails.workflowSteps.map((step, index) => {
-                              const isFirst = index === 0;
+                              const _isFirst = index === 0;
                               const isLast = index === claimDetails.workflowSteps.length - 1;
                               const isPrevious = step.is_completed;
                               const isCurrent = step.is_current;
                               const isNext = !step.is_completed && !step.is_current;
                               
                               // Find history for this step
-                              const stepHistory = claimDetails.history.filter((h: any) => 
+                              const stepHistory = claimDetails.history.filter((h: Record<string, unknown>) => 
                                 h.workflow_step_id === step.id
                               );
 
@@ -500,7 +493,7 @@ export default function ClaimsPendingApprovalPage() {
                                         <span className="font-medium">Assignees:</span>
                                         <div className="flex flex-wrap gap-1">
                                           {step.assigned_users?.length > 0 ? (
-                                            step.assigned_users.map((u: any) => (
+                                            step.assigned_users.map((u: {id: string; full_name?: string; email?: string}) => (
                                               <Badge key={u.id} variant="secondary" className="text-xs">
                                                 {u.full_name || u.email}
                                               </Badge>
@@ -517,8 +510,8 @@ export default function ClaimsPendingApprovalPage() {
                                           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                                             Actions Taken
                                           </p>
-                                          {stepHistory.map((history: any) => (
-                                            <div key={history.id} className="bg-muted/30 rounded-lg p-3 space-y-2">
+                                          {stepHistory.map((history: Record<string, unknown>) => (
+                                            <div key={history.id as string} className="bg-muted/30 rounded-lg p-3 space-y-2">
                                               {/* Action header */}
                                               <div className="flex items-start justify-between">
                                                 <div className="flex items-center gap-2">
@@ -538,49 +531,49 @@ export default function ClaimsPendingApprovalPage() {
                                                   </div>
                                                   <div>
                                                     <p className="text-sm font-medium">
-                                                      {history.reviewer?.full_name || history.reviewer?.email || 'Unknown User'}
+                                                      {((history.reviewer as Record<string, unknown>)?.full_name as string) || ((history.reviewer as Record<string, unknown>)?.email as string) || 'Unknown User'}
                                                     </p>
                                                     <p className="text-xs text-muted-foreground">
-                                                      {history.action_status === 'approved' ? 'Approved' : history.action_status === 'rejected' ? 'Rejected' : history.action_status}
+                                                      {history.action_status === 'approved' ? 'Approved' : history.action_status === 'rejected' ? 'Rejected' : (history.action_status as string)}
                                                       {' on '}
-                                                      {format(new Date(history.created_at), 'MMM d, yyyy, HH:mm')}
+                                                      {format(new Date(history.created_at as string), 'MMM d, yyyy, HH:mm')}
                                                     </p>
                                                   </div>
                                                 </div>
                                               </div>
                                               
                                               {/* Approved/Rejected content if different from current */}
-                                              {history.updated_claim_text && history.updated_claim_text !== selectedClaim.claim_text && (
+                                              {history.updated_claim_text && (history.updated_claim_text as string) !== selectedClaim.claim_text ? (
                                                 <div className="bg-muted/50 rounded p-2 space-y-1">
                                                   <p className="text-xs font-medium flex items-center gap-1">
                                                     <FileText className="h-3 w-3" />
                                                     {history.action_status === 'approved' ? 'Approved with changes:' : 'Content at time of action:'}
                                                   </p>
-                                                  <p className="text-xs italic">{history.updated_claim_text}</p>
+                                                  <p className="text-xs italic">{history.updated_claim_text as string}</p>
                                                 </div>
-                                              )}
+                                              ) : null}
                                               
                                               {/* Comment */}
-                                              {history.comment && (
+                                              {history.comment ? (
                                                 <div className="bg-muted/50 rounded p-2 space-y-1">
                                                   <p className="text-xs font-medium flex items-center gap-1">
                                                     <MessageSquare className="h-3 w-3" />
                                                     Comment:
                                                   </p>
-                                                  <p className="text-xs">{history.comment}</p>
+                                                  <p className="text-xs">{history.comment as string}</p>
                                                 </div>
-                                              )}
+                                              ) : null}
                                               
                                               {/* Feedback (for rejections) */}
-                                              {history.feedback && (
+                                              {history.feedback ? (
                                                 <div className="bg-red-50 dark:bg-red-900/20 rounded p-2 space-y-1">
                                                   <p className="text-xs font-medium flex items-center gap-1 text-red-700 dark:text-red-300">
                                                     <AlertCircle className="h-3 w-3" />
                                                     Rejection Feedback:
                                                   </p>
-                                                  <p className="text-xs text-red-600 dark:text-red-400">{history.feedback}</p>
+                                                  <p className="text-xs text-red-600 dark:text-red-400">{history.feedback as string}</p>
                                                 </div>
-                                              )}
+                                              ) : null}
                                             </div>
                                           ))}
                                         </div>

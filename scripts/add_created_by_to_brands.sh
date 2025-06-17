@@ -28,7 +28,7 @@ apply_migration() {
   fi
   
   # Apply the migration
-  psql "${db_url}" -f migrations/add_created_by_to_brands.sql
+  psql "${db_url}" -f supabase/migrations/20240126_add_created_by_to_brands.sql
   
   if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Migration successfully applied to ${db_name}${NC}"

@@ -81,8 +81,7 @@ MixerAI2.0/
 │   │   └── utils/                # Utility functions
 │   └── types/                    # TypeScript type definitions
 ├── docs/                         # Project documentation
-├── migrations/                   # Database migrations (legacy)
-├── supabase/migrations/          # Supabase database migrations (current)
+├── supabase/migrations/          # Database migrations
 ├── scripts/                      # Utility scripts
 ├── email-templates/              # HTML email templates
 └── public/                       # Static assets
@@ -389,8 +388,7 @@ touch supabase/migrations/$(date +%Y%m%d%H%M%S)_description.sql
 # Reset database (caution: destroys data)
 ./scripts/reset-database.sh
 
-# Note: Legacy migrations are in /migrations/ directory
-# Current migrations use Supabase migrations in /supabase/migrations/
+# Migrations are stored in /supabase/migrations/ directory
 ```
 
 ### Local Development with PostgreSQL
@@ -411,7 +409,7 @@ When working with this codebase, follow these specific guidelines:
 
 ### 1. Database Migrations
 - **NEVER run database migrations directly**
-- Create migration files in `/migrations/` following the naming convention: `YYYYMMDD_description.sql`
+- Create migration files in `/supabase/migrations/` following the naming convention: `YYYYMMDD_description.sql`
 - Provide clear instructions for running migrations
 - Wait for confirmation before proceeding with code that depends on migrations
 - Example: "I've created migration `20241217_add_user_preferences.sql`. Please run `./scripts/run-migrations.sh` and let me know when complete."

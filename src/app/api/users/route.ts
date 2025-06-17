@@ -70,7 +70,7 @@ export const GET = withAuth(async (_req: NextRequest, user) => {
     
     const mergedUsers = authUsersData.users.map(authUser => {
       const profile = (profilesData as ProfileRecord[]).find(p => p.id === authUser.id);
-      const invitationStatus = invitationStatusData?.find((inv: any) => inv.id === authUser.id);
+      const invitationStatus = invitationStatusData?.find((inv: Record<string, unknown>) => inv.id === authUser.id);
       
       let highestRole = 'viewer';
       if (profile?.user_brand_permissions && Array.isArray(profile.user_brand_permissions) && profile.user_brand_permissions.length > 0) {

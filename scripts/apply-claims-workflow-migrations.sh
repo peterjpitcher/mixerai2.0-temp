@@ -19,10 +19,10 @@ echo "Applying claims workflow migrations..."
 
 # Run the create claims workflows migration
 echo "Creating claims_workflows and claims_workflow_steps tables..."
-psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f migrations/20250117_create_claims_workflows.sql
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f supabase/migrations/20250117_create_claims_workflows.sql
 
 # Run the update roles migration
 echo "Updating role constraints..."
-psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f migrations/20250117_update_claims_workflow_roles.sql
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f supabase/migrations/20250117_update_claims_workflow_roles.sql
 
 echo "Claims workflow migrations completed successfully!"
