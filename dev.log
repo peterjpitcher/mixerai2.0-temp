@@ -1545,3 +1545,10 @@ Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-93
 
  ✓ Starting...
  ✓ Ready in 2.1s
+ ⚠ Found a change in next.config.js. Restarting the server to apply the changes...
+  ▲ Next.js 14.2.28
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1963ms

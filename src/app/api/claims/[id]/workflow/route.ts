@@ -171,7 +171,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context?: unkno
 
     // If the action was successful and we have a comment, update the most recent history entry
     // This is a temporary workaround until the migration is applied
-    if (result?.success && validatedData.comment) {
+    if ((result as any)?.success && validatedData.comment) {
       const { error: updateError } = await supabase
         .from('claim_workflow_history')
         .update({ 
