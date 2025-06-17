@@ -30,7 +30,7 @@ async function checkAdvanceWorkflowFunction() {
       if (error.message && error.message.includes('function advance_claim_workflow')) {
         console.log('❌ Function advance_claim_workflow does NOT exist');
         console.log('\nYou need to run the migration to create this function.');
-        console.log('The migration file is: /migrations/20250117_add_workflow_history_fields.sql');
+        console.log('The migration file is: /supabase/migrations/20250117_add_workflow_history_fields.sql');
       } else if (error.message && error.message.includes('Claim has no active workflow')) {
         console.log('✅ Function advance_claim_workflow EXISTS');
         console.log('   (It returned an expected error for the dummy claim ID)');
