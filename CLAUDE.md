@@ -356,7 +356,7 @@ Follow the established design system documented in `/docs/UI_STANDARDS.md`:
 - `/docs/deployment.md` - Deployment procedures and configuration
 
 ### Development Resources
-- `/migrations/` - Database migration files (format: YYYYMMDD_description.sql)
+- `/supabase/migrations/` - Database migration files (format: YYYYMMDD_description.sql)
 - `/email-templates/` - Email HTML templates for auth and notifications
 - `/.env.example` - Complete list of required environment variables
 - `/scripts/README-code-review.md` - Code review process documentation
