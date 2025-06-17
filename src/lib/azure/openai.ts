@@ -1,5 +1,6 @@
 import { OpenAI } from "openai";
 import type { StyledClaims } from "@/types/claims";
+import { activityTracker } from "./activity-tracker";
 
 // Initialize the Azure OpenAI client
 export const getAzureOpenAIClient = () => {
@@ -75,31 +76,62 @@ export async function generateTextCompletion(
 
     const endpointUrl = `${azureOpenAIEndpoint}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
 
-    const response = await fetch(endpointUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': apiKey,
-      },
-      body: JSON.stringify(completionRequest),
-    });
+    // Start tracking the request
+    const requestId = activityTracker.startRequest('generateTextCompletion');
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[generateTextCompletion] API request failed with status ${response.status}: ${errorText}`);
-      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
-    }
+    try {
+      const response = await fetch(endpointUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': apiKey,
+        },
+        body: JSON.stringify(completionRequest),
+      });
 
-    const responseData = await response.json();
+      // Extract rate limit headers (Azure OpenAI format)
+      const rateLimitHeaders = {
+        'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
+        'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
+        'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
+      };
+      
+      // Debug: Log all headers to understand what Azure returns
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Azure OpenAI] Response headers:', Object.fromEntries(response.headers.entries()));
+      }
 
-    if (responseData.choices && responseData.choices.length > 0 && responseData.choices[0].message) {
-      const content = responseData.choices[0].message.content;
-      return content;
-    } else {
-      console.error("[generateTextCompletion] No content in completion choices or choices array is empty.");
-      // Consistent with original logic, though an error was thrown above for !response.ok
-      // This case implies a 200 OK but unexpected payload.
-      return null; 
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[generateTextCompletion] API request failed with status ${response.status}: ${errorText}`);
+        
+        // Check if it's a rate limit error
+        const status = response.status === 429 ? 'rate_limited' : 'error';
+        activityTracker.completeRequest(requestId, status, rateLimitHeaders);
+        
+        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+      }
+
+      // Mark request as successful
+      activityTracker.completeRequest(requestId, 'success', rateLimitHeaders);
+
+      const responseData = await response.json();
+
+      if (responseData.choices && responseData.choices.length > 0 && responseData.choices[0].message) {
+        const content = responseData.choices[0].message.content;
+        return content;
+      } else {
+        console.error("[generateTextCompletion] No content in completion choices or choices array is empty.");
+        // Consistent with original logic, though an error was thrown above for !response.ok
+        // This case implies a 200 OK but unexpected payload.
+        return null; 
+      }
+    } catch (requestError) {
+      // Make sure to mark the request as failed if it wasn't already
+      if (requestId) {
+        activityTracker.completeRequest(requestId, 'error');
+      }
+      throw requestError;
     }
   } catch (error) {
     console.error("[generateTextCompletion] Error calling Azure OpenAI:", error);
@@ -389,6 +421,9 @@ The product context is provided in the user prompt.
     const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
     // console.log(`Using direct endpoint URL: ${endpoint}`);
     
+    // Start tracking the request
+    const requestId = activityTracker.startRequest('generateContentFromTemplate');
+    
     // Make a direct fetch call
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -399,10 +434,22 @@ The product context is provided in the user prompt.
       body: JSON.stringify(completionRequest)
     });
     
+    // Extract rate limit headers
+    const rateLimitHeaders = {
+      'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests'),
+      'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests'),
+      'retry-after': response.headers.get('retry-after')
+    };
+    
     if (!response.ok) {
       const errorText = await response.text();
+      const status = response.status === 429 ? 'rate_limited' : 'error';
+      activityTracker.completeRequest(requestId, status, rateLimitHeaders);
       throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
+    
+    // Mark request as successful
+    activityTracker.completeRequest(requestId, 'success', rateLimitHeaders);
     
     const responseData = await response.json();
     // console.log("API call successful");
@@ -505,7 +552,8 @@ export async function generateBrandIdentityFromUrls(
   brandName: string,
   urls: string[],
   language: string,
-  country: string
+  country: string,
+  context?: { userId?: string; brandId?: string }
 ): Promise<{
   brandIdentity: string;
   toneOfVoice: string;
@@ -523,7 +571,6 @@ export async function generateBrandIdentityFromUrls(
     // console.log("- AZURE_OPENAI_DEPLOYMENT:", process.env.AZURE_OPENAI_DEPLOYMENT);
   
   const deploymentName = getModelName();
-  const client = getAzureOpenAIClient();
       
       // Prepare the prompt
       const prompt = `
@@ -547,6 +594,9 @@ export async function generateBrandIdentityFromUrls(
       `;
       
       // Make the API call
+      // Start tracking the request
+      const requestId = activityTracker.startRequest('generateBrandIdentityFromUrls');
+      
   try {
       // console.log("Sending request to Azure OpenAI API");
       // console.log(`Using deployment: ${deploymentName}`);
@@ -555,7 +605,7 @@ export async function generateBrandIdentityFromUrls(
       // console.log("---- System Prompt ----\n", systemMessageContent);
       // console.log("---- User Prompt for Brand Identity ----\n", prompt);
 
-      const completion = await client.chat.completions.create({
+      const completionRequest = {
         model: deploymentName,
         messages: [
           { role: "system", content: systemMessageContent },
@@ -564,10 +614,49 @@ export async function generateBrandIdentityFromUrls(
         temperature: 0.7,
         max_tokens: 1000,
         response_format: { type: "json_object" }
+      };
+
+      const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': process.env.AZURE_OPENAI_API_KEY || ''
+        },
+        body: JSON.stringify(completionRequest)
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        
+        // Extract rate limit headers even on error
+        const rateLimitHeaders = {
+          'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
+          'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
+          'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
+        };
+        
+        const status = response.status === 429 ? 'rate_limited' : 'error';
+        activityTracker.completeRequest(requestId, status, rateLimitHeaders);
+        
+        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+      }
+
+      const responseData = await response.json();
+      
+      // Extract rate limit headers (Azure OpenAI format)
+      const rateLimitHeaders = {
+        'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
+        'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
+        'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
+      };
+      
+      // Complete the request tracking
+      activityTracker.completeRequest(requestId, 'success', rateLimitHeaders);
       
       // console.log("Received response from Azure OpenAI API");
-      const responseContent = completion.choices[0]?.message?.content || "{}";
+      const responseContent = responseData.choices[0]?.message?.content || "{}";
       // console.log("Raw API response:", responseContent.substring(0, 100) + "...");
       
     const parsedResponse = JSON.parse(responseContent);
@@ -587,6 +676,8 @@ export async function generateBrandIdentityFromUrls(
           };
         } catch (error) {
     console.error("Error generating brand identity with Azure OpenAI:", error);
+    // Mark request as failed
+    activityTracker.completeRequest(requestId, 'error');
     throw new Error(`Failed to generate brand identity: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -713,6 +804,9 @@ export async function generateMetadata(
       const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
       // console.log(`Using direct endpoint URL: ${endpoint}`);
       
+      // Start tracking the request
+      const requestId = activityTracker.startRequest('generateMetadata');
+      
       // Make a direct fetch call instead
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -723,10 +817,22 @@ export async function generateMetadata(
         body: JSON.stringify(completionRequest)
       });
       
+      // Extract rate limit headers (Azure OpenAI format)
+      const rateLimitHeaders = {
+        'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
+        'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
+        'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
+      };
+      
       if (!response.ok) {
         const errorText = await response.text();
+        const status = response.status === 429 ? 'rate_limited' : 'error';
+        activityTracker.completeRequest(requestId, status, rateLimitHeaders);
         throw new Error(`API request failed with status ${response.status}: ${errorText}`);
       }
+      
+      // Mark request as successful
+      activityTracker.completeRequest(requestId, 'success', rateLimitHeaders);
       
       const responseData = await response.json();
       // console.log("API call successful");
@@ -843,6 +949,9 @@ If the image is decorative and doesn't convey information, you can indicate that
   // console.log(`[generateAltText] Using direct fetch endpoint URL: ${endpointUrl}`);
 
   try {
+    // Start tracking the request
+    const requestId = activityTracker.startRequest('generateAltText');
+    
     const response = await fetch(endpointUrl, {
       method: 'POST',
       headers: {
@@ -852,11 +961,23 @@ If the image is decorative and doesn't convey information, you can indicate that
       body: JSON.stringify(completionRequest),
     });
 
+    // Extract rate limit headers (Azure OpenAI format)
+    const rateLimitHeaders = {
+      'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
+      'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
+      'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
+    };
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[generateAltText] API request failed with status ${response.status}: ${errorText}`, { imageUrl });
+      const status = response.status === 429 ? 'rate_limited' : 'error';
+      activityTracker.completeRequest(requestId, status, rateLimitHeaders);
       throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
+
+    // Mark request as successful
+    activityTracker.completeRequest(requestId, 'success', rateLimitHeaders);
 
     const responseData = await response.json();
     const content = responseData.choices?.[0]?.message?.content;
@@ -966,6 +1087,9 @@ export async function transCreateContent(
     const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
     // console.log(`Using direct endpoint URL: ${endpoint}`);
     
+    // Start tracking the request
+    const requestId = activityTracker.startRequest('transCreateContent');
+    
     // Make a direct fetch call
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -976,10 +1100,22 @@ export async function transCreateContent(
       body: JSON.stringify(completionRequest)
     });
     
+    // Extract rate limit headers (Azure OpenAI format)
+    const rateLimitHeaders = {
+      'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
+      'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
+      'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
+    };
+    
     if (!response.ok) {
       const errorText = await response.text();
+      const status = response.status === 429 ? 'rate_limited' : 'error';
+      activityTracker.completeRequest(requestId, status, rateLimitHeaders);
       throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
+    
+    // Mark request as successful
+    activityTracker.completeRequest(requestId, 'success', rateLimitHeaders);
     
     const responseData = await response.json();
     // console.log("API call successful");
@@ -1075,6 +1211,9 @@ export async function generateSuggestions(
     const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
     // console.log(`Using direct endpoint URL: ${endpoint}`);
 
+    // Start tracking the request
+    const requestId = activityTracker.startRequest('generateSuggestions');
+    
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -1084,10 +1223,22 @@ export async function generateSuggestions(
       body: JSON.stringify(completionRequest)
     });
 
+    // Extract rate limit headers (Azure OpenAI format)
+    const rateLimitHeaders = {
+      'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
+      'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
+      'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
+    };
+
     if (!response.ok) {
       const errorText = await response.text();
+      const status = response.status === 429 ? 'rate_limited' : 'error';
+      activityTracker.completeRequest(requestId, status, rateLimitHeaders);
       throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
+
+    // Mark request as successful
+    activityTracker.completeRequest(requestId, 'success', rateLimitHeaders);
 
     const responseData = await response.json();
     // console.log("API call successful");
@@ -1181,6 +1332,10 @@ export async function generateContentTitleFromContext(
     };
 
     const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
+    
+    // Start tracking the request
+    const requestId = activityTracker.startRequest('generateContentTitleFromContext');
+    
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -1190,10 +1345,22 @@ export async function generateContentTitleFromContext(
       body: JSON.stringify(completionRequest)
     });
 
+    // Extract rate limit headers (Azure OpenAI format)
+    const rateLimitHeaders = {
+      'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
+      'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
+      'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
+    };
+
     if (!response.ok) {
       const errorText = await response.text();
+      const status = response.status === 429 ? 'rate_limited' : 'error';
+      activityTracker.completeRequest(requestId, status, rateLimitHeaders);
       throw new Error(`API request for title generation failed with status ${response.status}: ${errorText}`);
     }
+
+    // Mark request as successful
+    activityTracker.completeRequest(requestId, 'success', rateLimitHeaders);
 
     const responseData = await response.json();
     let title = responseData.choices?.[0]?.message?.content?.trim() || "Suggested Title (Error)";
