@@ -59,6 +59,7 @@ interface Brand {
   language: string; // Expecting language from brand data
   country: string;  // Expecting country from brand data
   color?: string;
+  logo_url?: string | null;
 }
 
 // Define ToolRunHistoryItem interface
@@ -344,7 +345,7 @@ export default function ContentTransCreatorPage() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6">
+    <div className="space-y-6">
       <Breadcrumbs 
         items={[
           { label: 'Dashboard', href: '/dashboard' },
@@ -406,7 +407,7 @@ export default function ContentTransCreatorPage() {
                           {brands.map(brand => (
                             <SelectItem key={brand.id} value={brand.id}>
                               <div className="flex items-center">
-                                <BrandIcon name={brand.name} color={brand.color} className="mr-2 h-4 w-4" />
+                                <BrandIcon name={brand.name} color={brand.color} logoUrl={brand.logo_url} className="mr-2 h-4 w-4" />
                                 {brand.name} ({brand.language?.toUpperCase()}-{brand.country?.toUpperCase()})
                               </div>
                             </SelectItem>
@@ -545,7 +546,7 @@ export default function ContentTransCreatorPage() {
                   <TableBody>
                     {runHistory.map((run) => (
                       <TableRow key={run.id}>
-                        <TableCell>{format(new Date(run.run_at), 'dd MMMM yyyy, HH:mm')}</TableCell>
+                        <TableCell>{format(new Date(run.run_at), 'MMMM d, yyyy, HH:mm')}</TableCell>
                         <TableCell>
                           <Badge variant={run.status === 'success' ? 'default' : 'destructive'}>
                             {run.status}

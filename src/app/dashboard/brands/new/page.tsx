@@ -6,13 +6,14 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Loader2, X, PlusCircle, ArrowLeft, Info, HelpCircle } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
+import { BrandLogoUpload } from '@/components/ui/brand-logo-upload';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 import { Checkbox } from '@/components/ui/checkbox';
 import { v4 as uuidv4 } from 'uuid';
@@ -138,6 +139,7 @@ export default function NewBrandPage() {
     guardrails: '',
     content_vetting_agencies: [] as string[],
     master_claim_brand_id: null as string | null,
+    logo_url: null as string | null,
   });
 
   const [allVettingAgencies, setAllVettingAgencies] = useState<VettingAgency[]>([]);
@@ -398,6 +400,9 @@ export default function NewBrandPage() {
         payload.master_claim_brand_id = null;
       }
 
+      console.log('Creating brand with payload:', payload);
+      console.log('Logo URL in payload:', payload.logo_url);
+      
       const response = await fetch('/api/brands', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -420,14 +425,19 @@ export default function NewBrandPage() {
   const languageName = LANGUAGES.find(l => l.value === formData.language)?.label || formData.language || 'Select language';
   
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6"> {/* Standard Page Padding */}
+    <div className="space-y-6">
       <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Brands", href: "/dashboard/brands" }, { label: "Create New Brand" }]} />
        <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/brands')} aria-label="Back to Brands">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <BrandIcon name={formData.name || "New Brand"} color={formData.brand_color} size="lg" />
+          <BrandIcon 
+            name={formData.name || "New Brand"} 
+            color={formData.brand_color} 
+            logoUrl={formData.logo_url}
+            size="lg" 
+          />
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Create New Brand</h1>
             <p className="text-muted-foreground">Define the details for your new brand.</p>
@@ -452,38 +462,78 @@ export default function NewBrandPage() {
           <Card>
             <CardHeader><CardTitle>Basic Information</CardTitle><CardDescription>Set the foundational details for your brand.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2"><Label htmlFor="name">Brand Name <span className="text-destructive">*</span></Label><Input id="name" name="name" value={formData.name} onChange={handleInputChange} placeholder="Enter brand name" required/></div>
-                <div className="space-y-2"><Label htmlFor="website_url">Main Website URL</Label><Input id="website_url" name="website_url" value={formData.website_url} onChange={handleInputChange} placeholder="https://example.com" type="url"/></div>
+              <div className="grid grid-cols-12 gap-4 items-center">
+                <Label htmlFor="name" className="col-span-12 sm:col-span-3 text-left sm:text-right">Brand Name <span className="text-destructive">*</span></Label>
+                <div className="col-span-12 sm:col-span-9">
+                  <Input id="name" name="name" value={formData.name} onChange={handleInputChange} placeholder="Enter brand name" required/>
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2"><Label htmlFor="country">Country</Label><Select value={formData.country} onValueChange={(v) => handleSelectChange('country', v)}><SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger><SelectContent className="max-h-[300px]">{COUNTRIES.map(c => (<SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>))}</SelectContent></Select></div>
-                <div className="space-y-2"><Label htmlFor="language">Language</Label><Select value={formData.language} onValueChange={(v) => handleSelectChange('language', v)}><SelectTrigger><SelectValue placeholder="Select language" /></SelectTrigger><SelectContent className="max-h-[300px]">{LANGUAGES.map(l => (<SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>))}</SelectContent></Select></div>
+              <div className="grid grid-cols-12 gap-4 items-center">
+                <Label htmlFor="website_url" className="col-span-12 sm:col-span-3 text-left sm:text-right">Main Website URL</Label>
+                <div className="col-span-12 sm:col-span-9">
+                  <Input id="website_url" name="website_url" value={formData.website_url} onChange={handleInputChange} placeholder="https://example.com" type="url"/>
+                </div>
+              </div>
+              <div className="grid grid-cols-12 gap-4 items-center">
+                <Label htmlFor="country" className="col-span-12 sm:col-span-3 text-left sm:text-right">Country</Label>
+                <div className="col-span-12 sm:col-span-9">
+                  <Select value={formData.country} onValueChange={(v) => handleSelectChange('country', v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select country" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      {COUNTRIES.map(c => (<SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-12 gap-4 items-center">
+                <Label htmlFor="language" className="col-span-12 sm:col-span-3 text-left sm:text-right">Language</Label>
+                <div className="col-span-12 sm:col-span-9">
+                  <Select value={formData.language} onValueChange={(v) => handleSelectChange('language', v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      {LANGUAGES.map(l => (<SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* Master Claim Brand Selector */}
-              <div className="space-y-2">
-                <Label htmlFor="master_claim_brand_id">Product Claims Brand (Optional)</Label>
-                <Select 
-                  value={formData.master_claim_brand_id || 'NO_SELECTION'} 
-                  onValueChange={handleMasterClaimBrandChange}
-                  disabled={isLoadingMasterClaimBrands}
-                >
-                  <SelectTrigger id="master_claim_brand_id">
-                    <SelectValue placeholder={isLoadingMasterClaimBrands ? "Loading claim brands..." : "Link to a Product Claims Brand..."} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NO_SELECTION">No specific Product Claims Brand</SelectItem>
-                    {masterClaimBrands.map(mcb => (
-                      <SelectItem key={mcb.id} value={mcb.id}>{mcb.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground flex items-center">
-                  <Info className="h-3 w-3 mr-1" /> Link this MixerAI brand to a central Product Claims Brand if applicable.
-                </p>
+              <div className="grid grid-cols-12 gap-4 items-start">
+                <Label htmlFor="master_claim_brand_id" className="col-span-12 sm:col-span-3 text-left sm:text-right sm:pt-2">Product Claims Brand</Label>
+                <div className="col-span-12 sm:col-span-9 space-y-1">
+                  <Select 
+                    value={formData.master_claim_brand_id || 'NO_SELECTION'} 
+                    onValueChange={handleMasterClaimBrandChange}
+                    disabled={isLoadingMasterClaimBrands}
+                  >
+                    <SelectTrigger id="master_claim_brand_id">
+                      <SelectValue placeholder={isLoadingMasterClaimBrands ? "Loading claim brands..." : "Link to a Product Claims Brand..."} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NO_SELECTION">No specific Product Claims Brand</SelectItem>
+                      {masterClaimBrands.map(mcb => (
+                        <SelectItem key={mcb.id} value={mcb.id}>{mcb.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground flex items-center">
+                    <Info className="h-3 w-3 mr-1" /> Link this MixerAI brand to a central Product Claims Brand if applicable.
+                  </p>
+                </div>
               </div>
             </CardContent>
+            <CardFooter className="flex justify-end space-x-2 border-t pt-6">
+              <Button variant="outline" onClick={() => router.push('/dashboard/brands')} disabled={isSaving || isGenerating}>
+                  Cancel
+              </Button>
+              <Button onClick={handleCreateBrand} disabled={isSaving || isGenerating}>
+                  {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Create Brand'}
+              </Button>
+            </CardFooter>
           </Card>
         </TabsContent>
 
@@ -496,26 +546,28 @@ export default function NewBrandPage() {
                   <div className="space-y-4 border-b pb-4">
                     <h3 className="text-lg font-semibold">Generate Brand Identity</h3>
                     <p className="text-sm text-muted-foreground">Add website URLs to auto-generate or enhance brand identity, tone, and guardrails. The main URL from Basic Details is included by default.</p>
-                      <div className="space-y-2">
-                      <Label>Additional Website URLs (Optional)</Label>
-                      {formData.additional_website_urls.map((urlObj) => (
-                        <div key={urlObj.id} className="flex items-center gap-2">
-                          <Input
-                            value={urlObj.value}
-                            onChange={(e) => handleAdditionalUrlChange(urlObj.id, e.target.value)}
-                            placeholder="https://additional-example.com"
-                            className="flex-grow"
-                            type="url"
-                          />
-                          <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveAdditionalUrl(urlObj.id)} className="h-8 w-8" aria-label="Remove URL">
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button type="button" variant="outline" onClick={handleAddAdditionalUrlField} size="sm" className="mt-2 w-full">
-                        <PlusCircle className="mr-2 h-4 w-4" /> Add another URL
-                      </Button>
+                    <div className="grid grid-cols-12 gap-4">
+                      <Label className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Additional<br />Website URLs</Label>
+                      <div className="col-span-12 sm:col-span-9 space-y-2">
+                        {formData.additional_website_urls.map((urlObj) => (
+                          <div key={urlObj.id} className="flex items-center gap-2">
+                            <Input
+                              value={urlObj.value}
+                              onChange={(e) => handleAdditionalUrlChange(urlObj.id, e.target.value)}
+                              placeholder="https://additional-example.com"
+                              className="flex-grow"
+                              type="url"
+                            />
+                            <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveAdditionalUrl(urlObj.id)} className="h-8 w-8" aria-label="Remove URL">
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button type="button" variant="outline" onClick={handleAddAdditionalUrlField} size="sm" className="mt-2 w-full">
+                          <PlusCircle className="mr-2 h-4 w-4" /> Add another URL
+                        </Button>
                       </div>
+                    </div>
                     <div className="space-y-2 pt-2">
                       <p className="text-xs text-muted-foreground">Identity will be generated for {countryName} in {languageName} (if set).</p>
                       <Button onClick={handleGenerateBrandIdentity} disabled={isGenerating || !canGenerateIdentity} className="w-full">
@@ -525,15 +577,31 @@ export default function NewBrandPage() {
                   </div>
                   
                   <div className="space-y-4">
-                    <div className="space-y-2"><Label htmlFor="brand_identity">Brand Identity</Label><Textarea id="brand_identity" name="brand_identity" value={formData.brand_identity} onChange={handleInputChange} placeholder="Describe your brand..." rows={6}/></div>
-                    <div className="space-y-2"><Label htmlFor="tone_of_voice">Tone of Voice</Label><Textarea id="tone_of_voice" name="tone_of_voice" value={formData.tone_of_voice} onChange={handleInputChange} placeholder="Describe your brand's tone..." rows={4}/></div>
-                    <div className="space-y-2"><Label htmlFor="guardrails">Content Guardrails</Label><Textarea id="guardrails" name="guardrails" value={formData.guardrails} onChange={handleInputChange} placeholder="e.g., Do not mention competitors..." rows={4}/></div>
+                    <div className="grid grid-cols-12 gap-4">
+                      <Label htmlFor="brand_identity" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Brand Identity</Label>
+                      <div className="col-span-12 sm:col-span-9">
+                        <Textarea id="brand_identity" name="brand_identity" value={formData.brand_identity} onChange={handleInputChange} placeholder="Describe your brand..." rows={6}/>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-12 gap-4">
+                      <Label htmlFor="tone_of_voice" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Tone of Voice</Label>
+                      <div className="col-span-12 sm:col-span-9">
+                        <Textarea id="tone_of_voice" name="tone_of_voice" value={formData.tone_of_voice} onChange={handleInputChange} placeholder="Describe your brand's tone..." rows={4}/>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-12 gap-4">
+                      <Label htmlFor="guardrails" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Content Guardrails</Label>
+                      <div className="col-span-12 sm:col-span-9">
+                        <Textarea id="guardrails" name="guardrails" value={formData.guardrails} onChange={handleInputChange} placeholder="e.g., Do not mention competitors..." rows={4}/>
+                      </div>
+                    </div>
                     
-                    <div className="space-y-4">
-                      <Label>Content Vetting Agencies (Optional)</Label>
-                      {isLoading && <p className="text-sm text-muted-foreground">Loading agencies...</p>}
-                      
-                      {(() => { // IIFE to manage filteredAgencies
+                    <div className="grid grid-cols-12 gap-4">
+                      <Label className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Content Vetting<br />Agencies</Label>
+                      <div className="col-span-12 sm:col-span-9">
+                        {isLoading && <p className="text-sm text-muted-foreground">Loading agencies...</p>}
+                        
+                        {(() => { // IIFE to manage filteredAgencies
                         const filteredAgenciesByIdentityTab = allVettingAgencies.filter(agency => !formData.country || !agency.country_code || agency.country_code === formData.country);
 
                         if (!isLoading && !formData.country && allVettingAgencies.length > 0) {
@@ -639,6 +707,7 @@ export default function NewBrandPage() {
                         }
                         return null; // Fallback if no conditions met to render agencies
                       })()}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -647,9 +716,22 @@ export default function NewBrandPage() {
                     <div className="space-y-2">
                       <Label className="font-semibold">Quick Preview</Label>
                       <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/30">
-                        <BrandIcon name={formData.name || 'Brand Name'} color={formData.brand_color ?? undefined} />
+                        <BrandIcon 
+                          name={formData.name || 'Brand Name'} 
+                          color={formData.brand_color ?? undefined}
+                          logoUrl={formData.logo_url}
+                        />
                         <span className="truncate">{formData.name || 'Your Brand Name'}</span>
                       </div>
+                    </div>
+                    <div className="space-y-2">
+                      <BrandLogoUpload
+                        currentLogoUrl={formData.logo_url}
+                        onLogoChange={(url) => setFormData(prev => ({ ...prev, logo_url: url }))}
+                        brandId={uuidv4()} // Temporary ID for new brand
+                        brandName={formData.name}
+                        isDisabled={isSaving}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="brand_color_identity_tab">Brand Colour</Label>
@@ -678,18 +760,17 @@ export default function NewBrandPage() {
                 </div>
               </div>
          </CardContent>
+         <CardFooter className="flex justify-end space-x-2 border-t pt-6">
+           <Button variant="outline" onClick={() => router.push('/dashboard/brands')} disabled={isSaving || isGenerating}>
+               Cancel
+           </Button>
+           <Button onClick={handleCreateBrand} disabled={isSaving || isGenerating}>
+               {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Create Brand'}
+           </Button>
+         </CardFooter>
        </Card>
         </TabsContent>
       </Tabs>
-
-      <div className="flex justify-end space-x-2 pt-4 mt-4 border-t">
-        <Button variant="outline" onClick={() => router.push('/dashboard/brands')} disabled={isSaving || isGenerating}>
-            Cancel
-        </Button>
-        <Button onClick={handleCreateBrand} disabled={isSaving || isGenerating}>
-            {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Create Brand'}
-        </Button>
-      </div>
     </div>
   );
 } 

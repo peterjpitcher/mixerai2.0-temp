@@ -12,7 +12,8 @@ import {
   AlertCircle,
   Edit,
   Loader2,
-  UserCircle2
+  UserCircle2,
+  MoreVertical
 } from 'lucide-react';
 import {
   Dialog,
@@ -26,6 +27,12 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { BrandIcon } from '@/components/brand-icon';
 import { Label } from '@/components/ui/label';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { format as formatDateFns } from 'date-fns';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
@@ -33,6 +40,7 @@ interface Brand {
   id: string;
   name: string;
   brand_color?: string;
+  logo_url?: string | null;
 }
 
 interface BrandPermission {
@@ -171,13 +179,13 @@ export default function UserDetailPage() {
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Never';
     const date = new Date(dateString);
-    // Standard 4.6: Use dd MMMM yyyy format
-    return formatDateFns(date, 'dd MMMM yyyy'); 
+    // Standard 4.6: Use MMMM d, yyyy format
+    return formatDateFns(date, 'MMMM d, yyyy'); 
   };
   
   if (isLoading) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+      <div className="space-y-8">
         {/* Minimal header for loading state */}
         <div className="flex items-center mb-4">
             <Button variant="outline" size="icon" asChild className="mr-3">
@@ -196,7 +204,7 @@ export default function UserDetailPage() {
   
   if (!user) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+      <div className="space-y-8">
         <Breadcrumbs items={[
             { label: "Dashboard", href: "/dashboard" }, 
             { label: "Users", href: "/dashboard/users" }, 
@@ -227,7 +235,7 @@ export default function UserDetailPage() {
   const userId = params?.id;
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+    <div className="space-y-8">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" }, 
         { label: "Users", href: "/dashboard/users" }, 
@@ -266,18 +274,27 @@ export default function UserDetailPage() {
         </div>
         <div className="flex space-x-2">
             {userId && (
-              <>
-                <Button asChild>
-                  <Link href={`/dashboard/users/${userId}/edit`} className="flex items-center">
-                    <Edit className="mr-2 h-4 w-4" />
-                    Edit User
-                  </Link>
-                </Button>
-                <Button variant="destructive" onClick={() => setShowDeleteDialog(true)} title="Delete this user">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete User
-                </Button>
-              </>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <span className="sr-only">Open menu</span>
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link href={`/dashboard/users/${userId}/edit`}>
+                      <Edit className="mr-2 h-4 w-4" /> Edit User
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setShowDeleteDialog(true)} 
+                    className="text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete User
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
         </div>
       </div>
@@ -314,7 +331,11 @@ export default function UserDetailPage() {
               {user.brand_permissions.map(permission => (
                 <li key={permission.id || permission.brand_id} className="flex items-center justify-between p-3 bg-muted/50 rounded-md">
                   <div className="flex items-center gap-3">
-                    <BrandIcon name={permission.brand?.name || 'Unknown Brand'} color={permission.brand?.brand_color || '#cccccc'} />
+                    <BrandIcon 
+                      name={permission.brand?.name || 'Unknown Brand'} 
+                      color={permission.brand?.brand_color || '#cccccc'}
+                      logoUrl={permission.brand?.logo_url}
+                    />
                     <span className="font-medium">{permission.brand?.name || 'Unknown Brand'}</span>
                   </div>
                   <Badge variant={permission.role === 'admin' ? 'default' : 'secondary'}>

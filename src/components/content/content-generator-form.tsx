@@ -26,6 +26,7 @@ interface Brand {
   brand_identity?: string | null;
   tone_of_voice?: string | null;
   guardrails?: string | null;
+  logo_url?: string | null;
 }
 
 interface WorkflowSummary {
@@ -641,7 +642,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
             <ArrowLeft className="h-4 w-4" />
           </Button>
           {currentBrand && 
-            <BrandIcon name={currentBrand.name} color={currentBrand.brand_color} size="lg" />
+            <BrandIcon name={currentBrand.name} color={currentBrand.brand_color} logoUrl={currentBrand.logo_url} size="lg" />
           }
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Content Generator</h1>

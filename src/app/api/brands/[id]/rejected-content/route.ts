@@ -20,19 +20,33 @@ export const GET = withAuth(async (request: NextRequest, user: User, context?: u
   const supabase = createSupabaseAdminClient();
 
   try {
-    // 1. Verify user is the brand_admin_id for this brand
+    // 1. Check if user has admin or editor permissions for this brand
+    const globalRole = user.user_metadata?.role;
+    
+    if (globalRole !== 'admin') {
+      // Check brand-specific permissions
+      const { data: permission, error: permError } = await supabase
+        .from('user_brand_permissions')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('brand_id', brandId)
+        .in('role', ['admin', 'editor'])
+        .maybeSingle();
+
+      if (permError || !permission) {
+        return NextResponse.json({ success: false, error: 'User is not authorized to view rejected content for this brand.' }, { status: 403 });
+      }
+    }
+    
+    // Verify brand exists
     const { data: brandData, error: brandError } = await supabase
       .from('brands')
-      .select('id, name, brand_admin_id')
+      .select('id, name')
       .eq('id', brandId)
       .single();
 
     if (brandError || !brandData) {
       return NextResponse.json({ success: false, error: brandError?.message || 'Brand not found.' }, { status: 404 });
-    }
-
-    if (brandData.brand_admin_id !== user.id) {
-      return NextResponse.json({ success: false, error: 'User is not authorized to view rejected content for this brand.' }, { status: 403 });
     }
 
     // 2. Fetch rejected content for this brand

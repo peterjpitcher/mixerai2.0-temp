@@ -12,10 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { Loader2, X, PlusCircle, ArrowLeft, AlertTriangle, Sparkles, Info } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
+import { BrandLogoUpload } from '@/components/ui/brand-logo-upload';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 import { Checkbox } from '@/components/ui/checkbox';
 import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
 // export const metadata: Metadata = {
@@ -126,6 +128,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     guardrails: '',
     content_vetting_agencies: [] as string[],
     master_claim_brand_id: null as string | null,
+    logo_url: null as string | null,
   });
 
   const [allVettingAgencies, setAllVettingAgencies] = useState<VettingAgency[]>([]);
@@ -198,6 +201,8 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
           throw new Error(data.error || 'Failed to fetch brand data structure');
         }
         
+        console.log('Edit page - Received brand data:', data.brand);
+        console.log('Edit page - Logo URL:', data.brand.logo_url);
         setBrand(data.brand);
         
         setFormData({
@@ -220,6 +225,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                                       ? data.brand.selected_vetting_agencies.map((agency: unknown) => (agency as { id: string }).id)
                                       : [],
           master_claim_brand_id: data.brand.master_claim_brand_id || null,
+          logo_url: data.brand.logo_url || null,
         });
 
       } catch (err) {
@@ -290,7 +296,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   };
 
   const handleMasterClaimBrandChange = (value: string) => {
-    setFormData(prev => ({ ...prev, master_claim_brand_id: value || null }));
+    setFormData(prev => ({ ...prev, master_claim_brand_id: value === 'NO_SELECTION' ? null : value }));
   };
 
   const handleAddAdditionalUrlField = () => {
@@ -415,6 +421,9 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         payload.master_claim_brand_id = null;
       }
 
+      console.log('Updating brand with payload:', payload);
+      console.log('Logo URL in payload:', payload.logo_url);
+      
       const response = await fetch(`/api/brands/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -425,7 +434,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         throw new Error(data.error || 'Failed to update brand');
       }
       toast.success('Brand updated successfully!');
-      router.push(`/dashboard/brands/${data.data.id}`);
+      router.push('/dashboard/brands');
     } catch (error) {
       toast.error((error instanceof Error ? error.message : String(error)) || 'Failed to update brand.');
     } finally {
@@ -480,7 +489,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
       <Breadcrumbs items={breadcrumbItems} />
       
       <div className="flex items-center justify-between">
@@ -488,7 +497,26 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
           <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/brands')} aria-label="Back to Brands">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <BrandIcon name={formData.name || "Edit Brand"} color={formData.brand_color} size="lg" />
+          <div className="relative w-14 h-14 rounded-full overflow-hidden bg-gray-100">
+            {formData.logo_url ? (
+              <Image
+                src={formData.logo_url}
+                alt={formData.name || 'Brand logo'}
+                width={112}
+                height={112}
+                className="object-cover w-full h-full"
+                quality={100}
+                unoptimized={formData.logo_url.includes('supabase')}
+              />
+            ) : (
+              <div 
+                className="w-full h-full flex items-center justify-center text-xl font-bold text-white"
+                style={{ backgroundColor: formData.brand_color || '#3498db' }}
+              >
+                {formData.name ? formData.name.charAt(0).toUpperCase() : '?'}
+              </div>
+            )}
+          </div>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Edit Brand: {formData.name || 'Loading...'}</h1>
             <p className="text-muted-foreground">Update the details, identity, and settings for this brand.</p>
@@ -509,59 +537,73 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
               <CardDescription>Set the foundational details for your brand.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                  <Label htmlFor="name">Brand Name <span className="text-destructive">*</span></Label>
+              <div className="grid grid-cols-12 gap-4 items-center">
+                <Label htmlFor="name" className="col-span-12 sm:col-span-3 text-left sm:text-right">Brand Name <span className="text-destructive">*</span></Label>
+                <div className="col-span-12 sm:col-span-9">
                   <Input id="name" name="name" value={formData.name} onChange={handleInputChange} placeholder="Enter brand name" required/>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="website_url">Main Website URL</Label>
+              <div className="grid grid-cols-12 gap-4 items-center">
+                <Label htmlFor="website_url" className="col-span-12 sm:col-span-3 text-left sm:text-right">Main Website URL</Label>
+                <div className="col-span-12 sm:col-span-9">
                   <Input id="website_url" name="website_url" value={formData.website_url} onChange={handleInputChange} placeholder="https://example.com" type="url"/>
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="country">Country</Label>
+              <div className="grid grid-cols-12 gap-4 items-center">
+                <Label htmlFor="country" className="col-span-12 sm:col-span-3 text-left sm:text-right">Country</Label>
+                <div className="col-span-12 sm:col-span-9">
                   <Select value={formData.country} onValueChange={(v) => handleSelectChange('country', v)}>
                     <SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger>
                     <SelectContent className="max-h-[300px]">
                       {COUNTRIES.map(c => (<SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>))}
                     </SelectContent>
                   </Select>
+                </div>
               </div>
-              <div className="space-y-2">
-                  <Label htmlFor="language">Language</Label>
+              <div className="grid grid-cols-12 gap-4 items-center">
+                <Label htmlFor="language" className="col-span-12 sm:col-span-3 text-left sm:text-right">Language</Label>
+                <div className="col-span-12 sm:col-span-9">
                   <Select value={formData.language} onValueChange={(v) => handleSelectChange('language', v)}>
                     <SelectTrigger><SelectValue placeholder="Select language" /></SelectTrigger>
                     <SelectContent className="max-h-[300px]">
                       {LANGUAGES.map(l => (<SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>))}
-                  </SelectContent>
-                </Select>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="master_claim_brand_id">Product Claims Brand (Optional)</Label>
-                <Select 
-                  value={formData.master_claim_brand_id || 'NO_SELECTION'} 
-                  onValueChange={handleMasterClaimBrandChange}
-                  disabled={isLoadingMasterClaimBrands}
-                >
-                  <SelectTrigger id="master_claim_brand_id">
-                    <SelectValue placeholder={isLoadingMasterClaimBrands ? "Loading claim brands..." : "Link to a Product Claims Brand..."} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NO_SELECTION">No specific Product Claims Brand</SelectItem>
-                    {masterClaimBrands.map(mcb => (
-                      <SelectItem key={mcb.id} value={mcb.id}>{mcb.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground flex items-center">
-                  <Info className="h-3 w-3 mr-1" /> Link this MixerAI brand to a central Product Claims Brand if applicable.
-                </p>
+              <div className="grid grid-cols-12 gap-4 items-start">
+                <Label htmlFor="master_claim_brand_id" className="col-span-12 sm:col-span-3 text-left sm:text-right sm:pt-2">Product Claims Brand</Label>
+                <div className="col-span-12 sm:col-span-9 space-y-1">
+                  <Select 
+                    value={formData.master_claim_brand_id || 'NO_SELECTION'} 
+                    onValueChange={handleMasterClaimBrandChange}
+                    disabled={isLoadingMasterClaimBrands}
+                  >
+                    <SelectTrigger id="master_claim_brand_id">
+                      <SelectValue placeholder={isLoadingMasterClaimBrands ? "Loading claim brands..." : "Link to a Product Claims Brand..."} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NO_SELECTION">No specific Product Claims Brand</SelectItem>
+                      {masterClaimBrands.map(mcb => (
+                        <SelectItem key={mcb.id} value={mcb.id}>{mcb.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground flex items-center">
+                    <Info className="h-3 w-3 mr-1" /> Link this MixerAI brand to a central Product Claims Brand if applicable.
+                  </p>
+                </div>
               </div>
             </CardContent>
+            <CardFooter className="flex justify-end space-x-2 border-t pt-6">
+              <Button variant="outline" onClick={() => router.push('/dashboard/brands')} disabled={isSaving || isGenerating}>
+                  Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={isSaving || isGenerating}>
+                  {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
+              </Button>
+            </CardFooter>
           </Card>
         </TabsContent>
 
@@ -577,50 +619,63 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                   <div className="space-y-4 border-b pb-4">
                     <h3 className="text-lg font-semibold">Generate Brand Identity</h3>
                     <p className="text-sm text-muted-foreground">Add website URLs to auto-generate or enhance brand identity, tone, and guardrails. The main URL from Basic Details is included by default.</p>
-              <div className="space-y-2">
-                      <Label>Additional Website URLs (Optional)</Label>
-                      {formData.additional_website_urls.map((urlObj) => (
-                        <div key={urlObj.id} className="flex items-center gap-2">
-                    <Input
-                            value={urlObj.value}
-                            onChange={(e) => handleAdditionalUrlChange(urlObj.id, e.target.value)}
-                            placeholder="https://additional-example.com"
-                            className="flex-grow"
-                      type="url"
-                    />
-                          <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveAdditionalUrl(urlObj.id)} className="h-8 w-8" aria-label="Remove URL">
-                            <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                      <Button type="button" variant="outline" onClick={handleAddAdditionalUrlField} size="sm" className="mt-2 w-full">
-                        <PlusCircle className="mr-2 h-4 w-4" /> Add another URL
-                  </Button>
-                </div>
+                    <div className="grid grid-cols-12 gap-4">
+                      <Label className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">
+                        Additional<br />Website URLs
+                      </Label>
+                      <div className="col-span-12 sm:col-span-9 space-y-2">
+                        {formData.additional_website_urls.map((urlObj) => (
+                          <div key={urlObj.id} className="flex items-center gap-2">
+                            <Input
+                              value={urlObj.value}
+                              onChange={(e) => handleAdditionalUrlChange(urlObj.id, e.target.value)}
+                              placeholder="https://additional-example.com"
+                              className="flex-grow"
+                              type="url"
+                            />
+                            <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveAdditionalUrl(urlObj.id)} className="h-8 w-8" aria-label="Remove URL">
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button type="button" variant="outline" onClick={handleAddAdditionalUrlField} size="sm" className="mt-2 w-full">
+                          <PlusCircle className="mr-2 h-4 w-4" /> Add another URL
+                        </Button>
+                      </div>
+                    </div>
                     <div className="space-y-2 pt-2">
                       <p className="text-xs text-muted-foreground">Identity will be generated for {countryName} in {languageName} (if set).</p>
                       <Button onClick={handleGenerateBrandIdentity} disabled={isGenerating || !canGenerateIdentity} className="w-full">
                         {isGenerating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</> : ( <> <Sparkles className="mr-2 h-4 w-4" /> Generate Brand Identity </>)}
                       </Button>
-              </div>
-              </div>
+                    </div>
+                  </div>
 
                   <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="brand_identity">Brand Identity</Label>
-                      <Textarea id="brand_identity" name="brand_identity" value={formData.brand_identity} onChange={handleInputChange} placeholder="Describe your brand..." rows={6}/>
+              <div className="grid grid-cols-12 gap-4">
+                <Label htmlFor="brand_identity" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Brand Identity</Label>
+                <div className="col-span-12 sm:col-span-9">
+                  <Textarea id="brand_identity" name="brand_identity" value={formData.brand_identity} onChange={handleInputChange} placeholder="Describe your brand..." rows={6}/>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="tone_of_voice">Tone of Voice</Label>
-                      <Textarea id="tone_of_voice" name="tone_of_voice" value={formData.tone_of_voice} onChange={handleInputChange} placeholder="Describe your brand's tone..." rows={4}/>
+              <div className="grid grid-cols-12 gap-4">
+                <Label htmlFor="tone_of_voice" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Tone of Voice</Label>
+                <div className="col-span-12 sm:col-span-9">
+                  <Textarea id="tone_of_voice" name="tone_of_voice" value={formData.tone_of_voice} onChange={handleInputChange} placeholder="Describe your brand's tone..." rows={4}/>
+                </div>
               </div>
-              <div className="space-y-2">
-                      <Label htmlFor="guardrails">Content Guardrails</Label>
-                      <Textarea id="guardrails" name="guardrails" value={formData.guardrails} onChange={handleInputChange} placeholder="e.g., Do not mention competitors..." rows={4}/>
+              <div className="grid grid-cols-12 gap-4">
+                <Label htmlFor="guardrails" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Content Guardrails</Label>
+                <div className="col-span-12 sm:col-span-9">
+                  <Textarea id="guardrails" name="guardrails" value={formData.guardrails} onChange={handleInputChange} placeholder="e.g., Do not mention competitors..." rows={4}/>
+                </div>
               </div>
               
-              <div className="space-y-4">
-                      <Label>Content Vetting Agencies (Optional)</Label>
+              <div className="grid grid-cols-12 gap-4">
+                <Label className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">
+                  Content Vetting<br />Agencies
+                </Label>
+                <div className="col-span-12 sm:col-span-9 space-y-2">
                       {isLoadingAgencies && <p className="text-sm text-muted-foreground">Loading agencies...</p>}
                       
                       {(() => { 
@@ -713,14 +768,48 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                     </div>
                   </div>
                 </div>
+              </div>
                 <div className="lg:col-span-1">
                   <div className="bg-muted rounded-lg p-4 space-y-6 sticky top-4">
                     <div className="space-y-2">
-                      <Label className="font-semibold">Quick Preview</Label>
-                      <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/30">
-                        <BrandIcon name={formData.name || 'Brand Name'} color={formData.brand_color ?? undefined} />
-                        <span className="truncate">{formData.name || 'Your Brand Name'}</span>
+                      <Label className="font-semibold">Brand Preview</Label>
+                      {/* Large logo preview */}
+                      <div className="flex justify-center p-4 border rounded-md bg-muted/30">
+                        <div className="relative w-32 h-32 rounded-full overflow-hidden bg-gray-100">
+                          {formData.logo_url ? (
+                            <Image
+                              src={formData.logo_url}
+                              alt={formData.name || 'Brand logo'}
+                              width={256}
+                              height={256}
+                              className="object-cover w-full h-full"
+                              quality={100}
+                              unoptimized={formData.logo_url.includes('supabase')}
+                            />
+                          ) : (
+                            <div 
+                              className="w-full h-full flex items-center justify-center text-4xl font-bold text-white"
+                              style={{ backgroundColor: formData.brand_color || '#3498db' }}
+                            >
+                              {formData.name ? formData.name.charAt(0).toUpperCase() : '?'}
+                            </div>
+                          )}
+                        </div>
                       </div>
+                      {/* Small preview with name */}
+                      <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/30">
+                        <BrandIcon name={formData.name || 'Brand Name'} color={formData.brand_color ?? undefined} logoUrl={formData.logo_url} size="sm" />
+                        <span className="truncate text-sm">{formData.name || 'Your Brand Name'}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <BrandLogoUpload
+                        currentLogoUrl={formData.logo_url}
+                        onLogoChange={(url) => setFormData(prev => ({ ...prev, logo_url: url }))}
+                        brandId={id}
+                        brandName={formData.name}
+                        isDisabled={isSaving}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="brand_color_identity_tab">Brand Colour</Label>
@@ -749,18 +838,17 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                 </div>
               </div>
             </CardContent>
+            <CardFooter className="flex justify-end space-x-2 border-t pt-6">
+              <Button variant="outline" onClick={() => router.push('/dashboard/brands')} disabled={isSaving || isGenerating}>
+                  Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={isSaving || isGenerating}>
+                  {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
+              </Button>
+            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>
-
-      <div className="flex justify-end space-x-2 pt-4 mt-4 border-t">
-        <Button variant="outline" onClick={() => router.push('/dashboard/brands')} disabled={isSaving || isGenerating}>
-            Cancel
-        </Button>
-        <Button onClick={handleSave} disabled={isSaving || isGenerating}>
-            {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
-        </Button>
-              </div>
     </div>
   );
 } 

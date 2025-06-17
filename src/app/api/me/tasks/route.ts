@@ -54,7 +54,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         updated_at,
         current_step, 
         assigned_to,
-        brand:brands!brand_id (id, name, brand_color),
+        brand:brands!brand_id (id, name, brand_color, logo_url),
         workflow:workflows!workflow_id (id, name),
         workflow_step_details:workflow_steps!current_step (id, name, step_order)
       `)
@@ -83,7 +83,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
 
     // Adapt the mapping to the TaskItem interface from my-tasks/page.tsx
     const formattedTasks = contentItems.map((item: Record<string, unknown>) => {
-      const brand = item.brand as { id: string; name: string; brand_color: string } | undefined;
+      const brand = item.brand as { id: string; name: string; brand_color: string; logo_url?: string | null } | undefined;
       const workflow = item.workflow as { id: string; name: string } | undefined;
       const workflow_step_details = item.workflow_step_details as { id: string; name: string; step_order: number } | undefined;
       
@@ -98,6 +98,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         brand_id: brand?.id,
         brand_name: brand?.name,
         brand_color: brand?.brand_color,
+        brand_logo_url: brand?.logo_url,
         workflow_id: workflow?.id,
         workflow_name: workflow?.name,
         workflow_step_id: workflow_step_details?.id, 

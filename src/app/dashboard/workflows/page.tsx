@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Plus, Trash2, Eye, Edit3, AlertTriangle, WorkflowIcon, ShieldAlert, Loader2, Copy } from 'lucide-react';
+import { Plus, AlertTriangle, WorkflowIcon, ShieldAlert, Loader2, Copy, Eye, Edit, Trash2, MoreVertical, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandIcon } from '@/components/brand-icon';
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +21,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface UserSessionData {
   id: string;
@@ -41,6 +47,7 @@ interface WorkflowFromAPI {
   brand_id: string;
   brand_name: string;
   brand_color?: string;
+  brand_logo_url?: string | null;
   template_id?: string | null;
   template_name?: string | null;
   steps: Array<{
@@ -61,6 +68,7 @@ interface GroupedWorkflows {
   [key: string]: {
     brand_name: string;
     brand_color?: string;
+    brand_logo_url?: string | null;
     workflows: WorkflowFromAPI[];
   }
 }
@@ -160,7 +168,7 @@ export default function WorkflowsPage() {
       const result = await response.json();
       if (result.success && result.workflow) {
         toast.success(`Workflow "${result.workflow.name}" duplicated successfully.`);
-        router.push(`/dashboard/workflows/${result.workflow.id}/edit`);
+        router.push(`/dashboard/workflows/${result.workflow.id}/edit?duplicated=true`);
       } else {
         throw new Error(result.error || 'Failed to duplicate workflow.');
       }
@@ -172,30 +180,146 @@ export default function WorkflowsPage() {
     }
   };
 
-  const filteredWorkflowsList = allWorkflows.filter(workflow => 
-    workflow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    workflow.brand_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (workflow.template_name && workflow.template_name.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // Define columns for the data table
+  const columns: DataTableColumn<WorkflowFromAPI>[] = [
+    {
+      id: "name",
+      header: "Workflow",
+      cell: ({ row }) => (
+        <div>
+          <div className="font-medium">{row.name}</div>
+          {row.description && (
+            <div className="text-sm text-muted-foreground line-clamp-1">
+              {row.description}
+            </div>
+          )}
+        </div>
+      ),
+      enableSorting: true,
+    },
+    {
+      id: "brand_name",
+      header: "Brand",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <BrandIcon 
+            name={row.brand_name} 
+            color={row.brand_color}
+            logoUrl={row.brand_logo_url} 
+            size="sm"
+          />
+          <span>{row.brand_name}</span>
+        </div>
+      ),
+      enableSorting: true,
+      enableFiltering: true,
+    },
+    {
+      id: "template_name",
+      header: "Template",
+      cell: ({ row }) => row.template_name || <span className="text-muted-foreground">No template</span>,
+      enableSorting: true,
+    },
+    {
+      id: "steps_count",
+      header: "Steps",
+      cell: ({ row }) => (
+        <Badge variant="secondary">
+          {row.steps_count} step{row.steps_count !== 1 ? 's' : ''}
+        </Badge>
+      ),
+      enableSorting: true,
+      sortingFn: (a, b) => a.steps_count - b.steps_count,
+    },
+    {
+      id: "content_count",
+      header: "In Use",
+      cell: ({ row }) => (
+        <span className="font-medium">
+          {row.content_count} item{row.content_count !== 1 ? 's' : ''}
+        </span>
+      ),
+      enableSorting: true,
+      sortingFn: (a, b) => a.content_count - b.content_count,
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const canManage = isGlobalAdmin || currentUser?.brand_permissions?.some(p => p.brand_id === row.brand_id && p.role === 'admin');
+        
+        return (
+          <div className="flex items-center justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="sr-only">Open menu</span>
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/dashboard/workflows/${row.id}`);
+                  }}
+                >
+                  <Eye className="mr-2 h-4 w-4" /> View
+                </DropdownMenuItem>
+                {canManage && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/dashboard/workflows/${row.id}/edit`);
+                      }}
+                    >
+                      <Pencil className="mr-2 h-4 w-4" /> Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDuplicateWorkflow(row.id);
+                      }}
+                      disabled={isDuplicating === row.id}
+                    >
+                      <Copy className="mr-2 h-4 w-4" /> 
+                      {isDuplicating === row.id ? 'Duplicating...' : 'Duplicate'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setWorkflowToDelete(row);
+                        setShowDeleteDialog(true);
+                      }}
+                      className="text-destructive"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      },
+      className: "w-[120px]",
+    },
+  ];
 
-  const groupWorkflowsByBrand = (workflowsToGroup: WorkflowFromAPI[]) => {
-    const grouped: GroupedWorkflows = {};
-    workflowsToGroup.forEach(workflow => {
-      const brandKey = workflow.brand_name || 'Unknown Brand';
-      if (!grouped[brandKey]) {
-        grouped[brandKey] = {
-          brand_name: brandKey,
-          brand_color: workflow.brand_color,
-          workflows: []
-        };
-      }
-      grouped[brandKey].workflows.push(workflow);
-    });
-    return Object.entries(grouped)
-      .sort((a, b) => a[1].brand_name.localeCompare(b[1].brand_name));
-  };
-
-  const displayedGroupedWorkflows = groupWorkflowsByBrand(filteredWorkflowsList);
+  // Get unique brands for filter
+  const brandOptions = useMemo(() => {
+    const brands = new Set(allWorkflows.map(w => w.brand_name).filter(Boolean));
+    return Array.from(brands).map(brand => ({
+      value: brand,
+      label: brand
+    })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [allWorkflows]);
 
   const handleDeleteWorkflow = async () => {
     if (!workflowToDelete) return;
@@ -281,7 +405,7 @@ export default function WorkflowsPage() {
   }
   
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+    <div className="space-y-8">
       <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Workflows" }]} />
       <PageHeader
         title="Workflows"
@@ -297,96 +421,32 @@ export default function WorkflowsPage() {
         }
       />
       
-      {canAccessPage && (allWorkflows.length > 0 || isLoading || error) && (
-         <div className="flex items-center justify-between">
-          <div className="max-w-sm w-full">
-            <label htmlFor="workflow-search" className="sr-only">Search workflows</label>
-            <Input 
-              id="workflow-search"
-              placeholder="Search workflows by name, brand, or content type..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
-      )}
-      
       {error && canAccessPage ? (
         <ErrorState />
       ) : allWorkflows.length === 0 && canAccessPage ? (
         <EmptyState />
-      ) : filteredWorkflowsList.length === 0 && searchTerm && canAccessPage ? (
-        <div className="flex flex-col items-center justify-center min-h-[200px] py-8">
-          <h3 className="text-xl font-bold mb-2">No Workflows Found</h3>
-          <p className="text-muted-foreground mb-4">No workflows match your search criteria.</p>
-          <Button variant="outline" onClick={() => setSearchTerm("")}>
-            Clear Search
-          </Button>
-        </div>
       ) : canAccessPage ? (
-        <div className="space-y-10">
-          {displayedGroupedWorkflows.map(([brandKey, group]) => (
-            <div key={brandKey}>
-              <h2 className="text-xl font-semibold mb-3 flex items-center">
-                <BrandIcon name={group.brand_name} color={group.brand_color} className="mr-2" /> 
-                {group.brand_name}
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {group.workflows.map(workflow => {
-                  const canManageThisSpecificWorkflow = isGlobalAdmin || currentUser?.brand_permissions?.some(p => p.brand_id === workflow.brand_id && p.role === 'admin');
-                  return (
-                    <Card key={workflow.id} className="flex flex-col">
-                      <CardHeader>
-                        <CardTitle className="text-lg">{workflow.name}</CardTitle>
-                        <CardDescription className="text-sm h-10 overflow-hidden text-ellipsis">
-                          {workflow.description || (workflow.template_name ? `Based on ${workflow.template_name}` : 'No description')}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="flex-grow space-y-2 text-sm">
-                        <p>Steps: {workflow.steps_count}</p>
-                        <p>In Use: {workflow.content_count} content item{workflow.content_count !== 1 ? 's' : ''}</p>
-                      </CardContent>
-                      <CardFooter className="border-t pt-3 pb-3 flex flex-wrap justify-end gap-2">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/dashboard/workflows/${workflow.id}`}><Eye className="mr-1.5 h-4 w-4" />View</Link>
-                        </Button>
-                        {canManageThisSpecificWorkflow && (
-                          <>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => handleDuplicateWorkflow(workflow.id)}
-                              disabled={isDuplicating === workflow.id}
-                              title="Duplicate this workflow"
-                            >
-                              {isDuplicating === workflow.id ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Copy className="mr-1.5 h-4 w-4" />}
-                              Duplicate
-                            </Button>
-                            <Button variant="secondary" size="sm" asChild>
-                              <Link href={`/dashboard/workflows/${workflow.id}/edit`}><Edit3 className="mr-1.5 h-4 w-4" />Edit</Link>
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="text-destructive hover:text-destructive/90" 
-                              onClick={() => { 
-                                setWorkflowToDelete(workflow);
-                                setShowDeleteDialog(true);
-                              }}
-                            >
-                              <Trash2 className="mr-1.5 h-4 w-4" />Delete
-                            </Button>
-                          </>
-                        )}
-                      </CardFooter>
-                    </Card>
-                  );
-                })}
-              </div>
+        <DataTable
+          columns={columns}
+          data={allWorkflows}
+          searchKey="name"
+          searchPlaceholder="Search workflows by name..."
+          filters={[
+            {
+              id: "brand_name",
+              label: "Brand",
+              options: brandOptions,
+            },
+          ]}
+          onRowClick={(row) => router.push(`/dashboard/workflows/${row.id}`)}
+          emptyState={
+            <div className="flex flex-col items-center justify-center py-8">
+              <h3 className="text-xl font-bold mb-2">No workflows found</h3>
+              <p className="text-muted-foreground mb-4">No workflows match your search criteria.</p>
             </div>
-          ))}
-        </div>
-      ) : null }
+          }
+        />
+      ) : null}
 
       {/* Delete Confirmation Dialog */}
       {workflowToDelete && (

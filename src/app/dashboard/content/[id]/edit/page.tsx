@@ -135,6 +135,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const fetchingRef = React.useRef(false);
   
   // User and Permissions State
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
@@ -160,7 +161,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   });
 
   const [versions, setVersions] = useState<ContentVersion[]>([]);
-  const [activeBrandData, setActiveBrandData] = useState<{ id: string; name: string; brand_color?: string } | null>(null);
+  const [activeBrandData, setActiveBrandData] = useState<{ id: string; name: string; brand_color?: string; logo_url?: string | null } | null>(null);
   const [template, setTemplate] = useState<Template | null>(null);
 
   // For ContentApprovalWorkflow to trigger save
@@ -201,7 +202,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   const getFormattedDateTime = (dateString: string) => {
     if (!dateString) return 'N/A';
     try {
-      return formatDateFns(new Date(dateString), 'dd MMMM yyyy, HH:mm');
+      return formatDateFns(new Date(dateString), 'MMMM d, yyyy, HH:mm');
     } catch (e) {
       console.error("Error formatting date/time:", dateString, e);
       return "Invalid Date/Time";
@@ -269,6 +270,12 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
 
   useEffect(() => {
     const fetchAllData = async () => {
+      // Prevent multiple simultaneous fetches
+      if (fetchingRef.current) {
+        console.log('[ContentEditPage] Fetch already in progress, skipping...');
+        return;
+      }
+      fetchingRef.current = true;
       setIsLoading(true);
       try {
         const [contentResponse, versionsResponse] = await Promise.all([
@@ -289,8 +296,8 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             status: contentResult.data.status || 'draft',
             brand_id: contentResult.data.brand_id || contentResult.data.brands?.id,
             brand_name: contentResult.data.brand_name || contentResult.data.brands?.name || 'N/A',
-            brand_color: contentResult.data.brands?.brand_color,
-            brand_avatar_url: contentResult.data.brands?.avatar_url,
+            brand_color: contentResult.data.brands?.brand_color || contentResult.data.brand_color,
+            brand_avatar_url: contentResult.data.brands?.avatar_url || contentResult.data.brand_avatar_url,
             template_name: contentResult.data.template_name || contentResult.data.content_templates?.name || 'N/A',
             template_id: contentResult.data.template_id || '',
             content_data: contentResult.data.content_data || {},
@@ -301,16 +308,22 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
           setContent(newContentState);
           console.log('[ContentEditPage] Content state AFTER setContent in fetchAllData:', JSON.stringify(newContentState, null, 2));
 
-          if (contentResult.data.brand_id && !activeBrandData) {
-            fetch(`/api/brands/${contentResult.data.brand_id}`)
-              .then(res => res.json())
-              .then(brandRes => {
-                if (brandRes.success && brandRes.brand) {
-                  setActiveBrandData(brandRes.brand);
-                }
-              });
-          } else if (contentResult.data.brands) {
-            setActiveBrandData(contentResult.data.brands);
+          // Set brand data from the content response if available
+          if (contentResult.data.brands) {
+            setActiveBrandData({
+              id: contentResult.data.brands.id,
+              name: contentResult.data.brands.name,
+              brand_color: contentResult.data.brands.brand_color,
+              logo_url: contentResult.data.brands.logo_url
+            });
+          } else if (contentResult.data.brand_id && contentResult.data.brand_name) {
+            // Use brand data from content if brands relation is not populated
+            setActiveBrandData({
+              id: contentResult.data.brand_id,
+              name: contentResult.data.brand_name,
+              brand_color: contentResult.data.brand_color,
+              logo_url: contentResult.data.brand_logo_url
+            });
           }
 
           if (contentResult.data.workflow_id && !contentResult.data.workflow?.steps) {
@@ -325,34 +338,30 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
 
           // Fetch template data if template_id exists
           if (contentResult.data.template_id) {
-            fetch(`/api/content-templates/${contentResult.data.template_id}`)
-              .then(res => res.json())
-              .then(templateRes => {
-                if (templateRes.success && templateRes.template) {
-                  const fetchedApiTemplate = templateRes.template;
-                  // Reshape the fetched template to match the component's Template interface
-                  const correctlyShapedTemplate: Template = {
-                    id: fetchedApiTemplate.id,
-                    name: fetchedApiTemplate.name,
-                    description: fetchedApiTemplate.description,
-                    // Ensure other top-level fields from API response are mapped if they exist in Template interface
-                    // For now, focusing on the critical 'fields' structure:
-                    fields: {
-                      inputFields: fetchedApiTemplate.inputFields || [],
-                      outputFields: fetchedApiTemplate.outputFields || []
-                    }
-                  };
-                  setTemplate(correctlyShapedTemplate);
-                  console.log('[ContentEditPage] Template state AFTER setTemplate (SHAPED):', JSON.stringify(correctlyShapedTemplate, null, 2));
-                } else {
-                  console.error('Failed to fetch template for edit page:', templateRes.error);
-                  // toast.error('Could not load content template structure.'); // Avoid double toast if content load fails
-                }
-              })
-              .catch(err => {
-                console.error('Error fetching template for edit page:', err);
-                // toast.error('Error loading content template structure.');
-              });
+            try {
+              const templateResponse = await fetch(`/api/content-templates/${contentResult.data.template_id}`);
+              const templateRes = await templateResponse.json();
+              
+              if (templateRes.success && templateRes.template) {
+                const fetchedApiTemplate = templateRes.template;
+                // Reshape the fetched template to match the component's Template interface
+                const correctlyShapedTemplate: Template = {
+                  id: fetchedApiTemplate.id,
+                  name: fetchedApiTemplate.name,
+                  description: fetchedApiTemplate.description,
+                  fields: {
+                    inputFields: fetchedApiTemplate.inputFields || [],
+                    outputFields: fetchedApiTemplate.outputFields || []
+                  }
+                };
+                setTemplate(correctlyShapedTemplate);
+                console.log('[ContentEditPage] Template state AFTER setTemplate (SHAPED):', JSON.stringify(correctlyShapedTemplate, null, 2));
+              } else {
+                console.error('Failed to fetch template for edit page:', templateRes.error);
+              }
+            } catch (err) {
+              console.error('Error fetching template for edit page:', err);
+            }
           }
 
         } else {
@@ -373,6 +382,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         toast.error(error instanceof Error ? error.message : 'Failed to load page data.');
       } finally {
         setIsLoading(false);
+        fetchingRef.current = false;
       }
     };
     
@@ -383,7 +393,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     } else {
       console.warn('[ContentEditPage] Conditions NOT met for fetchAllData. ID:', id, 'CurrentUser:', currentUser);
     }
-  }, [id, currentUser?.id, activeBrandData, currentUser]);
+  }, [id, currentUser?.id]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -476,7 +486,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   useEffect(() => {
     contentSaveRef.current = handleSave;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, activeBrandData, currentUser]); // Dependencies for handleSave - using id, activeBrandData, currentUser instead of handleSave to avoid circular dependency
+  }, [content, template]); // Dependencies that handleSave actually uses
   
   const handleWorkflowActionCompletion = () => {
     console.log('[ContentEditPage] handleWorkflowActionCompletion called.');
@@ -505,7 +515,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
 
   if (isLoadingUser || isLoading || isCheckingPermissions) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
           <Skeleton className="h-10 w-1/3" />
           <Skeleton className="h-10 w-24" />
@@ -548,7 +558,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" },
         { label: "Content", href: "/dashboard/content" },
@@ -562,7 +572,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         </Button>
         {activeBrandData && (
           <div className="ml-4 flex items-center">
-            <BrandIcon name={activeBrandData.name} color={activeBrandData.brand_color} size="sm" />
+            <BrandIcon name={activeBrandData.name} color={activeBrandData.brand_color} logoUrl={activeBrandData.logo_url} size="sm" />
             <span className="ml-2 text-sm font-medium text-muted-foreground">Brand: {activeBrandData.name}</span>
           </div>
         )}

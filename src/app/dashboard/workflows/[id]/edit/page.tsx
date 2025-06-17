@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { v4 as uuidv4 } from 'uuid';
 // import { notFound } from 'next/navigation'; // notFound can be used if needed based on API response
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +28,7 @@ interface WorkflowEditPageProps {
   params: {
     id: string;
   };
+  searchParams?: { [key: string]: string | string[] | undefined };
 }
 
 interface UserSessionData {
@@ -46,6 +48,7 @@ interface BrandSummary {
     id: string;
     name: string;
     color?: string;
+    logo_url?: string | null;
 }
 
 interface ContentTemplateSummary {
@@ -149,7 +152,7 @@ const RoleSelectionCards: React.FC<RoleSelectionCardsProps> = ({ selectedRole, o
   );
 };
 
-export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
+export default function WorkflowEditPage({ params, searchParams }: WorkflowEditPageProps) {
   const { id } = params;
   const router = useRouter();
   const [workflow, setWorkflow] = useState<WorkflowFull | null>(null);
@@ -172,6 +175,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
 
   const [otherBrandWorkflows, setOtherBrandWorkflows] = useState<WorkflowSummary[]>([]);
   const [isLoadingBrandWorkflows, setIsLoadingBrandWorkflows] = useState(false);
+  const [isDuplicated, setIsDuplicated] = useState(false);
 
   const currentBrandForDisplay = brands.find(b => b.id === workflow?.brand_id);
 
@@ -203,6 +207,11 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
+      
+      // Check if this is a duplicated workflow
+      const isDuplicatedWorkflow = searchParams?.duplicated === 'true';
+      setIsDuplicated(isDuplicatedWorkflow);
+      
       try {
         const workflowResponse = await fetch(`/api/workflows/${id}`);
         if (!workflowResponse.ok) {
@@ -217,9 +226,21 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
         if (!workflowData.success || !workflowData.workflow) {
           throw new Error(workflowData.error || 'Failed to process workflow data');
         }
-        setWorkflow(workflowData.workflow);
-        setSelectedTemplateId(workflowData.workflow?.template_id || 'NO_TEMPLATE_SELECTED');
-        setAssigneeInputs(new Array(workflowData.workflow?.steps?.length || 0).fill(''));
+        
+        // If this is a duplicated workflow, clear the IDs to make it a new workflow
+        const processedWorkflow = isDuplicatedWorkflow ? {
+          ...workflowData.workflow,
+          id: null, // Clear the ID so it creates a new workflow
+          name: workflowData.workflow.name, // Keep the "Copy of" name from duplication
+          steps: workflowData.workflow.steps.map((step: WorkflowStepDefinition) => ({
+            ...step,
+            id: uuidv4() // Generate new IDs for all steps
+          }))
+        } : workflowData.workflow;
+        
+        setWorkflow(processedWorkflow);
+        setSelectedTemplateId(processedWorkflow?.template_id || 'NO_TEMPLATE_SELECTED');
+        setAssigneeInputs(new Array(processedWorkflow?.steps?.length || 0).fill(''));
 
 
         const brandsResponse = await fetch('/api/brands');
@@ -242,7 +263,7 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
       }
     };
     fetchData();
-  }, [id]);
+  }, [id, searchParams]);
 
   useEffect(() => {
     if (isLoadingUser || isLoading || !currentUser || !workflow || allFetchedBrands.length === 0) return;
@@ -630,30 +651,56 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
       brand_id: workflow.brand_id,
       status: workflow.status,
       template_id: selectedTemplateId === 'NO_TEMPLATE_SELECTED' ? null : selectedTemplateId,
-      steps: workflow.steps.map(step => ({
+      steps: workflow.steps.map((step, index) => ({
         // Ensure only necessary fields are sent, especially if step.id is temporary client-side ID
+        id: step.id && !step.id.startsWith('temp_') && !step.id.startsWith('email_') ? step.id : uuidv4(), // Generate a proper UUID for new steps
         name: step.name,
         description: step.description,
         role: step.role,
         approvalRequired: step.approvalRequired,
-        assignees: step.assignees.map(a => ({ email: a.email, id: a.id && !a.id.startsWith('temp_') && !a.id.startsWith('email_') ? a.id : '', full_name: a.full_name || null })), // Ensure full_name is included
-        ...(step.id && !step.id.startsWith('temp_') && !step.id.startsWith('email_') ? { id: step.id && !step.id.startsWith('temp_') && !step.id.startsWith('email_') ? step.id : 'default-id' } : { id: 'default-id' }) // Ensure id is always a string by providing a default value
+        step_order: index + 1, // Add step_order based on array position
+        assignees: step.assignees.map(a => ({ 
+          email: a.email, 
+          id: a.id && !a.id.startsWith('temp_') && !a.id.startsWith('email_') ? a.id : '', 
+          full_name: a.full_name || null 
+        }))
       })),
         updated_at: new Date().toISOString()
       };
       
     try {
-      const response = await fetch(`/api/workflows/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(workflowToSave)
-      });
-      const data = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to update workflow. Please try again.');
+      let response;
+      let newWorkflowId;
+      
+      if (isDuplicated) {
+        // For duplicated workflows, create a new workflow instead of updating
+        response = await fetch('/api/workflows', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(workflowToSave)
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'Failed to create workflow. Please try again.');
+        }
+        newWorkflowId = data.workflow?.id;
+        toast.success('Workflow created successfully!');
+      } else {
+        // For existing workflows, update as normal
+        response = await fetch(`/api/workflows/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(workflowToSave)
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'Failed to update workflow. Please try again.');
+        }
+        newWorkflowId = id;
+        toast.success('Workflow updated successfully!');
       }
-      toast.success('Workflow updated successfully!');
-      router.push(`/dashboard/workflows/${id}`); // Or to list: /dashboard/workflows
+      
+      router.push(`/dashboard/workflows/${newWorkflowId}`);
     } catch (error) {
       console.error('Error saving workflow:', error);
       toast.error((error as Error).message || 'An unexpected error occurred.');
@@ -735,44 +782,46 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" }, 
         { label: "Workflows", href: "/dashboard/workflows" }, 
-        { label: workflow.name || "Loading...", href: `/dashboard/workflows/${id}` },
-        { label: "Edit" }
+        { label: workflow.name || "Loading...", href: isDuplicated ? undefined : `/dashboard/workflows/${id}` },
+        { label: isDuplicated ? "Create" : "Edit" }
       ]} />
 
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
-           <Button variant="outline" size="icon" onClick={() => router.push(`/dashboard/workflows/${id}`)} aria-label="Back to Workflow view">
+           <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/workflows')} aria-label="Back to Workflows list">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           {currentBrandForDisplay && 
-            <BrandIcon name={currentBrandForDisplay.name} color={currentBrandForDisplay.color ?? undefined} size="md" className="mr-1" />
+            <BrandIcon name={currentBrandForDisplay.name} color={currentBrandForDisplay.color ?? undefined} logoUrl={currentBrandForDisplay.logo_url} size="md" className="mr-1" />
           }
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Edit: {workflow.name || 'Workflow'}</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{isDuplicated ? 'Create New Workflow' : `Edit: ${workflow.name || 'Workflow'}`}</h1>
             <p className="text-muted-foreground mt-1">
-              Modify the details, steps, assignees, and other settings for this workflow.
+              {isDuplicated ? 'Configure the details for your new workflow based on the duplicated template.' : 'Modify the details, steps, assignees, and other settings for this workflow.'}
               {currentBrandForDisplay && <span className="block text-xs">For Brand: {currentBrandForDisplay.name}</span>}
             </p>
           </div>
         </div>
-        <div className="flex space-x-2">
-          <Button 
-            variant="destructive"
-            onClick={() => setShowDeleteConfirm(true)}
-            disabled={isDeleting || isSaving}
-            title="Delete this workflow"
-          >
-            {isDeleting ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting...</>
-            ) : (
-              <><Trash2 className="mr-2 h-4 w-4" /> Delete Workflow</>
-            )}
-          </Button>
-        </div>
+        {!isDuplicated && (
+          <div className="flex space-x-2">
+            <Button 
+              variant="destructive"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isDeleting || isSaving}
+              title="Delete this workflow"
+            >
+              {isDeleting ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting...</>
+              ) : (
+                <><Trash2 className="mr-2 h-4 w-4" /> Delete Workflow</>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
       
       <div className="grid grid-cols-1 gap-6">
@@ -1072,14 +1121,14 @@ export default function WorkflowEditPage({ params }: WorkflowEditPageProps) {
       />
 
       <div className="flex justify-end space-x-3 mt-8 sticky bottom-0 bg-background/95 py-4 z-10 border-t border-border">
-        <Button variant="outline" onClick={() => router.push(`/dashboard/workflows/${id}`)} disabled={isSaving || isDeleting}>
+        <Button variant="outline" onClick={() => router.push('/dashboard/workflows')} disabled={isSaving || isDeleting}>
             Cancel
         </Button>
         <Button onClick={handleSaveWorkflow} disabled={isSaving || isDeleting || !canEditThisWorkflow}>
             {isSaving ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {isDuplicated ? 'Creating...' : 'Saving...'}</>
             ) : (
-              'Save Changes'
+              isDuplicated ? 'Create Workflow' : 'Save Changes'
             )}
         </Button>
       </div>

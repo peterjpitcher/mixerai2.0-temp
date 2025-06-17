@@ -44,6 +44,7 @@ interface Brand {
   id: string;
   name: string;
   color?: string; // Ensure brand object has color if used directly
+  logo_url?: string | null;
 }
 
 interface ContentTemplateSummary {
@@ -675,7 +676,7 @@ export default function NewWorkflowPage() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" }, 
         { label: "Workflows", href: "/dashboard/workflows" }, 
@@ -688,7 +689,7 @@ export default function NewWorkflowPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           {selectedBrandFull && 
-            <BrandIcon name={selectedBrandFull.name} color={selectedBrandFull.color ?? undefined} size="md" className="mr-1" />
+            <BrandIcon name={selectedBrandFull.name} color={selectedBrandFull.color ?? undefined} logoUrl={selectedBrandFull.logo_url} size="md" className="mr-1" />
           }
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Create New Workflow</h1>

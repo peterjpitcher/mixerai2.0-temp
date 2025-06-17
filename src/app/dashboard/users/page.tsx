@@ -14,7 +14,8 @@ import {
   Trash2, 
   AlertCircle,
   Users2,
-  Mail
+  Mail,
+  MoreVertical
 } from 'lucide-react';
 import {
   Table,
@@ -33,11 +34,18 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { format as formatDateFns } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
+import { BrandIcon } from '@/components/brand-icon';
 
 // export const metadata: Metadata = {
 //   title: 'Manage Users | MixerAI 2.0',
@@ -48,6 +56,7 @@ interface Brand {
   id: string;
   name: string;
   brand_color?: string;
+  logo_url?: string | null;
 }
 
 interface User {
@@ -303,7 +312,7 @@ export default function UsersPage() {
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Never';
     const date = new Date(dateString);
-    return formatDateFns(date, 'dd MMMM yyyy');
+    return formatDateFns(date, 'MMMM d, yyyy');
   };
 
   // Helper to render sort indicator
@@ -322,17 +331,15 @@ export default function UsersPage() {
       <div className="flex flex-wrap gap-1">
         {user.brand_permissions.map((permission, index) => {
           const brand = permission.brand;
-          const color = brand?.brand_color || '#cbd5e1';
-          const initial = brand?.name?.charAt(0).toUpperCase() || '?';
           
           return (
-            <div 
+            <BrandIcon
               key={`${permission.brand_id}-${index}`}
-              className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium text-white"
-              style={{ backgroundColor: color }}
-            >
-              {initial}
-            </div>
+              name={brand?.name}
+              color={brand?.brand_color}
+              logoUrl={brand?.logo_url}
+              size="sm"
+            />
           );
         })}
       </div>
@@ -342,7 +349,7 @@ export default function UsersPage() {
   // --- Loading and Access Denied States ---
   if (isLoadingUser || isCheckingPermissions) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="space-y-6">
         <Skeleton className="h-8 w-1/3 mb-4" /> {/* Breadcrumbs skeleton */}
         <PageHeader
           title="Manage Users"
@@ -380,7 +387,7 @@ export default function UsersPage() {
   // --- Main Page Content (shown if allowed and not loading users/brands) ---
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+    <div className="space-y-8">
       <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Users" }]} />
       <PageHeader
         title="Users"
@@ -503,42 +510,40 @@ export default function UsersPage() {
                   <TableCell>{user.company || '-'}</TableCell>
                   <TableCell>{user.job_title || '-'}</TableCell>
                   <TableCell>{formatDate(user.last_sign_in_at)}</TableCell>
-                  <TableCell className="text-right space-x-1">
-                    {(!user.last_sign_in_at || user.user_status === 'expired') && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleResendInvite(user.id, user.email)}
-                        disabled={resendingInviteToUserId === user.id}
-                        title={user.user_status === 'expired' ? "Resend Expired Invite" : "Resend Invite"}
-                      >
-                        {resendingInviteToUserId === user.id ? (
-                          <>
-                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Sending...
-                          </>
-                        ) : (
-                          <Mail className="h-4 w-4" />
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <span className="sr-only">Open menu</span>
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {(!user.last_sign_in_at || user.user_status === 'expired') && (
+                          <DropdownMenuItem
+                            onClick={() => handleResendInvite(user.id, user.email)}
+                            disabled={resendingInviteToUserId === user.id}
+                          >
+                            <Mail className="mr-2 h-4 w-4" />
+                            {resendingInviteToUserId === user.id ? 'Sending...' : 
+                              (user.user_status === 'expired' ? 'Resend Expired Invite' : 'Resend Invite')
+                            }
+                          </DropdownMenuItem>
                         )}
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="icon" asChild aria-label="Edit User">
-                      <Link href={`/dashboard/users/${user.id}/edit`} >
-                        <Pencil className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      aria-label="Delete User"
-                      onClick={() => setUserToDelete(user)}
-                      disabled={isDeleting && userToDelete?.id === user.id}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                        <DropdownMenuItem asChild>
+                          <Link href={`/dashboard/users/${user.id}/edit`}>
+                            <Pencil className="mr-2 h-4 w-4" /> Edit User
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setUserToDelete(user)}
+                          disabled={isDeleting && userToDelete?.id === user.id}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete User
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
