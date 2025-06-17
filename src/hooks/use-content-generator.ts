@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 import type { InputField, ContentTemplate as Template, FieldType } from '@/types/template';
 import type { ProductContext } from '@/types/claims';
 
@@ -12,6 +13,7 @@ interface Brand {
   brand_identity?: string | null;
   tone_of_voice?: string | null;
   guardrails?: string | null;
+  logo_url?: string | null;
 }
 
 interface WorkflowSummary {
@@ -25,7 +27,7 @@ interface WorkflowSummary {
 export function useContentGenerator(templateId?: string | null) {
   // Core state
   const [isLoading, setIsLoading] = useState(false);
-  const [isGeneratingTitle] = useState(false);
+  const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
   // Data state
@@ -295,6 +297,46 @@ export function useContentGenerator(templateId?: string | null) {
     }
   }, [selectedBrand, template, templateFieldValues, productContext]);
   
+  // Generate title using AI
+  const generateTitle = useCallback(async (contentBody: string): Promise<string | null> => {
+    if (!selectedBrand || !contentBody) {
+      return null;
+    }
+
+    setIsGeneratingTitle(true);
+    try {
+      const response = await fetch('/api/ai/generate-title', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentBody: contentBody,
+          brand_id: selectedBrand,
+          topic: templateFieldValues.topic || templateFieldValues.title || undefined,
+          keywords: templateFieldValues.keywords ? 
+            (typeof templateFieldValues.keywords === 'string' ? 
+              templateFieldValues.keywords.split(',').map(k => k.trim()).filter(Boolean) : 
+              templateFieldValues.keywords) : 
+            undefined
+        })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok && data.success && data.title) {
+        setTitle(data.title);
+        return data.title;
+      } else {
+        console.error('Failed to generate title:', data.error);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error generating title:', error);
+      return null;
+    } finally {
+      setIsGeneratingTitle(false);
+    }
+  }, [selectedBrand, templateFieldValues]);
+
   // Save content
   const saveContent = useCallback(async () => {
     if (!selectedBrand || !template) {
@@ -305,8 +347,6 @@ export function useContentGenerator(templateId?: string | null) {
     setIsSaving(true);
     
     try {
-      // Auto-generate title if not set
-      const autoTitle = title.trim() || `${template.name} - ${new Date().toLocaleDateString()}`;
       // Get primary body content from generated outputs
       let primaryBodyContent = '';
       if (template && (template.outputFields || []).length > 0) {
@@ -321,13 +361,22 @@ export function useContentGenerator(templateId?: string | null) {
         }
       }
 
+      // Generate AI title if not already set and we have content
+      let finalTitle = title.trim();
+      if (!finalTitle && primaryBodyContent) {
+        const generatedTitle = await generateTitle(primaryBodyContent);
+        finalTitle = generatedTitle || `${template.name} - ${format(new Date(), 'MMMM d, yyyy')}`;
+      } else if (!finalTitle) {
+        finalTitle = `${template.name} - ${format(new Date(), 'MMMM d, yyyy')}`;
+      }
+
       const response = await fetch('/api/content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           brand_id: selectedBrand,
           template_id: template.id,
-          title: autoTitle,
+          title: finalTitle,
           workflow_id: associatedWorkflowDetails?.id,
           body: primaryBodyContent,
           content_data: {
@@ -355,7 +404,7 @@ export function useContentGenerator(templateId?: string | null) {
     } finally {
       setIsSaving(false);
     }
-  }, [selectedBrand, template, generatedOutputs, templateFieldValues, associatedWorkflowDetails, title]);
+  }, [selectedBrand, template, generatedOutputs, templateFieldValues, associatedWorkflowDetails, title, generateTitle]);
   
   return {
     // State
@@ -394,6 +443,7 @@ export function useContentGenerator(templateId?: string | null) {
     setAiError,
     handleTemplateFieldChange,
     generateContent,
+    generateTitle,
     saveContent,
   };
 }

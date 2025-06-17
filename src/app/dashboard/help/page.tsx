@@ -111,7 +111,7 @@ export default async function HelpPage({ searchParams }: HelpPageProps) {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6">
+    <div className="space-y-6">
       <Breadcrumbs items={breadcrumbItems} />
       
       <header className="my-6">

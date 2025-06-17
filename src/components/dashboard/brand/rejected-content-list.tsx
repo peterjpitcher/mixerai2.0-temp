@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Eye, AlertCircle, Inbox } from 'lucide-react';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 
 interface RejectedContentItem {
   id: string;
@@ -60,9 +61,7 @@ export default function RejectedContentList({ brandId }: RejectedContentListProp
   }, [brandId]);
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-GB', {
-      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-    });
+    return format(new Date(dateString), 'MMM d, yyyy, HH:mm');
   };
 
   if (isLoading) {

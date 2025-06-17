@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { format } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,18 +24,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trash2, PlusCircle, Search, AlertTriangle, Package, Building2, Loader2, Pencil } from "lucide-react";
+import { Trash2, PlusCircle, Search, AlertTriangle, Package, Building2, Loader2, Pencil, MoreVertical } from "lucide-react";
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DropdownMenu,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DropdownMenuContent,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DropdownMenuItem,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
@@ -158,7 +155,6 @@ export default function ProductsPage() {
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (product.master_brand_name && product.master_brand_name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
@@ -198,7 +194,7 @@ export default function ProductsPage() {
   );
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Manage Products"
         description="View, add, edit, and delete products within your brands."
@@ -216,7 +212,7 @@ export default function ProductsPage() {
           <div className="relative w-full max-w-md">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name, brand, or description..."
+              placeholder="Search by name or brand..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9"
@@ -248,9 +244,8 @@ export default function ProductsPage() {
               </TableCaption>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[200px]">Product Name</TableHead>
+                  <TableHead className="w-[250px]">Product Name</TableHead>
                   <TableHead>Brand</TableHead>
-                  <TableHead>Description</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Updated</TableHead>
                   <TableHead className="text-right w-[120px]">Actions</TableHead>
@@ -271,25 +266,27 @@ export default function ProductsPage() {
                           {product.master_brand_name || 'N/A'}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{product.description || "-"}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{product.created_at ? new Date(product.created_at).toLocaleDateString() : "-"}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{product.updated_at ? new Date(product.updated_at).toLocaleDateString() : "-"}</TableCell>
-                      <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="icon" asChild title="Edit Product" aria-label="Edit Product">
-                          <Link href={`/dashboard/claims/products/${product.id}/edit`} >
-                            <Pencil className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          title="Delete Product"
-                          aria-label="Delete Product"
-                          onClick={() => openDeleteDialog(product)}
-                          // disabled={isDeleting && itemToDelete?.id === product.id} // Assuming itemToDelete is the state for the dialog
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                      <TableCell className="text-sm text-muted-foreground">{product.created_at ? format(new Date(product.created_at), 'MMMM d, yyyy') : "-"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{product.updated_at ? format(new Date(product.updated_at), 'MMMM d, yyyy') : "-"}</TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/dashboard/claims/products/${product.id}/edit`}>
+                                <Pencil className="mr-2 h-4 w-4" /> Edit
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openDeleteDialog(product)} className="text-destructive">
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))

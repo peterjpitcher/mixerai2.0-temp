@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { format } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,17 +24,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trash2, PlusCircle, Search, AlertTriangle, Loader2, Globe, Pencil } from "lucide-react";
+import { Trash2, PlusCircle, Search, AlertTriangle, Loader2, Globe, Pencil, MoreVertical } from "lucide-react";
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
 import {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DropdownMenu,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DropdownMenuContent,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DropdownMenuItem,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -119,8 +116,7 @@ export default function MasterClaimBrandsPage() {
   };
 
   const filteredBrands = brands.filter(brand =>
-    brand.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (brand.mixerai_brand_id && brand.mixerai_brand_id.toLowerCase().includes(searchTerm.toLowerCase()))
+    brand.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const ErrorState = () => (
@@ -159,7 +155,7 @@ export default function MasterClaimBrandsPage() {
   );
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Master Claim Brands" 
         description="Manage master brand entities for claim association." 
@@ -177,7 +173,7 @@ export default function MasterClaimBrandsPage() {
           <div className="relative w-full max-w-md">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name or MixerAI Brand ID..."
+              placeholder="Search by name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9"
@@ -209,8 +205,7 @@ export default function MasterClaimBrandsPage() {
               </TableCaption>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[200px]">Brand Name</TableHead>
-                  <TableHead>MixerAI Brand ID</TableHead>
+                  <TableHead className="w-[300px]">Brand Name</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Updated</TableHead>
                   <TableHead className="text-right w-[120px]">Actions</TableHead>
@@ -225,25 +220,27 @@ export default function MasterClaimBrandsPage() {
                           {brand.name}
                         </Link>
                       </TableCell>
-                      <TableCell className="text-sm">{brand.mixerai_brand_id || "-"}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{brand.created_at ? new Date(brand.created_at).toLocaleDateString() : '-'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{brand.updated_at ? new Date(brand.updated_at).toLocaleDateString() : '-'}</TableCell>
-                      <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="icon" asChild title="Edit Brand" aria-label="Edit Brand">
-                          <Link href={`/dashboard/claims/brands/${brand.id}/edit`} >
-                            <Pencil className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          title="Delete Brand"
-                          aria-label="Delete Brand"
-                          onClick={() => openDeleteDialog(brand)}
-                          // disabled={isDeleting && itemToDelete?.id === brand.id} 
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                      <TableCell className="text-sm text-muted-foreground">{brand.created_at ? format(new Date(brand.created_at), 'MMMM d, yyyy') : '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{brand.updated_at ? format(new Date(brand.updated_at), 'MMMM d, yyyy') : '-'}</TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/dashboard/claims/brands/${brand.id}/edit`}>
+                                <Pencil className="mr-2 h-4 w-4" /> Edit
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openDeleteDialog(brand)} className="text-destructive">
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))

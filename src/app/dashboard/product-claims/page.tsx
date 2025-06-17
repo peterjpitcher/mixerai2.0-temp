@@ -12,7 +12,7 @@ export default function ProductClaimsPage() {
   ];
 
   return (
-    <div className="flex-1 space-y-4 px-4 sm:px-6 lg:px-8 py-6">
+    <div className="flex-1 space-y-4">
       <Breadcrumbs items={breadcrumbItems} />
       <div className="flex items-start justify-between pt-4">
         <Heading

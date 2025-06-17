@@ -12,6 +12,7 @@ import { Spinner } from '@/components/spinner';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { HelpCircle } from 'lucide-react';
+import { AvatarUpload } from '@/components/ui/avatar-upload';
 
 // Page metadata should ideally be exported from a server component or the page file if it's RSC.
 // For client components, this is more of a placeholder for what should be set.
@@ -49,6 +50,7 @@ const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) =
 export default function AccountPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [session, setSession] = useState<any>(null);
   
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -60,6 +62,7 @@ export default function AccountPage() {
     email: '', // Email is typically not changed by the user directly here
     company: '',
     jobTitle: '',
+    avatarUrl: '',
   });
 
   // Mock notification settings - this should be fetched and saved via an API
@@ -75,33 +78,63 @@ export default function AccountPage() {
     async function fetchUserData() {
       setIsLoading(true); // Ensure loading is true at the start of fetch
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        const { data: { session: userSession }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) throw sessionError;
-        if (!session) {
+        if (!userSession) {
           window.location.href = '/auth/login'; // Redirect if not logged in
           return;
         }
+        setSession(userSession);
         
-        const userId = session.user.id;
-        const userEmail = session.user.email || '';
+        const userId = userSession.user.id;
+        const userEmail = userSession.user.email || '';
 
         const { data: userData, error: userError } = await supabase
           .from('profiles')
-          .select('full_name, company, job_title') // Only select fields that can be missing from auth
+          .select('full_name, company, job_title, avatar_url') // Include avatar_url
           .eq('id', userId)
           .single();
         
         if (userError && userError.code !== 'PGRST116') throw userError;
+        
+        // If no profile exists, create one
+        let profileData = userData;
+        if (!userData) {
+          const newProfileData = {
+            id: userId,
+            full_name: userSession.user.user_metadata?.full_name || userEmail,
+            email: userEmail,
+            company: userSession.user.user_metadata?.company || '',
+            job_title: userSession.user.user_metadata?.job_title || ''
+          };
+          
+          const { error: createError } = await supabase
+            .from('profiles')
+            .insert(newProfileData);
+          
+          if (createError) {
+            console.error('Error creating profile:', createError);
+          } else {
+            // Use the newly created profile data
+            profileData = {
+              full_name: newProfileData.full_name,
+              company: newProfileData.company,
+              job_title: newProfileData.job_title,
+              avatar_url: null
+            };
+          }
+        }
         
         // Auth user data is the source of truth for email and potentially some metadata fallbacks
         const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
         if (authError) throw authError;
         
         setProfileData({
-          fullName: userData?.full_name || authUser?.user_metadata?.full_name || '',
+          fullName: profileData?.full_name || authUser?.user_metadata?.full_name || '',
           email: userEmail, // Use email from active session
-          company: userData?.company || authUser?.user_metadata?.company || '',
-          jobTitle: userData?.job_title || authUser?.user_metadata?.job_title || '',
+          company: profileData?.company || authUser?.user_metadata?.company || '',
+          jobTitle: profileData?.job_title || authUser?.user_metadata?.job_title || '',
+          avatarUrl: profileData?.avatar_url || '',
         });
         
         // TODO: Fetch actual notification settings for the user from an API
@@ -133,6 +166,13 @@ export default function AccountPage() {
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate full name is not empty
+    if (!profileData.fullName.trim()) {
+      toast.error('Full name is required and cannot be empty.', { description: 'Validation Error' });
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -273,33 +313,41 @@ export default function AccountPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center space-x-4 mb-6">
-                  <div className="w-20 h-20 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-3xl">
-                    {profileData.fullName ? profileData.fullName.split(' ').map(name => name[0]).join('').toUpperCase() : (profileData.email ? profileData.email[0]?.toUpperCase() : '?')}
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-semibold">{profileData.fullName || 'User'}</h2>
-                    <p className="text-sm text-muted-foreground">{profileData.email}</p>
-                  </div>
+                <div className="mb-6">
+                  <AvatarUpload
+                    currentAvatarUrl={profileData.avatarUrl}
+                    onAvatarChange={(url) => setProfileData(prev => ({ ...prev, avatarUrl: url }))}
+                    userId={session?.user.id || ''}
+                    fullName={profileData.fullName}
+                    email={profileData.email}
+                  />
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="fullName">Full Name</Label>
-                    <Input id="fullName" value={profileData.fullName} onChange={handleProfileChange} placeholder="e.g. Jane Doe" />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-12 gap-4 items-center">
+                    <Label htmlFor="fullName" className="col-span-12 sm:col-span-3 text-left sm:text-right">Full Name <span className="text-destructive">*</span></Label>
+                    <div className="col-span-12 sm:col-span-9">
+                      <Input id="fullName" value={profileData.fullName} onChange={handleProfileChange} placeholder="e.g. Jane Doe" required />
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input id="email" type="email" value={profileData.email} disabled readOnly title="Your email address cannot be changed using this form." />
-                    <p className="text-xs text-muted-foreground mt-1">Your email address is used for logging in and cannot be changed here.</p>
+                  <div className="grid grid-cols-12 gap-4 items-center">
+                    <Label htmlFor="email" className="col-span-12 sm:col-span-3 text-left sm:text-right">Email Address</Label>
+                    <div className="col-span-12 sm:col-span-9">
+                      <Input id="email" type="email" value={profileData.email} disabled readOnly title="Your email address cannot be changed using this form." />
+                      <p className="text-xs text-muted-foreground mt-1">Your email address is used for logging in and cannot be changed here.</p>
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="company">Company</Label>
-                    <Input id="company" value={profileData.company} onChange={handleProfileChange} placeholder="General Mills"/>
+                  <div className="grid grid-cols-12 gap-4 items-center">
+                    <Label htmlFor="company" className="col-span-12 sm:col-span-3 text-left sm:text-right">Company</Label>
+                    <div className="col-span-12 sm:col-span-9">
+                      <Input id="company" value={profileData.company} onChange={handleProfileChange} placeholder="General Mills"/>
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="jobTitle">Job Title</Label>
-                    <Input id="jobTitle" value={profileData.jobTitle} onChange={handleProfileChange} placeholder="e.g. Content Strategist"/>
+                  <div className="grid grid-cols-12 gap-4 items-center">
+                    <Label htmlFor="jobTitle" className="col-span-12 sm:col-span-3 text-left sm:text-right">Job Title</Label>
+                    <div className="col-span-12 sm:col-span-9">
+                      <Input id="jobTitle" value={profileData.jobTitle} onChange={handleProfileChange} placeholder="e.g. Content Strategist"/>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -322,18 +370,21 @@ export default function AccountPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="current-password">Current Password <span className="text-destructive">*</span></Label>
-                  <Input id="current-password" name="current-password" type="password" required />
+                <div className="grid grid-cols-12 gap-4 items-center">
+                  <Label htmlFor="current-password" className="col-span-12 sm:col-span-3 text-left sm:text-right">Current Password <span className="text-destructive">*</span></Label>
+                  <div className="col-span-12 sm:col-span-9">
+                    <Input id="current-password" name="current-password" type="password" required />
+                  </div>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="new-password">New Password <span className="text-destructive">*</span></Label>
+                <div className="grid grid-cols-12 gap-4 items-center">
+                  <Label htmlFor="new-password" className="col-span-12 sm:col-span-3 text-left sm:text-right">New Password <span className="text-destructive">*</span></Label>
+                  <div className="col-span-12 sm:col-span-9">
                     <Input id="new-password" name="new-password" type="password" required minLength={6} placeholder="Minimum 6 characters"/>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="confirm-password">Confirm New Password <span className="text-destructive">*</span></Label>
+                </div>
+                <div className="grid grid-cols-12 gap-4 items-center">
+                  <Label htmlFor="confirm-password" className="col-span-12 sm:col-span-3 text-left sm:text-right">Confirm Password <span className="text-destructive">*</span></Label>
+                  <div className="col-span-12 sm:col-span-9">
                     <Input id="confirm-password" name="confirm-password" type="password" required minLength={6} />
                   </div>
                 </div>

@@ -8,11 +8,9 @@ import { MyTasks } from '@/components/dashboard/my-tasks';
 import { DashboardMetrics } from '@/components/dashboard/dashboard-metrics';
 import { JumpBackIn } from '@/components/dashboard/jump-back-in';
 import { StatCard } from '@/components/dashboard/stat-card';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { Plus, FileText, GitBranch, Shield, BarChart3, Clock, CheckCircle2 } from 'lucide-react';
+import { FileText, BarChart3, Clock, CheckCircle2 } from 'lucide-react';
 
-async function getTeamActivity(supabase: ReturnType<typeof createSupabaseServerClient>, profile: { id?: string; role?: string; assigned_brands?: string[]; full_name?: string } | null) {
+async function getTeamActivity(supabase: ReturnType<typeof createSupabaseServerClient>, profile: { role?: string; assigned_brands?: string[] } | null) {
   if (!profile) return [];
 
   let query = supabase
@@ -54,7 +52,7 @@ async function getTeamActivity(supabase: ReturnType<typeof createSupabaseServerC
   }));
 }
 
-async function getMostAgedContent(supabase: ReturnType<typeof createSupabaseServerClient>, profile: { id?: string; role?: string; assigned_brands?: string[]; full_name?: string } | null) {
+async function getMostAgedContent(supabase: ReturnType<typeof createSupabaseServerClient>, profile: { role?: string; assigned_brands?: string[] } | null) {
   if (!profile) return [];
 
   let query = supabase
@@ -86,8 +84,12 @@ async function getMostAgedContent(supabase: ReturnType<typeof createSupabaseServ
     }));
 }
 
-async function getDashboardMetrics(supabase: ReturnType<typeof createSupabaseServerClient>, profile: { id?: string; role?: string; assigned_brands?: string[]; full_name?: string } | null) {
+async function getDashboardMetrics(supabase: ReturnType<typeof createSupabaseServerClient>, profile: { role?: string; assigned_brands?: string[] } | null) {
   if (!profile) return { totalContent: 0, totalBrands: 0, totalWorkflows: 0, pendingTasks: 0, completedThisWeek: 0, pendingReviews: 0 };
+
+  // Get the current user
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { totalContent: 0, totalBrands: 0, totalWorkflows: 0, pendingTasks: 0, completedThisWeek: 0, pendingReviews: 0 };
 
   try {
     // Base queries
@@ -118,7 +120,7 @@ async function getDashboardMetrics(supabase: ReturnType<typeof createSupabaseSer
     const { count: pendingTasksCount } = await supabase
       .from('user_tasks')
       .select('*', { count: 'exact', head: true })
-      .eq('assigned_to', profile.id || '')
+      .eq('assigned_to', user.id)
       .eq('status', 'pending');
 
     // Get completed tasks this week
@@ -127,7 +129,7 @@ async function getDashboardMetrics(supabase: ReturnType<typeof createSupabaseSer
     const { count: completedThisWeekCount } = await supabase
       .from('user_tasks')
       .select('*', { count: 'exact', head: true })
-      .eq('assigned_to', profile.id || '')
+      .eq('assigned_to', user.id)
       .eq('status', 'completed')
       .gte('updated_at', weekAgo.toISOString());
 
@@ -145,13 +147,17 @@ async function getDashboardMetrics(supabase: ReturnType<typeof createSupabaseSer
   }
 }
 
-async function getRecentItems(supabase: ReturnType<typeof createSupabaseServerClient>, profile: { id?: string; role?: string; assigned_brands?: string[]; full_name?: string } | null) {
-  if (!profile || !profile.id) return [];
+async function getRecentItems(supabase: ReturnType<typeof createSupabaseServerClient>, profile: { role?: string; assigned_brands?: string[] } | null) {
+  if (!profile) return [];
+  
+  // Get the current user
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
 
   let query = supabase
     .from('content')
     .select('id, title, updated_at, brands ( name )')
-    .eq('created_by', profile.id)
+    .eq('created_by', user.id)
     .order('updated_at', { ascending: false })
     .limit(5);
 
@@ -166,12 +172,20 @@ async function getRecentItems(supabase: ReturnType<typeof createSupabaseServerCl
     return [];
   }
 
-  return data || [];
+  return (data || []).filter(item => item.updated_at !== null) as Array<{ id: string; title: string; updated_at: string; brands: { name: string } | null }>;
 }
 
 export default async function DashboardPage() {
   const supabase = createSupabaseServerClient();
   const profile = await getProfileWithAssignedBrands(supabase);
+  
+  // Fetch user profile data
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: userProfile } = user ? await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', user.id)
+    .single() : { data: null };
   
   // Fetch data in parallel
   const [
@@ -187,100 +201,97 @@ export default async function DashboardPage() {
   ]);
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
-      {/* Header with welcome message and quick actions */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Welcome back{profile?.full_name ? `, ${profile.full_name}` : ''}</h1>
-          <p className="text-muted-foreground mt-1">
-            Here's what's happening with your content today.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild>
-            <Link href="/dashboard/content/new">
-              <Plus className="mr-2 h-4 w-4" /> Create Content
-            </Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/workflows/new">
-              <GitBranch className="mr-2 h-4 w-4" /> New Workflow
-            </Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/claims/pending-approval">
-              <Shield className="mr-2 h-4 w-4" /> Review Claims
-            </Link>
-          </Button>
-        </div>
+    <div className="space-y-8">
+      {/* Header with welcome message */}
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Welcome back{userProfile?.full_name ? `, ${userProfile.full_name}` : ''}</h1>
+        <p className="text-muted-foreground mt-1">
+          Here's what's happening with your content today.
+        </p>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Content"
-          value={metrics.totalContent}
-          icon={FileText}
-          description="across all brands"
-        />
-        <StatCard
-          title="Pending Tasks"
-          value={metrics.pendingTasks}
-          icon={Clock}
-          description="awaiting your action"
-        />
-        <StatCard
-          title="Completed This Week"
-          value={metrics.completedThisWeek}
-          icon={CheckCircle2}
-          description="tasks completed"
-        />
-        <StatCard
-          title="In Review"
-          value={metrics.pendingReviews}
-          icon={BarChart3}
-          description="content items"
-        />
-      </div>
+      {/* Main Grid Layout */}
+      <div className="grid gap-6 lg:grid-cols-4">
+        {/* Left Column - Main Content */}
+        <div className="lg:col-span-3 space-y-6">
+          {/* All Key Metrics at the top (smaller) */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div className="scale-[0.85] origin-top-left">
+              <StatCard
+                title="Total Content"
+                value={metrics.totalContent}
+                icon={FileText}
+                description="across all brands"
+              />
+            </div>
+            <div className="scale-[0.85] origin-top-left">
+              <StatCard
+                title="Pending Tasks"
+                value={metrics.pendingTasks}
+                icon={Clock}
+                description="awaiting action"
+              />
+            </div>
+            <div className="scale-[0.85] origin-top-left">
+              <StatCard
+                title="Completed"
+                value={metrics.completedThisWeek}
+                icon={CheckCircle2}
+                description="this week"
+              />
+            </div>
+            <div className="scale-[0.85] origin-top-left">
+              <StatCard
+                title="In Review"
+                value={metrics.pendingReviews}
+                icon={BarChart3}
+                description="content items"
+              />
+            </div>
+            <div className="scale-[0.85] origin-top-left">
+              <StatCard
+                title="Total Brands"
+                value={metrics.totalBrands}
+                icon={FileText}
+                description="active brands"
+              />
+            </div>
+            <div className="scale-[0.85] origin-top-left">
+              <StatCard
+                title="Workflows"
+                value={metrics.totalWorkflows}
+                icon={FileText}
+                description="active workflows"
+              />
+            </div>
+          </div>
 
-      {/* Jump Back In Section */}
-      {recentItems.length > 0 && (
-        <div>
-          <Suspense fallback={<TasksSkeleton />}>
-            <JumpBackIn items={recentItems} />
-          </Suspense>
-        </div>
-      )}
+          {/* Jump Back In Section */}
+          {recentItems.length > 0 && (
+            <div>
+              <Suspense fallback={<TasksSkeleton />}>
+                <JumpBackIn items={recentItems} />
+              </Suspense>
+            </div>
+          )}
 
-      {/* Main Content Grid */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Activity Feed - 2 columns */}
-        <div className="lg:col-span-2 space-y-6">
-          <Suspense fallback={<TasksSkeleton />}>
-            <TeamActivityFeed initialActivity={teamActivity} />
-          </Suspense>
-        </div>
-        
-        {/* Right Sidebar - 1 column */}
-        <div className="space-y-6">
+          {/* My Tasks */}
           <Suspense fallback={<TasksSkeleton />}>
             <MyTasks />
           </Suspense>
+
+          {/* Stalled Content */}
           <Suspense fallback={<TasksSkeleton />}>
             <MostAgedContent initialContent={mostAgedContent} />
           </Suspense>
         </div>
-      </div>
-
-      {/* Brand Metrics Summary */}
-      <div className="mt-8">
-        <DashboardMetrics 
-          metrics={{
-            totalContent: metrics.totalContent,
-            totalBrands: metrics.totalBrands,
-            totalWorkflows: metrics.totalWorkflows
-          }} 
-        />
+        
+        {/* Right Column - Team Activity (Condensed, Full Height) */}
+        <div className="lg:col-span-1 lg:sticky lg:top-6 lg:h-[calc(100vh-120px)]">
+          <Suspense fallback={<TasksSkeleton />}>
+            <TeamActivityFeed initialActivity={teamActivity} condensed={true} />
+          </Suspense>
+        </div>
       </div>
     </div>
   );

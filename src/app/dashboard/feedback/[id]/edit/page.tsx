@@ -285,7 +285,7 @@ export default function EditFeedbackPage() {
   ];
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 bg-gray-50 min-h-screen">
+    <div className="bg-gray-50 min-h-screen space-y-6">
       <Breadcrumbs items={breadcrumbItemsForShared} />
       
       <header className="my-6">

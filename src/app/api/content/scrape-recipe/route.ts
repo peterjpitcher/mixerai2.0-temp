@@ -35,7 +35,7 @@ function extractJsonLdData(html: string): RecipeData | null {
   try {
     // Find all script tags with type="application/ld+json"
     const jsonLdRegex = /<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi;
-    const matches = [...html.matchAll(jsonLdRegex)];
+    const matches = Array.from(html.matchAll(jsonLdRegex));
     
     for (const match of matches) {
       try {

@@ -39,6 +39,7 @@ export interface ClaimDefinitionData {
   ingredient_id?: string | null;
   product_ids?: string[];
   country_codes: string[];
+  workflow_id?: string | null; // Add workflow support
   // Optional name fields that might come from the parent page (ClaimEntry) for display purposes in edit mode
   master_brand_name?: string;
   // product_names_concatenated?: string; // This might be complex to pass, product_ids is primary
@@ -68,12 +69,15 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
   const [selectedIngredient, setSelectedIngredient] = useState('');
   const [selectedProductValues, setSelectedProductValues] = useState<string[]>([]);
   const [selectedCountryCodes, setSelectedCountryCodes] = useState<string[]>([]); // Renamed for clarity
+  const [selectedWorkflow, setSelectedWorkflow] = useState(''); // Add workflow state
 
   const [masterBrandOptions, setMasterBrandOptions] = useState<ComboboxOption[]>([]); // Renamed
   const [productOptions, setProductOptions] = useState<ComboboxOption[]>([]);
   const [ingredientOptions, setIngredientOptions] = useState<ComboboxOption[]>([]);
   const [countryOptions, setCountryOptions] = useState<ComboboxOption[]>([]);
+  const [workflowOptions, setWorkflowOptions] = useState<ComboboxOption[]>([]); // Add workflow options
   const [isLoadingCountries, setIsLoadingCountries] = useState(true);
+  const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(true); // Add workflow loading state
 
   // Effect to populate form when initialData changes (for edit mode)
   useEffect(() => {
@@ -86,6 +90,7 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
       setSelectedIngredient(initialData.ingredient_id || '');
       setSelectedProductValues(initialData.product_ids || []);
       setSelectedCountryCodes(initialData.country_codes || []); // Renamed
+      setSelectedWorkflow(initialData.workflow_id || ''); // Add workflow
     } else {
       // Reset form if initialData is null (e.g. switching from edit to create)
       resetFormFields();
@@ -119,6 +124,32 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
     fetchData('/api/master-claim-brands', setMasterBrandOptions, 'master brands');
     fetchData('/api/products', setProductOptions, 'products');
     fetchData('/api/ingredients', setIngredientOptions, 'ingredients');
+
+    // Fetch claims workflows
+    async function fetchClaimsWorkflows() {
+      setIsLoadingWorkflows(true);
+      try {
+        const response = await fetch('/api/claims/workflows');
+        if (!response.ok) throw new Error('Failed to fetch claims workflows');
+        const apiResponse = await response.json();
+        if (apiResponse.success && Array.isArray(apiResponse.data)) {
+          const workflows = apiResponse.data.map((w: any) => ({ 
+            value: w.id, 
+            label: w.brand_name ? `${w.name} (${w.brand_name})` : w.name 
+          }));
+          setWorkflowOptions(workflows);
+        } else {
+          console.warn("Could not load claims workflows for form selection.");
+          setWorkflowOptions([]);
+        }
+      } catch (error) {
+        console.error("Error fetching claims workflows for form:", error);
+        setWorkflowOptions([]);
+      } finally {
+        setIsLoadingWorkflows(false);
+      }
+    }
+    fetchClaimsWorkflows();
 
     // Fetch countries
     async function fetchCountries() {
@@ -158,6 +189,7 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
       setLevel(initialData.level || '');
       setDescription(initialData.description || '');
       setSelectedCountryCodes(initialData.country_codes || []);
+      setSelectedWorkflow(initialData.workflow_id || ''); // Add workflow
 
       if (isEditMode) {
         // For Brand
@@ -197,6 +229,7 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
     setSelectedIngredient('');
     setSelectedProductValues([]);
     setSelectedCountryCodes([]); // Renamed
+    setSelectedWorkflow(''); // Reset workflow
   };
 
   const handleCountrySelection = (countryCode: string, checked: boolean | 'indeterminate') => {
@@ -228,6 +261,9 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
     if (selectedCountryCodes.length === 0) { // Renamed
         toast.error('Please select at least one target market/country (or Master).'); return;
     }
+    if (!selectedWorkflow) {
+        toast.error('Please select an approval workflow.'); return;
+    }
 
     const submissionData: ClaimDefinitionData = {
       claim_text: claimText,
@@ -238,6 +274,7 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
       ingredient_id: level === 'ingredient' ? selectedIngredient : null,
       product_ids: level === 'product' ? selectedProductValues : [],
       country_codes: selectedCountryCodes, // Renamed
+      workflow_id: selectedWorkflow || null, // Add workflow
     };
 
     if (isEditMode && initialData) {
@@ -252,7 +289,7 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 border p-4 sm:p-6 rounded-lg shadow-sm bg-card">
+    <form onSubmit={handleSubmit} className="space-y-4 border p-3 sm:p-4 rounded-lg shadow-sm bg-card">
       {/* 1. Claim Level */}
       <div>
         <Label htmlFor="level">Claim Level <span className="text-destructive">*</span></Label>
@@ -277,7 +314,7 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
               <SelectValue placeholder="Select master brand" />
             </SelectTrigger>
             <SelectContent>
-              {masterBrandOptions.length === 0 && <SelectItem value="" disabled>{isLoading ? "Loading..." : "No master brands"}</SelectItem>}
+              {masterBrandOptions.length === 0 && <div className="py-2 px-3 text-sm text-muted-foreground">{isLoading ? "Loading..." : "No master brands"}</div>}
               {masterBrandOptions.map(brand => (
                 <SelectItem key={brand.value} value={brand.value}>{brand.label}</SelectItem>
               ))}
@@ -309,7 +346,7 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
               <SelectValue placeholder="Select ingredient" />
             </SelectTrigger>
             <SelectContent>
-              {ingredientOptions.length === 0 && <SelectItem value="" disabled>{isLoading ? "Loading..." : "No ingredients"}</SelectItem>}
+              {ingredientOptions.length === 0 && <div className="py-2 px-3 text-sm text-muted-foreground">{isLoading ? "Loading..." : "No ingredients"}</div>}
               {ingredientOptions.map(ingredient => (
                 <SelectItem key={ingredient.value} value={ingredient.value}>{ingredient.label}</SelectItem>
               ))}
@@ -346,7 +383,29 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
         </Select>
       </div>
 
-      {/* 5. Target Markets / Countries */}
+      {/* 5. Approval Workflow */}
+      <div>
+        <Label htmlFor="workflow">Approval Workflow <span className="text-destructive">*</span></Label>
+        <Select value={selectedWorkflow} onValueChange={setSelectedWorkflow} required>
+          <SelectTrigger id="workflow">
+            <SelectValue placeholder={isLoadingWorkflows ? "Loading workflows..." : "Select workflow"} />
+          </SelectTrigger>
+          <SelectContent>
+            {workflowOptions.length === 0 && <div className="py-2 px-3 text-sm text-muted-foreground">{isLoadingWorkflows ? "Loading..." : "No workflows available"}</div>}
+            {workflowOptions.map(workflow => (
+              <SelectItem key={workflow.value} value={workflow.value}>{workflow.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground mt-1">
+          Select a workflow for claim approval process.
+          {workflowOptions.length === 0 && !isLoadingWorkflows && (
+            <> <a href="/dashboard/claims/workflows/new" className="text-primary hover:underline">Create a claims workflow</a> to enable approval processes.</>
+          )}
+        </p>
+      </div>
+
+      {/* 6. Target Markets / Countries */}
       <div>
         <Label htmlFor="countries">Target Markets / Countries <span className="text-destructive">*</span></Label>
         {isLoadingCountries ? (
@@ -371,7 +430,7 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
         )}
       </div>
 
-      {/* 6. Description (Optional) */}
+      {/* 7. Description (Optional) */}
       <div>
         <Label htmlFor="description">Description (Optional)</Label>
         <Textarea

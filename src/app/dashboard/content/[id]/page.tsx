@@ -282,7 +282,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   
   if (!content) {
     return (
-      <div className="container mx-auto p-4">
+      <div className="space-y-6">
         <PageHeader title="Content Not Found" description="The content you are looking for could not be loaded or does not exist." />
         <Button onClick={() => router.back()} variant="outline">
           <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
@@ -308,7 +308,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   const getFormattedDate = (dateString: string) => {
     if (!dateString) return 'N/A';
     try {
-      return formatDateFns(new Date(dateString), 'dd MMMM yyyy');
+      return formatDateFns(new Date(dateString), 'MMMM d, yyyy');
     } catch (e) {
       console.error("Error formatting date:", dateString, e);
       return "Invalid Date";
@@ -317,7 +317,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   const getFormattedDateTime = (dateString: string) => {
     if (!dateString) return 'N/A';
     try {
-      return formatDateFns(new Date(dateString), 'dd MMMM yyyy, HH:mm');
+      return formatDateFns(new Date(dateString), 'MMMM d, yyyy, HH:mm');
     } catch (e) {
       console.error("Error formatting date/time:", dateString, e);
       return "Invalid Date/Time";
@@ -364,7 +364,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   };
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="space-y-6">
       <Breadcrumbs items={breadcrumbItems} />
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-6 gap-4">
         <div className="flex items-center gap-3">

@@ -15,11 +15,13 @@ const assignWorkflowSchema = z.object({
 // Schema for workflow action (approve/reject)
 const workflowActionSchema = z.object({
   action: z.enum(['approve', 'reject']),
-  feedback: z.string().optional()
+  feedback: z.string().optional(),
+  updatedClaimText: z.string().optional(),
+  comment: z.string().optional()
 });
 
 // POST /api/claims/[id]/workflow - Assign workflow to claim
-export const POST = withAuth(async (req: NextRequest, user: User, context: Record<string, unknown>) => {
+export const POST = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
   const { params } = context as { params: { id: string } };
   const claimId = params.id;
 
@@ -60,7 +62,7 @@ export const POST = withAuth(async (req: NextRequest, user: User, context: Recor
           .eq('role', 'admin')
           .limit(1);
         
-        hasPermission = permissions && permissions.length > 0;
+        hasPermission = permissions !== null && permissions.length > 0;
       }
     }
 
@@ -90,7 +92,7 @@ export const POST = withAuth(async (req: NextRequest, user: User, context: Recor
 });
 
 // PUT /api/claims/[id]/workflow - Perform workflow action (approve/reject)
-export const PUT = withAuth(async (req: NextRequest, user: User, context: Record<string, unknown>) => {
+export const PUT = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
   const { params } = context as { params: { id: string } };
   const claimId = params.id;
 
@@ -106,7 +108,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Record
       .select(`
         id,
         current_workflow_step,
-        workflow_steps!inner(
+        claims_workflow_steps!inner(
           id,
           assigned_user_ids
         )
@@ -123,24 +125,68 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Record
     }
 
     // Check if user is assigned to current step
-    const stepData = claim.workflow_steps;
-    const isAssigned = stepData?.assigned_user_ids?.includes(user.id);
+    const stepData = claim.claims_workflow_steps;
+    const isAssigned = (stepData as any)?.assigned_user_ids?.includes(user.id);
 
     if (!isAssigned && user?.user_metadata?.role !== 'admin') {
       return NextResponse.json({ success: false, error: 'Not authorized to approve/reject this claim' }, { status: 403 });
     }
 
+    // Update claim text if provided
+    if (validatedData.updatedClaimText) {
+      const { error: updateError } = await supabase
+        .from('claims')
+        .update({ claim_text: validatedData.updatedClaimText })
+        .eq('id', claimId);
+      
+      if (updateError) {
+        console.error('Error updating claim text:', updateError);
+        return NextResponse.json({ success: false, error: 'Failed to update claim text' }, { status: 500 });
+      }
+    }
+
     // Perform workflow action
+    // Note: The current database function only accepts 4 parameters
+    // The new parameters (p_comment and p_updated_claim_text) require running the migration
+    console.log('[API Claims Workflow] Calling advance_claim_workflow with:', {
+      claimId,
+      action: validatedData.action,
+      feedback: validatedData.feedback || '',
+      reviewerId: user.id
+    });
+    
     const { data: result, error: actionError } = await supabase.rpc('advance_claim_workflow', {
       p_claim_id: claimId,
       p_action: validatedData.action,
-      p_feedback: validatedData.feedback || null,
+      p_feedback: validatedData.feedback || '',
       p_reviewer_id: user.id
     });
 
     if (actionError) {
       console.error('[API Claims Workflow] Error performing workflow action:', actionError);
       return handleApiError(actionError, 'Failed to perform workflow action');
+    }
+    
+    console.log('[API Claims Workflow] Function result:', result);
+
+    // If the action was successful and we have a comment, update the most recent history entry
+    // This is a temporary workaround until the migration is applied
+    if (result?.success && validatedData.comment) {
+      const { error: updateError } = await supabase
+        .from('claim_workflow_history')
+        .update({ 
+          feedback: validatedData.action === 'reject' 
+            ? validatedData.comment 
+            : (validatedData.feedback ? `${validatedData.feedback}\n\nComment: ${validatedData.comment}` : `Comment: ${validatedData.comment}`)
+        })
+        .eq('claim_id', claimId)
+        .eq('reviewer_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (updateError) {
+        console.error('Warning: Could not update history with comment:', updateError);
+      }
     }
 
     return NextResponse.json({ success: true, data: result });
@@ -154,7 +200,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context: Record
 });
 
 // GET /api/claims/[id]/workflow - Get workflow status and history
-export const GET = withAuth(async (_req: NextRequest, user: User, context: Record<string, unknown>) => {
+export const GET = withAuth(async (_req: NextRequest, user: User, context?: unknown) => {
   const { params } = context as { params: { id: string } };
   const claimId = params.id;
 
@@ -169,12 +215,11 @@ export const GET = withAuth(async (_req: NextRequest, user: User, context: Recor
         workflow_id,
         current_workflow_step,
         workflow_status,
-        workflows(
+        claims_workflows(
           id,
-          name,
-          brand_name
+          name
         ),
-        workflow_steps(
+        claims_workflow_steps(
           id,
           name,
           role,

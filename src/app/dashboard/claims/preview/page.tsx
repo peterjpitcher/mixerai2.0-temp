@@ -3,7 +3,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 // import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent,  } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
@@ -704,37 +703,32 @@ export default function ClaimsPreviewPage() {
         <PageHeader title={pageTitle} description={pageDescription} /> 
       </div>
       
-      <Card className={cn("mb-0", isFullScreen && "hidden")}> 
-        <CardContent className="flex items-center justify-between py-2"> {/* Adjusted padding for compactness */}
-          <div className="flex space-x-2 items-center"> 
-            <div className="flex-1"> 
-              <Label htmlFor="matrix_country_code" className="text-xs mb-0.5 block">Country</Label> 
-              <Select value={selectedCountry} onValueChange={setSelectedCountry} disabled={isLoadingCountries}>
-                <SelectTrigger id="matrix_country_code" className="h-8 text-xs"><SelectValue /></SelectTrigger> 
-              <SelectContent>
-                  <SelectItem value={ALL_COUNTRIES_CODE} className="text-xs min-h-[1.5rem]">{ALL_COUNTRIES_NAME} ({ALL_COUNTRIES_CODE})</SelectItem> 
-                  {availableCountries.map(c => <SelectItem key={c.code} value={c.code} className="text-xs min-h-[1.5rem]">{c.name} ({c.code})</SelectItem>)} 
-              </SelectContent>
-            </Select>
-          </div>
-            <div className="flex-1"> 
-              <Label htmlFor="matrix_brand_filter" className="text-xs mb-0.5 block">Brand</Label> 
-              <Select value={selectedBrandId} onValueChange={setSelectedBrandId} disabled={isLoadingBrands}> 
-                <SelectTrigger id="matrix_brand_filter" className="h-8 text-xs"><SelectValue placeholder={isLoadingBrands ? "Loading..." : "All Brands"} /></SelectTrigger> 
-              <SelectContent>
-                  <SelectItem value="all" className="text-xs min-h-[1.5rem]">All Brands</SelectItem> 
-                  {availableBrands.map(b => <SelectItem key={b.id} value={b.id} className="text-xs min-h-[1.5rem]">{b.name}</SelectItem>)} 
-              </SelectContent>
-            </Select>
-            </div> 
-          </div>
-          {/* Original button position was here, it's moved out */}
-        </CardContent>
-      </Card>
+      <div className={cn("mb-2 flex items-center gap-4", isFullScreen && "hidden")}> 
+        <div className="flex items-center gap-2"> 
+          <Label htmlFor="matrix_country_code" className="text-sm">Country:</Label> 
+          <Select value={selectedCountry} onValueChange={setSelectedCountry} disabled={isLoadingCountries}>
+            <SelectTrigger id="matrix_country_code" className="h-9 w-[200px]"><SelectValue /></SelectTrigger> 
+            <SelectContent>
+              <SelectItem value={ALL_COUNTRIES_CODE}>{ALL_COUNTRIES_NAME} ({ALL_COUNTRIES_CODE})</SelectItem> 
+              {availableCountries.map(c => <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>)} 
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2"> 
+          <Label htmlFor="matrix_brand_filter" className="text-sm">Brand:</Label> 
+          <Select value={selectedBrandId} onValueChange={setSelectedBrandId} disabled={isLoadingBrands}> 
+            <SelectTrigger id="matrix_brand_filter" className="h-9 w-[200px]"><SelectValue placeholder={isLoadingBrands ? "Loading..." : "All Brands"} /></SelectTrigger> 
+            <SelectContent>
+              <SelectItem value="all">All Brands</SelectItem> 
+              {availableBrands.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)} 
+            </SelectContent>
+          </Select>
+        </div> 
+      </div>
 
       {/* This button is for non-fullscreen mode, appears next to filters */}
       {!isFullScreen && (
-        <div className="py-2 flex justify-end">
+        <div className="mb-2 flex justify-end">
             <Button onClick={toggleFullScreen} variant="outline" size="icon" className="h-8 w-8">
                 <Maximize className="h-4 w-4" />
                 <span className="sr-only">Enter Fullscreen</span>
@@ -745,7 +739,7 @@ export default function ClaimsPreviewPage() {
       <div 
         className={cn(
           "flex-grow overflow-auto border rounded-md relative",
-          isFullScreen ? "h-full w-full" : "h-[calc(100vh-220px)]" // Adjusted height to account for button potentially
+          isFullScreen ? "h-full w-full" : "h-[calc(100vh-300px)]" // Adjusted height to account for header and filters
         )}
       >
         {/* This button is for fullscreen mode, absolutely positioned */}
@@ -769,12 +763,12 @@ export default function ClaimsPreviewPage() {
         
         {!isLoading && !error && matrixData && matrixData.productsAsCols.length > 0 && matrixData.claimTextsAsRows.length > 0 && (
             <Table className="min-w-full border-collapse h-full">
-              <TableHeader className={cn("sticky top-0 z-10 bg-white shadow", isFullScreen && "bg-background")}>
+              <TableHeader className={cn("sticky top-0 z-20 shadow-sm", isFullScreen ? "bg-background" : "bg-white")}>
                 <TableRow>
                   <TableHead 
                     className={cn(
-                        "sticky left-0 z-30 p-1 text-xs font-semibold text-muted-foreground min-w-[160px] sm:min-w-[200px] border",
-                        isFullScreen ? "bg-background/95" : "bg-muted"
+                        "sticky left-0 z-30 p-2 text-sm font-semibold text-muted-foreground min-w-[200px] sm:min-w-[250px] border",
+                        isFullScreen ? "bg-background" : "bg-white"
                     )}
                   >
                     Claim Text
@@ -783,8 +777,8 @@ export default function ClaimsPreviewPage() {
                     <TableHead 
                       key={product.id} 
                       className={cn(
-                        "p-1 text-xs font-semibold text-muted-foreground min-w-[100px] sm:min-w-[120px] text-center whitespace-normal break-words border",
-                        isFullScreen ? "bg-background/95" : "bg-muted"
+                        "p-2 text-sm font-semibold text-muted-foreground min-w-[120px] sm:min-w-[140px] text-center whitespace-normal break-words border",
+                        isFullScreen ? "bg-background" : "bg-white"
                         )}
                       title={product.name}
                     >

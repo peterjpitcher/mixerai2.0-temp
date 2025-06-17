@@ -245,7 +245,7 @@ const BrandClaimsOutputPage = () => {
     };
 
     return (
-        <div className="container mx-auto p-4 md:p-6 lg:p-8">
+        <div className="space-y-6">
             <Heading title="Brand Claims Styler" description="Select a brand, and optionally a product and market, to generate a styled list of claims." />
 
             <Card className="mb-6">

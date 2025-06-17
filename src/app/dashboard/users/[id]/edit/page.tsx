@@ -304,7 +304,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
   // --- Loading and Access Denied States ---
   if (isLoadingUserSession || isCheckingPermissions) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="space-y-6">
         <Skeleton className="h-8 w-1/3 mb-4" /> {/* Breadcrumbs skeleton */}
         <div className="flex items-center justify-between mb-6">
           <Skeleton className="h-10 w-1/2" /> {/* Page title skeleton */}
@@ -354,7 +354,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
   }
   
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+    <div className="space-y-8">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" },
         { label: "Users", href: "/dashboard/users" },
@@ -485,17 +485,16 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
               </p>
             )}
           </CardContent>
+          <CardFooter className="flex justify-end space-x-2">
+            <Button variant="outline" type="button" onClick={() => router.push(user ? `/dashboard/users/${user.id}` : '/dashboard/users')} disabled={isSaving}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSaving} className="flex items-center gap-2">
+              {isSaving && <Loader2 className="h-4 w-4 animate-spin" />} 
+              {isSaving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </CardFooter>
         </Card>
-
-        <CardFooter className="flex justify-end space-x-2">
-          <Button variant="outline" type="button" onClick={() => router.push(user ? `/dashboard/users/${user.id}` : '/dashboard/users')} disabled={isSaving}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isSaving} className="flex items-center gap-2">
-            {isSaving && <Loader2 className="h-4 w-4 animate-spin" />} 
-            {isSaving ? 'Saving...' : 'Save Changes'}
-          </Button>
-        </CardFooter>
       </form>
     </div>
   );

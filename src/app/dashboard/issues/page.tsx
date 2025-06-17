@@ -196,7 +196,7 @@ export default function IssuesPage() {
   };
 
   const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'dd MMM yyyy');
+    return format(new Date(dateString), 'MMM d, yyyy');
   };
 
   const getStateColor = (state: string) => {
@@ -252,7 +252,7 @@ export default function IssuesPage() {
 
   if (loading && issues.length === 0) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6">
+      <div className="space-y-6">
         {/* Back Button */}
         <Button
           variant="ghost"
@@ -289,7 +289,7 @@ export default function IssuesPage() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6">
+    <div className="space-y-6">
       {/* Back Button */}
       <Button
         variant="ghost"
@@ -668,8 +668,8 @@ export default function IssuesPage() {
                                     </div>
                                   )}
                                   <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
-                                    <span>Created: {format(new Date(issue.created_at), 'dd MMM yyyy HH:mm')}</span>
-                                    <span>Updated: {format(new Date(issue.updated_at), 'dd MMM yyyy HH:mm')}</span>
+                                    <span>Created: {format(new Date(issue.created_at), 'MMM d, yyyy HH:mm')}</span>
+                                    <span>Updated: {format(new Date(issue.updated_at), 'MMM d, yyyy HH:mm')}</span>
                                   </div>
                                 </div>
                               </div>

@@ -1,11 +1,12 @@
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
+import { format } from 'date-fns';
 
 export default function ReleaseNotesPage() {
-  const currentDate = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+  const currentDate = format(new Date(), 'MMMM d, yyyy');
 
   return (
-    <div className="space-y-6 px-4 sm:px-6 lg:px-8 py-6">
+    <div className="space-y-6">
       <header className="space-y-1 mb-6">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Release Notes</h1>
         <p className="text-muted-foreground">

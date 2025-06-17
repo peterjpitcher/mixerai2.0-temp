@@ -93,7 +93,7 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b bg-secondary text-secondary-foreground sticky top-0 z-40 h-16">
-        <div className="w-full mx-auto px-4 py-3 flex items-center justify-between h-full">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between h-full">
           <div className="flex items-center gap-2 font-semibold">
             <Image 
               src="/Mixerai2.0Logo.png" 
@@ -154,7 +154,7 @@ export default function DashboardLayout({
         <Suspense fallback={<div className="w-64 p-4 border-r"><Loader2 className="h-6 w-6 animate-spin mx-auto mt-8" /></div>}>
           <UnifiedNavigation />
         </Suspense>
-        <main className="flex-1 p-4 sm:p-6 overflow-auto lg:pb-0 pb-20">
+        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 overflow-auto lg:pb-6 pb-20">
           <DevelopmentOnly>
             <div id="domain-verification-container" className="mb-4">
               {/* This will be populated client-side */}

@@ -97,3 +97,1451 @@
  ✓ Compiled in 598ms (400 modules)
  ✓ Compiled in 582ms (400 modules)
  ✓ Compiled in 614ms (400 modules)
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 1364ms (399 modules)
+ ⨯ TypeError: Cannot read properties of undefined (reading 'clientModules')
+    at /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:39:25703
+    at /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/lib/trace/tracer.js:191:62
+    at /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/lib/trace/tracer.js:140:36
+    at NoopContextManager.with (/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/@opentelemetry/api/index.js:1:7062)
+    at ContextAPI.with (/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/@opentelemetry/api/index.js:1:518)
+    at NoopTracer.startActiveSpan (/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/@opentelemetry/api/index.js:1:18093)
+    at ProxyTracer.startActiveSpan (/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/@opentelemetry/api/index.js:1:18854)
+    at /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/lib/trace/tracer.js:122:103
+    at NoopContextManager.with (/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/@opentelemetry/api/index.js:1:7062)
+    at ContextAPI.with (/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/@opentelemetry/api/index.js:1:518)
+    at NextTracerImpl.trace (/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/lib/trace/tracer.js:122:28)
+    at /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/lib/trace/tracer.js:191:31
+    at r3 (/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:41:1678)
+    at async doRender (/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/base-server.js:1427:30)
+    at async cacheEntry.responseCache.get.routeKind (/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/base-server.js:1588:28)
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 1293ms (1009 modules)
+ GET /api/health 500 in 4858ms
+ ○ Compiling /api/env-check ...
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, lstat '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/env-check'
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '../../../../.next/server/app/api/env-check/route' in /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server for build dependencies doesn't lead to expected result '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/env-check/route.js', but to 'Error: Can't resolve '../../../../.next/server/app/api/env-check/route' in '/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server'' instead. Resolving dependencies are ignored for this path.
+<w>  at resolve commonjs file ../../../../.next/server/app/api/env-check/route (expected /Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/env-check/route.js)
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-route-loader/index.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-route-loader/index.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/loader-runner/LoaderRunner.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/loader-runner/LoaderRunner.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/webpack/bundle5.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/webpack/bundle5.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/webpack/webpack.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/webpack/webpack.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/plugins/define-env-plugin.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/plugins/define-env-plugin.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/swc/index.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/swc/index.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-swc-loader.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-swc-loader.js
+<w>  at resolve commonjs /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-swc-loader.js
+ ✓ Compiled /api/env-check in 1853ms (1040 modules)
+ GET /api/env-check 401 in 2135ms
+ ✓ Compiled /api/brands in 243ms (1047 modules)
+ GET /api/brands 401 in 386ms
+ ✓ Compiled /api/content in 170ms (1049 modules)
+ GET /api/content 401 in 225ms
+ ✓ Compiled /api/claims in 200ms (1052 modules)
+ GET /api/claims 401 in 257ms
+ ✓ Compiled /api/workflows in 189ms (1076 modules)
+ GET /api/workflows 401 in 242ms
+ ✓ Compiled /api/test-connection in 159ms (1078 modules)
+ GET /api/test-connection 401 in 198ms
+ ✓ Compiled in 5.4s (585 modules)
+ ✓ Compiled in 1528ms (1117 modules)
+ ✓ Compiled in 578ms (585 modules)
+ ✓ Compiled in 1217ms (585 modules)
+ ✓ Compiled in 1029ms (585 modules)
+ ✓ Compiled in 616ms (585 modules)
+ ✓ Compiled in 608ms (585 modules)
+ ✓ Compiled in 658ms (585 modules)
+ ✓ Compiled in 525ms (585 modules)
+ ✓ Compiled in 544ms (585 modules)
+ ✓ Compiled in 575ms (585 modules)
+ ✓ Compiled in 580ms (585 modules)
+ ✓ Compiled in 526ms (585 modules)
+ ✓ Compiled in 551ms (585 modules)
+ ✓ Compiled in 554ms (585 modules)
+ ✓ Compiled in 513ms (585 modules)
+ ✓ Compiled in 520ms (585 modules)
+ ✓ Compiled in 560ms (585 modules)
+ ✓ Compiled in 499ms (585 modules)
+ ✓ Compiled in 492ms (585 modules)
+ ✓ Compiled in 834ms (585 modules)
+ ✓ Compiled in 536ms (585 modules)
+ ✓ Compiled in 793ms (585 modules)
+ ✓ Compiled in 630ms (585 modules)
+ ✓ Compiled in 616ms (585 modules)
+ ✓ Compiled in 903ms (585 modules)
+ ✓ Compiled in 1632ms (585 modules)
+ ✓ Compiled in 808ms (585 modules)
+ ✓ Compiled in 1391ms (585 modules)
+ ✓ Compiled in 594ms (585 modules)
+ ✓ Compiled in 766ms (585 modules)
+ ✓ Compiled in 722ms (585 modules)
+ ✓ Compiled in 717ms (585 modules)
+ ✓ Compiled in 578ms (585 modules)
+ ✓ Compiled in 557ms (585 modules)
+ ✓ Compiled in 662ms (585 modules)
+ ✓ Compiled in 565ms (585 modules)
+ ✓ Compiled in 511ms (585 modules)
+ ✓ Compiled in 542ms (585 modules)
+ ✓ Compiled in 844ms (585 modules)
+ ✓ Compiled in 1522ms (585 modules)
+ ✓ Compiled in 1651ms (585 modules)
+ ✓ Compiled in 684ms (585 modules)
+ ✓ Compiled in 563ms (585 modules)
+ ✓ Compiled in 644ms (585 modules)
+ ✓ Compiled in 1943ms (585 modules)
+ ✓ Compiled in 863ms (585 modules)
+ ✓ Compiled in 741ms (585 modules)
+ ✓ Compiled in 957ms (585 modules)
+ ✓ Compiled in 667ms (585 modules)
+ ✓ Compiled in 858ms (585 modules)
+ ✓ Compiled in 1607ms (585 modules)
+ ✓ Compiled in 1364ms (585 modules)
+ ✓ Compiled in 636ms (585 modules)
+ ✓ Compiled in 548ms (585 modules)
+ ✓ Compiled in 1925ms (585 modules)
+ ✓ Compiled in 747ms (585 modules)
+ ✓ Compiled in 1525ms (585 modules)
+ ✓ Compiled in 650ms (585 modules)
+ ✓ Compiled in 533ms (585 modules)
+ ✓ Compiled in 566ms (585 modules)
+ ✓ Compiled in 505ms (585 modules)
+ ✓ Compiled in 693ms (585 modules)
+ ✓ Compiled in 1869ms (585 modules)
+ ✓ Compiled in 1842ms (585 modules)
+ ✓ Compiled in 567ms (585 modules)
+ ✓ Compiled in 549ms (585 modules)
+ ✓ Compiled in 514ms (585 modules)
+ ✓ Compiled in 1575ms (585 modules)
+ ✓ Compiled in 597ms (585 modules)
+ ✓ Compiled in 684ms (585 modules)
+ ✓ Compiled in 799ms (585 modules)
+ ✓ Compiled in 2.6s (585 modules)
+ ✓ Compiled in 1396ms (585 modules)
+ ✓ Compiled in 691ms (585 modules)
+ ✓ Compiled in 1482ms (585 modules)
+ ✓ Compiled in 1926ms (585 modules)
+ ✓ Compiled in 629ms (585 modules)
+ ✓ Compiled in 542ms (585 modules)
+ ✓ Compiled in 593ms (585 modules)
+ ✓ Compiled in 1324ms (585 modules)
+ ✓ Compiled in 597ms (585 modules)
+ ✓ Compiled in 622ms (585 modules)
+ ✓ Compiled in 563ms (585 modules)
+ ✓ Compiled in 1875ms (585 modules)
+ ✓ Compiled in 1610ms (585 modules)
+ ✓ Compiled in 1293ms (585 modules)
+ ✓ Compiled in 839ms (585 modules)
+ ✓ Compiled in 719ms (585 modules)
+ ✓ Compiled in 2.2s (585 modules)
+ ✓ Compiled in 572ms (585 modules)
+ ✓ Compiled in 644ms (585 modules)
+ ✓ Compiled in 581ms (585 modules)
+ ✓ Compiled in 545ms (585 modules)
+ ✓ Compiled in 1697ms (585 modules)
+ ✓ Compiled in 616ms (585 modules)
+ ✓ Compiled in 599ms (585 modules)
+ ✓ Compiled in 1384ms (585 modules)
+ ✓ Compiled in 870ms (585 modules)
+ ✓ Compiled in 727ms (585 modules)
+ ✓ Compiled in 1288ms (585 modules)
+ ✓ Compiled in 672ms (585 modules)
+ ✓ Compiled in 1866ms (585 modules)
+ ✓ Compiled in 693ms (585 modules)
+ ✓ Compiled in 1336ms (585 modules)
+ ✓ Compiled in 570ms (585 modules)
+ ✓ Compiled in 519ms (585 modules)
+ ✓ Compiled in 584ms (585 modules)
+ ✓ Compiled in 454ms (585 modules)
+ ✓ Compiled in 469ms (585 modules)
+ ✓ Compiled in 435ms (585 modules)
+ ✓ Compiled in 453ms (585 modules)
+ ✓ Compiled in 566ms (585 modules)
+ ✓ Compiled in 479ms (585 modules)
+ ✓ Compiled in 529ms (585 modules)
+ ✓ Compiled in 495ms (585 modules)
+ ✓ Compiled in 547ms (585 modules)
+ ✓ Compiled in 575ms (585 modules)
+ ✓ Compiled in 550ms (585 modules)
+ ✓ Compiled in 508ms (585 modules)
+ ✓ Compiled in 544ms (585 modules)
+ ✓ Compiled in 1259ms (585 modules)
+ ✓ Compiled in 873ms (585 modules)
+ ✓ Compiled in 698ms (585 modules)
+ ✓ Compiled in 4s (1101 modules)
+ ✓ Compiled in 926ms (1101 modules)
+ ✓ Compiled in 814ms (585 modules)
+ ✓ Compiled in 603ms (585 modules)
+ ✓ Compiled in 531ms (585 modules)
+ ✓ Compiled in 571ms (585 modules)
+ ✓ Compiled in 2.2s (585 modules)
+ ✓ Compiled in 1112ms (1101 modules)
+ ✓ Compiled in 3.7s (1101 modules)
+ ✓ Compiled in 759ms (585 modules)
+ ✓ Compiled in 2.2s (585 modules)
+ ✓ Compiled in 648ms (585 modules)
+ ✓ Compiled in 927ms (585 modules)
+ ✓ Compiled in 598ms (585 modules)
+ ✓ Compiled in 904ms (585 modules)
+ ✓ Compiled in 933ms (585 modules)
+ ✓ Compiled in 886ms (585 modules)
+ ✓ Compiled in 609ms (585 modules)
+ ✓ Compiled in 2.4s (585 modules)
+ ✓ Compiled in 1403ms (585 modules)
+ ✓ Compiled in 1377ms (585 modules)
+ ✓ Compiled in 602ms (585 modules)
+ ✓ Compiled in 611ms (585 modules)
+ ✓ Compiled in 672ms (585 modules)
+ ✓ Compiled in 548ms (585 modules)
+ ✓ Compiled in 630ms (585 modules)
+ ✓ Compiled in 1483ms (585 modules)
+ ✓ Compiled in 552ms (585 modules)
+ ✓ Compiled in 803ms (585 modules)
+ ✓ Compiled in 605ms (585 modules)
+ ✓ Compiled in 829ms (585 modules)
+ ✓ Compiled in 651ms (585 modules)
+ ✓ Compiled in 570ms (585 modules)
+ ✓ Compiled in 593ms (585 modules)
+ ✓ Compiled in 971ms (585 modules)
+ ✓ Compiled in 700ms (585 modules)
+ ✓ Compiled in 582ms (585 modules)
+ ✓ Compiled in 2.2s (585 modules)
+ ✓ Compiled in 1091ms (585 modules)
+ ✓ Compiled in 681ms (585 modules)
+ ✓ Compiled in 665ms (585 modules)
+ ✓ Compiled in 619ms (585 modules)
+ ✓ Compiled in 616ms (585 modules)
+ ✓ Compiled in 620ms (585 modules)
+ ✓ Compiled in 920ms (585 modules)
+ ✓ Compiled in 1430ms (585 modules)
+ ✓ Compiled in 612ms (585 modules)
+ ✓ Compiled in 583ms (585 modules)
+ ✓ Compiled in 661ms (585 modules)
+ ✓ Compiled in 918ms (585 modules)
+ ✓ Compiled in 561ms (585 modules)
+ ✓ Compiled in 663ms (585 modules)
+ ✓ Compiled in 747ms (585 modules)
+ ✓ Compiled in 693ms (585 modules)
+ ✓ Compiled in 620ms (585 modules)
+ ✓ Compiled in 828ms (585 modules)
+ ✓ Compiled in 681ms (585 modules)
+ ✓ Compiled in 660ms (585 modules)
+ ✓ Compiled in 769ms (585 modules)
+ ✓ Compiled in 679ms (585 modules)
+ ✓ Compiled in 525ms (585 modules)
+ ✓ Compiled in 904ms (585 modules)
+ ✓ Compiled in 1412ms (585 modules)
+ ✓ Compiled in 683ms (585 modules)
+ ✓ Compiled in 747ms (585 modules)
+ ✓ Compiled in 597ms (585 modules)
+ ✓ Compiled in 1184ms (585 modules)
+ ✓ Compiled in 692ms (585 modules)
+ ✓ Compiled in 562ms (585 modules)
+ ✓ Compiled in 2.5s (585 modules)
+ ✓ Compiled in 786ms (585 modules)
+ ✓ Compiled in 624ms (585 modules)
+ ✓ Compiled in 722ms (585 modules)
+ ✓ Compiled in 561ms (585 modules)
+ ✓ Compiled in 563ms (585 modules)
+ ✓ Compiled in 542ms (585 modules)
+ ✓ Compiled in 537ms (585 modules)
+ ✓ Compiled in 774ms (585 modules)
+ ✓ Compiled in 526ms (585 modules)
+ ✓ Compiled in 580ms (585 modules)
+ ✓ Compiled in 794ms (585 modules)
+ ✓ Compiled in 1185ms (585 modules)
+ ✓ Compiled in 608ms (585 modules)
+ ✓ Compiled in 583ms (585 modules)
+ ✓ Compiled in 656ms (585 modules)
+ ✓ Compiled in 1538ms (585 modules)
+ ✓ Compiled in 829ms (585 modules)
+ ✓ Compiled in 880ms (585 modules)
+ ✓ Compiled in 873ms (585 modules)
+ ✓ Compiled in 679ms (585 modules)
+ ✓ Compiled in 872ms (585 modules)
+ ✓ Compiled in 1658ms (585 modules)
+ ✓ Compiled in 593ms (585 modules)
+ ✓ Compiled in 563ms (585 modules)
+ ✓ Compiled in 837ms (585 modules)
+ ✓ Compiled in 695ms (585 modules)
+ ✓ Compiled in 882ms (585 modules)
+ ✓ Compiled in 822ms (585 modules)
+ ✓ Compiled in 1278ms (585 modules)
+ ✓ Compiled in 631ms (585 modules)
+ ✓ Compiled in 687ms (585 modules)
+ ✓ Compiled in 850ms (585 modules)
+ ✓ Compiled in 796ms (585 modules)
+ ✓ Compiled in 773ms (585 modules)
+ ✓ Compiled in 593ms (585 modules)
+ ✓ Compiled in 946ms (585 modules)
+ ✓ Compiled in 589ms (585 modules)
+ ✓ Compiled in 499ms (585 modules)
+ ✓ Compiled in 590ms (585 modules)
+ ✓ Compiled in 851ms (585 modules)
+ ✓ Compiled in 1697ms (585 modules)
+ ✓ Compiled in 709ms (585 modules)
+ ✓ Compiled in 626ms (585 modules)
+ ✓ Compiled in 656ms (585 modules)
+ ✓ Compiled in 832ms (585 modules)
+ ✓ Compiled in 2.1s (1101 modules)
+ ✓ Compiled in 1644ms (585 modules)
+ ✓ Compiled in 603ms (585 modules)
+ ✓ Compiled in 1036ms (585 modules)
+ ✓ Compiled in 895ms (585 modules)
+ ✓ Compiled in 587ms (585 modules)
+ ✓ Compiled in 609ms (585 modules)
+ ✓ Compiled in 592ms (585 modules)
+ ✓ Compiled in 688ms (585 modules)
+ ✓ Compiled in 540ms (585 modules)
+ ✓ Compiled in 697ms (585 modules)
+ ✓ Compiled in 851ms (585 modules)
+ ✓ Compiled in 607ms (585 modules)
+ ✓ Compiled in 636ms (585 modules)
+ ✓ Compiled in 748ms (585 modules)
+ ✓ Compiled in 618ms (585 modules)
+ ✓ Compiled in 1616ms (585 modules)
+ ✓ Compiled in 859ms (585 modules)
+ ✓ Compiled in 1573ms (585 modules)
+ ✓ Compiled in 579ms (585 modules)
+ ✓ Compiled in 562ms (585 modules)
+ ✓ Compiled in 1502ms (585 modules)
+ ✓ Compiled in 633ms (585 modules)
+ ✓ Compiled in 646ms (585 modules)
+ ✓ Compiled in 666ms (585 modules)
+ ✓ Compiled in 1222ms (585 modules)
+ ✓ Compiled in 793ms (585 modules)
+ ✓ Compiled in 685ms (585 modules)
+ ✓ Compiled in 622ms (585 modules)
+ ✓ Compiled in 649ms (585 modules)
+ ✓ Compiled in 631ms (585 modules)
+ ✓ Compiled in 549ms (585 modules)
+ ✓ Compiled in 529ms (585 modules)
+ ✓ Compiled in 864ms (585 modules)
+ ✓ Compiled in 663ms (585 modules)
+ ✓ Compiled in 587ms (585 modules)
+ ✓ Compiled in 847ms (585 modules)
+ ✓ Compiled in 865ms (585 modules)
+ ✓ Compiled in 624ms (585 modules)
+ ✓ Compiled in 649ms (585 modules)
+ ✓ Compiled in 776ms (585 modules)
+ ✓ Compiled in 1364ms (585 modules)
+ ✓ Compiled in 1056ms (585 modules)
+ ✓ Compiled in 654ms (585 modules)
+ ✓ Compiled in 1049ms (585 modules)
+ ✓ Compiled in 1028ms (585 modules)
+ ✓ Compiled in 1023ms (585 modules)
+ ✓ Compiled in 818ms (585 modules)
+ ✓ Compiled in 891ms (585 modules)
+ ✓ Compiled in 673ms (585 modules)
+ ✓ Compiled in 1242ms (585 modules)
+ ✓ Compiled in 776ms (585 modules)
+ ✓ Compiled in 841ms (585 modules)
+ ✓ Compiled in 762ms (585 modules)
+ ✓ Compiled in 845ms (585 modules)
+ ✓ Compiled in 836ms (585 modules)
+ ✓ Compiled in 1012ms (585 modules)
+ ✓ Compiled in 574ms (585 modules)
+ ✓ Compiled in 867ms (585 modules)
+ ✓ Compiled in 574ms (585 modules)
+ ✓ Compiled in 759ms (585 modules)
+ ✓ Compiled in 737ms (585 modules)
+ ✓ Compiled in 575ms (585 modules)
+ ✓ Compiled in 836ms (585 modules)
+ ✓ Compiled in 587ms (585 modules)
+ ✓ Compiled in 540ms (585 modules)
+ ✓ Compiled in 602ms (585 modules)
+ ✓ Compiled in 740ms (585 modules)
+ ✓ Compiled in 827ms (585 modules)
+ ✓ Compiled in 1052ms (585 modules)
+ ✓ Compiled in 625ms (585 modules)
+ ✓ Compiled in 910ms (585 modules)
+ ✓ Compiled in 839ms (585 modules)
+ ✓ Compiled in 931ms (585 modules)
+ ✓ Compiled in 666ms (585 modules)
+ ✓ Compiled in 688ms (585 modules)
+ ✓ Compiled in 1015ms (585 modules)
+ ✓ Compiled in 808ms (585 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, lstat '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/test-connection'
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '../../../../.next/server/app/api/test-connection/route' in /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server for build dependencies doesn't lead to expected result '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/test-connection/route.js', but to 'Error: Can't resolve '../../../../.next/server/app/api/test-connection/route' in '/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server'' instead. Resolving dependencies are ignored for this path.
+<w>  at resolve commonjs file ../../../../.next/server/app/api/test-connection/route (expected /Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/test-connection/route.js)
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-route-loader/index.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-route-loader/index.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/loader-runner/LoaderRunner.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/loader-runner/LoaderRunner.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/webpack/bundle5.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/webpack/bundle5.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/webpack/webpack.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/webpack/webpack.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/plugins/define-env-plugin.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/plugins/define-env-plugin.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/swc/index.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/swc/index.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-barrel-loader.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-barrel-loader.js
+<w>  at resolve commonjs /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-barrel-loader.js
+ ✓ Compiled in 579ms (585 modules)
+ ✓ Compiled in 714ms (585 modules)
+ ✓ Compiled in 750ms (585 modules)
+ ✓ Compiled in 566ms (585 modules)
+ ✓ Compiled in 669ms (585 modules)
+ ✓ Compiled in 632ms (585 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, lstat '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/test-connection'
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '../../../../.next/server/app/api/test-connection/route' in /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server for build dependencies doesn't lead to expected result '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/test-connection/route.js', but to 'Error: Can't resolve '../../../../.next/server/app/api/test-connection/route' in '/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server'' instead. Resolving dependencies are ignored for this path.
+<w>  at resolve commonjs file ../../../../.next/server/app/api/test-connection/route (expected /Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/test-connection/route.js)
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-route-loader/index.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-route-loader/index.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/loader-runner/LoaderRunner.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/loader-runner/LoaderRunner.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/webpack/bundle5.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/webpack/bundle5.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/webpack/webpack.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/webpack/webpack.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/plugins/define-env-plugin.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/plugins/define-env-plugin.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/swc/index.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/swc/index.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-barrel-loader.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-barrel-loader.js
+<w>  at resolve commonjs /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-barrel-loader.js
+ ✓ Compiled in 1046ms (585 modules)
+ ✓ Compiled in 509ms (585 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, lstat '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/test-connection'
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '../../../../.next/server/app/api/test-connection/route' in /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server for build dependencies doesn't lead to expected result '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/test-connection/route.js', but to 'Error: Can't resolve '../../../../.next/server/app/api/test-connection/route' in '/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server'' instead. Resolving dependencies are ignored for this path.
+<w>  at resolve commonjs file ../../../../.next/server/app/api/test-connection/route (expected /Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/test-connection/route.js)
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/handle-externals.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/handle-externals.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-swc-loader.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-swc-loader.js
+<w>  at resolve commonjs /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-swc-loader.js
+ ✓ Compiled in 1634ms (585 modules)
+ ✓ Compiled in 559ms (585 modules)
+ ✓ Compiled in 647ms (585 modules)
+ ✓ Compiled in 555ms (585 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, lstat '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/test-connection'
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '../../../../.next/server/app/api/test-connection/route' in /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server for build dependencies doesn't lead to expected result '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/test-connection/route.js', but to 'Error: Can't resolve '../../../../.next/server/app/api/test-connection/route' in '/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server'' instead. Resolving dependencies are ignored for this path.
+<w>  at resolve commonjs file ../../../../.next/server/app/api/test-connection/route (expected /Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/test-connection/route.js)
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/handle-externals.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/handle-externals.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-swc-loader.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-swc-loader.js
+<w>  at resolve commonjs /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-swc-loader.js
+ ✓ Compiled in 1292ms (585 modules)
+ ✓ Compiled in 513ms (585 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, lstat '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/test-connection'
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '../../../../.next/server/app/api/test-connection/route' in /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server for build dependencies doesn't lead to expected result '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/test-connection/route.js', but to 'Error: Can't resolve '../../../../.next/server/app/api/test-connection/route' in '/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server'' instead. Resolving dependencies are ignored for this path.
+<w>  at resolve commonjs file ../../../../.next/server/app/api/test-connection/route (expected /Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/test-connection/route.js)
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-route-loader/index.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-route-loader/index.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/loader-runner/LoaderRunner.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/loader-runner/LoaderRunner.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/webpack/bundle5.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/webpack/bundle5.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/webpack/webpack.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/webpack/webpack.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/plugins/define-env-plugin.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/plugins/define-env-plugin.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/swc/index.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/swc/index.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-barrel-loader.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-barrel-loader.js
+<w>  at resolve commonjs /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-barrel-loader.js
+ ⚠ Found a change in next.config.js. Restarting the server to apply the changes...
+  ▲ Next.js 14.2.28
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 2.7s
+ ○ Compiling /src/middleware ...
+ ✓ Compiled /src/middleware in 1030ms (484 modules)
+ ○ Compiling /dashboard/account ...
+ ✓ Compiled /dashboard/account in 7.5s (1758 modules)
+ GET /dashboard/account 200 in 8810ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /api/content-templates in 9.3s (2359 modules)
+ GET /favicon.ico 200 in 6890ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 8276ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /api/me 200 in 148ms
+ GET /api/me 200 in 5955ms
+ GET /api/content-templates 200 in 5937ms
+ GET /api/me 200 in 5987ms
+ GET /api/me 200 in 5988ms
+ GET /dashboard/account 200 in 292ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 80ms
+ GET /api/content-templates 200 in 142ms
+ GET /api/me 200 in 163ms
+ GET /api/me 200 in 220ms
+ GET /api/me 200 in 201ms
+ GET /api/me 200 in 177ms
+ ✓ Compiled /api/ai/usage in 298ms (1518 modules)
+API /api/ai/usage completed in 45ms
+ GET /api/ai/usage 200 in 446ms
+API /api/ai/usage completed in 53ms
+ GET /api/ai/usage 200 in 448ms
+ ○ Compiling /dashboard/users ...
+ ✓ Compiled /dashboard/users in 971ms (2499 modules)
+ GET /api/me 200 in 313ms
+ GET /api/me 200 in 359ms
+ ✓ Compiled /api/users in 210ms (1590 modules)
+ GET /api/users 200 in 448ms
+ ✓ Compiled /api/brands in 211ms (1594 modules)
+ GET /api/brands 200 in 368ms
+ ○ Compiling /dashboard/claims/pending-approval ...
+ ✓ Compiled /dashboard/claims/pending-approval in 1147ms (1862 modules)
+ ○ Compiling /api/claims/pending-approval ...
+ ✓ Compiled /api/claims/pending-approval in 761ms (1533 modules)
+[API Claims Pending Approval GET] Current user ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Current user ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 1200ms
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 1336ms
+ ✓ Compiled /api/claims/[id]/details in 298ms (1535 modules)
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Details] Error fetching claim: {
+  code: 'PGRST200',
+  details: "Searched for a foreign key relationship between 'claims' and 'profiles' using the hint 'claims_updated_by_fkey' in the schema 'public', but no matches were found.",
+  hint: null,
+  message: "Could not find a relationship between 'claims' and 'profiles' in the schema cache"
+}
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 404 in 1108ms
+[API Claims Details] Error fetching claim: {
+  code: 'PGRST200',
+  details: "Searched for a foreign key relationship between 'claims' and 'profiles' using the hint 'claims_updated_by_fkey' in the schema 'public', but no matches were found.",
+  hint: null,
+  message: "Could not find a relationship between 'claims' and 'profiles' in the schema cache"
+}
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 404 in 940ms
+ ✓ Compiled /_not-found in 223ms (1537 modules)
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 399ms
+ GET /dashboard/claims/pending-approval 200 in 101ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 149ms
+[API Claims Pending Approval GET] Current user ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+ ✓ Compiled /api/content-templates in 282ms (1541 modules)
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 430ms
+ ✓ Compiled (1543 modules)
+[API Claims Pending Approval GET] Current user ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 854ms
+ GET /api/me 200 in 1051ms
+ GET /api/me 200 in 1054ms
+ GET /api/content-templates 200 in 1059ms
+ GET /api/me 200 in 638ms
+ GET /api/me 200 in 1113ms
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 643ms (1572 modules)
+ GET /favicon.ico 200 in 750ms
+ ✓ Compiled /api/ai/usage in 249ms (1574 modules)
+API /api/ai/usage completed in 154ms
+ GET /api/ai/usage 200 in 1004ms
+API /api/ai/usage completed in 154ms
+ GET /api/ai/usage 200 in 1006ms
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Details] Error fetching claim: {
+  code: 'PGRST200',
+  details: "Searched for a foreign key relationship between 'claims' and 'profiles' using the hint 'claims_updated_by_fkey' in the schema 'public', but no matches were found.",
+  hint: null,
+  message: "Could not find a relationship between 'claims' and 'profiles' in the schema cache"
+}
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 404 in 1119ms
+ GET /dashboard/claims/pending-approval 200 in 460ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 37ms
+ GET /favicon.ico 200 in 49ms
+[API Claims Pending Approval GET] Current user ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Pending Approval GET] Current user ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+ GET /api/content-templates 200 in 190ms
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 291ms
+ GET /api/me 200 in 371ms
+ GET /api/me 200 in 379ms
+ GET /api/me 200 in 437ms
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 444ms
+ GET /api/me 200 in 293ms
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Details] Error fetching claim: {
+  code: 'PGRST200',
+  details: "Searched for a foreign key relationship between 'claims' and 'profiles' using the hint 'claims_updated_by_fkey' in the schema 'public', but no matches were found.",
+  hint: null,
+  message: "Could not find a relationship between 'claims' and 'profiles' in the schema cache"
+}
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 404 in 330ms
+API /api/ai/usage completed in 135ms
+ GET /api/ai/usage 200 in 172ms
+API /api/ai/usage completed in 137ms
+ GET /api/ai/usage 200 in 177ms
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Details] Error fetching claim: {
+  code: 'PGRST200',
+  details: "Searched for a foreign key relationship between 'claims' and 'profiles' using the hint 'claims_updated_by_fkey' in the schema 'public', but no matches were found.",
+  hint: null,
+  message: "Could not find a relationship between 'claims' and 'profiles' in the schema cache"
+}
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 404 in 273ms
+ ✓ Compiled in 1477ms (2509 modules)
+ ✓ Compiled in 848ms (2509 modules)
+API /api/ai/usage completed in 190ms
+ GET /api/ai/usage 200 in 352ms
+ ✓ Compiled in 1057ms (2343 modules)
+ ✓ Compiled in 700ms (935 modules)
+ ✓ Compiled in 538ms (935 modules)
+API /api/ai/usage completed in 305ms
+ GET /api/ai/usage 200 in 355ms
+API /api/ai/usage completed in 129ms
+ GET /api/ai/usage 200 in 161ms
+API /api/ai/usage completed in 264ms
+ GET /api/ai/usage 200 in 292ms
+API /api/ai/usage completed in 171ms
+ GET /api/ai/usage 200 in 224ms
+ GET /dashboard/claims/pending-approval 200 in 685ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 912ms (945 modules)
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 1209ms
+ ✓ Compiled /favicon.ico in 152ms (977 modules)
+ GET /favicon.ico 200 in 241ms
+ ✓ Compiled /api/me in 330ms (1564 modules)
+ ✓ Compiled (1568 modules)
+[API Claims Pending Approval GET] Current user ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Pending Approval GET] Current user ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+ GET /api/me 200 in 1951ms
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+ GET /api/me 200 in 2004ms
+ GET /api/me 200 in 2013ms
+ GET /api/me 200 in 2051ms
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 2064ms
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 2066ms
+ ✓ Compiled /api/claims/[id]/details in 497ms (1570 modules)
+ ✓ Compiled (1574 modules)
+API /api/ai/usage completed in 63ms
+ GET /api/ai/usage 200 in 679ms
+API /api/ai/usage completed in 65ms
+ GET /api/ai/usage 200 in 679ms
+[API Claims Details] Raw context: { params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' } }
+[API Claims Details] Context type: object
+[API Claims Details] Params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' }
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Details] Raw context: { params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' } }
+[API Claims Details] Context type: object
+[API Claims Details] Params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' }
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Details] Found claim: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] Found claim: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+ GET /api/content-templates 200 in 1070ms
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 200 in 851ms
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 200 in 877ms
+ GET /favicon.ico 200 in 47ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 252ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Details] Raw context: { params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' } }
+[API Claims Details] Context type: object
+[API Claims Details] Params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' }
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 209ms
+[API Claims Details] Found claim: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 200 in 326ms
+[API Claims Details] Raw context: { params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' } }
+[API Claims Details] Context type: object
+[API Claims Details] Params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' }
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Details] Found claim: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 200 in 288ms
+CSRF validation failed: No token in header
+ ✓ Compiled /api/claims/[id]/workflow in 365ms (1577 modules)
+ PUT /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/workflow 200 in 1211ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Details] Raw context: { params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' } }
+[API Claims Details] Context type: object
+[API Claims Details] Params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' }
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Details] Found claim: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 229ms
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 200 in 372ms
+ GET /dashboard/claims/pending-approval 200 in 165ms
+ GET /favicon.ico 200 in 29ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+ GET /api/content-templates 200 in 201ms
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 305ms
+ GET /api/me 200 in 310ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Details] Raw context: { params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' } }
+[API Claims Details] Context type: object
+[API Claims Details] Params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' }
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Details] Found claim: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 236ms
+ GET /api/me 200 in 251ms
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 200 in 314ms
+ GET /api/me 200 in 166ms
+[API Claims Details] Raw context: { params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' } }
+[API Claims Details] Context type: object
+[API Claims Details] Params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' }
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Details] Found claim: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+API /api/ai/usage completed in 40ms
+ GET /api/ai/usage 200 in 64ms
+API /api/ai/usage completed in 57ms
+ GET /api/ai/usage 200 in 80ms
+ GET /api/me 200 in 205ms
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 200 in 298ms
+ GET /dashboard/claims/pending-approval 200 in 42ms
+ GET /favicon.ico 200 in 22ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 268ms
+ GET /api/content-templates 200 in 247ms
+ GET /api/me 200 in 290ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Details] Raw context: { params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' } }
+[API Claims Details] Context type: object
+[API Claims Details] Params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' }
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 186ms
+[API Claims Details] Found claim: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+ GET /api/me 200 in 192ms
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 200 in 306ms
+ GET /api/me 200 in 157ms
+[API Claims Details] Raw context: { params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' } }
+[API Claims Details] Context type: object
+[API Claims Details] Params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' }
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Details] Found claim: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+API /api/ai/usage completed in 68ms
+ GET /api/ai/usage 200 in 89ms
+ GET /api/me 200 in 170ms
+API /api/ai/usage completed in 55ms
+ GET /api/ai/usage 200 in 79ms
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 200 in 293ms
+ ✓ Compiled in 1528ms (2507 modules)
+ ✓ Compiled in 782ms (2507 modules)
+ ✓ Compiled /api/claims/pending-approval in 903ms (1878 modules)
+ ✓ Compiled in 0ms (1533 modules)
+[API Claims Pending Approval GET] Current user ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Current user ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 1137ms
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 1239ms
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 1405ms
+ ✓ Compiled /api/claims/[id]/details in 401ms (1535 modules)
+[API Claims Details] Raw context: { params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' } }
+[API Claims Details] Context type: object
+[API Claims Details] Params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' }
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Details] Raw context: { params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' } }
+[API Claims Details] Context type: object
+[API Claims Details] Params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' }
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Details] Raw context: { params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' } }
+[API Claims Details] Context type: object
+[API Claims Details] Params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' }
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Details] Found claim: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Details] Found claim: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] Found claim: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 736ms
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 200 in 866ms
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 200 in 1005ms
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 200 in 622ms
+[API Claims Details] Raw context: { params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' } }
+[API Claims Details] Context type: object
+[API Claims Details] Params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' }
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Details] Found claim: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 200 in 310ms
+ ✓ Compiled in 1308ms (2470 modules)
+ ✓ Compiled in 1ms (1535 modules)
+ ✓ Compiled in 0ms (1535 modules)
+ ✓ Compiled in 0ms (1535 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 1474ms (2470 modules)
+ GET /dashboard/claims/pending-approval 200 in 259ms
+ ○ Compiling /api/content-templates ...
+ ✓ Compiled /api/content-templates in 605ms (1564 modules)
+ ✓ Compiled (1570 modules)
+ GET /favicon.ico 200 in 872ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+ GET /api/content-templates 200 in 1137ms
+ GET /api/me 200 in 1181ms
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 1207ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+ GET /api/me 200 in 308ms
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 244ms
+ GET /api/me 200 in 180ms
+ GET /api/me 200 in 151ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 1454ms (2505 modules)
+ ✓ Compiled in 1ms (1569 modules)
+ ✓ Compiled in 0ms (1569 modules)
+ ✓ Compiled in 0ms (1569 modules)
+ GET /dashboard/claims/pending-approval 200 in 1029ms
+ GET /favicon.ico 200 in 47ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+ GET /api/content-templates 200 in 302ms
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 350ms
+ GET /api/me 200 in 428ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 312ms
+ GET /api/me 200 in 212ms
+ GET /api/me 200 in 202ms
+ GET /api/me 200 in 193ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 1767ms (2505 modules)
+ ✓ Compiled in 0ms (1569 modules)
+ ✓ Compiled in 0ms (1569 modules)
+ ✓ Compiled in 0ms (1569 modules)
+ GET /dashboard/claims/pending-approval 200 in 1450ms
+ GET /favicon.ico 200 in 223ms
+ GET /api/content-templates 200 in 289ms
+ GET /api/me 200 in 320ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 477ms
+ GET /api/me 200 in 250ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+ GET /api/me 200 in 169ms
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 381ms
+ GET /api/me 200 in 160ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 1068ms (2505 modules)
+ ✓ Compiled in 0ms (1569 modules)
+ ✓ Compiled in 0ms (1569 modules)
+ ✓ Compiled in 0ms (1569 modules)
+ GET /dashboard/claims/pending-approval 200 in 929ms
+ GET /favicon.ico 200 in 37ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+ GET /api/content-templates 200 in 268ms
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 319ms
+ GET /api/me 200 in 326ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 539ms
+ GET /api/me 200 in 576ms
+ GET /api/me 200 in 157ms
+ GET /api/me 200 in 156ms
+ GET /dashboard/claims/pending-approval 200 in 87ms
+ GET /favicon.ico 200 in 53ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+ GET /api/content-templates 200 in 228ms
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 300ms
+ GET /api/me 200 in 350ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 287ms
+ GET /api/me 200 in 184ms
+ GET /api/me 200 in 155ms
+ GET /api/me 200 in 155ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 847ms (2505 modules)
+ ✓ Compiled in 0ms (1569 modules)
+ ✓ Compiled in 0ms (1569 modules)
+ ✓ Compiled in 0ms (1569 modules)
+ GET /dashboard/claims/pending-approval 200 in 928ms
+ GET /favicon.ico 200 in 51ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+ GET /api/content-templates 200 in 273ms
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 310ms
+ GET /api/me 200 in 323ms
+[API Claims Pending Approval GET] Current user ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 260ms
+ ✓ Compiled /api/claims/[id]/details in 169ms (1571 modules)
+[API Claims Details] Raw context: { params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' } }
+[API Claims Details] Context type: object
+[API Claims Details] Params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' }
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Details] Found claim: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+ GET /api/me 200 in 555ms
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 200 in 661ms
+ GET /api/me 200 in 175ms
+[API Claims Details] Raw context: { params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' } }
+[API Claims Details] Context type: object
+[API Claims Details] Params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' }
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 040ae028-e004-458a-9300-6795125531ae
+[API Claims Details] Found claim: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+ ✓ Compiled /api/ai/usage in 173ms (1573 modules)
+ GET /api/me 200 in 284ms
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 200 in 347ms
+API /api/ai/usage completed in 47ms
+ GET /api/ai/usage 200 in 281ms
+API /api/ai/usage completed in 44ms
+ GET /api/ai/usage 200 in 72ms
+ ✓ Compiled in 774ms (2509 modules)
+ ✓ Compiled in 0ms (1573 modules)
+ ✓ Compiled in 0ms (1573 modules)
+ ✓ Compiled in 0ms (1573 modules)
+ ✓ Compiled /api/claims/[id] in 0ms (1573 modules)
+ ✓ Compiled /_not-found in 0ms (1575 modules)
+ ✓ Compiled (1577 modules)
+ GET /_next/static/css/app/layout.css?v=1750146070629 404 in 474ms
+ GET /dashboard/account 404 in 65ms
+ GET /_next/static/css/app/layout.css?v=1750146071198 404 in 260ms
+ GET /_next/static/media/e4af272ccee01ff0-s.p.woff2 404 in 274ms
+ ⨯ Error: Cannot find module './vendor-chunks/next.js'
+Require stack:
+- /Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js
+- /Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/claims/[id]/route.js
+- /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js
+- /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js
+- /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js
+- /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/dev/static-paths-worker.js
+- /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/jest-worker/processChild.js
+    at Function.<anonymous> (node:internal/modules/cjs/loader:1225:15)
+    at /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require-hook.js:55:36
+    at Function._load (node:internal/modules/cjs/loader:1055:27)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:220:24)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1311:12)
+    at mod.require (/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require-hook.js:65:28)
+    at require (node:internal/modules/helpers:136:16)
+    at __webpack_require__.f.require (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:208:28)
+    at /Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:116:40 {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js',
+    '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/claims/[id]/route.js',
+    '/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js',
+    '/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js',
+    '/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js',
+    '/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/dev/static-paths-worker.js',
+    '/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/jest-worker/processChild.js'
+  ],
+  page: '/api/claims/pending-approval'
+}
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 108ms
+ GET /_next/static/chunks/main-app.js?v=1750146071198 404 in 115ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 112ms
+ GET /_next/static/chunks/app/not-found.js 404 in 131ms
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 1860ms (2723 modules)
+ GET /api/claims/pending-approval 500 in 4394ms
+ GET /_next/static/css/app/layout.css?v=1750146074118 404 in 94ms
+ ⨯ Error: Cannot find module './vendor-chunks/@supabase.js'
+Require stack:
+- /Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js
+- /Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/claims/[id]/route.js
+- /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js
+- /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js
+- /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js
+- /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/dev/static-paths-worker.js
+- /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/jest-worker/processChild.js
+    at Function.<anonymous> (node:internal/modules/cjs/loader:1225:15)
+    at /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require-hook.js:55:36
+    at Function._load (node:internal/modules/cjs/loader:1055:27)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:220:24)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1311:12)
+    at mod.require (/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require-hook.js:65:28)
+    at require (node:internal/modules/helpers:136:16)
+    at __webpack_require__.f.require (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:208:28)
+    at /Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:116:40 {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js',
+    '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/claims/[id]/route.js',
+    '/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js',
+    '/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js',
+    '/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js',
+    '/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/dev/static-paths-worker.js',
+    '/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/compiled/jest-worker/processChild.js'
+  ],
+  page: '/api/claims/pending-approval'
+}
+ GET /api/claims/pending-approval 500 in 439ms
+ GET /dashboard/account 200 in 285ms
+ GET /_next/static/css/app/layout.css?v=1750146081989 404 in 239ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 219ms
+ GET /_next/static/media/e4af272ccee01ff0-s.p.woff2 404 in 320ms
+ GET /_next/static/chunks/main-app.js?v=1750146081989 404 in 295ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 237ms
+ GET /_next/static/chunks/app/dashboard/account/page.js 404 in 236ms
+ GET /_next/static/chunks/app/dashboard/layout.js 404 in 94ms
+ GET /_next/static/chunks/app/not-found.js 404 in 73ms
+ ✓ Compiled in 1653ms (2739 modules)
+ GET /favicon.ico 404 in 632ms
+ GET /_next/static/css/app/layout.css?v=1750146084656 404 in 78ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, lstat '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/brands'
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '../../../../.next/server/app/api/brands/route' in /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server for build dependencies doesn't lead to expected result '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/brands/route.js', but to 'Error: Can't resolve '../../../../.next/server/app/api/brands/route' in '/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server'' instead. Resolving dependencies are ignored for this path.
+<w>  at resolve commonjs file ../../../../.next/server/app/api/brands/route (expected /Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/brands/route.js)
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-route-loader/index.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-route-loader/index.js
+<w>  at resolve commonjs /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-route-loader/index.js
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '../../../../.next/server/app/api/claims/[id]/workflow/route' in /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server for build dependencies doesn't lead to expected result '/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/claims/[id]/workflow/route.js', but to 'Error: Can't resolve '../../../../.next/server/app/api/claims/[id]/workflow/route' in '/Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server'' instead. Resolving dependencies are ignored for this path.
+<w>  at resolve commonjs file ../../../../.next/server/app/api/claims/[id]/workflow/route (expected /Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/claims/[id]/workflow/route.js)
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/require.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/server/load-components.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/utils.js
+<w>  at file dependencies /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-route-loader/index.js
+<w>  at file /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-route-loader/index.js
+<w>  at resolve commonjs /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/next/dist/build/webpack/loaders/next-route-loader/index.js
+ ✓ Compiled in 1077ms (1121 modules)
+ ✓ Compiled in 681ms (1121 modules)
+ ✓ Compiled in 637ms (1121 modules)
+ ✓ Compiled in 721ms (1121 modules)
+ ✓ Compiled in 947ms (1121 modules)
+ ✓ Compiled in 603ms (1121 modules)
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 3.8s (2642 modules)
+ GET /dashboard 200 in 4971ms
+ ✓ Compiled /api/me/tasks in 460ms (1668 modules)
+ ✓ Compiled /favicon.ico in 1ms (1674 modules)
+ ✓ Compiled in 1ms (1703 modules)
+ ✓ Compiled in 1ms (1703 modules)
+ ✓ Compiled in 0ms (1703 modules)
+ GET /api/me 200 in 2977ms
+[API Tasks GET] Admin user. Fetching tasks from all brands.
+ GET /api/me/tasks 200 in 3064ms
+ GET /api/content-templates 200 in 3110ms
+ ✓ Compiled in 0ms (1703 modules)
+ GET /favicon.ico 200 in 2377ms
+[API Tasks GET] Admin user. Fetching tasks from all brands.
+ GET /api/me/tasks 200 in 691ms
+ GET /api/me 200 in 915ms
+ GET /api/me 200 in 376ms
+ GET /api/me 200 in 370ms
+ ✓ Compiled /api/ai/usage in 351ms (1705 modules)
+API /api/ai/usage completed in 62ms
+ GET /api/ai/usage 200 in 548ms
+API /api/ai/usage completed in 46ms
+ GET /api/ai/usage 200 in 97ms
+ ✓ Compiled /api/claims/pending-approval in 423ms (1707 modules)
+[API Claims Pending Approval GET] Current user ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 879ms
+[API Claims Pending Approval GET] Current user ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 330ms
+ ✓ Compiled /api/claims/[id]/details in 269ms (1709 modules)
+[API Claims Details] Raw context: { params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' } }
+[API Claims Details] Context type: object
+[API Claims Details] Params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' }
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Details] Found claim: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 200 in 597ms
+[API Claims Details] Raw context: { params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' } }
+[API Claims Details] Context type: object
+[API Claims Details] Params: { id: '505aad1c-fc81-435a-a9c2-83fe88c878e8' }
+[API Claims Details] Fetching claim with ID: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+[API Claims Details] User ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Details] Found claim: 505aad1c-fc81-435a-a9c2-83fe88c878e8
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 200 in 344ms
+ ⨯ Failed to generate static paths for /api/claims/[id]/details:
+TypeError: Cannot read properties of undefined (reading 'call')
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43)
+    at eval (webpack-internal:///(rsc)/./src/lib/api-utils.ts:12:63)
+    at (rsc)/./src/lib/api-utils.ts (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/claims/[id]/details/route.js:262:1)
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43)
+    at eval (webpack-internal:///(rsc)/./src/app/api/claims/[id]/details/route.ts:8:72)
+    at (rsc)/./src/app/api/claims/[id]/details/route.ts (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/claims/[id]/details/route.js:252:1)
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute&page=%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute&appPaths=&pagePath=private-next-app-dir%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute.ts&appDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0%2Fsrc%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=standalone&preferredRegion=&middlewareConfig=e30%3D!:15:134)
+    at (rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute&page=%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute&appPaths=&pagePath=private-next-app-dir%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute.ts&appDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0%2Fsrc%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=standalone&preferredRegion=&middlewareConfig=e30%3D! (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/claims/[id]/details/route.js:242:1)
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43) {
+  type: 'TypeError'
+}
+ ⨯ Failed to generate static paths for /api/claims/[id]/details:
+TypeError: Cannot read properties of undefined (reading 'call')
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43)
+    at eval (webpack-internal:///(rsc)/./src/lib/api-utils.ts:12:63)
+    at (rsc)/./src/lib/api-utils.ts (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/claims/[id]/details/route.js:262:1)
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43)
+    at eval (webpack-internal:///(rsc)/./src/app/api/claims/[id]/details/route.ts:8:72)
+    at (rsc)/./src/app/api/claims/[id]/details/route.ts (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/claims/[id]/details/route.js:252:1)
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute&page=%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute&appPaths=&pagePath=private-next-app-dir%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute.ts&appDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0%2Fsrc%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=standalone&preferredRegion=&middlewareConfig=e30%3D!:15:134)
+    at (rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute&page=%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute&appPaths=&pagePath=private-next-app-dir%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute.ts&appDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0%2Fsrc%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=standalone&preferredRegion=&middlewareConfig=e30%3D! (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/claims/[id]/details/route.js:242:1)
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43) {
+  type: 'TypeError'
+}
+ ○ Compiling /dashboard/content/new ...
+ ✓ Compiled /dashboard/content/new in 4.1s (2983 modules)
+ ✓ Compiled /api/content-templates/[id] in 405ms (1850 modules)
+ ✓ Compiled (1876 modules)
+[API Workflows GET] Admin user. Fetching all workflows (or specific brand if requestedBrandId set).
+ GET /api/brands 200 in 1459ms
+ GET /api/workflows?template_id=c21b9928-edbe-4204-9aa8-770e2b43b0be 200 in 1530ms
+[API Workflows GET] Admin user. Fetching all workflows (or specific brand if requestedBrandId set).
+ GET /api/brands 200 in 324ms
+ GET /api/workflows?template_id=c21b9928-edbe-4204-9aa8-770e2b43b0be 200 in 179ms
+ ⨯ TypeError: Cannot read properties of undefined (reading 'call')
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43)
+    at eval (webpack-internal:///(rsc)/./src/lib/api-utils.ts:12:63)
+    at (rsc)/./src/lib/api-utils.ts (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/content-templates/[id]/route.js:262:1)
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43)
+    at eval (webpack-internal:///(rsc)/./src/app/api/content-templates/[id]/route.ts:10:72)
+    at (rsc)/./src/app/api/content-templates/[id]/route.ts (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/content-templates/[id]/route.js:252:1)
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fapi%2Fcontent-templates%2F%5Bid%5D%2Froute&page=%2Fapi%2Fcontent-templates%2F%5Bid%5D%2Froute&appPaths=&pagePath=private-next-app-dir%2Fapi%2Fcontent-templates%2F%5Bid%5D%2Froute.ts&appDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0%2Fsrc%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=standalone&preferredRegion=&middlewareConfig=e30%3D!:15:137)
+    at (rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fapi%2Fcontent-templates%2F%5Bid%5D%2Froute&page=%2Fapi%2Fcontent-templates%2F%5Bid%5D%2Froute&appPaths=&pagePath=private-next-app-dir%2Fapi%2Fcontent-templates%2F%5Bid%5D%2Froute.ts&appDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0%2Fsrc%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=standalone&preferredRegion=&middlewareConfig=e30%3D! (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/content-templates/[id]/route.js:242:1)
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43) {
+  type: 'TypeError',
+  page: '/api/content-templates/c21b9928-edbe-4204-9aa8-770e2b43b0be'
+}
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 575ms (3165 modules)
+ GET /api/content-templates/c21b9928-edbe-4204-9aa8-770e2b43b0be 500 in 2788ms
+ ⨯ TypeError: Cannot read properties of undefined (reading 'call')
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43)
+    at eval (webpack-internal:///(rsc)/./src/lib/api-utils.ts:12:63)
+    at (rsc)/./src/lib/api-utils.ts (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/content-templates/[id]/route.js:262:1)
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43)
+    at eval (webpack-internal:///(rsc)/./src/app/api/content-templates/[id]/route.ts:10:72)
+    at (rsc)/./src/app/api/content-templates/[id]/route.ts (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/content-templates/[id]/route.js:252:1)
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fapi%2Fcontent-templates%2F%5Bid%5D%2Froute&page=%2Fapi%2Fcontent-templates%2F%5Bid%5D%2Froute&appPaths=&pagePath=private-next-app-dir%2Fapi%2Fcontent-templates%2F%5Bid%5D%2Froute.ts&appDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0%2Fsrc%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=standalone&preferredRegion=&middlewareConfig=e30%3D!:15:137)
+    at (rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fapi%2Fcontent-templates%2F%5Bid%5D%2Froute&page=%2Fapi%2Fcontent-templates%2F%5Bid%5D%2Froute&appPaths=&pagePath=private-next-app-dir%2Fapi%2Fcontent-templates%2F%5Bid%5D%2Froute.ts&appDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0%2Fsrc%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=standalone&preferredRegion=&middlewareConfig=e30%3D! (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/content-templates/[id]/route.js:242:1)
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43) {
+  type: 'TypeError',
+  page: '/api/content-templates/c21b9928-edbe-4204-9aa8-770e2b43b0be'
+}
+ GET /api/content-templates/c21b9928-edbe-4204-9aa8-770e2b43b0be 500 in 751ms
+ ○ Compiling /dashboard/claims/preview ...
+ ✓ Compiled /dashboard/claims/preview in 818ms (3200 modules)
+ ○ Compiling /api/master-claim-brands ...
+ ✓ Compiled /api/master-claim-brands in 508ms (1898 modules)
+ ✓ Compiled (1902 modules)
+ GET /api/countries 200 in 1844ms
+ GET /api/master-claim-brands 200 in 1900ms
+ GET /api/countries 200 in 206ms
+ GET /api/master-claim-brands 200 in 207ms
+ GET /api/claims/matrix?countryCode=__ALL_COUNTRIES__ 200 in 2229ms
+ GET /api/claims/matrix?countryCode=__ALL_COUNTRIES__ 200 in 438ms
+ ✓ Compiled /api/claims/pending-approval in 438ms (1904 modules)
+[API Claims Pending Approval GET] Current user ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 800ms
+[API Claims Pending Approval GET] Current user ID: 33d292a7-0e06-4125-ab88-943e8844b7d7
+[API Claims Pending Approval GET] All pending claims: 1
+Claim 505aad1c-fc81-435a-a9c2-83fe88c878e8 - Assignees: [ '040ae028-e004-458a-9300-6795125531ae' ]
+[API Claims Pending Approval GET] Total pending claims: 1
+ GET /api/claims/pending-approval 200 in 369ms
+ ✓ Compiled /api/claims/[id]/details in 449ms (1906 modules)
+ ⨯ TypeError: Cannot read properties of undefined (reading 'call')
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43)
+    at eval (webpack-internal:///(rsc)/./src/lib/api-utils.ts:12:63)
+    at (rsc)/./src/lib/api-utils.ts (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/claims/[id]/details/route.js:262:1)
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43)
+    at eval (webpack-internal:///(rsc)/./src/app/api/claims/[id]/details/route.ts:8:72)
+    at (rsc)/./src/app/api/claims/[id]/details/route.ts (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/claims/[id]/details/route.js:252:1)
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute&page=%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute&appPaths=&pagePath=private-next-app-dir%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute.ts&appDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0%2Fsrc%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=standalone&preferredRegion=&middlewareConfig=e30%3D!:15:134)
+    at (rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute&page=%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute&appPaths=&pagePath=private-next-app-dir%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute.ts&appDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0%2Fsrc%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=standalone&preferredRegion=&middlewareConfig=e30%3D! (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/claims/[id]/details/route.js:242:1)
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43) {
+  type: 'TypeError',
+  page: '/api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details'
+}
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 500 in 1187ms
+ ⨯ TypeError: Cannot read properties of undefined (reading 'call')
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43)
+    at eval (webpack-internal:///(rsc)/./src/lib/api-utils.ts:12:63)
+    at (rsc)/./src/lib/api-utils.ts (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/claims/[id]/details/route.js:262:1)
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43)
+    at eval (webpack-internal:///(rsc)/./src/app/api/claims/[id]/details/route.ts:8:72)
+    at (rsc)/./src/app/api/claims/[id]/details/route.ts (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/claims/[id]/details/route.js:252:1)
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute&page=%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute&appPaths=&pagePath=private-next-app-dir%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute.ts&appDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0%2Fsrc%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=standalone&preferredRegion=&middlewareConfig=e30%3D!:15:134)
+    at (rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute&page=%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute&appPaths=&pagePath=private-next-app-dir%2Fapi%2Fclaims%2F%5Bid%5D%2Fdetails%2Froute.ts&appDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0%2Fsrc%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2FUsers%2Fpeterpitcher%2FCursor%2FMixerAI2.0&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=standalone&preferredRegion=&middlewareConfig=e30%3D! (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/app/api/claims/[id]/details/route.js:242:1)
+    at __webpack_require__ (/Users/peterpitcher/Cursor/MixerAI2.0/.next/server/webpack-runtime.js:33:43) {
+  type: 'TypeError',
+  page: '/api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details'
+}
+ GET /api/claims/505aad1c-fc81-435a-a9c2-83fe88c878e8/details 500 in 608ms
+ ✓ Compiled in 4s (1319 modules)
+ ✓ Compiled in 875ms (1319 modules)
+ ✓ Compiled in 1336ms (1319 modules)
+ ✓ Compiled in 1350ms (1319 modules)
+ ✓ Compiled in 1165ms (1319 modules)
+ ✓ Compiled in 851ms (1319 modules)
+ ✓ Compiled in 765ms (1319 modules)
+ ✓ Compiled in 1582ms (3034 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/peterpitcher/Cursor/MixerAI2.0/.next/cache/webpack/server-development/10.pack.gz_' -> '/Users/peterpitcher/Cursor/MixerAI2.0/.next/cache/webpack/server-development/10.pack.gz'
+ ✓ Compiled in 5s (1319 modules)
+ ✓ Compiled in 1872ms (1319 modules)
+ ✓ Compiled in 812ms (1319 modules)
+ ✓ Compiled in 805ms (1319 modules)
+ ✓ Compiled in 1312ms (1319 modules)
+ ✓ Compiled in 1441ms (1319 modules)
+ ✓ Compiled in 741ms (1319 modules)
+ ✓ Compiled in 718ms (1319 modules)
+ ✓ Compiled in 777ms (1319 modules)
+ ✓ Compiled in 1216ms (1319 modules)
+ ✓ Compiled in 603ms (1319 modules)
+ ✓ Compiled in 624ms (1319 modules)
+ ✓ Compiled in 1364ms (1319 modules)
+ ✓ Compiled in 728ms (1319 modules)
+ ✓ Compiled in 668ms (1319 modules)
+ ✓ Compiled in 612ms (1319 modules)
+ ✓ Compiled in 603ms (1319 modules)
+ ✓ Compiled in 733ms (1319 modules)
+ ✓ Compiled in 1348ms (1319 modules)
+ ✓ Compiled in 976ms (1319 modules)
+ ✓ Compiled in 649ms (1319 modules)
+ ✓ Compiled in 562ms (1319 modules)
+ ✓ Compiled in 715ms (1319 modules)
+ ✓ Compiled in 623ms (1319 modules)
+ ✓ Compiled in 656ms (1319 modules)
+ ✓ Compiled in 1205ms (1319 modules)
+ ✓ Compiled in 2.5s (3034 modules)
+ ✓ Compiled in 595ms (1319 modules)
+ ✓ Compiled in 989ms (1319 modules)
+ ✓ Compiled in 677ms (1319 modules)
+ ✓ Compiled in 875ms (1319 modules)
+ ✓ Compiled in 866ms (1319 modules)
+ ✓ Compiled in 1205ms (1319 modules)
+ ✓ Compiled in 1049ms (1319 modules)
+ ✓ Compiled in 775ms (1319 modules)
+ ✓ Compiled in 950ms (1319 modules)
+ ✓ Compiled in 801ms (1319 modules)
+ ✓ Compiled in 726ms (1319 modules)
+ ✓ Compiled in 673ms (1319 modules)
+ ✓ Compiled in 802ms (1319 modules)
+ ✓ Compiled in 800ms (1319 modules)
+ ✓ Compiled in 978ms (1319 modules)
+ ✓ Compiled in 3.8s (1319 modules)
+ ✓ Compiled in 1199ms (1319 modules)
+ ✓ Compiled in 834ms (1319 modules)
+ ✓ Compiled in 1164ms (1319 modules)
+ ✓ Compiled in 745ms (1319 modules)
+ ✓ Compiled in 674ms (1319 modules)
+ ✓ Compiled in 802ms (1319 modules)
+ ✓ Compiled in 743ms (1319 modules)
+ ✓ Compiled in 595ms (1319 modules)
+ ✓ Compiled in 1568ms (3034 modules)
+ ✓ Compiled in 571ms (1319 modules)
+ ✓ Compiled in 633ms (1319 modules)
+ ✓ Compiled in 720ms (1319 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/peterpitcher/Cursor/MixerAI2.0/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/peterpitcher/Cursor/MixerAI2.0/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 693ms (1319 modules)
+ ✓ Compiled in 603ms (1319 modules)
+ ✓ Compiled in 661ms (1319 modules)
+ ✓ Compiled in 647ms (1319 modules)
+ ✓ Compiled in 678ms (1319 modules)
+ ✓ Compiled in 588ms (1319 modules)
+ ✓ Compiled in 808ms (1319 modules)
+ ✓ Compiled in 552ms (1319 modules)
+ ✓ Compiled in 1420ms (3034 modules)
+ ✓ Compiled in 1188ms (3034 modules)
+ ✓ Compiled in 630ms (1319 modules)
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 1918ms (1717 modules)
+ GET /dashboard 404 in 2504ms
+ GET /dashboard 200 in 1480ms
+ ○ Compiling /api/me ...
+ ✓ Compiled /api/me/tasks in 1720ms (1868 modules)
+ ✓ Compiled (1874 modules)
+[API Tasks GET] Admin user. Fetching tasks from all brands.
+ GET /api/content-templates 200 in 2979ms
+ GET /api/me/tasks 200 in 3011ms
+ GET /api/me 200 in 3453ms
+[API Tasks GET] Admin user. Fetching tasks from all brands.
+ GET /api/me/tasks 200 in 908ms
+ GET /api/me 200 in 854ms
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 1181ms (3179 modules)
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /api/me 404 in 1354ms
+ ✓ Compiled in 1349ms (1320 modules)
+ ✓ Compiled in 2.6s (3034 modules)
+ ✓ Compiled in 748ms (1319 modules)
+ ✓ Compiled in 1349ms (1319 modules)
+ ✓ Compiled in 1354ms (3034 modules)
+ ✓ Compiled in 1693ms (3034 modules)
+ ✓ Compiled in 612ms (1319 modules)
+ ✓ Compiled in 968ms (1319 modules)
+ ✓ Compiled in 1521ms (3029 modules)
+ ✓ Compiled in 1003ms (3029 modules)
+ ✓ Compiled in 1314ms (3029 modules)
+ ✓ Compiled in 1030ms (3029 modules)
+ ✓ Compiled in 1798ms (3029 modules)
+ ✓ Compiled in 960ms (3029 modules)
+ ✓ Compiled in 1859ms (3029 modules)
+ ✓ Compiled in 2s (3029 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/peterpitcher/Cursor/MixerAI2.0/.next/cache/webpack/client-development/6.pack.gz_' -> '/Users/peterpitcher/Cursor/MixerAI2.0/.next/cache/webpack/client-development/6.pack.gz'
+ ✓ Compiled in 1477ms (3029 modules)
+ ✓ Compiled in 1421ms (3029 modules)
+ ✓ Compiled in 1521ms (1317 modules)
+ ✓ Compiled in 2.2s (3029 modules)
+ ✓ Compiled in 1382ms (3029 modules)
+ ✓ Compiled in 713ms (1317 modules)
+ ✓ Compiled in 720ms (1317 modules)
+ ✓ Compiled in 1182ms (1317 modules)
+ ✓ Compiled in 664ms (1317 modules)
+ ✓ Compiled in 3s (1317 modules)
+ ✓ Compiled in 790ms (1317 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/peterpitcher/Cursor/MixerAI2.0/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/peterpitcher/Cursor/MixerAI2.0/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 750ms (1317 modules)
+ ✓ Compiled in 3.5s (3029 modules)
+ ✓ Compiled in 960ms (1317 modules)
+ ✓ Compiled in 2.9s (1317 modules)
+ ✓ Compiled in 2.1s (1317 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/peterpitcher/Cursor/MixerAI2.0/.next/cache/webpack/client-development/5.pack.gz_' -> '/Users/peterpitcher/Cursor/MixerAI2.0/.next/cache/webpack/client-development/5.pack.gz'
+ ⚠ Found a change in next.config.js. Restarting the server to apply the changes...
+  ▲ Next.js 14.2.28
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 2.1s

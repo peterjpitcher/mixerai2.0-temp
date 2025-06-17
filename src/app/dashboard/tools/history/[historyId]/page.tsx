@@ -179,7 +179,7 @@ const AltTextHistoryDisplay = ({ inputs, outputs }: { inputs: AltTextInputs, out
               <TableRow>
                 <TableCell>Image Domains</TableCell>
                 <TableCell>
-                  {[...new Set(inputs.imageUrls?.map(url => getDomainFromUrl(url)) || [])].map((domain, idx) => (
+                  {Array.from(new Set(inputs.imageUrls?.map(url => getDomainFromUrl(url)) || [])).map((domain, idx) => (
                     <Badge key={idx} variant="secondary" className="mr-1 mb-1">{domain}</Badge>
                   ))}
                 </TableCell>
@@ -356,7 +356,7 @@ const MetadataHistoryDisplay = ({ inputs, outputs }: { inputs: MetadataInputs, o
               <TableRow>
                 <TableCell>Domains Processed</TableCell>
                 <TableCell>
-                  {[...new Set(inputs.urls?.map(url => getDomainFromUrl(url)) || [])].map((domain, idx) => (
+                  {Array.from(new Set(inputs.urls?.map(url => getDomainFromUrl(url)) || [])).map((domain, idx) => (
                     <Badge key={idx} variant="secondary" className="mr-1 mb-1">{domain}</Badge>
                   ))}
                 </TableCell>
@@ -828,7 +828,7 @@ export default function ToolRunHistoryDetailPage() {
 
   if (error && !historyItem) { // If there was an error and no item was loaded
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 bg-gray-50 min-h-screen">
+      <div className="space-y-6 bg-gray-50 min-h-screen">
         <Breadcrumbs items={[{label: 'Dashboard', href: '/dashboard'}, {label: 'Tool History', href: '/dashboard/tools/history'}, {label: 'Error'}]} />
         <div className="flex flex-col items-center justify-center h-[calc(100vh-15rem)] p-6 text-center">
             <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
@@ -844,7 +844,7 @@ export default function ToolRunHistoryDetailPage() {
 
   if (!historyItem) { // If no error but item is still null (e.g., not found but no specific error thrown to UI)
      return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 bg-gray-50 min-h-screen">
+      <div className="space-y-6 bg-gray-50 min-h-screen">
         <Breadcrumbs items={[{label: 'Dashboard', href: '/dashboard'}, {label: 'Tool History', href: '/dashboard/tools/history'}, {label: 'Not Found'}]} />
         <div className="flex flex-col items-center justify-center h-[calc(100vh-15rem)] p-6 text-center">
             <AlertTriangle className="h-16 w-16 text-orange-500 mb-4" />
@@ -869,7 +869,7 @@ export default function ToolRunHistoryDetailPage() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6">
+    <div className="space-y-6">
       <Breadcrumbs 
         items={[
           { label: 'Dashboard', href: '/dashboard' },
@@ -903,7 +903,7 @@ export default function ToolRunHistoryDetailPage() {
             {formatToolName(historyItem.tool_name)} - Run Overview
           </CardTitle>
           <CardDescription>
-            Run executed on {format(new Date(historyItem.run_at), 'dd MMMM yyyy, HH:mm')}
+            Run executed on {format(new Date(historyItem.run_at), 'MMMM d, yyyy, HH:mm')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

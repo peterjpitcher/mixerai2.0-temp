@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { format } from 'date-fns';
 
 interface AnalyticsData {
   contentCounts: {
@@ -276,7 +277,7 @@ export function AnalyticsOverview() {
                       }}
                     ></div>
                     <div className="text-xs text-muted-foreground mt-2">
-                      {new Date(dataPoint.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                      {format(new Date(dataPoint.date), 'MMM d')}
                     </div>
                     <div className="text-xs font-medium">{dataPoint.count}</div>
                   </div>

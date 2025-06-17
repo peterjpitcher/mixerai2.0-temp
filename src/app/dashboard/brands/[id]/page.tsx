@@ -1,7 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { BrandDetailsClient } from '@/components/dashboard/brand/brand-details-client';
 import { AccessDenied } from '@/components/access-denied';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 
 interface BrandDetailsPageProps {
   params: {
@@ -34,8 +34,8 @@ export default async function BrandDetailsPage({ params }: BrandDetailsPageProps
     .single();
 
   if (rpcError || !data || typeof data !== 'object') {
-    // Handle RPC error or brand not found
-    notFound();
+    // If brand details can't be loaded, redirect to edit page
+    redirect(`/dashboard/brands/${brandId}/edit`);
   }
 
   const brand = data as BrandFromRPC;

@@ -12,8 +12,7 @@ type Claim = {
 };
 
 // Function to fetch all claims related to a master claim brand
-async function fetchAllBrandClaims(supabase: ReturnType<typeof createSupabaseAdminClient>, masterClaimBrandId: string, productId: string | null, countryCode: string | null): Promise<Claim[]> {
-  // @ts-expect-error RPC function type not yet in generated types
+async function fetchAllBrandClaims(supabase: ReturnType<typeof createSupabaseAdminClient>, masterClaimBrandId: string, productId: string | undefined, countryCode: string | undefined): Promise<Claim[]> {
   const { data, error } = await supabase.rpc('get_all_claims_for_master_brand', {
     master_brand_id_param: masterClaimBrandId,
     product_id_param: productId,

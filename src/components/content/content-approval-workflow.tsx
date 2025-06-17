@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 export interface WorkflowStep {
   id: string | number;
@@ -228,7 +229,7 @@ export function ContentApprovalWorkflow({
                       !['approved', 'rejected', 'pending_review'].includes(v.action_status) && 'text-gray-600'
                     )}>{v.action_status || 'N/A'}</span>
                     </p>
-                    <p className="text-xs text-muted-foreground">{new Date(v.created_at).toLocaleDateString()}</p>
+                    <p className="text-xs text-muted-foreground">{format(new Date(v.created_at), 'MMMM d, yyyy')}</p>
                   </div>
                   {v.reviewer?.full_name && (
                     <div className="flex items-center mt-1">

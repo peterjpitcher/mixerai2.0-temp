@@ -9,12 +9,18 @@ import { toast } from 'sonner';
 import { ComboboxOption } from '@/components/ui/MultiSelectCheckboxCombobox';
 import { Claim, MarketClaimOverride, ClaimTypeEnum } from '@/lib/claims-utils'; 
 import { Heading } from '@/components/ui/heading';
-import { Edit3, Trash2 } from 'lucide-react';
+import { Edit3, Trash2, MoreVertical } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 // import { } from "@/lib/constants/country-codes"; // Removed - empty import
 
 // Base Entity interface
@@ -369,7 +375,7 @@ export default function MarketOverridesPage() {
   )};
 
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8">
+    <div className="space-y-6">
       <Heading title="Manage Market Claim Overrides" description="Block or replace Master (Global) claims for specific products in selected markets." />
       <Card className="mb-6"> 
         <CardHeader><CardTitle>Context Selection</CardTitle><CardDescription>Choose a product and a target market to manage its overrides.</CardDescription></CardHeader>
@@ -461,12 +467,22 @@ export default function MarketOverridesPage() {
                           {override.replacement_claim_id ? `${override.replacement_claim_text || 'N/A'} (${override.replacement_claim_type?.toUpperCase() || 'N/A'})` : '-'}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="outline" size="sm" onClick={() => openEditOverrideDialog(override)} disabled={isLoading} className="h-8 mr-1">
-                            <Edit3 className="h-3 w-3 mr-1"/> Edit
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => openConfirmDeleteDialog(override)} title="Remove Override" aria-label="Remove Override" disabled={isLoading} className="h-8 w-8">
-                            <Trash2 className="h-4 w-4"/>
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <span className="sr-only">Open menu</span>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openEditOverrideDialog(override)} disabled={isLoading}>
+                                <Edit3 className="mr-2 h-4 w-4" /> Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openConfirmDeleteDialog(override)} disabled={isLoading} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" /> Remove Override
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     );

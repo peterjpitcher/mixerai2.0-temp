@@ -84,7 +84,7 @@ export default function NewIngredientPage() {
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
       <div className="mb-4">
         <Button variant="outline" size="sm" asChild>
           <Link href="/dashboard/claims/ingredients"> {/* Updated back link path */}
@@ -108,32 +108,36 @@ export default function NewIngredientPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Ingredient Name <span className="text-red-500">*</span></Label>
-              <Input 
-                id="name" 
-                name="name" 
-                value={formData.name}
-                onChange={handleInputChange} 
-                placeholder="e.g., Turmeric Extract, Vitamin C"
-                maxLength={255}
-                className={errors.name ? "border-red-500" : ""}
-              />
-              {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+            <div className="grid grid-cols-12 gap-4">
+              <Label htmlFor="name" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Ingredient Name <span className="text-red-500">*</span></Label>
+              <div className="col-span-12 sm:col-span-9">
+                <Input 
+                  id="name" 
+                  name="name" 
+                  value={formData.name}
+                  onChange={handleInputChange} 
+                  placeholder="e.g., Turmeric Extract, Vitamin C"
+                  maxLength={255}
+                  className={errors.name ? "border-red-500" : ""}
+                />
+                {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Description (Optional)</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={formData.description || ''}
-                onChange={handleInputChange}
-                placeholder="Provide a brief description of the ingredient..."
-                rows={4}
-                maxLength={1000} // Example max length
-                className={errors.description ? "border-red-500" : ""}
-              />
-              {errors.description && <p className="text-xs text-red-500 mt-1">{errors.description}</p>}
+            <div className="grid grid-cols-12 gap-4">
+              <Label htmlFor="description" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Description (Optional)</Label>
+              <div className="col-span-12 sm:col-span-9">
+                <Textarea
+                  id="description"
+                  name="description"
+                  value={formData.description || ''}
+                  onChange={handleInputChange}
+                  placeholder="Provide a brief description of the ingredient..."
+                  rows={4}
+                  maxLength={1000} // Example max length
+                  className={errors.description ? "border-red-500" : ""}
+                />
+                {errors.description && <p className="text-xs text-red-500 mt-1">{errors.description}</p>}
+              </div>
             </div>
           </CardContent>
           <CardFooter className="flex justify-end space-x-2">

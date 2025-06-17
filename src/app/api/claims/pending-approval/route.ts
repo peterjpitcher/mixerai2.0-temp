@@ -16,77 +16,43 @@ export const GET = withAuth(async (_req: NextRequest, user: User) => {
 
     const supabase = createSupabaseAdminClient();
     
-    // Get claims that are assigned to the current user for approval
+    console.log('[API Claims Pending Approval GET] Current user ID:', user.id);
+    
+    // First, let's get all pending claims to debug
+    const { data: allPendingClaims, error: allError } = await supabase
+      .from('claims_pending_approval')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (allError) {
+      console.error('[API Claims Pending Approval GET] Error fetching all pending claims:', allError);
+    } else {
+      console.log('[API Claims Pending Approval GET] All pending claims:', allPendingClaims?.length || 0);
+      allPendingClaims?.forEach(claim => {
+        console.log(`Claim ${claim.id} - Assignees:`, claim.current_step_assignees);
+      });
+    }
+    
+    // Get all pending claims (remove user filter to show all claims)
     const { data: pendingClaims, error } = await supabase
-      .from('claims')
-      .select(`
-        id,
-        claim_text,
-        claim_type,
-        level,
-        description,
-        workflow_id,
-        current_workflow_step,
-        workflow_status,
-        created_at,
-        created_by,
-        workflows(
-          id,
-          name
-        ),
-        workflow_steps!inner(
-          id,
-          name,
-          role,
-          assigned_user_ids
-        ),
-        profiles!claims_created_by_fkey(
-          id,
-          full_name
-        ),
-        master_claim_brands(
-          id,
-          name
-        ),
-        products(
-          id,
-          name
-        ),
-        ingredients(
-          id,
-          name
-        )
-      `)
-      .in('workflow_status', ['pending_review', 'in_review'])
-      .not('workflow_id', 'is', null)
-      .contains('workflow_steps.assigned_user_ids', [user.id])
+      .from('claims_pending_approval')
+      .select('*')
       .order('created_at', { ascending: false });
 
     if (error) {
       console.error('[API Claims Pending Approval GET] Error fetching pending claims:', error);
       return handleApiError(error, 'Failed to fetch pending claims');
     }
+    
+    console.log('[API Claims Pending Approval GET] Total pending claims:', pendingClaims?.length || 0);
 
-    // Process the data to flatten nested relationships
-    const processedData = (pendingClaims || []).map(claim => ({
-      ...claim,
-      workflow_name: claim.workflows?.name || null,
-      current_step_name: claim.workflow_steps?.name || null,
-      current_step_role: claim.workflow_steps?.role || null,
-      creator_name: claim.profiles?.full_name || null,
-      entity_name: claim.level === 'brand' ? claim.master_claim_brands?.name :
-                   claim.level === 'product' ? claim.products?.name :
-                   claim.level === 'ingredient' ? claim.ingredients?.name : null,
-      // Clean up nested objects
-      workflows: undefined,
-      workflow_steps: undefined,
-      profiles: undefined,
-      master_claim_brands: undefined,
-      products: undefined,
-      ingredients: undefined
-    }));
-
-    return NextResponse.json({ success: true, data: processedData });
+    // The view already provides flattened data, so we can return it directly
+    // Include the current user ID so frontend can determine which claims they can approve
+    return NextResponse.json({ 
+      success: true, 
+      data: pendingClaims || [],
+      currentUserId: user.id 
+    });
 
   } catch (error: unknown) {
     console.error('[API Claims Pending Approval GET] Caught error:', error);

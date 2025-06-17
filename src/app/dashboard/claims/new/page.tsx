@@ -81,7 +81,7 @@ export default function NewClaimPage() {
           fetch('/api/products').then(res => res.json()),
           fetch('/api/ingredients').then(res => res.json()),
           fetch('/api/countries').then(res => res.json()),
-          fetch('/api/workflows').then(res => res.json()),
+          fetch('/api/claims/workflows').then(res => res.json()),
         ]);
 
         if (brandsRes.status === 'fulfilled' && brandsRes.value.success) setMasterBrands(brandsRes.value.data || []);
@@ -194,7 +194,7 @@ export default function NewClaimPage() {
   const isEntityLoading = isLoadingBrands || isLoadingProducts || isLoadingIngredients;
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
       <div className="mb-4">
         <Button variant="outline" size="sm" asChild>
           <Link href="/dashboard/claims"><ArrowLeft className="mr-2 h-4 w-4" />Back to Claims</Link>
@@ -210,130 +210,144 @@ export default function NewClaimPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Claim Text */}
-            <div className="space-y-2">
-              <Label htmlFor="claim_text">Claim Text <span className="text-red-500">*</span></Label>
-              <Textarea id="claim_text" name="claim_text" value={formData.claim_text} onChange={handleInputChange} placeholder="e.g., Clinically proven to boost immunity" rows={3} className={errors.claim_text ? "border-red-500" : ""}/>
-              {errors.claim_text && <p className="text-xs text-red-500 mt-1">{errors.claim_text}</p>}
+            <div className="grid grid-cols-12 gap-4">
+              <Label htmlFor="claim_text" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Claim Text <span className="text-red-500">*</span></Label>
+              <div className="col-span-12 sm:col-span-9">
+                <Textarea id="claim_text" name="claim_text" value={formData.claim_text} onChange={handleInputChange} placeholder="e.g., Clinically proven to boost immunity" rows={3} className={errors.claim_text ? "border-red-500" : ""}/>
+                {errors.claim_text && <p className="text-xs text-red-500 mt-1">{errors.claim_text}</p>}
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Claim Type */}
-              <div className="space-y-2">
-                <Label htmlFor="claim_type">Claim Type <span className="text-red-500">*</span></Label>
-                <Select name="claim_type" value={formData.claim_type} onValueChange={(value) => handleSelectChange('claim_type', value)} >
-                  <SelectTrigger className={errors.claim_type ? "border-red-500" : ""}><SelectValue placeholder="Select claim type" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="allowed">Allowed</SelectItem>
-                    <SelectItem value="disallowed">Disallowed</SelectItem>
-                    <SelectItem value="mandatory">Mandatory</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.claim_type && <p className="text-xs text-red-500 mt-1">{errors.claim_type}</p>}
-              </div>
-
-              {/* Claim Level */}
-              <div className="space-y-2">
-                <Label htmlFor="level">Claim Level <span className="text-red-500">*</span></Label>
-                <Select name="level" value={formData.level} onValueChange={(value) => handleSelectChange('level', value)}>
-                  <SelectTrigger className={errors.level ? "border-red-500" : ""}><SelectValue placeholder="Select claim level" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="brand">Brand</SelectItem>
-                    <SelectItem value="product">Product</SelectItem>
-                    <SelectItem value="ingredient">Ingredient</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.level && <p className="text-xs text-red-500 mt-1">{errors.level}</p>}
-              </div>
-              
-              {/* Country Code */}
-              <div className="space-y-2">
-                <Label htmlFor="country_code">Country <span className="text-red-500">*</span></Label>
-                <Select name="country_code" value={formData.country_code} onValueChange={(value) => handleSelectChange('country_code', value)} disabled={isLoadingCountries}>
-                    <SelectTrigger className={errors.country_code ? "border-red-500" : ""}><SelectValue placeholder={isLoadingCountries ? "Loading countries..." : "Select country"} /></SelectTrigger>
-                    <SelectContent className="max-h-60">
-                        <SelectItem value={ALL_COUNTRIES_CODE}><span className="truncate">{ALL_COUNTRIES_NAME}</span></SelectItem>
-                        {availableCountries.map(country => (
-                            <SelectItem key={country.code} value={country.code}><span className="truncate">{country.name} ({country.code})</span></SelectItem>
-                        ))}
+            <div className="grid grid-cols-12 gap-4">
+              <Label htmlFor="claim_type" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Claim Type <span className="text-red-500">*</span></Label>
+              <div className="col-span-12 sm:col-span-9 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Select name="claim_type" value={formData.claim_type} onValueChange={(value) => handleSelectChange('claim_type', value)} >
+                    <SelectTrigger className={errors.claim_type ? "border-red-500" : ""}><SelectValue placeholder="Select claim type" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="allowed">Allowed</SelectItem>
+                      <SelectItem value="disallowed">Disallowed</SelectItem>
+                      <SelectItem value="mandatory">Mandatory</SelectItem>
                     </SelectContent>
-                </Select>
-                {errors.country_code && <p className="text-xs text-red-500 mt-1">{errors.country_code}</p>}
+                  </Select>
+                  {errors.claim_type && <p className="text-xs text-red-500 mt-1">{errors.claim_type}</p>}
+                </div>
+
+                <div>
+                  <Select name="level" value={formData.level} onValueChange={(value) => handleSelectChange('level', value)}>
+                    <SelectTrigger className={errors.level ? "border-red-500" : ""}><SelectValue placeholder="Select claim level" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="brand">Brand</SelectItem>
+                      <SelectItem value="product">Product</SelectItem>
+                      <SelectItem value="ingredient">Ingredient</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.level && <p className="text-xs text-red-500 mt-1">{errors.level}</p>}
+                </div>
+                
+                <div>
+                  <Select name="country_code" value={formData.country_code} onValueChange={(value) => handleSelectChange('country_code', value)} disabled={isLoadingCountries}>
+                      <SelectTrigger className={errors.country_code ? "border-red-500" : ""}><SelectValue placeholder={isLoadingCountries ? "Loading countries..." : "Select country"} /></SelectTrigger>
+                      <SelectContent className="max-h-60">
+                          <SelectItem value={ALL_COUNTRIES_CODE}><span className="truncate">{ALL_COUNTRIES_NAME}</span></SelectItem>
+                          {availableCountries.map(country => (
+                              <SelectItem key={country.code} value={country.code}><span className="truncate">{country.name} ({country.code})</span></SelectItem>
+                          ))}
+                      </SelectContent>
+                  </Select>
+                  {errors.country_code && <p className="text-xs text-red-500 mt-1">{errors.country_code}</p>}
+                </div>
               </div>
             </div>
 
             {/* Dynamic Entity Selector based on Level */} 
             {formData.level === 'brand' && (
-              <div className="space-y-2">
-                <Label htmlFor="master_brand_id">Master Claim Brand <span className="text-red-500">*</span></Label>
-                <Select name="master_brand_id" value={formData.master_brand_id || ""} onValueChange={(value) => handleSelectChange('master_brand_id', value)} disabled={isLoadingBrands}>
-                  <SelectTrigger className={errors.master_brand_id ? "border-red-500" : ""}>
-                    <SelectValue placeholder={isLoadingBrands ? "Loading brands..." : "Select master brand"} />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {masterBrands.map(brand => (
-                      <SelectItem key={brand.id} value={brand.id}><span className="truncate">{brand.name}</span></SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.master_brand_id && <p className="text-xs text-red-500 mt-1">{errors.master_brand_id}</p>}
+              <div className="grid grid-cols-12 gap-4">
+                <Label htmlFor="master_brand_id" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Master Claim Brand <span className="text-red-500">*</span></Label>
+                <div className="col-span-12 sm:col-span-9">
+                  <Select name="master_brand_id" value={formData.master_brand_id || ""} onValueChange={(value) => handleSelectChange('master_brand_id', value)} disabled={isLoadingBrands}>
+                    <SelectTrigger className={errors.master_brand_id ? "border-red-500" : ""}>
+                      <SelectValue placeholder={isLoadingBrands ? "Loading brands..." : "Select master brand"} />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {masterBrands.map(brand => (
+                        <SelectItem key={brand.id} value={brand.id}><span className="truncate">{brand.name}</span></SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.master_brand_id && <p className="text-xs text-red-500 mt-1">{errors.master_brand_id}</p>}
+                </div>
               </div>
             )}
             {formData.level === 'product' && (
-              <div className="space-y-2">
-                <Label htmlFor="product_id">Product <span className="text-red-500">*</span></Label>
-                <Select name="product_id" value={formData.product_id || ""} onValueChange={(value) => handleSelectChange('product_id', value)} disabled={isLoadingProducts}>
-                  <SelectTrigger className={errors.product_id ? "border-red-500" : ""}>
-                    <SelectValue placeholder={isLoadingProducts ? "Loading products..." : "Select product"} />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {products.map(product => (
-                      <SelectItem key={product.id} value={product.id}><span className="truncate">{product.name} {product.master_brand_name ? `(${product.master_brand_name})` : ""}</span></SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.product_id && <p className="text-xs text-red-500 mt-1">{errors.product_id}</p>}
+              <div className="grid grid-cols-12 gap-4">
+                <Label htmlFor="product_id" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Product <span className="text-red-500">*</span></Label>
+                <div className="col-span-12 sm:col-span-9">
+                  <Select name="product_id" value={formData.product_id || ""} onValueChange={(value) => handleSelectChange('product_id', value)} disabled={isLoadingProducts}>
+                    <SelectTrigger className={errors.product_id ? "border-red-500" : ""}>
+                      <SelectValue placeholder={isLoadingProducts ? "Loading products..." : "Select product"} />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {products.map(product => (
+                        <SelectItem key={product.id} value={product.id}><span className="truncate">{product.name} {product.master_brand_name ? `(${product.master_brand_name})` : ""}</span></SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.product_id && <p className="text-xs text-red-500 mt-1">{errors.product_id}</p>}
+                </div>
               </div>
             )}
             {formData.level === 'ingredient' && (
-              <div className="space-y-2">
-                <Label htmlFor="ingredient_id">Ingredient <span className="text-red-500">*</span></Label>
-                <Select name="ingredient_id" value={formData.ingredient_id || ""} onValueChange={(value) => handleSelectChange('ingredient_id', value)} disabled={isLoadingIngredients}>
-                  <SelectTrigger className={errors.ingredient_id ? "border-red-500" : ""}>
-                    <SelectValue placeholder={isLoadingIngredients ? "Loading ingredients..." : "Select ingredient"} />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {ingredients.map(ingredient => (
-                      <SelectItem key={ingredient.id} value={ingredient.id}><span className="truncate">{ingredient.name}</span></SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.ingredient_id && <p className="text-xs text-red-500 mt-1">{errors.ingredient_id}</p>}
+              <div className="grid grid-cols-12 gap-4">
+                <Label htmlFor="ingredient_id" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Ingredient <span className="text-red-500">*</span></Label>
+                <div className="col-span-12 sm:col-span-9">
+                  <Select name="ingredient_id" value={formData.ingredient_id || ""} onValueChange={(value) => handleSelectChange('ingredient_id', value)} disabled={isLoadingIngredients}>
+                    <SelectTrigger className={errors.ingredient_id ? "border-red-500" : ""}>
+                      <SelectValue placeholder={isLoadingIngredients ? "Loading ingredients..." : "Select ingredient"} />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {ingredients.map(ingredient => (
+                        <SelectItem key={ingredient.id} value={ingredient.id}><span className="truncate">{ingredient.name}</span></SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.ingredient_id && <p className="text-xs text-red-500 mt-1">{errors.ingredient_id}</p>}
+                </div>
               </div>
             )}
 
             {/* Description (Optional) */}
-            <div className="space-y-2">
-              <Label htmlFor="description">Description (Optional)</Label>
-              <Textarea id="description" name="description" value={formData.description || ''} onChange={handleInputChange} placeholder="Provide additional context or notes for this claim" rows={3}/>
+            <div className="grid grid-cols-12 gap-4">
+              <Label htmlFor="description" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Description (Optional)</Label>
+              <div className="col-span-12 sm:col-span-9">
+                <Textarea id="description" name="description" value={formData.description || ''} onChange={handleInputChange} placeholder="Provide additional context or notes for this claim" rows={3}/>
+              </div>
             </div>
 
             {/* Workflow (Optional) */}
-            <div className="space-y-2">
-              <Label htmlFor="workflow_id">Approval Workflow (Optional)</Label>
-              <Select name="workflow_id" value={formData.workflow_id || ""} onValueChange={(value) => handleSelectChange('workflow_id', value)} disabled={isLoadingWorkflows}>
-                <SelectTrigger>
-                  <SelectValue placeholder={isLoadingWorkflows ? "Loading workflows..." : "Select workflow (optional)"} />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  <SelectItem value="">No workflow</SelectItem>
-                  {workflows.map(workflow => (
-                    <SelectItem key={workflow.id} value={workflow.id}>
-                      <span className="truncate">{workflow.name} {workflow.brand_name ? `(${workflow.brand_name})` : ""}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">Choose a workflow if this claim requires approval before use.</p>
+            <div className="grid grid-cols-12 gap-4">
+              <Label htmlFor="workflow_id" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Approval Workflow (Optional)</Label>
+              <div className="col-span-12 sm:col-span-9">
+                <Select name="workflow_id" value={formData.workflow_id || ""} onValueChange={(value) => handleSelectChange('workflow_id', value)} disabled={isLoadingWorkflows}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={isLoadingWorkflows ? "Loading workflows..." : "Select workflow (optional)"} />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    <SelectItem value="">No workflow</SelectItem>
+                    {workflows.map(workflow => (
+                      <SelectItem key={workflow.id} value={workflow.id}>
+                        <span className="truncate">{workflow.name} {workflow.brand_name ? `(${workflow.brand_name})` : ""}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Choose a workflow if this claim requires approval before use.
+                  {workflows.length === 0 && !isLoadingWorkflows && (
+                    <> <Link href="/dashboard/claims/workflows/new" className="text-primary hover:underline">Create a claims workflow</Link> to enable approval processes.</>
+                  )}
+                </p>
+              </div>
             </div>
 
           </CardContent>

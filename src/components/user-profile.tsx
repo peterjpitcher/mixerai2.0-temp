@@ -53,7 +53,7 @@ export function UserProfile({ user, isCurrentUser = false, canEdit = false, onUs
     if (!dateString) return 'Never';
     try {
       const date = new Date(dateString);
-      return formatDateFns(date, 'dd MMM yyyy, HH:mm');
+      return formatDateFns(date, 'MMM d, yyyy, HH:mm');
     } catch (error) {
       console.error('Error formatting date:', dateString, error);
       return 'Invalid Date';
