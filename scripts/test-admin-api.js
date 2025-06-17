@@ -171,9 +171,9 @@ async function main() {
     console.log('Issues with the Supabase admin API were detected.');
     console.log('To fix this:');
     console.log('1. Verify your SUPABASE_SERVICE_ROLE_KEY is correct in .env');
-    console.log('2. Check for database-related issues using migrations/diagnose-invitation-system.sql');
+    console.log('2. Check for database-related issues using supabase/migrations/diagnose-invitation-system.sql');
     console.log('3. If trigger issues persist, check if on_auth_user_created is correctly set up');
-    console.log('4. Consider running migrations/fix-invitation-system-modified.sql again');
+    console.log('4. Consider running supabase/migrations/fix-invitation-system-modified.sql again');
   }
 }
 
