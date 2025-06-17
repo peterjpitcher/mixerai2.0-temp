@@ -134,7 +134,7 @@ If users don't have a profile record (which stores the full name and avatar URL)
 
 ```bash
 # Run the migration to create profiles for existing users
-psql $DATABASE_URL < migrations/20241217_create_missing_profiles.sql
+psql $DATABASE_URL < supabase/migrations/20241217_create_missing_profiles.sql
 ```
 
 This migration will:
