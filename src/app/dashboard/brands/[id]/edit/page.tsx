@@ -19,6 +19,7 @@ import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import { apiClient } from '@/lib/api-client';
 
 // export const metadata: Metadata = {
 //   title: 'Edit Brand | MixerAI 2.0',
@@ -424,11 +425,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       console.log('Updating brand with payload:', payload);
       console.log('Logo URL in payload:', payload.logo_url);
       
-      const response = await fetch(`/api/brands/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const response = await apiClient.put(`/api/brands/${id}`, payload);
       const data = await response.json();
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to update brand');
