@@ -8,7 +8,7 @@ import { CreateContentDropdown } from '@/components/content/create-content-dropd
 // import { } from '@/components/ui/card'; // Removed - empty import
 import { Input } from '@/components/ui/input';
 import { toast as sonnerToast } from "sonner";
-import { format as formatDateFns } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
 import { useDebounce } from '@/lib/hooks/use-debounce';
 import { useSearchParams } from 'next/navigation';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -215,12 +215,6 @@ export default function ContentPageClient() {
     fetchActiveBrand();
   }, [brandIdFromParams]);
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    try { 
-      return formatDateFns(new Date(dateString), 'MMMM d, yyyy'); 
-    }
-    catch (e) { console.error('Error formatting date:', dateString, e); return 'Invalid Date'; }
   };
 
   const groupedContent = useMemo(() => {

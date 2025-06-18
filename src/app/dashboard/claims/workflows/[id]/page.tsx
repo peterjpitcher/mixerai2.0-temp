@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import { formatDateTime } from '@/lib/utils/date';
 import { 
   Loader2, 
   Edit, 
@@ -232,25 +233,13 @@ export default function ClaimWorkflowDetailPage() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Created</p>
                 <p className="text-sm">
-                  {new Date(workflow.created_at).toLocaleDateString('en-US', {
-                    month: 'long',
-                    day: 'numeric',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
+                  {formatDateTime(workflow.created_at)}
                 </p>
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Last Updated</p>
                 <p className="text-sm">
-                  {new Date(workflow.updated_at).toLocaleDateString('en-US', {
-                    month: 'long',
-                    day: 'numeric',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
+                  {formatDateTime(workflow.updated_at)}
                 </p>
               </div>
               {workflow.claims_count !== undefined && (

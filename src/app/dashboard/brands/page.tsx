@@ -8,7 +8,7 @@ import { BrandIcon } from "@/components/brand-icon";
 import { COUNTRIES, LANGUAGES } from "@/lib/constants";
 import { PackageOpen, AlertTriangle, Eye, Edit, Trash2, Plus, MoreVertical } from "lucide-react";
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { DeleteBrandDialog } from "@/components/dashboard/brand/delete-brand-dialog";
 import { Badge } from '@/components/ui/badge';
@@ -145,7 +145,7 @@ export default function BrandsPage() {
       header: "Last updated",
       cell: ({ row }) => (
         <span className="text-sm text-muted-foreground">
-          {row.updated_at ? format(new Date(row.updated_at), 'MMMM d, yyyy') : row.created_at ? format(new Date(row.created_at), 'MMMM d, yyyy') : 'N/A'}
+          {row.updated_at ? formatDate(row.updated_at) : row.created_at ? formatDate(row.created_at) : 'N/A'}
         </span>
       ),
       enableSorting: true,

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -220,8 +220,8 @@ export default function IngredientsPage() {
                           {ingredient.name}
                         </Link>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{ingredient.created_at ? format(new Date(ingredient.created_at), 'MMMM d, yyyy') : '-'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{ingredient.updated_at ? format(new Date(ingredient.updated_at), 'MMMM d, yyyy') : '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{ingredient.created_at ? formatDate(ingredient.created_at) : '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{ingredient.updated_at ? formatDate(ingredient.updated_at) : '-'}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

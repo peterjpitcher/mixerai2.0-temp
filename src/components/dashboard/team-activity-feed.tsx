@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
 import { FilePlus, Send, CheckCircle, Edit3, UserPlus, Milestone } from 'lucide-react';
 
 export type ActivityType =
@@ -107,7 +107,7 @@ export function TeamActivityFeed({ initialActivity, condensed = false }: { initi
                       {getActivityMessage(item)}
                     </div>
                     <time className={condensed ? "text-[10px] text-muted-foreground" : "text-xs text-muted-foreground"}>
-                      {format(new Date(item.created_at), 'MMMM d, yyyy')}
+                      {formatDate(item.created_at)}
                     </time>
                   </div>
                 </div>

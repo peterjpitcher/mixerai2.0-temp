@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ClaimDefinitionForm, ClaimDefinitionData } from '@/components/dashboard/claims/ClaimDefinitionForm';
+import { ClaimDefinitionFormV2, ClaimDefinitionData } from '@/components/dashboard/claims/ClaimDefinitionFormV2';
 import { toast } from 'sonner';
+import { Breadcrumbs } from '@/components/ui/breadcrumbs';
+import { PageHeader } from '@/components/dashboard/page-header';
 
 export default function DefineClaimsPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -36,15 +38,19 @@ export default function DefineClaimsPage() {
   };
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Define New Claim</h1>
-        <p className="text-muted-foreground mt-2">
-          Create Master and Market-specific claims.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Claims", href: "/dashboard/claims" },
+        { label: "Define New Claim" }
+      ]} />
       
-      <ClaimDefinitionForm 
+      <PageHeader
+        title="Define New Claim"
+        description="Create claims that can be used across your products and markets. Follow the guided steps to ensure all required information is provided."
+      />
+      
+      <ClaimDefinitionFormV2 
         onSubmit={handleFormSubmit} 
         isLoading={isLoading}
       />

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, AlertTriangle, WorkflowIcon, Loader2, Eye, Edit, Trash2, MoreVertical } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -139,7 +139,7 @@ export default function ClaimsWorkflowsPage() {
       header: "Modified",
       cell: ({ row }) => (
         <span className="text-sm text-muted-foreground">
-          {format(new Date(row.updated_at || row.created_at), 'MMMM d, yyyy')}
+          {formatDate(row.updated_at || row.created_at)}
         </span>
       ),
       enableSorting: true,

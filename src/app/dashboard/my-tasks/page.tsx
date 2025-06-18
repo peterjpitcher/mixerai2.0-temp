@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Edit, AlertCircle, ListChecks, Loader2, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { createSupabaseClient } from '@/lib/supabase/client';
-import { format as formatDateFns } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
 import { BrandIcon } from '@/components/brand-icon';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
@@ -81,15 +81,6 @@ export default function MyTasksPage() {
     initializePage();
   }, []); // Dependency array is empty, runs once on mount
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'N/A';
-    try {
-      return formatDateFns(new Date(dateString), 'MMMM d, yyyy'); 
-    } catch (e) {
-      console.error("Error formatting date:", dateString, e);
-      return "Invalid Date";
-    }
-  };
 
   if (isLoading) {
     return (

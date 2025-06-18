@@ -1,9 +1,9 @@
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
 
 export default function ReleaseNotesPage() {
-  const currentDate = format(new Date(), 'MMMM d, yyyy');
+  const currentDate = formatDate(new Date());
 
   return (
     <div className="space-y-6">

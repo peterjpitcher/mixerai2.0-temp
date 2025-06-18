@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -266,8 +266,8 @@ export default function ProductsPage() {
                           {product.master_brand_name || 'N/A'}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{product.created_at ? format(new Date(product.created_at), 'MMMM d, yyyy') : "-"}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{product.updated_at ? format(new Date(product.updated_at), 'MMMM d, yyyy') : "-"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{product.created_at ? formatDate(product.created_at) : "-"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{product.updated_at ? formatDate(product.updated_at) : "-"}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

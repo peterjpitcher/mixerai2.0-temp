@@ -8,7 +8,6 @@ import { MostAgedContent } from '@/components/dashboard/most-aged-content';
 import { TasksSkeleton } from '@/components/dashboard/dashboard-skeleton';
 import { MyTasks } from '@/components/dashboard/my-tasks';
 import { DashboardMetrics } from '@/components/dashboard/dashboard-metrics';
-import { JumpBackIn } from '@/components/dashboard/jump-back-in';
 import { StatCard } from '@/components/dashboard/stat-card';
 import { FileText, BarChart3, Clock, CheckCircle2 } from 'lucide-react';
 
@@ -160,39 +159,6 @@ async function getDashboardMetrics(supabase: SupabaseClient<Database>, profile: 
   }
 }
 
-async function getRecentItems(supabase: SupabaseClient<Database>, profile: { role?: string; assigned_brands?: string[] } | null) {
-  if (!profile) return [];
-  
-  // Get the current user
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-
-  let query = supabase
-    .from('content')
-    .select('id, title, updated_at, brands ( name )')
-    // @ts-ignore - Type issue with Supabase
-    .eq('created_by', user.id)
-    .order('updated_at', { ascending: false })
-    .limit(5);
-
-  if (profile.role !== 'admin' && profile.assigned_brands && profile.assigned_brands.length > 0) {
-    // @ts-ignore - Type issue with Supabase query builder
-    query = query.in('brand_id', profile.assigned_brands);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error('Error fetching recent items:', error);
-    return [];
-  }
-
-  return (data || []).filter((item) => item.updated_at !== null).map((item) => ({
-    ...item,
-    updated_at: item.updated_at!
-  }));
-}
-
 export default async function DashboardPage() {
   const supabase = createSupabaseServerClient();
   const profile = await getProfileWithAssignedBrands(supabase as any);
@@ -215,13 +181,11 @@ export default async function DashboardPage() {
   const [
     teamActivity,
     mostAgedContent,
-    metrics,
-    recentItems
+    metrics
   ] = await Promise.all([
     getTeamActivity(supabase, profile),
     getMostAgedContent(supabase, profile),
-    getDashboardMetrics(supabase, profile),
-    getRecentItems(supabase, profile)
+    getDashboardMetrics(supabase, profile)
   ]);
 
   return (
@@ -289,15 +253,6 @@ export default async function DashboardPage() {
               />
             </div>
           </div>
-
-          {/* Jump Back In Section */}
-          {recentItems.length > 0 && (
-            <div>
-              <Suspense fallback={<TasksSkeleton />}>
-                <JumpBackIn items={recentItems} />
-              </Suspense>
-            </div>
-          )}
 
           {/* My Tasks */}
           <Suspense fallback={<TasksSkeleton />}>

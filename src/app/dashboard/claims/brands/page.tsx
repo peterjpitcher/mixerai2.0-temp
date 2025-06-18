@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -220,8 +220,8 @@ export default function MasterClaimBrandsPage() {
                           {brand.name}
                         </Link>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{brand.created_at ? format(new Date(brand.created_at), 'MMMM d, yyyy') : '-'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{brand.updated_at ? format(new Date(brand.updated_at), 'MMMM d, yyyy') : '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{brand.created_at ? formatDate(brand.created_at) : '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{brand.updated_at ? formatDate(brand.updated_at) : '-'}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

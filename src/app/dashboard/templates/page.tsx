@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Loader2, PlusCircle, LayoutTemplate, ShieldAlert, Copy, Eye, Edit, Trash2, MoreVertical, Pencil } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
 import type { InputField, OutputField } from '@/types/template';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import {
@@ -283,7 +283,7 @@ export default function TemplatesPage() {
       header: "Last updated",
       cell: ({ row }) => (
         <span className="text-sm text-muted-foreground">
-          {row.updated_at ? format(new Date(row.updated_at), 'MMMM d, yyyy') : row.created_at ? format(new Date(row.created_at), 'MMMM d, yyyy') : 'N/A'}
+          {row.updated_at ? formatDate(row.updated_at) : row.created_at ? formatDate(row.created_at) : 'N/A'}
         </span>
       ),
       enableSorting: true,

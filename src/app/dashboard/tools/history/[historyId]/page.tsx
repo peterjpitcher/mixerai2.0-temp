@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertTriangle, ArrowLeft, Info, FileText, PlayCircle, CheckCircle2, XCircle, Eye, EyeOff } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatDateTime } from '@/lib/utils/date';
 import { Table, TableHeader, TableRow, TableCell, TableBody, TableHead } from "@/components/ui/table";
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -903,7 +903,7 @@ export default function ToolRunHistoryDetailPage() {
             {formatToolName(historyItem.tool_name)} - Run Overview
           </CardTitle>
           <CardDescription>
-            Run executed on {format(new Date(historyItem.run_at), 'MMMM d, yyyy, HH:mm')}
+            Run executed on {formatDateTime(historyItem.run_at)}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
