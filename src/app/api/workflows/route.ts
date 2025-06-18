@@ -78,7 +78,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         created_at,
         updated_at,
         template_id,
-        brands:brand_id ( name, brand_color ),
+        brands:brand_id ( name, brand_color, logo_url ),
         content_templates:template_id ( name ),
         content ( count ),
         workflow_steps ( count )
@@ -110,7 +110,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     if (error) throw error;
     
     const formattedWorkflows = workflows.map((workflow: Record<string, unknown>) => {
-      const brands = workflow.brands as { name?: string; brand_color?: string } | undefined;
+      const brands = workflow.brands as { name?: string; brand_color?: string; logo_url?: string | null } | undefined;
       const content_templates = workflow.content_templates as { name?: string } | undefined;
       const workflow_steps = workflow.workflow_steps as Array<{ count?: number }> | undefined;
       const content = workflow.content as Array<{ count?: number }> | undefined;
@@ -121,6 +121,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         brand_id: workflow.brand_id,
         brand_name: brands?.name || null,
         brand_color: brands?.brand_color || null,
+        brand_logo_url: brands?.logo_url || null,
         template_id: workflow.template_id,
         template_name: content_templates?.name || null,
         steps_count: workflow_steps && workflow_steps.length > 0 ? workflow_steps[0].count : 0,
@@ -268,6 +269,17 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     }
     
     const rawSteps = body.steps || [];
+    
+    // Validate that each step has at least one assignee
+    for (let i = 0; i < rawSteps.length; i++) {
+      const step = rawSteps[i];
+      if (!step.assignees || !Array.isArray(step.assignees) || step.assignees.length === 0) {
+        return NextResponse.json(
+          { success: false, error: `Step "${step.name || `Step ${i + 1}`}" must have at least one assignee` },
+          { status: 400 }
+        );
+      }
+    }
     
     const processedStepsForRPC: WorkflowStepData[] = [];
     const invitationItems: RpcInvitationItem[] = []; 

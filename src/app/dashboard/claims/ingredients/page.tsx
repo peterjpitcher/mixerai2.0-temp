@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { format } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,17 +24,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trash2, PlusCircle, Search, AlertTriangle, Loader2, Sprout, Pencil } from "lucide-react";
+import { Trash2, PlusCircle, Search, AlertTriangle, Loader2, Sprout, Pencil, MoreVertical } from "lucide-react";
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
 import {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DropdownMenu,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DropdownMenuContent,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DropdownMenuItem,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -119,8 +116,7 @@ export default function IngredientsPage() {
   };
 
   const filteredIngredients = ingredients.filter(ingredient =>
-    ingredient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (ingredient.description && ingredient.description.toLowerCase().includes(searchTerm.toLowerCase()))
+    ingredient.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const ErrorState = () => (
@@ -159,7 +155,7 @@ export default function IngredientsPage() {
   );
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Manage Ingredients"
         description="View, add, edit, and delete ingredients for product composition."
@@ -177,7 +173,7 @@ export default function IngredientsPage() {
           <div className="relative w-full max-w-md">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name or description..."
+              placeholder="Search by name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9"
@@ -209,8 +205,7 @@ export default function IngredientsPage() {
               </TableCaption>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[200px]">Ingredient Name</TableHead>
-                  <TableHead>Description</TableHead>
+                  <TableHead className="w-[300px]">Ingredient Name</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Updated</TableHead>
                   <TableHead className="text-right w-[120px]">Actions</TableHead>
@@ -225,27 +220,27 @@ export default function IngredientsPage() {
                           {ingredient.name}
                         </Link>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-xs truncate" title={ingredient.description || ''}>
-                        {ingredient.description || "-"}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{ingredient.created_at ? new Date(ingredient.created_at).toLocaleDateString() : '-'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{ingredient.updated_at ? new Date(ingredient.updated_at).toLocaleDateString() : '-'}</TableCell>
-                      <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="icon" asChild title="Edit Ingredient" aria-label="Edit Ingredient">
-                          <Link href={`/dashboard/claims/ingredients/${ingredient.id}/edit`} >
-                            <Pencil className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          title="Delete Ingredient"
-                          aria-label="Delete Ingredient"
-                          onClick={() => openDeleteDialog(ingredient)}
-                          // disabled={isDeleting && itemToDelete?.id === ingredient.id} 
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                      <TableCell className="text-sm text-muted-foreground">{ingredient.created_at ? format(new Date(ingredient.created_at), 'MMMM d, yyyy') : '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{ingredient.updated_at ? format(new Date(ingredient.updated_at), 'MMMM d, yyyy') : '-'}</TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/dashboard/claims/ingredients/${ingredient.id}/edit`}>
+                                <Pencil className="mr-2 h-4 w-4" /> Edit
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openDeleteDialog(ingredient)} className="text-destructive">
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))

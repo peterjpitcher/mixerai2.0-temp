@@ -45,7 +45,7 @@ export function BrandDetailsClient({ brand, canEditBrand }: { brand: Brand, canE
   ];
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className="space-y-6">
       <Breadcrumbs items={breadcrumbItems} />
       <PageHeader 
         title={brand.name}

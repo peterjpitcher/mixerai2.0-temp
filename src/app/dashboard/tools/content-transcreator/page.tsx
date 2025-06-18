@@ -59,6 +59,7 @@ interface Brand {
   language: string; // Expecting language from brand data
   country: string;  // Expecting country from brand data
   color?: string;
+  logo_url?: string | null;
 }
 
 // Define ToolRunHistoryItem interface
@@ -344,7 +345,7 @@ export default function ContentTransCreatorPage() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6">
+    <div className="space-y-6">
       <Breadcrumbs 
         items={[
           { label: 'Dashboard', href: '/dashboard' },
@@ -406,7 +407,7 @@ export default function ContentTransCreatorPage() {
                           {brands.map(brand => (
                             <SelectItem key={brand.id} value={brand.id}>
                               <div className="flex items-center">
-                                <BrandIcon name={brand.name} color={brand.color} className="mr-2 h-4 w-4" />
+                                <BrandIcon name={brand.name} color={brand.color} logoUrl={brand.logo_url} className="mr-2 h-4 w-4" />
                                 {brand.name} ({brand.language?.toUpperCase()}-{brand.country?.toUpperCase()})
                               </div>
                             </SelectItem>
@@ -459,7 +460,42 @@ export default function ContentTransCreatorPage() {
                   Content successfully trans-created for {selectedBrandDetails?.name} ({results.targetLanguage.toUpperCase()}-{results.targetCountry.toUpperCase()}).
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {/* Summary Statistics */}
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Source:</span>
+                      <p className="font-semibold">{sourceLanguage.toUpperCase()}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Target:</span>
+                      <p className="font-semibold">{results.targetLanguage.toUpperCase()}-{results.targetCountry.toUpperCase()}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Original:</span>
+                      <p className="font-semibold">{content.trim().split(/\s+/).length} words</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Trans-created:</span>
+                      <p className="font-semibold">{results.transCreatedContent.trim().split(/\s+/).length} words</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 pt-2 border-t">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Length Change:</span>
+                      <Badge variant={
+                        Math.abs(((results.transCreatedContent.length - content.length) / content.length) * 100) > 20 
+                          ? "outline" 
+                          : "secondary"
+                      }>
+                        {results.transCreatedContent.length > content.length ? '+' : ''}
+                        {Math.round(((results.transCreatedContent.length - content.length) / content.length) * 100)}%
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+                
                 <Textarea value={results.transCreatedContent} readOnly rows={10} className="min-h-[200px]" />
               </CardContent>
               <CardFooter>
@@ -510,7 +546,7 @@ export default function ContentTransCreatorPage() {
                   <TableBody>
                     {runHistory.map((run) => (
                       <TableRow key={run.id}>
-                        <TableCell>{format(new Date(run.run_at), 'dd MMMM yyyy, HH:mm')}</TableCell>
+                        <TableCell>{format(new Date(run.run_at), 'MMMM d, yyyy, HH:mm')}</TableCell>
                         <TableCell>
                           <Badge variant={run.status === 'success' ? 'default' : 'destructive'}>
                             {run.status}

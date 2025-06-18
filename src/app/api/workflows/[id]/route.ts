@@ -56,7 +56,7 @@ export const GET = withAuth(async (
       .from('workflows')
       .select(`
         *,
-        brands:brand_id(name, brand_color),
+        brands:brand_id(name, brand_color, logo_url),
         content_templates:template_id(name)
       `)
       .eq('id', workflowId)
@@ -172,6 +172,7 @@ export const GET = withAuth(async (
       brand_id: workflowData.brand_id,
       brand_name: workflowData.brands?.name || null,
       brand_color: workflowData.brands?.brand_color || null,
+      brand_logo_url: workflowData.brands?.logo_url || null,
       template_id: (workflowData as Record<string, unknown>).template_id || null, 
       status: (workflowData as Record<string, unknown>).status || null, 
       steps: processedSteps, 
@@ -330,6 +331,18 @@ export const PUT = withAuth(async (
     }
     
     const stepsFromClient = body.steps || [];
+    
+    // Validate that each step has at least one assignee
+    for (let i = 0; i < stepsFromClient.length; i++) {
+      const step = stepsFromClient[i];
+      if (!step.assignees || !Array.isArray(step.assignees) || step.assignees.length === 0) {
+        return NextResponse.json(
+          { success: false, error: `Step "${step.name || `Step ${i + 1}`}" must have at least one assignee` },
+          { status: 400 }
+        );
+      }
+    }
+    
     const processedStepsForRpc: Record<string, unknown>[] = [];
     
     // Ensure step_order is present, using array index as a fallback
@@ -388,11 +401,11 @@ export const PUT = withAuth(async (
 
     const paramsToPass = {
       p_workflow_id: workflowId,
-      p_name: String(body.name || ''),
-      p_brand_id: String(body.brand_id || ''),
+      p_name: body.name || null,
+      p_brand_id: body.brand_id || null,
       p_steps: processedStepsForRpc as Json, // Cast to Json type
-      p_template_id: body.template_id ? String(body.template_id) : '',
-      p_description: String(body.description ?? workflowDescriptionToUpdate ?? ''),
+      p_template_id: body.template_id || null,
+      p_description: body.description ?? workflowDescriptionToUpdate ?? null,
       p_new_invitation_items: newInvitationItemsForRpc as Json // Cast to Json type
     };
 
@@ -416,10 +429,14 @@ export const PUT = withAuth(async (
     // Additionally, if your RPC is designed to return `false` on logical failure (handled exception):
     if (rpcData === false) {
       console.error(`[API Workflows PUT /${workflowId}] RPC update_workflow_and_handle_invites returned false, indicating a handled error within the RPC.`);
+      
+      // Try to get more information about the error
+      console.error('Full RPC response:', { rpcData, rpcError });
+      
       return NextResponse.json(
         { 
           success: false, 
-          error: 'Workflow update failed due to a handled error within the update process.'
+          error: 'Workflow update failed. Please check the workflow data and try again.'
         },
         { status: 500 } 
       );

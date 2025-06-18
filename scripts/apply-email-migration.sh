@@ -57,7 +57,7 @@ echo "3. Create a trigger to keep it in sync when users update their email"
 echo "============================================================="
 
 # Run the migration
-psql -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -U "$DB_USER" -f migrations/add_email_to_profiles.sql
+psql -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -U "$DB_USER" -f supabase/migrations/20240125_add_email_to_profiles.sql
 
 # Check if migration was successful
 if [ $? -eq 0 ]; then

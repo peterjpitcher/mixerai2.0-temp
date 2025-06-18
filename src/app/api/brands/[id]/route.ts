@@ -64,6 +64,9 @@ export const GET = withAuth(async (
       throw rpcError;
     }
 
+    console.log('[API Brands GET] Brand details from RPC:', brandDetails);
+    console.log('[API Brands GET] Logo URL from RPC:', (brandDetails as Record<string, unknown>)?.logo_url);
+
     if (!brandDetails) {
       return NextResponse.json(
         { success: false, error: 'Brand not found' },
@@ -126,6 +129,8 @@ export const PUT = withAuth(async (
     }
 
     const body = await request.json();
+    console.log(`[API PUT /brands/${brandIdToUpdate}] Received body:`, body);
+    console.log(`[API PUT /brands/${brandIdToUpdate}] Logo URL:`, body.logo_url);
     
     if (!body.name || body.name.trim() === '') {
       return NextResponse.json(
@@ -133,6 +138,8 @@ export const PUT = withAuth(async (
         { status: 400 }
       );
     }
+    
+    // Note: logo_url will be handled by the RPC function
     
     // Prepare parameters for the RPC call
     const rpcParams = {
@@ -158,9 +165,12 @@ export const PUT = withAuth(async (
       p_new_custom_agency_names: Array.isArray(body.new_custom_agency_names) 
         ? body.new_custom_agency_names.filter((name: unknown) => typeof name === 'string') 
         : [],
-      p_user_id: authenticatedUser.id // Pass the authenticated user's ID
+      p_user_id: authenticatedUser.id, // Pass the authenticated user's ID
+      p_logo_url: body.logo_url || null // Pass logo_url to RPC function
     };
 
+    console.log('[API Brands PUT] RPC params:', rpcParams);
+    console.log('[API Brands PUT] Logo URL in RPC params:', rpcParams.p_logo_url);
 
     const { data: updatedBrandData, error: rpcError } = await supabase.rpc(
       'update_brand_with_agencies',
@@ -203,7 +213,7 @@ export const PUT = withAuth(async (
 
     return NextResponse.json({
       success: true,
-      brand: updatedBrandData, // This should be the JSON object returned by the RPC
+      data: updatedBrandData, // Using 'data' for consistency with POST endpoint
       message: 'Brand updated successfully.',
       meta: {
         source: 'database (Supabase RPC)',

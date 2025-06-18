@@ -22,7 +22,7 @@ export default async function NewContentPage({
   const templateId = typeof searchParams.template === 'string' ? searchParams.template : undefined;
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
        <Suspense fallback={<div>Loading form...</div>}>
          <ContentGeneratorForm key={templateId || 'no-template'} templateId={templateId} />
        </Suspense>

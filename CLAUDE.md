@@ -13,7 +13,7 @@ npm run build           # Build for production (includes memory optimization)
 npm run start           # Start production server
 
 # Code Quality
-npm run lint            # Run ESLint for code quality checks
+npm run lint            # Run ESLint for code quality checks (uses .eslintrc.json)
 npm run check           # Run both ESLint and TypeScript type checking
 npm run review          # Run comprehensive code review
 npm run review:fix      # Fix linting issues and run code review
@@ -28,6 +28,7 @@ node scripts/test-azure-openai.js      # Test Azure OpenAI connectivity
 node scripts/verify-openai-integration.js # Verify OpenAI integration
 node scripts/test-db-connection.js     # Test database connectivity
 node scripts/diagnose-brand-generation.js # Diagnose brand identity generation
+node scripts/test-title-generation.js  # Test AI title generation feature
 node scripts/code-review.js            # Run comprehensive code review
 node scripts/code-review-simple.js     # Run simplified code review
 
@@ -43,6 +44,9 @@ node scripts/code-review-simple.js     # Run simplified code review
 ./scripts/analyze-bundle-sizes.sh     # Analyze build bundle sizes
 ./scripts/setup-env.sh               # Interactive environment setup
 ./scripts/setup.sh                   # Initial project setup
+node scripts/test-user-flows.js       # Test user flows and interactions
+node scripts/test-workflow-assignee-validation.js  # Test workflow assignee validation
+node scripts/check-workflows-without-assignees.js  # Check for workflows without assignees
 
 # Issue Creation Scripts (for GitHub integration)
 ./scripts/create-security-issues.sh      # Create security-related GitHub issues
@@ -78,7 +82,7 @@ MixerAI2.0/
 │   │   └── utils/                # Utility functions
 │   └── types/                    # TypeScript type definitions
 ├── docs/                         # Project documentation
-├── migrations/                   # Database migrations
+├── supabase/migrations/          # Database migrations
 ├── scripts/                      # Utility scripts
 ├── email-templates/              # HTML email templates
 └── public/                       # Static assets
@@ -117,6 +121,9 @@ MixerAI 2.0 is a Next.js 14 application using the App Router for AI-powered cont
 - **Supabase** provides PostgreSQL database and authentication
 - **Row-Level Security (RLS)** policies enforce multi-tenant data isolation
 - **User roles**: admin, editor, viewer (stored in user_metadata)
+  - **Viewer**: Read-only access to assigned brands
+  - **Editor**: Can create/edit content for assigned brands
+  - **Admin**: Platform-wide access if no brand assignments, otherwise scoped to assigned brands
 - **Brand-based permissions**: Users can have different roles per brand
 - **Profile system**: Extended user profiles linked to auth.users
 
@@ -175,6 +182,12 @@ MixerAI 2.0 is a Next.js 14 application using the App Router for AI-powered cont
 - AI-powered claim simplification and styling
 - Claim preview matrix for visualization
 - Integration with content generation prompts
+
+### AI Title Generation
+- Automatic title generation for content when not provided by user
+- Uses Azure OpenAI to create contextual, brand-appropriate titles
+- Integrated into content creation workflow
+- Test with `node scripts/test-title-generation.js`
 
 ### Environment Configuration
 Required environment variables:
@@ -251,7 +264,7 @@ Follow the established design system documented in `/docs/UI_STANDARDS.md`:
 
 ### Code Style
 - Use TypeScript for all new code
-- Follow ESLint configuration
+- Follow ESLint configuration (`.eslintrc.json` and `eslint.config.mjs`)
 - Prefer named exports over default exports
 - Use absolute imports with @ alias
 - TypeScript configured with `noImplicitAny: false` (allows implicit any)
@@ -327,17 +340,27 @@ Follow the established design system documented in `/docs/UI_STANDARDS.md`:
 - Added brand URLs and cleaned up profile metadata
 - Performance optimizations: Split ContentGeneratorForm into smaller components
 - Enhanced error handling with proper TypeScript types (replaced 'any' types)
+- Implemented claims approval workflow (Issue #126)
+- Redesigned dashboard home page (Issue #121)
+- Added workflow assignee validation as mandatory field
+- Enhanced tool run history with additional metadata
 
 ## Key Documentation References
 
 ### Core Documentation
 - `/docs/README.md` - Documentation hub with quick start guide
 - `/docs/ARCHITECTURE.md` - Detailed technical architecture
-- `/docs/UI_STANDARDS.md` - Comprehensive UI/UX standards (Version 1.0)
+- `/docs/UI_STANDARDS.md` - Comprehensive UI/UX standards (Version 2.0)
 - `/docs/api_reference.md` - Complete API endpoint documentation
 - `/docs/user_guide.md` - End-user documentation for all features
 - `/docs/database.md` - Database schema and relationships
 - `/docs/authentication.md` - Auth flow and permissions model
+- `/USER_FLOWS.md` - User flow documentation
+- `/USER_FLOW_DIAGRAMS.md` - Visual user flow diagrams
+- `/TESTING_REPORT.md` & `/TESTING_SUMMARY.md` - Testing documentation
+- `/docs/workflow-assignee-mandatory-changes.md` - Workflow assignee implementation
+- `/docs/AI_TITLE_GENERATION.md` - AI-powered title generation feature
+- `/docs/NAVIGATION_PERMISSIONS.md` - Detailed role-based navigation permissions
 
 ### Security & Operations
 - `/SECURITY.md` - Security policies and vulnerability reporting
@@ -345,7 +368,7 @@ Follow the established design system documented in `/docs/UI_STANDARDS.md`:
 - `/docs/deployment.md` - Deployment procedures and configuration
 
 ### Development Resources
-- `/migrations/` - Database migration files (format: YYYYMMDD_description.sql)
+- `/supabase/migrations/` - Database migration files (format: YYYYMMDD_description.sql)
 - `/email-templates/` - Email HTML templates for auth and notifications
 - `/.env.example` - Complete list of required environment variables
 - `/scripts/README-code-review.md` - Code review process documentation
@@ -368,14 +391,16 @@ npm run test:openai                   # Run full OpenAI integration tests
 
 ### Working with Database Migrations
 ```bash
-# Create new migration
-touch migrations/$(date +%Y%m%d)_description.sql
+# Create new migration (Supabase)
+touch supabase/migrations/$(date +%Y%m%d%H%M%S)_description.sql
 
 # Apply migrations
 ./scripts/run-migrations.sh
 
 # Reset database (caution: destroys data)
 ./scripts/reset-database.sh
+
+# Migrations are stored in /supabase/migrations/ directory
 ```
 
 ### Local Development with PostgreSQL
@@ -389,6 +414,265 @@ touch migrations/$(date +%Y%m%d)_description.sql
 # Add test user for authentication
 ./scripts/add-test-user.sh
 ```
+
+## Personalized Working Guidelines
+
+When working with this codebase, follow these specific guidelines:
+
+### 1. Database Migrations
+- **NEVER run database migrations directly**
+- Create migration files in `/supabase/migrations/` following the naming convention: `YYYYMMDD_description.sql`
+- Provide clear instructions for running migrations
+- Wait for confirmation before proceeding with code that depends on migrations
+- Example: "I've created migration `20241217_add_user_preferences.sql`. Please run `./scripts/run-migrations.sh` and let me know when complete."
+
+### 2. Pre-Commit Build Verification
+- **ALWAYS run `vercel build --prod` before committing or creating pull requests**
+- Fix all build errors and warnings until you achieve a clean build
+- Also run these checks before committing:
+  - `npm run lint` - Fix all linting issues
+  - `npm run check` - Ensure TypeScript types are correct
+  - `npm run test:openai` - Verify AI integration if AI code was modified
+- Only commit or create PRs after all checks pass cleanly
+
+### 3. Documentation Maintenance
+- Update relevant documentation immediately when making changes
+- Key documentation to maintain:
+  - `/docs/api_reference.md` - When modifying API endpoints
+  - `/docs/database.md` - When changing database schema
+  - `/docs/user_guide.md` - When adding/modifying user-facing features
+  - `/docs/ARCHITECTURE.md` - When making architectural changes
+  - Code comments for complex logic or non-obvious implementations
+- Use clear, concise language and include examples where helpful
+
+### 4. Standards Compliance
+- **ALWAYS check for and follow existing standards documents**
+- Key standards to follow:
+  - `/docs/UI_STANDARDS.md` - Mandatory for all UI changes
+  - ESLint configuration - For code style
+  - TypeScript conventions - Despite `noImplicitAny: false`, use proper types where possible
+- When in doubt, search for similar implementations in the codebase and follow established patterns
+
+### 5. Additional Best Practices
+- **Test all changes locally** before committing:
+  - Run affected features in development mode (`npm run dev`)
+  - Test with different user roles and brands
+  - Verify error handling and edge cases
+- **Use GitHub Issues integration** for tracking bugs and feature requests (not the feedback_log table)
+- **Follow the NO FALLBACKS policy** for AI generation - never provide default content if AI fails
+- **Check for related tests** and update them when modifying code
+- **Use meaningful commit messages** that explain the "why" not just the "what"
+- **Verify environment variables** are properly documented in `.env.example` when adding new ones
+
+### 6. Communication Protocol
+- Provide progress updates for long-running tasks
+- Ask for clarification rather than making assumptions
+- Alert about potential breaking changes or security implications
+- Suggest alternatives when requested changes might cause issues
+
+### 7. Branch Naming Conventions
+- **Feature branches**: `feature/description-with-hyphens`
+- **Bug fixes**: `fix/issue-number-description` or `bugfix/description`
+- **Hotfixes**: `hotfix/critical-issue-description`
+- **Documentation**: `docs/what-is-being-documented`
+- **Refactoring**: `refactor/component-or-area`
+- **Performance**: `perf/optimization-description`
+- **Testing**: `test/what-is-being-tested`
+- Always use lowercase with hyphens, no underscores or camelCase
+
+### 8. Comprehensive Code Review Requirements
+When reviewing code, check ALL of the following:
+- **UI/Database Alignment**:
+  - Every form field must map to a database column
+  - Database schema must support all UI operations
+  - Check data types match between UI validation and database constraints
+  - Verify required/optional fields match between UI and database
+  - Ensure field lengths in UI match database column limits
+- **Type Safety**:
+  - Verify TypeScript types match database schema
+  - Check Zod schemas align with both UI and database
+  - Ensure API response types match frontend expectations
+- **Security**:
+  - Verify RLS policies are appropriate
+  - Check for SQL injection vulnerabilities
+  - Ensure proper input sanitization
+  - Verify authentication on all protected routes
+- **Performance**:
+  - Look for N+1 query problems
+  - Check for missing database indexes
+  - Verify efficient data fetching strategies
+- **Error Handling**:
+  - All edge cases covered
+  - User-friendly error messages
+  - Proper error logging
+- **Standards Compliance**:
+  - UI follows `/docs/UI_STANDARDS.md`
+  - Code follows ESLint rules
+  - Consistent naming patterns
+
+### 9. Data Integrity Guidelines
+- **Before modifying database schema**:
+  - Check all affected UI components
+  - Verify API endpoints that use the data
+  - Plan data migration for existing records
+  - Update TypeScript types and Zod schemas
+  - Update relevant documentation
+- **Validation layers**:
+  - Client-side (React Hook Form + Zod)
+  - API-level validation
+  - Database constraints
+  - All three must align perfectly
+- **Testing data changes**:
+  - Test with existing data
+  - Test with edge cases (nulls, empty strings, max lengths)
+  - Test with different user roles
+
+### 10. API Development Standards
+- **Naming**: Use RESTful conventions (`/api/[resource]/[id]/[action]`)
+- **Responses**: Always return `{ success: boolean, data?: any, error?: string }`
+- **Status codes**: Use appropriate HTTP status codes
+- **Validation**: Validate all inputs before processing
+- **Documentation**: Update `/docs/api_reference.md` for any changes
+- **Testing**: Create or update API tests for endpoints
+
+### 11. Performance Monitoring
+- **Before deploying features that**:
+  - Add new database queries: Check query execution plans
+  - Process large datasets: Implement pagination
+  - Generate AI content: Add appropriate timeouts and loading states
+  - Upload files: Implement size limits and type validation
+- **Monitor**:
+  - API response times
+  - Database query performance
+  - Build sizes with `./scripts/analyze-bundle-sizes.sh`
+  - Memory usage during development
+
+### 12. Multi-tenant Safety
+- **Always consider**:
+  - Brand isolation in queries
+  - User permissions per brand
+  - RLS policies for new tables
+  - Cross-tenant data leakage risks
+- **Test with**:
+  - Multiple brands
+  - Different user roles
+  - Brand switching scenarios
+
+### 13. AI Integration Guidelines
+- **When modifying AI features**:
+  - Test with Azure OpenAI offline scenarios
+  - Verify error messages are helpful (no fallbacks!)
+  - Check token usage and costs
+  - Test with various input sizes
+  - Ensure prompts are in version control, not hardcoded
+
+### 14. Deployment Checklist
+Before requesting deployment:
+1. Run `vercel build --prod` - must pass
+2. Run `npm run lint` - must pass
+3. Run `npm run check` - must pass
+4. Run `npm run test:openai` - must pass if AI code changed
+5. Test all modified features locally
+6. Update all affected documentation
+7. Verify no console.log statements in production code
+8. Check for any hardcoded development URLs
+9. Ensure all environment variables are documented
+10. Test with production-like data volumes
+
+### 15. Dependency Management
+- **Before updating packages**:
+  - Check breaking changes in changelogs
+  - Test thoroughly after updates
+  - Update types if needed
+  - Pay special attention to: React Quill, Supabase, Next.js
+- **Security updates**: Apply promptly but test carefully
+- **Lock file**: Always commit package-lock.json changes
+
+### 16. Cost Optimization
+- **AI Usage**:
+  - Monitor token consumption
+  - Implement caching for repeated AI calls
+  - Set appropriate max_tokens limits
+  - Use streaming where appropriate
+- **Database**:
+  - Optimize queries before adding indexes
+  - Use connection pooling efficiently
+  - Implement query result caching where appropriate
+- **Storage**:
+  - Compress images before upload
+  - Set retention policies for old content
+
+### 17. Session & State Management
+- **Authentication state**: Use Supabase auth helpers consistently
+- **Brand context**: Always verify current brand access
+- **Form state**: Clear on successful submission
+- **Cache invalidation**: Update after mutations
+- **Error recovery**: Preserve user input on errors
+
+### 18. File Upload Standards
+- **Validation**:
+  - File type restrictions (use MIME type checking)
+  - Maximum file sizes (5MB for images, configurable)
+  - Virus scanning for user uploads (when implemented)
+- **Storage**:
+  - Use Supabase Storage buckets
+  - Implement proper access controls
+  - Generate unique filenames to prevent conflicts
+- **UI/UX**:
+  - Show upload progress
+  - Preview before upload
+  - Clear error messages for validation failures
+
+### 19. Critical Data Operations
+- **Before deleting data**:
+  - Confirm cascading deletes are intended
+  - Check for dependent records
+  - Consider soft deletes for important data
+  - Log deletions for audit trail
+- **Bulk operations**:
+  - Implement in batches
+  - Show progress indicators
+  - Allow cancellation
+  - Test with large datasets
+
+### 20. Monitoring & Debugging
+- **Logging guidelines**:
+  - Log errors with full context
+  - Never log sensitive data (passwords, API keys, PII)
+  - Use structured logging format
+  - Include user ID and brand ID in logs
+- **Performance tracking**:
+  - Monitor slow queries
+  - Track API response times
+  - Alert on error rate spikes
+- **Debug mode**: Remove all debug code before committing
+
+### 21. Rollback Procedures
+- **Database changes**: Always create a rollback migration
+- **Feature releases**: Plan how to disable if issues arise
+- **API changes**: Maintain backward compatibility or version
+- **UI changes**: Test on multiple screen sizes before release
+
+### 22. Email & Notifications
+- **Email templates**: Test with multiple email clients
+- **Rate limiting**: Prevent notification spam
+- **Unsubscribe**: Ensure compliance with regulations
+- **Testing**: Use preview/sandbox mode in development
+
+### 23. Accessibility Beyond Compliance
+- **Test with**: Screen readers (NVDA, JAWS, VoiceOver)
+- **Keyboard navigation**: Full functionality without mouse
+- **Color contrast**: Test with color blindness simulators
+- **Motion**: Respect prefers-reduced-motion
+- **Focus management**: Logical tab order
+
+### 24. Emergency Procedures
+- **If you encounter**:
+  - Data breach indicators: Stop immediately and alert
+  - Performance degradation: Check for infinite loops or memory leaks
+  - Suspicious code: Don't execute, ask for clarification
+  - Production errors: Prioritize fix or rollback
+- **Always have**: Rollback plan for database migrations
 
 ## License
 

@@ -80,29 +80,33 @@ const getActivityMessage = (item: ActivityItem): React.ReactNode => {
   }
 };
 
-export function TeamActivityFeed({ initialActivity }: { initialActivity: ActivityItem[] }) {
+export function TeamActivityFeed({ initialActivity, condensed = false }: { initialActivity: ActivityItem[]; condensed?: boolean }) {
   const activities = initialActivity;
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Team Activity</CardTitle>
-        <CardDescription>A live feed of recent events across the platform.</CardDescription>
+    <Card className={condensed ? "h-full overflow-hidden flex flex-col" : ""}>
+      <CardHeader className={condensed ? "pb-3" : ""}>
+        <CardTitle className={condensed ? "text-lg" : ""}>Team Activity</CardTitle>
+        {!condensed && <CardDescription>A live feed of recent events across the platform.</CardDescription>}
       </CardHeader>
-      <CardContent>
+      <CardContent className={condensed ? "flex-1 overflow-y-auto" : ""}>
         {activities && activities.length > 0 ? (
-          <div className="space-y-6">
+          <div className={condensed ? "space-y-4" : "space-y-6"}>
             {activities.map((item) => {
               const config = activityConfig[item.type] || activityConfig.content_updated;
               return (
-                <div key={item.id} className="flex items-start gap-4">
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${config.bgColor}`}>
-                      {config.icon}
+                <div key={item.id} className={condensed ? "flex items-start gap-3" : "flex items-start gap-4"}>
+                  <div className={`flex ${condensed ? "h-8 w-8" : "h-10 w-10"} shrink-0 items-center justify-center rounded-full ${config.bgColor}`}>
+                      {condensed ? (
+                        <div className="scale-75">{config.icon}</div>
+                      ) : (
+                        config.icon
+                      )}
                   </div>
-                  <div className="flex-grow">
-                    <div className="text-sm">
+                  <div className="flex-grow min-w-0">
+                    <div className={condensed ? "text-xs line-clamp-2" : "text-sm"}>
                       {getActivityMessage(item)}
                     </div>
-                    <time className="text-xs text-muted-foreground">
+                    <time className={condensed ? "text-[10px] text-muted-foreground" : "text-xs text-muted-foreground"}>
                       {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
                     </time>
                   </div>
@@ -111,8 +115,8 @@ export function TeamActivityFeed({ initialActivity }: { initialActivity: Activit
             })}
           </div>
         ) : (
-          <div className="text-center text-muted-foreground py-8">
-            <p>No recent activity to display.</p>
+          <div className={`text-center text-muted-foreground ${condensed ? "py-4" : "py-8"}`}>
+            <p className={condensed ? "text-sm" : ""}>No recent activity to display.</p>
           </div>
         )}
       </CardContent>

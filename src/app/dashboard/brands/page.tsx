@@ -1,34 +1,24 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { BrandIcon } from "@/components/brand-icon";
 import { COUNTRIES, LANGUAGES } from "@/lib/constants";
-import { 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  AlertDialog,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  AlertDialogAction,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  AlertDialogCancel,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  AlertDialogContent,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  AlertDialogDescription,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  AlertDialogFooter,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  AlertDialogHeader,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Trash2, PackageOpen, AlertTriangle, Eye, Edit3 } from "lucide-react";
+import { PackageOpen, AlertTriangle, Eye, Edit, Trash2, Plus, MoreVertical } from "lucide-react";
 import { toast } from 'sonner';
-// import { PageHeader } from "@/components/dashboard/page-header";
+import { format } from 'date-fns';
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { DeleteBrandDialog } from "@/components/dashboard/brand/delete-brand-dialog";
+import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface Brand {
   id: string;
@@ -37,6 +27,9 @@ interface Brand {
   language: string;
   content_count: number;
   brand_color?: string;
+  logo_url?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -61,7 +54,7 @@ const EmptyState = () => (
       You currently do not have access to any brands, or no brands have been created in the system.
     </p>
     <Button asChild>
-      <Link href="/brands/new">Add Brand</Link>
+      <Link href="/dashboard/brands/new">Add Brand</Link>
     </Button>
   </div>
 );
@@ -70,7 +63,6 @@ export default function BrandsPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
 
   const fetchBrands = useCallback(async () => {
     setIsLoading(true);
@@ -86,6 +78,7 @@ export default function BrandsPage() {
       
       if (data.success) {
         console.log('Fetched brands data:', data.data);
+        console.log('First brand logo_url:', data.data[0]?.logo_url);
         setBrands(Array.isArray(data.data) ? data.data : []);
       } else {
         throw new Error(data.error || 'Failed to fetch brands');
@@ -109,51 +102,130 @@ export default function BrandsPage() {
     setBrands(prevBrands => prevBrands.filter(b => b.id !== deletedBrandId));
   };
 
-  // Group brands by country
-  const groupBrandsByCountry = (brands: Brand[]) => {
-    const groupedBrands: Record<string, { countryName: string, brands: Brand[] }> = {};
-    
-    brands.forEach(brand => {
-      if (!brand.country) {
-        // Handle brands with no country
-        if (!groupedBrands['unknown']) {
-          groupedBrands['unknown'] = {
-            countryName: 'Unknown',
-            brands: []
-          };
-        }
-        groupedBrands['unknown'].brands.push(brand);
-        return;
-      }
-      
-      if (!groupedBrands[brand.country]) {
-        const countryName = COUNTRIES.find(c => c.value === brand.country)?.label || brand.country;
-        groupedBrands[brand.country] = {
-          countryName,
-          brands: []
-        };
-      }
-      
-      groupedBrands[brand.country].brands.push(brand);
-    });
-    
-    // Sort by country name
-    return Object.entries(groupedBrands)
-      .sort((a, b) => a[1].countryName.localeCompare(b[1].countryName));
-  };
+  const router = useRouter();
   
-  // Filter brands based on search term
-  const filteredBrands = (Array.isArray(brands) ? brands : []).filter(brand => 
-    brand.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (COUNTRIES.find(c => c.value === brand.country)?.label || brand.country)
-      .toLowerCase().includes(searchTerm.toLowerCase())
-  );
-  
-  // Group brands by country after filtering
-  const groupedBrands = groupBrandsByCountry(filteredBrands);
+  // Define columns for the data table
+  const columns: DataTableColumn<Brand>[] = [
+    {
+      id: "name",
+      header: "Brand",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-3">
+          <BrandIcon 
+            name={row.name} 
+            color={row.brand_color}
+            logoUrl={row.logo_url} 
+            size="sm"
+          />
+          <div className="font-medium">{row.name}</div>
+        </div>
+      ),
+      enableSorting: true,
+    },
+    {
+      id: "country",
+      header: "Country",
+      cell: ({ row }) => COUNTRIES.find(c => c.value === row.country)?.label || row.country || 'Unknown',
+      enableSorting: true,
+      enableFiltering: true,
+    },
+    {
+      id: "language",
+      header: "Language",
+      cell: ({ row }) => (
+        <Badge variant="secondary">
+          {LANGUAGES.find(l => l.value === row.language)?.label || row.language}
+        </Badge>
+      ),
+      enableSorting: true,
+      enableFiltering: true,
+    },
+    {
+      id: "updated_at",
+      header: "Last updated",
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground">
+          {row.updated_at ? format(new Date(row.updated_at), 'MMMM d, yyyy') : row.created_at ? format(new Date(row.created_at), 'MMMM d, yyyy') : 'N/A'}
+        </span>
+      ),
+      enableSorting: true,
+      sortingFn: (a, b) => {
+        const dateA = a.updated_at ? new Date(a.updated_at).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
+        const dateB = b.updated_at ? new Date(b.updated_at).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
+        return dateA - dateB;
+      },
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+            >
+              <span className="sr-only">Open menu</span>
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/dashboard/brands/${row.id}`);
+              }}
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              View
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/dashboard/brands/${row.id}/edit`);
+              }}
+            >
+              <Edit className="mr-2 h-4 w-4" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DeleteBrandDialog brand={row} onSuccess={handleSuccessfulDelete}>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onSelect={(e) => e.preventDefault()}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DeleteBrandDialog>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+      className: "w-[60px]",
+    },
+  ];
+
+  // Get unique countries for filter
+  const countryOptions = useMemo(() => {
+    const countries = new Set(brands.map(b => b.country).filter(Boolean));
+    return Array.from(countries).map(country => ({
+      value: country,
+      label: COUNTRIES.find(c => c.value === country)?.label || country
+    })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [brands]);
+
+  // Get unique languages for filter
+  const languageOptions = useMemo(() => {
+    const languages = new Set(brands.map(b => b.language).filter(Boolean));
+    return Array.from(languages).map(language => ({
+      value: language,
+      label: LANGUAGES.find(l => l.value === language)?.label || language
+    })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [brands]);
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+    <div className="space-y-8">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Brands</h1>
@@ -162,22 +234,12 @@ export default function BrandsPage() {
           </p>
         </div>
         <Button asChild>
-          <Link href="/brands/new">Add Brand</Link>
+          <Link href="/dashboard/brands/new">
+            <Plus className="mr-2 h-4 w-4" />
+            Add Brand
+          </Link>
         </Button>
       </div>
-
-      {/* Always show search and export buttons, even when empty */}
-      {brands.length > 0 && (
-        <div className="flex items-center justify-between">
-          <div className="max-w-sm w-full">
-            <Input 
-              placeholder="Search brands..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
-      )}
 
       {isLoading ? (
         <div className="py-10 flex justify-center items-center min-h-[300px]">
@@ -190,88 +252,34 @@ export default function BrandsPage() {
         <ErrorState error={error} onRetry={fetchBrands} />
       ) : brands.length === 0 ? (
         <EmptyState />
-      ) : filteredBrands.length === 0 ? (
-        <div className="flex flex-col items-center justify-center min-h-[200px] py-8">
-          <h3 className="text-xl font-bold mb-2">No brands found</h3>
-          <p className="text-muted-foreground mb-4">No brands match your search criteria.</p>
-          <Button variant="outline" onClick={() => setSearchTerm("")}>
-            Clear Search
-          </Button>
-        </div>
       ) : (
-        <div className="space-y-10">
-          {groupedBrands.map(([countryCode, { countryName, brands }]) => (
-            <div key={countryCode} className="space-y-4">
-              <div className="flex items-center">
-                <h2 className="text-xl font-semibold">{countryName}</h2>
-                <div className="ml-3 px-2 py-1 bg-muted rounded-full text-xs font-medium">
-                  {brands.length} brand{brands.length !== 1 ? 's' : ''}
-                </div>
-                <div className="h-px flex-1 bg-border ml-4"></div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {brands.map((brand) => (
-                  <Card key={brand.id}>
-                    <CardHeader className="pb-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-xl">{brand.name}</CardTitle>
-                          <CardDescription>
-                            {LANGUAGES.find(l => l.value === brand.language)?.label || brand.language}
-                          </CardDescription>
-                        </div>
-                        <BrandIcon 
-                          name={brand.name} 
-                          color={brand.brand_color} 
-                          size="md"
-                        />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="w-full bg-muted rounded-full h-2 mt-2">
-                        <div 
-                          className="h-2 rounded-full" 
-                          style={{ 
-                            width: `${Math.min(Number(brand.content_count) * 5, 100)}%`,
-                            backgroundColor: brand.brand_color || '#3498db'
-                          }}
-                        ></div>
-                      </div>
-                      <div className="mt-2 text-sm text-muted-foreground">
-                        {brand.content_count} content item{brand.content_count !== 1 ? 's' : ''}
-                      </div>
-                    </CardContent>
-                    <CardFooter className="border-t pt-4 flex justify-between">
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/dashboard/brands/${brand.id}`} className="flex items-center">
-                            <Eye className="mr-2 h-4 w-4" /> View
-                          </Link>
-                        </Button>
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/dashboard/brands/${brand.id}/edit`} className="flex items-center">
-                            <Edit3 className="mr-2 h-4 w-4" /> Edit
-                          </Link>
-                        </Button>
-                      </div>
-                      <DeleteBrandDialog brand={brand} onSuccess={handleSuccessfulDelete}>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </Button>
-                      </DeleteBrandDialog>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
+        <DataTable
+          columns={columns}
+          data={brands}
+          searchKey="name"
+          searchPlaceholder="Search brands by name..."
+          filters={[
+            {
+              id: "country",
+              label: "Country",
+              options: countryOptions,
+            },
+            {
+              id: "language",
+              label: "Language",
+              options: languageOptions,
+            },
+          ]}
+          onRowClick={(row) => router.push(`/dashboard/brands/${row.id}`)}
+          emptyState={
+            <div className="flex flex-col items-center justify-center py-8">
+              <h3 className="text-xl font-bold mb-2">No brands found</h3>
+              <p className="text-muted-foreground mb-4">No brands match your search criteria.</p>
             </div>
-          ))}
-        </div>
+          }
+        />
       )}
     </div>
   );
-} 
+}
+ 

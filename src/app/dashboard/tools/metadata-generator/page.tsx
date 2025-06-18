@@ -370,7 +370,7 @@ export default function MetadataGeneratorPage() {
   // --- Loading and Access Denied States ---
   if (isLoadingUser || isCheckingPermissions) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="space-y-6">
         <Skeleton className="h-8 w-1/3 mb-4" /> {/* Breadcrumbs skeleton */}
         <Skeleton className="h-12 w-1/2 mb-2" /> {/* Page title skeleton */}
         <Skeleton className="h-6 w-3/4 mb-6" /> {/* Page description skeleton */}
@@ -409,7 +409,7 @@ export default function MetadataGeneratorPage() {
   }
   // --- Main Page Content ---
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" }, 
         { label: "Tools", href: "/dashboard/tools" }, 
@@ -509,12 +509,37 @@ export default function MetadataGeneratorPage() {
                 </div>
             </CardHeader>
             <CardContent>
+              {results.length > 0 && !isLoading && (
+                <div className="bg-muted/50 rounded-lg p-4 mb-4">
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div className="text-center">
+                      <span className="text-muted-foreground">Total Processed</span>
+                      <p className="font-semibold text-lg">{results.length}</p>
+                    </div>
+                    <div className="text-center">
+                      <span className="text-muted-foreground">Successful</span>
+                      <p className="font-semibold text-lg text-green-600">
+                        {results.filter(r => r.metaTitle && !r.error).length}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <span className="text-muted-foreground">Failed</span>
+                      <p className="font-semibold text-lg text-red-600">
+                        {results.filter(r => r.error).length}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-3 text-xs text-muted-foreground text-center">
+                    <span className="font-medium">SEO Guidelines:</span> Title: 30-60 chars | Description: 70-160 chars
+                  </div>
+                </div>
+              )}
               <div className="overflow-x-auto rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead scope="col" className="w-[35%]">URL</TableHead>
-                      <TableHead scope="col" className="w-[30%]">Meta Title / Error</TableHead>
+                      <TableHead scope="col" className="w-[30%]">URL</TableHead>
+                      <TableHead scope="col" className="w-[35%]">Meta Title / Error</TableHead>
                       <TableHead scope="col" className="w-[35%]">Meta Description</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -531,14 +556,42 @@ export default function MetadataGeneratorPage() {
                               <span className="text-sm">{item.error}</span>
                             </div>
                           ) : (
-                            <span className="text-sm">{item.metaTitle || "N/A"}</span>
+                            <div className="space-y-1">
+                              <span className="text-sm">{item.metaTitle || "N/A"}</span>
+                              {item.metaTitle && (
+                                <Badge 
+                                  variant={
+                                    item.metaTitle.length > 60 ? "destructive" : 
+                                    item.metaTitle.length < 30 ? "outline" : 
+                                    "secondary"
+                                  } 
+                                  className="text-xs"
+                                >
+                                  {item.metaTitle.length} chars
+                                </Badge>
+                              )}
+                            </div>
                           )}
                         </TableCell>
                         <TableCell className="py-2 align-top whitespace-pre-wrap">
                           {item.error ? (
                             <span className="text-sm text-muted-foreground">N/A</span>
                           ) : (
-                            <span className="text-sm">{item.metaDescription || "N/A"}</span>
+                            <div className="space-y-1">
+                              <span className="text-sm">{item.metaDescription || "N/A"}</span>
+                              {item.metaDescription && (
+                                <Badge 
+                                  variant={
+                                    item.metaDescription.length > 160 ? "destructive" : 
+                                    item.metaDescription.length < 70 ? "outline" : 
+                                    "secondary"
+                                  } 
+                                  className="text-xs"
+                                >
+                                  {item.metaDescription.length} chars
+                                </Badge>
+                              )}
+                            </div>
                           )}
                         </TableCell>
                       </TableRow>
@@ -602,7 +655,7 @@ export default function MetadataGeneratorPage() {
                 <TableBody>
                   {runHistory.map((run) => (
                     <TableRow key={run.id}>
-                      <TableCell>{format(new Date(run.run_at), 'dd MMMM yyyy, HH:mm')}</TableCell>
+                      <TableCell>{format(new Date(run.run_at), 'MMMM d, yyyy, HH:mm')}</TableCell>
                       <TableCell>
                         <Badge variant={run.status === 'success' ? 'default' : 'destructive'}>
                           {run.status}

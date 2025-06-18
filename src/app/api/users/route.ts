@@ -56,11 +56,21 @@ export const GET = withAuth(async (_req: NextRequest, user) => {
       `)
       .order('created_at', { ascending: false });
     
+    // Fetch invitation status from the view
+    const { data: invitationStatusData, error: invitationError } = await supabase
+      .from('user_invitation_status')
+      .select('*');
+    
+    if (invitationError) {
+      console.error('Error fetching invitation status:', invitationError);
+    }
+    
     if (profilesError) throw profilesError;
     if (!profilesData) throw new Error('Failed to fetch profiles data.');
     
     const mergedUsers = authUsersData.users.map(authUser => {
       const profile = (profilesData as ProfileRecord[]).find(p => p.id === authUser.id);
+      const invitationStatus = invitationStatusData?.find((inv: Record<string, unknown>) => inv.id === authUser.id);
       
       let highestRole = 'viewer';
       if (profile?.user_brand_permissions && Array.isArray(profile.user_brand_permissions) && profile.user_brand_permissions.length > 0) {
@@ -98,6 +108,9 @@ export const GET = withAuth(async (_req: NextRequest, user) => {
         created_at: authUser.created_at,
         last_sign_in_at: authUser.last_sign_in_at,
         brand_permissions: profile?.user_brand_permissions || [],
+        invitation_status: invitationStatus?.invitation_status || null,
+        invitation_expires_at: invitationStatus?.expires_at || null,
+        user_status: invitationStatus?.user_status || 'no_invitation',
         is_current_user: authUser.id === user.id
       };
     });

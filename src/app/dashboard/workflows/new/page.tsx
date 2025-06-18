@@ -44,6 +44,7 @@ interface Brand {
   id: string;
   name: string;
   color?: string; // Ensure brand object has color if used directly
+  logo_url?: string | null;
 }
 
 interface ContentTemplateSummary {
@@ -595,6 +596,10 @@ export default function NewWorkflowPage() {
         toast.error(`Step "${step.name}" must have an assigned role.`);
         return false;
       }
+      if (!step.assignees || step.assignees.length === 0) {
+        toast.error(`Step "${step.name}" must have at least one assignee.`);
+        return false;
+      }
     }
     return true;
   };
@@ -671,7 +676,7 @@ export default function NewWorkflowPage() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" }, 
         { label: "Workflows", href: "/dashboard/workflows" }, 
@@ -684,7 +689,7 @@ export default function NewWorkflowPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           {selectedBrandFull && 
-            <BrandIcon name={selectedBrandFull.name} color={selectedBrandFull.color ?? undefined} size="md" className="mr-1" />
+            <BrandIcon name={selectedBrandFull.name} color={selectedBrandFull.color ?? undefined} logoUrl={selectedBrandFull.logo_url} size="md" className="mr-1" />
           }
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Create New Workflow</h1>
@@ -921,7 +926,7 @@ export default function NewWorkflowPage() {
                     
                     {/* Assignees Section */}
                     <div className="space-y-3">
-                        <Label htmlFor={`assignee-input-${index}`} className="text-sm font-medium">Assign Users (Optional)</Label>
+                        <Label htmlFor={`assignee-input-${index}`} className="text-sm font-medium">Assign Users <span className="text-destructive">*</span></Label>
                         <div className="flex items-center gap-2">
                             <Input
                                 id={`assignee-input-${index}`}
@@ -966,7 +971,7 @@ export default function NewWorkflowPage() {
 
 
                         {/* Added Assignees Badges */}
-                        {step.assignees.length > 0 && (
+                        {step.assignees.length > 0 ? (
                             <div className="mt-2 space-y-1">
                                 <p className="text-xs text-muted-foreground">Assigned:</p>
                                 <div className="flex flex-wrap gap-1.5">
@@ -984,6 +989,10 @@ export default function NewWorkflowPage() {
                                         </Badge>
                                     ))}
                                 </div>
+                            </div>
+                        ) : (
+                            <div className="mt-2 p-3 border border-destructive/50 rounded-md bg-destructive/10">
+                                <p className="text-sm text-destructive">No assignees added. At least one assignee is required for this step.</p>
                             </div>
                         )}
                     </div>

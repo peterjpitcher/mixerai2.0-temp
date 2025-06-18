@@ -376,7 +376,7 @@ export default function AltTextGeneratorPage() {
   // --- Loading and Access Denied States ---
   if (isLoadingUser || isCheckingPermissions) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="space-y-6">
         <Skeleton className="h-8 w-1/3 mb-4" /> {/* Breadcrumbs skeleton */}
         <Skeleton className="h-12 w-1/2 mb-2" /> {/* Page title skeleton */}
         <Skeleton className="h-6 w-3/4 mb-6" /> {/* Page description skeleton */}
@@ -415,7 +415,7 @@ export default function AltTextGeneratorPage() {
   }
   // --- Main Page Content ---
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" },
         { label: "Tools", href: "/dashboard/tools" }, 
@@ -515,6 +515,28 @@ export default function AltTextGeneratorPage() {
                 </div>
             </CardHeader>
             <CardContent>
+              {results.length > 0 && !isLoading && (
+                <div className="bg-muted/50 rounded-lg p-4 mb-4">
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div className="text-center">
+                      <span className="text-muted-foreground">Total Processed</span>
+                      <p className="font-semibold text-lg">{results.length}</p>
+                    </div>
+                    <div className="text-center">
+                      <span className="text-muted-foreground">Successful</span>
+                      <p className="font-semibold text-lg text-green-600">
+                        {results.filter(r => r.altText && !r.error).length}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <span className="text-muted-foreground">Failed</span>
+                      <p className="font-semibold text-lg text-red-600">
+                        {results.filter(r => r.error).length}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="overflow-x-auto rounded-md border">
                 <Table>
                   <TableHeader>
@@ -652,7 +674,7 @@ export default function AltTextGeneratorPage() {
                 <TableBody>
                   {runHistory.map((run) => (
                     <TableRow key={run.id}>
-                      <TableCell>{format(new Date(run.run_at), 'dd MMMM yyyy, HH:mm')}</TableCell>
+                      <TableCell>{format(new Date(run.run_at), 'MMMM d, yyyy, HH:mm')}</TableCell>
                       <TableCell>
                         <Badge variant={run.status === 'success' ? 'default' : 'destructive'}>
                           {run.status}

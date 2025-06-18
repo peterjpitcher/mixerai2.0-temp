@@ -16,8 +16,14 @@ import { createBrowserClient } from '@supabase/ssr';
 // Added imports for PageHeader and lucide-react icons
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandIcon,  } from '@/components/brand-icon'; 
-import { FileText, AlertTriangle, PlusCircle, Edit3, RefreshCw, CheckCircle, XCircle, ListFilter, Archive, Trash2, HelpCircle } from 'lucide-react';
+import { FileText, AlertTriangle, PlusCircle, Edit3, RefreshCw, CheckCircle, XCircle, ListFilter, Archive, Trash2, HelpCircle, MoreVertical, Pencil } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 // Define types
 type ContentFilterStatus = 'active' | 'approved' | 'rejected' | 'all';
@@ -28,7 +34,7 @@ interface ContentItem {
   brand_id: string;
   brand_name: string | null;
   brand_color?: string | null;
-  brand_avatar_url?: string | null; // Retain for data structure, though BrandIcon doesn't use it yet
+  brand_logo_url?: string | null;
   status: string;
   created_at: string;
   updated_at: string;
@@ -211,7 +217,7 @@ export default function ContentPageClient() {
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
     try { 
-      return formatDateFns(new Date(dateString), 'dd MMMM yyyy'); 
+      return formatDateFns(new Date(dateString), 'MMMM d, yyyy'); 
     }
     catch (e) { console.error('Error formatting date:', dateString, e); return 'Invalid Date'; }
   };
@@ -334,7 +340,7 @@ export default function ContentPageClient() {
   ];
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+    <div className="space-y-8">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" }, 
         ...(brandIdFromParams && activeBrandData ? 
@@ -390,7 +396,8 @@ export default function ContentPageClient() {
                   {items.length > 0 && 
                     <BrandIcon 
                       name={brandName} 
-                      color={items[0].brand_color ?? undefined} 
+                      color={items[0].brand_color ?? undefined}
+                      logoUrl={items[0].brand_logo_url} 
                       size="sm" 
                       className="mr-2" 
                     />}
@@ -475,25 +482,35 @@ export default function ContentPageClient() {
                               )}
                             </td>
                             <td className="p-3 whitespace-nowrap">{formatDate(item.updated_at)}</td>
-                            <td className="p-3 text-right space-x-2 whitespace-nowrap">
-                              {(currentUser && isUserAssigned(item, currentUser.id)) && (
-                                <Button variant="outline" size="sm" asChild className="h-8 px-2.5 text-xs">
-                                    <Link href={`/dashboard/content/${item.id}/edit`}> 
-                                        <Edit3 className="h-3.5 w-3.5 mr-1.5"/> Edit
-                                    </Link>
-                                </Button>
-                              )}
-                              {canDeleteContent(item) && (
-                                <Button 
-                                  variant="destructive" 
-                                  size="sm" 
-                                  className="h-8 px-2.5 text-xs"
-                                  onClick={() => handleDeleteClick(item)}
-                                  disabled={isDeleting && itemToDelete?.id === item.id}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                                  {isDeleting && itemToDelete?.id === item.id ? 'Deleting...' : 'Delete'}
-                                </Button>
+                            <td className="p-3 text-right">
+                              {((currentUser && isUserAssigned(item, currentUser.id)) || canDeleteContent(item)) && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                      <span className="sr-only">Open menu</span>
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    {(currentUser && isUserAssigned(item, currentUser.id)) && (
+                                      <DropdownMenuItem asChild>
+                                        <Link href={`/dashboard/content/${item.id}/edit`}>
+                                          <Pencil className="mr-2 h-4 w-4" /> Edit
+                                        </Link>
+                                      </DropdownMenuItem>
+                                    )}
+                                    {canDeleteContent(item) && (
+                                      <DropdownMenuItem 
+                                        onClick={() => handleDeleteClick(item)} 
+                                        className="text-destructive"
+                                        disabled={isDeleting && itemToDelete?.id === item.id}
+                                      >
+                                        <Trash2 className="mr-2 h-4 w-4" /> 
+                                        {isDeleting && itemToDelete?.id === item.id ? 'Deleting...' : 'Delete'}
+                                      </DropdownMenuItem>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               )}
                             </td>
                           </tr>

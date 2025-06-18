@@ -183,7 +183,7 @@ export default function FeedbackDetailPage() {
 
   if (error || !feedbackItem) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 bg-gray-50 min-h-screen">
+      <div className="bg-gray-50 min-h-screen space-y-6">
         <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Feedback", href: "/dashboard/admin/feedback-log" }, { label: 'Error' }]} />
         <div className="flex flex-col items-center justify-center h-[calc(100vh-15rem)] p-6 text-center">
             <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
@@ -228,7 +228,7 @@ export default function FeedbackDetailPage() {
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return 'N/A';
     try {
-      return formatDateFns(new Date(dateString), 'dd MMMM yyyy, HH:mm');
+      return formatDateFns(new Date(dateString), 'MMMM d, yyyy, HH:mm');
     } catch (e) {
       console.error("Error formatting date:", dateString, e);
       return "Invalid Date";
@@ -236,7 +236,7 @@ export default function FeedbackDetailPage() {
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
       <Breadcrumbs items={breadcrumbItemsForShared} /> {/* Using shared Breadcrumbs */}
       <header className="space-y-1">
         <div className="flex items-center justify-between">

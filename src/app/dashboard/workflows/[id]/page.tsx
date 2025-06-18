@@ -40,6 +40,7 @@ interface WorkflowWithDetails {
   brand_id?: string;
   brand_name?: string;
   brand_color?: string;
+  brand_logo_url?: string | null;
   template_name?: string;
   status: string;
   steps: WorkflowStep[];
@@ -161,6 +162,7 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
   // Safely extract values with fallbacks
   const brandName = workflow.brand_name || 'Unknown Brand';
   const brandColor = workflow.brand_color || '#6E6E6E';
+  const brandLogoUrl = workflow.brand_logo_url || null;
   const workflowStatus = workflow.status || 'draft';
   const workflowSteps = Array.isArray(workflow.steps) ? workflow.steps : [];
   const createdByName = workflow.createdBy?.name || 'Unknown User';
@@ -171,7 +173,7 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
   const getFormattedDate = (dateString: string) => {
     if (!dateString) return 'N/A';
     try {
-      return formatDateFns(new Date(dateString), 'dd MMMM yyyy');
+      return formatDateFns(new Date(dateString), 'MMMM d, yyyy');
     } catch (e) {
       console.error("Error formatting date:", dateString, e);
       return "Invalid Date";
@@ -180,7 +182,7 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
   const getFormattedDateTime = (dateString: string) => {
     if (!dateString) return 'N/A';
     try {
-      return formatDateFns(new Date(dateString), 'dd MMMM yyyy, HH:mm');
+      return formatDateFns(new Date(dateString), 'MMMM d, yyyy, HH:mm');
     } catch (e) {
       console.error("Error formatting date/time:", dateString, e);
       return "Invalid Date/Time";
@@ -205,7 +207,8 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
               {workflow.brand_id && 
                 <BrandIcon 
                   name={brandName} 
-                  color={brandColor ?? undefined} 
+                  color={brandColor ?? undefined}
+                  logoUrl={brandLogoUrl} 
                   size="md" 
                   className="mr-3" 
                 />

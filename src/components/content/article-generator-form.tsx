@@ -1172,7 +1172,7 @@ export function ArticleGeneratorForm() {
                     {Array.isArray(brands) && brands.map(brand => (
                       <SelectItem key={brand.id} value={brand.id}>
                         <div className="flex items-center">
-                          <BrandIcon name={brand.name} color={brand.brand_color ?? undefined} size="sm" className="mr-2" />
+                          <BrandIcon name={brand.name} color={brand.brand_color ?? undefined} logoUrl={brand.logo_url} size="sm" className="mr-2" />
                           {brand.name}
                         </div>
                       </SelectItem>

@@ -15,20 +15,42 @@ interface Product {
     updated_at?: string;
 }
 
-// GET handler for all products
-export const GET = withAuth(async () => {
+// GET handler for all products with pagination
+export const GET = withAuth(async (req: NextRequest) => {
     // TODO: Implement filtering by master_brand_id if needed as a query param
     // TODO: Implement permission checks - user might only see products for brands they have access to.
     try {
+        // Parse pagination parameters from query string
+        const searchParams = req.nextUrl.searchParams;
+        const page = parseInt(searchParams.get('page') || '1', 10);
+        const limit = parseInt(searchParams.get('limit') || '20', 10);
+        const search = searchParams.get('search') || '';
+        
+        // Validate pagination parameters
+        const validatedPage = Math.max(1, page);
+        const validatedLimit = Math.min(Math.max(1, limit), 100); // Max 100 items per page
+        const offset = (validatedPage - 1) * validatedLimit;
         if (isBuildPhase()) {
             console.log('[API Products GET] Build phase: returning empty array.');
             return NextResponse.json({ success: true, isMockData: true, data: [] });
         }
 
         const supabase = createSupabaseAdminClient();
-        const { data, error } = await supabase.from('products')
-            .select('*') // Consider selecting specific fields or related data like brand name
+        
+        // Build query with pagination
+        let query = supabase.from('products')
+            .select('*', { count: 'exact' }) // Get total count for pagination
             .order('name');
+        
+        // Add search filter if provided
+        if (search) {
+            query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+        }
+        
+        // Apply pagination
+        query = query.range(offset, offset + validatedLimit - 1);
+        
+        const { data, error, count } = await query;
 
         if (error) {
             console.error('[API Products GET] Error fetching products:', error);
@@ -44,7 +66,23 @@ export const GET = withAuth(async () => {
             updated_at: item.updated_at
         })).filter(item => item.master_brand_id !== '') : []; // Filter out products without master_brand_id
 
-        return NextResponse.json({ success: true, data: validatedData as Product[] });
+        // Calculate pagination metadata
+        const totalPages = count ? Math.ceil(count / validatedLimit) : 0;
+        const hasNextPage = validatedPage < totalPages;
+        const hasPreviousPage = validatedPage > 1;
+        
+        return NextResponse.json({ 
+            success: true, 
+            data: validatedData as Product[],
+            pagination: {
+                page: validatedPage,
+                limit: validatedLimit,
+                total: count || 0,
+                totalPages,
+                hasNextPage,
+                hasPreviousPage
+            }
+        });
 
     } catch (error: unknown) {
         console.error('[API Products GET] Catched error:', error);

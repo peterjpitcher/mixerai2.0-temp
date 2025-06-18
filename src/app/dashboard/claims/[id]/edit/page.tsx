@@ -300,7 +300,7 @@ export default function EditClaimPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className="space-y-6">
       <Breadcrumbs items={breadcrumbItems} />
       <PageHeader
         title={pageTitle}
@@ -356,50 +356,53 @@ export default function EditClaimPage() {
             )}
 
             {/* Claim Text */}
-            <div className="space-y-2">
-              <Label htmlFor="claim_text">Claim Text <span className="text-red-500">*</span></Label>
-              <Textarea id="claim_text" name="claim_text" value={formData.claim_text} onChange={handleInputChange} placeholder="e.g., Clinically proven to boost immunity" rows={3} className={formErrors.claim_text ? "border-red-500" : ""}/>
-              {formErrors.claim_text && <p className="text-xs text-red-500 mt-1">{formErrors.claim_text}</p>}
+            <div className="grid grid-cols-12 gap-4">
+              <Label htmlFor="claim_text" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Claim Text <span className="text-red-500">*</span></Label>
+              <div className="col-span-12 sm:col-span-9">
+                <Textarea id="claim_text" name="claim_text" value={formData.claim_text} onChange={handleInputChange} placeholder="e.g., Clinically proven to boost immunity" rows={3} className={formErrors.claim_text ? "border-red-500" : ""}/>
+                {formErrors.claim_text && <p className="text-xs text-red-500 mt-1">{formErrors.claim_text}</p>}
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Claim Type */}
-              <div className="space-y-2">
-                <Label htmlFor="claim_type">Claim Type <span className="text-red-500">*</span></Label>
-                <Select name="claim_type" value={formData.claim_type} onValueChange={(value) => handleSelectChange('claim_type' as keyof ClaimEditFormData, value)} >
-                  <SelectTrigger className={formErrors.claim_type ? "border-red-500" : ""}><SelectValue placeholder="Select claim type" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="allowed">Allowed</SelectItem>
-                    <SelectItem value="disallowed">Disallowed</SelectItem>
-                    <SelectItem value="mandatory">Mandatory</SelectItem>
-                  </SelectContent>
-                </Select>
-                {formErrors.claim_type && <p className="text-xs text-red-500 mt-1">{formErrors.claim_type}</p>}
-              </div>
-              
-              {/* Country Code */}
-              <div className="space-y-2">
-                <Label htmlFor="country_code">Country <span className="text-red-500">*</span></Label>
-                <Select name="country_code" value={formData.country_code} onValueChange={(value) => handleSelectChange('country_code' as keyof ClaimEditFormData, value)}
-                    disabled={isMarketSpecificClaimUsedAsReplacement || isLoadingCountries}
-                >
-                    <SelectTrigger className={formErrors.country_code ? "border-red-500" : ""}><SelectValue placeholder={isLoadingCountries ? "Loading countries..." : "Select country"} /></SelectTrigger>
-                    <SelectContent className="max-h-60">
-                        <SelectItem value={ALL_COUNTRIES_CODE}>{ALL_COUNTRIES_NAME}</SelectItem>
-                        {availableCountries.map(country => (
-                            <SelectItem key={country.code} value={country.code}>{country.name} ({country.code})</SelectItem>
-                        ))}
+            <div className="grid grid-cols-12 gap-4">
+              <Label htmlFor="claim_type" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Claim Type <span className="text-red-500">*</span></Label>
+              <div className="col-span-12 sm:col-span-9 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Select name="claim_type" value={formData.claim_type} onValueChange={(value) => handleSelectChange('claim_type' as keyof ClaimEditFormData, value)} >
+                    <SelectTrigger className={formErrors.claim_type ? "border-red-500" : ""}><SelectValue placeholder="Select claim type" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="allowed">Allowed</SelectItem>
+                      <SelectItem value="disallowed">Disallowed</SelectItem>
+                      <SelectItem value="mandatory">Mandatory</SelectItem>
                     </SelectContent>
-                </Select>
-                {formErrors.country_code && <p className="text-xs text-red-500 mt-1">{formErrors.country_code}</p>}
-                {isMarketSpecificClaimUsedAsReplacement && <p className="text-xs text-muted-foreground mt-1">Country code cannot be changed while claim is used as a replacement.</p>}
+                  </Select>
+                  {formErrors.claim_type && <p className="text-xs text-red-500 mt-1">{formErrors.claim_type}</p>}
+                </div>
+                
+                <div>
+                  <Select name="country_code" value={formData.country_code} onValueChange={(value) => handleSelectChange('country_code' as keyof ClaimEditFormData, value)}
+                      disabled={isMarketSpecificClaimUsedAsReplacement || isLoadingCountries}
+                  >
+                      <SelectTrigger className={formErrors.country_code ? "border-red-500" : ""}><SelectValue placeholder={isLoadingCountries ? "Loading countries..." : "Select country"} /></SelectTrigger>
+                      <SelectContent className="max-h-60">
+                          <SelectItem value={ALL_COUNTRIES_CODE}>{ALL_COUNTRIES_NAME}</SelectItem>
+                          {availableCountries.map(country => (
+                              <SelectItem key={country.code} value={country.code}>{country.name} ({country.code})</SelectItem>
+                          ))}
+                      </SelectContent>
+                  </Select>
+                  {formErrors.country_code && <p className="text-xs text-red-500 mt-1">{formErrors.country_code}</p>}
+                  {isMarketSpecificClaimUsedAsReplacement && <p className="text-xs text-muted-foreground mt-1">Country code cannot be changed while claim is used as a replacement.</p>}
+                </div>
               </div>
             </div>
 
             {/* Description (Optional) */}
-            <div className="space-y-2">
-              <Label htmlFor="description">Description (Optional)</Label>
-              <Textarea id="description" name="description" value={formData.description || ''} onChange={handleInputChange} placeholder="Provide additional context or notes for this claim" rows={3}/>
+            <div className="grid grid-cols-12 gap-4">
+              <Label htmlFor="description" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Description (Optional)</Label>
+              <div className="col-span-12 sm:col-span-9">
+                <Textarea id="description" name="description" value={formData.description || ''} onChange={handleInputChange} placeholder="Provide additional context or notes for this claim" rows={3}/>
+              </div>
             </div>
 
           </CardContent>

@@ -85,6 +85,7 @@ const JsonViewer = ({ jsonData }: { jsonData: unknown }) => {
 interface AltTextInputs {
   imageUrls: string[];
   language?: string;
+  error?: string; // For rate limit errors
 }
 interface AltTextOutputItem {
   imageUrl: string;
@@ -93,13 +94,69 @@ interface AltTextOutputItem {
 }
 interface AltTextOutputs {
   results: AltTextOutputItem[];
+  error?: string; // For overall errors
 }
 
 const AltTextHistoryDisplay = ({ inputs, outputs }: { inputs: AltTextInputs, outputs: AltTextOutputs }) => {
+  // Helper function to extract domain from URL
+  const getDomainFromUrl = (url: string) => {
+    try {
+      if (url.startsWith('data:')) return 'Data URL (uploaded image)';
+      const domain = new URL(url).hostname;
+      return domain;
+    } catch {
+      return 'Invalid URL';
+    }
+  };
+
+  // Helper to detect language from TLD (matching API logic)
+  const getDetectedLanguageFromUrl = (url: string) => {
+    try {
+      if (url.startsWith('data:')) return 'en (default)';
+      const hostname = new URL(url).hostname;
+      
+      // Common TLD to language mappings
+      if (hostname.endsWith('.fr')) return 'fr (French)';
+      if (hostname.endsWith('.de')) return 'de (German)';
+      if (hostname.endsWith('.es')) return 'es (Spanish)';
+      if (hostname.endsWith('.it')) return 'it (Italian)';
+      if (hostname.endsWith('.nl')) return 'nl (Dutch)';
+      if (hostname.endsWith('.co.uk')) return 'en (UK)';
+      if (hostname.endsWith('.com.au')) return 'en (AU)';
+      
+      return 'en (default)';
+    } catch {
+      return 'en (default)';
+    }
+  };
+
+  const successCount = outputs.results?.filter(r => r.altText && !r.error).length || 0;
+  const errorCount = outputs.results?.filter(r => r.error).length || 0;
+  const totalCount = inputs.imageUrls?.length || 0;
+
   return (
     <div className="space-y-4">
+      {/* Summary Statistics */}
+      <div className="bg-muted/50 rounded-lg p-4">
+        <h4 className="font-semibold mb-2 text-base">Run Summary</h4>
+        <div className="grid grid-cols-3 gap-4 text-sm">
+          <div>
+            <span className="text-muted-foreground">Total Images:</span>
+            <p className="font-semibold text-lg">{totalCount}</p>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Successful:</span>
+            <p className="font-semibold text-lg text-green-600">{successCount}</p>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Failed:</span>
+            <p className="font-semibold text-lg text-red-600">{errorCount}</p>
+          </div>
+        </div>
+      </div>
+
       <div>
-        <h4 className="font-semibold mb-2 text-base">Inputs</h4>
+        <h4 className="font-semibold mb-2 text-base">Input Details</h4>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -110,47 +167,95 @@ const AltTextHistoryDisplay = ({ inputs, outputs }: { inputs: AltTextInputs, out
             </TableHeader>
             <TableBody>
               <TableRow>
-                <TableCell>Image URLs</TableCell>
-                <TableCell>
-                  {inputs.imageUrls.map((url, idx) => (
-                    <div key={idx} className="truncate" title={url}>{url}</div>
-                  ))}
-                </TableCell>
+                <TableCell>Number of Images</TableCell>
+                <TableCell>{totalCount}</TableCell>
               </TableRow>
               {inputs.language && (
                 <TableRow>
-                  <TableCell>Language</TableCell>
-                  <TableCell>{inputs.language}</TableCell>
+                  <TableCell>Requested Language</TableCell>
+                  <TableCell className="font-medium">{inputs.language}</TableCell>
+                </TableRow>
+              )}
+              <TableRow>
+                <TableCell>Image Domains</TableCell>
+                <TableCell>
+                  {Array.from(new Set(inputs.imageUrls?.map(url => getDomainFromUrl(url)) || [])).map((domain, idx) => (
+                    <Badge key={idx} variant="secondary" className="mr-1 mb-1">{domain}</Badge>
+                  ))}
+                </TableCell>
+              </TableRow>
+              {inputs.error && (
+                <TableRow>
+                  <TableCell>Input Error</TableCell>
+                  <TableCell className="text-destructive">{inputs.error}</TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </div>
       </div>
+
       <div>
-        <h4 className="font-semibold mb-2 text-base">Outputs</h4>
+        <h4 className="font-semibold mb-2 text-base">Processing Results</h4>
         {outputs.results && outputs.results.length > 0 ? (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead scope="col">Image URL</TableHead>
-                  <TableHead scope="col">Generated Alt Text</TableHead>
-                  <TableHead scope="col">Error</TableHead>
+                  <TableHead scope="col" className="w-[25%]">Image</TableHead>
+                  <TableHead scope="col" className="w-[15%]">Detected Language</TableHead>
+                  <TableHead scope="col" className="w-[35%]">Generated Alt Text</TableHead>
+                  <TableHead scope="col" className="w-[10%]">Character Count</TableHead>
+                  <TableHead scope="col" className="w-[15%]">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {outputs.results.map((item, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell className="truncate" title={item.imageUrl}>{item.imageUrl}</TableCell>
-                    <TableCell className="whitespace-pre-wrap">{item.altText || 'N/A'}</TableCell>
-                    <TableCell className="whitespace-pre-wrap text-destructive">{item.error || 'N/A'}</TableCell>
+                  <TableRow key={idx} className={item.error ? "bg-destructive/5" : ""}>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <p className="truncate text-sm" title={item.imageUrl}>
+                          {getDomainFromUrl(item.imageUrl)}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate" title={item.imageUrl}>
+                          {item.imageUrl.length > 50 ? `${item.imageUrl.substring(0, 47)}...` : item.imageUrl}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {!inputs.language && getDetectedLanguageFromUrl(item.imageUrl)}
+                      {inputs.language && <span className="text-muted-foreground">→ {inputs.language}</span>}
+                    </TableCell>
+                    <TableCell className="whitespace-pre-wrap text-sm">
+                      {item.altText || (item.error ? '—' : 'N/A')}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {item.altText ? (
+                        <Badge variant="secondary">{item.altText.length}</Badge>
+                      ) : '—'}
+                    </TableCell>
+                    <TableCell>
+                      {item.error ? (
+                        <div className="space-y-1">
+                          <Badge variant="destructive" className="mb-1">Failed</Badge>
+                          <p className="text-xs text-destructive">{item.error}</p>
+                        </div>
+                      ) : (
+                        <Badge variant="default">Success</Badge>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
         ) : <p className="text-sm text-muted-foreground">No output results found.</p>}
+        
+        {outputs.error && (
+          <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+            <p className="text-sm text-destructive font-medium">Overall Error: {outputs.error}</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -160,6 +265,7 @@ const AltTextHistoryDisplay = ({ inputs, outputs }: { inputs: AltTextInputs, out
 interface MetadataInputs {
   urls: string[];
   language?: string;
+  error?: string; // For rate limit errors
 }
 interface MetadataOutputItem {
   url: string;
@@ -170,13 +276,66 @@ interface MetadataOutputItem {
 }
 interface MetadataOutputs {
   results: MetadataOutputItem[];
+  error?: string; // For overall errors
 }
 
 const MetadataHistoryDisplay = ({ inputs, outputs }: { inputs: MetadataInputs, outputs: MetadataOutputs }) => {
+  // Helper function to extract domain from URL
+  const getDomainFromUrl = (url: string) => {
+    try {
+      const domain = new URL(url).hostname;
+      return domain;
+    } catch {
+      return 'Invalid URL';
+    }
+  };
+
+  const successCount = outputs.results?.filter(r => r.metaTitle && !r.error).length || 0;
+  const errorCount = outputs.results?.filter(r => r.error).length || 0;
+  const totalCount = inputs.urls?.length || 0;
+
+  // Calculate character lengths for SEO insights
+  const getCharacterLengthBadge = (text: string | undefined, type: 'title' | 'description') => {
+    if (!text) return null;
+    const length = text.length;
+    let variant: "default" | "secondary" | "destructive" | "outline" = "secondary";
+    
+    if (type === 'title') {
+      if (length > 60) variant = "destructive"; // Too long
+      else if (length < 30) variant = "outline"; // Too short
+      else variant = "default"; // Optimal
+    } else if (type === 'description') {
+      if (length > 160) variant = "destructive"; // Too long
+      else if (length < 70) variant = "outline"; // Too short
+      else variant = "default"; // Optimal
+    }
+    
+    return <Badge variant={variant}>{length} chars</Badge>;
+  };
+
   return (
     <div className="space-y-4">
+      {/* Summary Statistics */}
+      <div className="bg-muted/50 rounded-lg p-4">
+        <h4 className="font-semibold mb-2 text-base">Run Summary</h4>
+        <div className="grid grid-cols-3 gap-4 text-sm">
+          <div>
+            <span className="text-muted-foreground">Total URLs:</span>
+            <p className="font-semibold text-lg">{totalCount}</p>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Successful:</span>
+            <p className="font-semibold text-lg text-green-600">{successCount}</p>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Failed:</span>
+            <p className="font-semibold text-lg text-red-600">{errorCount}</p>
+          </div>
+        </div>
+      </div>
+
       <div>
-        <h4 className="font-semibold mb-2 text-base">Inputs</h4>
+        <h4 className="font-semibold mb-2 text-base">Input Details</h4>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -187,55 +346,112 @@ const MetadataHistoryDisplay = ({ inputs, outputs }: { inputs: MetadataInputs, o
             </TableHeader>
             <TableBody>
               <TableRow>
-                <TableCell>Page URLs</TableCell>
+                <TableCell>Number of URLs</TableCell>
+                <TableCell>{totalCount}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Language</TableCell>
+                <TableCell className="font-medium">{inputs.language || 'en (default)'}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Domains Processed</TableCell>
                 <TableCell>
-                  {inputs.urls.map((url, idx) => (
-                    <div key={idx} className="truncate" title={url}>{url}</div>
+                  {Array.from(new Set(inputs.urls?.map(url => getDomainFromUrl(url)) || [])).map((domain, idx) => (
+                    <Badge key={idx} variant="secondary" className="mr-1 mb-1">{domain}</Badge>
                   ))}
                 </TableCell>
               </TableRow>
-              {inputs.language && (
+              {inputs.error && (
                 <TableRow>
-                  <TableCell>Language</TableCell>
-                  <TableCell>{inputs.language}</TableCell>
+                  <TableCell>Input Error</TableCell>
+                  <TableCell className="text-destructive">{inputs.error}</TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </div>
       </div>
+
       <div>
-        <h4 className="font-semibold mb-2 text-base">Outputs</h4>
+        <h4 className="font-semibold mb-2 text-base">SEO Metadata Results</h4>
+        <p className="text-xs text-muted-foreground mb-2">
+          Title: 30-60 chars optimal | Description: 70-160 chars optimal
+        </p>
         {outputs.results && outputs.results.length > 0 ? (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead scope="col">URL</TableHead>
-                  <TableHead scope="col">Meta Title</TableHead>
-                  <TableHead scope="col">Meta Description</TableHead>
-                  <TableHead scope="col">Keywords</TableHead>
-                  <TableHead scope="col">Error</TableHead>
+                  <TableHead scope="col" className="w-[20%]">URL</TableHead>
+                  <TableHead scope="col" className="w-[25%]">Meta Title</TableHead>
+                  <TableHead scope="col" className="w-[30%]">Meta Description</TableHead>
+                  <TableHead scope="col" className="w-[15%]">Keywords</TableHead>
+                  <TableHead scope="col" className="w-[10%]">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {outputs.results.map((item, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell className="truncate" title={item.url}>{item.url}</TableCell>
-                    <TableCell className="whitespace-pre-wrap">{item.metaTitle || 'N/A'}</TableCell>
-                    <TableCell className="whitespace-pre-wrap">{item.metaDescription || 'N/A'}</TableCell>
+                  <TableRow key={idx} className={item.error ? "bg-destructive/5" : ""}>
                     <TableCell>
-                      {item.keywords && item.keywords.length > 0 
-                        ? item.keywords.map(kw => <Badge key={kw} variant="secondary" className="mr-1 mb-1">{kw}</Badge>) 
-                        : 'N/A'}
+                      <div className="space-y-1">
+                        <p className="truncate text-sm" title={item.url}>
+                          {getDomainFromUrl(item.url)}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate" title={item.url}>
+                          {item.url.length > 40 ? `${item.url.substring(0, 37)}...` : item.url}
+                        </p>
+                      </div>
                     </TableCell>
-                    <TableCell className="whitespace-pre-wrap text-destructive">{item.error || 'N/A'}</TableCell>
+                    <TableCell>
+                      {item.metaTitle ? (
+                        <div className="space-y-1">
+                          <p className="text-sm">{item.metaTitle}</p>
+                          {getCharacterLengthBadge(item.metaTitle, 'title')}
+                        </div>
+                      ) : (item.error ? '—' : 'N/A')}
+                    </TableCell>
+                    <TableCell>
+                      {item.metaDescription ? (
+                        <div className="space-y-1">
+                          <p className="text-sm line-clamp-3">{item.metaDescription}</p>
+                          {getCharacterLengthBadge(item.metaDescription, 'description')}
+                        </div>
+                      ) : (item.error ? '—' : 'N/A')}
+                    </TableCell>
+                    <TableCell>
+                      {item.keywords && item.keywords.length > 0 ? (
+                        <div className="space-y-1">
+                          {item.keywords.slice(0, 3).map(kw => (
+                            <Badge key={kw} variant="secondary" className="mr-1 mb-1 text-xs">{kw}</Badge>
+                          ))}
+                          {item.keywords.length > 3 && (
+                            <span className="text-xs text-muted-foreground">+{item.keywords.length - 3} more</span>
+                          )}
+                        </div>
+                      ) : 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      {item.error ? (
+                        <div className="space-y-1">
+                          <Badge variant="destructive" className="mb-1">Failed</Badge>
+                          <p className="text-xs text-destructive">{item.error}</p>
+                        </div>
+                      ) : (
+                        <Badge variant="default">Success</Badge>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
         ) : <p className="text-sm text-muted-foreground">No output results found.</p>}
+        
+        {outputs.error && (
+          <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+            <p className="text-sm text-destructive font-medium">Overall Error: {outputs.error}</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -264,10 +480,108 @@ type ContentTranscreatorOutputs = ContentTranscreatorSuccessOutputs | ContentTra
 
 
 const ContentTranscreatorHistoryDisplay = ({ inputs, outputs, status }: { inputs: ContentTranscreatorInputs, outputs: ContentTranscreatorOutputs, status: 'success' | 'failure' }) => {
+  // Helper function to get language name from code
+  const getLanguageName = (code: string) => {
+    const languages: Record<string, string> = {
+      'en': 'English',
+      'fr': 'French',
+      'es': 'Spanish',
+      'de': 'German',
+      'it': 'Italian',
+      'pt': 'Portuguese',
+      'nl': 'Dutch',
+      'ja': 'Japanese',
+      'zh': 'Chinese',
+      'ko': 'Korean',
+      'ar': 'Arabic',
+      'ru': 'Russian',
+      'hi': 'Hindi'
+    };
+    return languages[code] || code.toUpperCase();
+  };
+
+  // Helper function to get country name from code
+  const getCountryName = (code: string) => {
+    const countries: Record<string, string> = {
+      'US': 'United States',
+      'GB': 'United Kingdom',
+      'FR': 'France',
+      'DE': 'Germany',
+      'ES': 'Spain',
+      'IT': 'Italy',
+      'PT': 'Portugal',
+      'NL': 'Netherlands',
+      'JP': 'Japan',
+      'CN': 'China',
+      'KR': 'South Korea',
+      'IN': 'India',
+      'BR': 'Brazil',
+      'MX': 'Mexico',
+      'CA': 'Canada',
+      'AU': 'Australia'
+    };
+    return countries[code] || code;
+  };
+
+  // Calculate content lengths
+  const originalLength = inputs.content?.length || 0;
+  const transCreatedLength = status === 'success' && outputs.transCreatedContent ? 
+    (outputs as ContentTranscreatorSuccessOutputs).transCreatedContent.length : 0;
+  const lengthChange = transCreatedLength - originalLength;
+  const lengthChangePercent = originalLength > 0 ? Math.round((lengthChange / originalLength) * 100) : 0;
+
+  // Count words for better content analysis
+  const countWords = (text: string) => text.trim().split(/\s+/).filter(word => word.length > 0).length;
+  const originalWords = inputs.content ? countWords(inputs.content) : 0;
+  const transCreatedWords = status === 'success' && outputs.transCreatedContent ? 
+    countWords((outputs as ContentTranscreatorSuccessOutputs).transCreatedContent) : 0;
+
   return (
     <div className="space-y-4">
+      {/* Summary Statistics */}
+      {status === 'success' && outputs.transCreatedContent && (
+        <div className="bg-muted/50 rounded-lg p-4">
+          <h4 className="font-semibold mb-2 text-base">Trans-creation Summary</h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <span className="text-muted-foreground">Source Language:</span>
+              <p className="font-semibold">{getLanguageName(inputs.sourceLanguage || 'en')}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Target Language:</span>
+              <p className="font-semibold">{getLanguageName((outputs as ContentTranscreatorSuccessOutputs).targetLanguage)}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Target Market:</span>
+              <p className="font-semibold">{getCountryName((outputs as ContentTranscreatorSuccessOutputs).targetCountry)}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Status:</span>
+              <Badge variant="default" className="mt-1">Success</Badge>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4 text-sm mt-3 pt-3 border-t">
+            <div>
+              <span className="text-muted-foreground">Original Content:</span>
+              <p className="font-semibold">{originalWords} words ({originalLength} chars)</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Trans-created Content:</span>
+              <p className="font-semibold">
+                {transCreatedWords} words ({transCreatedLength} chars)
+                {lengthChangePercent !== 0 && (
+                  <span className={`ml-2 text-xs ${lengthChangePercent > 0 ? 'text-green-600' : 'text-orange-600'}`}>
+                    ({lengthChangePercent > 0 ? '+' : ''}{lengthChangePercent}%)
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
-        <h4 className="font-semibold mb-2 text-base">Inputs</h4>
+        <h4 className="font-semibold mb-2 text-base">Input Details</h4>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -278,25 +592,43 @@ const ContentTranscreatorHistoryDisplay = ({ inputs, outputs, status }: { inputs
             </TableHeader>
             <TableBody>
               <TableRow>
-                <TableCell>Original Content</TableCell>
-                <TableCell className="whitespace-pre-wrap">{inputs.content}</TableCell>
+                <TableCell>Source Language</TableCell>
+                <TableCell className="font-medium">
+                  {getLanguageName(inputs.sourceLanguage || 'en')} ({inputs.sourceLanguage || 'en'})
+                </TableCell>
               </TableRow>
-              {inputs.sourceLanguage && (
-                <TableRow>
-                  <TableCell>Source Language</TableCell>
-                  <TableCell>{inputs.sourceLanguage}</TableCell>
-                </TableRow>
-              )}
               <TableRow>
                 <TableCell>Target Brand ID</TableCell>
-                <TableCell>{inputs.brand_id}</TableCell>
+                <TableCell className="font-mono text-sm">{inputs.brand_id}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Content Statistics</TableCell>
+                <TableCell>
+                  <div className="space-y-1">
+                    <p>{originalWords} words</p>
+                    <p className="text-sm text-muted-foreground">{originalLength} characters</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Original Content Preview</TableCell>
+                <TableCell>
+                  <div className="max-h-32 overflow-y-auto">
+                    <p className="whitespace-pre-wrap text-sm">
+                      {inputs.content.length > 500 ? 
+                        `${inputs.content.substring(0, 500)}...` : 
+                        inputs.content}
+                    </p>
+                  </div>
+                </TableCell>
               </TableRow>
             </TableBody>
           </Table>
         </div>
       </div>
+
       <div>
-        <h4 className="font-semibold mb-2 text-base">Outputs</h4>
+        <h4 className="font-semibold mb-2 text-base">Output Results</h4>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -309,23 +641,56 @@ const ContentTranscreatorHistoryDisplay = ({ inputs, outputs, status }: { inputs
               {status === 'success' && outputs.transCreatedContent && (
                 <>
                   <TableRow>
-                    <TableCell>Trans-created Content</TableCell>
-                    <TableCell className="whitespace-pre-wrap">{(outputs as ContentTranscreatorSuccessOutputs).transCreatedContent}</TableCell>
-                  </TableRow>
-                  <TableRow>
                     <TableCell>Target Language</TableCell>
-                    <TableCell>{(outputs as ContentTranscreatorSuccessOutputs).targetLanguage}</TableCell>
+                    <TableCell className="font-medium">
+                      {getLanguageName((outputs as ContentTranscreatorSuccessOutputs).targetLanguage)} 
+                      ({(outputs as ContentTranscreatorSuccessOutputs).targetLanguage})
+                    </TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell>Target Country</TableCell>
-                    <TableCell>{(outputs as ContentTranscreatorSuccessOutputs).targetCountry}</TableCell>
+                    <TableCell>Target Market</TableCell>
+                    <TableCell className="font-medium">
+                      {getCountryName((outputs as ContentTranscreatorSuccessOutputs).targetCountry)} 
+                      ({(outputs as ContentTranscreatorSuccessOutputs).targetCountry})
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Trans-created Statistics</TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <p>{transCreatedWords} words</p>
+                        <p className="text-sm text-muted-foreground">{transCreatedLength} characters</p>
+                        {lengthChangePercent !== 0 && (
+                          <Badge variant={lengthChangePercent > 20 || lengthChangePercent < -20 ? "outline" : "secondary"}>
+                            {lengthChangePercent > 0 ? '+' : ''}{lengthChangePercent}% length change
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={2}>
+                      <div className="space-y-2">
+                        <p className="font-medium">Trans-created Content:</p>
+                        <div className="bg-muted/30 rounded-md p-4 max-h-64 overflow-y-auto">
+                          <p className="whitespace-pre-wrap text-sm">
+                            {(outputs as ContentTranscreatorSuccessOutputs).transCreatedContent}
+                          </p>
+                        </div>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 </>
               )}
               {status === 'failure' && outputs.error && (
                 <TableRow>
                   <TableCell>Error</TableCell>
-                  <TableCell className="whitespace-pre-wrap text-destructive">{(outputs as ContentTranscreatorFailureOutputs).error}</TableCell>
+                  <TableCell>
+                    <div className="space-y-2">
+                      <Badge variant="destructive">Failed</Badge>
+                      <p className="text-sm text-destructive">{(outputs as ContentTranscreatorFailureOutputs).error}</p>
+                    </div>
+                  </TableCell>
                 </TableRow>
               )}
                {status === 'success' && !outputs.transCreatedContent && !outputs.error && (
@@ -463,7 +828,7 @@ export default function ToolRunHistoryDetailPage() {
 
   if (error && !historyItem) { // If there was an error and no item was loaded
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 bg-gray-50 min-h-screen">
+      <div className="space-y-6 bg-gray-50 min-h-screen">
         <Breadcrumbs items={[{label: 'Dashboard', href: '/dashboard'}, {label: 'Tool History', href: '/dashboard/tools/history'}, {label: 'Error'}]} />
         <div className="flex flex-col items-center justify-center h-[calc(100vh-15rem)] p-6 text-center">
             <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
@@ -479,7 +844,7 @@ export default function ToolRunHistoryDetailPage() {
 
   if (!historyItem) { // If no error but item is still null (e.g., not found but no specific error thrown to UI)
      return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 bg-gray-50 min-h-screen">
+      <div className="space-y-6 bg-gray-50 min-h-screen">
         <Breadcrumbs items={[{label: 'Dashboard', href: '/dashboard'}, {label: 'Tool History', href: '/dashboard/tools/history'}, {label: 'Not Found'}]} />
         <div className="flex flex-col items-center justify-center h-[calc(100vh-15rem)] p-6 text-center">
             <AlertTriangle className="h-16 w-16 text-orange-500 mb-4" />
@@ -504,7 +869,7 @@ export default function ToolRunHistoryDetailPage() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6">
+    <div className="space-y-6">
       <Breadcrumbs 
         items={[
           { label: 'Dashboard', href: '/dashboard' },
@@ -538,7 +903,7 @@ export default function ToolRunHistoryDetailPage() {
             {formatToolName(historyItem.tool_name)} - Run Overview
           </CardTitle>
           <CardDescription>
-            Run executed on {format(new Date(historyItem.run_at), 'dd MMMM yyyy, HH:mm')}
+            Run executed on {format(new Date(historyItem.run_at), 'MMMM d, yyyy, HH:mm')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

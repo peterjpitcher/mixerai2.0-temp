@@ -33,6 +33,7 @@ const requestBodySchema = z.object({
   ingredient_id: z.string().uuid().optional().nullable(),
   product_ids: z.array(z.string().uuid()).optional().default([]),
   country_codes: z.array(z.string().min(2)).min(1, "At least one country/market must be selected."),
+  workflow_id: z.string().uuid().optional().nullable(), // Added for workflow support
 }).refine(data => {
   if (data.level === 'brand' && !data.master_brand_id) return false;
   if (data.level === 'product' && (!data.product_ids || data.product_ids.length === 0)) return false;
@@ -58,12 +59,19 @@ export const GET = withAuth(async (req: NextRequest) => {
         const includeMasterBrandName = searchParams.get('includeMasterBrandName') === 'true';
         const includeProductNames = searchParams.get('includeProductNames') === 'true';
         const includeIngredientName = searchParams.get('includeIngredientName') === 'true';
+        
+        // Pagination parameters
+        const page = parseInt(searchParams.get('page') || '1', 10);
+        const limit = parseInt(searchParams.get('limit') || '50', 10);
+        const validatedPage = Math.max(1, page);
+        const validatedLimit = Math.min(100, Math.max(1, limit)); // Cap at 100 items per page
+        const offset = (validatedPage - 1) * validatedLimit;
 
         const supabase = createSupabaseAdminClient();
         
-        let selectStatement = '*,';
+        let selectStatement = '*, workflow_id, workflow_status, current_workflow_step,';
         if (includeMasterBrandName) selectStatement += 'master_claim_brands(name),';
-        if (includeProductNames) selectStatement += 'products(name),';
+        if (includeProductNames) selectStatement += 'products!claims_product_id_fkey(name),';
         if (includeIngredientName) selectStatement += 'ingredients(name),';
         selectStatement = selectStatement.slice(0, -1); // remove last ','
 
@@ -83,7 +91,9 @@ export const GET = withAuth(async (req: NextRequest) => {
             query = query.eq('level', levelFilter as 'brand' | 'product' | 'ingredient');
         }
         
-        const { data, error } = await query.order('created_at', { ascending: false });
+        const { data, error, count } = await query
+            .order('created_at', { ascending: false })
+            .range(offset, offset + validatedLimit - 1);
 
         if (error) {
             console.error('[API Claims GET] Error fetching claims:', error);
@@ -95,7 +105,7 @@ export const GET = withAuth(async (req: NextRequest) => {
         const processedData = Array.isArray(data) ? data.map((claim: any) => ({
             ...claim,
             master_brand_name: (claim.master_claim_brands && typeof claim.master_claim_brands === 'object' && claim.master_claim_brands !== null && 'name' in claim.master_claim_brands) ? claim.master_claim_brands.name : null,
-            product_names: (claim.products && typeof claim.products === 'object' && claim.products !== null && 'name' in claim.products) ? [claim.products.name] : [],
+            product_names: (claim['products!claims_product_id_fkey'] && typeof claim['products!claims_product_id_fkey'] === 'object' && claim['products!claims_product_id_fkey'] !== null && 'name' in claim['products!claims_product_id_fkey']) ? [claim['products!claims_product_id_fkey'].name] : [],
             ingredient_name: (claim.ingredients && typeof claim.ingredients === 'object' && claim.ingredients !== null && 'name' in claim.ingredients) ? claim.ingredients.name : null,
             // Ensure country_codes is an array for client-side consistency.
             // This API returns one record per country_code, so we set it up as an array of one.
@@ -107,7 +117,23 @@ export const GET = withAuth(async (req: NextRequest) => {
         // A more advanced implementation could group claims here, but for now we will let the client handle it.
         // The old `validatedData` mapping was redundant as we are now processing the data.
 
-        return NextResponse.json({ success: true, data: processedData });
+        // Calculate pagination metadata
+        const totalPages = count ? Math.ceil(count / validatedLimit) : 0;
+        const hasNextPage = validatedPage < totalPages;
+        const hasPreviousPage = validatedPage > 1;
+        
+        return NextResponse.json({ 
+            success: true, 
+            data: processedData,
+            pagination: {
+                page: validatedPage,
+                limit: validatedLimit,
+                total: count || 0,
+                totalPages,
+                hasNextPage,
+                hasPreviousPage
+            }
+        });
 
     } catch (error: unknown) {
         console.error('[API Claims GET] Catched error:', error);
@@ -145,7 +171,8 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
         master_brand_id,
         ingredient_id,
         product_ids,
-        country_codes 
+        country_codes,
+        workflow_id 
     } = parsedBody.data;
 
     // --- Permission Check Start ---
@@ -300,6 +327,25 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
                 return NextResponse.json({ success: false, error: 'One or more claims already exist with the same text, level, entity, country, and type.', details: error.message }, { status: 409 });
             }
             return NextResponse.json({ success: false, error: 'Failed to save claims to database.', details: error.message }, { status: 500 });
+        }
+
+        // If workflow_id is provided, assign workflow to each created claim
+        if (workflow_id && data && data.length > 0) {
+            console.log(`[API Claims POST] Assigning workflow ${workflow_id} to ${data.length} claim(s)`);
+            
+            for (const claim of data) {
+                const { data: workflowResult, error: workflowError } = await supabase.rpc('assign_workflow_to_claim', {
+                    p_claim_id: claim.id,
+                    p_workflow_id: workflow_id
+                });
+
+                if (workflowError) {
+                    console.error(`[API Claims POST] Error assigning workflow to claim ${claim.id}:`, workflowError);
+                    // Continue with other claims even if one fails
+                } else {
+                    console.log(`[API Claims POST] Workflow assigned to claim ${claim.id}:`, workflowResult);
+                }
+            }
         }
 
         return NextResponse.json({ success: true, message: `${data ? data.length : 0} claim(s) created successfully.`, claims: data });

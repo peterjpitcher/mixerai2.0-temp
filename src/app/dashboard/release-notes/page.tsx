@@ -1,11 +1,12 @@
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
+import { format } from 'date-fns';
 
 export default function ReleaseNotesPage() {
-  const currentDate = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+  const currentDate = format(new Date(), 'MMMM d, yyyy');
 
   return (
-    <div className="space-y-6 px-4 sm:px-6 lg:px-8 py-6">
+    <div className="space-y-6">
       <header className="space-y-1 mb-6">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Release Notes</h1>
         <p className="text-muted-foreground">
@@ -16,9 +17,80 @@ export default function ReleaseNotesPage() {
       
       <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
         
-        {/* LATEST RELEASE - DASHBOARD REDESIGN & STABILIZATION */}
+        {/* LATEST RELEASE - BRAND LOGO UPLOAD & DOCUMENTATION UPDATES */}
         <section className="mb-12">
           <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            This release introduces brand logo upload functionality, improves documentation, and updates migration paths across the codebase for better maintainability.
+          </p>
+
+          <h3>Key Features & Enhancements</h3>
+          <h4>Brand Logo Management</h4>
+          <ul>
+            <li>
+              <strong>Logo Upload Capability:</strong> Brands can now upload custom logos through the brand edit interface. The feature includes:
+              <ul>
+                <li>Support for common image formats (PNG, JPG, JPEG, WebP)</li>
+                <li>Automatic image optimization and storage in Supabase Storage</li>
+                <li>Real-time preview during upload</li>
+                <li>Ability to remove existing logos</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Logo Display Integration:</strong> Brand logos are now displayed throughout the application:
+              <ul>
+                <li>Brand listings show logos with automatic fallback to brand initials</li>
+                <li>Brand detail pages prominently feature the logo</li>
+                <li>Navigation brand selector includes logo avatars</li>
+                <li>Consistent avatar styling across all brand references</li>
+              </ul>
+            </li>
+          </ul>
+
+          <h4>Documentation Improvements</h4>
+          <ul>
+            <li>
+              <strong>CLAUDE.md Updates:</strong> Enhanced the AI assistant guidelines with:
+              <ul>
+                <li>AI title generation feature documentation</li>
+                <li>Expanded user role descriptions with specific permissions</li>
+                <li>Updated UI Standards version reference to 2.0</li>
+                <li>Added missing documentation file references</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Migration Path Standardization:</strong> Updated all references to database migrations across documentation and scripts to use the new <code>migrations_backup/</code> directory structure, ensuring consistency throughout the codebase.
+            </li>
+          </ul>
+
+          <h4>Bug Fixes</h4>
+          <ul>
+            <li>
+              <strong>TypeScript Error Resolution:</strong> Fixed a type error in the claims workflow route where optional chaining was incorrectly applied to a required property.
+            </li>
+            <li>
+              <strong>Build Error Fixes:</strong> Resolved multiple build errors related to the brand logo implementation, ensuring clean production builds.
+            </li>
+          </ul>
+
+          <h4>Infrastructure Updates</h4>
+          <ul>
+            <li>
+              <strong>GitHub Integration:</strong> Resolved merge conflicts with the main branch, incorporating the new activity tracking system that replaces the previous token usage tracking.
+            </li>
+            <li>
+              <strong>Migration Organization:</strong> Database migrations have been reorganized into a <code>migrations_backup/</code> directory with an archive subfolder for better version control and maintenance.
+            </li>
+          </ul>
+
+          <p className="mt-4">
+            For any issues or feedback, please create an issue in our <Link href="https://github.com/gmi-common/mixerai2.0/issues" target="_blank" rel="noopener noreferrer">GitHub repository</Link>.
+          </p>
+        </section>
+        
+        {/* PREVIOUS RELEASE - DASHBOARD REDESIGN & STABILIZATION */}
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold border-b pb-2 mb-4">Release: December 17, 2024</h2>
           <p className="text-sm text-muted-foreground mb-4">
             This release introduces a complete overhaul of the main dashboard, replacing the previous workflow matrix with a more dynamic and insightful interface. It also includes critical bug fixes to stabilize the application&apos;s data-fetching and permission systems.
           </p>
@@ -50,7 +122,7 @@ export default function ReleaseNotesPage() {
             </li>
           </ul>
           <p className="mt-4">
-            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+            For any issues or feedback, please create an issue in our <Link href="https://github.com/gmi-common/mixerai2.0/issues" target="_blank" rel="noopener noreferrer">GitHub repository</Link>.
           </p>
         </section>
         
@@ -81,7 +153,7 @@ export default function ReleaseNotesPage() {
             </li>
           </ul>
           <p className="mt-4">
-            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+            For any issues or feedback, please create an issue in our <Link href="https://github.com/gmi-common/mixerai2.0/issues" target="_blank" rel="noopener noreferrer">GitHub repository</Link>.
           </p>
         </section>
 
@@ -130,7 +202,7 @@ export default function ReleaseNotesPage() {
             </li>
           </ul>
           <p className="mt-4">
-            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+            For any issues or feedback, please create an issue in our <Link href="https://github.com/gmi-common/mixerai2.0/issues" target="_blank" rel="noopener noreferrer">GitHub repository</Link>.
           </p>
         </section>
         
@@ -169,7 +241,7 @@ export default function ReleaseNotesPage() {
             </li>
           </ul>
           <p className="mt-4">
-            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+            For any issues or feedback, please create an issue in our <Link href="https://github.com/gmi-common/mixerai2.0/issues" target="_blank" rel="noopener noreferrer">GitHub repository</Link>.
           </p>
         </section>
 
@@ -205,7 +277,7 @@ export default function ReleaseNotesPage() {
             </li>
           </ul>
           <p className="mt-4">
-            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+            For any issues or feedback, please create an issue in our <Link href="https://github.com/gmi-common/mixerai2.0/issues" target="_blank" rel="noopener noreferrer">GitHub repository</Link>.
           </p>
         </section>
 
@@ -225,7 +297,7 @@ export default function ReleaseNotesPage() {
             <li>This prevents errors such as &quot;Name and fields are required&quot; or &quot;Name, inputFields, and outputFields are required&quot; during template management.</li>
           </ul>
           <p className="mt-4">
-            For any issues or feedback, please use the <Link href="/dashboard/admin/feedback-log">Feedback Log</Link>.
+            For any issues or feedback, please create an issue in our <Link href="https://github.com/gmi-common/mixerai2.0/issues" target="_blank" rel="noopener noreferrer">GitHub repository</Link>.
           </p>
         </section>
 

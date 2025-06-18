@@ -132,7 +132,7 @@ export default function NewProductPage() {
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
       <div className="mb-4">
         <Button variant="outline" size="sm" asChild>
           <Link href="/dashboard/claims/products">  {/* Updated back link path */}
@@ -156,58 +156,64 @@ export default function NewProductPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Product Name <span className="text-red-500">*</span></Label>
-              <Input 
-                id="name" 
-                name="name" 
-                value={formData.name}
-                onChange={handleInputChange} 
-                placeholder="e.g., Super Immune Booster Capsules"
-                maxLength={255}
-                className={errors.name ? "border-red-500" : ""}
-              />
-              {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+            <div className="grid grid-cols-12 gap-4">
+              <Label htmlFor="name" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Product Name <span className="text-red-500">*</span></Label>
+              <div className="col-span-12 sm:col-span-9">
+                <Input 
+                  id="name" 
+                  name="name" 
+                  value={formData.name}
+                  onChange={handleInputChange} 
+                  placeholder="e.g., Super Immune Booster Capsules"
+                  maxLength={255}
+                  className={errors.name ? "border-red-500" : ""}
+                />
+                {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="master_brand_id">Master Claim Brand <span className="text-red-500">*</span></Label>
-              <Select 
-                value={formData.master_brand_id}
-                onValueChange={handleSelectChange}
-                disabled={isLoadingBrands}
-              >
-                <SelectTrigger className={errors.master_brand_id ? "border-red-500" : ""}>
-                  <SelectValue placeholder={isLoadingBrands ? "Loading brands..." : "Select a Master Claim Brand"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {masterBrands.length === 0 && !isLoadingBrands ? (
-                    <SelectItem value="" disabled>No brands available</SelectItem>
-                  ) : (
-                    masterBrands.map((brand) => (
-                      <SelectItem key={brand.id} value={brand.id}>
-                        {brand.name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-              {errors.master_brand_id && <p className="text-xs text-red-500 mt-1">{errors.master_brand_id}</p>}
+            <div className="grid grid-cols-12 gap-4">
+              <Label htmlFor="master_brand_id" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Master Claim Brand <span className="text-red-500">*</span></Label>
+              <div className="col-span-12 sm:col-span-9">
+                <Select 
+                  value={formData.master_brand_id}
+                  onValueChange={handleSelectChange}
+                  disabled={isLoadingBrands}
+                >
+                  <SelectTrigger className={errors.master_brand_id ? "border-red-500" : ""}>
+                    <SelectValue placeholder={isLoadingBrands ? "Loading brands..." : "Select a Master Claim Brand"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {masterBrands.length === 0 && !isLoadingBrands ? (
+                      <SelectItem value="" disabled>No brands available</SelectItem>
+                    ) : (
+                      masterBrands.map((brand) => (
+                        <SelectItem key={brand.id} value={brand.id}>
+                          {brand.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {errors.master_brand_id && <p className="text-xs text-red-500 mt-1">{errors.master_brand_id}</p>}
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Description (Optional)</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={formData.description || ''}
-                onChange={handleInputChange}
-                placeholder="Provide a brief description of the product..."
-                rows={4}
-                maxLength={1000}
-                className={errors.description ? "border-red-500" : ""}
-              />
-              {errors.description && <p className="text-xs text-red-500 mt-1">{errors.description}</p>}
+            <div className="grid grid-cols-12 gap-4">
+              <Label htmlFor="description" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Description (Optional)</Label>
+              <div className="col-span-12 sm:col-span-9">
+                <Textarea
+                  id="description"
+                  name="description"
+                  value={formData.description || ''}
+                  onChange={handleInputChange}
+                  placeholder="Provide a brief description of the product..."
+                  rows={4}
+                  maxLength={1000}
+                  className={errors.description ? "border-red-500" : ""}
+                />
+                {errors.description && <p className="text-xs text-red-500 mt-1">{errors.description}</p>}
+              </div>
             </div>
           </CardContent>
           <CardFooter className="flex justify-end space-x-2">

@@ -67,7 +67,7 @@ MixerAI2.0/
 │   ├── types/                    # TypeScript type definitions
 │   └── content/                  # Static content (help wiki)
 ├── docs/                         # Project documentation
-├── migrations/                   # Database migrations
+├── supabase/migrations/          # Database migrations
 ├── scripts/                      # Utility scripts
 └── public/                       # Static assets
 ```

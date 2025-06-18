@@ -152,7 +152,7 @@ export default function EditMasterClaimBrandPage() {
   
   if (!id && !isLoading) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
         <h2 className="text-xl font-semibold mb-2">Invalid Page URL</h2>
         <p className="text-muted-foreground mb-4 text-center max-w-md">
@@ -169,7 +169,7 @@ export default function EditMasterClaimBrandPage() {
 
   if (isLoading) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 flex justify-center items-center min-h-[calc(100vh-200px)]">
+      <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="ml-2 text-muted-foreground">Loading brand details...</p>
       </div>
@@ -178,7 +178,7 @@ export default function EditMasterClaimBrandPage() {
 
   if (error && !isLoading) { 
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
         <h2 className="text-xl font-semibold mb-2">Failed to Load Data</h2>
         <p className="text-muted-foreground mb-4 text-center max-w-md">{error}</p>
@@ -192,7 +192,7 @@ export default function EditMasterClaimBrandPage() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
       <Breadcrumbs items={breadcrumbItems} />
       <PageHeader 
         title={pageTitle} 
@@ -208,34 +208,38 @@ export default function EditMasterClaimBrandPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Brand Name <span className="text-red-500">*</span></Label>
-              <Input 
-                id="name" 
-                name="name" 
-                value={formData.name}
-                onChange={handleInputChange} 
-                placeholder="e.g., Master Food Corp Claims" 
-                maxLength={255}
-                className={formErrors.name ? "border-red-500" : ""}
-              />
-              {formErrors.name && <p className="text-xs text-red-500 mt-1">{formErrors.name}</p>}
+            <div className="grid grid-cols-12 gap-4 items-start">
+              <Label htmlFor="name" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Brand Name <span className="text-red-500">*</span></Label>
+              <div className="col-span-12 sm:col-span-9">
+                <Input 
+                  id="name" 
+                  name="name" 
+                  value={formData.name}
+                  onChange={handleInputChange} 
+                  placeholder="e.g., Master Food Corp Claims" 
+                  maxLength={255}
+                  className={formErrors.name ? "border-red-500" : ""}
+                />
+                {formErrors.name && <p className="text-xs text-red-500 mt-1">{formErrors.name}</p>}
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="mixerai_brand_id">MixerAI Brand ID (Optional)</Label>
-              <Input 
-                id="mixerai_brand_id" 
-                name="mixerai_brand_id" 
-                value={formData.mixerai_brand_id || ''} 
-                onChange={handleInputChange}
-                placeholder="Enter associated MixerAI Brand ID (UUID)"
-                maxLength={36} 
-                className={formErrors.mixerai_brand_id ? "border-red-500" : ""}
-              />
-              {formErrors.mixerai_brand_id && <p className="text-xs text-red-500 mt-1">{formErrors.mixerai_brand_id}</p>}
-              <p className="text-xs text-muted-foreground mt-1">
-                If this Master Claim Brand corresponds to an existing brand in MixerAI, enter its ID here.
-              </p>
+            <div className="grid grid-cols-12 gap-4 items-start">
+              <Label htmlFor="mixerai_brand_id" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">MixerAI Brand ID (Optional)</Label>
+              <div className="col-span-12 sm:col-span-9">
+                <Input 
+                  id="mixerai_brand_id" 
+                  name="mixerai_brand_id" 
+                  value={formData.mixerai_brand_id || ''} 
+                  onChange={handleInputChange}
+                  placeholder="Enter associated MixerAI Brand ID (UUID)"
+                  maxLength={36} 
+                  className={formErrors.mixerai_brand_id ? "border-red-500" : ""}
+                />
+                {formErrors.mixerai_brand_id && <p className="text-xs text-red-500 mt-1">{formErrors.mixerai_brand_id}</p>}
+                <p className="text-xs text-muted-foreground mt-1">
+                  If this Master Claim Brand corresponds to an existing brand in MixerAI, enter its ID here.
+                </p>
+              </div>
             </div>
           </CardContent>
           <CardFooter className="flex justify-end space-x-2">

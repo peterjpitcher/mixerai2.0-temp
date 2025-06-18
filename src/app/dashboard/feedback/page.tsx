@@ -15,6 +15,7 @@ import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 import { FeedbackSubmitForm } from '@/components/feedback/FeedbackSubmitForm'; // Import the new form
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'; // Import Dialog components
+import { format } from 'date-fns';
 
 // Matches ENUMs in DB (copied from admin page for consistency)
 const feedbackTypes = ['bug', 'enhancement'] as const;
@@ -176,7 +177,7 @@ export default function ViewFeedbackPage() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
       <div className="mb-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -314,7 +315,7 @@ export default function ViewFeedbackPage() {
                         <TableCell>{item.priority}</TableCell>
                         <TableCell>{item.status}</TableCell>
                         <TableCell className="max-w-[150px] truncate" title={item.affected_area || undefined}>{item.affected_area || 'N/A'}</TableCell>
-                        <TableCell>{new Date(item.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell>{format(new Date(item.created_at), 'MMMM d, yyyy')}</TableCell>
                         </TableRow>
                     ))}
                     </TableBody>

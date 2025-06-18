@@ -892,6 +892,7 @@ export async function generateAltText(
 Analyze the provided image and generate a descriptive alt text in ${brandLanguage}.
 Focus on the main subject, context, and any relevant text visible in the image.
 Be factual and avoid subjective interpretations.
+IMPORTANT: Do NOT include color descriptions in the alt text for accessibility reasons. Focus on shape, size, position, content, and function instead of colors.
 If the image is decorative and doesn't convey information, you can indicate that, but prefer descriptive text if possible.`;
 
   if (brandContext?.toneOfVoice) {

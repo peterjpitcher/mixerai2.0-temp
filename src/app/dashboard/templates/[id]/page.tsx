@@ -328,7 +328,7 @@ export default function TemplateEditPage() {
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+    <div className="space-y-8">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" }, 
         { label: "Content Templates", href: "/dashboard/templates" }, 

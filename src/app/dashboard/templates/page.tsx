@@ -1,14 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Loader2, PlusCircle, LayoutTemplate, Edit3, Eye, Trash2, ShieldAlert, Copy } from 'lucide-react';
+import { Loader2, PlusCircle, LayoutTemplate, ShieldAlert, Copy, Eye, Edit, Trash2, MoreVertical, Pencil } from 'lucide-react';
+import { format } from 'date-fns';
 import type { InputField, OutputField } from '@/types/template';
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +20,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 // Placeholder Breadcrumbs component - replace with actual implementation later
 const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
@@ -52,6 +59,7 @@ interface Template {
   brand_id?: string | null;
   usageCount?: number;
   created_at?: string;
+  updated_at?: string;
   created_by?: string;
 }
 
@@ -216,6 +224,139 @@ export default function TemplatesPage() {
   };
 
   const isGlobalAdmin = currentUser?.user_metadata?.role === 'admin';
+  
+  // Define columns for the data table
+  const columns: DataTableColumn<Template>[] = [
+    {
+      id: "name",
+      header: "Template Name",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          {row.icon && (
+            <span className="text-xl">{row.icon}</span>
+          )}
+          <span className="font-medium">{row.name}</span>
+        </div>
+      ),
+      enableSorting: true,
+    },
+    {
+      id: "inputFields",
+      header: "Input Fields",
+      cell: ({ row }) => (
+        <Badge variant="secondary">
+          {row.fields.inputFields.length} field{row.fields.inputFields.length !== 1 ? 's' : ''}
+        </Badge>
+      ),
+      enableSorting: true,
+      sortingFn: (a, b) => a.fields.inputFields.length - b.fields.inputFields.length,
+    },
+    {
+      id: "outputFields",
+      header: "Output Fields",
+      cell: ({ row }) => (
+        <Badge variant="secondary">
+          {row.fields.outputFields.length} field{row.fields.outputFields.length !== 1 ? 's' : ''}
+        </Badge>
+      ),
+      enableSorting: true,
+      sortingFn: (a, b) => a.fields.outputFields.length - b.fields.outputFields.length,
+    },
+    {
+      id: "usageCount",
+      header: "Usage",
+      cell: ({ row }) => (
+        <div className="text-center">
+          <span className="font-medium">
+            {row.usageCount || 0}
+          </span>
+          <span className="text-sm text-muted-foreground block">
+            time{(row.usageCount || 0) !== 1 ? 's' : ''}
+          </span>
+        </div>
+      ),
+      enableSorting: true,
+      sortingFn: (a, b) => (a.usageCount || 0) - (b.usageCount || 0),
+    },
+    {
+      id: "updated_at",
+      header: "Last updated",
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground">
+          {row.updated_at ? format(new Date(row.updated_at), 'MMMM d, yyyy') : row.created_at ? format(new Date(row.created_at), 'MMMM d, yyyy') : 'N/A'}
+        </span>
+      ),
+      enableSorting: true,
+      sortingFn: (a, b) => {
+        const dateA = a.updated_at ? new Date(a.updated_at).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
+        const dateB = b.updated_at ? new Date(b.updated_at).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
+        return dateA - dateB;
+      },
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => (
+        <div className="flex items-center justify-end">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span className="sr-only">Open menu</span>
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/dashboard/templates/${row.id}`);
+                }}
+              >
+                <Eye className="mr-2 h-4 w-4" /> View
+              </DropdownMenuItem>
+              {isGlobalAdmin && (
+                <>
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/dashboard/templates/${row.id}`);
+                    }}
+                  >
+                    <Pencil className="mr-2 h-4 w-4" /> Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDuplicateTemplate(row);
+                    }}
+                    disabled={isDuplicating === row.id}
+                  >
+                    <Copy className="mr-2 h-4 w-4" /> Duplicate
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTemplateToDelete(row);
+                      setShowDeleteDialog(true);
+                    }}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ),
+      className: "w-[120px]",
+    },
+  ];
 
   if (isLoadingUser || loading) { // Combined loading state
     return (
@@ -240,7 +381,7 @@ export default function TemplatesPage() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+    <div className="space-y-8">
       <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Content Templates" }]} />
       <div className="flex justify-between items-start">
         <div>
@@ -259,94 +400,34 @@ export default function TemplatesPage() {
         )}
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {templates.map(template => (
-          <Card key={template.id} className="flex flex-col">
-            <CardHeader className="pb-3">
-              <div>
-                <CardTitle className="text-xl">{template.name}</CardTitle>
-                <CardDescription className="mt-1 h-10 overflow-hidden text-ellipsis">
-                  {template.description || 'No description provided.'}
-                </CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="flex-grow pt-2">
-              <div className="space-y-2">
-                <Badge variant="outline" className="flex items-center w-fit">
-                  <LayoutTemplate className="mr-1.5 h-3.5 w-3.5" />
-                  {template.fields.inputFields.length} input field{template.fields.inputFields.length !== 1 ? 's' : ''}
-                </Badge>
-                <Badge variant="outline" className="flex items-center w-fit">
-                  <LayoutTemplate className="mr-1.5 h-3.5 w-3.5" />
-                  {template.fields.outputFields.length} output field{template.fields.outputFields.length !== 1 ? 's' : ''}
-                </Badge>
-                <div className="text-sm text-muted-foreground pt-2">
-                  Used: {template.usageCount !== undefined ? template.usageCount : '0'} time{template.usageCount !== 1 ? 's' : ''}
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="border-t pt-4 flex justify-between items-center">
-              <div className="flex gap-2 flex-wrap">
-                <Button variant="outline" size="sm" asChild title="View this template">
-                  <Link href={`/dashboard/templates/${template.id}`} className="flex items-center">
-                    <Eye className="mr-2 h-4 w-4" /> View
-                  </Link>
-                </Button>
-                {isGlobalAdmin && (
-                  <>
-                    <Button variant="ghost" size="sm" asChild title="Edit this template">
-                      <Link href={`/dashboard/templates/${template.id}`} className="flex items-center">
-                        <Edit3 className="mr-2 h-4 w-4" /> Edit
-                      </Link>
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => handleDuplicateTemplate(template)}
-                      disabled={isDuplicating === template.id}
-                      title="Duplicate this template"
-                      className="flex items-center"
-                    >
-                      {isDuplicating === template.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Copy className="mr-2 h-4 w-4" />}
-                      Duplicate
-                    </Button>
-                  </>
-                )}
-              </div>
-              {isGlobalAdmin && (
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  className="text-destructive hover:text-destructive/90 shrink-0"
-                  title="Delete this template"
-                  onClick={() => {
-                    setTemplateToDelete(template);
-                    setShowDeleteDialog(true);
-                  }}
-                  disabled={isDuplicating === template.id}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
-            </CardFooter>
-          </Card>
-        ))}
-        
-        {templates.length === 0 && !loading && isGlobalAdmin && (
-          <div className="md:col-span-2 lg:col-span-3 text-center py-10">
-            <LayoutTemplate className="mx-auto h-12 w-12 text-muted-foreground/70" />
-            <h3 className="mt-4 text-lg font-medium">No Templates Found</h3>
-            <p className="mt-1 text-sm text-muted-foreground mb-6">
-                Create your first content template to get started.
-            </p>
-            <Link href="/dashboard/templates/new">
-                <Button>
-                    <PlusCircle className="mr-2 h-4 w-4" /> Create Your First Template
-                </Button>
-            </Link>
-          </div>
-        )}
-      </div>
+      {templates.length === 0 && !loading ? (
+        <div className="text-center py-10">
+          <LayoutTemplate className="mx-auto h-12 w-12 text-muted-foreground/70" />
+          <h3 className="mt-4 text-lg font-medium">No Templates Found</h3>
+          <p className="mt-1 text-sm text-muted-foreground mb-6">
+              Create your first content template to get started.
+          </p>
+          <Link href="/dashboard/templates/new">
+              <Button>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Create Your First Template
+              </Button>
+          </Link>
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={templates}
+          searchKey="name"
+          searchPlaceholder="Search templates by name..."
+          onRowClick={(row) => router.push(`/dashboard/templates/${row.id}`)}
+          emptyState={
+            <div className="flex flex-col items-center justify-center py-8">
+              <h3 className="text-xl font-bold mb-2">No templates found</h3>
+              <p className="text-muted-foreground mb-4">No templates match your search criteria.</p>
+            </div>
+          }
+        />
+      )}
 
       {/* AlertDialog for delete confirmation */}
       {isGlobalAdmin && templateToDelete && (

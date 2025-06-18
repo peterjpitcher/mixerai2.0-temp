@@ -85,8 +85,21 @@ if ! psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "postgres" -lqt | cut -d 
   psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "postgres" -c "CREATE DATABASE $DB_NAME;"
 fi
 
-# Run the consolidated migration
+# Run migrations from supabase/migrations directory
 echo "Running migrations..."
-run_sql_file "migrations/consolidated_migrations.sql"
+MIGRATIONS_DIR="supabase/migrations"
+
+# Check if migrations directory exists
+if [ ! -d "$MIGRATIONS_DIR" ]; then
+  echo "Error: Migrations directory $MIGRATIONS_DIR does not exist"
+  exit 1
+fi
+
+# Run migrations in sorted order
+for migration in $(ls "$MIGRATIONS_DIR"/*.sql 2>/dev/null | sort); do
+  if [ -f "$migration" ]; then
+    run_sql_file "$migration"
+  fi
+done
 
 echo "Migrations completed successfully!" 

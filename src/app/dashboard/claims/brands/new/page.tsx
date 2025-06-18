@@ -82,7 +82,7 @@ export default function NewMasterClaimBrandPage() {
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
       <div className="mb-4">
         <Button variant="outline" size="sm" asChild>
           <Link href="/dashboard/claims/brands"> {/* Updated back link path */}
@@ -106,34 +106,38 @@ export default function NewMasterClaimBrandPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Brand Name <span className="text-red-500">*</span></Label>
-              <Input 
-                id="name" 
-                name="name" 
-                value={formData.name}
-                onChange={handleInputChange} 
-                placeholder="e.g., Master Food Corp Claims" 
-                maxLength={255}
-                className={errors.name ? "border-red-500" : ""}
-              />
-              {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+            <div className="grid grid-cols-12 gap-4 items-start">
+              <Label htmlFor="name" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Brand Name <span className="text-red-500">*</span></Label>
+              <div className="col-span-12 sm:col-span-9">
+                <Input 
+                  id="name" 
+                  name="name" 
+                  value={formData.name}
+                  onChange={handleInputChange} 
+                  placeholder="e.g., Master Food Corp Claims" 
+                  maxLength={255}
+                  className={errors.name ? "border-red-500" : ""}
+                />
+                {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="mixerai_brand_id">MixerAI Brand ID (Optional)</Label>
-              <Input 
-                id="mixerai_brand_id" 
-                name="mixerai_brand_id" 
-                value={formData.mixerai_brand_id || ''} 
-                onChange={handleInputChange}
-                placeholder="Enter associated MixerAI Brand ID (UUID)"
-                maxLength={36}
-                className={errors.mixerai_brand_id ? "border-red-500" : ""}
-              />
-              {errors.mixerai_brand_id && <p className="text-xs text-red-500 mt-1">{errors.mixerai_brand_id}</p>}
-               <p className="text-xs text-muted-foreground mt-1">
-                If this Master Claim Brand corresponds to an existing brand in MixerAI, enter its ID here.
-              </p>
+            <div className="grid grid-cols-12 gap-4 items-start">
+              <Label htmlFor="mixerai_brand_id" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">MixerAI Brand ID (Optional)</Label>
+              <div className="col-span-12 sm:col-span-9">
+                <Input 
+                  id="mixerai_brand_id" 
+                  name="mixerai_brand_id" 
+                  value={formData.mixerai_brand_id || ''} 
+                  onChange={handleInputChange}
+                  placeholder="Enter associated MixerAI Brand ID (UUID)"
+                  maxLength={36}
+                  className={errors.mixerai_brand_id ? "border-red-500" : ""}
+                />
+                {errors.mixerai_brand_id && <p className="text-xs text-red-500 mt-1">{errors.mixerai_brand_id}</p>}
+                 <p className="text-xs text-muted-foreground mt-1">
+                  If this Master Claim Brand corresponds to an existing brand in MixerAI, enter its ID here.
+                </p>
+              </div>
             </div>
           </CardContent>
           <CardFooter className="flex justify-end space-x-2">

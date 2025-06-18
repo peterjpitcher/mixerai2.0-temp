@@ -23,6 +23,7 @@ interface TaskItem {
   brand_id?: string | null;
   brand_name: string | null;
   brand_color?: string | null;
+  brand_logo_url?: string | null;
   workflow_id?: string | null;
   workflow_name: string | null;
   workflow_step_id?: string | null;
@@ -83,7 +84,7 @@ export default function MyTasksPage() {
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
     try {
-      return formatDateFns(new Date(dateString), 'dd MMMM yyyy'); 
+      return formatDateFns(new Date(dateString), 'MMMM d, yyyy'); 
     } catch (e) {
       console.error("Error formatting date:", dateString, e);
       return "Invalid Date";
@@ -111,7 +112,7 @@ export default function MyTasksPage() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="space-y-6">
       <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "My Tasks" }]} />
       <div className="flex justify-between items-center">
         <div>
@@ -169,7 +170,7 @@ export default function MyTasksPage() {
                       </td>
                       <td className="p-3">
                         <div className="flex items-center">
-                          <BrandIcon name={task.brand_name || ''} color={task.brand_color ?? undefined} size="sm" className="mr-2" />
+                          <BrandIcon name={task.brand_name || ''} color={task.brand_color ?? undefined} logoUrl={task.brand_logo_url} size="sm" className="mr-2" />
                           {task.brand_name || 'N/A'}
                         </div>
                       </td>

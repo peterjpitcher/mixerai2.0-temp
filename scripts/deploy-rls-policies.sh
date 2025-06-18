@@ -28,7 +28,7 @@ apply_rls_policies() {
   }
   
   # Apply the policies
-  psql "${db_url}" -f migrations/auth-rls-policies.sql
+  psql "${db_url}" -f supabase/migrations/20240124_auth_rls_policies.sql
   
   if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ RLS policies successfully applied to ${db_name}${NC}"

@@ -25,6 +25,14 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     const query = url.searchParams.get('query');
     const requestedBrandId = url.searchParams.get('brandId');
     const requestedStatusParam = url.searchParams.get('status'); // 'active', 'approved', 'rejected', 'all', or a direct status value
+    
+    // Pagination parameters
+    const page = parseInt(url.searchParams.get('page') || '1', 10);
+    const limit = parseInt(url.searchParams.get('limit') || '50', 10);
+    const validatedPage = Math.max(1, page);
+    const validatedLimit = Math.min(100, Math.max(1, limit)); // Cap at 100 items per page
+    const offset = (validatedPage - 1) * validatedLimit;
+    
     const globalRole = user?.user_metadata?.role;
     let permittedBrandIds: string[] | null = null;
 
@@ -59,12 +67,12 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       .from('content')
       .select(`
         *,
-        brands ( name, brand_color ),
+        brands ( name, brand_color, logo_url ),
         content_types ( name ),
         creator_profile:profiles!created_by ( id, full_name, avatar_url ),
         content_templates ( name, icon ),
         current_step_details:workflow_steps!current_step ( name )
-      `)
+      `, { count: 'exact' })
       .order('updated_at', { ascending: false });
 
     if (query) {
@@ -108,7 +116,10 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       queryBuilder = queryBuilder.in('status', activeStatuses);
     }
 
-    const { data: contentItems, error: contentError } = await queryBuilder;
+    // Apply pagination
+    queryBuilder = queryBuilder.range(offset, offset + validatedLimit - 1);
+    
+    const { data: contentItems, error: contentError, count } = await queryBuilder;
 
     if (contentError) {
       console.error('Error fetching content:', contentError);
@@ -263,6 +274,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         brand_id: item.brand_id,
         brand_name: item.brands?.name || null,
         brand_color: item.brands?.brand_color || null,
+        brand_logo_url: item.brands?.logo_url || null,
         content_type_id: item.content_type_id,
         content_type_name: item.content_types?.name || null,
         created_by: item.created_by,
@@ -282,9 +294,22 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       };
     });
 
+    // Calculate pagination metadata
+    const totalPages = count ? Math.ceil(count / validatedLimit) : 0;
+    const hasNextPage = validatedPage < totalPages;
+    const hasPreviousPage = validatedPage > 1;
+    
     return NextResponse.json({
       success: true,
       data: formattedContent,
+      pagination: {
+        page: validatedPage,
+        limit: validatedLimit,
+        total: count || 0,
+        totalPages,
+        hasNextPage,
+        hasPreviousPage
+      }
     });
 
   } catch (error: unknown) {

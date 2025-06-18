@@ -2,7 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
-import { Pool } from 'pg'; // Import Pool for direct DB access
+// import { Pool } from 'pg'; // Removed - using Supabase instead
 import { getUserAuthByEmail, inviteNewUserWithAppMetadata } from '@/lib/auth/user-management';
 import { extractCleanDomain } from '@/lib/utils/url-utils'; // Added import
 import { User } from '@supabase/supabase-js';
@@ -10,15 +10,7 @@ import { User } from '@supabase/supabase-js';
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
 
-// Configure the connection pool
-const pool = new Pool({
-  host: process.env.POSTGRES_HOST,
-  port: process.env.POSTGRES_PORT ? parseInt(process.env.POSTGRES_PORT) : 5432,
-  user: process.env.POSTGRES_USER,
-  password: process.env.POSTGRES_PASSWORD,
-  database: process.env.POSTGRES_DB,
-  ssl: process.env.POSTGRES_SSL === 'true' ? { rejectUnauthorized: false } : false,
-});
+// Removed PostgreSQL pool configuration - using Supabase instead
 
 // Type for priority as it comes from Supabase (enum string values)
 type SupabaseVettingAgencyPriority = "High" | "Medium" | "Low" | null;
@@ -137,6 +129,17 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       });
     }
     
+    // Parse pagination parameters from query string
+    const searchParams = req.nextUrl.searchParams;
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '20', 10);
+    const search = searchParams.get('search') || '';
+    
+    // Validate pagination parameters
+    const validatedPage = Math.max(1, page);
+    const validatedLimit = Math.min(Math.max(1, limit), 100); // Max 100 items per page
+    const offset = (validatedPage - 1) * validatedLimit;
+    
     // console.log('Attempting to fetch brands from database');
     const supabase = createSupabaseAdminClient();
     
@@ -180,7 +183,15 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       // console.log(`User ${user.id} is a global admin. Fetching all brands.`);
     }
     
-    const { data: brandsData, error } = await brandsQuery.order('name');
+    // Add search filter if provided
+    if (search) {
+      brandsQuery = brandsQuery.or(`name.ilike.%${search}%,brand_summary.ilike.%${search}%`);
+    }
+    
+    // Apply ordering and pagination
+    brandsQuery = brandsQuery.order('name').range(offset, offset + validatedLimit - 1);
+    
+    const { data: brandsData, error, count } = await brandsQuery;
     
     if (error) {
       // console.error('Error executing brands query:', error);
@@ -236,9 +247,22 @@ export const GET = withAuth(async (req: NextRequest, user) => {
 
     // console.log(`Successfully fetched ${formattedBrands.length} brands`);
     
+    // Calculate pagination metadata
+    const totalPages = count ? Math.ceil(count / validatedLimit) : 0;
+    const hasNextPage = validatedPage < totalPages;
+    const hasPreviousPage = validatedPage > 1;
+    
     return NextResponse.json({ 
       success: true, 
-      data: formattedBrands 
+      data: formattedBrands,
+      pagination: {
+        page: validatedPage,
+        limit: validatedLimit,
+        total: count || 0,
+        totalPages,
+        hasNextPage,
+        hasPreviousPage
+      }
     });
   } catch (error: unknown) {
     // console.error('Error fetching brands:', error);
@@ -257,14 +281,12 @@ export const POST = withAuth(async (req: NextRequest, user) => {
   }
 
   const supabase = createSupabaseAdminClient(); 
-  const dbClient = await pool.connect();
   try {
-    await dbClient.query('BEGIN'); 
     const body = await req.json();
+    console.log('[API POST /brands] Received body:', body);
+    console.log('[API POST /brands] Logo URL:', body.logo_url);
     
     if (!body.name) {
-      await dbClient.query('ROLLBACK');
-      dbClient.release();
       return NextResponse.json(
         { success: false, error: 'Brand name is required' },
         { status: 400 }
@@ -314,7 +336,8 @@ export const POST = withAuth(async (req: NextRequest, user) => {
         tone_of_voice: rpcParams.brand_tone_of_voice,
         guardrails: rpcParams.brand_guardrails,
         brand_color: rpcParams.brand_color_input,
-        approved_content_types: rpcParams.approved_content_types_input
+        approved_content_types: rpcParams.approved_content_types_input,
+        logo_url: body.logo_url || null
       })
       .select('id')
       .single();
@@ -484,9 +507,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
       .single();
 
     if (fetchBrandError || !newBrandDataFromDB) {
-      await dbClient.query('ROLLBACK');
-      dbClient.release();
-      throw new Error(fetchBrandError?.message || 'Failed to fetch newly created brand after commit.');
+      throw new Error(fetchBrandError?.message || 'Failed to fetch newly created brand.');
     }
 
     // Fetch selected agencies with Supabase client
@@ -526,16 +547,12 @@ export const POST = withAuth(async (req: NextRequest, user) => {
       selected_vetting_agencies: finalSelectedVettingAgencies,
     };
 
-    await dbClient.query('COMMIT'); 
     return NextResponse.json({ 
       success: true, 
       data: finalResponseData 
     });
 
   } catch (error) {
-    await dbClient.query('ROLLBACK');
     return handleApiError(error, 'Error creating brand');
-  } finally {
-    dbClient.release();
   }
 }); 

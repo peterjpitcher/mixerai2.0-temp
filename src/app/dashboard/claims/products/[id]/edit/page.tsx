@@ -384,7 +384,7 @@ export default function EditProductPage() {
 
   if (!id && !overallIsLoading) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
         <h2 className="text-xl font-semibold mb-2">Invalid Page URL</h2>
         <p className="text-muted-foreground mb-4">Product ID is missing or invalid.</p>
@@ -395,7 +395,7 @@ export default function EditProductPage() {
 
   if (overallIsLoading) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 flex justify-center items-center min-h-[calc(100vh-200px)]">
+      <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="ml-2 text-muted-foreground">Loading product details...</p>
       </div>
@@ -404,7 +404,7 @@ export default function EditProductPage() {
 
   if (error && !overallIsLoading) { 
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
         <h2 className="text-xl font-semibold mb-2">Failed to Load Data</h2>
         <p className="text-muted-foreground mb-4 text-center max-w-md">{error}</p>
@@ -414,7 +414,7 @@ export default function EditProductPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className="space-y-6">
       <Breadcrumbs items={breadcrumbItems} />
       <PageHeader
         title={pageTitle}
@@ -429,36 +429,42 @@ export default function EditProductPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Product Name <span className="text-red-500">*</span></Label>
-              <Input id="name" name="name" value={formData.name} onChange={handleInputChange} placeholder="e.g., Super Immune Booster Capsules" maxLength={255} className={formErrors.name ? "border-red-500" : ""} disabled={overallIsLoading || isSaving} />
-              {formErrors.name && <p className="text-xs text-red-500 mt-1">{formErrors.name}</p>}
+            <div className="grid grid-cols-12 gap-4">
+              <Label htmlFor="name" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Product Name <span className="text-red-500">*</span></Label>
+              <div className="col-span-12 sm:col-span-9">
+                <Input id="name" name="name" value={formData.name} onChange={handleInputChange} placeholder="e.g., Super Immune Booster Capsules" maxLength={255} className={formErrors.name ? "border-red-500" : ""} disabled={overallIsLoading || isSaving} />
+                {formErrors.name && <p className="text-xs text-red-500 mt-1">{formErrors.name}</p>}
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="master_brand_id">Master Claim Brand <span className="text-red-500">*</span></Label>
-              <Select value={formData.master_brand_id} onValueChange={handleSelectChange} disabled={isLoadingBrands || isSaving}>
-                <SelectTrigger className={formErrors.master_brand_id ? "border-red-500" : ""}>
-                  <SelectValue placeholder={isLoadingBrands ? "Loading brands..." : "Select Master Claim Brand"} />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {isLoadingBrands ? (
-                    <SelectItem value="loading" disabled>Loading brands...</SelectItem>
-                  ) : masterBrands.length > 0 ? (
-                    masterBrands.map(brand => (
-                      <SelectItem key={brand.id} value={brand.id}><span className="truncate">{brand.name}</span></SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="" disabled>No brands available</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-              {formErrors.master_brand_id && <p className="text-xs text-red-500 mt-1">{formErrors.master_brand_id}</p>}
+            <div className="grid grid-cols-12 gap-4">
+              <Label htmlFor="master_brand_id" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Master Claim Brand <span className="text-red-500">*</span></Label>
+              <div className="col-span-12 sm:col-span-9">
+                <Select value={formData.master_brand_id} onValueChange={handleSelectChange} disabled={isLoadingBrands || isSaving}>
+                  <SelectTrigger className={formErrors.master_brand_id ? "border-red-500" : ""}>
+                    <SelectValue placeholder={isLoadingBrands ? "Loading brands..." : "Select Master Claim Brand"} />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {isLoadingBrands ? (
+                      <SelectItem value="loading" disabled>Loading brands...</SelectItem>
+                    ) : masterBrands.length > 0 ? (
+                      masterBrands.map(brand => (
+                        <SelectItem key={brand.id} value={brand.id}><span className="truncate">{brand.name}</span></SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="" disabled>No brands available</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                {formErrors.master_brand_id && <p className="text-xs text-red-500 mt-1">{formErrors.master_brand_id}</p>}
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Description (Optional)</Label>
-              <Textarea id="description" name="description" value={formData.description || ''} onChange={handleInputChange} placeholder="Provide a brief description of the product..." rows={4} maxLength={1000} />
+            <div className="grid grid-cols-12 gap-4">
+              <Label htmlFor="description" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Description (Optional)</Label>
+              <div className="col-span-12 sm:col-span-9">
+                <Textarea id="description" name="description" value={formData.description || ''} onChange={handleInputChange} placeholder="Provide a brief description of the product..." rows={4} maxLength={1000} />
+              </div>
             </div>
           </CardContent>
           <CardFooter className="border-t px-6 py-4">

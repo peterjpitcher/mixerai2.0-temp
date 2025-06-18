@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MixerAI Code Review Report</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #13599f;
+            border-bottom: 3px solid #13599f;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #333;
+            margin-top: 30px;
+        }
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+        }
+        .stat-card.error {
+            border-color: #dc3545;
+            background: #fff5f5;
+        }
+        .stat-card.warning {
+            border-color: #ffc107;
+            background: #fffdf5;
+        }
+        .stat-card.success {
+            border-color: #28a745;
+            background: #f5fff5;
+        }
+        .stat-number {
+            font-size: 36px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .check-result {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        .check-result.passed {
+            background: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .check-result.warning {
+            background: #fff3cd;
+            border-color: #ffeeba;
+        }
+        .check-result.error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .issue {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .recommendation {
+            background: #e7f3ff;
+            border-left: 4px solid #13599f;
+            padding: 10px 15px;
+            margin: 10px 0;
+        }
+        .timestamp {
+            color: #6c757d;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MixerAI Code Review Report</h1>
+        <p class="timestamp">Generated: 6/16/2025, 8:00:05 PM</p>
+        
+        <h2>Summary</h2>
+        <div class="summary">
+            <div class="stat-card error">
+                <div>Total Issues</div>
+                <div class="stat-number">31</div>
+            </div>
+            <div class="stat-card success">
+                <div>ESLint Errors</div>
+                <div class="stat-number">0</div>
+            </div>
+            <div class="stat-card success">
+                <div>ESLint Warnings</div>
+                <div class="stat-number">0</div>
+            </div>
+            <div class="stat-card error">
+                <div>TypeScript Errors</div>
+                <div class="stat-number">31</div>
+            </div>
+        </div>
+        
+        <h2>Check Results</h2>
+        
+            <div class="check-result passed">
+                <h3>Dependencies - PASSED</h3>
+                <div>✅ No issues found</div>
+            </div>
+        
+            <div class="check-result error">
+                <h3>ESLint - ERROR</h3>
+                
+                    <div>Found 1 issues:</div>
+                    
+                        <div class="issue">
+                            
+                            Command failed: npx next lint
+ ⚠ If you set up ESLint yourself, we recommend adding the Next.js ESLint plugin. See https://nextjs.org/docs/basic-features/eslint#migrating-existing-config
+
+                        </div>
+                    
+                    
+                
+            </div>
+        
+            <div class="check-result error">
+                <h3>TypeScript - ERROR</h3>
+                
+                    <div>Found 31 issues:</div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/[id]/workflow/route.ts:22:30 - 
+                            Argument of type '(req: NextRequest, user: User, context: Record<string, unknown>) => Promise<NextResponse<{ success: boolean; error: string; }> | NextResponse<{ success: boolean; data: Json | unknown[] | undefined; }>>' is not assignable to parameter of type '(req: NextRequest, user: User, context?: unknown) => Promise<Response>'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/[id]/workflow/route.ts:63:9 - 
+                            Type 'boolean | null' is not assignable to type 'boolean'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/[id]/workflow/route.ts:72:69 - 
+                            Argument of type '"assign_workflow_to_claim"' is not assignable to parameter of type '"create_brand_and_set_admin" | "create_workflow_and_log_invitations" | "delete_brand_and_dependents" | "delete_template_and_update_content" | "delete_user_and_reassign_tasks" | ... 12 more ... | "update_workflow_and_handle_invites_invoker_version_temp"'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/[id]/workflow/route.ts:93:29 - 
+                            Argument of type '(req: NextRequest, user: User, context: Record<string, unknown>) => Promise<NextResponse<{ success: boolean; error: string; }> | NextResponse<{ success: boolean; data: Json | unknown[] | undefined; }>>' is not assignable to parameter of type '(req: NextRequest, user: User, context?: unknown) => Promise<Response>'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/[id]/workflow/route.ts:121:16 - 
+                            Property 'current_workflow_step' does not exist on type 'SelectQueryError<"column 'current_workflow_step' does not exist on 'claims'.">'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/[id]/workflow/route.ts:126:28 - 
+                            Property 'workflow_steps' does not exist on type 'SelectQueryError<"column 'current_workflow_step' does not exist on 'claims'.">'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/[id]/workflow/route.ts:134:69 - 
+                            Argument of type '"advance_claim_workflow"' is not assignable to parameter of type '"create_brand_and_set_admin" | "create_workflow_and_log_invitations" | "delete_brand_and_dependents" | "delete_template_and_update_content" | "delete_user_and_reassign_tasks" | ... 12 more ... | "update_workflow_and_handle_invites_invoker_version_temp"'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/[id]/workflow/route.ts:157:29 - 
+                            Argument of type '(_req: NextRequest, user: User, context: Record<string, unknown>) => Promise<NextResponse<{ success: boolean; isMockData: boolean; data: never[]; }> | NextResponse<{ success: boolean; error: string; }> | NextResponse<...>>' is not assignable to parameter of type '(req: NextRequest, user: User, context?: unknown) => Promise<Response>'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/[id]/workflow/route.ts:194:13 - 
+                            No overload matches this call.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/pending-approval/route.ts:72:7 - 
+                            Spread types may only be created from object types.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/pending-approval/route.ts:73:28 - 
+                            Property 'workflows' does not exist on type 'SelectQueryError<"column 'workflow_id' does not exist on 'claims'.">'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/pending-approval/route.ts:74:32 - 
+                            Property 'workflow_steps' does not exist on type 'SelectQueryError<"column 'workflow_id' does not exist on 'claims'.">'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/pending-approval/route.ts:75:32 - 
+                            Property 'workflow_steps' does not exist on type 'SelectQueryError<"column 'workflow_id' does not exist on 'claims'.">'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/pending-approval/route.ts:76:27 - 
+                            Property 'profiles' does not exist on type 'SelectQueryError<"column 'workflow_id' does not exist on 'claims'.">'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/pending-approval/route.ts:77:26 - 
+                            Property 'level' does not exist on type 'SelectQueryError<"column 'workflow_id' does not exist on 'claims'.">'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/pending-approval/route.ts:77:52 - 
+                            Property 'master_claim_brands' does not exist on type 'SelectQueryError<"column 'workflow_id' does not exist on 'claims'.">'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/pending-approval/route.ts:78:26 - 
+                            Property 'level' does not exist on type 'SelectQueryError<"column 'workflow_id' does not exist on 'claims'.">'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/pending-approval/route.ts:78:54 - 
+                            Property 'products' does not exist on type 'SelectQueryError<"column 'workflow_id' does not exist on 'claims'.">'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/pending-approval/route.ts:79:26 - 
+                            Property 'level' does not exist on type 'SelectQueryError<"column 'workflow_id' does not exist on 'claims'.">'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/app/api/claims/pending-approval/route.ts:79:57 - 
+                            Property 'ingredients' does not exist on type 'SelectQueryError<"column 'workflow_id' does not exist on 'claims'.">'.
+                        </div>
+                    
+                    <div>... and 11 more</div>
+                
+            </div>
+        
+            <div class="check-result passed">
+                <h3>Build Readiness - PASSED</h3>
+                <div>✅ No issues found</div>
+            </div>
+        
+        
+        
+            <h2>Recommendations</h2>
+            
+                <div class="recommendation">Fix 31 TypeScript errors</div>
+            
+        
+    </div>
+</body>
+</html>
