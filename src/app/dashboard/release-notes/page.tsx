@@ -117,8 +117,8 @@ export default function ReleaseNotesPage() {
 
           <h3>🎯 Key Features</h3>
           <ul>
-            <li><strong>Team Activity Feed</strong> - Live feed showing content creation, updates, and approvals</li>
-            <li><strong>Stalled Content Module</strong> - Highlights content not updated in 7+ days (yellow) or 30+ days (red)</li>
+            <li><strong>Team Activity Feed</strong> - Live feed showing content creation, updates, and approvals [2bcf416]</li>
+            <li><strong>Stalled Content Module</strong> - Highlights content not updated in 7+ days (yellow) or 30+ days (red) [2bcf416]</li>
             <li><strong>My Tasks Module</strong> - Robust client-side component with dedicated API endpoint</li>
             <li><strong>Visual Polish</strong> - Professional UI matching design specifications</li>
           </ul>
@@ -184,9 +184,9 @@ export default function ReleaseNotesPage() {
 
           <h3>🐛 Bug Fixes</h3>
           <ul>
-            <li><strong>Invalid Role Enum</strong> - Fixed RPC attempting to assign invalid 'brand_admin' role</li>
+            <li><strong>Invalid Role Enum</strong> - Fixed RPC attempting to assign invalid 'brand_admin' role [7fed487]</li>
             <li><strong>Missing Column</strong> - Removed reference to non-existent created_by column</li>
-            <li><strong>Direct Approach</strong> - Replaced faulty RPC with direct Supabase calls for brand creation</li>
+            <li><strong>Direct Approach</strong> - Replaced faulty RPC with direct Supabase calls for brand creation [7fed487]</li>
           </ul>
 
           <h3>✨ Improvements</h3>
@@ -205,14 +205,14 @@ export default function ReleaseNotesPage() {
 
           <h3>🎯 Key Features</h3>
           <ul>
-            <li><strong>PKCE Authentication</strong> - Dedicated client-side callback page at /auth/confirm</li>
-            <li><strong>Secure Session Handling</strong> - Proper code_verifier persistence across redirects</li>
-            <li><strong>Simplified Flow</strong> - Removed complex token-parsing logic from update page</li>
+            <li><strong>PKCE Authentication</strong> - Dedicated client-side callback page at /auth/confirm [3a27e26]</li>
+            <li><strong>Secure Session Handling</strong> - Proper code_verifier persistence across redirects [3a27e26]</li>
+            <li><strong>Simplified Flow</strong> - Removed complex token-parsing logic from update page [3a27e26]</li>
           </ul>
 
           <h3>✨ Improvements</h3>
           <ul>
-            <li>Isolated authentication handshake from React lifecycle</li>
+            <li>Isolated authentication handshake from React lifecycle [3a27e26]</li>
             <li>OAuth 2.0 PKCE best practices implementation</li>
             <li>Reliable and secure password reset experience</li>
           </ul>
@@ -227,9 +227,9 @@ export default function ReleaseNotesPage() {
 
           <h3>🐛 Bug Fixes</h3>
           <ul>
-            <li><strong>Payload Structure</strong> - Fixed inconsistent inputFields and outputFields handling</li>
+            <li><strong>Payload Structure</strong> - Fixed inconsistent inputFields and outputFields handling [9c33f24]</li>
             <li><strong>API Alignment</strong> - POST endpoint now matches PUT endpoint structure</li>
-            <li><strong>Field Storage</strong> - Proper reconstruction of nested fields object for database</li>
+            <li><strong>Field Storage</strong> - Proper reconstruction of nested fields object for database [9c33f24]</li>
           </ul>
         </section>
 
@@ -287,15 +287,15 @@ export default function ReleaseNotesPage() {
 
           <h3>🎯 Key Features</h3>
           <ul>
-            <li><strong>Field Retry Mechanism</strong> - Individual regeneration buttons for each output field</li>
-            <li><strong>Regenerate All</strong> - Option to regenerate entire content including title</li>
+            <li><strong>Field Retry Mechanism</strong> - Individual regeneration buttons for each output field [09947b7]</li>
+            <li><strong>Regenerate All</strong> - Option to regenerate entire content including title [09947b7]</li>
             <li><strong>AI Template Descriptions</strong> - Real Azure OpenAI integration for descriptions</li>
-            <li><strong>Enhanced Retry Context</strong> - Comprehensive brand context for quality regeneration</li>
+            <li><strong>Enhanced Retry Context</strong> - Comprehensive brand context for quality regeneration [09947b7]</li>
           </ul>
 
           <h3>✨ Improvements</h3>
           <ul>
-            <li><strong>Toast Notifications</strong> - Moved to top-right with solid white background</li>
+            <li><strong>Toast Notifications</strong> - Moved to top-right with solid white background [2954b5e]</li>
             <li><strong>Navigation Highlighting</strong> - Correct active state for "Create Content" items</li>
             <li><strong>API Structure</strong> - Flattened template field structure for consistency</li>
             <li><strong>Type Safety</strong> - Aligned ContentTemplate types across components</li>
