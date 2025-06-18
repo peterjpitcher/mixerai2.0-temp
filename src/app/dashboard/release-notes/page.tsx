@@ -132,6 +132,16 @@ export default function ReleaseNotesPage() {
           <h4>AI Suggestions</h4>
           <ul>
             <li>
+              <strong>Fixed AI Suggest Template Variable Interpolation (Issue #171):</strong> AI Suggest now properly replaces template variables:
+              <ul>
+                <li>Fixed client-server mismatch where template field values weren't being sent correctly</li>
+                <li>Updated refactored content generator form to send formValues in expected format</li>
+                <li>API now properly interpolates template variables like {{Article Title}} before sending to AI</li>
+                <li>Any unreplaced placeholders are cleaned up to prevent curly braces in output</li>
+                <li>Fixes issues in Article (Editorial) and Article (How-To) templates</li>
+              </ul>
+            </li>
+            <li>
               <strong>AI Suggest Feature Verification:</strong> Confirmed AI suggestion functionality is properly implemented:
               <ul>
                 <li>API endpoint is functional and handles brand context</li>

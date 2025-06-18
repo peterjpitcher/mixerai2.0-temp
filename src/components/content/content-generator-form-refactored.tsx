@@ -86,8 +86,8 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         body: JSON.stringify({
           brand_id: selectedBrand,
           prompt: field.aiPrompt,
+          formValues: templateFieldValues,
           context: {
-            templateFields: templateFieldValues,
             productContext: productContext
           }
         }),
