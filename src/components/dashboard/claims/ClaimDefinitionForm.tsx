@@ -27,6 +27,12 @@ interface Entity {
   ingredient_name?: string;
 }
 
+interface WorkflowResponse {
+  id: string;
+  name: string;
+  brand_name?: string;
+}
+
 // More specific type for initialData and form submission data
 export interface ClaimDefinitionData {
   claim_grouping_id?: string; // For edits, backend might expect this or id
@@ -133,7 +139,7 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
         if (!response.ok) throw new Error('Failed to fetch claims workflows');
         const apiResponse = await response.json();
         if (apiResponse.success && Array.isArray(apiResponse.data)) {
-          const workflows = apiResponse.data.map((w: any) => ({ 
+          const workflows = apiResponse.data.map((w: WorkflowResponse) => ({ 
             value: w.id, 
             label: w.brand_name ? `${w.name} (${w.brand_name})` : w.name 
           }));

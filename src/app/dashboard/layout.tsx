@@ -12,6 +12,7 @@ import { LogOut, UserCircle2, Loader2 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
 import Image from 'next/image';
 import { DevelopmentOnly } from "@/components/development-only";
+import { FeatureErrorBoundary } from "@/components/error-boundary";
 
 // Define UserSessionData interface (can be shared if defined elsewhere)
 interface UserSessionData {
@@ -74,6 +75,19 @@ export default function DashboardLayout({
   
   const handleSignOut = async () => {
     try {
+      // Get current user before signing out
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Invalidate all sessions for this user
+      if (user) {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      }
+      
       const { error } = await supabase.auth.signOut();
       if (error) {
         throw error;
@@ -160,7 +174,9 @@ export default function DashboardLayout({
               {/* This will be populated client-side */}
             </div>
           </DevelopmentOnly>
-          {children}
+          <FeatureErrorBoundary>
+            {children}
+          </FeatureErrorBoundary>
         </main>
       </div>
       <BottomMobileNavigation />

@@ -17,9 +17,256 @@ export default function ReleaseNotesPage() {
       
       <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
         
-        {/* LATEST RELEASE - BRAND LOGO UPLOAD & DOCUMENTATION UPDATES */}
+        {/* LATEST RELEASE - CRITICAL BUG FIXES & UX IMPROVEMENTS */}
         <section className="mb-12">
           <h2 className="text-xl font-semibold border-b pb-2 mb-4">{`Release: ${currentDate}`}</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            This release addresses critical issues with content generation, improves user experience with clearer error messages, and enhances the AI suggestion functionality.
+          </p>
+
+          <h3>Security Enhancements</h3>
+          <h4>Global Rate Limiting (Issue #139)</h4>
+          <ul>
+            <li>
+              <strong>Implemented Centralized Rate Limiting:</strong> Replaced individual endpoint rate limiting with global middleware-based solution:
+              <ul>
+                <li>Different rate limits for auth (5/15min), AI (10/min), expensive AI (5/5min), and general API (100/min) endpoints</li>
+                <li>Exponential backoff for repeat offenders</li>
+                <li>Rate limit headers (X-RateLimit-*) included in all responses</li>
+                <li>IP and user-based tracking for authenticated requests</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Security Benefits:</strong>
+              <ul>
+                <li>Protection against DDoS attacks</li>
+                <li>Prevention of brute force authentication attempts</li>
+                <li>API abuse mitigation</li>
+                <li>Resource exhaustion protection</li>
+              </ul>
+            </li>
+          </ul>
+
+          <h4>Authentication Security (Issue #140)</h4>
+          <ul>
+            <li>
+              <strong>Account Lockout Protection:</strong> Implemented brute-force protection:
+              <ul>
+                <li>Accounts lock after 5 failed login attempts within 15 minutes</li>
+                <li>30-minute lockout duration with clear user feedback</li>
+                <li>Remaining attempts shown after failed logins</li>
+                <li>Automatic cleanup of old login attempts</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Enhanced Password Policy:</strong> Strengthened password requirements:
+              <ul>
+                <li>Minimum 12 characters (increased from 6)</li>
+                <li>Must contain uppercase and lowercase letters</li>
+                <li>Requires at least one number and special character</li>
+                <li>Blocks common weak passwords</li>
+                <li>Clear requirements shown in password change form</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Security Event Logging:</strong> Added foundation for security audit trail:
+              <ul>
+                <li>Logs failed login attempts and account lockouts</li>
+                <li>Database migration prepared for security_logs table</li>
+                <li>Console logging in place until database table is deployed</li>
+              </ul>
+            </li>
+          </ul>
+
+          <h4>Performance Optimizations (Issues #138, #54)</h4>
+          <ul>
+            <li>
+              <strong>Fixed N+1 Query in Claims API:</strong> Optimized product claims permission checks:
+              <ul>
+                <li>Replaced individual queries per product with batch query</li>
+                <li>Single query fetches all products with master brands and permissions</li>
+                <li>Reduced database round trips from N+1 to 2 queries total</li>
+                <li>Significant performance improvement for claims with multiple products</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Added Pagination to Claims API:</strong> Implemented proper pagination:
+              <ul>
+                <li>Default 50 items per page, max 100</li>
+                <li>Returns total count and pagination metadata</li>
+                <li>Prevents loading entire claims table at once</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Users API Already Optimized:</strong> Verified the users list API uses proper joins:
+              <ul>
+                <li>Fetches profiles with user_brand_permissions in single query</li>
+                <li>No N+1 queries present in current implementation</li>
+              </ul>
+            </li>
+          </ul>
+
+          <h3>Bug Fixes & Improvements</h3>
+          <h4>Content Generation</h4>
+          <ul>
+            <li>
+              <strong>Fixed Content Generation Brand Selection:</strong> Resolved issue where content generation would fail with "brand_id is required" error:
+              <ul>
+                <li>Added visual indicator when no brand is selected</li>
+                <li>Improved error handling with clear user feedback</li>
+                <li>Added validation before attempting to generate content</li>
+                <li>Shows helpful warning message to guide users</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Enhanced Form Validation:</strong> Content generation form now provides better feedback:
+              <ul>
+                <li>Clear indication of why Generate button is disabled</li>
+                <li>Shows "Please select a brand" message when appropriate</li>
+                <li>Lists missing required fields before generation</li>
+                <li>Prevents confusing error popups</li>
+              </ul>
+            </li>
+          </ul>
+
+          <h4>AI Suggestions</h4>
+          <ul>
+            <li>
+              <strong>AI Suggest Feature Verification:</strong> Confirmed AI suggestion functionality is properly implemented:
+              <ul>
+                <li>API endpoint is functional and handles brand context</li>
+                <li>Frontend properly sends requests with brand information</li>
+                <li>Supports field-specific AI prompts with brand interpolation</li>
+                <li>Note: Templates must have AI prompts configured for fields to enable suggestions</li>
+              </ul>
+            </li>
+          </ul>
+
+          <h4>Build & TypeScript</h4>
+          <ul>
+            <li>
+              <strong>Resolved Build Issues:</strong> Application now builds successfully without TypeScript errors
+            </li>
+          </ul>
+
+          <h4>Profile Management</h4>
+          <ul>
+            <li>
+              <strong>Profile Photo Upload Verified:</strong> Confirmed avatar upload functionality is fully operational:
+              <ul>
+                <li>Users can upload profile photos in Account Settings</li>
+                <li>Supports JPEG, PNG, and WebP formats up to 5MB</li>
+                <li>Avatars are stored securely in Supabase Storage</li>
+                <li>Profile photos display in dashboard header and account page</li>
+                <li>Fallback to user initials when no photo is uploaded</li>
+              </ul>
+            </li>
+          </ul>
+
+          <h4>Error Boundaries (Issue #74)</h4>
+          <ul>
+            <li>
+              <strong>React Error Boundaries Implementation:</strong> Created and integrated comprehensive error handling:
+              <ul>
+                <li>ErrorBoundary: Full-page error boundary for route-level errors with recovery options</li>
+                <li>FeatureErrorBoundary: Minimal UI error boundary for component-level errors</li>
+                <li>Both components display detailed error information in development mode</li>
+                <li>Provide user-friendly error messages and recovery options in production</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Error Boundary Integration:</strong> Deployed error boundaries throughout the application:
+              <ul>
+                <li>Global ErrorBoundary wraps entire application in root layout</li>
+                <li>FeatureErrorBoundary wraps dashboard content area for graceful feature-level error handling</li>
+                <li>Prevents entire application crashes from component errors</li>
+                <li>Provides consistent error handling UX across the application</li>
+                <li>Successfully tested with production build</li>
+              </ul>
+            </li>
+          </ul>
+
+          <h4>Code Quality Improvements</h4>
+          <ul>
+            <li>
+              <strong>TypeScript 'any' Type Reduction (Issue #63):</strong> Started replacing 'any' types with proper TypeScript types:
+              <ul>
+                <li>Created common API types in /src/types/api.ts for consistent error handling</li>
+                <li>Updated handleApiError function to use proper types instead of 'any'</li>
+                <li>Fixed claims API route to use typed interfaces for Supabase responses</li>
+                <li>Replaced 'any' in component workflow response mapping</li>
+                <li>Improved type safety in critical API routes and error handling</li>
+                <li>Progress: ~10 instances fixed, 140+ remaining (incremental approach)</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Unit Testing Setup (Issue #64):</strong> Initiated unit test framework for the codebase:
+              <ul>
+                <li>Fixed Jest configuration to use modern ts-jest transform syntax</li>
+                <li>Added test scripts to package.json (test, test:watch, test:coverage)</li>
+                <li>Created test directory structure following best practices</li>
+                <li>Wrote comprehensive tests for API type guards (13 passing tests)</li>
+                <li>Created test templates for security features (rate limiting, session management, account lockout)</li>
+                <li>Fixed package.json naming collision with .next/standalone</li>
+                <li>Established foundation for achieving 60%+ test coverage goal</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Dependency Security Updates (Issue #51):</strong> Addressed npm vulnerabilities:
+              <ul>
+                <li>Fixed high-severity brace-expansion vulnerability via npm audit fix</li>
+                <li>Identified remaining vulnerabilities require major version updates (Next.js 15, React 19)</li>
+                <li>Major updates would introduce breaking changes requiring significant refactoring</li>
+                <li>Documented upgrade path for future major version migrations</li>
+              </ul>
+            </li>
+          </ul>
+
+          <h4>Session Management (Issue #46)</h4>
+          <ul>
+            <li>
+              <strong>Proper Session Lifecycle Management:</strong> Implemented comprehensive session handling:
+              <ul>
+                <li>Session tracking with unique session IDs stored in secure httpOnly cookies</li>
+                <li>Absolute session timeout of 24 hours regardless of activity</li>
+                <li>Idle session timeout of 30 minutes of inactivity</li>
+                <li>Automatic session renewal when approaching expiration (5 minute threshold)</li>
+                <li>Maximum 5 concurrent sessions per user with automatic cleanup of oldest sessions</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Enhanced Logout Functionality:</strong> Improved sign out process:
+              <ul>
+                <li>Server-side session invalidation on logout via /api/auth/logout endpoint</li>
+                <li>All user sessions are invalidated preventing reuse of old session tokens</li>
+                <li>Session cookies are properly cleared on logout</li>
+                <li>Security event logging for audit trail (console logging, ready for database integration)</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Re-authentication for Sensitive Operations:</strong> Added security checks for critical actions:
+              <ul>
+                <li>Password changes require re-authentication if last login was over 15 minutes ago</li>
+                <li>/api/auth/check-reauthentication endpoint validates if re-auth is needed</li>
+                <li>Sensitive operations list includes: password changes, account deletion, email changes, permission management</li>
+                <li>Clear user feedback when re-authentication is required</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Session Cleanup and Monitoring:</strong> Added maintenance capabilities:
+              <ul>
+                <li>/api/auth/cleanup-sessions endpoint for periodic expired session cleanup</li>
+                <li>Session monitoring functions to track active sessions</li>
+                <li>In-memory session store (development) with TODO for Redis/database in production</li>
+                <li>Middleware validates sessions on every request</li>
+              </ul>
+            </li>
+          </ul>
+        </section>
+
+        {/* PREVIOUS RELEASE - BRAND LOGO UPLOAD & DOCUMENTATION UPDATES */}
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold border-b pb-2 mb-4">Release: June 17, 2025</h2>
           <p className="text-sm text-muted-foreground mb-4">
             This release introduces brand logo upload functionality, improves documentation, and updates migration paths across the codebase for better maintainability.
           </p>

@@ -192,6 +192,17 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
   };
   
   const handleGenerateContent = async () => {
+    // Double-check brand selection before generating
+    if (!selectedBrand) {
+      toast.error('Please select a brand before generating content');
+      return;
+    }
+    
+    if (missingRequiredFields.length > 0) {
+      toast.error(`Please fill in required fields: ${missingRequiredFields.join(', ')}`);
+      return;
+    }
+    
     setHasAutoRegenerated(false); // Reset the flag when generating new content
     await generateContent();
   };
@@ -330,7 +341,16 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
           </CardContent>
           
           <CardFooter className="flex flex-col gap-4">
-            {missingRequiredFields.length > 0 && (
+            {!selectedBrand && (
+              <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 w-full">
+                <Info className="h-4 w-4" />
+                <p className="text-sm">
+                  Please select a brand to generate content
+                </p>
+              </div>
+            )}
+            
+            {selectedBrand && missingRequiredFields.length > 0 && (
               <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 w-full">
                 <Info className="h-4 w-4" />
                 <p className="text-sm">

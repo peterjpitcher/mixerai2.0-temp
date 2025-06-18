@@ -6,6 +6,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import RootLayoutWrapper from "@/components/layout/root-layout-wrapper";
 import { Toaster as SonnerToaster } from "@/components/sonner"; // Keep Sonner
+import { ErrorBoundary } from "@/components/error-boundary";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -36,7 +37,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {/* <ToastProvider> */}{/* Removed Radix ToastProvider */}
-            <RootLayoutWrapper>{children}</RootLayoutWrapper>
+            <ErrorBoundary>
+              <RootLayoutWrapper>{children}</RootLayoutWrapper>
+            </ErrorBoundary>
             {/* <Toaster /> */}{/* Removed Radix Toaster */}
             <SonnerToaster /> {/* Keep Sonner Toaster */}
           {/* </ToastProvider> */}{/* Removed Radix ToastProvider */}

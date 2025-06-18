@@ -4,11 +4,31 @@ import { handleApiError, isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
 import { z } from 'zod';
+import { checkProductClaimsPermission, fetchClaimsWithRelations } from '@/lib/api/claims-helpers';
 
 export const dynamic = "force-dynamic";
 
-
-
+// Define types for the joined data from Supabase
+interface ClaimWithRelations {
+  id: string;
+  claim_text: string;
+  claim_type: 'allowed' | 'disallowed' | 'mandatory';
+  level: 'brand' | 'product' | 'ingredient';
+  master_brand_id?: string | null;
+  product_id?: string | null;
+  ingredient_id?: string | null;
+  country_code: string;
+  description?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  workflow_id?: string | null;
+  workflow_status?: string | null;
+  current_workflow_step?: number | null;
+  master_claim_brands?: { name: string } | null;
+  'products!claims_product_id_fkey'?: { name: string } | null;
+  ingredients?: { name: string } | null;
+}
 
 // Define the expected schema for a single claim entry in the database
 const dbClaimSchema = z.object({
@@ -101,16 +121,18 @@ export const GET = withAuth(async (req: NextRequest) => {
         }
 
         // Process data to flatten joined names
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const processedData = Array.isArray(data) ? data.map((claim: any) => ({
-            ...claim,
-            master_brand_name: (claim.master_claim_brands && typeof claim.master_claim_brands === 'object' && claim.master_claim_brands !== null && 'name' in claim.master_claim_brands) ? claim.master_claim_brands.name : null,
-            product_names: (claim['products!claims_product_id_fkey'] && typeof claim['products!claims_product_id_fkey'] === 'object' && claim['products!claims_product_id_fkey'] !== null && 'name' in claim['products!claims_product_id_fkey']) ? [claim['products!claims_product_id_fkey'].name] : [],
-            ingredient_name: (claim.ingredients && typeof claim.ingredients === 'object' && claim.ingredients !== null && 'name' in claim.ingredients) ? claim.ingredients.name : null,
-            // Ensure country_codes is an array for client-side consistency.
-            // This API returns one record per country_code, so we set it up as an array of one.
-            country_codes: [claim.country_code]
-        })) : [];
+        // Type assertion after error check - data is definitely not an error at this point
+        const claims = data as unknown as ClaimWithRelations[] | null;
+        const processedData = claims && Array.isArray(claims) ? 
+            claims.map((claimData) => ({
+                ...claimData,
+                master_brand_name: claimData.master_claim_brands?.name || null,
+                product_names: claimData['products!claims_product_id_fkey']?.name ? [claimData['products!claims_product_id_fkey'].name] : [],
+                ingredient_name: claimData.ingredients?.name || null,
+                // Ensure country_codes is an array for client-side consistency.
+                // This API returns one record per country_code, so we set it up as an array of one.
+                country_codes: [claimData.country_code]
+            })) : [];
         
         // The frontend component expects product_ids and groups claims by text, etc.
         // The current API sends one record per claim definition.
@@ -203,47 +225,13 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
                 }
             }
         } else if (level === 'product' && product_ids && product_ids.length > 0) {
-            // For product-level claims, user must have permission for ALL associated core MixerAI brands.
-            let allProductsPermitted = true;
-            for (const product_id of product_ids) {
-                let currentProductPermitted = false;
-                const { data: productData, error: productError } = await supabase
-                    .from('products')
-                    .select('master_brand_id')
-                    .eq('id', product_id)
-                    .single();
-                if (productError || !productData || !productData.master_brand_id) {
-                    console.error(`[API Claims POST] Error fetching product/MCB for product-level claim creation (Product ID: ${product_id}):`, productError);
-                    allProductsPermitted = false; break;
-                }
-                const { data: mcbData, error: mcbError } = await supabase
-                    .from('master_claim_brands')
-                    .select('mixerai_brand_id')
-                    .eq('id', productData.master_brand_id)
-                    .single();
-                if (mcbError || !mcbData || !mcbData.mixerai_brand_id) {
-                    console.error(`[API Claims POST] Error fetching MCB or MCB not linked for product-level claim (Product ID: ${product_id}, MCB ID: ${productData.master_brand_id}):`, mcbError);
-                    allProductsPermitted = false; break;
-                }
-                const { data: permissionsData, error: permissionsError } = await supabase
-                    .from('user_brand_permissions')
-                    .select('role')
-                    .eq('user_id', user.id)
-                    .eq('brand_id', mcbData.mixerai_brand_id)
-                    .eq('role', 'admin')
-                    .limit(1);
-                if (permissionsError) {
-                    console.error(`[API Claims POST] Error fetching user_brand_permissions for product ${product_id}:`, permissionsError);
-                    allProductsPermitted = false; break;
-                } else if (permissionsData && permissionsData.length > 0) {
-                    currentProductPermitted = true;
-                }
-                if (!currentProductPermitted) {
-                    allProductsPermitted = false; break;
-                }
+            // Use optimized batch query to check permissions
+            const permissionCheck = await checkProductClaimsPermission(user.id, product_ids);
+            if (permissionCheck.hasPermission) {
+                hasPermission = true;
+            } else {
+                console.error('[API Claims POST] Permission check failed:', permissionCheck.errors.join(', '));
             }
-            if (allProductsPermitted) hasPermission = true;
-
         } else if (level === 'ingredient') {
             // For ingredient-level claims, only global admin can create (already covered by initial hasPermission check).
             // If initial check for global admin failed, hasPermission is false.
