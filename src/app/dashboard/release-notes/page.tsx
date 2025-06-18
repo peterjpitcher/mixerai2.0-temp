@@ -196,14 +196,28 @@ export default function ReleaseNotesPage() {
                 <li>Fixed claims API route to use typed interfaces for Supabase responses</li>
                 <li>Replaced 'any' in component workflow response mapping</li>
                 <li>Improved type safety in critical API routes and error handling</li>
+                <li>Progress: ~10 instances fixed, 140+ remaining (incremental approach)</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Unit Testing Setup (Issue #64):</strong> Initiated unit test framework for the codebase:
+              <ul>
+                <li>Fixed Jest configuration to use modern ts-jest transform syntax</li>
+                <li>Added test scripts to package.json (test, test:watch, test:coverage)</li>
+                <li>Created test directory structure following best practices</li>
+                <li>Wrote comprehensive tests for API type guards (13 passing tests)</li>
+                <li>Created test templates for security features (rate limiting, session management, account lockout)</li>
+                <li>Fixed package.json naming collision with .next/standalone</li>
+                <li>Established foundation for achieving 60%+ test coverage goal</li>
               </ul>
             </li>
             <li>
               <strong>Dependency Security Updates (Issue #51):</strong> Addressed npm vulnerabilities:
               <ul>
-                <li>Fixed brace-expansion Regular Expression DoS vulnerability</li>
-                <li>Identified remaining vulnerabilities in @supabase/ssr (cookie) and react-quill (XSS)</li>
-                <li>These require breaking changes and need careful migration planning</li>
+                <li>Fixed high-severity brace-expansion vulnerability via npm audit fix</li>
+                <li>Identified remaining vulnerabilities require major version updates (Next.js 15, React 19)</li>
+                <li>Major updates would introduce breaking changes requiring significant refactoring</li>
+                <li>Documented upgrade path for future major version migrations</li>
               </ul>
             </li>
           </ul>
