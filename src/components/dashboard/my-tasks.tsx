@@ -8,6 +8,7 @@ import { TasksSkeleton } from './dashboard-skeleton';
 import { Task } from '@/types/task';
 import { formatDistanceToNow } from 'date-fns';
 import { CheckSquare } from 'lucide-react';
+import { BrandIcon } from '@/components/brand-icon';
 
 async function fetchTasks(): Promise<Task[]> {
   try {
@@ -56,9 +57,12 @@ export function MyTasks() {
             {tasks.map((task) => (
               <li key={task.id} className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3">
-                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400">
-                      <CheckSquare className="h-5 w-5" />
-                   </div>
+                   <BrandIcon 
+                     name={task.brand_name} 
+                     color={task.brand_color}
+                     logoUrl={task.brand_logo_url}
+                     size="md"
+                   />
                    <div>
                     <Link href={`/dashboard/content/${task.content_id}`} className="font-semibold hover:underline">
                       {task.content_title}

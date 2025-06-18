@@ -22,6 +22,8 @@ npm run review:fix      # Fix linting issues and run code review
 npm run test:openai     # Verify Azure OpenAI integration
 jest                    # Run test suite (requires test files)
 npm test                # Alias for jest
+npm run test:watch      # Run tests in watch mode
+npm run test:coverage   # Run tests with coverage report
 
 # Core Utility Scripts
 node scripts/test-azure-openai.js      # Test Azure OpenAI connectivity
@@ -57,6 +59,56 @@ node scripts/check-workflows-without-assignees.js  # Check for workflows without
 
 # Deployment
 node scripts/vercel-postbuild.js      # Post-build processing for Vercel
+
+# Additional Testing & Validation Scripts
+node scripts/test-brand-identity-api.js  # Test brand identity API endpoint
+node scripts/test-brand-update.js        # Test brand update functionality
+node scripts/test-content-creation.js    # Test content creation flow
+node scripts/test-admin-api.js           # Test admin API endpoints
+node scripts/test-service-role-permissions.js  # Test service role permissions
+node scripts/test-local-env.js           # Verify local environment setup
+node scripts/test-redirects.js           # Test route redirects
+./scripts/test-rls-policies.sh           # Test Row-Level Security policies
+node scripts/diagnose-template-generation.js  # Diagnose template generation issues
+
+# Database Migration Scripts
+./scripts/apply-claims-workflow-brand-migration.sh  # Apply claims workflow migrations
+./scripts/apply-claims-workflow-migrations.sh       # Apply claims workflow updates
+./scripts/apply-email-migration.sh                  # Apply email system migration
+./scripts/apply-profile-job-title-migration.sh      # Add job title to profiles
+./scripts/apply-template-migration.sh               # Apply template system updates
+node scripts/apply-workflow-history-migration.js    # Apply workflow history updates
+node scripts/run-company-field-migration.js         # Add company field to profiles
+./scripts/run-job-title-migration.sh                # Run job title migration
+
+# User Management Scripts
+node scripts/seed-superadmin.ts       # Create initial superadmin user
+node scripts/create-user.js           # Create new user programmatically
+node scripts/create-local-user.js     # Create user for local development
+./scripts/add_created_by_to_brands.sh # Add created_by field to brands
+
+# Infrastructure & Storage Scripts
+node scripts/setup-storage-buckets.js  # Set up Supabase storage buckets
+./scripts/deploy-rls-policies.sh       # Deploy RLS policies to database
+./scripts/init-database.sh             # Initialize database schema
+./scripts/update-api-routes.sh         # Update API route configurations
+./scripts/update-domain-config.sh      # Update domain configurations
+./scripts/update-supabase-config.sh    # Update Supabase project settings
+
+# Development & Build Scripts
+node scripts/capture-build-errors.js   # Capture and analyze build errors
+./scripts/clean-cache.js               # Clean build and module caches
+node scripts/comprehensive-eslint-fix.js  # Comprehensive ESLint fixes
+node scripts/fix-remaining-eslint.js   # Fix remaining ESLint issues
+./scripts/cleanup-placeholder-files.sh # Remove placeholder files
+
+# Utility Scripts
+node scripts/force-local-generation.js # Force local AI generation mode
+node scripts/extract-schema.js         # Extract database schema
+./scripts/organize-docs.sh             # Organize documentation files
+node scripts/run-full-code-review.js   # Run comprehensive code review
+node scripts/check-invitation-flags.js # Check invitation system flags
+node scripts/check-rpc-function.js     # Check database RPC functions
 ```
 
 ## Project Structure
@@ -90,11 +142,11 @@ MixerAI2.0/
 
 ## Architecture Overview
 
-MixerAI 2.0 is a Next.js 14 application using the App Router for AI-powered content generation. Users can manage branded content through a flexible workflow interface powered by Supabase for backend services and PostgreSQL. Key architectural decisions:
+MixerAI 2.0 is an AI-powered content generation platform that creates high-quality marketing content using Azure OpenAI. It allows users to create and manage content for different brands using customizable workflows and templates. The application is built with Next.js 14 using the App Router, powered by Supabase for backend services and PostgreSQL.
 
 ### Technology Stack
 - **Framework**: Next.js 14 with App Router, React 18
-- **Language**: TypeScript with `noImplicitAny: false` (target: ES5)
+- **Language**: TypeScript with `noImplicitAny: false` (target: ES2015)
 - **Styling**: Tailwind CSS with custom color system
 - **Database**: PostgreSQL via Supabase
 - **AI**: Azure OpenAI API (GPT-4o deployment)
@@ -144,6 +196,7 @@ MixerAI 2.0 is a Next.js 14 application using the App Router for AI-powered cont
 6. **Form Handling**: React Hook Form with Zod schema validation
 7. **State Management**: React Context for global state, local state for components
 8. **Database Connections**: Can use either Supabase (default) or direct PostgreSQL connection for local development
+9. **Debug Mode**: Optional debug panel and enhanced logging available via environment flags
 
 ## Critical Implementation Details
 
@@ -189,6 +242,13 @@ MixerAI 2.0 is a Next.js 14 application using the App Router for AI-powered cont
 - Integrated into content creation workflow
 - Test with `node scripts/test-title-generation.js`
 
+### Navigation System Architecture
+- **Unified Navigation**: Single source of truth in `src/lib/navigation.ts`
+- **Dynamic Expansion**: Uses `useSelectedLayoutSegments()` for auto-expanding sections
+- **Framework Redirects**: All redirects handled at framework level (middleware/next.config.js)
+- **Permission-based**: Navigation items filtered based on user roles and brand access
+- **Responsive Design**: Mobile-friendly with collapsible sidebar
+
 ### Environment Configuration
 Required environment variables:
 ```bash
@@ -215,15 +275,35 @@ NEXT_PUBLIC_GITHUB_REPO=        # GitHub repository name (for client-side links)
 
 # Local Development (Optional)
 POSTGRES_HOST=                  # PostgreSQL host for direct connection
-POSTGRES_PORT=                  # PostgreSQL port
+POSTGRES_PORT=                  # PostgreSQL port (default: 5432)
 POSTGRES_USER=                  # PostgreSQL user
 POSTGRES_PASSWORD=              # PostgreSQL password
 POSTGRES_DB=                    # PostgreSQL database name
+POSTGRES_SSL=                   # PostgreSQL SSL mode (disable/require)
+USE_DIRECT_POSTGRES=            # Use direct PostgreSQL instead of Supabase (true/false)
+
+# Additional Configuration (Optional)
+USE_LOCAL_GENERATION=           # Force local AI generation (development/testing)
+AZURE_OPENAI_API_VERSION=       # Azure OpenAI API version (default: 2024-02-15-preview)
+INITIAL_SUPERADMIN_EMAIL=       # Email for initial superadmin user
+INITIAL_SUPERADMIN_PASSWORD=    # Password for initial superadmin user
+INITIAL_SUPERADMIN_FULL_NAME=   # Full name for initial superadmin user
+DEBUG_MODE=                     # Enable debug mode features (true/false)
+DEBUG_PANEL_ENABLED=            # Enable debug panel in UI (true/false)
+INTERNAL_API_KEY=               # Internal API key for service-to-service calls
+
+# Alternative AI Provider (Optional)
+OPENAI_API_KEY=                 # OpenAI API key (alternative to Azure OpenAI)
+OPENAI_MODEL=                   # OpenAI model name (e.g., gpt-4)
+
+# Build Information (Auto-populated)
+NEXT_PUBLIC_BUILD_DATE=         # Build date for versioning
+NEXT_PUBLIC_VERCEL_ENV=         # Vercel environment (development/preview/production)
 ```
 
 ## UI Standards Compliance
 
-Follow the established design system documented in `/docs/UI_STANDARDS.md`:
+Follow the established design system documented in `/docs/ui-standards.md`:
 
 ### Layout & Structure
 - Full-width dashboard pages with consistent padding (`px-4 sm:px-6 lg:px-8`)
@@ -301,8 +381,12 @@ Follow the established design system documented in `/docs/UI_STANDARDS.md`:
 - E2E tests for critical user flows (when implemented)
 - Test files use `.test.ts` or `.test.tsx` suffix or are placed in `__tests__` directories
 - Component-specific test scripts available in scripts/test-* files
-- Jest configuration includes TypeScript support via ts-jest
-- Module path aliases are configured to match TypeScript paths
+- **Jest Configuration**:
+  - Uses `ts-jest` preset for TypeScript support
+  - Test environment: `node` (not jsdom)
+  - Module path mapping: `@/` → `<rootDir>/src/`
+  - Ignores: node_modules, .next, out directories
+  - Test match patterns: `**/__tests__/**/*.+(ts|tsx|js)`, `**/?(*.)+(spec|test).+(ts|tsx|js)`
 
 ## Deployment
 
@@ -316,22 +400,30 @@ Follow the established design system documented in `/docs/UI_STANDARDS.md`:
 
 ### Build Configuration
 - Build uses increased memory allocation: `NODE_OPTIONS="--max_old_space_size=4096"`
-- Vercel deployment disables build cache for consistency
+- Vercel deployment disables build cache for consistency: `VERCEL_FORCE_NO_BUILD_CACHE=1`
+- Vercel install command: `npm install --no-save` (prevents package-lock.json modifications)
+- Telemetry disabled: `NEXT_TELEMETRY_DISABLED=1`
 - Standalone output mode for optimized Docker deployments
 - Build errors are NOT ignored (strict build process)
 - TypeScript incremental compilation enabled for faster builds
+- GitHub integration enabled for deployments
 
 ### Middleware Security Features
 - **CSRF Protection**: Automatic token generation and validation for all API routes
-- **Security Headers**: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Strict-Transport-Security
+- **Security Headers** (via middleware and vercel.json):
+  - X-Content-Type-Options: nosniff
+  - X-Frame-Options: DENY
+  - X-XSS-Protection: 1; mode=block
+  - Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
 - **Route Protection**: Authentication required for `/dashboard/*`, `/api/*` (except public endpoints), `/account/*`
 - **Public API Routes**: `/api/env-check`, `/api/test-connection`, `/api/auth/*`, `/api/test-*`
 
 ### Next.js Configuration
-- Image domains allowed: `api.dicebear.com`, `images.unsplash.com`, `placehold.co`, `placeholder.com`
+- Image domains allowed: `api.dicebear.com`, `images.unsplash.com`, `placehold.co`, `placeholder.com`, `shsfrtemevclwpqlypoq.supabase.co`
 - Security: `poweredByHeader` disabled
 - Permanent redirects configured for route consolidation (e.g., `/brands/*` → `/dashboard/brands/*`)
 - Path traversal protection implemented
+- ESLint: `ignoreDuringBuilds: true` (but pre-commit checks are mandatory)
 
 ### Recent Architecture Changes
 - Migrated from feedback_log table to GitHub issues integration
@@ -348,24 +440,40 @@ Follow the established design system documented in `/docs/UI_STANDARDS.md`:
 ## Key Documentation References
 
 ### Core Documentation
-- `/docs/README.md` - Documentation hub with quick start guide
-- `/docs/ARCHITECTURE.md` - Detailed technical architecture
-- `/docs/UI_STANDARDS.md` - Comprehensive UI/UX standards (Version 2.0)
-- `/docs/api_reference.md` - Complete API endpoint documentation
-- `/docs/user_guide.md` - End-user documentation for all features
+- `/docs/index.md` - Documentation index and overview
+- `/docs/readme.md` - Documentation hub with quick start guide
+- `/docs/architecture.md` - Detailed technical architecture
+- `/docs/ui-standards.md` - Comprehensive UI/UX standards (Version 2.0)
+- `/docs/user-guide.md` - End-user documentation for all features
+- `/docs/user-flows.md` - User flow documentation
+- `/docs/user-flow-diagrams.md` - Visual user flow diagrams
+- `/docs/workflow-assignee-mandatory-changes.md` - Workflow assignee implementation
+- `/docs/ai-title-generation.md` - AI-powered title generation feature
+- `/docs/navigation-permissions.md` - Detailed role-based navigation permissions
+- `/docs/email-template-standards.md` - Email design and implementation standards
+
+### API Documentation
+- `/docs/api/api-architecture-review.md` - Comprehensive API architecture analysis
+- `/docs/api/content-generation.md` - Content generation endpoint documentation
+- `/docs/api-reference.md` - Complete API endpoint documentation (TO BE CREATED)
+
+### Testing Documentation
+- `/docs/testing/manual-testing-checklist.md` - Comprehensive manual testing guide
+- `/docs/testing/testing-report.md` - Full testing report and findings
+- `/docs/testing/testing-summary.md` - Condensed testing overview
+
+### Setup & Configuration
+- `/docs/setup/storage-setup.md` - Supabase storage configuration guide
+- `/docs/setup/migration-path-update-summary.md` - Database migration updates
+
+### Missing Documentation (TO BE CREATED)
 - `/docs/database.md` - Database schema and relationships
 - `/docs/authentication.md` - Auth flow and permissions model
-- `/USER_FLOWS.md` - User flow documentation
-- `/USER_FLOW_DIAGRAMS.md` - Visual user flow diagrams
-- `/TESTING_REPORT.md` & `/TESTING_SUMMARY.md` - Testing documentation
-- `/docs/workflow-assignee-mandatory-changes.md` - Workflow assignee implementation
-- `/docs/AI_TITLE_GENERATION.md` - AI-powered title generation feature
-- `/docs/NAVIGATION_PERMISSIONS.md` - Detailed role-based navigation permissions
 
 ### Security & Operations
 - `/SECURITY.md` - Security policies and vulnerability reporting
 - Report security issues to: security@mixerai.com (DO NOT use GitHub issues)
-- `/docs/deployment.md` - Deployment procedures and configuration
+- `/docs/deployment.md` - Deployment procedures and configuration (TO BE CREATED)
 
 ### Development Resources
 - `/supabase/migrations/` - Database migration files (format: YYYYMMDD_description.sql)
@@ -375,11 +483,21 @@ Follow the established design system documented in `/docs/UI_STANDARDS.md`:
 
 ## Common Development Tasks
 
-### Running a Single Test
+### Running Tests
 ```bash
+# Single test execution
 jest path/to/test.test.ts        # Run specific test file
 jest -t "test name"              # Run test by name pattern
+
+# Test modes
 jest --watch                     # Run tests in watch mode
+npm run test:watch               # Alias for watch mode
+npm run test:coverage            # Generate coverage report
+
+# Component-specific tests
+node scripts/test-user-flows.js  # Test user interaction flows
+node scripts/test-workflow-assignee-validation.js  # Test workflow validation
+./scripts/test-rls-policies.sh   # Test database security policies
 ```
 
 ### Debugging Azure OpenAI Issues
@@ -407,13 +525,59 @@ touch supabase/migrations/$(date +%Y%m%d%H%M%S)_description.sql
 ```bash
 # Run with local database instead of Supabase
 ./scripts/use-local-db.sh
+# Or set USE_DIRECT_POSTGRES=true in .env
+
+# Initialize local database
+./scripts/init-database.sh
 
 # Clean database (removes test data)
 ./scripts/clean-database.sh
 
 # Add test user for authentication
 ./scripts/add-test-user.sh
+# Or use the Node.js version with more options
+node scripts/create-local-user.js
+
+# Create superadmin user
+node scripts/seed-superadmin.ts
 ```
+
+## Debug Mode Features
+
+When developing locally, you can enable debug features:
+
+```bash
+# Enable debug mode in .env
+DEBUG_MODE=true
+DEBUG_PANEL_ENABLED=true
+```
+
+This provides:
+- Enhanced error logging with stack traces
+- Debug panel in the UI showing current state
+- Additional development-only API endpoints
+- Verbose console output for troubleshooting
+
+## Direct PostgreSQL Connection
+
+For local development without Supabase:
+
+```bash
+# Configure in .env
+USE_DIRECT_POSTGRES=true
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USER=your_user
+POSTGRES_PASSWORD=your_password
+POSTGRES_DB=your_database
+POSTGRES_SSL=disable  # For local development
+```
+
+This is useful for:
+- Offline development
+- Testing database migrations locally
+- Debugging RLS policies
+- Performance testing with local data
 
 ## Personalized Working Guidelines
 
@@ -438,17 +602,17 @@ When working with this codebase, follow these specific guidelines:
 ### 3. Documentation Maintenance
 - Update relevant documentation immediately when making changes
 - Key documentation to maintain:
-  - `/docs/api_reference.md` - When modifying API endpoints
+  - `/docs/api-reference.md` - When modifying API endpoints
   - `/docs/database.md` - When changing database schema
-  - `/docs/user_guide.md` - When adding/modifying user-facing features
-  - `/docs/ARCHITECTURE.md` - When making architectural changes
+  - `/docs/user-guide.md` - When adding/modifying user-facing features
+  - `/docs/architecture.md` - When making architectural changes
   - Code comments for complex logic or non-obvious implementations
 - Use clear, concise language and include examples where helpful
 
 ### 4. Standards Compliance
 - **ALWAYS check for and follow existing standards documents**
 - Key standards to follow:
-  - `/docs/UI_STANDARDS.md` - Mandatory for all UI changes
+  - `/docs/ui-standards.md` - Mandatory for all UI changes
   - ESLint configuration - For code style
   - TypeScript conventions - Despite `noImplicitAny: false`, use proper types where possible
 - When in doubt, search for similar implementations in the codebase and follow established patterns
@@ -506,7 +670,7 @@ When reviewing code, check ALL of the following:
   - User-friendly error messages
   - Proper error logging
 - **Standards Compliance**:
-  - UI follows `/docs/UI_STANDARDS.md`
+  - UI follows `/docs/ui-standards.md`
   - Code follows ESLint rules
   - Consistent naming patterns
 
@@ -532,7 +696,7 @@ When reviewing code, check ALL of the following:
 - **Responses**: Always return `{ success: boolean, data?: any, error?: string }`
 - **Status codes**: Use appropriate HTTP status codes
 - **Validation**: Validate all inputs before processing
-- **Documentation**: Update `/docs/api_reference.md` for any changes
+- **Documentation**: Update `/docs/api-reference.md` for any changes
 - **Testing**: Create or update API tests for endpoints
 
 ### 11. Performance Monitoring

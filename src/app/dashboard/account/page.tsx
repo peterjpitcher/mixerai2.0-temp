@@ -82,16 +82,16 @@ export default function AccountPage() {
     async function fetchUserData() {
       setIsLoading(true); // Ensure loading is true at the start of fetch
       try {
-        const { data: { session: userSession }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) throw sessionError;
-        if (!userSession) {
+        const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+        if (authError) throw authError;
+        if (!currentUser) {
           window.location.href = '/auth/login'; // Redirect if not logged in
           return;
         }
-        setSession(userSession as unknown as Record<string, unknown>);
+        setSession({ user: currentUser } as unknown as Record<string, unknown>);
         
-        const userId = userSession.user.id;
-        const userEmail = userSession.user.email || '';
+        const userId = currentUser.id;
+        const userEmail = currentUser.email || '';
 
         const { data: userData, error: userError } = await supabase
           .from('profiles')
@@ -106,10 +106,10 @@ export default function AccountPage() {
         if (!userData) {
           const newProfileData = {
             id: userId,
-            full_name: userSession.user.user_metadata?.full_name || userEmail,
+            full_name: currentUser.user_metadata?.full_name || userEmail,
             email: userEmail,
-            company: userSession.user.user_metadata?.company || '',
-            job_title: userSession.user.user_metadata?.job_title || ''
+            company: currentUser.user_metadata?.company || '',
+            job_title: currentUser.user_metadata?.job_title || ''
           };
           
           const { error: createError } = await supabase
@@ -130,8 +130,8 @@ export default function AccountPage() {
         }
         
         // Auth user data is the source of truth for email and potentially some metadata fallbacks
-        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-        if (authError) throw authError;
+        const { data: { user: authUser }, error: authError2 } = await supabase.auth.getUser();
+        if (authError2) throw authError2;
         
         setProfileData({
           fullName: profileData?.full_name || authUser?.user_metadata?.full_name || '',
@@ -179,9 +179,9 @@ export default function AccountPage() {
     
     setIsSubmitting(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated. Please log in again.');
-      const userId = session.user.id;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated. Please log in again.');
+      const userId = user.id;
       
       const profileUpdates = {
         id: userId,
@@ -199,7 +199,7 @@ export default function AccountPage() {
         job_title: profileData.jobTitle.trim()
       };
       // Only update metadata if there are actual changes to avoid unnecessary calls
-      if (Object.values(userMetadataUpdates).some(val => val !== (session.user.user_metadata?.[Object.keys(userMetadataUpdates)[Object.values(userMetadataUpdates).indexOf(val)]] || ''))) {
+      if (Object.values(userMetadataUpdates).some(val => val !== (user.user_metadata?.[Object.keys(userMetadataUpdates)[Object.values(userMetadataUpdates).indexOf(val)]] || ''))) {
         const { error: metadataError } = await supabase.auth.updateUser({ data: userMetadataUpdates });
         if (metadataError) throw metadataError;
       }

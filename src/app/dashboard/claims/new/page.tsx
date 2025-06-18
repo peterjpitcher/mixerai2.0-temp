@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Save,  } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ALL_COUNTRIES_CODE, ALL_COUNTRIES_NAME } from "@/lib/constants/country-codes";
+import { BrandIcon } from "@/components/brand-icon";
 
 // Types
 type ClaimTypeEnum = 'allowed' | 'disallowed' | 'mandatory';
@@ -30,7 +31,7 @@ interface ClaimFormData {
   workflow_id: string | null; // Added for workflow support
 }
 
-interface MasterClaimBrand { id: string; name: string; }
+interface MasterClaimBrand { id: string; name: string; brand_color?: string | null; logo_url?: string | null; }
 interface Product { id: string; name: string; master_brand_id?: string; master_brand_name?: string; }
 interface Ingredient { id: string; name: string; }
 interface CountryOption { code: string; name: string; }
@@ -267,11 +268,36 @@ export default function NewClaimPage() {
                 <div className="col-span-12 sm:col-span-9">
                   <Select name="master_brand_id" value={formData.master_brand_id || ""} onValueChange={(value) => handleSelectChange('master_brand_id', value)} disabled={isLoadingBrands}>
                     <SelectTrigger className={errors.master_brand_id ? "border-red-500" : ""}>
-                      <SelectValue placeholder={isLoadingBrands ? "Loading brands..." : "Select master brand"} />
+                      <SelectValue placeholder={isLoadingBrands ? "Loading brands..." : "Select master brand"}>
+                        {formData.master_brand_id && (() => {
+                          const selectedBrand = masterBrands.find(b => b.id === formData.master_brand_id);
+                          return selectedBrand ? (
+                            <div className="flex items-center gap-2">
+                              <BrandIcon 
+                                name={selectedBrand.name} 
+                                color={selectedBrand.brand_color}
+                                logoUrl={selectedBrand.logo_url}
+                                size="sm"
+                              />
+                              <span>{selectedBrand.name}</span>
+                            </div>
+                          ) : null;
+                        })()}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="max-h-60">
                       {masterBrands.map(brand => (
-                        <SelectItem key={brand.id} value={brand.id}><span className="truncate">{brand.name}</span></SelectItem>
+                        <SelectItem key={brand.id} value={brand.id}>
+                          <div className="flex items-center gap-2">
+                            <BrandIcon 
+                              name={brand.name} 
+                              color={brand.brand_color}
+                              logoUrl={brand.logo_url}
+                              size="sm"
+                            />
+                            <span className="truncate">{brand.name}</span>
+                          </div>
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
+import { CreateContentDropdown } from '@/components/content/create-content-dropdown';
 // import { } from '@/components/ui/card'; // Removed - empty import
 import { Input } from '@/components/ui/input';
 import { toast as sonnerToast } from "sonner";
@@ -355,13 +356,7 @@ export default function ContentPageClient() {
       <PageHeader
         title={brandIdFromParams && activeBrandData ? `Content for ${activeBrandData.name}` : "All Content"}
         description="View, manage, and track all content items across your brands."
-        actions={
-          <Button asChild>
-            <Link href="/dashboard/templates">
-              <PlusCircle className="mr-2 h-4 w-4" /> Create New Content
-            </Link>
-          </Button>
-        }
+        actions={<CreateContentDropdown />}
       />
       
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

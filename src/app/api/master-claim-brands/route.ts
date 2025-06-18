@@ -15,6 +15,8 @@ interface MasterClaimBrand {
     mixerai_brand_id: string | null;
     created_at?: string;
     updated_at?: string;
+    brand_color?: string | null;
+    logo_url?: string | null;
 }
 
 // GET handler for all master claim brands
@@ -28,7 +30,13 @@ export const GET = withAuth(async () => {
         const supabase = createSupabaseAdminClient();
         // Assuming table will be renamed to 'master_claim_brands'
         const { data, error } = await supabase.from('master_claim_brands') 
-            .select('*')
+            .select(`
+                *,
+                brands:mixerai_brand_id (
+                    brand_color,
+                    logo_url
+                )
+            `)
             .order('name');
 
         if (error) {
@@ -36,12 +44,14 @@ export const GET = withAuth(async () => {
             return handleApiError(error, 'Failed to fetch master claim brands');
         }
 
-        const validatedData = Array.isArray(data) ? data.map((item: MasterClaimBrand) => ({
+        const validatedData = Array.isArray(data) ? data.map((item: Record<string, unknown>) => ({
             id: item.id,
             name: item.name,
             mixerai_brand_id: item.mixerai_brand_id,
             created_at: item.created_at,
-            updated_at: item.updated_at
+            updated_at: item.updated_at,
+            brand_color: (item.brands as Record<string, unknown>)?.brand_color || null,
+            logo_url: (item.brands as Record<string, unknown>)?.logo_url || null
         })) : [];
 
         return NextResponse.json({ success: true, data: validatedData as MasterClaimBrand[] });

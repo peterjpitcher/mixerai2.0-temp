@@ -41,25 +41,25 @@ export function createSupabaseServerClient() {
 // Helper to check if user is authenticated and redirect if not
 export async function requireAuth() {
   const supabase = createSupabaseServerClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
-  if (!session) {
+  if (!user) {
     redirect('/auth/login');
   }
   
-  return session;
+  return user;
 }
 
 // Helper to get the current user from supabase
 export async function getCurrentUser() {
   const supabase = createSupabaseServerClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
-  if (!session) {
+  if (!user) {
     return null;
   }
   
-  return session.user;
+  return user;
 }
 
 // Helper to check if user is admin and redirect if not

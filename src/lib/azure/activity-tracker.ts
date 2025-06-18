@@ -50,7 +50,7 @@ class ActivityTracker {
     return id;
   }
 
-  completeRequest(id: string, status: 'success' | 'error' | 'rate_limited', rateLimitHeaders?: any) {
+  completeRequest(id: string, status: 'success' | 'error' | 'rate_limited', rateLimitHeaders?: Record<string, string>) {
     const request = this.requests.get(id);
     if (!request) return;
 

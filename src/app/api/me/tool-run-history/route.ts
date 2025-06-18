@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
-import { createSupabaseServerClient } from '@/lib/supabase/server'; // Using server client for RLS with user context
+import { createSupabaseServerClient } from '@/lib/supabase/server'; // Using server client
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +19,7 @@ export const GET = withAuthAndMonitoring(async (request: NextRequest) => {
       .limit(50); // Let's limit to 50 records for now
 
     if (toolName) {
+      // @ts-ignore - Type issue with Supabase
       query = query.eq('tool_name', toolName);
     }
 

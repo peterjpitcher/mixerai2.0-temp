@@ -2,6 +2,21 @@ import { OpenAI } from "openai";
 import type { StyledClaims } from "@/types/claims";
 import { activityTracker } from "./activity-tracker";
 
+// Helper function to extract rate limit headers
+function extractRateLimitHeaders(response: Response): Record<string, string> {
+  const headers: Record<string, string> = {};
+  
+  const remainingRequests = response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests');
+  const resetRequests = response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests');
+  const retryAfter = response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms');
+  
+  if (remainingRequests) headers['x-ratelimit-remaining-requests'] = remainingRequests;
+  if (resetRequests) headers['x-ratelimit-reset-requests'] = resetRequests;
+  if (retryAfter) headers['retry-after'] = retryAfter;
+  
+  return headers;
+}
+
 // Initialize the Azure OpenAI client
 export const getAzureOpenAIClient = () => {
   const apiKey = process.env.AZURE_OPENAI_API_KEY;
@@ -90,11 +105,7 @@ export async function generateTextCompletion(
       });
 
       // Extract rate limit headers (Azure OpenAI format)
-      const rateLimitHeaders = {
-        'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
-        'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
-        'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
-      };
+      const rateLimitHeaders = extractRateLimitHeaders(response);
       
       // Debug: Log all headers to understand what Azure returns
       if (process.env.NODE_ENV === 'development') {
@@ -435,11 +446,7 @@ The product context is provided in the user prompt.
     });
     
     // Extract rate limit headers
-    const rateLimitHeaders = {
-      'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests'),
-      'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests'),
-      'retry-after': response.headers.get('retry-after')
-    };
+    const rateLimitHeaders = extractRateLimitHeaders(response);
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -631,11 +638,7 @@ export async function generateBrandIdentityFromUrls(
         const errorText = await response.text();
         
         // Extract rate limit headers even on error
-        const rateLimitHeaders = {
-          'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
-          'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
-          'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
-        };
+        const rateLimitHeaders = extractRateLimitHeaders(response);
         
         const status = response.status === 429 ? 'rate_limited' : 'error';
         activityTracker.completeRequest(requestId, status, rateLimitHeaders);
@@ -646,11 +649,7 @@ export async function generateBrandIdentityFromUrls(
       const responseData = await response.json();
       
       // Extract rate limit headers (Azure OpenAI format)
-      const rateLimitHeaders = {
-        'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
-        'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
-        'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
-      };
+      const rateLimitHeaders = extractRateLimitHeaders(response);
       
       // Complete the request tracking
       activityTracker.completeRequest(requestId, 'success', rateLimitHeaders);
@@ -818,11 +817,7 @@ export async function generateMetadata(
       });
       
       // Extract rate limit headers (Azure OpenAI format)
-      const rateLimitHeaders = {
-        'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
-        'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
-        'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
-      };
+      const rateLimitHeaders = extractRateLimitHeaders(response);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -962,11 +957,7 @@ If the image is decorative and doesn't convey information, you can indicate that
     });
 
     // Extract rate limit headers (Azure OpenAI format)
-    const rateLimitHeaders = {
-      'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
-      'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
-      'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
-    };
+    const rateLimitHeaders = extractRateLimitHeaders(response);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -1101,11 +1092,7 @@ export async function transCreateContent(
     });
     
     // Extract rate limit headers (Azure OpenAI format)
-    const rateLimitHeaders = {
-      'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
-      'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
-      'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
-    };
+    const rateLimitHeaders = extractRateLimitHeaders(response);
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -1224,11 +1211,7 @@ export async function generateSuggestions(
     });
 
     // Extract rate limit headers (Azure OpenAI format)
-    const rateLimitHeaders = {
-      'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
-      'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
-      'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
-    };
+    const rateLimitHeaders = extractRateLimitHeaders(response);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -1346,11 +1329,7 @@ export async function generateContentTitleFromContext(
     });
 
     // Extract rate limit headers (Azure OpenAI format)
-    const rateLimitHeaders = {
-      'x-ratelimit-remaining-requests': response.headers.get('x-ratelimit-remaining-requests') || response.headers.get('x-ms-ratelimit-remaining-requests'),
-      'x-ratelimit-reset-requests': response.headers.get('x-ratelimit-reset-requests') || response.headers.get('x-ms-ratelimit-reset-requests'),
-      'retry-after': response.headers.get('retry-after') || response.headers.get('x-ms-retry-after-ms')
-    };
+    const rateLimitHeaders = extractRateLimitHeaders(response);
 
     if (!response.ok) {
       const errorText = await response.text();

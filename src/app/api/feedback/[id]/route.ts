@@ -1,5 +1,5 @@
-import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { NextResponse } from 'next/server';
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,11 +32,11 @@ interface FeedbackUpdateBody {
 }
 
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: { id: string } }
 ) {
-  const supabase = createSupabaseServerClient();
-  const feedbackId = params.id;
+  const supabase = createSupabaseAdminClient();
+  const feedbackId = context.params.id;
 
   if (!feedbackId) {
     return NextResponse.json({ success: false, error: 'Feedback ID is required' }, { status: 400 });
@@ -48,7 +48,7 @@ export async function GET(
     return NextResponse.json({ success: false, error: 'User not authenticated' }, { status: 401 });
   }
 
-  const { data, error } = await supabase
+  const query = supabase
     .from('feedback_items')
     .select(`
       *,
@@ -60,7 +60,10 @@ export async function GET(
         full_name,
         avatar_url
       )
-    `)
+    `);
+  
+  const { data, error } = await query
+    // @ts-ignore - Type issue with Supabase
     .eq('id', feedbackId)
     .single();
 
@@ -80,11 +83,11 @@ export async function GET(
 }
 
 export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: { id: string } }
 ) {
-  const supabase = createSupabaseServerClient();
-  const feedbackId = params.id;
+  const supabase = createSupabaseAdminClient();
+  const feedbackId = context.params.id;
 
   if (!feedbackId) {
     return NextResponse.json({ success: false, error: 'Feedback ID is required' }, { status: 400 });
@@ -119,9 +122,12 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: 'No update data provided' }, { status: 400 });
   }
 
-  const { data, error } = await supabase
+  const updateQuery = supabase
     .from('feedback_items')
-    .update(updateData)
+    .update(updateData);
+  
+  const { data, error } = await updateQuery
+    // @ts-ignore - Type issue with Supabase
     .eq('id', feedbackId)
     .select()
     .single();

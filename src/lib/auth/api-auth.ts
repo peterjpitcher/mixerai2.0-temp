@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
 import { Database } from '@/types/supabase';
@@ -24,11 +24,11 @@ export function withAuth(
             get(name: string) {
               return cookieStore.get(name)?.value;
             },
-            set(name: string, value: string, options: { path: string; maxAge: number; domain?: string; sameSite?: "strict" | "lax" | "none"; secure?: boolean }) {
-              cookieStore.set(name, value, options);
+            set(name: string, value: string, options: CookieOptions) {
+              cookieStore.set({ name, value, ...options });
             },
-            remove(name: string, options: { path: string; domain?: string }) {
-              cookieStore.set(name, '', { ...options, maxAge: 0 });
+            remove(name: string, options: CookieOptions) {
+              cookieStore.set({ name, value: '', ...options });
             },
           },
         }
@@ -102,11 +102,11 @@ export function withAuthAndMonitoring(
             get(name: string) {
               return cookieStore.get(name)?.value;
             },
-            set(name: string, value: string, options: { path: string; maxAge: number; domain?: string; sameSite?: "strict" | "lax" | "none"; secure?: boolean }) {
-              cookieStore.set(name, value, options);
+            set(name: string, value: string, options: CookieOptions) {
+              cookieStore.set({ name, value, ...options });
             },
-            remove(name: string, options: { path: string; domain?: string }) {
-              cookieStore.set(name, '', { ...options, maxAge: 0 });
+            remove(name: string, options: CookieOptions) {
+              cookieStore.set({ name, value: '', ...options });
             },
           },
         }
@@ -189,11 +189,11 @@ export function withAdminAuth(
             get(name: string) {
               return cookieStore.get(name)?.value;
             },
-            set(name: string, value: string, options: { path: string; maxAge: number; domain?: string; sameSite?: "strict" | "lax" | "none"; secure?: boolean }) {
-              cookieStore.set(name, value, options);
+            set(name: string, value: string, options: CookieOptions) {
+              cookieStore.set({ name, value, ...options });
             },
-            remove(name: string, options: { path: string; domain?: string }) {
-              cookieStore.set(name, '', { ...options, maxAge: 0 });
+            remove(name: string, options: CookieOptions) {
+              cookieStore.set({ name, value: '', ...options });
             },
           },
         }

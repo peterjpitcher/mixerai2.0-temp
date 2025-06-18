@@ -33,8 +33,8 @@ async function seedSuperadmin() {
         persistSession: false
       }
     });
-  } catch (e: any) {
-    console.error('Failed to create Supabase admin client:', e.message);
+  } catch (e) {
+    console.error('Failed to create Supabase admin client:', e instanceof Error ? e.message : String(e));
     process.exit(1);
   }
 
@@ -126,8 +126,8 @@ async function seedSuperadmin() {
 
     console.log('Superadmin seeding process completed.');
 
-  } catch (error: any) {
-    console.error('An error occurred during the Superadmin seeding process:', error.message);
+  } catch (error) {
+    console.error('An error occurred during the Superadmin seeding process:', error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }

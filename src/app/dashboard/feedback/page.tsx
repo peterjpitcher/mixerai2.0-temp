@@ -68,15 +68,15 @@ export default function ViewFeedbackPage() {
     const supabaseClient = createSupabaseClient();
     setSupabase(supabaseClient);
 
-    const fetchSession = async () => {
-      const { data: { session: currentSession } } = await supabaseClient.auth.getSession();
-      setSession(currentSession);
-      if (currentSession?.user) {
-        setCurrentUserForForm(currentSession.user);
+    const fetchUser = async () => {
+      const { data: { user: currentUser } } = await supabaseClient.auth.getUser();
+      if (currentUser) {
+        setSession({ user: currentUser } as any);
+        setCurrentUserForForm(currentUser);
       }
       setIsLoadingUser(false);
     };
-    fetchSession();
+    fetchUser();
 
     const { data: authListener } = supabaseClient.auth.onAuthStateChange((event, currentSession) => {
       setSession(currentSession);

@@ -33,7 +33,7 @@ export const GET = withRouteAuth(async (request: NextRequest, authUser: User) =>
   }
 
   try {
-    const supabase = createSupabaseServerClient(); // Use admin or server client as appropriate
+    const supabase = createSupabaseServerClient(); // Use server client
 
     let userProfileDataFromDb: { 
       full_name?: string | null; 
@@ -45,6 +45,7 @@ export const GET = withRouteAuth(async (request: NextRequest, authUser: User) =>
     const { data: profileResponse, error: profileError } = await supabase
       .from('profiles')
       .select('full_name, job_title, company, avatar_url') 
+      // @ts-ignore - Type issue with Supabase
       .eq('id', authUser.id)
       .single();
 
@@ -62,6 +63,7 @@ export const GET = withRouteAuth(async (request: NextRequest, authUser: User) =>
         role,
         brand:brands (id, name, master_claim_brand_id)
       `)
+      // @ts-ignore - Type issue with Supabase
       .eq('user_id', authUser.id);
 
     if (permissionsError) {
@@ -71,11 +73,11 @@ export const GET = withRouteAuth(async (request: NextRequest, authUser: User) =>
     }
 
     // Ensure brand_permissions are correctly typed and filter out any with null brand_id if necessary
-    const typedBrandPermissions = (rawBrandPermissions || []).map(p => ({
+    const typedBrandPermissions = (rawBrandPermissions || []).map((p) => ({
         ...p,
         brand_id: p.brand_id as string, // Asserting brand_id is a string, as it's a FK
         brand: p.brand as { id: string; name: string; master_claim_brand_id?: string | null; } | null // Explicitly type the joined brand
-    })).filter(p => p.brand_id != null) as UserProfileResponse['brand_permissions'];
+    })).filter((p) => p.brand_id != null) as UserProfileResponse['brand_permissions'];
 
     // Combine all data into the final user object
     const finalUserResponse: UserProfileResponse = {

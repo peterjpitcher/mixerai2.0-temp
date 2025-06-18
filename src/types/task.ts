@@ -9,6 +9,7 @@ export interface Task {
   brand_id?: string;
   brand_name?: string;
   brand_color?: string;
+  brand_logo_url?: string | null;
   workflow_id?: string;
   workflow_name?: string;
   workflow_step_id?: string;

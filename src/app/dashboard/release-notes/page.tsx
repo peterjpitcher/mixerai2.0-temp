@@ -136,7 +136,7 @@ export default function ReleaseNotesPage() {
               <ul>
                 <li>Fixed client-server mismatch where template field values weren't being sent correctly</li>
                 <li>Updated refactored content generator form to send formValues in expected format</li>
-                <li>API now properly interpolates template variables like {{Article Title}} before sending to AI</li>
+                <li>API now properly interpolates template variables like {'{{Article Title}}'} before sending to AI</li>
                 <li>Any unreplaced placeholders are cleaned up to prevent curly braces in output</li>
                 <li>Fixes issues in Article (Editorial) and Article (How-To) templates</li>
               </ul>
