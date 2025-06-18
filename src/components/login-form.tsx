@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createSupabaseClient } from "@/lib/supabase/client";
 import { toast } from 'sonner';
+import { isAccountLocked, recordLoginAttempt } from '@/lib/auth/account-lockout';
+import { AlertCircle } from 'lucide-react';
 
 /**
  * LoginForm component.
@@ -29,7 +31,19 @@ export function LoginForm() {
     setError("");
 
     try {
+      // Check if account is locked
+      const lockStatus = await isAccountLocked(email);
+      if (lockStatus.locked) {
+        const minutes = Math.ceil((lockStatus.remainingTime || 0) / 60);
+        setError(`Account temporarily locked due to too many failed attempts. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`);
+        setIsLoading(false);
+        return;
+      }
+
       const supabase = createSupabaseClient();
+      
+      // Get IP address (in production, this would come from request headers)
+      const ip = 'unknown'; // TODO: Get real IP from headers
       
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
@@ -37,9 +51,24 @@ export function LoginForm() {
       });
 
       if (signInError) {
-        setError(signInError.message);
+        // Record failed attempt
+        await recordLoginAttempt(email, ip, false);
+        
+        // Check if this attempt triggered a lockout
+        const newLockStatus = await isAccountLocked(email);
+        if (newLockStatus.locked) {
+          const minutes = Math.ceil((newLockStatus.remainingTime || 0) / 60);
+          setError(`Account has been locked due to too many failed attempts. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`);
+        } else {
+          const remainingAttempts = 5 - (newLockStatus.attempts || 0);
+          setError(`${signInError.message}${remainingAttempts < 3 ? ` (${remainingAttempts} attempt${remainingAttempts > 1 ? 's' : ''} remaining)` : ''}`);
+        }
+        
         toast.error(signInError.message);
       } else {
+        // Record successful attempt
+        await recordLoginAttempt(email, ip, true);
+        
         toast.success('You have been logged in successfully.');
         router.push("/dashboard");
         router.refresh();
@@ -95,7 +124,10 @@ export function LoginForm() {
             />
           </div>
           {error && (
-            <div className="text-sm text-red-500">{error}</div>
+            <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
           )}
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? "Logging in..." : "Log in"}

@@ -1,9 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { generateCSRFToken, validateCSRFToken, shouldProtectRoute, CSRF_ERROR_RESPONSE } from '@/lib/csrf';
+import { checkRateLimit, rateLimitConfigs, getRateLimitHeaders, type RateLimitConfig } from '@/lib/rate-limit';
+import { validateSession, sessionNeedsRenewal, createSession } from '@/lib/auth/session-manager';
+import { sessionConfig } from '@/lib/auth/session-config';
 
 /**
- * This middleware adds security headers and handles authentication for protected routes
+ * This middleware adds security headers, rate limiting, and handles authentication for protected routes
  */
 export async function middleware(request: NextRequest) {
   // Clone the request headers to avoid modifying the original request headers object.
@@ -21,6 +24,53 @@ export async function middleware(request: NextRequest) {
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-XSS-Protection', '1; mode=block');
   response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+
+  // Rate Limiting
+  const pathForRateLimit = request.nextUrl.pathname;
+  let rateLimitConfig: RateLimitConfig = rateLimitConfigs.api; // Default rate limit
+  
+  // Apply different rate limits based on endpoint type
+  if (pathForRateLimit.startsWith('/api/auth/') || pathForRateLimit.startsWith('/auth/')) {
+    rateLimitConfig = rateLimitConfigs.auth;
+  } else if (pathForRateLimit.startsWith('/api/ai/') || pathForRateLimit.startsWith('/api/content/generate') || 
+             pathForRateLimit.startsWith('/api/tools/')) {
+    // Check for expensive AI operations
+    if (pathForRateLimit.includes('/generate') || pathForRateLimit.includes('/transcreator') || 
+        pathForRateLimit.includes('/identity')) {
+      rateLimitConfig = rateLimitConfigs.aiExpensive;
+    } else {
+      rateLimitConfig = rateLimitConfigs.ai;
+    }
+  } else if (pathForRateLimit.includes('/users') || pathForRateLimit.includes('/workflows')) {
+    rateLimitConfig = rateLimitConfigs.sensitive;
+  }
+  
+  // Check rate limit
+  const rateLimitResult = checkRateLimit(request, rateLimitConfig);
+  
+  // Apply rate limit headers to response
+  const rateLimitHeaders = getRateLimitHeaders(rateLimitResult);
+  Object.entries(rateLimitHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  
+  // If rate limit exceeded, return 429 Too Many Requests
+  if (!rateLimitResult.allowed) {
+    return new NextResponse(
+      JSON.stringify({
+        success: false,
+        error: rateLimitConfig.message || 'Too many requests. Please try again later.',
+        retryAfter: rateLimitResult.retryAfter,
+      }),
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          ...Object.fromEntries(response.headers.entries()),
+        },
+      }
+    );
+  }
 
   // CSRF Protection for API routes
   if (request.nextUrl.pathname.startsWith('/api/')) {
@@ -96,11 +146,62 @@ export async function middleware(request: NextRequest) {
     if (sessionError) {
         console.warn('Middleware: supabase.auth.getSession() error (token refresh might have failed):', sessionError.message);
     }
+    
+    // Add user ID to request headers for rate limiting
+    if (refreshedSession?.user?.id) {
+      requestHeaders.set('x-user-id', refreshedSession.user.id);
+    }
+    
+    // Session management
+    const sessionId = request.cookies.get('app-session-id')?.value;
+    let isSessionValid = false;
+    
+    if (refreshedSession?.user?.id) {
+      if (sessionId) {
+        // Validate existing session
+        const sessionValidation = await validateSession(sessionId);
+        isSessionValid = sessionValidation.valid && sessionValidation.userId === refreshedSession.user.id;
+        
+        if (!isSessionValid) {
+          // Create new session if invalid
+          const newSessionId = await createSession(refreshedSession.user.id);
+          response.cookies.set('app-session-id', newSessionId, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: sessionConfig.absoluteTimeout / 1000,
+            path: '/',
+          });
+          isSessionValid = true;
+        } else if (sessionNeedsRenewal(sessionId)) {
+          // Session is valid but needs renewal
+          const newSessionId = await createSession(refreshedSession.user.id);
+          response.cookies.set('app-session-id', newSessionId, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: sessionConfig.absoluteTimeout / 1000,
+            path: '/',
+          });
+        }
+      } else {
+        // No session cookie, create new session
+        const newSessionId = await createSession(refreshedSession.user.id);
+        response.cookies.set('app-session-id', newSessionId, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+          maxAge: sessionConfig.absoluteTimeout / 1000,
+          path: '/',
+        });
+        isSessionValid = true;
+      }
+    }
 
     if (request.nextUrl.pathname.startsWith('/dashboard') || 
         request.nextUrl.pathname.startsWith('/api/') ||
         request.nextUrl.pathname.startsWith('/account')) {
-      if (!refreshedSession) {
+      if (!refreshedSession || (refreshedSession && !isSessionValid)) {
         // Handle /dashboard/* and /account/* page routes: redirect to login
         if (request.nextUrl.pathname.startsWith('/dashboard') ||
             request.nextUrl.pathname.startsWith('/account')) {
@@ -208,7 +309,7 @@ export const config = {
      * 3. /public (public files)
      * 4. all root files inside /public (e.g. /favicon.ico)
      */
-    '/((?!api/env-check|api/test-connection|api/test-metadata-generator|api/brands/identity|_next/static|_next/image|public|favicon.ico).*)',
+    '/((?!api/env-check|api/test-connection|api/test-metadata-generator|_next/static|_next/image|public|favicon.ico).*)',
     '/brands/:path*',
     '/workflows/:path*',
     '/content/:path*',

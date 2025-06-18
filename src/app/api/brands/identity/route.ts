@@ -6,10 +6,7 @@ import { handleApiError } from '@/lib/api-utils';
 import axios from 'axios';
 import sanitizeHtml from 'sanitize-html';
 
-// In-memory rate limiting - consider a more robust solution for production
-const rateLimit = new Map<string, { count: number, timestamp: number }>();
-const RATE_LIMIT_PERIOD = 60 * 1000; // 1 minute
-const MAX_REQUESTS = 5; // 5 requests per minute
+// Rate limiting is now handled globally in middleware
 
 // Simplified OpenAI client initialization: Prioritizes Azure, falls back to standard OpenAI if configured, else error.
 const getOpenAIClientOrThrow = () => {
@@ -96,27 +93,6 @@ async function scrapeWebsiteContent(url: string): Promise<string> {
 }
 
 export const POST = withAuthAndMonitoring(async (req: NextRequest) => {
-  // Rate limiting logic remains as is for now.
-  const ip = req.headers.get('x-forwarded-for') || req.ip || 'unknown'; // Enhanced IP detection
-  const now = Date.now();
-  
-  if (rateLimit.has(ip)) {
-    const userRateLimit = rateLimit.get(ip)!;
-    if (now - userRateLimit.timestamp > RATE_LIMIT_PERIOD) {
-      userRateLimit.count = 1;
-      userRateLimit.timestamp = now;
-    } else if (userRateLimit.count >= MAX_REQUESTS) {
-      return NextResponse.json(
-        { success: false, error: 'Rate limit exceeded. Please try again later.' },
-        { status: 429 }
-      );
-    } else {
-      userRateLimit.count += 1;
-    }
-  } else {
-    rateLimit.set(ip, { count: 1, timestamp: now });
-  }
-  
   try {
     const body = await req.json();
     const name = body.name || body.brandName;

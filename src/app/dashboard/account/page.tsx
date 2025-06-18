@@ -13,6 +13,9 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import { HelpCircle } from 'lucide-react';
 import { AvatarUpload } from '@/components/ui/avatar-upload';
+import { validatePassword } from '@/lib/auth/session-config';
+import { AlertCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 // Page metadata should ideally be exported from a server component or the page file if it's RSC.
 // For client components, this is more of a placeholder for what should be set.
@@ -48,6 +51,7 @@ const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) =
  * Uses tabs for different settings sections.
  */
 export default function AccountPage() {
+  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [session, setSession] = useState<Record<string, unknown> | null>(null);
@@ -221,10 +225,16 @@ export default function AccountPage() {
       toast.error('Please complete all password fields.', { description: 'Missing Fields' });
       return;
     }
-    if (newPassword.length < 6) {
-      toast.error('New password must be at least 6 characters long.', { description: 'Password Too Short' });
+    
+    // Validate new password against policy
+    const validation = validatePassword(newPassword);
+    if (!validation.valid) {
+      toast.error('Password does not meet requirements', { 
+        description: validation.errors[0] 
+      });
       return;
     }
+    
     if (newPassword !== confirmPassword) {
       toast.error('Your new password and confirmation password do not match.', { description: 'Password Mismatch' });
       return;
@@ -232,6 +242,24 @@ export default function AccountPage() {
     
     setIsSubmitting(true);
     try {
+      // Check if re-authentication is required
+      const reauthResponse = await fetch('/api/auth/check-reauthentication', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operation: 'change-password' }),
+      });
+      
+      const reauthData = await reauthResponse.json();
+      
+      if (reauthData.requiresReauthentication) {
+        toast.error('For security reasons, please log in again before changing your password.', {
+          description: 'Re-authentication Required',
+        });
+        // Optionally redirect to login with return URL
+        router.push(`/auth/login?from=${encodeURIComponent('/dashboard/account?tab=password')}`);
+        return;
+      }
+      
       // Supabase updateUser for password doesn't require currentPassword if user is already authenticated.
       // However, asking for it is a good security practice to prevent session hijacking leading to password change.
       // For true verification of currentPassword, a custom server-side check would be needed.
@@ -376,16 +404,25 @@ export default function AccountPage() {
                     <Input id="current-password" name="current-password" type="password" required />
                   </div>
                 </div>
-                <div className="grid grid-cols-12 gap-4 items-center">
-                  <Label htmlFor="new-password" className="col-span-12 sm:col-span-3 text-left sm:text-right">New Password <span className="text-destructive">*</span></Label>
-                  <div className="col-span-12 sm:col-span-9">
-                    <Input id="new-password" name="new-password" type="password" required minLength={6} placeholder="Minimum 6 characters"/>
+                <div className="grid grid-cols-12 gap-4 items-start">
+                  <Label htmlFor="new-password" className="col-span-12 sm:col-span-3 text-left sm:text-right mt-2">New Password <span className="text-destructive">*</span></Label>
+                  <div className="col-span-12 sm:col-span-9 space-y-2">
+                    <Input id="new-password" name="new-password" type="password" required minLength={12} placeholder="Enter a strong password"/>
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <p className="font-medium">Password must contain:</p>
+                      <ul className="list-disc list-inside space-y-0.5 ml-2">
+                        <li>At least 12 characters</li>
+                        <li>Uppercase and lowercase letters</li>
+                        <li>At least one number</li>
+                        <li>At least one special character</li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-12 gap-4 items-center">
                   <Label htmlFor="confirm-password" className="col-span-12 sm:col-span-3 text-left sm:text-right">Confirm Password <span className="text-destructive">*</span></Label>
                   <div className="col-span-12 sm:col-span-9">
-                    <Input id="confirm-password" name="confirm-password" type="password" required minLength={6} />
+                    <Input id="confirm-password" name="confirm-password" type="password" required minLength={12} />
                   </div>
                 </div>
               </CardContent>

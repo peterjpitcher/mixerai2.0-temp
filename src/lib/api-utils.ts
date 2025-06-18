@@ -4,6 +4,7 @@
 
 import { NextResponse } from 'next/server';
 import axios from 'axios';
+import { ApiError, PostgresError, isPostgresError } from '@/types/api';
 
 /**
  * Get environment mode (development, production, test)
@@ -67,16 +68,35 @@ export const handleApiError = (
   error: unknown, 
   message: string = 'An error occurred', 
   status: number = 500
-) => {
+): NextResponse => {
   // Enhanced error object for logging
   const errorDetails = {
-    message: (error instanceof Error ? error.message : 
-              (error && typeof error === 'object' && 'message' in error ? String(error.message) : 'Unknown error')),
-    code: (error && typeof error === 'object' && 'code' in error ? String(error.code) : 'UNKNOWN'),
-    hint: (error && typeof error === 'object' && 'hint' in error ? String(error.hint) : ''),
-    source: (error && typeof error === 'object' && 'source' in error ? String(error.source) : 'unknown'),
-    isDatabaseError: isDatabaseConnectionError(error)
+    message: 'Unknown error',
+    code: 'UNKNOWN',
+    hint: '',
+    source: 'unknown',
+    isDatabaseError: false
   };
+
+  if (error instanceof Error) {
+    errorDetails.message = error.message;
+    if (isPostgresError(error)) {
+      errorDetails.code = error.code || 'UNKNOWN';
+      errorDetails.hint = error.hint || '';
+    } else if ('code' in error && typeof error.code === 'string') {
+      errorDetails.code = error.code;
+    }
+    if ('hint' in error && typeof error.hint === 'string') {
+      errorDetails.hint = error.hint;
+    }
+  } else if (error && typeof error === 'object') {
+    if ('message' in error) errorDetails.message = String(error.message);
+    if ('code' in error) errorDetails.code = String(error.code);
+    if ('hint' in error) errorDetails.hint = String(error.hint);
+    if ('source' in error) errorDetails.source = String(error.source);
+  }
+  
+  errorDetails.isDatabaseError = isDatabaseConnectionError(error);
   
   // Log the full error in development, but a sanitized version in production
   if (isProduction()) {
@@ -113,11 +133,9 @@ export const handleApiError = (
     { 
       success: false, 
       error: message,
-      details: isProduction() ? 'See server logs for details' : 
-        (error instanceof Error ? error.message : 
-         (error && typeof error === 'object' && 'message' in error ? String(error.message) : String(error))),
-      hint: (error && typeof error === 'object' && 'hint' in error ? String(error.hint) : ''),
-      code: (error && typeof error === 'object' && 'code' in error ? String(error.code) : '')
+      details: isProduction() ? 'See server logs for details' : errorDetails.message,
+      hint: errorDetails.hint,
+      code: errorDetails.code
     },
     { status }
   );
