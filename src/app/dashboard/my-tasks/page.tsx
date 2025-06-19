@@ -178,12 +178,12 @@ export default function MyTasksPage() {
                       </td>
                       <td className="p-3">
                         <div className="flex items-center">
-                          <BrandIcon name={task.brand_name || ''} color={task.brand_color ?? undefined} logoUrl={task.brand_logo_url} size="sm" className="mr-2" />
+                          <BrandIcon name={task.brand_name || ''} color={task.brand_color ?? undefined} logoUrl={task.brand_logo_url || undefined} size="sm" className="mr-2" />
                           {task.brand_name || 'N/A'}
                         </div>
                       </td>
                       <td className="p-3">{task.workflow_step_name || 'N/A'}</td>
-                      <td className="p-3 text-muted-foreground">{formatDate(task.created_at)}</td>
+                      <td className="p-3 text-muted-foreground">{task.created_at ? formatDate(task.created_at) : 'N/A'}</td>
                       <td className="p-3">
                         <Button variant="outline" size="sm" asChild>
                             <Link href={`/dashboard/content/${task.content_id}/edit`} className="flex items-center">

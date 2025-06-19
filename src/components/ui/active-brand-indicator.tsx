@@ -56,8 +56,8 @@ export function ActiveBrandIndicator({
     >
       <BrandIcon 
         name={brandName} 
-        color={brandColor} 
-        logoUrl={brandLogoUrl}
+        color={brandColor || undefined} 
+        logoUrl={brandLogoUrl || undefined}
         size={size}
       />
       {showLabel && (
@@ -101,9 +101,9 @@ export function ActiveBrandBadge({
     >
       <BrandIcon 
         name={brandName} 
-        color={brandColor} 
-        logoUrl={brandLogoUrl}
-        size="xs"
+        color={brandColor || undefined} 
+        logoUrl={brandLogoUrl || undefined}
+        size="sm"
         className="h-4 w-4"
       />
       <span>{brandName}</span>

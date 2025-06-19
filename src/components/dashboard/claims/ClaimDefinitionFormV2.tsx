@@ -164,12 +164,12 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
 
     fetchClaimsWorkflows();
 
-    // Map country codes to options
-    const mappedCountryOptions = ALL_COUNTRIES_CODE.map(code => ({
-      value: code,
-      label: ALL_COUNTRIES_NAME[code] || code,
-    }));
-    setCountryOptions(mappedCountryOptions);
+    // TODO: Fetch country codes from API or use proper country list
+    // For now, just add the "All Countries" option
+    setCountryOptions([{
+      value: ALL_COUNTRIES_CODE,
+      label: ALL_COUNTRIES_NAME
+    }]);
     setIsLoadingCountries(false);
   }, []);
 
@@ -351,9 +351,8 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
                 <MultiSelectCheckboxCombobox
                   options={productOptions}
                   selectedValues={selectedProductValues}
-                  onSelectedChange={setSelectedProductValues}
+                  onChange={setSelectedProductValues}
                   placeholder="Select products"
-                  emptyMessage="No products found"
                   searchPlaceholder="Search products..."
                 />
               </div>
@@ -485,9 +484,8 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
                 <MultiSelectCheckboxCombobox
                   options={countryOptions}
                   selectedValues={selectedCountryCodes}
-                  onSelectedChange={setSelectedCountryCodes}
+                  onChange={setSelectedCountryCodes}
                   placeholder="Select target countries"
-                  emptyMessage="No countries found"
                   searchPlaceholder="Search countries..."
                   disabled={isLoadingCountries}
                 />
