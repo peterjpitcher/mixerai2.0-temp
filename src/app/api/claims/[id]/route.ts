@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
+import { hasAccessToBrand, canAccessProduct, canAccessIngredient } from '@/lib/auth/permissions';
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,6 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
     if (!id) {
         return NextResponse.json({ success: false, error: 'Claim ID is required.' }, { status: 400 });
     }
-    // TODO: Implement permission checks
 
     try {
         const supabase = createSupabaseAdminClient();
@@ -58,6 +58,38 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
 
         if (!data) {
             return NextResponse.json({ success: false, error: 'Claim not found.' }, { status: 404 });
+        }
+        
+        // Permission check based on claim level
+        const isAdmin = user?.user_metadata?.role === 'admin';
+        let hasPermission = isAdmin;
+        
+        if (!hasPermission) {
+            if (data.level === 'brand' && data.master_brand_id) {
+                // For brand-level claims, check if user has access to the brand
+                const { data: mcbData } = await supabase
+                    .from('master_claim_brands')
+                    .select('mixerai_brand_id')
+                    .eq('id', data.master_brand_id)
+                    .single();
+                    
+                if (mcbData?.mixerai_brand_id) {
+                    hasPermission = await hasAccessToBrand(user.id, mcbData.mixerai_brand_id, supabase);
+                }
+            } else if (data.level === 'product' && data.product_id) {
+                // For product-level claims, check if user has access to the product
+                hasPermission = await canAccessProduct(user.id, data.product_id, supabase);
+            } else if (data.level === 'ingredient' && data.ingredient_id) {
+                // For ingredient-level claims, check if user has access to the ingredient
+                hasPermission = await canAccessIngredient(user.id, data.ingredient_id, supabase);
+            }
+        }
+        
+        if (!hasPermission) {
+            return NextResponse.json(
+                { success: false, error: 'You do not have permission to access this claim.' },
+                { status: 403 }
+            );
         }
         
         const singleDataObject = data as Record<string, unknown>;

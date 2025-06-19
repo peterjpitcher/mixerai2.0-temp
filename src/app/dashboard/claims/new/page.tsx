@@ -275,8 +275,8 @@ export default function NewClaimPage() {
                             <div className="flex items-center gap-2">
                               <BrandIcon 
                                 name={selectedBrand.name} 
-                                color={selectedBrand.brand_color}
-                                logoUrl={selectedBrand.logo_url}
+                                color={selectedBrand.brand_color || undefined}
+                                logoUrl={selectedBrand.logo_url || undefined}
                                 size="sm"
                               />
                               <span>{selectedBrand.name}</span>
@@ -291,8 +291,8 @@ export default function NewClaimPage() {
                           <div className="flex items-center gap-2">
                             <BrandIcon 
                               name={brand.name} 
-                              color={brand.brand_color}
-                              logoUrl={brand.logo_url}
+                              color={brand.brand_color || undefined}
+                              logoUrl={brand.logo_url || undefined}
                               size="sm"
                             />
                             <span className="truncate">{brand.name}</span>

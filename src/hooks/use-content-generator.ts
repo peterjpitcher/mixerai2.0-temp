@@ -58,6 +58,8 @@ export function useContentGenerator(templateId?: string | null) {
   const [productContext, setProductContext] = useState<ProductContext | null>(null);
   const [isFetchingProductContext, setIsFetchingProductContext] = useState(false);
   
+  const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
+  
   const currentBrand = allBrands.find(b => b.id === selectedBrand);
   
   // Calculate missing required fields
@@ -379,6 +381,7 @@ export function useContentGenerator(templateId?: string | null) {
           title: finalTitle,
           workflow_id: associatedWorkflowDetails?.id,
           body: primaryBodyContent,
+          due_date: dueDate?.toISOString() || null,
           content_data: {
             templateInputValues: templateFieldValues,
             generatedOutputs: generatedOutputs
@@ -404,7 +407,7 @@ export function useContentGenerator(templateId?: string | null) {
     } finally {
       setIsSaving(false);
     }
-  }, [selectedBrand, template, generatedOutputs, templateFieldValues, associatedWorkflowDetails, title, generateTitle]);
+  }, [selectedBrand, template, generatedOutputs, templateFieldValues, associatedWorkflowDetails, title, generateTitle, dueDate]);
   
   return {
     // State
@@ -432,6 +435,7 @@ export function useContentGenerator(templateId?: string | null) {
     productContext,
     isFetchingProductContext,
     missingRequiredFields,
+    dueDate,
     
     // Actions
     setSelectedBrand,
@@ -445,5 +449,6 @@ export function useContentGenerator(templateId?: string | null) {
     generateContent,
     generateTitle,
     saveContent,
+    setDueDate,
   };
 }

@@ -31,10 +31,6 @@ import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
-// export const metadata: Metadata = {
-//   title: 'Alt Text Generator | MixerAI 2.0',
-//   description: 'Generate accessible alt text for images using your brand guidelines.',
-// };
 
 interface AltTextResultItem {
   imageUrl: string;
@@ -113,6 +109,12 @@ interface ToolRunHistoryItem {
   error_message?: string | null;
 }
 
+interface EnhancedHistoryItem extends ToolRunHistoryItem {
+  imageCount?: number;
+  successCount?: number;
+  failureCount?: number;
+}
+
 /**
  * AltTextGeneratorPage provides a tool for generating accessible alt text for images.
  * Users can provide a list of image URLs, and the tool will generate alt text
@@ -139,6 +141,30 @@ export default function AltTextGeneratorPage() {
   const [runHistory, setRunHistory] = useState<ToolRunHistoryItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [enhancedHistory, setEnhancedHistory] = useState<EnhancedHistoryItem[]>([]);
+
+  // Enhance history items with additional metadata
+  const enhanceHistory = (items: ToolRunHistoryItem[]): EnhancedHistoryItem[] => {
+    return items.map(item => {
+      const enhanced: EnhancedHistoryItem = { ...item };
+      
+      // Extract image count and success/failure counts from inputs/outputs
+      if (item.inputs && typeof item.inputs === 'object' && 'imageUrls' in item.inputs) {
+        const imageUrls = item.inputs.imageUrls as string[];
+        enhanced.imageCount = Array.isArray(imageUrls) ? imageUrls.length : 0;
+      }
+      
+      if (item.outputs && typeof item.outputs === 'object' && 'results' in item.outputs) {
+        const results = item.outputs.results as AltTextResultItem[];
+        if (Array.isArray(results)) {
+          enhanced.successCount = results.filter(r => r.altText && !r.error).length;
+          enhanced.failureCount = results.filter(r => r.error).length;
+        }
+      }
+      
+      return enhanced;
+    });
+  };
 
   // Fetch current user
   useEffect(() => {
@@ -219,8 +245,11 @@ export default function AltTextGeneratorPage() {
         const data = await response.json();
         if (data.success && data.history) {
           setRunHistory(data.history);
+          const enhanced = enhanceHistory(data.history);
+          setEnhancedHistory(enhanced);
         } else {
           setRunHistory([]);
+          setEnhancedHistory([]);
           setHistoryError(data.error || 'History data not found.');
         }
       } catch (error) {
@@ -337,8 +366,11 @@ export default function AltTextGeneratorPage() {
                 const data = await response.json();
                 if (data.success && data.history) {
                 setRunHistory(data.history);
+                const enhanced = enhanceHistory(data.history);
+                setEnhancedHistory(enhanced);
                 } else {
                 setRunHistory([]);
+                setEnhancedHistory([]);
                 setHistoryError(data.error || 'History data not found.');
                 }
             } catch (error) {
@@ -370,8 +402,6 @@ export default function AltTextGeneratorPage() {
     }
   };
 
-  // const successfulResults = results.filter(r => !r.error && r.altText);
-  // const errorResults = results.filter(r => r.error); // This variable is not used
 
   // --- Loading and Access Denied States ---
   if (isLoadingUser || isCheckingPermissions) {
@@ -659,26 +689,48 @@ export default function AltTextGeneratorPage() {
                 <AlertTriangle className="inline mr-2 h-5 w-5" /> Error loading history: {historyError}
               </div>
             )}
-            {!isLoadingHistory && !historyError && runHistory.length === 0 && (
+            {!isLoadingHistory && !historyError && enhancedHistory.length === 0 && (
               <p className="text-muted-foreground py-4 text-center">No history available for this tool.</p>
             )}
-            {!isLoadingHistory && !historyError && runHistory.length > 0 && (
+            {!isLoadingHistory && !historyError && enhancedHistory.length > 0 && (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead scope="col">Run Date</TableHead>
-                    <TableHead scope="col">Status</TableHead>
+                    <TableHead scope="col">Images</TableHead>
+                    <TableHead scope="col">Results</TableHead>
                     <TableHead scope="col" className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {runHistory.map((run) => (
+                  {enhancedHistory.map((run) => (
                     <TableRow key={run.id}>
                       <TableCell>{format(new Date(run.run_at), 'MMMM d, yyyy, HH:mm')}</TableCell>
                       <TableCell>
-                        <Badge variant={run.status === 'success' ? 'default' : 'destructive'}>
-                          {run.status}
-                        </Badge>
+                        {run.imageCount !== undefined ? (
+                          <span className="text-sm">{run.imageCount} {run.imageCount === 1 ? 'image' : 'images'}</span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {run.successCount !== undefined && run.successCount > 0 && (
+                            <Badge variant="default" className="text-xs">
+                              {run.successCount} success
+                            </Badge>
+                          )}
+                          {run.failureCount !== undefined && run.failureCount > 0 && (
+                            <Badge variant="destructive" className="text-xs">
+                              {run.failureCount} failed
+                            </Badge>
+                          )}
+                          {(run.successCount === undefined && run.failureCount === undefined) && (
+                            <Badge variant={run.status === 'success' ? 'default' : 'destructive'}>
+                              {run.status}
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <Link href={`/dashboard/tools/history/${run.id}`} passHref>

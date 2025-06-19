@@ -25,7 +25,6 @@ export const GET = withAuthAndMonitoring(async (request: NextRequest, user: User
     const { data: historyItem, error } = await supabase
       .from('tool_run_history')
       .select('*')
-      // @ts-ignore - Type issue with Supabase
       .eq('id', historyId)
       // RLS policy should ensure user can only fetch their own or if admin, any.
       // For an extra layer, explicitly check user_id if not admin.

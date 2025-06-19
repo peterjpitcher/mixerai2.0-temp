@@ -11,6 +11,7 @@ import { createSupabaseClient } from "@/lib/supabase/client";
 import { toast } from 'sonner';
 import { isAccountLocked, recordLoginAttempt } from '@/lib/auth/account-lockout';
 import { AlertCircle } from 'lucide-react';
+import { getClientIP } from '@/lib/utils/get-client-ip';
 
 /**
  * LoginForm component.
@@ -42,8 +43,8 @@ export function LoginForm() {
 
       const supabase = createSupabaseClient();
       
-      // Get IP address (in production, this would come from request headers)
-      const ip = 'unknown'; // TODO: Get real IP from headers
+      // Get IP address
+      const ip = await getClientIP();
       
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,

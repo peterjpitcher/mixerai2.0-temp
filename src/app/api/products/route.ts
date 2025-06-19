@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
+import { getUserAccessibleBrands, isPlatformAdmin } from '@/lib/auth/permissions';
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +17,7 @@ interface Product {
 }
 
 // GET handler for all products with pagination
-export const GET = withAuth(async (req: NextRequest) => {
-    // TODO: Implement filtering by master_brand_id if needed as a query param
-    // TODO: Implement permission checks - user might only see products for brands they have access to.
+export const GET = withAuth(async (req: NextRequest, user: User) => {
     try {
         // Parse pagination parameters from query string
         const searchParams = req.nextUrl.searchParams;
@@ -37,10 +36,51 @@ export const GET = withAuth(async (req: NextRequest) => {
 
         const supabase = createSupabaseAdminClient();
         
+        // Check if user is platform admin
+        const isPlatAdmin = await isPlatformAdmin(user, supabase);
+        
+        // Get user's accessible brands if not platform admin
+        let accessibleBrands: string[] = [];
+        if (!isPlatAdmin) {
+            accessibleBrands = await getUserAccessibleBrands(user.id, supabase);
+            
+            // If user has no brand access, return empty result
+            if (accessibleBrands.length === 0) {
+                return NextResponse.json({
+                    success: true,
+                    data: [],
+                    meta: {
+                        total: 0,
+                        page: validatedPage,
+                        limit: validatedLimit,
+                        totalPages: 0
+                    }
+                });
+            }
+        }
+        
         // Build query with pagination
         let query = supabase.from('products')
             .select('*', { count: 'exact' }) // Get total count for pagination
             .order('name');
+        
+        // Apply brand filter if not platform admin
+        if (!isPlatAdmin && accessibleBrands.length > 0) {
+            query = query.in('master_brand_id', accessibleBrands);
+        }
+        
+        // Filter by specific brand if requested
+        const brandIdParam = req.nextUrl.searchParams.get('brand_id');
+        if (brandIdParam) {
+            // Verify user has access to this brand
+            if (!isPlatAdmin && !accessibleBrands.includes(brandIdParam)) {
+                return NextResponse.json(
+                    { success: false, error: 'Access denied to this brand' },
+                    { status: 403 }
+                );
+            }
+            query = query.eq('master_brand_id', brandIdParam);
+        }
         
         // Add search filter if provided
         if (search) {

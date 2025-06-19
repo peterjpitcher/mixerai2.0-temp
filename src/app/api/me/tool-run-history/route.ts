@@ -19,7 +19,6 @@ export const GET = withAuthAndMonitoring(async (request: NextRequest) => {
       .limit(50); // Let's limit to 50 records for now
 
     if (toolName) {
-      // @ts-ignore - Type issue with Supabase
       query = query.eq('tool_name', toolName);
     }
 
@@ -33,7 +32,16 @@ export const GET = withAuthAndMonitoring(async (request: NextRequest) => {
       );
     }
 
-    return NextResponse.json({ success: true, history });
+    // Map database fields to expected frontend fields
+    const mappedHistory = history?.map(item => ({
+      ...item,
+      run_at: item.run_at,
+      // Ensure inputs/outputs are objects
+      inputs: item.inputs || {},
+      outputs: item.outputs || {}
+    })) || [];
+
+    return NextResponse.json({ success: true, history: mappedHistory });
 
   } catch (error: unknown) {
     console.error('[ToolRunHistoryAPI] Unexpected error:', error);

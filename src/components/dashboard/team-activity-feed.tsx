@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { formatDate } from '@/lib/utils/date';
-import { FilePlus, Send, CheckCircle, Edit3, UserPlus, Milestone } from 'lucide-react';
+import { FilePlus, Send, CheckCircle, Edit3, UserPlus, Milestone, Activity } from 'lucide-react';
 
 export type ActivityType =
   | 'content_created'
@@ -116,6 +116,7 @@ export function TeamActivityFeed({ initialActivity, condensed = false }: { initi
           </div>
         ) : (
           <div className={`text-center text-muted-foreground ${condensed ? "py-4" : "py-8"}`}>
+            <Activity className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
             <p className={condensed ? "text-sm" : ""}>No recent activity to display.</p>
           </div>
         )}

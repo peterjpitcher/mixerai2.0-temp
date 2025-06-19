@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
-import { FileText as ContentIcon, GitFork as WorkflowIcon, Users, ExternalLink } from 'lucide-react';
+import { FileText as ContentIcon, GitFork as WorkflowIcon, Users, ExternalLink, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Label } from "@/components/ui/label";
 import RejectedContentList from '@/components/dashboard/brand/rejected-content-list';
@@ -46,6 +46,16 @@ export function BrandDetailsClient({ brand, canEditBrand }: { brand: Brand, canE
 
   return (
     <div className="space-y-6">
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={() => router.push('/dashboard/brands')}
+        className="mb-4"
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Back to Brands
+      </Button>
+      
       <Breadcrumbs items={breadcrumbItems} />
       <PageHeader 
         title={brand.name}

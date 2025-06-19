@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { toast } from 'sonner';
 import { Heading } from '@/components/ui/heading';
-import { Loader2, Copy } from 'lucide-react';
+import { Loader2, Copy, ArrowLeft } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { fetchCountries, fetchProducts } from '@/lib/api-utils';
 
 // Types
@@ -46,6 +47,8 @@ interface RawClaimForAI {
 }
 
 const BrandClaimsOutputPage = () => {
+    const router = useRouter();
+    
     // State
     const [brands, setBrands] = useState<SelectOption[]>([]);
     const [products, setProducts] = useState<SelectOption[]>([]);
@@ -246,6 +249,16 @@ const BrandClaimsOutputPage = () => {
 
     return (
         <div className="space-y-6">
+            <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => router.push('/dashboard/claims')}
+                className="mb-4"
+            >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Claims
+            </Button>
+            
             <Heading title="Brand Claims Styler" description="Select a brand, and optionally a product and market, to generate a styled list of claims." />
 
             <Card className="mb-6">

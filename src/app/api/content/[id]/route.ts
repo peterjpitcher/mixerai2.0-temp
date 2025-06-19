@@ -223,10 +223,10 @@ export const PUT = withAuth(async (request: NextRequest, user: User, context?: u
     // --- Permission Check Start ---
     const globalRole = user?.user_metadata?.role;
 
-    // Fetch the content item to check its brand_id for permission validation
+    // Fetch the content item to check its brand_id and status for permission validation
     const { data: currentContent, error: fetchError } = await supabase
       .from('content')
-      .select('brand_id')
+      .select('brand_id, status')
       .eq('id', id)
       .single();
 
@@ -240,6 +240,14 @@ export const PUT = withAuth(async (request: NextRequest, user: User, context?: u
 
     if (!currentContent) {
       return NextResponse.json({ success: false, error: 'Content not found' }, { status: 404 });
+    }
+
+    // Check if content is approved or published - if so, prevent editing
+    if (currentContent.status === 'approved' || currentContent.status === 'published') {
+      return NextResponse.json(
+        { success: false, error: 'Cannot edit content that has been approved or published. The content must be reopened through the workflow to make changes.' },
+        { status: 403 }
+      );
     }
 
     const targetBrandId = currentContent.brand_id;
@@ -284,7 +292,7 @@ export const PUT = withAuth(async (request: NextRequest, user: User, context?: u
     console.log('[API PUT /api/content/[id]] Received body (stringified):', JSON.stringify(body, null, 2));
 
     // Define allowed fields for update
-    const allowedFields = ['title', 'body', 'meta_title', 'meta_description', 'status', 'content_data'];
+    const allowedFields = ['title', 'body', 'meta_title', 'meta_description', 'status', 'content_data', 'due_date'];
     const updateData: Record<string, unknown> = {};
 
     // Filter request body to include only allowed fields
@@ -307,7 +315,7 @@ export const PUT = withAuth(async (request: NextRequest, user: User, context?: u
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ 
         success: false, 
-        error: 'No valid fields provided for update. Allowed fields: title, body, meta_title, meta_description, status' 
+        error: 'No valid fields provided for update. Allowed fields: title, body, meta_title, meta_description, status, content_data, due_date' 
       }, { status: 400 });
     }
 

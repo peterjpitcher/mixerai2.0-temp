@@ -141,8 +141,14 @@ export default function AccountPage() {
           avatarUrl: profileData?.avatar_url || '',
         });
         
-        // TODO: Fetch actual notification settings for the user from an API
-        // setNotificationSettings(fetchedSettings || defaultNotificationSettings);
+        // Fetch notification settings
+        const notificationResponse = await fetch('/api/user/notification-settings');
+        if (notificationResponse.ok) {
+          const notificationData = await notificationResponse.json();
+          if (notificationData.success) {
+            setNotificationSettings(notificationData.data);
+          }
+        }
         
       } catch (error: unknown) {
         // console.error removed
@@ -163,9 +169,26 @@ export default function AccountPage() {
     setProfileData(prev => ({ ...prev, [id]: value }));
   };
 
-  const handleNotificationChange = (id: keyof typeof notificationSettings, checked: boolean) => {
+  const handleNotificationChange = async (id: keyof typeof notificationSettings, checked: boolean) => {
+    // Update local state immediately for responsiveness
     setNotificationSettings(prev => ({ ...prev, [id]: checked }));
-    // TODO: Add API call here to persist individual notification setting changes if desired (debounced or on blur)
+    
+    try {
+      // Persist individual setting change
+      const response = await fetch('/api/user/notification-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [id]: checked })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update notification setting');
+      }
+    } catch (error) {
+      // Revert on error
+      setNotificationSettings(prev => ({ ...prev, [id]: !checked }));
+      toast.error('Failed to update notification preference', { description: 'Please try again' });
+    }
   };
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
@@ -281,9 +304,16 @@ export default function AccountPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      // TODO: Implement API call to save notificationSettings for the current user.
-      // Example: await fetch('/api/user/notification-settings', { method: 'POST', body: JSON.stringify(notificationSettings) });
-      await new Promise(resolve => setTimeout(resolve, 750)); // Simulate API delay
+      // Save all notification settings
+      const response = await fetch('/api/user/notification-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(notificationSettings)
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save notification settings');
+      }
       toast('Your notification preferences have been updated.', { description: 'Preferences Saved' });
     } catch (error: unknown) {
       // console.error removed

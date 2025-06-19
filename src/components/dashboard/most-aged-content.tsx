@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Hourglass } from 'lucide-react';
+import { Hourglass, CheckCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow, differenceInDays } from 'date-fns';
 
@@ -58,6 +58,7 @@ export function MostAgedContent({ initialContent }: MostAgedContentProps) {
           </ul>
         ) : (
           <div className="text-center text-muted-foreground py-8">
+            <CheckCircle className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
             <p>No stalled content found.</p>
           </div>
         )}

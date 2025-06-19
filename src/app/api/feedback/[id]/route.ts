@@ -63,7 +63,6 @@ export async function GET(
     `);
   
   const { data, error } = await query
-    // @ts-ignore - Type issue with Supabase
     .eq('id', feedbackId)
     .single();
 
@@ -127,7 +126,6 @@ export async function PATCH(
     .update(updateData);
   
   const { data, error } = await updateQuery
-    // @ts-ignore - Type issue with Supabase
     .eq('id', feedbackId)
     .select()
     .single();

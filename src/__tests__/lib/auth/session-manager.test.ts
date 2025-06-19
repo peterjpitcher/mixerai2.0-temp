@@ -17,7 +17,7 @@ describe('Session Manager', () => {
   
   beforeEach(() => {
     // Clear session store between tests
-    // @ts-ignore - accessing private variable for testing
+    // @ts-expect-error - accessing private variable for testing
     global.sessionStore = new Map();
   });
 
@@ -34,7 +34,7 @@ describe('Session Manager', () => {
       const sessionId = await createSession(testUserId);
       const afterCreate = Date.now();
       
-      // @ts-ignore - accessing private store for testing
+      // @ts-expect-error - accessing private store for testing
       const session = global.sessionStore.get(sessionId);
       
       expect(session).toBeDefined();
@@ -68,7 +68,7 @@ describe('Session Manager', () => {
       const sessionId = await createSession(testUserId);
       
       // Manually expire the session
-      // @ts-ignore - accessing private store for testing
+      // @ts-expect-error - accessing private store for testing
       const session = global.sessionStore.get(sessionId);
       session.expiresAt = Date.now() - 1000;
       
@@ -82,7 +82,7 @@ describe('Session Manager', () => {
       const sessionId = await createSession(testUserId);
       
       // Set last activity to beyond idle timeout
-      // @ts-ignore - accessing private store for testing
+      // @ts-expect-error - accessing private store for testing
       const session = global.sessionStore.get(sessionId);
       session.lastActivity = Date.now() - (31 * 60 * 1000); // 31 minutes ago
       
@@ -95,7 +95,7 @@ describe('Session Manager', () => {
     it('should update last activity on successful validation', async () => {
       const sessionId = await createSession(testUserId);
       
-      // @ts-ignore - accessing private store for testing
+      // @ts-expect-error - accessing private store for testing
       const session = global.sessionStore.get(sessionId);
       const originalActivity = session.lastActivity;
       
@@ -112,7 +112,7 @@ describe('Session Manager', () => {
     it('should extend session expiration', async () => {
       const sessionId = await createSession(testUserId);
       
-      // @ts-ignore - accessing private store for testing
+      // @ts-expect-error - accessing private store for testing
       const session = global.sessionStore.get(sessionId);
       const originalExpiry = session.expiresAt;
       
@@ -133,7 +133,7 @@ describe('Session Manager', () => {
       const sessionId = await createSession(testUserId);
       
       // Expire the session
-      // @ts-ignore - accessing private store for testing
+      // @ts-expect-error - accessing private store for testing
       const session = global.sessionStore.get(sessionId);
       session.expiresAt = Date.now() - 1000;
       
@@ -152,7 +152,7 @@ describe('Session Manager', () => {
       
       expect(result.success).toBe(true);
       
-      // @ts-ignore - accessing private store for testing
+      // @ts-expect-error - accessing private store for testing
       expect(global.sessionStore.has(sessionId)).toBe(false);
     });
 
@@ -177,7 +177,7 @@ describe('Session Manager', () => {
       
       expect(result.count).toBe(3);
       
-      // @ts-ignore - accessing private store for testing
+      // @ts-expect-error - accessing private store for testing
       expect(global.sessionStore.has(session1)).toBe(false);
       expect(global.sessionStore.has(session2)).toBe(false);
       expect(global.sessionStore.has(session3)).toBe(false);
@@ -198,7 +198,7 @@ describe('Session Manager', () => {
       const expiredSession2 = await createSession('user3');
       
       // Expire some sessions
-      // @ts-ignore - accessing private store for testing
+      // @ts-expect-error - accessing private store for testing
       const store = global.sessionStore;
       store.get(expiredSession1).expiresAt = Date.now() - 1000;
       store.get(expiredSession2).expiresAt = Date.now() - 2000;

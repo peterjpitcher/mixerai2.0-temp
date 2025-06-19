@@ -14,6 +14,8 @@ interface ContentTransCreationRequest {
   content: string;
   sourceLanguage?: string;
   brand_id: string;
+  batch_id?: string; // Optional batch ID for grouping multiple runs
+  batch_sequence?: number; // Optional sequence number within a batch
 }
 
 export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
@@ -56,7 +58,9 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
             outputs: { error: 'Rate limit exceeded' } as unknown as Json,
             status: historyEntryStatus,
             error_message: historyErrorMessage,
-            brand_id: data.brand_id
+            brand_id: data.brand_id,
+            batch_id: data.batch_id || null,
+            batch_sequence: data.batch_sequence || null
         } as Database['public']['Tables']['tool_run_history']['Insert']);
       } catch (logError) {
         console.error('[HistoryLoggingError] Failed to log rate limit error for content-transcreator:', logError);
@@ -171,7 +175,9 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
             outputs: apiOutputs as unknown as Json || { error: historyErrorMessage || 'Unknown error before output generation' },
             status: historyEntryStatus,
             error_message: historyErrorMessage,
-            brand_id: data.brand_id
+            brand_id: data.brand_id,
+            batch_id: data.batch_id || null,
+            batch_sequence: data.batch_sequence || null
         } as Database['public']['Tables']['tool_run_history']['Insert']);
       } else {
         if (historyEntryStatus === 'failure' && historyErrorMessage) {
@@ -182,7 +188,9 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
                 outputs: { error: historyErrorMessage } as unknown as Json,
                 status: 'failure',
                 error_message: historyErrorMessage,
-                brand_id: null
+                brand_id: null,
+                batch_id: null,
+                batch_sequence: null
             } as Database['public']['Tables']['tool_run_history']['Insert']);
         }
       }

@@ -1,25 +1,27 @@
 # Database Migrations
 
-## Squashed Migration (2025-06-18)
+## Current Migration Status (2025-06-18)
 
-All previous migrations have been squashed into a single comprehensive migration file:
-- `20250618_squashed_complete_schema.sql`
+All migrations have been consolidated into a single final migration file:
+- `20250618_final_squashed_schema.sql`
 
-This migration contains the complete database schema as of June 18, 2025, including:
+This represents the complete database schema including all updates through June 18, 2025.
+
+### Recent Updates Applied
+The final migration includes:
+- Batch support for tool_run_history (batch_id, batch_sequence columns)
+- Email preferences for user profiles (email_notifications_enabled, email_frequency, email_preferences)
+- All previous schema elements from earlier migrations
+
+## Migration History
+All individual migration files have been removed after consolidation. The full schema includes:
 - All tables, indexes, and constraints
 - All ENUM types
 - All functions and procedures
 - All views
 - All Row Level Security (RLS) policies
 - All triggers
-- Initial seed data for content types and countries
-
-## Archived Migrations
-
-Previous individual migration files have been archived to:
-- `/migrations_archive_20250618/`
-
-These are kept for historical reference but should not be used for new deployments.
+- Initial seed data
 
 ## Important Notes
 

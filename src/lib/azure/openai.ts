@@ -194,7 +194,29 @@ export function getVettingAgenciesForCountry(countryCode: string): Array<{name: 
 }
 
 /**
- * Generate content based on a template
+ * Generate content based on a template using AI
+ * 
+ * @param brand - Brand context including identity, tone of voice, and guardrails
+ * @param brand.name - The brand name
+ * @param brand.brand_identity - Brand identity description (optional)
+ * @param brand.tone_of_voice - Brand tone of voice guidelines (optional)
+ * @param brand.guardrails - Content guardrails and restrictions (optional)
+ * @param template - Content template with input and output field definitions
+ * @param template.prompt - Main AI prompt for content generation
+ * @param template.fields - Template field configuration with inputFields and outputFields
+ * @param values - User-provided values for template input fields
+ * @param productContext - Optional product context for claims-based content
+ * @param styledClaims - Optional pre-styled marketing claims
+ * @param systemInstructions - Optional system-level instructions for AI
+ * @returns Promise resolving to an object containing generated content for each output field
+ * @throws Error if AI generation fails or required fields are missing
+ * 
+ * @example
+ * const result = await generateContentFromTemplate(
+ *   { name: "BrandX", tone_of_voice: "Professional" },
+ *   { prompt: "Create a product description", fields: {...} },
+ *   { product_name: "Widget Pro" }
+ * );
  */
 export async function generateContentFromTemplate(
   brand: {

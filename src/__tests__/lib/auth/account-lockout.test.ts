@@ -119,7 +119,7 @@ describe('Account Lockout', () => {
       }
       
       // Simulate expired lockout
-      // @ts-ignore - accessing private store for testing
+      // @ts-expect-error - accessing private store for testing
       const attempts = global.loginAttemptsStore.get(testEmail);
       attempts.lockedUntil = Date.now() - 1000; // 1 second ago
       
@@ -166,7 +166,7 @@ describe('Account Lockout', () => {
       await recordFailedAttempt('user3@example.com');
       
       // Make some attempts old
-      // @ts-ignore - accessing private store for testing
+      // @ts-expect-error - accessing private store for testing
       const store = global.loginAttemptsStore;
       
       // user1: expired lockout
@@ -199,7 +199,7 @@ describe('Account Lockout', () => {
       
       expect(result.cleaned).toBe(0);
       
-      // @ts-ignore - accessing private store for testing
+      // @ts-expect-error - accessing private store for testing
       const store = global.loginAttemptsStore;
       expect(store.has(testEmail)).toBe(true);
       expect(store.has(lockedEmail)).toBe(true);

@@ -7,50 +7,159 @@ export default function TermsPage() {
     <div className="container max-w-4xl mx-auto py-12">
       <h1 className="text-3xl font-bold mb-8">Terms of Service</h1>
       
-      {/* TODO: Update with current Terms of Service content */}
       <Card>
         <CardHeader>
           <CardTitle>MixerAI 2.0 Terms of Service</CardTitle>
         </CardHeader>
-        <CardContent className="prose">
-          <p>Last updated: June 2023</p>
+        <CardContent className="prose max-w-none">
+          <p className="text-muted-foreground">Last updated: December 2024</p>
           
-          <h2>Agreement to Terms</h2>
-          <p>
-            By accessing or using our AI-powered content creation platform, MixerAI 2.0, you agree to be bound
-            by these Terms of Service and all applicable laws and regulations. If you do not agree with any of 
-            these terms, you are prohibited from using this service.
+          <h2 className="text-xl font-semibold mt-6 mb-3">1. Agreement to Terms</h2>
+          <p className="mb-4">
+            These Terms of Service ("Terms") govern your use of MixerAI's AI-powered content creation and 
+            workflow management platform ("Service"). By accessing or using our Service, you agree to be 
+            bound by these Terms. If you disagree with any part of these terms, you may not access our Service.
           </p>
           
-          <h2>Use of Service</h2>
-          <p>
-            MixerAI 2.0 provides an AI-powered platform for generating and managing content. Users are responsible
-            for all content they create, manage, and publish using our platform. Users must not:
+          <h2 className="text-xl font-semibold mt-6 mb-3">2. Description of Service</h2>
+          <p className="mb-4">
+            MixerAI provides an AI-powered platform that enables users to:
           </p>
-          <ul>
-            <li>Use the service for any illegal purpose</li>
-            <li>Attempt to gain unauthorized access to any part of our system</li>
-            <li>Use the service to generate content that violates copyright, trademark, or other intellectual property rights</li>
-            <li>Generate or distribute harmful, offensive, or inappropriate content</li>
+          <ul className="list-disc pl-6 mb-4 space-y-1">
+            <li>Generate marketing content using AI technology</li>
+            <li>Manage brand identities and content templates</li>
+            <li>Collaborate with team members through workflow systems</li>
+            <li>Organize and track content production</li>
+            <li>Maintain product claims and ingredient information</li>
           </ul>
           
-          <h2>Content Ownership</h2>
-          <p>
-            Users retain intellectual property rights to content they create using MixerAI 2.0, subject to
-            our right to use such content for service improvement and promotional purposes as outlined in 
-            our Privacy Policy.
+          <h2 className="text-xl font-semibold mt-6 mb-3">3. Account Registration</h2>
+          <p className="mb-2">To use our Service, you must:</p>
+          <ul className="list-disc pl-6 mb-4 space-y-1">
+            <li>Provide accurate and complete registration information</li>
+            <li>Maintain the security of your account credentials</li>
+            <li>Promptly update any changes to your information</li>
+            <li>Accept responsibility for all activities under your account</li>
+            <li>Notify us immediately of any unauthorized access</li>
+          </ul>
+          
+          <h2 className="text-xl font-semibold mt-6 mb-3">4. Acceptable Use</h2>
+          <p className="mb-2">You agree not to:</p>
+          <ul className="list-disc pl-6 mb-4 space-y-1">
+            <li>Use the Service for any illegal or unauthorized purpose</li>
+            <li>Generate content that infringes on intellectual property rights</li>
+            <li>Create harmful, offensive, or misleading content</li>
+            <li>Attempt to breach or test our security measures</li>
+            <li>Interfere with or disrupt the Service or servers</li>
+            <li>Reverse engineer or attempt to extract source code</li>
+            <li>Use automated systems or bots without permission</li>
+            <li>Resell or redistribute the Service without authorization</li>
+          </ul>
+          
+          <h2 className="text-xl font-semibold mt-6 mb-3">5. Content and Intellectual Property</h2>
+          <h3 className="text-lg font-medium mt-4 mb-2">5.1 Your Content</h3>
+          <p className="mb-4">
+            You retain ownership of content you create using our Service. By using MixerAI, you grant us a 
+            limited, non-exclusive license to process and display your content solely for providing the Service.
           </p>
           
-          <h2>Limitation of Liability</h2>
-          <p>
-            MixerAI 2.0 is provided &quot;as is&quot; without warranties of any kind. We shall not be liable for any
-            direct, indirect, incidental, or consequential damages resulting from your use of our services.
+          <h3 className="text-lg font-medium mt-4 mb-2">5.2 Our Technology</h3>
+          <p className="mb-4">
+            MixerAI and its licensors retain all rights to the Service, including our AI models, software, 
+            designs, and trademarks. Nothing in these Terms grants you rights to our intellectual property.
           </p>
           
-          <h2>Contact Us</h2>
-          <p>
-            If you have any questions about these Terms of Service, please contact us at legal@mixerai.com.
+          <h3 className="text-lg font-medium mt-4 mb-2">5.3 AI-Generated Content</h3>
+          <p className="mb-4">
+            Content generated by our AI is provided as-is. You are responsible for reviewing, editing, and 
+            ensuring compliance with applicable laws before using AI-generated content.
           </p>
+          
+          <h2 className="text-xl font-semibold mt-6 mb-3">6. Payment Terms</h2>
+          <p className="mb-2">If you subscribe to a paid plan:</p>
+          <ul className="list-disc pl-6 mb-4 space-y-1">
+            <li>You agree to pay all fees according to your selected plan</li>
+            <li>Fees are non-refundable except as required by law</li>
+            <li>We may change fees with 30 days' notice</li>
+            <li>You authorize us to charge your payment method automatically</li>
+            <li>You're responsible for all taxes except where we're required to collect them</li>
+          </ul>
+          
+          <h2 className="text-xl font-semibold mt-6 mb-3">7. Privacy and Data Protection</h2>
+          <p className="mb-4">
+            Your use of our Service is subject to our Privacy Policy, which explains how we collect, use, 
+            and protect your information. By using MixerAI, you consent to our data practices as described 
+            in the Privacy Policy.
+          </p>
+          
+          <h2 className="text-xl font-semibold mt-6 mb-3">8. Third-Party Services</h2>
+          <p className="mb-4">
+            Our Service integrates with third-party services (e.g., Azure OpenAI, Supabase). Your use of 
+            these integrations is subject to their respective terms and policies. We are not responsible 
+            for third-party services' practices or content.
+          </p>
+          
+          <h2 className="text-xl font-semibold mt-6 mb-3">9. Disclaimers and Limitations</h2>
+          <h3 className="text-lg font-medium mt-4 mb-2">9.1 Service Availability</h3>
+          <p className="mb-4">
+            The Service is provided "as is" and "as available." We do not guarantee uninterrupted or 
+            error-free operation. We may modify or discontinue features at any time.
+          </p>
+          
+          <h3 className="text-lg font-medium mt-4 mb-2">9.2 No Warranties</h3>
+          <p className="mb-4">
+            TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING 
+            WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+          </p>
+          
+          <h3 className="text-lg font-medium mt-4 mb-2">9.3 Limitation of Liability</h3>
+          <p className="mb-4">
+            IN NO EVENT SHALL MIXERAI BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR 
+            PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES, WHETHER INCURRED DIRECTLY OR INDIRECTLY.
+          </p>
+          
+          <h2 className="text-xl font-semibold mt-6 mb-3">10. Indemnification</h2>
+          <p className="mb-4">
+            You agree to indemnify and hold harmless MixerAI and its affiliates from any claims, damages, 
+            or expenses arising from your use of the Service, violation of these Terms, or infringement of 
+            any third-party rights.
+          </p>
+          
+          <h2 className="text-xl font-semibold mt-6 mb-3">11. Termination</h2>
+          <p className="mb-4">
+            We may terminate or suspend your account immediately, without prior notice, for any breach of 
+            these Terms. Upon termination, your right to use the Service will cease immediately. You may 
+            terminate your account at any time through your account settings.
+          </p>
+          
+          <h2 className="text-xl font-semibold mt-6 mb-3">12. Governing Law</h2>
+          <p className="mb-4">
+            These Terms shall be governed by and construed in accordance with the laws of [Jurisdiction], 
+            without regard to its conflict of law provisions. Any disputes shall be resolved in the courts 
+            of [Jurisdiction].
+          </p>
+          
+          <h2 className="text-xl font-semibold mt-6 mb-3">13. Changes to Terms</h2>
+          <p className="mb-4">
+            We reserve the right to modify these Terms at any time. Material changes will be notified via 
+            email or Service announcement. Continued use after changes constitutes acceptance of new Terms.
+          </p>
+          
+          <h2 className="text-xl font-semibold mt-6 mb-3">14. Miscellaneous</h2>
+          <ul className="list-disc pl-6 mb-4 space-y-1">
+            <li><strong>Entire Agreement:</strong> These Terms constitute the entire agreement between you and MixerAI</li>
+            <li><strong>Severability:</strong> If any provision is unenforceable, the remaining provisions continue in effect</li>
+            <li><strong>No Waiver:</strong> Our failure to enforce any right or provision is not a waiver</li>
+            <li><strong>Assignment:</strong> You may not assign these Terms without our written consent</li>
+          </ul>
+          
+          <h2 className="text-xl font-semibold mt-6 mb-3">15. Contact Information</h2>
+          <p className="mb-2">For questions about these Terms of Service:</p>
+          <ul className="list-none space-y-1">
+            <li><strong>Email:</strong> legal@mixerai.com</li>
+            <li><strong>Support:</strong> support@mixerai.com</li>
+            <li><strong>Address:</strong> [Company Address]</li>
+          </ul>
         </CardContent>
       </Card>
     </div>

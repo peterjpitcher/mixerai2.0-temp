@@ -1,13 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import { X, Check, ChevronsUpDown } from 'lucide-react';
+import { X, Check, ChevronsUpDown, AlertCircle } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { touchTargetClasses } from '@/lib/utils/touch-target';
 import { Checkbox } from '@/components/ui/checkbox'; // Assuming Checkbox component is available and works as expected
 
 export interface ComboboxOption {
@@ -82,7 +83,7 @@ export const MultiSelectCheckboxCombobox: React.FC<MultiSelectCheckboxComboboxPr
                   <Badge
                     key={option.value}
                     variant="secondary"
-                    className="flex items-center gap-1"
+                    className={cn("flex items-center gap-1", touchTargetClasses.clickableBadge)}
                     onClick={(e) => { // Allow clicking badge to unselect
                         e.stopPropagation(); // Prevent popover from closing
                         handleUnselect(option.value);
@@ -146,6 +147,12 @@ export const MultiSelectCheckboxCombobox: React.FC<MultiSelectCheckboxComboboxPr
                             );
                             })}
                         </CommandGroup>
+                        {options.filter(option => option.label.toLowerCase().includes(inputValue.toLowerCase())).length === 0 && options.length > 0 && (
+                            <div className="p-6 text-center text-sm text-muted-foreground">
+                                <AlertCircle className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                                <div>No matching options found.</div>
+                            </div>
+                        )}
                     </CommandList>
                 </Command>
             </PopoverContent>

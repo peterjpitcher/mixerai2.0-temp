@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatDate } from '@/lib/utils/date';
+import { touchFriendly } from '@/lib/utils/touch-target';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -225,7 +226,7 @@ export default function MasterClaimBrandsPage() {
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <Button variant="ghost" size="sm" className={touchFriendly('tableAction')}>
                               <span className="sr-only">Open menu</span>
                               <MoreVertical className="h-4 w-4" />
                             </Button>

@@ -195,14 +195,14 @@ export function NotificationsButton() {
                   key={notification.id} 
                   className={cn(
                     "transition-all hover:bg-muted/50",
-                    !notification.isRead && "border-l-4",
-                    notification.type === 'success' && !notification.isRead && "border-l-success",
-                    notification.type === 'info' && !notification.isRead && "border-l-secondary",
-                    notification.type === 'warning' && !notification.isRead && "border-l-warning",
-                    notification.type === 'error' && !notification.isRead && "border-l-destructive",
-                    notification.actionUrl ? "cursor-default" : "cursor-pointer"
+                    !notification.is_read && "border-l-4",
+                    notification.type === 'success' && !notification.is_read && "border-l-success",
+                    notification.type === 'info' && !notification.is_read && "border-l-secondary",
+                    notification.type === 'warning' && !notification.is_read && "border-l-warning",
+                    notification.type === 'error' && !notification.is_read && "border-l-destructive",
+                    notification.action_url ? "cursor-default" : "cursor-pointer"
                   )}
-                  onClick={notification.actionUrl ? undefined : () => markAsRead(notification.id)}
+                  onClick={notification.action_url ? undefined : () => markAsRead(notification.id)}
                 >
                   <CardContent className="p-3">
                     <div className="flex items-start gap-3">
@@ -211,11 +211,11 @@ export function NotificationsButton() {
                       </div>
                       <div className="flex-1 space-y-0.5 min-w-0">
                         <div className="flex items-center justify-between">
-                          <p className={cn("text-sm font-medium truncate", !notification.isRead && "font-semibold")}>{notification.title}</p>
-                          <p className="text-xs text-muted-foreground whitespace-nowrap ml-2">{formatTimeAgo(notification.createdAt)}</p>
+                          <p className={cn("text-sm font-medium truncate", !notification.is_read && "font-semibold")}>{notification.title}</p>
+                          <p className="text-xs text-muted-foreground whitespace-nowrap ml-2">{formatTimeAgo(notification.created_at)}</p>
                         </div>
                         <p className="text-sm text-muted-foreground line-clamp-2">{notification.message}</p>
-                        {notification.actionUrl && notification.actionLabel && (
+                        {notification.action_url && notification.action_label && (
                           <Button 
                             variant="link" 
                             className="h-auto p-0 text-sm text-primary hover:text-primary/80 mt-1"
@@ -225,11 +225,11 @@ export function NotificationsButton() {
                             }}
                             asChild
                           >
-                            <Link href={notification.actionUrl}>{notification.actionLabel}</Link>
+                            <Link href={notification.action_url}>{notification.action_label}</Link>
                           </Button>
                         )}
                       </div>
-                       {!notification.isRead && (
+                       {!notification.is_read && (
                         <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0 self-start" aria-label="Unread mark"></div>
                       )}
                     </div>

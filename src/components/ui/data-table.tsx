@@ -6,6 +6,7 @@ import {
   ChevronUpIcon,
   ChevronsUpDownIcon,
   Search,
+  FileX,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -35,6 +36,7 @@ export interface DataTableColumn<TData, TValue = unknown> {
   filterOptions?: { label: string; value: string }[]
   sortingFn?: (a: TData, b: TData) => number
   className?: string
+  hideOnMobile?: boolean
 }
 
 interface Column<TData, TValue> {
@@ -196,8 +198,9 @@ export function DataTable<TData>({
       </div>
 
       {/* Table */}
-      <div className="rounded-md border">
-        <Table>
+      <div className="rounded-md border overflow-hidden">
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <Table>
           <TableHeader>
             <TableRow>
               {columns.map((column) => {
@@ -208,7 +211,13 @@ export function DataTable<TData>({
                 }
 
                 return (
-                  <TableHead key={column.id} className={column.className}>
+                  <TableHead 
+                    key={column.id} 
+                    className={cn(
+                      column.className,
+                      column.hideOnMobile && "hidden sm:table-cell"
+                    )}
+                  >
                     {column.enableSorting ? (
                       <Button
                         variant="ghost"
@@ -246,7 +255,13 @@ export function DataTable<TData>({
                   className={onRowClick ? "cursor-pointer" : undefined}
                 >
                   {columns.map((column) => (
-                    <TableCell key={column.id} className={column.className}>
+                    <TableCell 
+                      key={column.id} 
+                      className={cn(
+                        column.className,
+                        column.hideOnMobile && "hidden sm:table-cell"
+                      )}
+                    >
                       {column.cell({ row })}
                     </TableCell>
                   ))}
@@ -258,12 +273,18 @@ export function DataTable<TData>({
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  {emptyState || "No results found."}
+                  {emptyState || (
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <FileX className="h-8 w-8 text-muted-foreground" />
+                      <div className="text-sm text-muted-foreground">No results found.</div>
+                    </div>
+                  )}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
+        </div>
       </div>
     </div>
   )

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { TemplateForm } from '@/components/template/template-form';
-import { ChevronLeft, Loader2, ShieldAlert, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, ShieldAlert, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
@@ -85,11 +85,15 @@ export default function NewTemplatePage() {
 
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-            <Link href="/dashboard/templates" passHref>
-                <Button variant="outline" size="icon" aria-label="Back to Templates">
-                    <ChevronLeft className="h-4 w-4" />
-                </Button>
-            </Link>
+            <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => window.location.href = '/dashboard/templates'}
+                aria-label="Back to Templates"
+            >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+            </Button>
             <div>
                 <h1 className="text-2xl font-bold tracking-tight">Create Template</h1>
                 <p className="text-muted-foreground mt-1">Design a new content template with custom fields.</p>

@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, AlertTriangle, Save, XCircle } from 'lucide-react';
+import { Loader2, AlertTriangle, Save, XCircle, ArrowLeft } from 'lucide-react';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 // import Link from 'next/link';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
@@ -287,6 +287,16 @@ export default function EditFeedbackPage() {
   return (
     <div className="bg-gray-50 min-h-screen space-y-6">
       <Breadcrumbs items={breadcrumbItemsForShared} />
+      
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={() => router.push(`/dashboard/feedback/${feedbackId}`)}
+        className="mb-4"
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Back to Feedback
+      </Button>
       
       <header className="my-6">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">

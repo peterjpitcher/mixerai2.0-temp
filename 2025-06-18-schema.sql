@@ -1744,6 +1744,19 @@ $$;
 ALTER FUNCTION "public"."update_modified_column"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."update_updated_at_column"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."update_updated_at_column"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."update_user_details"("p_user_id" "uuid", "p_full_name" "text", "p_job_title" "text", "p_company" "text", "p_role" "text" DEFAULT NULL::"text", "p_brand_permissions" "jsonb" DEFAULT NULL::"jsonb") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -2156,6 +2169,29 @@ CREATE TABLE IF NOT EXISTS "public"."claim_products" (
 ALTER TABLE "public"."claim_products" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."claim_reviews" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "master_claim_brand_id" "uuid" NOT NULL,
+    "country_code" character varying(2) NOT NULL,
+    "review_data" "jsonb" NOT NULL,
+    "reviewed_by" "uuid" NOT NULL,
+    "reviewed_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"()
+);
+
+
+ALTER TABLE "public"."claim_reviews" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."claim_reviews" IS 'Stores AI-generated compliance reviews for master claim brands by country';
+
+
+
+COMMENT ON COLUMN "public"."claim_reviews"."review_data" IS 'JSON object containing the full review details including individual claim reviews';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."claim_workflow_history" (
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
     "claim_id" "uuid" NOT NULL,
@@ -2398,7 +2434,8 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "updated_at" timestamp with time zone DEFAULT "now"(),
     "job_title" "text",
     "company" "text",
-    "email" "text"
+    "email" "text",
+    "notification_settings" "jsonb" DEFAULT '{"weeklyDigest": false, "productUpdates": true, "marketingEmails": false, "emailNotifications": true, "workflowNotifications": true}'::"jsonb"
 );
 
 
@@ -2418,6 +2455,10 @@ COMMENT ON COLUMN "public"."profiles"."company" IS 'Company or organization wher
 
 
 COMMENT ON COLUMN "public"."profiles"."email" IS 'Email address of the user, used for workflows and notifications';
+
+
+
+COMMENT ON COLUMN "public"."profiles"."notification_settings" IS 'User notification preferences as JSON object';
 
 
 
@@ -2502,7 +2543,8 @@ CREATE TABLE IF NOT EXISTS "public"."content" (
     "published_version" integer,
     "content_type_id" "uuid",
     "assigned_to" "uuid"[],
-    "fields" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL
+    "fields" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "due_date" timestamp with time zone
 );
 
 ALTER TABLE ONLY "public"."content" FORCE ROW LEVEL SECURITY;
@@ -2516,6 +2558,10 @@ COMMENT ON COLUMN "public"."content"."assigned_to" IS 'Array of user IDs assigne
 
 
 COMMENT ON COLUMN "public"."content"."fields" IS 'Stores data for custom fields defined in a content template.';
+
+
+
+COMMENT ON COLUMN "public"."content"."due_date" IS 'Optional due date for when the content should be published or reviewed';
 
 
 
@@ -2784,11 +2830,26 @@ CREATE TABLE IF NOT EXISTS "public"."notifications" (
     "is_read" boolean DEFAULT false,
     "action_url" "text",
     "action_label" "text",
-    "created_at" timestamp with time zone DEFAULT "now"()
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "is_archived" boolean DEFAULT false NOT NULL,
+    "archived_at" timestamp with time zone,
+    "updated_at" timestamp with time zone DEFAULT "now"()
 );
 
 
 ALTER TABLE "public"."notifications" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."notifications" IS 'Stores user notifications for in-app notification system';
+
+
+
+COMMENT ON COLUMN "public"."notifications"."type" IS 'Notification type: success, error, warning, or info';
+
+
+
+COMMENT ON COLUMN "public"."notifications"."is_archived" IS 'Soft delete flag - archived notifications are hidden but not deleted';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."product_ingredients" (
@@ -3097,6 +3158,11 @@ ALTER TABLE ONLY "public"."claim_products"
 
 
 
+ALTER TABLE ONLY "public"."claim_reviews"
+    ADD CONSTRAINT "claim_reviews_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."claim_workflow_history"
     ADD CONSTRAINT "claim_workflow_history_pkey" PRIMARY KEY ("id");
 
@@ -3393,6 +3459,22 @@ CREATE INDEX "idx_claim_products_product_id" ON "public"."claim_products" USING 
 
 
 
+CREATE INDEX "idx_claim_reviews_country_code" ON "public"."claim_reviews" USING "btree" ("country_code");
+
+
+
+CREATE INDEX "idx_claim_reviews_master_claim_brand_id" ON "public"."claim_reviews" USING "btree" ("master_claim_brand_id");
+
+
+
+CREATE INDEX "idx_claim_reviews_reviewed_at" ON "public"."claim_reviews" USING "btree" ("reviewed_at" DESC);
+
+
+
+CREATE INDEX "idx_claim_reviews_reviewed_by" ON "public"."claim_reviews" USING "btree" ("reviewed_by");
+
+
+
 CREATE INDEX "idx_claim_workflow_history_claim_id" ON "public"."claim_workflow_history" USING "btree" ("claim_id");
 
 
@@ -3434,6 +3516,10 @@ CREATE INDEX "idx_content_brand_id" ON "public"."content" USING "btree" ("brand_
 
 
 CREATE INDEX "idx_content_created_by" ON "public"."content" USING "btree" ("created_by");
+
+
+
+CREATE INDEX "idx_content_due_date" ON "public"."content" USING "btree" ("due_date");
 
 
 
@@ -3482,6 +3568,26 @@ CREATE INDEX "idx_feedback_items_updated_by" ON "public"."feedback_items" USING 
 
 
 CREATE INDEX "idx_invitation_logs_email" ON "public"."invitation_logs" USING "btree" ("email");
+
+
+
+CREATE INDEX "idx_notifications_created_at" ON "public"."notifications" USING "btree" ("created_at" DESC);
+
+
+
+CREATE INDEX "idx_notifications_is_archived" ON "public"."notifications" USING "btree" ("is_archived");
+
+
+
+CREATE INDEX "idx_notifications_is_read" ON "public"."notifications" USING "btree" ("is_read");
+
+
+
+CREATE INDEX "idx_notifications_user_id" ON "public"."notifications" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "idx_profiles_notification_settings" ON "public"."profiles" USING "gin" ("notification_settings");
 
 
 
@@ -3621,6 +3727,10 @@ CREATE OR REPLACE TRIGGER "update_brand_summary_trigger" BEFORE INSERT OR UPDATE
 
 
 
+CREATE OR REPLACE TRIGGER "update_notifications_updated_at" BEFORE UPDATE ON "public"."notifications" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
+
+
+
 CREATE OR REPLACE TRIGGER "update_user_invitations_modtime" BEFORE UPDATE ON "public"."user_invitations" FOR EACH ROW EXECUTE FUNCTION "public"."update_modified_column"();
 
 
@@ -3661,6 +3771,16 @@ ALTER TABLE ONLY "public"."claim_products"
 
 ALTER TABLE ONLY "public"."claim_products"
     ADD CONSTRAINT "claim_products_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."claim_reviews"
+    ADD CONSTRAINT "claim_reviews_master_claim_brand_id_fkey" FOREIGN KEY ("master_claim_brand_id") REFERENCES "public"."master_claim_brands"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."claim_reviews"
+    ADD CONSTRAINT "claim_reviews_reviewed_by_fkey" FOREIGN KEY ("reviewed_by") REFERENCES "auth"."users"("id");
 
 
 
@@ -4086,6 +4206,12 @@ CREATE POLICY "Editors and Admins can update content" ON "public"."content" FOR 
 
 
 
+CREATE POLICY "Editors and admins can create claim reviews" ON "public"."claim_reviews" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
+   FROM "public"."user_brand_permissions"
+  WHERE (("user_brand_permissions"."user_id" = "auth"."uid"()) AND ("user_brand_permissions"."brand_id" = "claim_reviews"."master_claim_brand_id") AND ("user_brand_permissions"."role" = ANY (ARRAY['editor'::"public"."user_brand_role_enum", 'admin'::"public"."user_brand_role_enum"]))))));
+
+
+
 CREATE POLICY "Everyone can view analytics" ON "public"."analytics" FOR SELECT USING (true);
 
 
@@ -4154,6 +4280,10 @@ CREATE POLICY "Public profiles are viewable by everyone" ON "public"."profiles" 
 
 
 
+CREATE POLICY "Service role can create notifications" ON "public"."notifications" FOR INSERT WITH CHECK (true);
+
+
+
 CREATE POLICY "Service role can insert security logs" ON "public"."security_logs" FOR INSERT WITH CHECK (true);
 
 
@@ -4208,6 +4338,10 @@ CREATE POLICY "Users can manage claim products based on claim permissions" ON "p
 
 
 
+CREATE POLICY "Users can update own notifications" ON "public"."notifications" FOR UPDATE USING (("auth"."uid"() = "user_id"));
+
+
+
 CREATE POLICY "Users can update their own notifications" ON "public"."notifications" FOR UPDATE USING (("user_id" = "auth"."uid"())) WITH CHECK (("user_id" = "auth"."uid"()));
 
 
@@ -4228,10 +4362,20 @@ CREATE POLICY "Users can view claim products based on claim permissions" ON "pub
 
 
 
+CREATE POLICY "Users can view claim reviews for their brands" ON "public"."claim_reviews" FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM "public"."user_brand_permissions"
+  WHERE (("user_brand_permissions"."user_id" = "auth"."uid"()) AND ("user_brand_permissions"."brand_id" = "claim_reviews"."master_claim_brand_id")))));
+
+
+
 CREATE POLICY "Users can view content ownership history" ON "public"."content_ownership_history" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM ("public"."content"
      JOIN "public"."user_brand_permissions" ON (("user_brand_permissions"."brand_id" = "content"."brand_id")))
   WHERE (("content"."id" = "content_ownership_history"."content_id") AND ("user_brand_permissions"."user_id" = "auth"."uid"())))));
+
+
+
+CREATE POLICY "Users can view own notifications" ON "public"."notifications" FOR SELECT USING (("auth"."uid"() = "user_id"));
 
 
 
@@ -4265,6 +4409,9 @@ ALTER TABLE "public"."claim_countries" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."claim_products" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."claim_reviews" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."claim_workflow_history" ENABLE ROW LEVEL SECURITY;
@@ -4941,6 +5088,12 @@ GRANT ALL ON FUNCTION "public"."update_modified_column"() TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "anon";
+GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."update_user_details"("p_user_id" "uuid", "p_full_name" "text", "p_job_title" "text", "p_company" "text", "p_role" "text", "p_brand_permissions" "jsonb") TO "anon";
 GRANT ALL ON FUNCTION "public"."update_user_details"("p_user_id" "uuid", "p_full_name" "text", "p_job_title" "text", "p_company" "text", "p_role" "text", "p_brand_permissions" "jsonb") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_user_details"("p_user_id" "uuid", "p_full_name" "text", "p_job_title" "text", "p_company" "text", "p_role" "text", "p_brand_permissions" "jsonb") TO "service_role";
@@ -5013,6 +5166,12 @@ GRANT ALL ON TABLE "public"."claim_countries" TO "service_role";
 GRANT ALL ON TABLE "public"."claim_products" TO "anon";
 GRANT ALL ON TABLE "public"."claim_products" TO "authenticated";
 GRANT ALL ON TABLE "public"."claim_products" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."claim_reviews" TO "anon";
+GRANT ALL ON TABLE "public"."claim_reviews" TO "authenticated";
+GRANT ALL ON TABLE "public"."claim_reviews" TO "service_role";
 
 
 

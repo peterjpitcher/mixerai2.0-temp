@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
+import { canAccessProduct, canAccessIngredient, canEditInBrand } from '@/lib/auth/permissions';
 
 export const dynamic = "force-dynamic";
 
@@ -32,12 +33,59 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
         }
 
         const supabase = createSupabaseAdminClient();
-        // TODO: Add permission checks. User might need write access to the product or its brand.
-        const isAdmin = user?.user_metadata?.role === 'admin';
-        if (!isAdmin) {
-            console.warn(`[API ProductIngredients POST] User ${user.id} attempted to create association without admin privileges.`);
+        
+        // Check if user can access both the product and ingredient
+        const [canAccessProd, canAccessIngr] = await Promise.all([
+            canAccessProduct(user.id, product_id, supabase),
+            canAccessIngredient(user.id, ingredient_id, supabase)
+        ]);
+        
+        if (!canAccessProd) {
             return NextResponse.json(
-                { success: false, error: 'You do not have permission to create this association.' },
+                { success: false, error: 'You do not have permission to access this product.' },
+                { status: 403 }
+            );
+        }
+        
+        if (!canAccessIngr) {
+            return NextResponse.json(
+                { success: false, error: 'You do not have permission to access this ingredient.' },
+                { status: 403 }
+            );
+        }
+        
+        // Check if user has edit permissions for the product's brand
+        const { data: product } = await supabase
+            .from('products')
+            .select('master_brand_id')
+            .eq('id', product_id)
+            .single();
+            
+        if (!product || !product.master_brand_id) {
+            return NextResponse.json(
+                { success: false, error: 'Product not found.' },
+                { status: 404 }
+            );
+        }
+        
+        // Get the actual brand ID from master_claim_brands
+        const { data: masterBrand } = await supabase
+            .from('master_claim_brands')
+            .select('mixerai_brand_id')
+            .eq('id', product.master_brand_id)
+            .single();
+            
+        if (!masterBrand || !masterBrand.mixerai_brand_id) {
+            return NextResponse.json(
+                { success: false, error: 'Master brand not found.' },
+                { status: 404 }
+            );
+        }
+        
+        const canEdit = await canEditInBrand(user.id, masterBrand.mixerai_brand_id, supabase);
+        if (!canEdit) {
+            return NextResponse.json(
+                { success: false, error: 'You do not have permission to modify this product.' },
                 { status: 403 }
             );
         }
@@ -108,12 +156,49 @@ export const DELETE = withAuth(async (req: NextRequest, user: User) => {
         }
 
         const supabase = createSupabaseAdminClient();
-        // TODO: Add permission checks. User might need write access to the product or its brand.
-        const isAdmin = user?.user_metadata?.role === 'admin';
-        if (!isAdmin) {
-            console.warn(`[API ProductIngredients DELETE] User ${user.id} attempted to delete association without admin privileges.`);
+        
+        // Check if user can access the product
+        const canAccessProd = await canAccessProduct(user.id, product_id, supabase);
+        
+        if (!canAccessProd) {
             return NextResponse.json(
-                { success: false, error: 'You do not have permission to delete this association.' },
+                { success: false, error: 'You do not have permission to access this product.' },
+                { status: 403 }
+            );
+        }
+        
+        // Check if user has edit permissions for the product's brand
+        const { data: product } = await supabase
+            .from('products')
+            .select('master_brand_id')
+            .eq('id', product_id)
+            .single();
+            
+        if (!product || !product.master_brand_id) {
+            return NextResponse.json(
+                { success: false, error: 'Product not found.' },
+                { status: 404 }
+            );
+        }
+        
+        // Get the actual brand ID from master_claim_brands
+        const { data: masterBrand } = await supabase
+            .from('master_claim_brands')
+            .select('mixerai_brand_id')
+            .eq('id', product.master_brand_id)
+            .single();
+            
+        if (!masterBrand || !masterBrand.mixerai_brand_id) {
+            return NextResponse.json(
+                { success: false, error: 'Master brand not found.' },
+                { status: 404 }
+            );
+        }
+        
+        const canEdit = await canEditInBrand(user.id, masterBrand.mixerai_brand_id, supabase);
+        if (!canEdit) {
+            return NextResponse.json(
+                { success: false, error: 'You do not have permission to modify this product.' },
                 { status: 403 }
             );
         }

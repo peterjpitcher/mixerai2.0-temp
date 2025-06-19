@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { withAuth } from '@/lib/auth/api-auth';
+import { hasAccessToBrand } from '@/lib/auth/permissions';
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { User } from '@supabase/supabase-js';
 
 // Mock data - replace with actual database call
 const mockClaims = [
@@ -14,10 +18,13 @@ const paramsSchema = z.object({
   id: z.string().uuid({ message: 'Invalid brand ID format.' }),
 });
 
-export async function GET(
+export const GET = withAuth(async (
   request: Request,
-  { params }: { params: { id: string } }
-) {
+  user: User,
+  context?: unknown
+) => {
+  const { params } = context as { params: { id: string } };
+  
   // Validate brandId from the URL
   const validation = paramsSchema.safeParse(params);
   if (!validation.success) {
@@ -27,9 +34,17 @@ export async function GET(
     );
   }
 
-  // TODO: Add permission check to ensure user can access this brand.
-  // For now, we'll proceed with the validated brandId.
-  // Brand ID is validated
+  // Check if user has access to this brand
+  const brandId = validation.data.id;
+  const supabase = createSupabaseAdminClient();
+  const hasAccess = await hasAccessToBrand(user.id, brandId, supabase);
+  
+  if (!hasAccess) {
+    return NextResponse.json(
+      { success: false, error: 'You do not have permission to access this brand.' },
+      { status: 403 }
+    );
+  }
 
   // In a real implementation, you would fetch claims for the given brandId from the database.
   // For example:
@@ -50,4 +65,4 @@ export async function GET(
       },
     }
   );
-} 
+});

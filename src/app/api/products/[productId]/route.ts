@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
+import { canAccessProduct } from '@/lib/auth/permissions';
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +23,18 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
     if (!productId) {
         return NextResponse.json({ success: false, error: 'Product ID is required.' }, { status: 400 });
     }
-    // TODO: Implement permission checks - user might only see products for brands they have access to.
 
     try {
         const supabase = createSupabaseAdminClient();
+        
+        // Check if user has access to this product
+        const hasAccess = await canAccessProduct(user.id, productId, supabase);
+        if (!hasAccess) {
+            return NextResponse.json(
+                { success: false, error: 'Access denied to this product' },
+                { status: 403 }
+            );
+        }
 
         const { data, error } = await supabase.from('products')
             .select('*')

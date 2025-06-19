@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Input } from "@/components/ui/input";
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +24,7 @@ import {
 } from "lucide-react";
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
+import { touchFriendly } from '@/lib/utils/touch-target';
 import { Badge } from "@/components/ui/badge";
 import { 
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
@@ -167,7 +169,7 @@ export default function ClaimsPage() {
       cell: ({ row }) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <Button variant="ghost" size="sm" className={touchFriendly('tableAction')}>
               <span className="sr-only">Open menu</span>
               <MoreVertical className="h-4 w-4" />
             </Button>
@@ -343,6 +345,11 @@ export default function ClaimsPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Claims" }
+      ]} />
+      
       <PageHeader 
         title="Claims Management"
         description="Manage all claims across brands, products, and ingredients."

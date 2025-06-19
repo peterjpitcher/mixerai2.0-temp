@@ -397,7 +397,7 @@ export const POST = withAuth(async (request: NextRequest, user: User) => {
       current_step: currentWorkflowStepId,
       assigned_to: assignedToUsersForContent,
       status: data.status || 'draft',
-      content_data: data.content_data || {}
+      content_data: data.content_data || {},
     };
 
     const { data: newContentData, error: newContentError } = await supabase

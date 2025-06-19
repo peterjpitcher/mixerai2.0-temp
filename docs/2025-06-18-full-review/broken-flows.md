@@ -1,6 +1,7 @@
 # Broken User Flows - Critical Issues
 
 **Date**: December 2024  
+**Last Updated**: June 19, 2025  
 **Severity**: High  
 **Action Required**: Immediate fixes needed
 
@@ -10,30 +11,27 @@ This document identifies user flows that are currently broken or severely impair
 
 ## Critical Broken Flows
 
-### 1. 🔴 Password Reset Completion
+### 1. ✅ FIXED - Password Reset Completion
 
-**Flow**: Forgot Password → Reset Email → Update Password → **[BROKEN]**
+**Flow**: Forgot Password → Reset Email → Update Password → ✅ **Login**
 
-**Issue**: After successfully resetting their password, users are left on a blank `/auth/update-password` page with no indication of success or next steps.
+**Status**: ✅ FIXED on June 19, 2025
 
-**Impact**: 
-- Users don't know if password was changed
-- Can't find their way back to login
-- May attempt multiple resets
-- Increased support tickets
+**Solution Implemented**:
+- Users now see success message with checkmark icon
+- Automatic redirect button to login page
+- Clear confirmation: "Password Updated! You may now log in with your new password."
 
 **Evidence**:
 ```typescript
 // In /src/app/auth/update-password/page.tsx
-if (form.formState.isSubmitSuccessful) {
-  // No redirect or success message implemented
-  return null; // This leaves users stranded
-}
-```
-
-**Fix Required**:
-```typescript
-router.push('/auth/login?message=password-reset-success');
+case 'complete': return (
+  <div className="text-center py-8">
+    <h3 className="text-xl font-semibold">Password Updated!</h3>
+    <p className="mt-2 text-muted-foreground">You may now log in with your new password.</p>
+    <Button onClick={() => router.push('/auth/login')} className="mt-4">Go to Login</Button>
+  </div>
+);
 ```
 
 ### 2. 🔴 Non-Admin Brand Creation Redirect
@@ -58,23 +56,30 @@ return NextResponse.json({
 });
 ```
 
-### 3. 🔴 Workflow Without Assignees
+### 3. ✅ FIXED - Workflow Without Assignees
 
-**Flow**: Create Workflow → Add Steps → Save Without Assignees → **[BROKEN]**
+**Flow**: Create Workflow → Add Steps → Validation → ✅ **Must Add Assignees**
 
-**Issue**: Workflows can be created without assignees despite being required, creating non-functional workflows that can't process content.
+**Status**: ✅ FIXED on June 19, 2025
 
-**Impact**:
-- Content gets stuck in workflows
-- No notifications sent
-- Workflows appear broken
-- Data integrity compromised
+**Solution Implemented**:
+- API now validates each step has at least one assignee
+- Returns 400 error with clear message if assignees missing
+- Frontend shows which step needs assignees
 
 **Evidence**:
 ```typescript
 // In /src/app/api/workflows/route.ts
-// No validation for assignees
-const workflow = await createWorkflow(data); // Missing validation
+// Validate that each step has at least one assignee
+for (let i = 0; i < rawSteps.length; i++) {
+  const step = rawSteps[i];
+  if (!step.assignees || !Array.isArray(step.assignees) || step.assignees.length === 0) {
+    return NextResponse.json(
+      { success: false, error: `Step "${step.name || `Step ${i + 1}`}" must have at least one assignee` },
+      { status: 400 }
+    );
+  }
+}
 ```
 
 ### 4. 🔴 Session Timeout During Form Completion
@@ -94,25 +99,28 @@ const workflow = await createWorkflow(data); // Missing validation
 - No session expiry warnings
 - No data recovery options
 
-### 5. 🔴 AI Generation Failure Dead End
+### 5. ✅ FIXED - AI Generation Failure Dead End
 
-**Flow**: Generate Content → AI Error → **[BROKEN]**
+**Flow**: Generate Content → AI Error → ✅ **Retry Options Available**
 
-**Issue**: When AI generation fails, users see an error with no recovery options and must start over.
+**Status**: ✅ FIXED on June 19, 2025
 
-**Impact**:
-- Complete loss of form data
-- No way to retry
-- Users abandon task
-- Poor experience with core feature
+**Solution Implemented**:
+- RegenerationPanel component added for content retry
+- Field-level regeneration with feedback
+- Full content regeneration option
+- Form data preserved between attempts
 
 **Evidence**:
 ```typescript
-// In /src/components/content/ContentGeneratorForm.tsx
-catch (error) {
-  toast.error('Generation failed'); // No retry option
-  // Form data is lost
-}
+// In /src/components/content/regeneration-panel.tsx
+<RegenerationPanel
+  contentId={contentId}
+  canRegenerate={canRegenerate}
+  outputFields={outputFields}
+  onRegenerationComplete={onRegenerationComplete}
+/>
+// Allows retry with feedback capture
 ```
 
 ## Severely Impaired Flows
@@ -152,12 +160,12 @@ catch (error) {
 
 ## Quick Fix Priority
 
-### Immediate (Today)
-1. Password reset redirect
-2. AI generation retry button
-3. Workflow assignee validation
+### ✅ Completed
+1. Password reset redirect ✅
+2. AI generation retry button ✅
+3. Workflow assignee validation ✅
 
-### This Week
+### Still Required This Week
 4. Brand creation redirect logic
 5. Form data persistence
 6. Session expiry warning
@@ -171,23 +179,26 @@ catch (error) {
 
 After implementing fixes, test these scenarios:
 
-- [ ] Complete password reset flow end-to-end
+- [x] Complete password reset flow end-to-end ✅
 - [ ] Create brand as non-admin user
-- [ ] Create workflow and verify assignee requirement
+- [x] Create workflow and verify assignee requirement ✅
 - [ ] Fill long form, wait for session timeout
-- [ ] Trigger AI generation failure and retry
+- [x] Trigger AI generation failure and retry ✅
 - [ ] Access unauthorized brand page
 - [ ] Send and track user invitation
 - [ ] Upload oversized logo file
 
 ## Code Locations
 
-Critical files requiring immediate fixes:
+### ✅ Fixed Files:
 
-1. `/src/app/auth/update-password/page.tsx` - Add redirect
-2. `/src/app/api/brands/route.ts` - Fix permission-aware redirect
-3. `/src/app/api/workflows/route.ts` - Add assignee validation
-4. `/src/components/content/ContentGeneratorForm.tsx` - Add retry mechanism
+1. `/src/app/auth/update-password/page.tsx` - Redirect added ✅
+2. `/src/app/api/workflows/route.ts` - Assignee validation added ✅
+3. `/src/components/content/regeneration-panel.tsx` - Retry mechanism added ✅
+
+### Still Requiring Fixes:
+
+4. `/src/app/api/brands/route.ts` - Fix permission-aware redirect
 5. `/src/hooks/useFormPersistence.ts` - Create this for form saving
 6. `/src/middleware.ts` - Add session expiry warning
 

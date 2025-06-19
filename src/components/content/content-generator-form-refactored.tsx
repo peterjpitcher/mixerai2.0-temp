@@ -18,6 +18,7 @@ import { TemplateFieldRenderer } from './template-field-renderer';
 import { GeneratedContentPreview } from './generated-content-preview';
 import { ClaimsViewerSection } from './claims-viewer-section';
 import { useContentGenerator } from '@/hooks/use-content-generator';
+import { DatePicker } from '@/components/ui/date-picker';
 
 interface ContentGeneratorFormProps {
   templateId?: string | null;
@@ -45,6 +46,8 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     productContext,
     isFetchingProductContext,
     missingRequiredFields,
+    dueDate,
+    currentBrand,
     
     // Actions
     setSelectedBrand,
@@ -58,6 +61,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     generateContent,
     generateTitle,
     saveContent,
+    setDueDate,
   } = useContentGenerator(templateId);
 
   const handleBack = () => {
@@ -259,7 +263,8 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     <div className="space-y-6">
       <ContentHeader 
         templateName={template?.name} 
-        onBack={handleBack} 
+        onBack={handleBack}
+        activeBrand={currentBrand}
       />
 
       {/* Template Description */}
@@ -285,6 +290,20 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
                 onBrandChange={setSelectedBrand}
                 disabled={isLoading}
               />
+            </div>
+
+            {/* Due Date */}
+            <div className="space-y-2">
+              <Label htmlFor="due-date">Due Date (Optional)</Label>
+              <DatePicker
+                date={dueDate}
+                onDateChange={setDueDate}
+                placeholder="Select a due date"
+                disabled={isLoading}
+              />
+              <p className="text-sm text-muted-foreground">
+                Set a due date for when this content should be published or reviewed
+              </p>
             </div>
 
             {/* Template Fields */}

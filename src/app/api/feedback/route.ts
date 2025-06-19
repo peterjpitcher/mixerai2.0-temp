@@ -89,7 +89,6 @@ export async function POST(request: Request) {
   
   const { data, error } = await supabase
     .from('feedback_items')
-    // @ts-ignore - Type issue with Supabase
     .insert([feedbackData])
     .select()
     .single();
@@ -128,16 +127,13 @@ export async function GET(request: Request) {
     .select('*, created_by_profile:profiles!fk_feedback_created_by(full_name, avatar_url)', { count: 'exact' }); // Fetch creator profile info
 
   if (typeParam && feedbackTypes.includes(typeParam as FeedbackType)) {
-    // @ts-ignore - Type issue with Supabase
-    query = query.eq('type', typeParam);
+    query = query.eq('type', typeParam as FeedbackType);
   }
   if (statusParam && feedbackStatuses.includes(statusParam as FeedbackStatus)) {
-    // @ts-ignore - Type issue with Supabase
-    query = query.eq('status', statusParam);
+    query = query.eq('status', statusParam as FeedbackStatus);
   }
   if (priorityParam && feedbackPriorities.includes(priorityParam as FeedbackPriority)) {
-    // @ts-ignore - Type issue with Supabase
-    query = query.eq('priority', priorityParam);
+    query = query.eq('priority', priorityParam as FeedbackPriority);
   }
 
   query = query.order(sortBy, { ascending: sortOrder === 'asc' });

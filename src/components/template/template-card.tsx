@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import { touchFriendly } from '@/lib/utils/touch-target';
 
 interface TemplateCardProps {
   id: string;
@@ -63,7 +64,7 @@ export function TemplateCard({ id, name, description, inputFieldCount, outputFie
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Button variant="ghost" size="sm" className={touchFriendly('tableAction')}>
                   <span className="sr-only">Open menu</span>
                   <svg
                     width="15"

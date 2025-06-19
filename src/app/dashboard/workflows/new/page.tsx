@@ -676,7 +676,7 @@ export default function NewWorkflowPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" }, 
         { label: "Workflows", href: "/dashboard/workflows" }, 
@@ -1004,7 +1004,7 @@ export default function NewWorkflowPage() {
         </Card>
       </div>
 
-      <div className="flex justify-end space-x-3 mt-8 sticky bottom-0 bg-background/95 py-4 z-10 border-t border-border">
+      <div className="flex justify-end space-x-3 mt-8 sticky bottom-0 bg-background py-4 px-4 -mx-4 z-10 border-t border-border">
         <Button variant="outline" onClick={() => router.push('/dashboard/workflows')} disabled={isSaving}>
             Cancel
         </Button>

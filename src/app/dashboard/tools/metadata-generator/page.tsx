@@ -31,10 +31,6 @@ import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
-// export const metadata: Metadata = {
-//   title: 'Metadata Generator | MixerAI 2.0',
-//   description: 'Generate SEO-optimised meta titles, descriptions, and keywords for your web pages.',
-// };
 
 interface MetadataResultItem {
   url: string;
@@ -69,6 +65,12 @@ interface ToolRunHistoryItem {
   run_at: string; 
   status: 'success' | 'failure';
   error_message?: string | null;
+}
+
+interface EnhancedHistoryItem extends ToolRunHistoryItem {
+  urlCount?: number;
+  successCount?: number;
+  failureCount?: number;
 }
 
 const supportedLanguages = [
@@ -142,6 +144,30 @@ export default function MetadataGeneratorPage() {
   const [runHistory, setRunHistory] = useState<ToolRunHistoryItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [enhancedHistory, setEnhancedHistory] = useState<EnhancedHistoryItem[]>([]);
+
+  // Enhance history items with additional metadata
+  const enhanceHistory = (items: ToolRunHistoryItem[]): EnhancedHistoryItem[] => {
+    return items.map(item => {
+      const enhanced: EnhancedHistoryItem = { ...item };
+      
+      // Extract URL count and success/failure counts from inputs/outputs
+      if (item.inputs && typeof item.inputs === 'object' && 'urls' in item.inputs) {
+        const urls = item.inputs.urls as string[];
+        enhanced.urlCount = Array.isArray(urls) ? urls.length : 0;
+      }
+      
+      if (item.outputs && typeof item.outputs === 'object' && 'results' in item.outputs) {
+        const results = item.outputs.results as MetadataResultItem[];
+        if (Array.isArray(results)) {
+          enhanced.successCount = results.filter(r => r.metaTitle && !r.error).length;
+          enhanced.failureCount = results.filter(r => r.error).length;
+        }
+      }
+      
+      return enhanced;
+    });
+  };
 
   // Fetch current user
   useEffect(() => {
@@ -223,8 +249,11 @@ export default function MetadataGeneratorPage() {
         const data = await response.json();
         if (data.success && data.history) {
           setRunHistory(data.history);
+          const enhanced = enhanceHistory(data.history);
+          setEnhancedHistory(enhanced);
         } else {
           setRunHistory([]);
+          setEnhancedHistory([]);
           setHistoryError(data.error || 'History data not found.');
         }
       } catch (error) {
@@ -340,8 +369,11 @@ export default function MetadataGeneratorPage() {
                 const data = await response.json();
                 if (data.success && data.history) {
                 setRunHistory(data.history);
+                const enhanced = enhanceHistory(data.history);
+                setEnhancedHistory(enhanced);
                 } else {
                 setRunHistory([]);
+                setEnhancedHistory([]);
                 setHistoryError(data.error || 'History data not found.');
                 }
             } catch (error) {
@@ -640,26 +672,48 @@ export default function MetadataGeneratorPage() {
                 <AlertTriangle className="inline mr-2 h-5 w-5" /> Error loading history: {historyError}
               </div>
             )}
-            {!isLoadingHistory && !historyError && runHistory.length === 0 && (
+            {!isLoadingHistory && !historyError && enhancedHistory.length === 0 && (
               <p className="text-muted-foreground py-4 text-center">No history available for this tool.</p>
             )}
-            {!isLoadingHistory && !historyError && runHistory.length > 0 && (
+            {!isLoadingHistory && !historyError && enhancedHistory.length > 0 && (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead scope="col">Run Date</TableHead>
-                    <TableHead scope="col">Status</TableHead>
+                    <TableHead scope="col">URLs</TableHead>
+                    <TableHead scope="col">Results</TableHead>
                     <TableHead scope="col" className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {runHistory.map((run) => (
+                  {enhancedHistory.map((run) => (
                     <TableRow key={run.id}>
                       <TableCell>{format(new Date(run.run_at), 'MMMM d, yyyy, HH:mm')}</TableCell>
                       <TableCell>
-                        <Badge variant={run.status === 'success' ? 'default' : 'destructive'}>
-                          {run.status}
-                        </Badge>
+                        {run.urlCount !== undefined ? (
+                          <span className="text-sm">{run.urlCount} {run.urlCount === 1 ? 'URL' : 'URLs'}</span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {run.successCount !== undefined && run.successCount > 0 && (
+                            <Badge variant="default" className="text-xs">
+                              {run.successCount} success
+                            </Badge>
+                          )}
+                          {run.failureCount !== undefined && run.failureCount > 0 && (
+                            <Badge variant="destructive" className="text-xs">
+                              {run.failureCount} failed
+                            </Badge>
+                          )}
+                          {(run.successCount === undefined && run.failureCount === undefined) && (
+                            <Badge variant={run.status === 'success' ? 'default' : 'destructive'}>
+                              {run.status}
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <Link href={`/dashboard/tools/history/${run.id}`} passHref>

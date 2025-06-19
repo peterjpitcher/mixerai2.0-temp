@@ -45,7 +45,6 @@ export const GET = withRouteAuth(async (request: NextRequest, authUser: User) =>
     const { data: profileResponse, error: profileError } = await supabase
       .from('profiles')
       .select('full_name, job_title, company, avatar_url') 
-      // @ts-ignore - Type issue with Supabase
       .eq('id', authUser.id)
       .single();
 
@@ -63,7 +62,6 @@ export const GET = withRouteAuth(async (request: NextRequest, authUser: User) =>
         role,
         brand:brands (id, name, master_claim_brand_id)
       `)
-      // @ts-ignore - Type issue with Supabase
       .eq('user_id', authUser.id);
 
     if (permissionsError) {

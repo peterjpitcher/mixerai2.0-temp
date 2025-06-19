@@ -3,6 +3,31 @@ import { User } from '@supabase/supabase-js';
 
 /**
  * Check if user has permission to create claims for products (optimized batch query)
+ * 
+ * @param userId - The ID of the user to check permissions for
+ * @param productIds - Array of product IDs to verify permissions against
+ * @returns Promise resolving to an object with:
+ *   - hasPermission: boolean indicating if user has admin rights for ALL products
+ *   - errors: Array of error messages if permission check fails
+ * 
+ * @description
+ * This function performs a single optimized query to check if a user has admin permissions
+ * for all specified products. It checks both master brand permissions and individual
+ * mixer brand permissions through the products' associated brands.
+ * 
+ * Permission logic:
+ * - If user is a global admin (role='admin'), they have permission for all products
+ * - Otherwise, user must have admin role for the brand of EVERY specified product
+ * - Products can be associated with brands through master_claim_brand_id or mixer_brand_id
+ * 
+ * @example
+ * const { hasPermission, errors } = await checkProductClaimsPermission(
+ *   "user-123",
+ *   ["product-456", "product-789"]
+ * );
+ * if (!hasPermission) {
+ *   console.error("Permission denied:", errors);
+ * }
  */
 export async function checkProductClaimsPermission(
   userId: string,
@@ -84,6 +109,35 @@ export async function checkProductClaimsPermission(
 
 /**
  * Batch fetch claims with related data to avoid N+1 queries
+ * 
+ * @param filters - Filtering options for claims
+ * @param filters.countryCode - Filter claims by country code (optional)
+ * @param filters.excludeGlobal - Whether to exclude global claims (ALL countries) (optional)
+ * @param filters.level - Filter by claim level: 'brand', 'product', or 'ingredient' (optional)
+ * @param pagination - Pagination parameters
+ * @param pagination.page - Page number (1-indexed)
+ * @param pagination.limit - Number of items per page
+ * @param includes - Flags for including related data
+ * @param includes.masterBrandName - Include master brand names (optional)
+ * @param includes.productNames - Include product names (optional)
+ * @param includes.ingredientName - Include ingredient names (optional)
+ * @returns Promise resolving to an object containing:
+ *   - claims: Array of claims with requested related data
+ *   - totalCount: Total number of claims matching filters
+ *   - totalPages: Total number of pages
+ *   - currentPage: Current page number
+ * 
+ * @description
+ * Performs optimized database queries with selective joins based on requested includes.
+ * This prevents N+1 query problems by fetching all related data in a single query.
+ * Supports pagination and flexible filtering options.
+ * 
+ * @example
+ * const result = await fetchClaimsWithRelations(
+ *   { countryCode: 'US', level: 'product' },
+ *   { page: 1, limit: 20 },
+ *   { masterBrandName: true, productNames: true }
+ * );
  */
 export async function fetchClaimsWithRelations(
   filters: {
@@ -106,7 +160,7 @@ export async function fetchClaimsWithRelations(
   const offset = (page - 1) * limit;
   
   // Build select statement with relations
-  let selectParts = ['*'];
+  const selectParts = ['*'];
   if (includes.masterBrandName) {
     selectParts.push('master_claim_brands(name)');
   }

@@ -6,8 +6,9 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Loader2, PlusCircle, LayoutTemplate, ShieldAlert, Copy, Eye, Edit, Trash2, MoreVertical, Pencil } from 'lucide-react';
+import { PlusCircle, LayoutTemplate, ShieldAlert, Copy, Eye, Edit, Trash2, MoreVertical, Pencil } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
+import { touchFriendly } from '@/lib/utils/touch-target';
 import type { InputField, OutputField } from '@/types/template';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import {
@@ -26,6 +27,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { CardGridSkeleton } from '@/components/ui/loading-skeletons';
 
 // Placeholder Breadcrumbs component - replace with actual implementation later
 const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
@@ -303,7 +305,7 @@ export default function TemplatesPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0"
+                className={touchFriendly('tableAction')}
                 onClick={(e) => e.stopPropagation()}
               >
                 <span className="sr-only">Open menu</span>
@@ -360,9 +362,17 @@ export default function TemplatesPage() {
 
   if (isLoadingUser || loading) { // Combined loading state
     return (
-      <div className="flex justify-center items-center py-8">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="ml-2">Loading templates...</p>
+      <div className="space-y-8">
+        <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Content Templates" }]} />
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Content Templates</h1>
+            <p className="text-muted-foreground mt-2">
+              Create and manage your content templates for AI-powered content generation
+            </p>
+          </div>
+        </div>
+        <CardGridSkeleton cards={6} />
       </div>
     );
   }

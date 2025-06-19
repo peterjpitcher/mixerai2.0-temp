@@ -8,6 +8,7 @@ import { Plus, AlertTriangle, WorkflowIcon, Loader2, Eye, Edit, Trash2, MoreVert
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { formatDate } from '@/lib/utils/date';
+import { touchFriendly } from '@/lib/utils/touch-target';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -27,6 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { TableSkeleton } from '@/components/ui/loading-skeletons';
 
 interface ClaimsWorkflow {
   id: string;
@@ -155,7 +157,11 @@ export default function ClaimsWorkflowsPage() {
       cell: ({ row }) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={touchFriendly('tableAction')}
+            >
               <span className="sr-only">Open menu</span>
               <MoreVertical className="h-4 w-4" />
             </Button>
@@ -222,9 +228,24 @@ export default function ClaimsWorkflowsPage() {
 
   if (isLoading) {
     return (
-      <div className="py-10 flex justify-center items-center min-h-[calc(100vh-var(--header-height,theme(spacing.16))-theme(spacing.12))]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-muted-foreground">Loading claims workflows...</p>
+      <div className="space-y-8">
+        <Breadcrumbs items={[
+          { label: "Dashboard", href: "/dashboard" }, 
+          { label: "Claims", href: "/dashboard/claims" },
+          { label: "Workflows" }
+        ]} />
+        <PageHeader
+          title="Claims Workflows"
+          description="Manage approval workflows for claims validation."
+          actions={
+            <Button asChild>
+              <Link href="/dashboard/claims/workflows/new">
+                <Plus className="mr-2 h-4 w-4" /> Create Workflow
+              </Link>
+            </Button>
+          }
+        />
+        <TableSkeleton rows={5} columns={4} />
       </div>
     );
   }

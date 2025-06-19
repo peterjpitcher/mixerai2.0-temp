@@ -13,6 +13,7 @@ import { ArrowLeft, ExternalLink, MessageSquare, User, Search, AlertCircle, Chev
 import { format } from 'date-fns';
 import Link from 'next/link';
 import Image from 'next/image';
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 interface PriorityLabel {
   name: string;
@@ -290,18 +291,10 @@ export default function IssuesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Back Button */}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="mb-4"
-        asChild
-      >
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
-        </Link>
-      </Button>
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Issues" }
+      ]} />
 
       {/* Page Title and Description */}
       <div className="mb-6">

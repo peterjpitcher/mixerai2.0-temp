@@ -4,7 +4,7 @@ import { sessionConfig } from './session-config';
 import { User } from '@supabase/supabase-js';
 
 // In-memory session store for development
-// TODO: Replace with Redis or database for production
+// NOTE: For production, implement Redis session store as documented in /docs/INFRASTRUCTURE_REDIS_SETUP.md
 const sessionStore = new Map<string, {
   userId: string;
   lastActivity: number;
@@ -249,6 +249,6 @@ async function logSecurityEvent(event: {
   user_agent: string;
   metadata?: Record<string, any>;
 }): Promise<void> {
-  // TODO: Implement actual security event logging
+  // NOTE: For database logging, use the security_logs table or implement as per /docs/INFRASTRUCTURE_REDIS_SETUP.md
   console.log('[SECURITY_EVENT]', event);
 }

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
-import { PlusIcon, UserIcon } from 'lucide-react';
+import { PlusIcon, UserIcon, Users } from 'lucide-react';
 import { useDebounce } from '@/lib/hooks';
 
 interface User {
@@ -168,7 +168,8 @@ export function UserSelect({ onSelect, placeholder = "Search users or enter emai
               </div>
             ) : (
               <div className="p-4 text-center text-sm text-muted-foreground">
-                No users found. Enter a valid email to invite.
+                <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <div>No users found. Enter a valid email to invite.</div>
               </div>
             )
           )}

@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
+import { canAccessIngredient } from '@/lib/auth/permissions';
 
 export const dynamic = "force-dynamic";
 
@@ -26,8 +27,6 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
         return NextResponse.json({ success: false, error: 'Ingredient ID is required and must be a string.' }, { status: 400 });
     }
 
-    // TODO: Permission check - general access to ingredients might be open, or restricted by some criteria.
-
     try {
         const supabase = createSupabaseAdminClient();
 
@@ -41,6 +40,16 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
         if (ingredientError || !ingredientData) {
             console.warn(`[API /ingredients/${id}/products GET] Ingredient not found or error checking ingredient:`, ingredientError);
             return NextResponse.json({ success: false, error: 'Ingredient not found.' }, { status: 404 });
+        }
+        
+        // Check if user has access to this ingredient
+        const hasAccess = await canAccessIngredient(user.id, id, supabase);
+        
+        if (!hasAccess) {
+            return NextResponse.json(
+                { success: false, error: 'You do not have permission to access this ingredient.' },
+                { status: 403 }
+            );
         }
 
         // Fetch associated products

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { ClaimDefinitionFormV2, ClaimDefinitionData } from '@/components/dashboard/claims/ClaimDefinitionFormV2';
 import { toast } from 'sonner';
-import { Breadcrumbs } from '@/components/ui/breadcrumbs';
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { PageHeader } from '@/components/dashboard/page-header';
 
 export default function DefineClaimsPage() {

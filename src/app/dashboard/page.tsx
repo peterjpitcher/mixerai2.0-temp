@@ -10,6 +10,7 @@ import { MyTasks } from '@/components/dashboard/my-tasks';
 import { DashboardMetrics } from '@/components/dashboard/dashboard-metrics';
 import { StatCard } from '@/components/dashboard/stat-card';
 import { FileText, BarChart3, Clock, CheckCircle2 } from 'lucide-react';
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 async function getTeamActivity(supabase: SupabaseClient<Database>, profile: { role?: string; assigned_brands?: string[] } | null) {
   if (!profile) return [];
@@ -190,6 +191,8 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      <Breadcrumbs items={[{ label: "Dashboard" }]} />
+      
       {/* Header with welcome message */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Welcome back{userProfile?.full_name ? `, ${userProfile.full_name}` : ''}</h1>

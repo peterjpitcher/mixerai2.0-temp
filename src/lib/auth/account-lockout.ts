@@ -9,7 +9,7 @@ interface LoginAttempt {
 }
 
 // In-memory storage for login attempts
-// TODO: Move to Redis for production/distributed deployments
+// NOTE: For production/distributed deployments, implement Redis as documented in /docs/INFRASTRUCTURE_REDIS_SETUP.md
 const loginAttempts = new Map<string, LoginAttempt[]>();
 
 // Export for testing purposes only
@@ -158,7 +158,7 @@ export async function logSecurityEvent(
   userId?: string
 ): Promise<void> {
   try {
-    // TODO: Uncomment when security_logs table is created and types are updated
+    // NOTE: security_logs table is available - uncomment to enable database logging
     // const supabase = createSupabaseAdminClient();
     // 
     // await supabase.from('security_logs').insert({
@@ -169,7 +169,7 @@ export async function logSecurityEvent(
     //   timestamp: new Date().toISOString()
     // });
     
-    // For now, log to console in production
+    // Currently logging to console
     console.log('[SECURITY EVENT]', {
       event_type: eventType,
       user_id: userId,
