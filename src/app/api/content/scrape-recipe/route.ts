@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/api-auth';
-import { User } from '@supabase/supabase-js';
 import { z } from 'zod';
 
 // Schema for the request

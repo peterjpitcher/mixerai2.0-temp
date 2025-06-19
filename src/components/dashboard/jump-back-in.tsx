@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText } from 'lucide-react';
+import { FileText, History } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -50,6 +50,7 @@ export function JumpBackIn({ items }: JumpBackInProps) {
           </ul>
         ) : (
           <div className="text-center text-muted-foreground py-8">
+            <History className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
             <p>No recent activity found.</p>
           </div>
         )}

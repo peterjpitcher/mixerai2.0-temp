@@ -1,13 +1,20 @@
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Breadcrumbs } from './breadcrumbs';
+import { ActiveBrandIndicator } from '@/components/ui/active-brand-indicator';
 
 interface ContentHeaderProps {
   templateName?: string;
   onBack?: () => void;
+  activeBrand?: {
+    id: string;
+    name: string;
+    brand_color?: string | null;
+    logo_url?: string | null;
+  };
 }
 
-export function ContentHeader({ templateName, onBack }: ContentHeaderProps) {
+export function ContentHeader({ templateName, onBack, activeBrand }: ContentHeaderProps) {
   const breadcrumbItems = [
     { label: 'Dashboard', href: '/dashboard' },
     { label: 'Content', href: '/dashboard/content' },
@@ -27,6 +34,16 @@ export function ContentHeader({ templateName, onBack }: ContentHeaderProps) {
       </Button>
       
       <Breadcrumbs items={breadcrumbItems} />
+      
+      {activeBrand && (
+        <div className="my-4">
+          <ActiveBrandIndicator
+            brandName={activeBrand.name}
+            brandColor={activeBrand.brand_color}
+            brandLogoUrl={activeBrand.logo_url}
+          />
+        </div>
+      )}
       
       <div className="flex items-center justify-between">
         <div>

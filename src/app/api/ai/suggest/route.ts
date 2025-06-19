@@ -10,12 +10,16 @@ export const dynamic = "force-dynamic";
 
 interface SuggestionRequest {
   prompt: string;
-  fieldType: string;
-  formValues: Record<string, unknown>;
+  fieldType?: string;
+  formValues?: Record<string, unknown>;
   brand_id?: string;
   options?: {
     maxLength?: number;
     format?: string;
+  };
+  // Support for new content generator format
+  context?: {
+    templateFields?: Record<string, string>;
   };
 }
 
@@ -33,6 +37,19 @@ export const POST = withAuth(async (request: NextRequest) => {
     let userPrompt = body.prompt;
     console.log('[API /ai/suggest] Received original prompt:', userPrompt);
     console.log('[API /ai/suggest] Received brand_id:', body.brand_id);
+    console.log('[API /ai/suggest] Received formValues:', body.formValues);
+
+    // First, interpolate any field variables from formValues
+    if (body.formValues && typeof body.formValues === 'object') {
+      Object.entries(body.formValues).forEach(([key, value]) => {
+        if (typeof value === 'string' || typeof value === 'number') {
+          // Replace {{fieldName}} patterns
+          const fieldNamePattern = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'gi');
+          userPrompt = userPrompt.replace(fieldNamePattern, String(value));
+        }
+      });
+      console.log('[API /ai/suggest] Interpolated prompt with form values:', userPrompt);
+    }
 
     if (body.brand_id) {
       try {
@@ -68,6 +85,13 @@ export const POST = withAuth(async (request: NextRequest) => {
         // Proceed with original prompt in case of an unexpected error during brand processing
       }
     }
+    
+    // Clean up any remaining unreplaced variables by removing them or replacing with empty string
+    // This prevents curly braces from appearing in the AI output
+    userPrompt = userPrompt.replace(/\{\{[^}]+\}\}/g, (match) => {
+      console.warn(`[API /ai/suggest] Unreplaced variable found: ${match}`);
+      return ''; // Replace with empty string instead of leaving the curly braces
+    });
 
     const systemPrompt = "You are a helpful assistant. Provide a concise suggestion based on the user's instructions. If the user asks for a title, it should be between 6 and 10 words long. If the user asks for a list, provide a comma-separated list.";
     

@@ -6,12 +6,16 @@ import { useRouter } from "next/navigation";
 import { Button } from '@/components/ui/button';
 import { BrandIcon } from "@/components/brand-icon";
 import { COUNTRIES, LANGUAGES } from "@/lib/constants";
-import { PackageOpen, AlertTriangle, Eye, Edit, Trash2, Plus, MoreVertical } from "lucide-react";
+import { PackageOpen, AlertTriangle, Eye, Pencil, Trash2, Plus, MoreVertical } from "lucide-react";
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
+import { touchFriendly } from '@/lib/utils/touch-target';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { DeleteBrandDialog } from "@/components/dashboard/brand/delete-brand-dialog";
 import { Badge } from '@/components/ui/badge';
+import { TableSkeleton } from '@/components/ui/loading-skeletons';
+import { TableEmptyState } from '@/components/ui/table-empty-state';
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -128,6 +132,7 @@ export default function BrandsPage() {
       cell: ({ row }) => COUNTRIES.find(c => c.value === row.country)?.label || row.country || 'Unknown',
       enableSorting: true,
       enableFiltering: true,
+      hideOnMobile: true,
     },
     {
       id: "language",
@@ -139,13 +144,14 @@ export default function BrandsPage() {
       ),
       enableSorting: true,
       enableFiltering: true,
+      hideOnMobile: true,
     },
     {
       id: "updated_at",
       header: "Last updated",
       cell: ({ row }) => (
         <span className="text-sm text-muted-foreground">
-          {row.updated_at ? format(new Date(row.updated_at), 'MMMM d, yyyy') : row.created_at ? format(new Date(row.created_at), 'MMMM d, yyyy') : 'N/A'}
+          {row.updated_at ? formatDate(row.updated_at) : row.created_at ? formatDate(row.created_at) : 'N/A'}
         </span>
       ),
       enableSorting: true,
@@ -164,7 +170,7 @@ export default function BrandsPage() {
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 w-8 p-0"
+              className={touchFriendly('tableAction')}
             >
               <span className="sr-only">Open menu</span>
               <MoreVertical className="h-4 w-4" />
@@ -186,7 +192,7 @@ export default function BrandsPage() {
                 router.push(`/dashboard/brands/${row.id}/edit`);
               }}
             >
-              <Edit className="mr-2 h-4 w-4" />
+              <Pencil className="mr-2 h-4 w-4" />
               Edit
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -226,6 +232,11 @@ export default function BrandsPage() {
 
   return (
     <div className="space-y-8">
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Brands" }
+      ]} />
+      
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Brands</h1>
@@ -242,12 +253,7 @@ export default function BrandsPage() {
       </div>
 
       {isLoading ? (
-        <div className="py-10 flex justify-center items-center min-h-[300px]">
-          <div className="flex flex-col items-center">
-            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-muted-foreground">Loading brands...</p>
-          </div>
-        </div>
+        <TableSkeleton rows={5} columns={5} />
       ) : error ? (
         <ErrorState error={error} onRetry={fetchBrands} />
       ) : brands.length === 0 ? (
@@ -272,10 +278,11 @@ export default function BrandsPage() {
           ]}
           onRowClick={(row) => router.push(`/dashboard/brands/${row.id}`)}
           emptyState={
-            <div className="flex flex-col items-center justify-center py-8">
-              <h3 className="text-xl font-bold mb-2">No brands found</h3>
-              <p className="text-muted-foreground mb-4">No brands match your search criteria.</p>
-            </div>
+            <TableEmptyState 
+              icon={PackageOpen}
+              title="No brands found"
+              description="No brands match your search criteria."
+            />
           }
         />
       )}

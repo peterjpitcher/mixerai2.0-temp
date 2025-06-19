@@ -51,11 +51,56 @@ interface PendingClaim {
   brand_primary_color?: string;
 }
 
+interface WorkflowStep {
+  id: string;
+  step_order: number;
+  step_name: string;
+  name?: string; // Some responses use 'name' instead of 'step_name'
+  step_type: string;
+  requires_all_assignees: boolean;
+  assignees?: string[];
+  assigned_users?: Array<{id: string; full_name?: string; email?: string}>;
+  instructions?: string;
+  is_completed?: boolean;
+  is_current?: boolean;
+  role?: string;
+}
+
+interface WorkflowHistory {
+  id: string;
+  action_type: string;
+  action_status?: string;
+  action_by: string;
+  action_by_name?: string;
+  comment?: string;
+  created_at: string;
+  workflow_step_id?: string;
+  updated_claim_text?: string;
+  feedback?: string;
+  reviewer?: {
+    full_name?: string;
+    email?: string;
+  };
+}
+
+interface ChangeHistoryItem {
+  id: string;
+  field_name: string;
+  old_value: string;
+  new_value: string;
+  changed_by: string;
+  changed_by_name?: string;
+  created_at: string;
+}
+
 interface ClaimDetails {
-  claim: any;
-  workflowSteps: any[];
-  history: any[];
-  changeHistory: any[];
+  claim: PendingClaim & {
+    workflow_id?: string;
+    workflow_status?: string;
+  };
+  workflowSteps: WorkflowStep[];
+  history: WorkflowHistory[];
+  changeHistory: ChangeHistoryItem[];
   currentUserId: string;
 }
 
@@ -196,7 +241,7 @@ export default function ClaimsPendingApprovalPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <Breadcrumbs items={[
           { label: "Dashboard", href: "/dashboard" },
           { label: "Claims", href: "/dashboard/claims" },
@@ -214,7 +259,7 @@ export default function ClaimsPendingApprovalPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" },
         { label: "Claims", href: "/dashboard/claims" },
@@ -228,7 +273,7 @@ export default function ClaimsPendingApprovalPage() {
       {pendingClaims.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
+            <ClipboardList className="h-12 w-12 text-muted-foreground mb-2" />
             <h3 className="text-lg font-semibold mb-2">No Claims Pending</h3>
             <p className="text-muted-foreground text-center">
               There are no claims currently pending approval.
@@ -239,7 +284,7 @@ export default function ClaimsPendingApprovalPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
           {/* Left Panel - Claims Table */}
           <div className="lg:col-span-2">
             <Card className="h-full flex flex-col">
@@ -340,13 +385,13 @@ export default function ClaimsPendingApprovalPage() {
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="flex-1 overflow-y-auto p-6">
+                <CardContent className="flex-1 overflow-y-auto p-4">
                   {isLoadingDetails ? (
                     <div className="flex justify-center items-center h-full">
                       <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     </div>
                   ) : (
-                    <div className="space-y-6">
+                    <div className="space-y-4">
                       {/* Claim Text */}
                       <div>
                         <div className="flex items-center justify-between mb-2">
@@ -425,8 +470,8 @@ export default function ClaimsPendingApprovalPage() {
                               const isNext = !step.is_completed && !step.is_current;
                               
                               // Find history for this step
-                              const stepHistory = claimDetails.history.filter((h: Record<string, unknown>) => 
-                                h.workflow_step_id === step.id
+                              const stepHistory = claimDetails.history.filter((h) => 
+                                (h as any).workflow_step_id === step.id
                               );
 
                               return (
@@ -441,7 +486,7 @@ export default function ClaimsPendingApprovalPage() {
                                   
                                   <div
                                     className={cn(
-                                      "flex items-start gap-4 p-4 rounded-lg mb-4 border-2 transition-all",
+                                      "flex items-start gap-3 p-3 rounded-lg mb-2 border-2 transition-all",
                                       isCurrent ? "border-primary bg-primary/5 shadow-sm" : 
                                       isPrevious ? "border-green-500 bg-green-50 dark:bg-green-900/20" : 
                                       "border-gray-200 bg-gray-50/50 dark:bg-gray-900/20"
@@ -463,7 +508,7 @@ export default function ClaimsPendingApprovalPage() {
                                     <div className="flex-1 space-y-3">
                                       <div className="flex items-center justify-between">
                                         <div>
-                                          <p className="font-medium text-sm">{step.name}</p>
+                                          <p className="font-medium text-sm">{step.name || step.step_name}</p>
                                           <p className="text-xs text-muted-foreground mt-0.5">
                                             Role: {step.role}
                                           </p>
@@ -492,8 +537,8 @@ export default function ClaimsPendingApprovalPage() {
                                         <User className="h-3 w-3 text-muted-foreground" />
                                         <span className="font-medium">Assignees:</span>
                                         <div className="flex flex-wrap gap-1">
-                                          {step.assigned_users?.length > 0 ? (
-                                            step.assigned_users.map((u: {id: string; full_name?: string; email?: string}) => (
+                                          {step.assigned_users && step.assigned_users.length > 0 ? (
+                                            step.assigned_users.map((u) => (
                                               <Badge key={u.id} variant="secondary" className="text-xs">
                                                 {u.full_name || u.email}
                                               </Badge>
@@ -510,8 +555,8 @@ export default function ClaimsPendingApprovalPage() {
                                           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                                             Actions Taken
                                           </p>
-                                          {stepHistory.map((history: Record<string, unknown>) => (
-                                            <div key={history.id as string} className="bg-muted/30 rounded-lg p-3 space-y-2">
+                                          {stepHistory.map((history) => (
+                                            <div key={history.id} className="bg-muted/30 rounded-lg p-3 space-y-2">
                                               {/* Action header */}
                                               <div className="flex items-start justify-between">
                                                 <div className="flex items-center gap-2">
@@ -531,7 +576,7 @@ export default function ClaimsPendingApprovalPage() {
                                                   </div>
                                                   <div>
                                                     <p className="text-sm font-medium">
-                                                      {((history.reviewer as Record<string, unknown>)?.full_name as string) || ((history.reviewer as Record<string, unknown>)?.email as string) || 'Unknown User'}
+                                                      {history.reviewer?.full_name || history.reviewer?.email || history.action_by_name || 'Unknown User'}
                                                     </p>
                                                     <p className="text-xs text-muted-foreground">
                                                       {history.action_status === 'approved' ? 'Approved' : history.action_status === 'rejected' ? 'Rejected' : (history.action_status as string)}
@@ -543,7 +588,7 @@ export default function ClaimsPendingApprovalPage() {
                                               </div>
                                               
                                               {/* Approved/Rejected content if different from current */}
-                                              {history.updated_claim_text && (history.updated_claim_text as string) !== selectedClaim.claim_text ? (
+                                              {history.updated_claim_text && history.updated_claim_text !== selectedClaim.claim_text ? (
                                                 <div className="bg-muted/50 rounded p-2 space-y-1">
                                                   <p className="text-xs font-medium flex items-center gap-1">
                                                     <FileText className="h-3 w-3" />

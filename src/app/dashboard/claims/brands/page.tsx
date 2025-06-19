@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
+import { touchFriendly } from '@/lib/utils/touch-target';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -220,12 +221,12 @@ export default function MasterClaimBrandsPage() {
                           {brand.name}
                         </Link>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{brand.created_at ? format(new Date(brand.created_at), 'MMMM d, yyyy') : '-'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{brand.updated_at ? format(new Date(brand.updated_at), 'MMMM d, yyyy') : '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{brand.created_at ? formatDate(brand.created_at) : '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{brand.updated_at ? formatDate(brand.updated_at) : '-'}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <Button variant="ghost" size="sm" className={touchFriendly('tableAction')}>
                               <span className="sr-only">Open menu</span>
                               <MoreVertical className="h-4 w-4" />
                             </Button>

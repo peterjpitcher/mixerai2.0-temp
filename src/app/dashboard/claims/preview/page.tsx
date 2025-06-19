@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 // import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
 import { 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  Loader2, AlertTriangle, Search, FileText, Edit3, XOctagon, CornerDownRight, Info, CheckCircle2, MinusCircle, ShieldQuestion, Settings2, Trash2, Undo2, Replace, Save, Sparkles, Maximize, Minimize
+  Loader2, AlertTriangle, Search, FileText, Edit3, XOctagon, CornerDownRight, Info, CheckCircle2, MinusCircle, ShieldQuestion, Settings2, Trash2, Undo2, Replace, Save, Sparkles, Maximize, Minimize, ArrowLeft
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
@@ -407,6 +408,7 @@ OverrideModalContent.displayName = 'OverrideModalContent';
 // ----- End OverrideModalContent Component -----
 
 export default function ClaimsPreviewPage() {
+  const router = useRouter();
   const [matrixData, setMatrixData] = useState<ClaimsMatrixApiResponseData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -699,6 +701,15 @@ export default function ClaimsPreviewPage() {
       isFullScreen ? "fixed inset-0 bg-background z-50 p-4" : "space-y-0 p-y-0 sm:py-0.5 lg:py-1 relative" 
     )}> 
       <div className={cn("flex-shrink-0", isFullScreen && "hidden")}> 
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => router.push('/dashboard/claims')}
+          className="mb-4"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Claims
+        </Button>
         <Breadcrumbs items={breadcrumbItems} /> 
         <PageHeader title={pageTitle} description={pageDescription} /> 
       </div>

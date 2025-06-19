@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Eye, Edit3, Trash2, MoreHorizontal } from 'lucide-react';
+import { Eye, Pencil, Trash2, MoreVertical } from 'lucide-react';
 import Link from 'next/link';
 import {
   DropdownMenu,
@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ReactNode } from 'react';
+import { touchFriendly } from '@/lib/utils/touch-target';
 
 interface ActionButtonsProps {
   viewHref?: string;
@@ -57,8 +58,8 @@ export function ActionButtons({
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm">
-            <MoreHorizontal className="h-4 w-4" />
+          <Button variant="ghost" className={touchFriendly('tableAction')}>
+            <MoreVertical className="h-4 w-4" />
             <span className="sr-only">Actions</span>
           </Button>
         </DropdownMenuTrigger>
@@ -74,7 +75,7 @@ export function ActionButtons({
           {editHref && (
             <DropdownMenuItem asChild>
               <Link href={editHref} className="flex items-center">
-                <Edit3 className="mr-2 h-4 w-4" />
+                <Pencil className="mr-2 h-4 w-4" />
                 {editLabel}
               </Link>
             </DropdownMenuItem>
@@ -122,7 +123,7 @@ export function ActionButtons({
       {editHref && (
         <Button variant="outline" size="sm" asChild>
           <Link href={editHref} className="flex items-center">
-            <Edit3 className="mr-2 h-4 w-4" />
+            <Pencil className="mr-2 h-4 w-4" />
             {editLabel}
           </Link>
         </Button>

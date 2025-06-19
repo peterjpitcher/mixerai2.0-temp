@@ -10,6 +10,7 @@ import { ComboboxOption } from '@/components/ui/MultiSelectCheckboxCombobox';
 import { Claim, MarketClaimOverride, ClaimTypeEnum } from '@/lib/claims-utils'; 
 import { Heading } from '@/components/ui/heading';
 import { Edit3, Trash2, MoreVertical } from 'lucide-react';
+import { touchFriendly } from '@/lib/utils/touch-target';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -469,7 +470,7 @@ export default function MarketOverridesPage() {
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <Button variant="ghost" size="sm" className={touchFriendly('tableAction')}>
                                 <span className="sr-only">Open menu</span>
                                 <MoreVertical className="h-4 w-4" />
                               </Button>

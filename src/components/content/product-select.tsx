@@ -5,6 +5,7 @@ import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/icons';
+import { Package, AlertCircle } from 'lucide-react';
 import { useDebounce } from '@/lib/hooks/use-debounce';
 import useSWR from 'swr';
 
@@ -53,7 +54,7 @@ export function ProductSelect({ brandId, value, onChange }: ProductSelectProps) 
 
   const renderContent = () => {
     if (!brandId) {
-      return <CommandEmpty>Please select a brand first.</CommandEmpty>;
+      return <CommandEmpty icon={AlertCircle}>Please select a brand first.</CommandEmpty>;
     }
     if (isLoading) {
       return (
@@ -72,7 +73,7 @@ export function ProductSelect({ brandId, value, onChange }: ProductSelectProps) 
       );
     }
     if (products.length === 0) {
-      return <CommandEmpty>No products found for this brand.</CommandEmpty>;
+      return <CommandEmpty icon={Package}>No products found for this brand.</CommandEmpty>;
     }
     return (
       <CommandGroup>

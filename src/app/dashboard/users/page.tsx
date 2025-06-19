@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from "@/components/dashboard/page-header";
+import { touchFriendly } from '@/lib/utils/touch-target';
 import { format as formatDateFns } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
@@ -460,14 +461,14 @@ export default function UsersPage() {
                   </div>
                 </TableHead>
                 <TableHead scope="col" className="w-[120px]">Brands</TableHead>
-                <TableHead scope="col" className="w-[120px] cursor-pointer" onClick={() => handleSort('company')}>
+                <TableHead scope="col" className="w-[120px] cursor-pointer hidden lg:table-cell" onClick={() => handleSort('company')}>
                   <div className="flex items-center">
                     Company
                     <SortIndicator field="company" />
                   </div>
                 </TableHead>
-                <TableHead scope="col" className="w-[100px]">Job Title</TableHead>
-                <TableHead scope="col" className="w-[100px] cursor-pointer" onClick={() => handleSort('last_sign_in_at')}>
+                <TableHead scope="col" className="w-[100px] hidden lg:table-cell">Job Title</TableHead>
+                <TableHead scope="col" className="w-[100px] cursor-pointer hidden sm:table-cell" onClick={() => handleSort('last_sign_in_at')}>
                   <div className="flex items-center">
                     Last Login
                     <SortIndicator field="last_sign_in_at" />
@@ -507,13 +508,13 @@ export default function UsersPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>{renderBrandIcons(user)}</TableCell>
-                  <TableCell>{user.company || '-'}</TableCell>
-                  <TableCell>{user.job_title || '-'}</TableCell>
-                  <TableCell>{formatDate(user.last_sign_in_at)}</TableCell>
+                  <TableCell className="hidden lg:table-cell">{user.company || '-'}</TableCell>
+                  <TableCell className="hidden lg:table-cell">{user.job_title || '-'}</TableCell>
+                  <TableCell className="hidden sm:table-cell">{formatDate(user.last_sign_in_at)}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <Button variant="ghost" size="sm" className={touchFriendly('tableAction')}>
                           <span className="sr-only">Open menu</span>
                           <MoreVertical className="h-4 w-4" />
                         </Button>

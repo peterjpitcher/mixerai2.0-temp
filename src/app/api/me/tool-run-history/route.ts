@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
-import { createSupabaseServerClient } from '@/lib/supabase/server'; // Using server client for RLS with user context
+import { createSupabaseServerClient } from '@/lib/supabase/server'; // Using server client
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +32,16 @@ export const GET = withAuthAndMonitoring(async (request: NextRequest) => {
       );
     }
 
-    return NextResponse.json({ success: true, history });
+    // Map database fields to expected frontend fields
+    const mappedHistory = history?.map(item => ({
+      ...item,
+      run_at: item.run_at,
+      // Ensure inputs/outputs are objects
+      inputs: item.inputs || {},
+      outputs: item.outputs || {}
+    })) || [];
+
+    return NextResponse.json({ success: true, history: mappedHistory });
 
   } catch (error: unknown) {
     console.error('[ToolRunHistoryAPI] Unexpected error:', error);

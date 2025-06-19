@@ -24,7 +24,7 @@ describe('Rate Limiting', () => {
   beforeEach(() => {
     // Clear the rate limit store between tests
     // Since the store is in-memory, we need to access it directly
-    // @ts-ignore - accessing private variable for testing
+    // @ts-expect-error - accessing private variable for testing
     global.rateLimitStore = new Map();
   });
 

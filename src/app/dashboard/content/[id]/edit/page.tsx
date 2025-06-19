@@ -9,7 +9,6 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-// import { } from '@/components/ui/tabs'; // Removed - empty import
 import { RichTextEditor } from '@/components/content/rich-text-editor';
 import { toast } from 'sonner';
 import { createBrowserClient } from '@supabase/ssr';
@@ -19,11 +18,9 @@ import { BrandIcon,  } from '@/components/brand-icon';
 import { ArrowLeft, Loader2, ShieldAlert, XCircle, CheckCircle, Clock, MessageSquare, UserCircle,  } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format as formatDateFns } from 'date-fns';
+import { DatePicker } from '@/components/ui/date-picker';
+import { RegenerationPanel } from '@/components/content/regeneration-panel';
 
-// export const metadata: Metadata = {
-//   title: 'Edit Content | MixerAI 2.0',
-//   description: 'Modify the details, body, and SEO metadata for a piece of content.',
-// };
 
 interface ContentEditPageProps {
   params: {
@@ -47,6 +44,7 @@ interface ContentState {
   workflow_id?: string | null;
   current_step?: number | null;
   workflow?: { id: string; name: string; steps: unknown[] };
+  due_date?: string | null;
   // Add other fields from your actual content structure as needed
   // Add fields for actual template output fields if they need to be directly editable
   // For example, if an outputField from template is 'summary', you might add: summary?: string;
@@ -250,7 +248,11 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       setIsCheckingPermissions(true);
       const userRole = currentUser.user_metadata?.role;
       let allowed = false;
-      if (userRole === 'admin') {
+      
+      // First check if content is approved - if so, no one can edit it
+      if (content.status === 'approved' || content.status === 'published') {
+        allowed = false;
+      } else if (userRole === 'admin') {
         allowed = true;
       } else if (content.brand_id && currentUser.brand_permissions) {
         const brandPerm = currentUser.brand_permissions.find(p => p.brand_id === content.brand_id);
@@ -266,7 +268,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       setIsCheckingPermissions(false); 
     }
     // Do not run if content.id or content.brand_id is not yet available from fetchAllData
-  }, [currentUser, isLoadingUser, content.id, content.brand_id]); 
+  }, [currentUser, isLoadingUser, content.id, content.brand_id, content.status]); 
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -303,7 +305,8 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             content_data: contentResult.data.content_data || {},
             workflow_id: contentResult.data.workflow_id || null,
             current_step: contentResult.data.current_step || null,
-            workflow: contentResult.data.workflow || undefined
+            workflow: contentResult.data.workflow || undefined,
+            due_date: contentResult.data.due_date || null
           };
           setContent(newContentState);
           console.log('[ContentEditPage] Content state AFTER setContent in fetchAllData:', JSON.stringify(newContentState, null, 2));
@@ -435,6 +438,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         title: content.title,
         body: primaryBodyFromOutputs, 
         status: content.status,
+        due_date: content.due_date,
         content_data: {
           ...(content.content_data || {}),
           generatedOutputs: content.content_data?.generatedOutputs || {},
@@ -545,11 +549,25 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   }
   
   if (!isAllowedToEdit) {
+    const isApproved = content.status === 'approved' || content.status === 'published';
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
-        <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
-        <h3 className="text-xl font-semibold mb-2">Access Denied</h3>
-        <p className="text-muted-foreground text-center mb-6">You do not have permission to edit this content.</p>
+        {isApproved ? (
+          <>
+            <CheckCircle className="h-16 w-16 text-green-600 mb-4" />
+            <h3 className="text-xl font-semibold mb-2">Content is Locked</h3>
+            <p className="text-muted-foreground text-center mb-6">
+              This content has been {content.status} and cannot be edited.<br />
+              To make changes, the content would need to be reopened through the workflow.
+            </p>
+          </>
+        ) : (
+          <>
+            <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
+            <h3 className="text-xl font-semibold mb-2">Access Denied</h3>
+            <p className="text-muted-foreground text-center mb-6">You do not have permission to edit this content.</p>
+          </>
+        )}
         <Link href={content.id ? `/dashboard/content/${content.id}` : '/dashboard/content'} passHref>
           <Button variant="outline">Back to Content</Button>
         </Link>
@@ -602,6 +620,18 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div><Label>Content Template</Label><Input value={content.template_name || 'N/A'} disabled /></div>
                 <div><Label>Brand</Label><Input value={content.brand_name || 'N/A'} disabled /></div>
+              </div>
+              <div>
+                <Label htmlFor="due-date">Due Date (Optional)</Label>
+                <DatePicker
+                  date={content.due_date ? new Date(content.due_date) : undefined}
+                  onDateChange={(date) => setContent(prev => ({ ...prev, due_date: date?.toISOString() || null }))}
+                  placeholder="Select a due date"
+                  disabled={false}
+                />
+                <p className="text-sm text-muted-foreground mt-1">
+                  Set a due date for when this content should be published or reviewed
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -680,6 +710,18 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             />
           )}
           {!content.workflow && <Card><CardContent><p className="text-muted-foreground py-4">No workflow associated with this content.</p></CardContent></Card>}
+
+          {/* Regeneration Panel */}
+          <RegenerationPanel
+            contentId={content.id}
+            currentStepName={content.current_step ? (content.workflow?.steps as any[])?.find((step: any) => step?.id === content.current_step)?.name || undefined : undefined}
+            canRegenerate={isAllowedToEdit}
+            outputFields={template?.fields?.outputFields || []}
+            onRegenerationComplete={() => {
+              // Reload content to show regenerated data
+              window.location.reload();
+            }}
+          />
 
           {/* New Card for Version History on Edit Page */}
           {versions && versions.length > 0 && (

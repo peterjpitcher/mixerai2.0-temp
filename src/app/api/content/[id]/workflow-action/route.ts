@@ -183,6 +183,68 @@ export const POST = withAuth(async (request: NextRequest, user: User, context?: 
       }
     }
 
+    // Send email notifications
+    try {
+      // Get content details for email
+      const { data: content } = await supabase
+        .from('content')
+        .select('title, created_by')
+        .eq('id', contentId)
+        .single();
+        
+      if (content) {
+        // Send notification to content creator about the action
+        await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/notifications/email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'workflow_action',
+            userId: content.created_by,
+            contentId: contentId,
+            action: action,
+            feedback: feedback
+          })
+        });
+        
+        // If approved and moved to next step, send notifications to new assignees
+        if (action === 'approve' && updatePayload.assigned_to && Array.isArray(updatePayload.assigned_to)) {
+          for (const assigneeId of updatePayload.assigned_to) {
+            // Create task for the assignee
+            const { data: newTask } = await supabase
+              .from('user_tasks')
+              .insert({
+                user_id: assigneeId,
+                content_id: contentId,
+                workflow_id: currentContent.workflow_id || '',
+                workflow_step_id: updatePayload.current_step || '',
+                workflow_step_name: null,
+                status: 'pending',
+                due_date: null
+              })
+              .select()
+              .single();
+              
+            if (newTask) {
+              // Send email notification for the task
+              await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/notifications/email`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: 'task_assignment',
+                  userId: assigneeId,
+                  taskId: newTask.id,
+                  contentId: contentId
+                })
+              });
+            }
+          }
+        }
+      }
+    } catch (emailError) {
+      console.error('Error sending email notifications:', emailError);
+      // Don't fail the workflow action if email sending fails
+    }
+
     return NextResponse.json({ success: true, message: `Content ${action}d successfully.`, data: updatedContent });
 
   } catch (error: unknown) {

@@ -443,17 +443,22 @@ export default function EditClaimsWorkflowPage() {
         { label: name || "Edit" }
       ]} />
 
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={() => router.push(`/dashboard/claims/workflows/${workflowId}`)}
+        className="mb-4"
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Back to Workflow
+      </Button>
+      
       <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" onClick={() => router.push(`/dashboard/claims/workflows/${workflowId}`)} aria-label="Back to Workflow">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Edit Claims Workflow</h1>
-            <p className="text-muted-foreground mt-1">
-              Update workflow steps and approval process
-            </p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Edit Claims Workflow</h1>
+          <p className="text-muted-foreground mt-1">
+            Update workflow steps and approval process
+          </p>
         </div>
       </div>
 

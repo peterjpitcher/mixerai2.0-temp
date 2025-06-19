@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { TemplateForm } from '@/components/template/template-form';
-import { Loader2, ChevronLeft, Trash2, ShieldAlert } from 'lucide-react';
+import { Loader2, ArrowLeft, Trash2, ShieldAlert } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -337,11 +337,15 @@ export default function TemplateEditPage() {
       
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard/templates" passHref>
-            <Button variant="outline" size="icon" aria-label="Back to Templates">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-          </Link>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => router.push('/dashboard/templates')}
+            aria-label="Back to Templates"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{String(template?.name || 'Edit Template')}</h1>
             <p className="text-muted-foreground mt-1">Modify the fields and settings for this template.</p>

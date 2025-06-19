@@ -17,7 +17,7 @@ interface RateLimitEntry {
 }
 
 // In-memory storage for rate limits
-// TODO: Replace with Redis for production/distributed deployments
+// NOTE: For production/distributed deployments, implement Redis as documented in /docs/INFRASTRUCTURE_REDIS_SETUP.md
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
 // Clean up expired entries periodically

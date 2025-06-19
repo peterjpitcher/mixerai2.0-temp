@@ -1,0 +1,62 @@
+
+> mixerai-2.0@0.1.0 build
+> NODE_OPTIONS="--max_old_space_size=4096" next build
+
+  ▲ Next.js 14.2.30
+  - Environments: .env.local
+
+   Creating an optimized production build ...
+ ⚠ Compiled with warnings
+
+./src/app/api/ai/master-claim-brands/[masterClaimBrandId]/review-claims/route.ts
+Attempted import error: 'generateContent' is not exported from '@/lib/azure/openai' (imported as 'generateContent').
+
+Import trace for requested module:
+./src/app/api/ai/master-claim-brands/[masterClaimBrandId]/review-claims/route.ts
+
+./src/app/api/content/[id]/regenerate/route.ts
+Attempted import error: 'generateAIContent' is not exported from '@/lib/azure/openai' (imported as 'generateAIContent').
+
+Import trace for requested module:
+./src/app/api/content/[id]/regenerate/route.ts
+
+./src/app/api/content/[id]/regenerate/route.ts
+Attempted import error: 'generateAIContent' is not exported from '@/lib/azure/openai' (imported as 'generateAIContent').
+
+Import trace for requested module:
+./src/app/api/content/[id]/regenerate/route.ts
+
+./src/app/api/user/notification-settings/route.ts
+Attempted import error: 'createClient' is not exported from '@/lib/supabase/server' (imported as 'createClient').
+
+Import trace for requested module:
+./src/app/api/user/notification-settings/route.ts
+
+./src/app/api/user/notification-settings/route.ts
+Attempted import error: 'createClient' is not exported from '@/lib/supabase/server' (imported as 'createClient').
+
+Import trace for requested module:
+./src/app/api/user/notification-settings/route.ts
+
+./src/app/api/user/notification-settings/route.ts
+Attempted import error: 'createClient' is not exported from '@/lib/supabase/server' (imported as 'createClient').
+
+Import trace for requested module:
+./src/app/api/user/notification-settings/route.ts
+
+ ✓ Compiled successfully
+   Skipping linting
+   Checking validity of types ...
+Failed to compile.
+
+./src/app/api/ai/master-claim-brands/[masterClaimBrandId]/review-claims/route.ts:6:10
+Type error: Module '"@/lib/azure/openai"' has no exported member 'generateContent'.
+
+[0m [90m 4 |[39m [36mimport[39m { createSupabaseAdminClient } [36mfrom[39m [32m'@/lib/supabase/client'[39m[33m;[39m[0m
+[0m [90m 5 |[39m [36mimport[39m { hasAccessToBrand } [36mfrom[39m [32m'@/lib/auth/permissions'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m 6 |[39m [36mimport[39m { generateContent } [36mfrom[39m [32m'@/lib/azure/openai'[39m[33m;[39m[0m
+[0m [90m   |[39m          [31m[1m^[22m[39m[0m
+[0m [90m 7 |[39m[0m
+[0m [90m 8 |[39m [36minterface[39m [33mClaimReview[39m {[0m
+[0m [90m 9 |[39m   claim_id[33m:[39m string[33m;[39m[0m
+Next.js build worker exited with code: 1 and signal: null

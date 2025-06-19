@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertTriangle, ArrowLeft, Info, FileText, PlayCircle, CheckCircle2, XCircle, Eye, EyeOff } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatDateTime } from '@/lib/utils/date';
 import { Table, TableHeader, TableRow, TableCell, TableBody, TableHead } from "@/components/ui/table";
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -733,13 +733,13 @@ export default function ToolRunHistoryDetailPage() {
 
       // Fetch user first (can be done in parallel or sequence)
       try {
-        const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
-        if (sessionError) throw sessionError;
-        if (session?.user) {
+        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+        if (userError) throw userError;
+        if (user) {
           // setCurrentUser({
-          //   id: session.user.id,
-          //   email: session.user.email,
-          //   user_metadata: session.user.user_metadata
+          //   id: user.id,
+          //   email: user.email,
+          //   user_metadata: user.user_metadata
           // });
         } else {
           // No active session, or user is null
@@ -903,7 +903,7 @@ export default function ToolRunHistoryDetailPage() {
             {formatToolName(historyItem.tool_name)} - Run Overview
           </CardTitle>
           <CardDescription>
-            Run executed on {format(new Date(historyItem.run_at), 'MMMM d, yyyy, HH:mm')}
+            Run executed on {formatDateTime(historyItem.run_at)}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

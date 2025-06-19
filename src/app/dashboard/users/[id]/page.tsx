@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { touchFriendly } from '@/lib/utils/touch-target';
 import { BrandIcon } from '@/components/brand-icon';
 import { Label } from '@/components/ui/label';
 import {
@@ -276,7 +277,7 @@ export default function UserDetailPage() {
             {userId && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <Button variant="ghost" size="sm" className={touchFriendly('tableAction')}>
                     <span className="sr-only">Open menu</span>
                     <MoreVertical className="h-4 w-4" />
                   </Button>

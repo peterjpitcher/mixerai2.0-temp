@@ -11,6 +11,24 @@ type Claim = {
   country_code: string;
 };
 
+/**
+ * Fetches all claims at brand, product, and ingredient levels
+ * 
+ * @param supabase - Initialized Supabase admin client
+ * @param masterClaimBrandId - The master claim brand ID to fetch brand-level claims
+ * @param productId - The product ID to fetch product and ingredient claims (nullable)
+ * @param countryCode - Country code to filter claims, or null for all countries
+ * @returns Promise<Claim[]> Array of claims with text, type, level, and country
+ * 
+ * @description
+ * Fetches claims from three levels:
+ * 1. Brand-level claims using masterClaimBrandId
+ * 2. Product-level claims if productId is provided
+ * 3. Ingredient-level claims through product_ingredients junction
+ * 
+ * Applies country filtering when countryCode is provided, otherwise
+ * returns both country-specific and global (ALL) claims.
+ */
 async function fetchAllBrandClaims(supabase: ReturnType<typeof createSupabaseAdminClient>, masterClaimBrandId: string, productId: string | null, countryCode: string | null): Promise<Claim[]> {
   // Fetch brand-level claims
   let brandQuery = supabase
@@ -113,6 +131,36 @@ function sortClaims(a: Claim, b: Claim): number {
   return 0;
 }
 
+/**
+ * Prepares product context by fetching and styling claims for content generation
+ * 
+ * @param request - Next.js request object containing productId in JSON body
+ * @returns Promise<NextResponse> containing styled claims and product information
+ * 
+ * @description
+ * This handler performs the following operations:
+ * 1. Fetches all relevant claims for a product (brand, product, and ingredient levels)
+ * 2. Sorts claims by priority (mandatory > allowed > disallowed) and level (brand > product > ingredient)
+ * 3. For global (ALL countries) claims, removes duplicates
+ * 4. Fetches the product's master brand information
+ * 5. Uses AI to style the claims into marketing-friendly language based on brand identity
+ * 
+ * The styled claims are formatted for easy insertion into content generation prompts
+ * and include both the original claims data and the AI-styled marketing version.
+ * 
+ * @example
+ * POST /api/content/prepare-product-context
+ * Body: { "productId": "123e4567-e89b-12d3-a456-426614174000" }
+ * 
+ * Response: {
+ *   "success": true,
+ *   "data": {
+ *     "productName": "Example Product",
+ *     "styledClaims": "✓ Clinically proven effectiveness...",
+ *     "claims": [...]
+ *   }
+ * }
+ */
 async function prepareProductContextHandler(request: NextRequest) {
   try {
     const { productId } = await request.json();

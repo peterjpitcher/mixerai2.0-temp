@@ -20,6 +20,7 @@ import debounce from 'lodash.debounce';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { cn } from '@/lib/utils';
 import { BrandIcon } from '@/components/brand-icon';
+import { ActiveBrandIndicator } from '@/components/ui/active-brand-indicator';
 // Assuming UserOption might be defined elsewhere or keep it local if specific
 // import { MultiSelectUserCombobox, UserOption } from '@/components/ui/multi-select-user-combobox';
 
@@ -782,7 +783,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       <Breadcrumbs items={[
         { label: "Dashboard", href: "/dashboard" }, 
         { label: "Workflows", href: "/dashboard/workflows" }, 
@@ -790,11 +791,28 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         { label: isDuplicated ? "Create" : "Edit" }
       ]} />
 
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={() => router.push(isDuplicated ? '/dashboard/workflows' : `/dashboard/workflows/${id}`)}
+        className="mb-4"
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Back to {isDuplicated ? 'Workflows' : 'Workflow'}
+      </Button>
+
+      {currentBrandForDisplay && (
+        <div className="my-4">
+          <ActiveBrandIndicator
+            brandName={currentBrandForDisplay.name}
+            brandColor={currentBrandForDisplay.color}
+            brandLogoUrl={currentBrandForDisplay.logo_url}
+          />
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
-           <Button variant="outline" size="icon" onClick={() => router.push('/dashboard/workflows')} aria-label="Back to Workflows list">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
           {currentBrandForDisplay && 
             <BrandIcon name={currentBrandForDisplay.name} color={currentBrandForDisplay.color ?? undefined} logoUrl={currentBrandForDisplay.logo_url} size="md" className="mr-1" />
           }
@@ -1120,7 +1138,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         onConfirm={handleDeleteWorkflow}
       />
 
-      <div className="flex justify-end space-x-3 mt-8 sticky bottom-0 bg-background/95 py-4 z-10 border-t border-border">
+      <div className="flex justify-end space-x-3 mt-8 sticky bottom-0 bg-background py-4 px-4 -mx-4 z-10 border-t border-border">
         <Button variant="outline" onClick={() => router.push('/dashboard/workflows')} disabled={isSaving || isDeleting}>
             Cancel
         </Button>

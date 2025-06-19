@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Edit, AlertCircle, ListChecks, Loader2, HelpCircle } from 'lucide-react';
+import { Edit, AlertCircle, ListChecks, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { createSupabaseClient } from '@/lib/supabase/client';
-import { format as formatDateFns } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
 import { BrandIcon } from '@/components/brand-icon';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
+import { TableSkeleton } from '@/components/ui/loading-skeletons';
 
 // TaskItem interface for the page - this should match the output of /api/me/tasks
 interface TaskItem {
@@ -81,21 +82,28 @@ export default function MyTasksPage() {
     initializePage();
   }, []); // Dependency array is empty, runs once on mount
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'N/A';
-    try {
-      return formatDateFns(new Date(dateString), 'MMMM d, yyyy'); 
-    } catch (e) {
-      console.error("Error formatting date:", dateString, e);
-      return "Invalid Date";
-    }
-  };
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-[300px]">
-        {/* Using Loader2 for consistency with other loading states */}
-        <Loader2 className="h-12 w-12 text-primary animate-spin" /> 
+      <div className="space-y-6">
+        <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "My Tasks" }]} />
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">My Tasks</h1>
+            <p className="text-muted-foreground">Content items assigned to you that are currently active and require your action.</p>
+          </div>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Pending Your Action</CardTitle>
+            <CardDescription>Loading your assigned tasks...</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <TableSkeleton rows={3} columns={5} />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -170,12 +178,12 @@ export default function MyTasksPage() {
                       </td>
                       <td className="p-3">
                         <div className="flex items-center">
-                          <BrandIcon name={task.brand_name || ''} color={task.brand_color ?? undefined} logoUrl={task.brand_logo_url} size="sm" className="mr-2" />
+                          <BrandIcon name={task.brand_name || ''} color={task.brand_color ?? undefined} logoUrl={task.brand_logo_url || undefined} size="sm" className="mr-2" />
                           {task.brand_name || 'N/A'}
                         </div>
                       </td>
                       <td className="p-3">{task.workflow_step_name || 'N/A'}</td>
-                      <td className="p-3 text-muted-foreground">{formatDate(task.created_at)}</td>
+                      <td className="p-3 text-muted-foreground">{task.created_at ? formatDate(task.created_at) : 'N/A'}</td>
                       <td className="p-3">
                         <Button variant="outline" size="sm" asChild>
                             <Link href={`/dashboard/content/${task.content_id}/edit`} className="flex items-center">

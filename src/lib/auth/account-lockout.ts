@@ -9,8 +9,14 @@ interface LoginAttempt {
 }
 
 // In-memory storage for login attempts
-// TODO: Move to Redis for production/distributed deployments
+// NOTE: For production/distributed deployments, implement Redis as documented in /docs/INFRASTRUCTURE_REDIS_SETUP.md
 const loginAttempts = new Map<string, LoginAttempt[]>();
+
+// Export for testing purposes only
+export const _testHelpers = {
+  clearStore: () => loginAttempts.clear(),
+  getStore: () => loginAttempts
+};
 
 // Cleanup old attempts periodically
 setInterval(() => {
@@ -104,6 +110,46 @@ export async function clearLoginAttempts(email: string): Promise<void> {
 }
 
 /**
+ * Record a failed login attempt (convenience wrapper for tests)
+ */
+export async function recordFailedAttempt(email: string, ip: string = '127.0.0.1'): Promise<{
+  attempts: number;
+  locked: boolean;
+  remainingAttempts: number;
+}> {
+  await recordLoginAttempt(email, ip, false);
+  const status = await isAccountLocked(email);
+  
+  return {
+    attempts: status.attempts || 0,
+    locked: status.locked,
+    remainingAttempts: Math.max(0, sessionConfig.lockout.maxAttempts - (status.attempts || 0))
+  };
+}
+
+/**
+ * Unlock an account (alias for clearLoginAttempts)
+ */
+export async function unlockAccount(email: string): Promise<void> {
+  await clearLoginAttempts(email);
+}
+
+/**
+ * Clean up old attempts (exposed for testing)
+ */
+export function cleanupOldAttempts(): void {
+  const cutoff = Date.now() - sessionConfig.lockout.checkWindow;
+  for (const [email, attempts] of loginAttempts.entries()) {
+    const validAttempts = attempts.filter(a => a.timestamp > cutoff);
+    if (validAttempts.length === 0) {
+      loginAttempts.delete(email);
+    } else {
+      loginAttempts.set(email, validAttempts);
+    }
+  }
+}
+
+/**
  * Log security events to the database
  */
 export async function logSecurityEvent(
@@ -112,7 +158,7 @@ export async function logSecurityEvent(
   userId?: string
 ): Promise<void> {
   try {
-    // TODO: Uncomment when security_logs table is created and types are updated
+    // NOTE: security_logs table is available - uncomment to enable database logging
     // const supabase = createSupabaseAdminClient();
     // 
     // await supabase.from('security_logs').insert({
@@ -123,7 +169,7 @@ export async function logSecurityEvent(
     //   timestamp: new Date().toISOString()
     // });
     
-    // For now, log to console in production
+    // Currently logging to console
     console.log('[SECURITY EVENT]', {
       event_type: eventType,
       user_id: userId,

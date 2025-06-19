@@ -38,7 +38,7 @@ export default async function BrandDetailsPage({ params }: BrandDetailsPageProps
     redirect(`/dashboard/brands/${brandId}/edit`);
   }
 
-  const brand = data as BrandFromRPC;
+  const brand = data as unknown as BrandFromRPC;
 
   // Authorization check
   const isGlobalAdmin = user.user_metadata?.role === 'admin';

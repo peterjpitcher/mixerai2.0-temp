@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,12 +27,14 @@ import {
 import { Trash2, PlusCircle, Search, AlertTriangle, Loader2, Sprout, Pencil, MoreVertical } from "lucide-react";
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
+import { touchFriendly } from '@/lib/utils/touch-target';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { TableSkeleton } from '@/components/ui/loading-skeletons';
 
 interface Ingredient {
   id: string;
@@ -183,11 +185,8 @@ export default function IngredientsPage() {
       )}
 
       {isLoading ? (
-        <div className="py-10 flex justify-center items-center min-h-[300px]">
-          <div className="flex flex-col items-center">
-            <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-            <p className="text-muted-foreground">Loading Ingredients...</p>
-          </div>
+        <div className="border rounded-lg shadow-sm overflow-hidden">
+          <TableSkeleton rows={5} columns={4} />
         </div>
       ) : error ? (
         <ErrorState />
@@ -220,12 +219,12 @@ export default function IngredientsPage() {
                           {ingredient.name}
                         </Link>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{ingredient.created_at ? format(new Date(ingredient.created_at), 'MMMM d, yyyy') : '-'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{ingredient.updated_at ? format(new Date(ingredient.updated_at), 'MMMM d, yyyy') : '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{ingredient.created_at ? formatDate(ingredient.created_at) : '-'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{ingredient.updated_at ? formatDate(ingredient.updated_at) : '-'}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <Button variant="ghost" size="sm" className={touchFriendly('tableAction')}>
                               <span className="sr-only">Open menu</span>
                               <MoreVertical className="h-4 w-4" />
                             </Button>

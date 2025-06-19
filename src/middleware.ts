@@ -142,29 +142,29 @@ export async function middleware(request: NextRequest) {
       }
     );
 
-    const { data: { session: refreshedSession }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError) {
-        console.warn('Middleware: supabase.auth.getSession() error (token refresh might have failed):', sessionError.message);
+    const { data: { user: refreshedUser }, error: userError } = await supabase.auth.getUser();
+    if (userError) {
+        console.warn('Middleware: supabase.auth.getUser() error:', userError.message);
     }
     
     // Add user ID to request headers for rate limiting
-    if (refreshedSession?.user?.id) {
-      requestHeaders.set('x-user-id', refreshedSession.user.id);
+    if (refreshedUser?.id) {
+      requestHeaders.set('x-user-id', refreshedUser.id);
     }
     
     // Session management
     const sessionId = request.cookies.get('app-session-id')?.value;
     let isSessionValid = false;
     
-    if (refreshedSession?.user?.id) {
+    if (refreshedUser?.id) {
       if (sessionId) {
         // Validate existing session
         const sessionValidation = await validateSession(sessionId);
-        isSessionValid = sessionValidation.valid && sessionValidation.userId === refreshedSession.user.id;
+        isSessionValid = sessionValidation.valid && sessionValidation.userId === refreshedUser.id;
         
         if (!isSessionValid) {
           // Create new session if invalid
-          const newSessionId = await createSession(refreshedSession.user.id);
+          const newSessionId = await createSession(refreshedUser.id);
           response.cookies.set('app-session-id', newSessionId, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -175,7 +175,7 @@ export async function middleware(request: NextRequest) {
           isSessionValid = true;
         } else if (sessionNeedsRenewal(sessionId)) {
           // Session is valid but needs renewal
-          const newSessionId = await createSession(refreshedSession.user.id);
+          const newSessionId = await createSession(refreshedUser.id);
           response.cookies.set('app-session-id', newSessionId, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -186,7 +186,7 @@ export async function middleware(request: NextRequest) {
         }
       } else {
         // No session cookie, create new session
-        const newSessionId = await createSession(refreshedSession.user.id);
+        const newSessionId = await createSession(refreshedUser.id);
         response.cookies.set('app-session-id', newSessionId, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
@@ -201,7 +201,7 @@ export async function middleware(request: NextRequest) {
     if (request.nextUrl.pathname.startsWith('/dashboard') || 
         request.nextUrl.pathname.startsWith('/api/') ||
         request.nextUrl.pathname.startsWith('/account')) {
-      if (!refreshedSession || (refreshedSession && !isSessionValid)) {
+      if (!refreshedUser || (refreshedUser && !isSessionValid)) {
         // Handle /dashboard/* and /account/* page routes: redirect to login
         if (request.nextUrl.pathname.startsWith('/dashboard') ||
             request.nextUrl.pathname.startsWith('/account')) {
@@ -256,7 +256,7 @@ export async function middleware(request: NextRequest) {
       }
     } else if (request.nextUrl.pathname === '/') {
       if (supabaseUrl && supabaseAnonKey) {
-        if (!refreshedSession) {
+        if (!refreshedUser) {
           const redirectUrl = new URL('/auth/login', baseUrl);
           redirectUrl.searchParams.set('from', '/');
           response = NextResponse.redirect(redirectUrl);

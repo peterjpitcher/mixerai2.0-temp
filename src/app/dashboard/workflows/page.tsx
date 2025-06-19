@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandIcon } from '@/components/brand-icon';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { touchFriendly } from '@/lib/utils/touch-target';
 import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
@@ -255,7 +256,7 @@ export default function WorkflowsPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 w-8 p-0"
+                  className={touchFriendly('tableAction')}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <span className="sr-only">Open menu</span>

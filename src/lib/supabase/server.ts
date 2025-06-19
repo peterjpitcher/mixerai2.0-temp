@@ -1,18 +1,6 @@
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/supabase';
-
-interface CookieOptions {
-  name?: string;
-  value?: string;
-  domain?: string;
-  path?: string;
-  sameSite?: 'lax' | 'strict' | 'none';
-  secure?: boolean;
-  httpOnly?: boolean;
-  maxAge?: number;
-  expires?: Date;
-}
 
 export function createSupabaseServerClient() {
   const cookieStore = cookies();

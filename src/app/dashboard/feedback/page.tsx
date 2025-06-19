@@ -15,7 +15,9 @@ import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 import { FeedbackSubmitForm } from '@/components/feedback/FeedbackSubmitForm'; // Import the new form
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'; // Import Dialog components
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
+import { TableSkeleton } from '@/components/ui/loading-skeletons';
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
 // Matches ENUMs in DB (copied from admin page for consistency)
 const feedbackTypes = ['bug', 'enhancement'] as const;
@@ -68,15 +70,15 @@ export default function ViewFeedbackPage() {
     const supabaseClient = createSupabaseClient();
     setSupabase(supabaseClient);
 
-    const fetchSession = async () => {
-      const { data: { session: currentSession } } = await supabaseClient.auth.getSession();
-      setSession(currentSession);
-      if (currentSession?.user) {
-        setCurrentUserForForm(currentSession.user);
+    const fetchUser = async () => {
+      const { data: { user: currentUser } } = await supabaseClient.auth.getUser();
+      if (currentUser) {
+        setSession({ user: currentUser } as any);
+        setCurrentUserForForm(currentUser);
       }
       setIsLoadingUser(false);
     };
-    fetchSession();
+    fetchUser();
 
     const { data: authListener } = supabaseClient.auth.onAuthStateChange((event, currentSession) => {
       setSession(currentSession);
@@ -178,12 +180,14 @@ export default function ViewFeedbackPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Feedback" }
+      ]} />
+      
       <div className="mb-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="icon" onClick={() => router.back()} aria-label="Go back">
-                <ArrowLeft className="h-4 w-4" />
-            </Button>
             <h1 className="text-3xl font-bold tracking-tight">Feedback & Known Issues</h1>
           </div>
         {/* Button to trigger the modal for submitting new feedback */} 
@@ -278,7 +282,11 @@ export default function ViewFeedbackPage() {
           <CardDescription>List of submitted bug reports and enhancement requests.</CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoadingItems && <Progress value={isLoadingItems ? undefined : 100} className="w-full h-1 mb-4" />} 
+          {isLoadingItems && (
+            <div className="overflow-x-auto rounded-md border">
+              <TableSkeleton rows={5} columns={6} />
+            </div>
+          )} 
           {!isLoadingItems && error && (
             <div className="text-center text-destructive py-8">
               <AlertTriangle className="mx-auto h-12 w-12 mb-4" />
@@ -315,7 +323,7 @@ export default function ViewFeedbackPage() {
                         <TableCell>{item.priority}</TableCell>
                         <TableCell>{item.status}</TableCell>
                         <TableCell className="max-w-[150px] truncate" title={item.affected_area || undefined}>{item.affected_area || 'N/A'}</TableCell>
-                        <TableCell>{format(new Date(item.created_at), 'MMMM d, yyyy')}</TableCell>
+                        <TableCell>{formatDate(item.created_at)}</TableCell>
                         </TableRow>
                     ))}
                     </TableBody>

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { X, UserSearch } from 'lucide-react';
+import { X, UserSearch, Users, Search } from 'lucide-react';
 import { Command as CommandPrimitive } from 'cmdk';
 import { toast } from 'sonner';
 import { debounce } from 'lodash';
@@ -187,10 +187,16 @@ export const MultiSelectUserCombobox: React.FC<MultiSelectUserComboboxProps> = (
                     <div className="p-2 text-center text-sm text-muted-foreground">Loading...</div>
                   )}
                   {!isLoading && searchResults.length === 0 && inputValue.trim() !== '' && (
-                    <div className="p-2 text-center text-sm text-muted-foreground">No users found.</div>
+                    <div className="p-6 text-center text-sm text-muted-foreground">
+                      <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <div>No users found.</div>
+                    </div>
                   )}
                   {!isLoading && searchResults.length === 0 && inputValue.trim() === '' && selectedUsers.length < 1 && (
-                     <div className="p-2 text-center text-sm text-muted-foreground">Start typing to search...</div>
+                     <div className="p-6 text-center text-sm text-muted-foreground">
+                       <Search className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                       <div>Start typing to search...</div>
+                     </div>
                   )}
                   <CommandGroup>
                     {searchResults.map((user) => {

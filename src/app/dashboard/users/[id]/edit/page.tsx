@@ -361,13 +361,19 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
         { label: user?.full_name || "User", href: user ? `/dashboard/users/${user.id}` : undefined },
         { label: "Edit" }
       ]} />
+      
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={() => router.push(user ? `/dashboard/users/${user.id}` : '/dashboard/users')}
+        className="mb-4"
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Back to {user ? 'User Details' : 'Users'}
+      </Button>
+      
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" asChild>
-            <Link href={user ? `/dashboard/users/${user.id}` : '/dashboard/users'} aria-label="Back to User Details or Users List">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
           {/* Avatar Display for the user being edited */}
           {user && (
             <div className="relative h-12 w-12 rounded-full bg-muted overflow-hidden flex-shrink-0">

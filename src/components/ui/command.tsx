@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { Command as CommandPrimitive } from "cmdk"
-import { SearchIcon } from "lucide-react"
+import { SearchIcon, type LucideIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import {
@@ -91,15 +91,30 @@ function CommandList({
   )
 }
 
+interface CommandEmptyProps extends React.ComponentProps<typeof CommandPrimitive.Empty> {
+  icon?: LucideIcon
+}
+
 function CommandEmpty({
+  icon: Icon,
+  children,
+  className,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Empty>) {
+}: CommandEmptyProps) {
   return (
     <CommandPrimitive.Empty
       data-slot="command-empty"
-      className="py-6 text-center text-sm"
+      className={cn("py-6 text-center text-sm", className)}
       {...props}
-    />
+    >
+      {Icon && (
+        <div className="flex flex-col items-center justify-center space-y-2">
+          <Icon className="h-8 w-8 text-muted-foreground" />
+          <div>{children}</div>
+        </div>
+      )}
+      {!Icon && children}
+    </CommandPrimitive.Empty>
   )
 }
 

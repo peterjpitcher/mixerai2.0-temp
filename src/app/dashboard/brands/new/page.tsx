@@ -17,8 +17,6 @@ import { BrandLogoUpload } from '@/components/ui/brand-logo-upload';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 import { Checkbox } from '@/components/ui/checkbox';
 import { v4 as uuidv4 } from 'uuid';
-// import { Badge } from '@/components/ui/badge';
-// import { cn } from "@/lib/utils";
 
 // Define UserSessionData interface (can be moved to a shared types file later)
 interface UserSessionData {
@@ -34,16 +32,9 @@ interface UserSessionData {
   }>;
 }
 
-// Metadata for a redirecting page might be minimal or not strictly necessary
-// as user shouldn't spend time here.
-// export const metadata: Metadata = {
-//   title: 'Creating New Brand | MixerAI 2.0',
-//   description: 'Redirecting to the brand creation page.',
-// };
 
 /**
  * NewBrandPage allows users to create a new brand profile.
- * TODO: Implement the full brand creation form here.
  */
 
 // Interface for VettingAgency (copied from edit page)
@@ -79,14 +70,6 @@ const getPriorityAgencyStyles = (priority: 'High' | 'Medium' | 'Low' | null | un
   return 'font-normal text-gray-700 dark:text-gray-300';
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-interface UserSearchResult {
-  id: string;
-  full_name: string | null;
-  email: string | null;
-  avatar_url: string | null;
-  job_title?: string | null;
-}
 
 interface MasterClaimBrand {
   id: string;
@@ -122,7 +105,6 @@ export default function NewBrandPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(false); 
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [isForbidden, setIsForbidden] = useState(false);
@@ -143,7 +125,6 @@ export default function NewBrandPage() {
   });
 
   const [allVettingAgencies, setAllVettingAgencies] = useState<VettingAgency[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [customAgencyInput, setCustomAgencyInput] = useState('');
   const priorityOrder: Array<'High' | 'Medium' | 'Low'> = ['High', 'Medium', 'Low'];
 

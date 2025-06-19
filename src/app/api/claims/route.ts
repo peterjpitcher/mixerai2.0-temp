@@ -4,7 +4,7 @@ import { handleApiError, isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
 import { z } from 'zod';
-import { checkProductClaimsPermission, fetchClaimsWithRelations } from '@/lib/api/claims-helpers';
+import { checkProductClaimsPermission } from '@/lib/api/claims-helpers';
 
 export const dynamic = "force-dynamic";
 

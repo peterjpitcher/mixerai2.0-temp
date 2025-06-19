@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { formatDistanceToNow } from 'date-fns';
-import { FilePlus, Send, CheckCircle, Edit3, UserPlus, Milestone } from 'lucide-react';
+import { formatDate } from '@/lib/utils/date';
+import { FilePlus, Send, CheckCircle, Edit3, UserPlus, Milestone, Activity } from 'lucide-react';
 
 export type ActivityType =
   | 'content_created'
@@ -84,22 +84,22 @@ export function TeamActivityFeed({ initialActivity, condensed = false }: { initi
   const activities = initialActivity;
   return (
     <Card className={condensed ? "h-full overflow-hidden flex flex-col" : ""}>
-      <CardHeader className={condensed ? "pb-3" : ""}>
-        <CardTitle className={condensed ? "text-lg" : ""}>Team Activity</CardTitle>
+      <CardHeader className={condensed ? "py-2 px-4" : ""}>
+        <CardTitle className={condensed ? "text-base" : ""}>Team Activity</CardTitle>
         {!condensed && <CardDescription>A live feed of recent events across the platform.</CardDescription>}
       </CardHeader>
-      <CardContent className={condensed ? "flex-1 overflow-y-auto" : ""}>
+      <CardContent className={condensed ? "flex-1 overflow-y-auto px-4 py-2" : ""}>
         {activities && activities.length > 0 ? (
-          <div className={condensed ? "space-y-4" : "space-y-6"}>
+          <div className={condensed ? "space-y-2" : "space-y-4"}>
             {activities.map((item) => {
               const config = activityConfig[item.type] || activityConfig.content_updated;
               return (
-                <div key={item.id} className={condensed ? "flex items-start gap-3" : "flex items-start gap-4"}>
-                  <div className={`flex ${condensed ? "h-8 w-8" : "h-10 w-10"} shrink-0 items-center justify-center rounded-full ${config.bgColor}`}>
+                <div key={item.id} className={condensed ? "flex items-start gap-2" : "flex items-start gap-3"}>
+                  <div className={`flex ${condensed ? "h-6 w-6" : "h-8 w-8"} shrink-0 items-center justify-center rounded-full ${config.bgColor}`}>
                       {condensed ? (
-                        <div className="scale-75">{config.icon}</div>
+                        <div className="scale-50">{config.icon}</div>
                       ) : (
-                        config.icon
+                        <div className="scale-75">{config.icon}</div>
                       )}
                   </div>
                   <div className="flex-grow min-w-0">
@@ -107,7 +107,7 @@ export function TeamActivityFeed({ initialActivity, condensed = false }: { initi
                       {getActivityMessage(item)}
                     </div>
                     <time className={condensed ? "text-[10px] text-muted-foreground" : "text-xs text-muted-foreground"}>
-                      {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                      {formatDate(item.created_at)}
                     </time>
                   </div>
                 </div>
@@ -116,6 +116,7 @@ export function TeamActivityFeed({ initialActivity, condensed = false }: { initi
           </div>
         ) : (
           <div className={`text-center text-muted-foreground ${condensed ? "py-4" : "py-8"}`}>
+            <Activity className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
             <p className={condensed ? "text-sm" : ""}>No recent activity to display.</p>
           </div>
         )}

@@ -10,10 +10,10 @@ import { createSupabaseServerClient } from '@/lib/auth/server';
 export default async function Home() {
   // Check authentication status
   const supabase = createSupabaseServerClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
   // Redirect based on authentication status
-  if (session) {
+  if (user) {
     redirect('/dashboard');
         } else {
     redirect('/auth/login');

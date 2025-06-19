@@ -4,20 +4,21 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-// import { } from '@/components/ui/card'; // Removed - empty import
+import { CreateContentDropdown } from '@/components/content/create-content-dropdown';
 import { Input } from '@/components/ui/input';
 import { toast as sonnerToast } from "sonner";
-import { format as formatDateFns } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
 import { useDebounce } from '@/lib/hooks/use-debounce';
 import { useSearchParams } from 'next/navigation';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { createBrowserClient } from '@supabase/ssr';
 
-// Added imports for PageHeader and lucide-react icons
 import { PageHeader } from "@/components/dashboard/page-header";
-import { BrandIcon,  } from '@/components/brand-icon'; 
+import { BrandIcon } from '@/components/brand-icon'; 
 import { FileText, AlertTriangle, PlusCircle, Edit3, RefreshCw, CheckCircle, XCircle, ListFilter, Archive, Trash2, HelpCircle, MoreVertical, Pencil } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
+import { TableSkeleton } from '@/components/ui/loading-skeletons';
+import { touchFriendly } from '@/lib/utils/touch-target';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +51,7 @@ interface ContentItem {
   assigned_to_name?: string | null;
   assigned_to_avatar_url?: string | null; // Added for assignee avatar
   assigned_to?: string[] | null;
+  due_date?: string | null;
 }
 
 // Define UserSessionData interface (mirroring what /api/me is expected to return)
@@ -100,9 +102,7 @@ export default function ContentPageClient() {
   const brandIdFromParams = searchParams?.get('brandId');
   const [activeBrandData, setActiveBrandData] = useState<{ id: string; name: string; brand_color?: string; logo_url?: string } | null>(null); 
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isLoadingUser, setIsLoadingUser] = useState(true);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [userError, setUserError] = useState<string | null>(null);
 
   // State for delete confirmation
@@ -214,14 +214,6 @@ export default function ContentPageClient() {
     fetchActiveBrand();
   }, [brandIdFromParams]);
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    try { 
-      return formatDateFns(new Date(dateString), 'MMMM d, yyyy'); 
-    }
-    catch (e) { console.error('Error formatting date:', dateString, e); return 'Invalid Date'; }
-  };
-
   const groupedContent = useMemo(() => {
     if (!content) return {};
     return content.reduce((acc, item) => {
@@ -292,44 +284,45 @@ export default function ContentPageClient() {
     }
   };
 
-  const EmptyState = () => ( 
-      <div className="text-center py-12 px-4">
-        <div className="mx-auto w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-          <FileText size={40} className="text-primary" strokeWidth={1.5}/>
-        </div>
-        <h3 className="text-xl font-semibold mb-2">No content found</h3>
-        <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-          No content matches the current filters. Try adjusting your search or filter selection.
-        </p>
-        <div className="space-y-3">
-          {statusFilter !== 'all' && (
-            <Button variant="outline" onClick={() => setStatusFilter('all') }>
-              <ListFilter size={16} className="mr-2" /> Show All Content
-            </Button>
-          )}
-          <div>
-            <Link 
-              href="/dashboard/help?article=03-content" 
-              className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-            >
-              <HelpCircle className="h-4 w-4" />
-              Learn how to create content
-            </Link>
-          </div>
+  const EmptyState = () => (
+    <div className="text-center py-12 px-4">
+      <div className="mx-auto w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+        <FileText size={40} className="text-primary" strokeWidth={1.5}/>
+      </div>
+      <h3 className="text-xl font-semibold mb-2">No content found</h3>
+      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+        No content matches the current filters. Try adjusting your search or filter selection.
+      </p>
+      <div className="space-y-3">
+        {statusFilter !== 'all' && (
+          <Button variant="outline" onClick={() => setStatusFilter('all') }>
+            <ListFilter size={16} className="mr-2" /> Show All Content
+          </Button>
+        )}
+        <div>
+          <Link 
+            href="/dashboard/help?article=03-content" 
+            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+          >
+            <HelpCircle className="h-4 w-4" />
+            Learn how to create content
+          </Link>
         </div>
       </div>
+    </div>
   );
-  const ErrorState = () => ( 
-      <div className="text-center py-12 px-4">
-        <div className="mx-auto w-24 h-24 rounded-full bg-destructive/10 flex items-center justify-center mb-6">
-          <AlertTriangle size={40} className="text-destructive" strokeWidth={1.5}/>
-        </div>
-        <h3 className="text-xl font-semibold mb-2">Failed to load content</h3>
-        <p className="text-muted-foreground mb-6 max-w-md mx-auto">{error || "An error occurred while loading your content. Please try again."}</p>
-        <Button variant="outline" size="lg" onClick={() => window.location.reload()}>
-          <RefreshCw size={16} className="mr-2" /> Retry
-        </Button>
+
+  const ErrorState = () => (
+    <div className="text-center py-12 px-4">
+      <div className="mx-auto w-24 h-24 rounded-full bg-destructive/10 flex items-center justify-center mb-6">
+        <AlertTriangle size={40} className="text-destructive" strokeWidth={1.5}/>
       </div>
+      <h3 className="text-xl font-semibold mb-2">Failed to load content</h3>
+      <p className="text-muted-foreground mb-6 max-w-md mx-auto">{error || "An error occurred while loading your content. Please try again."}</p>
+      <Button variant="outline" size="lg" onClick={() => window.location.reload()}>
+        <RefreshCw size={16} className="mr-2" /> Retry
+      </Button>
+    </div>
   );
 
   const filterOptions: { label: string; value: ContentFilterStatus; icon?: React.ElementType }[] = [
@@ -355,13 +348,7 @@ export default function ContentPageClient() {
       <PageHeader
         title={brandIdFromParams && activeBrandData ? `Content for ${activeBrandData.name}` : "All Content"}
         description="View, manage, and track all content items across your brands."
-        actions={
-          <Button asChild>
-            <Link href="/dashboard/templates">
-              <PlusCircle className="mr-2 h-4 w-4" /> Create New Content
-            </Link>
-          </Button>
-        }
+        actions={<CreateContentDropdown />}
       />
       
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -382,7 +369,7 @@ export default function ContentPageClient() {
         </div>
       </div>
       {isLoading ? (
-        <div className="py-10 flex justify-center items-center min-h-[300px]"><div className="flex flex-col items-center"><div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div><p className="text-muted-foreground">Loading content...</p></div></div>
+        <TableSkeleton rows={8} columns={5} />
       ) : error ? (
         <ErrorState />
       ) : Object.keys(groupedContent).length === 0 ? (
@@ -412,18 +399,12 @@ export default function ContentPageClient() {
                       <th className="text-left p-3 font-medium">Current Step</th>
                       <th className="text-left p-3 font-medium">Assigned To</th>
                       <th className="text-left p-3 font-medium">Created By</th>
+                      <th className="text-left p-3 font-medium">Due Date</th>
                       <th className="text-left p-3 font-medium">Last Updated</th>
                       <th className="text-right p-3 font-medium">Actions</th>
                     </tr></thead>
                     <tbody>
                       {items.map((item) => {
-                        // --- Start Diagnostic Logging for Avatar URLs ---
-                        if (process.env.NODE_ENV === 'development') {
-                          console.log(`[Content List Avatar Debug] Item ID: ${item.id}, Title: ${item.title}`);
-                          console.log(`  \_ Creator Name: ${item.created_by_name}, Creator Avatar URL: ${item.creator_avatar_url}`);
-                          console.log(`  \_ Assignee Name: ${item.assigned_to_name}, Assignee Avatar URL: ${item.assigned_to_avatar_url}`);
-                        }
-                        // --- End Diagnostic Logging ---
                         return (
                           <tr key={item.id} className="border-b hover:bg-muted/50 transition-colors">
                             <td className="p-3">
@@ -481,12 +462,15 @@ export default function ContentPageClient() {
                                 'N/A'
                               )}
                             </td>
+                            <td className="p-3 whitespace-nowrap">
+                              {item.due_date ? formatDate(item.due_date) : 'N/A'}
+                            </td>
                             <td className="p-3 whitespace-nowrap">{formatDate(item.updated_at)}</td>
                             <td className="p-3 text-right">
                               {((currentUser && isUserAssigned(item, currentUser.id)) || canDeleteContent(item)) && (
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                    <Button variant="ghost" size="sm" className={touchFriendly('tableAction')}>
                                       <span className="sr-only">Open menu</span>
                                       <MoreVertical className="h-4 w-4" />
                                     </Button>

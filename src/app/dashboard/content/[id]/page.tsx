@@ -385,11 +385,18 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
           </div>
         </div>
         <div className="flex-shrink-0">
-          <Button asChild variant="default">
-            <Link href={`${pathname}/edit`}>
-              <Edit3 className="mr-2 h-4 w-4" /> Edit Content
-            </Link>
-          </Button>
+          {content.status !== 'approved' && content.status !== 'published' ? (
+            <Button asChild variant="default">
+              <Link href={`${pathname}/edit`}>
+                <Edit3 className="mr-2 h-4 w-4" /> Edit Content
+              </Link>
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <span>Content is {content.status}</span>
+            </div>
+          )}
         </div>
       </div>
 
