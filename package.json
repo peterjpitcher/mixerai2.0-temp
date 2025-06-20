@@ -14,7 +14,8 @@
     "test:openai": "node scripts/verify-openai-integration.js",
     "check": "next lint && tsc --noEmit",
     "review": "node scripts/code-review.js",
-    "review:fix": "next lint --fix && npm run review"
+    "review:fix": "next lint --fix && npm run review",
+    "db:types": "./scripts/regenerate-types.sh"
   },
   "keywords": [
     "wrapper"
@@ -45,6 +46,8 @@
     "@supabase/supabase-js": "^2.39.0",
     "@tailwindcss/forms": "^0.5.7",
     "@tailwindcss/typography": "^0.5.10",
+    "@tanstack/react-query": "^5.80.10",
+    "@tanstack/react-query-devtools": "^5.80.10",
     "@types/cheerio": "^0.22.35",
     "@types/dompurify": "^3.0.5",
     "@types/pg": "^8.15.1",
@@ -68,6 +71,7 @@
     "next-themes": "^0.4.6",
     "openai": "^4.97.0",
     "pg": "^8.16.0",
+    "playwright": "^1.53.1",
     "postcss": "^8.4.32",
     "react": "18.2.0",
     "react-day-picker": "^9.7.0",
@@ -89,6 +93,7 @@
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
+    "@types/lodash": "^4.17.18",
     "@types/node": "^20.10.4",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",

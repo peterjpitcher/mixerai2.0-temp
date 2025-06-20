@@ -28,26 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CardGridSkeleton } from '@/components/ui/loading-skeletons';
-
-// Placeholder Breadcrumbs component - replace with actual implementation later
-const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
-  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
-    <ol className="flex items-center space-x-1.5">
-      {items.map((item, index) => (
-        <li key={index} className="flex items-center">
-          {item.href ? (
-            <Link href={item.href} className="hover:underline">
-              {item.label}
-            </Link>
-          ) : (
-            <span>{item.label}</span>
-          )}
-          {index < items.length - 1 && <span className="mx-1.5">/</span>}
-        </li>
-      ))}
-    </ol>
-  </nav>
-);
+import { BreadcrumbNav } from '@/components/ui/breadcrumb-nav';
 
 interface Template {
   id: string;
@@ -122,11 +103,15 @@ export default function TemplatesPage() {
   }, []);
 
   useEffect(() => {
-    // Fetch templates only if user is loaded and is an admin, or if currentUser is still null (initial load before check)
-    if (!isLoadingUser && (!currentUser || currentUser.user_metadata?.role !== 'admin')) {
-      setLoading(false); // Stop loading templates if user is not admin
+    // Fetch templates only if user is loaded and is an admin or editor
+    const userRole = currentUser?.user_metadata?.role;
+    const canViewTemplates = userRole === 'admin' || userRole === 'editor';
+    
+    if (!isLoadingUser && (!currentUser || !canViewTemplates)) {
+      setLoading(false); // Stop loading templates if user doesn't have permission
       return;
     }
+    
     const fetchTemplates = async () => {
       try {
         setLoading(true);
@@ -152,8 +137,8 @@ export default function TemplatesPage() {
       }
     };
 
-    // Only fetch if user is loaded and is an admin, or if user data isn't loaded yet
-    if (isLoadingUser || (currentUser && currentUser.user_metadata?.role === 'admin')) {
+    // Only fetch if user is loaded and has permission (admin or editor)
+    if (isLoadingUser || (currentUser && canViewTemplates)) {
         fetchTemplates();
     }
   }, [isLoadingUser, currentUser]);
@@ -363,7 +348,7 @@ export default function TemplatesPage() {
   if (isLoadingUser || loading) { // Combined loading state
     return (
       <div className="space-y-8">
-        <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Content Templates" }]} />
+        <BreadcrumbNav items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Content Templates" }]} />
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Content Templates</h1>
@@ -392,7 +377,7 @@ export default function TemplatesPage() {
 
   return (
     <div className="space-y-8">
-      <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Content Templates" }]} />
+      <BreadcrumbNav items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Content Templates" }]} />
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Content Templates</h1>

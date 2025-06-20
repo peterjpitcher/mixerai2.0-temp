@@ -62,16 +62,44 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: User, contex
       );
     }
 
-    const { error: rpcError } = await supabase.rpc('update_user_details', {
-      p_user_id: params.id,
-      p_full_name: body.full_name,
-      p_job_title: body.job_title,
-      p_company: body.company,
-      p_role: isGlobalAdmin ? body.role : undefined,
-      p_brand_permissions: isGlobalAdmin ? body.brand_permissions : undefined,
+    // Log the request data for debugging
+    console.log('Update user request:', {
+      userId: params.id,
+      isGlobalAdmin,
+      body,
     });
 
-    if (rpcError) throw rpcError;
+    // Prepare RPC parameters
+    const rpcParams: Record<string, unknown> = {
+      p_user_id: params.id,
+      p_full_name: body.full_name || null,
+      p_job_title: body.job_title || null,
+      p_company: body.company || null,
+    };
+
+    // Only include role and brand_permissions if user is global admin
+    if (isGlobalAdmin) {
+      rpcParams.p_role = body.role || null;
+      // Ensure role values in brand_permissions are valid enum values
+      if (body.brand_permissions && Array.isArray(body.brand_permissions)) {
+        const validRoles = ['admin', 'editor', 'viewer'];
+        rpcParams.p_brand_permissions = body.brand_permissions.map((perm: any) => ({
+          brand_id: perm.brand_id,
+          role: validRoles.includes(perm.role) ? perm.role : 'viewer' // Default to viewer if invalid
+        }));
+      } else {
+        rpcParams.p_brand_permissions = null;
+      }
+    }
+
+    console.log('RPC params:', rpcParams);
+
+    const { error: rpcError } = await supabase.rpc('update_user_details', rpcParams);
+
+    if (rpcError) {
+      console.error('RPC Error:', rpcError);
+      throw rpcError;
+    }
 
     const { data: updatedUserDetails, error: fetchError } = await supabase
       .rpc('get_user_details', { p_user_id: params.id })

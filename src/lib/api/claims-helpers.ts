@@ -67,7 +67,7 @@ export async function checkProductClaimsPermission(
     // Extract all unique mixerai brand IDs
     const mixeraiBrandIds = [...new Set(
       productsData
-        .map(p => p.master_claim_brands?.mixerai_brand_id)
+        .map(p => (p.master_claim_brands as any)?.mixerai_brand_id)
         .filter(Boolean)
     )] as string[];
     

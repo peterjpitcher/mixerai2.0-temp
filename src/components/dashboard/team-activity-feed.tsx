@@ -80,8 +80,55 @@ const getActivityMessage = (item: ActivityItem): React.ReactNode => {
   }
 };
 
+function groupActivitiesByTimePeriod(activities: ActivityItem[]) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const weekStart = new Date(today);
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Start of this week (Sunday)
+  const lastWeekStart = new Date(weekStart);
+  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  const lastWeekEnd = new Date(weekStart);
+  lastWeekEnd.setDate(lastWeekEnd.getDate() - 1);
+
+  const groups: { [key: string]: ActivityItem[] } = {
+    'Today': [],
+    'Yesterday': [],
+    'This Week': [],
+    'Last Week': [],
+    'Older': []
+  };
+
+  activities.forEach(activity => {
+    const activityDate = new Date(activity.created_at);
+    
+    if (activityDate >= today) {
+      groups['Today'].push(activity);
+    } else if (activityDate >= yesterday && activityDate < today) {
+      groups['Yesterday'].push(activity);
+    } else if (activityDate >= weekStart && activityDate < yesterday) {
+      groups['This Week'].push(activity);
+    } else if (activityDate >= lastWeekStart && activityDate <= lastWeekEnd) {
+      groups['Last Week'].push(activity);
+    } else {
+      groups['Older'].push(activity);
+    }
+  });
+
+  // Remove empty groups
+  Object.keys(groups).forEach(key => {
+    if (groups[key].length === 0) {
+      delete groups[key];
+    }
+  });
+
+  return groups;
+}
+
 export function TeamActivityFeed({ initialActivity, condensed = false }: { initialActivity: ActivityItem[]; condensed?: boolean }) {
-  const activities = initialActivity;
+  const groupedActivities = groupActivitiesByTimePeriod(initialActivity);
+  
   return (
     <Card className={condensed ? "h-full overflow-hidden flex flex-col" : ""}>
       <CardHeader className={condensed ? "py-2 px-4" : ""}>
@@ -89,30 +136,39 @@ export function TeamActivityFeed({ initialActivity, condensed = false }: { initi
         {!condensed && <CardDescription>A live feed of recent events across the platform.</CardDescription>}
       </CardHeader>
       <CardContent className={condensed ? "flex-1 overflow-y-auto px-4 py-2" : ""}>
-        {activities && activities.length > 0 ? (
-          <div className={condensed ? "space-y-2" : "space-y-4"}>
-            {activities.map((item) => {
-              const config = activityConfig[item.type] || activityConfig.content_updated;
-              return (
-                <div key={item.id} className={condensed ? "flex items-start gap-2" : "flex items-start gap-3"}>
-                  <div className={`flex ${condensed ? "h-6 w-6" : "h-8 w-8"} shrink-0 items-center justify-center rounded-full ${config.bgColor}`}>
-                      {condensed ? (
-                        <div className="scale-50">{config.icon}</div>
-                      ) : (
-                        <div className="scale-75">{config.icon}</div>
-                      )}
-                  </div>
-                  <div className="flex-grow min-w-0">
-                    <div className={condensed ? "text-xs line-clamp-2" : "text-sm"}>
-                      {getActivityMessage(item)}
-                    </div>
-                    <time className={condensed ? "text-[10px] text-muted-foreground" : "text-xs text-muted-foreground"}>
-                      {formatDate(item.created_at)}
-                    </time>
-                  </div>
+        {initialActivity && initialActivity.length > 0 ? (
+          <div className={condensed ? "space-y-3" : "space-y-6"}>
+            {Object.entries(groupedActivities).map(([period, activities]) => (
+              <div key={period}>
+                <h3 className={`font-semibold mb-2 ${condensed ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}`}>
+                  {period}
+                </h3>
+                <div className={condensed ? "space-y-1.5" : "space-y-3"}>
+                  {activities.map((item) => {
+                    const config = activityConfig[item.type] || activityConfig.content_updated;
+                    return (
+                      <div key={item.id} className={condensed ? "flex items-start gap-2" : "flex items-start gap-3"}>
+                        <div className={`flex ${condensed ? "h-5 w-5" : "h-7 w-7"} shrink-0 items-center justify-center rounded-full ${config.bgColor}`}>
+                            {condensed ? (
+                              <div className="scale-[0.4]">{config.icon}</div>
+                            ) : (
+                              <div className="scale-[0.65]">{config.icon}</div>
+                            )}
+                        </div>
+                        <div className="flex-grow min-w-0">
+                          <div className={condensed ? "text-xs line-clamp-2" : "text-sm"}>
+                            {getActivityMessage(item)}
+                          </div>
+                          <time className={condensed ? "text-[10px] text-muted-foreground" : "text-xs text-muted-foreground"}>
+                            {formatDate(item.created_at)}
+                          </time>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         ) : (
           <div className={`text-center text-muted-foreground ${condensed ? "py-4" : "py-8"}`}>

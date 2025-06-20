@@ -110,7 +110,7 @@ export function LoginForm() {
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <Label htmlFor="password">Password</Label>
-              <Link href="/auth/forgot-password" className="text-sm font-medium text-primary hover:underline">
+              <Link href="/auth/forgot-password" className="text-sm font-medium text-primary hover:underline" tabIndex={-1}>
                 Forgot password?
               </Link>
             </div>
@@ -122,6 +122,7 @@ export function LoginForm() {
               autoComplete="current-password"
               disabled={isLoading}
               required
+              tabIndex={0}
             />
           </div>
           {error && (

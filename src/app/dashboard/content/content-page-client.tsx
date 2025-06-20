@@ -25,6 +25,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { DueDateIndicator } from '@/components/ui/due-date-indicator';
 
 // Define types
 type ContentFilterStatus = 'active' | 'approved' | 'rejected' | 'all';
@@ -250,7 +251,7 @@ export default function ContentPageClient() {
 
   const handleDeleteClick = (item: ContentItem) => {
     if (!canDeleteContent(item)) {
-      sonnerToast.error("You don&apos;t have permission to delete this content item.");
+      sonnerToast.error("You don't have permission to delete this content item.");
       return;
     }
     setItemToDelete(item);
@@ -463,7 +464,12 @@ export default function ContentPageClient() {
                               )}
                             </td>
                             <td className="p-3 whitespace-nowrap">
-                              {item.due_date ? formatDate(item.due_date) : 'N/A'}
+                              <DueDateIndicator 
+                                dueDate={item.due_date || null} 
+                                status={item.status as any}
+                                size="sm"
+                              />
+                              {!item.due_date && <span className="text-muted-foreground">N/A</span>}
                             </td>
                             <td className="p-3 whitespace-nowrap">{formatDate(item.updated_at)}</td>
                             <td className="p-3 text-right">

@@ -11,24 +11,28 @@ import Image from 'next/image';
  * Aligns with MixerAI design standards for consistency.
  */
 export default function NotFound() {
+  // Since this is a static error page, we can't use auth context reliably
+  // Default to showing public navigation options
+  const isAuthenticated = false;
+  
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-secondary py-12 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8">
         {/* Logo */}
         <div className="flex justify-center">
           <Link href="/" aria-label="Go to homepage">
             <Image 
               src="/Mixerai2.0Logo.png" 
-              alt="MixerAI Logo" 
-              width={200} 
-              height={46} 
+              alt="MixerAI 2.0 Logo"
+              width={250}
+              height={58}
               priority 
             />
           </Link>
         </div>
 
         {/* Main Card */}
-        <Card className="shadow-lg">
+        <Card>
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-destructive/10 text-destructive">
               <Search className="h-10 w-10" />
@@ -47,52 +51,54 @@ export default function NotFound() {
             {/* Action Buttons */}
             <div className="flex flex-col gap-3">
               <Button asChild size="lg" className="w-full">
-                <Link href="/dashboard">
+                <Link href={isAuthenticated ? "/dashboard" : "/"}>
                   <Home className="mr-2 h-4 w-4" />
-                  Go to Dashboard
+                  {isAuthenticated ? "Go to Dashboard" : "Go to Home"}
                 </Link>
               </Button>
               
               <Button asChild variant="outline" size="lg" className="w-full">
-                <Link href="/dashboard/help">
+                <Link href={isAuthenticated ? "/dashboard/help" : "/auth/login"}>
                   <HelpCircle className="mr-2 h-4 w-4" />
-                  Get Help
+                  {isAuthenticated ? "Get Help" : "Sign In"}
                 </Link>
               </Button>
             </div>
 
-            {/* Additional Options */}
-            <div className="pt-4 border-t">
-              <p className="text-sm text-center text-muted-foreground mb-3">
-                Or try one of these:
-              </p>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <Link 
-                  href="/dashboard/content" 
-                  className="text-primary hover:text-primary/80 hover:underline text-center"
-                >
-                  View Content
-                </Link>
-                <Link 
-                  href="/dashboard/brands" 
-                  className="text-primary hover:text-primary/80 hover:underline text-center"
-                >
-                  Manage Brands
-                </Link>
-                <Link 
-                  href="/dashboard/templates" 
-                  className="text-primary hover:text-primary/80 hover:underline text-center"
-                >
-                  Browse Templates
-                </Link>
-                <Link 
-                  href="/dashboard/workflows" 
-                  className="text-primary hover:text-primary/80 hover:underline text-center"
-                >
-                  View Workflows
-                </Link>
+            {/* Additional Options - Only show for authenticated users */}
+            {isAuthenticated && (
+              <div className="pt-4 border-t">
+                <p className="text-sm text-center text-muted-foreground mb-3">
+                  Or try one of these:
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <Link 
+                    href="/dashboard/content" 
+                    className="text-primary hover:text-primary/80 hover:underline text-center"
+                  >
+                    View Content
+                  </Link>
+                  <Link 
+                    href="/dashboard/brands" 
+                    className="text-primary hover:text-primary/80 hover:underline text-center"
+                  >
+                    Manage Brands
+                  </Link>
+                  <Link 
+                    href="/dashboard/templates" 
+                    className="text-primary hover:text-primary/80 hover:underline text-center"
+                  >
+                    Browse Templates
+                  </Link>
+                  <Link 
+                    href="/dashboard/workflows" 
+                    className="text-primary hover:text-primary/80 hover:underline text-center"
+                  >
+                    View Workflows
+                  </Link>
+                </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 

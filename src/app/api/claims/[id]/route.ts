@@ -400,6 +400,17 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context?: un
         // --- Permission Check End ---
 
 
+        // First, delete any workflow history entries for this claim
+        const { error: historyError } = await supabase.from('claim_workflow_history')
+            .delete()
+            .eq('claim_id', id);
+
+        if (historyError) {
+            console.error(`[API Claims DELETE /${id}] Error deleting claim workflow history:`, historyError);
+            // Continue with claim deletion even if history deletion fails
+        }
+
+        // Now delete the claim itself
         const { error, count } = await supabase.from('claims')
             .delete({ count: 'exact' })
             .eq('id', id);
@@ -413,7 +424,7 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context?: un
             return NextResponse.json({ success: false, error: 'Claim not found.' }, { status: 404 });
         }
 
-        return NextResponse.json({ success: true, message: 'Claim deleted successfully.' });
+        return NextResponse.json({ success: true, message: 'Claim and any pending approvals deleted successfully.' });
 
     } catch (error: unknown) {
         console.error(`[API Claims DELETE /${id}] Catched error:`, error);

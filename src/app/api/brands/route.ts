@@ -2,15 +2,42 @@ import { NextResponse, NextRequest } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import { createErrorResponse, createSuccessResponse } from '@/lib/api/error-handler';
 // import { Pool } from 'pg'; // Removed - using Supabase instead
 import { getUserAuthByEmail, inviteNewUserWithAppMetadata } from '@/lib/auth/user-management';
 import { extractCleanDomain } from '@/lib/utils/url-utils'; // Added import
 import { User } from '@supabase/supabase-js';
+import { z } from 'zod';
+import { validateRequest, commonSchemas } from '@/lib/api/validation';
+import { executeTransaction, CompensatingTransaction } from '@/lib/db/transactions';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
 
 // Removed PostgreSQL pool configuration - using Supabase instead
+
+// Validation schema for creating a brand
+const createBrandSchema = z.object({
+  name: commonSchemas.nonEmptyString,
+  website_url: commonSchemas.url.optional().nullable(),
+  country: z.string().optional().nullable(),
+  language: z.string().optional().nullable(),
+  brand_identity: z.string().optional().nullable(),
+  tone_of_voice: z.string().optional().nullable(),
+  guardrails: z.union([
+    z.string(),
+    z.array(z.string())
+  ]).optional().nullable(),
+  brand_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color').optional().nullable(),
+  logo_url: commonSchemas.url.optional().nullable(),
+  master_claim_brand_id: commonSchemas.uuid.optional().nullable(),
+  selected_agency_ids: z.array(commonSchemas.uuid).optional().nullable(),
+  approved_content_types: z.array(z.string()).optional().nullable(),
+  admin_users: z.array(z.object({
+    email: commonSchemas.email,
+    role: z.literal('admin')
+  })).optional()
+});
 
 // Type for priority as it comes from Supabase (enum string values)
 type SupabaseVettingAgencyPriority = "High" | "Medium" | "Low" | null;
@@ -42,8 +69,10 @@ interface BrandFromSupabase {
   language?: string | null;
   brand_identity?: string | null;
   tone_of_voice?: string | null;
+  guardrails?: string | null;
   brand_summary?: string | null;
   brand_color?: string | null;
+  logo_url?: string | null;
   approved_content_types?: unknown; 
   created_at: string | null;
   updated_at: string | null;
@@ -71,8 +100,10 @@ interface FormattedBrand {
   language?: string | null;
   brand_identity?: string | null;
   tone_of_voice?: string | null;
+  guardrails?: string | null;
   brand_summary?: string | null;
   brand_color?: string | null;
+  logo_url?: string | null;
   approved_content_types?: unknown;
   created_at?: string | null;
   updated_at?: string | null;
@@ -235,8 +266,10 @@ export const GET = withAuth(async (req: NextRequest, user) => {
         language: brand.language,
         brand_identity: brand.brand_identity,
         tone_of_voice: brand.tone_of_voice,
+        guardrails: brand.guardrails,
         brand_summary: brand.brand_summary,
         brand_color: brand.brand_color,
+        logo_url: brand.logo_url,
         approved_content_types: brand.approved_content_types,
         created_at: brand.created_at,
         updated_at: brand.updated_at,
@@ -282,16 +315,15 @@ export const POST = withAuth(async (req: NextRequest, user) => {
 
   const supabase = createSupabaseAdminClient(); 
   try {
-    const body = await req.json();
+    // Validate request body
+    const validation = await validateRequest(req, createBrandSchema);
+    if (!validation.success) {
+      return validation.response;
+    }
+    
+    const body = validation.data;
     console.log('[API POST /brands] Received body:', body);
     console.log('[API POST /brands] Logo URL:', body.logo_url);
-    
-    if (!body.name) {
-      return NextResponse.json(
-        { success: false, error: 'Brand name is required' },
-        { status: 400 }
-      );
-    }
     
     let formattedGuardrails = body.guardrails || null;
     if (formattedGuardrails) {
@@ -310,102 +342,46 @@ export const POST = withAuth(async (req: NextRequest, user) => {
       }
     }
 
-    const rpcParams = {
-      creator_user_id: user.id,
-      brand_name: body.name,
-      brand_website_url: body.website_url || null,
-      brand_country: body.country || null,
-      brand_language: body.language || null,
-      brand_identity_text: body.brand_identity || null,
-      brand_tone_of_voice: body.tone_of_voice || null,
-      brand_guardrails: formattedGuardrails,
-      brand_content_vetting_agencies_input: body.selected_agency_ids || null, 
-      brand_color_input: body.brand_color || null, 
-      approved_content_types_input: body.approved_content_types || null 
-    };
-
-    // START of replacement for 'create_brand_and_set_admin' RPC
-    const { data: brandInsertData, error: brandInsertError } = await supabase
-      .from('brands')
-      .insert({
-        name: rpcParams.brand_name,
-        website_url: rpcParams.brand_website_url,
-        country: rpcParams.brand_country,
-        language: rpcParams.brand_language,
-        brand_identity: rpcParams.brand_identity_text,
-        tone_of_voice: rpcParams.brand_tone_of_voice,
-        guardrails: rpcParams.brand_guardrails,
-        brand_color: rpcParams.brand_color_input,
-        approved_content_types: rpcParams.approved_content_types_input,
-        logo_url: body.logo_url || null
-      })
-      .select('id')
-      .single();
-
-    if (brandInsertError) {
-      // console.error('Error creating brand directly:', brandInsertError);
-      throw new Error(`Failed to create brand: ${brandInsertError.message}`);
-    }
-
-    const newBrandId = brandInsertData.id;
-
-    const { error: permissionError } = await supabase
-      .from('user_brand_permissions')
-      .insert({
-        user_id: rpcParams.creator_user_id,
-        brand_id: newBrandId,
-        role: 'admin' // Explicitly setting the correct role
-      });
-
-    if (permissionError) {
-      // console.error('Error setting creator admin permission:', permissionError);
-      // Attempt to clean up the created brand if permission fails
-      await supabase.from('brands').delete().eq('id', newBrandId);
-      throw new Error(`Failed to set admin permission for new brand: ${permissionError.message}`);
-    }
-    // END of replacement for 'create_brand_and_set_admin' RPC
-    
-    // Update master_claim_brand_id if provided
-    if (body.master_claim_brand_id) {
-      const { error: updateMasterClaimError } = await supabase
-        .from('brands')
-        .update({ master_claim_brand_id: body.master_claim_brand_id } as Record<string, unknown>)
-        .eq('id', newBrandId);
-      
-      if (updateMasterClaimError) {
-        // Log the error but don't fail the brand creation, as the primary record is made
-        // console.warn(`[API /api/brands POST] Failed to update master_claim_brand_id for new brand ${newBrandId}: ${updateMasterClaimError.message}`);
+    // Use transactional function to create brand with all related data
+    const transactionResult = await executeTransaction<{ brand_id: string }>(
+      supabase,
+      'create_brand_with_permissions',
+      {
+        p_creator_user_id: user.id,
+        p_brand_name: body.name,
+        p_website_url: body.website_url || null,
+        p_country: body.country || null,
+        p_language: body.language || null,
+        p_brand_identity: body.brand_identity || null,
+        p_tone_of_voice: body.tone_of_voice || null,
+        p_guardrails: formattedGuardrails,
+        p_brand_color: body.brand_color || null,
+        p_logo_url: body.logo_url || null,
+        p_approved_content_types: body.approved_content_types || null,
+        p_master_claim_brand_id: body.master_claim_brand_id || null,
+        p_agency_ids: body.selected_agency_ids || null
       }
+    );
+
+    if (!transactionResult.success || !transactionResult.data?.[0]?.brand_id) {
+      throw new Error(transactionResult.error || 'Failed to create brand');
     }
 
-    // Populate normalized_website_domain
-    if (body.website_url) {
-      const normalizedDomain = extractCleanDomain(body.website_url);
-      if (normalizedDomain) {
-        const { error: updateDomainError } = await supabase
-          .from('brands')
-          .update({ normalized_website_domain: normalizedDomain })
-          .eq('id', newBrandId);
-        
-        if (updateDomainError) {
-          // Log the error but don't fail the brand creation, as the primary record is made
-          // console.warn(`[API /api/brands POST] Failed to update normalized_website_domain for new brand ${newBrandId}: ${updateDomainError.message}`);
-        }
-      }
-    }
+    const newBrandId = transactionResult.data[0].brand_id;
     
     // --- Process Additional Brand Admins ---
-    const adminIdentifiers: string[] = body.brand_admin_ids || [];
+    const adminUsers = body.admin_users || [];
     const resolvedAdminUserIds: string[] = []; // To store IDs of existing or successfully invited new admins
 
-    for (const identifier of adminIdentifiers) {
-      if (identifier === user.id) continue; // Skip creator, already handled by RPC
+    for (const adminUserInfo of adminUsers) {
+      const identifier = adminUserInfo.email;
+      if (identifier === user.email) continue; // Skip creator, already handled by RPC
 
       let adminUser: User | null = null;
       let isNewAdmin = false;
 
-      // Check if identifier is an email (for potential new user)
-      if (identifier.includes('@')) { 
+      // Process the admin user email
+      if (identifier) { 
         adminUser = await getUserAuthByEmail(identifier, supabase);
         if (!adminUser) {
           // User does not exist, invite them

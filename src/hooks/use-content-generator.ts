@@ -14,6 +14,8 @@ interface Brand {
   tone_of_voice?: string | null;
   guardrails?: string | null;
   logo_url?: string | null;
+  language?: string | null;
+  country?: string | null;
 }
 
 interface WorkflowSummary {
@@ -275,14 +277,11 @@ export function useContentGenerator(templateId?: string | null) {
       if (data.success) {
         // Extract the generated outputs from the response
         // The API returns the fields directly in the response object
-        const { ...generatedFields } = data;
+        const { success, userId, error, ...generatedFields } = data;
         
         if (Object.keys(generatedFields).length > 0) {
           setGeneratedOutputs(generatedFields);
           toast.success('Content generated successfully!');
-          
-          // Log for debugging
-          console.log('Generated outputs:', generatedFields);
         } else {
           throw new Error('No content fields were generated');
         }

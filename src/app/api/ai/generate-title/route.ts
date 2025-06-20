@@ -4,7 +4,7 @@ import { handleApiError } from '@/lib/api-utils';
 import { generateContentTitleFromContext } from '@/lib/azure/openai';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { extractCleanDomain } from '@/lib/utils/url-utils';
-import { Tables } from '@/types/supabase';
+// import { Database } from '@/types/supabase'; // TODO: Uncomment when supabase types are generated
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +37,7 @@ export const POST = withAuth(async (request: NextRequest) => {
       return NextResponse.json({ success: false, error: 'brand_id or websiteUrlForBrandDetection is required' }, { status: 400 });
     }
 
-    let brandForContext: Tables<'brands'> | null = null;
+    let brandForContext: any | null = null; // TODO: Type as Database['public']['Tables']['brands']['Row'] when types are generated
     const supabase = createSupabaseAdminClient();
 
     if (body.brand_id) {

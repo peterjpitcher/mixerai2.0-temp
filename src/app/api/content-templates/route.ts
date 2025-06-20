@@ -2,9 +2,33 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import { z } from 'zod';
+import { validateRequest, commonSchemas } from '@/lib/api/validation';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
+
+// Field schema for template fields
+const templateFieldSchema = z.object({
+  id: commonSchemas.nonEmptyString,
+  name: commonSchemas.nonEmptyString,
+  type: z.enum(['shortText', 'longText', 'richText', 'plainText', 'tags', 'email', 'url', 'number', 'date']),
+  options: z.record(z.any()).optional(),
+  required: z.boolean().optional(),
+  aiSuggester: z.boolean().optional(),
+  aiPrompt: z.string().optional(),
+  aiAutoComplete: z.boolean().optional()
+});
+
+// Validation schema for creating a template
+const createTemplateSchema = z.object({
+  name: commonSchemas.nonEmptyString,
+  description: z.string().optional(),
+  icon: z.string().optional().nullable(),
+  brand_id: commonSchemas.uuid.optional().nullable(),
+  inputFields: z.array(templateFieldSchema).min(1, 'At least one input field is required'),
+  outputFields: z.array(templateFieldSchema).min(1, 'At least one output field is required')
+});
 
 // Mock templates for fallback in development
 /* 
@@ -189,15 +213,13 @@ export const POST = withAuth(async (request: NextRequest, user: unknown) => {
       );
     }
 
-    const data = await request.json();
-    
-    // Validate required fields (expecting flat structure now)
-    if (!data.name || !data.inputFields || !data.outputFields) {
-      return NextResponse.json(
-        { success: false, error: 'Name, inputFields, and outputFields are required' }, // Consistent error message
-        { status: 400 }
-      );
+    // Validate request body
+    const validation = await validateRequest(request, createTemplateSchema);
+    if (!validation.success) {
+      return validation.response;
     }
+    
+    const data = validation.data;
     
     const supabase = createSupabaseAdminClient();
     

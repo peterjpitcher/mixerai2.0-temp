@@ -34,7 +34,7 @@ export function ClaimsViewerSection({
             <div className="flex items-center gap-2">
               <span className="font-medium">Product Claims for {productName}</span>
               <span className="text-xs text-muted-foreground">
-                ({styledClaims.mandatory_claims.length} mandatory, {styledClaims.grouped_claims.reduce((acc, g) => acc + g.allowed_claims.length + g.disallowed_claims.length, 0)} other claims)
+                ({styledClaims.grouped_claims.reduce((acc, g) => acc + g.allowed_claims.length + g.disallowed_claims.length, 0)} total claims)
               </span>
             </div>
             {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -52,28 +52,6 @@ export function ClaimsViewerSection({
                 {styledClaims.introductory_sentence}
               </p>
             </div>
-            
-            {/* Mandatory Claims */}
-            {styledClaims.mandatory_claims.length > 0 && (
-              <>
-                <Separator />
-                <div>
-                  <h3 className="text-sm font-semibold mb-2 text-orange-700 dark:text-orange-400">
-                    Mandatory Claims ({styledClaims.mandatory_claims.length})
-                  </h3>
-                  <div className="grid gap-2">
-                    {styledClaims.mandatory_claims.map((claim, index) => (
-                      <div key={index} className="flex items-start gap-2 p-2 bg-orange-50 dark:bg-orange-900/20 rounded-md">
-                        <span className="text-[10px] font-medium text-orange-600 dark:text-orange-400 uppercase mt-0.5">
-                          {claim.level}
-                        </span>
-                        <p className="text-sm flex-1">{claim.text}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
             
             {/* Grouped Claims */}
             {styledClaims.grouped_claims.map((group, index) => {

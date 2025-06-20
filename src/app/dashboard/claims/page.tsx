@@ -18,14 +18,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  Trash2, Edit3, PlusCircle, Search, AlertTriangle, PackageOpen, Loader2, 
+  Trash2, PlusCircle, Search, AlertTriangle, PackageOpen, Loader2, 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  FileText, Building2, Package, Sprout, Globe, Tag, ShieldCheck, ShieldOff, ShieldAlert, WorkflowIcon, MoreVertical, Eye 
+  FileText, Building2, Package, Sprout, Globe, Tag, ShieldCheck, ShieldOff, ShieldAlert, ShieldQuestion, WorkflowIcon, MoreVertical, Eye 
 } from "lucide-react";
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { touchFriendly } from '@/lib/utils/touch-target';
 import { Badge } from "@/components/ui/badge";
+import { apiClient } from '@/lib/api-client';
 import { 
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select"; // For filtering
@@ -38,7 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 // Types from API definitions
-type ClaimTypeEnum = 'allowed' | 'disallowed' | 'mandatory';
+type ClaimTypeEnum = 'allowed' | 'disallowed';
 type ClaimLevelEnum = 'brand' | 'product' | 'ingredient';
 
 interface Claim {
@@ -47,9 +48,12 @@ interface Claim {
   claim_type: ClaimTypeEnum;
   level: ClaimLevelEnum;
   master_brand_id?: string | null;
-  product_id?: string | null;
-  ingredient_id?: string | null;
-  country_code: string;
+  product_id?: string | null; // Deprecated
+  ingredient_id?: string | null; // Deprecated
+  country_code: string; // Single country from API response
+  country_codes?: string[]; // Array of countries from junction table
+  product_ids?: string[]; // Array from junction table
+  ingredient_ids?: string[]; // Array from junction table
   description?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -60,6 +64,9 @@ interface Claim {
   // For display
   entity_name?: string;
   entity_icon?: JSX.Element;
+  product_names?: string[]; // From API
+  ingredient_names?: string[]; // From API
+  master_brand_name?: string; // From API
 }
 
 interface MasterClaimBrand { id: string; name: string; }
@@ -69,7 +76,6 @@ interface Ingredient { id: string; name: string; }
 const claimTypeIcons: Record<ClaimTypeEnum, () => JSX.Element> = {
   allowed: () => <ShieldCheck className="mr-1 h-3 w-3 text-green-500" />,
   disallowed: () => <ShieldOff className="mr-1 h-3 w-3 text-red-500" />,
-  mandatory: () => <ShieldAlert className="mr-1 h-3 w-3 text-blue-500" />,
 };
 
 const claimLevelIcons: Record<ClaimLevelEnum, () => JSX.Element> = {
@@ -79,134 +85,8 @@ const claimLevelIcons: Record<ClaimLevelEnum, () => JSX.Element> = {
 };
 
 export default function ClaimsPage() {
-  // Define columns for the data table
-  const columns: DataTableColumn<Claim>[] = [
-    {
-      id: "claim_text",
-      header: "Claim Text",
-      cell: ({ row }) => (
-        <div>
-          <div className="font-medium">{row.claim_text}</div>
-          {row.description && (
-            <div className="text-sm text-muted-foreground line-clamp-1">
-              {row.description}
-            </div>
-          )}
-        </div>
-      ),
-      enableSorting: true,
-    },
-    {
-      id: "entity",
-      header: "Entity",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          {row.entity_icon}
-          <span>{row.entity_name}</span>
-        </div>
-      ),
-      enableSorting: true,
-      enableFiltering: true,
-    },
-    {
-      id: "level",
-      header: "Level",
-      cell: ({ row }) => (
-        <Badge variant="outline">
-          {row.level}
-        </Badge>
-      ),
-      enableSorting: true,
-      enableFiltering: true,
-    },
-    {
-      id: "claim_type",
-      header: "Type",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          {claimTypeIcons[row.claim_type]()}
-          <span className="capitalize">{row.claim_type}</span>
-        </div>
-      ),
-      enableSorting: true,
-      enableFiltering: true,
-    },
-    {
-      id: "country_code",
-      header: "Country",
-      cell: ({ row }) => (
-        <Badge variant="secondary">
-          {row.country_code === '__GLOBAL__' ? 'Global' : row.country_code}
-        </Badge>
-      ),
-      enableSorting: true,
-      enableFiltering: true,
-    },
-    {
-      id: "workflow_status",
-      header: "Status",
-      cell: ({ row }) => {
-        if (!row.workflow_status) return <span className="text-muted-foreground">—</span>;
-        return (
-          <Badge 
-            variant={
-              row.workflow_status === 'approved' ? 'default' :
-              row.workflow_status === 'rejected' ? 'destructive' :
-              row.workflow_status === 'pending_review' ? 'secondary' :
-              'outline'
-            }
-          >
-            {row.workflow_status}
-          </Badge>
-        );
-      },
-      enableSorting: true,
-      enableFiltering: true,
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-            <Button variant="ghost" size="sm" className={touchFriendly('tableAction')}>
-              <span className="sr-only">Open menu</span>
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                router.push(`/dashboard/claims/${row.id}`);
-              }}
-            >
-              <Eye className="mr-2 h-4 w-4" /> View
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                router.push(`/dashboard/claims/${row.id}/edit`);
-              }}
-            >
-              <Edit3 className="mr-2 h-4 w-4" /> Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={(e) => {
-                e.stopPropagation();
-                openDeleteDialog(row);
-              }} 
-              className="text-destructive"
-            >
-              <Trash2 className="mr-2 h-4 w-4" /> Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-      className: "w-[60px]",
-    },
-  ];
-
+  const router = useRouter();
+  
   const [claims, setClaims] = useState<Claim[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [masterBrands, setMasterBrands] = useState<MasterClaimBrand[]>([]);
@@ -227,13 +107,172 @@ export default function ClaimsPage() {
   const [filterType, setFilterType] = useState<ClaimTypeEnum | 'all'>('all');
   const [filterCountry, setFilterCountry] = useState<string>('all');
 
+  const openDeleteDialog = (claim: Claim) => {
+    setItemToDelete(claim);
+    setShowDeleteDialog(true);
+  };
+
+  // Define columns for the data table - memoized to prevent re-renders
+  const columns = useMemo<DataTableColumn<Claim>[]>(() => [
+    {
+      id: "claim_text",
+      header: "Claim Text",
+      cell: ({ row }) => {
+        const claim = row;
+        if (!claim || !claim.claim_text) {
+          return <div className="text-muted-foreground">-</div>;
+        }
+        return (
+          <div>
+            <div className="font-medium">{claim.claim_text}</div>
+            {claim.description && (
+              <div className="text-sm text-muted-foreground line-clamp-1">
+                {claim.description}
+              </div>
+            )}
+          </div>
+        );
+      },
+      enableSorting: true,
+    },
+    {
+      id: "entity",
+      header: "Entity",
+      cell: ({ row }) => {
+        const claim = row;
+        if (!claim) return <div className="text-muted-foreground">-</div>;
+        return (
+          <div className="flex items-center gap-2">
+            {claim.entity_icon}
+            <span>{claim.entity_name}</span>
+          </div>
+        );
+      },
+      enableSorting: true,
+      enableFiltering: true,
+    },
+    {
+      id: "level",
+      header: "Level",
+      cell: ({ row }) => {
+        const claim = row as Claim;
+        const level = claim.level;
+        if (!level) return <div className="text-muted-foreground">-</div>;
+        return (
+          <Badge variant="outline">
+            {level}
+          </Badge>
+        );
+      },
+      enableSorting: true,
+      enableFiltering: true,
+    },
+    {
+      id: "claim_type",
+      header: "Type",
+      cell: ({ row }) => {
+        const claim = row as Claim;
+        const claimType = claim.claim_type;
+        if (!claimType) return <div className="text-muted-foreground">-</div>;
+        const IconComponent = claimTypeIcons[claimType];
+        return (
+          <div className="flex items-center gap-1">
+            {IconComponent && <IconComponent />}
+            <span className="capitalize">{claimType}</span>
+          </div>
+        );
+      },
+      enableSorting: true,
+      enableFiltering: true,
+    },
+    {
+      id: "country_code",
+      header: "Country",
+      cell: ({ row }) => {
+        const claim = row as Claim;
+        const countryCode = claim.country_code;
+        if (!countryCode) return <div className="text-muted-foreground">-</div>;
+        return (
+          <Badge variant="secondary">
+            {countryCode === '__GLOBAL__' ? 'Global' : countryCode}
+          </Badge>
+        );
+      },
+      enableSorting: true,
+      enableFiltering: true,
+    },
+    {
+      id: "workflow_status",
+      header: "Status",
+      cell: ({ row }) => {
+        const claim = row as Claim;
+        const workflowStatus = claim.workflow_status;
+        if (!workflowStatus) return <span className="text-muted-foreground">—</span>;
+        return (
+          <Badge 
+            variant={
+              workflowStatus === 'approved' ? 'default' :
+              workflowStatus === 'rejected' ? 'destructive' :
+              workflowStatus === 'pending_review' ? 'secondary' :
+              'outline'
+            }
+          >
+            {workflowStatus}
+          </Badge>
+        );
+      },
+      enableSorting: true,
+      enableFiltering: true,
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const claim = row as Claim;
+        if (!claim || !claim.id) return null;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+              <Button variant="ghost" size="sm" className={touchFriendly('tableAction')}>
+                <span className="sr-only">Open menu</span>
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/dashboard/claims/${claim.id}`);
+                }}
+              >
+                <Eye className="mr-2 h-4 w-4" /> View
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openDeleteDialog(claim);
+                }} 
+                className="text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" /> Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+      className: "w-[60px]",
+    },
+  ], [router, openDeleteDialog]);
+
   useEffect(() => {
     async function fetchData() {
       setIsLoading(true);
       setError(null);
       try {
+        // Fetch all claims by requesting a high limit
+        // TODO: Implement proper pagination with infinite scroll or pagination controls
         const [claimsRes, brandsRes, productsRes, ingredientsRes] = await Promise.all([
-          fetch('/api/claims'),
+          fetch('/api/claims?limit=1000&includeProductNames=true&includeMasterBrandName=true&includeIngredientName=true'),
           fetch('/api/master-claim-brands'),
           fetch('/api/products'),
           fetch('/api/ingredients'),
@@ -261,16 +300,38 @@ export default function ClaimsPage() {
         const enrichedClaims = (claimsData.data as Claim[]).map(claim => {
           let entity_name = 'N/A';
           let entity_icon: JSX.Element = <FileText className="mr-1 h-3 w-3" />;
-          if (claim.level === 'brand' && claim.master_brand_id) {
-            entity_name = fetchedBrands.find(b => b.id === claim.master_brand_id)?.name || 'Unknown Brand';
+          
+          if (claim.level === 'brand') {
+            // Use master_brand_name from API if available, otherwise look up
+            entity_name = claim.master_brand_name || 
+                         (claim.master_brand_id ? fetchedBrands.find(b => b.id === claim.master_brand_id)?.name || 'Unknown Brand' : 'N/A');
             entity_icon = claimLevelIcons.brand();
-          } else if (claim.level === 'product' && claim.product_id) {
-            entity_name = fetchedProducts.find(p => p.id === claim.product_id)?.name || 'Unknown Product';
+          } else if (claim.level === 'product') {
+            // Use product_names from API if available
+            if (claim.product_names && claim.product_names.length > 0) {
+              entity_name = claim.product_names.join(', ');
+            } else if (claim.product_ids && claim.product_ids.length > 0) {
+              const names = claim.product_ids.map(id => fetchedProducts.find(p => p.id === id)?.name || 'Unknown').filter(Boolean);
+              entity_name = names.join(', ');
+            } else if (claim.product_id) {
+              // Fallback to deprecated single product_id
+              entity_name = fetchedProducts.find(p => p.id === claim.product_id)?.name || 'Unknown Product';
+            }
             entity_icon = claimLevelIcons.product();
-          } else if (claim.level === 'ingredient' && claim.ingredient_id) {
-            entity_name = fetchedIngredients.find(i => i.id === claim.ingredient_id)?.name || 'Unknown Ingredient';
+          } else if (claim.level === 'ingredient') {
+            // Use ingredient_names from API if available
+            if (claim.ingredient_names && claim.ingredient_names.length > 0) {
+              entity_name = claim.ingredient_names.join(', ');
+            } else if (claim.ingredient_ids && claim.ingredient_ids.length > 0) {
+              const names = claim.ingredient_ids.map(id => fetchedIngredients.find(i => i.id === id)?.name || 'Unknown').filter(Boolean);
+              entity_name = names.join(', ');
+            } else if (claim.ingredient_id) {
+              // Fallback to deprecated single ingredient_id
+              entity_name = fetchedIngredients.find(i => i.id === claim.ingredient_id)?.name || 'Unknown Ingredient';
+            }
             entity_icon = claimLevelIcons.ingredient();
           }
+          
           return { ...claim, entity_name, entity_icon };
         });
 
@@ -288,13 +349,11 @@ export default function ClaimsPage() {
     fetchData();
   }, []);
 
-  const router = useRouter();
-
   const handleDelete = async () => {
     if (!itemToDelete) return;
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/claims/${itemToDelete.id}`, { method: 'DELETE' });
+      const response = await apiClient.delete(`/api/claims/${itemToDelete.id}`);
       const data = await response.json();
       if (data.success) {
         toast.success("Claim deleted successfully");
@@ -311,11 +370,6 @@ export default function ClaimsPage() {
     } finally {
       setIsDeleting(false);
     }
-  };
-
-  const openDeleteDialog = (claim: Claim) => {
-    setItemToDelete(claim);
-    setShowDeleteDialog(true);
   };
 
   const uniqueCountryCodes = useMemo(() => {
@@ -396,7 +450,6 @@ export default function ClaimsPage() {
                     <SelectItem value="all">All Types</SelectItem>
                     <SelectItem value="allowed">Allowed</SelectItem>
                     <SelectItem value="disallowed">Disallowed</SelectItem>
-                    <SelectItem value="mandatory">Mandatory</SelectItem>
                 </SelectContent>
             </Select>
             <Select value={filterCountry} onValueChange={setFilterCountry} disabled={uniqueCountryCodes.length <= 1}>

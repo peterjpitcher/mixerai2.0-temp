@@ -2,12 +2,12 @@
 
 import React from 'react';
 import dynamic from 'next/dynamic';
-// Quill CSS is now imported globally in globals.css
-// import 'react-quill/dist/quill.core.css';   
-// import 'react-quill/dist/quill.snow.css';   
 
-// Dynamically import ReactQuill to avoid SSR issues
-const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
+// Dynamically import ReactQuill to avoid SSR issues and ensure proper initialization
+const ReactQuill = dynamic(() => import('react-quill'), { 
+  ssr: false,
+  loading: () => <div className="h-40 bg-muted animate-pulse rounded-md" />
+});
 
 interface RichTextEditorProps {
   value: string;
@@ -25,12 +25,9 @@ const defaultModules = {
     ['bold', 'italic', 'underline', 'strike'],
     ['blockquote', 'code-block'],
     [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-    [{ 'script': 'sub'}, { 'script': 'super' }],
     [{ 'color': [] }, { 'background': [] }],
-    [{ 'font': [] }],
     [{ 'align': [] }],
-    ['link', 'image'],
-    ['clean']
+    ['link', 'image']
   ],
   clipboard: {
     // toggle to add extra line breaks when pasting HTML:
@@ -41,11 +38,10 @@ const defaultModules = {
 const defaultFormats = [
   'header', 'font', 'size',
   'bold', 'italic', 'underline', 'strike', 'blockquote', 'code-block',
-  'list', 'bullet',
+  'list', 'indent',
   'link', 'image',
   'color', 'background', 'align',
-  'script',
-  'clean'
+  'script'
 ];
 
 export function RichTextEditor({
@@ -57,11 +53,14 @@ export function RichTextEditor({
   modules = defaultModules,
   formats = defaultFormats
 }: RichTextEditorProps) {
+  // Ensure value is a string (fallback to empty string if null/undefined)
+  const safeValue = value || '';
+  
   return (
     <div className={className}>
       <ReactQuill 
         theme="snow"
-        value={value}
+        value={safeValue}
         onChange={onChange}
         modules={modules}
         formats={formats}

@@ -3,7 +3,8 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
-import { TablesUpdate, TablesInsert } from '@/types/supabase'; // Import types
+// import { TablesUpdate, TablesInsert } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
+import { executeTransaction } from '@/lib/db/transactions';
 
 export const dynamic = "force-dynamic";
 
@@ -93,31 +94,8 @@ export const POST = withAuth(async (request: NextRequest, user: User, context?: 
       return NextResponse.json({ success: false, error: 'User is not assigned to the current step or not authorized.' }, { status: 403 });
     }
 
-    // 3. Create Content Version
-    const versionNumber = await getNextVersionNumber(supabase, contentId);
-    const versionPayload: TablesInsert<'content_versions'> = {
-      content_id: contentId,
-      workflow_step_identifier: currentDbStep.id, // Store the UUID of the step
-      step_name: currentDbStep.name,
-      version_number: versionNumber,
-      content_json: currentContent.content_data, 
-      action_status: action,
-      feedback: feedback || null,
-      reviewer_id: user.id,
-    };
-    const { error: versionError } = await supabase.from('content_versions').insert(versionPayload);
-    if (versionError) {
-        console.error("Error creating content version:", versionError);
-        throw versionError;
-    }
-
-    // 4. Determine Next Step & Prepare Content Update Payload
-    const updatePayload: TablesUpdate<'content'> = {
-        updated_at: new Date().toISOString(),
-    };
-    
-    let newAssignmentsForNextStep: TablesInsert<'workflow_user_assignments'>[] = [];
-
+    // Get next step info if approving
+    let nextAssigneeId: string | null = null;
     if (action === 'approve') {
       const { data: nextDbStep, error: nextStepError } = await supabase
         .from('workflow_steps')
@@ -133,53 +111,61 @@ export const POST = withAuth(async (request: NextRequest, user: User, context?: 
         throw nextStepError;
       }
 
-      if (nextDbStep) {
-        updatePayload.current_step = nextDbStep.id;
-        updatePayload.status = 'pending_review';
-        updatePayload.assigned_to = (nextDbStep.assigned_user_ids && nextDbStep.assigned_user_ids.length > 0) 
-                                      ? nextDbStep.assigned_user_ids 
-                                      : null;
-        
-        // Prepare workflow_user_assignments for the next step
-        if (currentContent.workflow_id && nextDbStep.id && nextDbStep.assigned_user_ids && nextDbStep.assigned_user_ids.length > 0) {
-          newAssignmentsForNextStep = nextDbStep.assigned_user_ids.map((assigneeId: string) => ({
-            workflow_id: currentContent.workflow_id!,
-            step_id: nextDbStep.id!,
-            user_id: assigneeId,
-          }));
-        }
-
-      } else {
-        updatePayload.status = 'approved';
-        updatePayload.current_step = null;
-        updatePayload.assigned_to = null;
+      if (nextDbStep && nextDbStep.assigned_user_ids && nextDbStep.assigned_user_ids.length > 0) {
+        nextAssigneeId = nextDbStep.assigned_user_ids[0]; // For transaction, we'll handle multiple assignees separately
       }
-    } else { // action === 'reject'
-      updatePayload.status = 'rejected';
     }
 
-    const { data: updatedContent, error: updateContentError } = await supabase
-      .from('content')
-      .update(updatePayload)
-      .eq('id', contentId)
-      .select()
-      .single();
+    // Use transactional function to update workflow status
+    const transactionResult = await executeTransaction<{ new_status: string; new_step: number }>(
+      supabase,
+      'update_content_workflow_status',
+      {
+        p_content_id: contentId,
+        p_user_id: user.id,
+        p_action: action,
+        p_comments: feedback || null,
+        p_new_assignee_id: nextAssigneeId,
+        p_version_data: {
+          workflow_step_identifier: currentDbStep.id,
+          step_name: currentDbStep.name,
+          content_json: currentContent.content_data,
+          action_status: action,
+          feedback: feedback || null
+        }
+      }
+    );
 
-    if (updateContentError) {
-        console.error("Error updating content after action:", updateContentError);
-        throw updateContentError;
+    if (!transactionResult.success || !transactionResult.data) {
+      throw new Error(transactionResult.error || 'Failed to update workflow status');
     }
 
-    // If there are new assignments for the next step, upsert them
-    if (newAssignmentsForNextStep.length > 0) {
-      const { error: assignmentError } = await supabase
-        .from('workflow_user_assignments')
-        .upsert(newAssignmentsForNextStep, { onConflict: 'workflow_id,step_id,user_id' });
+    const { new_status, new_step } = transactionResult.data[0];
 
-      if (assignmentError) {
-        console.error("Error upserting new workflow_user_assignments:", assignmentError);
-        // Decide if this error should be critical. For now, log and continue.
-        // If this fails, user_tasks might not be created for the next step.
+    // Handle multiple assignees if needed (the transaction only handles the first one)
+    if (action === 'approve' && new_step && currentContent.workflow_id) {
+      const { data: nextDbStep } = await supabase
+        .from('workflow_steps')
+        .select('id, assigned_user_ids')
+        .eq('workflow_id', currentContent.workflow_id)
+        .eq('step_order', new_step)
+        .single();
+
+      if (nextDbStep && nextDbStep.assigned_user_ids && nextDbStep.assigned_user_ids.length > 1) {
+        // Insert additional assignees (first one was handled by transaction)
+        const additionalAssignees = nextDbStep.assigned_user_ids.slice(1).map((assigneeId: string) => ({
+          workflow_id: currentContent.workflow_id!,
+          step_id: nextDbStep.id!,
+          user_id: assigneeId,
+        }));
+
+        const { error: assignmentError } = await supabase
+          .from('workflow_user_assignments')
+          .upsert(additionalAssignees, { onConflict: 'workflow_id,step_id,user_id' });
+
+        if (assignmentError) {
+          console.error("Error upserting additional workflow_user_assignments:", assignmentError);
+        }
       }
     }
 
@@ -207,8 +193,16 @@ export const POST = withAuth(async (request: NextRequest, user: User, context?: 
         });
         
         // If approved and moved to next step, send notifications to new assignees
-        if (action === 'approve' && updatePayload.assigned_to && Array.isArray(updatePayload.assigned_to)) {
-          for (const assigneeId of updatePayload.assigned_to) {
+        if (action === 'approve' && new_step && currentContent.workflow_id) {
+          const { data: nextDbStep } = await supabase
+            .from('workflow_steps')
+            .select('id, assigned_user_ids')
+            .eq('workflow_id', currentContent.workflow_id)
+            .eq('step_order', new_step)
+            .single();
+            
+          if (nextDbStep && nextDbStep.assigned_user_ids && Array.isArray(nextDbStep.assigned_user_ids)) {
+            for (const assigneeId of nextDbStep.assigned_user_ids) {
             // Create task for the assignee
             const { data: newTask } = await supabase
               .from('user_tasks')
@@ -216,7 +210,7 @@ export const POST = withAuth(async (request: NextRequest, user: User, context?: 
                 user_id: assigneeId,
                 content_id: contentId,
                 workflow_id: currentContent.workflow_id || '',
-                workflow_step_id: updatePayload.current_step || '',
+                workflow_step_id: nextDbStep.id || '',
                 workflow_step_name: null,
                 status: 'pending',
                 due_date: null
@@ -237,6 +231,7 @@ export const POST = withAuth(async (request: NextRequest, user: User, context?: 
                 })
               });
             }
+            }
           }
         }
       }
@@ -245,7 +240,11 @@ export const POST = withAuth(async (request: NextRequest, user: User, context?: 
       // Don't fail the workflow action if email sending fails
     }
 
-    return NextResponse.json({ success: true, message: `Content ${action}d successfully.`, data: updatedContent });
+    return NextResponse.json({ success: true, message: `Content ${action}d successfully.`, data: { 
+      id: contentId,
+      status: new_status,
+      current_step: new_step 
+    } });
 
   } catch (error: unknown) {
     return handleApiError(error, 'Error processing workflow action');

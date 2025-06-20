@@ -170,7 +170,7 @@ export default function ClaimsWorkflowsPage() {
             <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation();
-                router.push(`/dashboard/claims/workflows/${row.id}`);
+                router.push(`/dashboard/claims/workflows/${row.id}/edit`);
               }}
             >
               <Eye className="mr-2 h-4 w-4" /> View
@@ -279,7 +279,7 @@ export default function ClaimsWorkflowsPage() {
           data={workflows}
           searchKey="name"
           searchPlaceholder="Search workflows by name..."
-          onRowClick={(row) => router.push(`/dashboard/claims/workflows/${row.id}`)}
+          onRowClick={(row) => router.push(`/dashboard/claims/workflows/${row.id}/edit`)}
           emptyState={
             <div className="flex flex-col items-center justify-center py-8">
               <h3 className="text-xl font-bold mb-2">No workflows found</h3>

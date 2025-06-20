@@ -9,7 +9,9 @@ import { handleApiError } from '@/lib/api-utils';
 import { v4 as uuidv4 } from 'uuid';
 import { withAuth } from '@/lib/auth/api-auth';
 import { verifyEmailTemplates } from '@/lib/auth/email-templates';
-import type { Json } from '@/types/supabase';
+// import type { Json } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
+import { z } from 'zod';
+import { validateRequest, commonSchemas } from '@/lib/api/validation';
 
 // Define types for workflow steps and assignees
 interface WorkflowAssignee {
@@ -17,6 +19,30 @@ interface WorkflowAssignee {
   email: string;
   name?: string;
 }
+
+// Validation schema for workflow assignees
+const workflowAssigneeSchema = z.object({
+  id: z.string().optional(),
+  email: commonSchemas.email,
+  name: z.string().optional()
+});
+
+// Validation schema for workflow steps
+const workflowStepSchema = z.object({
+  name: commonSchemas.nonEmptyString,
+  order_index: z.number().int().min(0),
+  assignees: z.array(workflowAssigneeSchema).min(1, 'Each step must have at least one assignee'),
+  description: z.string().optional(),
+  deadline_days: z.number().int().min(0).optional()
+});
+
+// Validation schema for creating a workflow
+const createWorkflowSchema = z.object({
+  name: commonSchemas.nonEmptyString,
+  brand_id: commonSchemas.uuid,
+  template_id: commonSchemas.uuid.optional().nullable(),
+  steps: z.array(workflowStepSchema).min(1, 'At least one step is required')
+});
 
 interface WorkflowStepData {
   id?: number | string | null;
@@ -150,21 +176,14 @@ export const GET = withAuth(async (request: NextRequest, user) => {
 export const POST = withAuth(async (request: NextRequest, user) => {
   try {
     const supabase = createSupabaseAdminClient();
-    const body = await request.json();
     
-    if (!body.name) {
-      return NextResponse.json(
-        { success: false, error: 'Workflow name is required' },
-        { status: 400 }
-      );
+    // Validate request body
+    const validation = await validateRequest(request, createWorkflowSchema);
+    if (!validation.success) {
+      return validation.response;
     }
     
-    if (!body.brand_id) {
-      return NextResponse.json(
-        { success: false, error: 'Brand ID is required' },
-        { status: 400 }
-      );
-    }
+    const body = validation.data;
 
     // Permission Check:
     const isGlobalAdmin = user.user_metadata?.role === 'admin';
@@ -196,16 +215,9 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       );
     }
     
-    if (body.steps && !Array.isArray(body.steps)) {
-      return NextResponse.json(
-        { success: false, error: 'Steps must be an array' },
-        { status: 400 }
-      );
-    }
-    
     // workflowDescription must be declared here to be available for the update later
     let workflowDescription = '';
-    const stepsForAIDescription = body.steps || []; // Use a distinct variable for AI description if body.steps is modified
+    const stepsForAIDescription = body.steps; // Use validated steps for AI description
 
     // --- AI Description Generation ---
     try {
@@ -268,36 +280,17 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       expires_at: string;
     }
     
-    const rawSteps = body.steps || [];
-    
-    // Validate that each step has at least one assignee
-    for (let i = 0; i < rawSteps.length; i++) {
-      const step = rawSteps[i];
-      if (!step.assignees || !Array.isArray(step.assignees) || step.assignees.length === 0) {
-        return NextResponse.json(
-          { success: false, error: `Step "${step.name || `Step ${i + 1}`}" must have at least one assignee` },
-          { status: 400 }
-        );
-      }
-    }
+    const rawSteps = body.steps; // Already validated by Zod schema
     
     const processedStepsForRPC: WorkflowStepData[] = [];
     const invitationItems: RpcInvitationItem[] = []; 
     const pendingInvites: string[] = [];
 
     for (const rawStep of rawSteps) {
-        const stepRole = ['admin', 'editor', 'viewer'].includes(rawStep.role) ? rawStep.role : 'editor';
+        const stepRole = 'editor'; // Default role for workflow steps
         const processedAssigneesForStep: WorkflowAssignee[] = [];
 
-        let stepId = NaN;
-        if (typeof rawStep.id === 'number') {
-            stepId = rawStep.id;
-        } else if (typeof rawStep.id === 'string' && rawStep.id.trim() !== '') {
-            stepId = parseInt(rawStep.id, 10);
-        } else if (rawStep.id !== null && rawStep.id !== undefined) {
-            const idStr = String(rawStep.id);
-            if (idStr.trim() !== '') stepId = parseInt(idStr, 10);
-        }
+        // New steps don't have IDs yet
 
         if (rawStep.assignees && Array.isArray(rawStep.assignees)) {
             for (const assignee of rawStep.assignees) {
@@ -321,19 +314,10 @@ export const POST = withAuth(async (request: NextRequest, user) => {
                 if (existingUser) {
                     processedAssignee.id = existingUser.id;
                 } else {
-                    if (!isNaN(stepId)) { 
-                        invitationItems.push({
-                            step_id: stepId,
-                            email: assignee.email,
-                            role: stepRole, 
-                            invite_token: uuidv4(),
-                            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-                        });
-                        if (!pendingInvites.includes(assignee.email)) {
-                            pendingInvites.push(assignee.email);
-                        }
-                    } else {
-                        console.warn(`Skipping invitation for assignee ${assignee.email} because of an invalid or unparseable stepId for step:`, rawStep);
+                    // For new workflows, we'll add invitations after steps are created
+                    // Store email for later invitation
+                    if (!pendingInvites.includes(assignee.email)) {
+                        pendingInvites.push(assignee.email);
                     }
                 }
                 processedAssigneesForStep.push(processedAssignee);
@@ -343,7 +327,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         const baseStepData = (typeof rawStep === 'object' && rawStep !== null) ? rawStep : {};
         processedStepsForRPC.push({
             ...baseStepData, 
-            id: !isNaN(stepId) ? stepId : null,
+            // id will be assigned by database,
             role: stepRole, 
             assignees: processedAssigneesForStep 
         });
@@ -352,9 +336,9 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     const rpcParams = {
       p_name: String(body.name),
       p_brand_id: String(body.brand_id),
-      p_steps_definition: processedStepsForRPC as unknown as Json,
+      p_steps_definition: processedStepsForRPC as any, // TODO: Type as Json when types are regenerated
       p_created_by: user.id,
-      p_invitation_items: invitationItems as unknown as Json
+      p_invitation_items: invitationItems as any // TODO: Type as Json when types are regenerated
     };
 
     const { data: newWorkflowId, error: rpcError } = await supabase.rpc(

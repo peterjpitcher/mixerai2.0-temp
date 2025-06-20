@@ -3,13 +3,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Hourglass, CheckCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow, differenceInDays } from 'date-fns';
+import { BrandIcon } from '@/components/brand-icon';
 
 interface AgedItem {
   id: string;
   title: string;
   updated_at: string;
   status: string;
-  brands: { name: string } | null;
+  brands: { 
+    name: string;
+    brand_color?: string | null;
+    logo_url?: string | null;
+  } | null;
 }
 
 interface MostAgedContentProps {
@@ -35,27 +40,49 @@ export function MostAgedContent({ initialContent }: MostAgedContentProps) {
       </CardHeader>
       <CardContent>
         {items && items.length > 0 ? (
-          <ul className="space-y-4">
+          <div className="space-y-3">
             {items.map((item) => (
-              <li key={item.id} className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <Hourglass className="h-6 w-6 text-muted-foreground" />
-                  <div>
-                    <Link href={`/dashboard/content/${item.id}`} className="text-sm font-medium hover:underline">
+              <div key={item.id} className="flex items-start justify-between gap-4 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <div className={`mt-0.5 ${getAgeColor(item.updated_at)}`}>
+                    <Hourglass className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <Link href={`/dashboard/content/${item.id}`} className="font-medium hover:underline block truncate">
                       {item.title}
                     </Link>
-                    <div className="text-sm text-muted-foreground">
-                      <span className={getAgeColor(item.updated_at)}>
-                        {item.brands?.name ? <Badge variant="outline" className="mr-2 -translate-y-px">{item.brands.name}</Badge> : null}
-                        Last updated {formatDistanceToNow(new Date(item.updated_at), { addSuffix: true })}
+                    <div className="flex items-center gap-2 mt-1">
+                      {item.brands?.name && (
+                        <div className="flex items-center gap-1.5">
+                          <BrandIcon 
+                            name={item.brands.name} 
+                            color={item.brands.brand_color || undefined}
+                            logoUrl={item.brands.logo_url || undefined}
+                            size="sm"
+                            className="h-3.5 w-3.5"
+                          />
+                          <span className="text-sm text-muted-foreground">{item.brands.name}</span>
+                        </div>
+                      )}
+                      <span className="text-xs text-muted-foreground">•</span>
+                      <span className={`text-sm ${getAgeColor(item.updated_at)}`}>
+                        {formatDistanceToNow(new Date(item.updated_at), { addSuffix: true })}
                       </span>
                     </div>
+                    <Badge variant={item.status === 'draft' ? 'secondary' : 'outline'} className="mt-2 text-xs">
+                      {item.status === 'draft' ? 'Draft' : 'Pending Review'}
+                    </Badge>
                   </div>
                 </div>
-                <Link href={`/dashboard/content/${item.id}`} className="text-sm hover:underline">View</Link>
-              </li>
+                <Link 
+                  href={`/dashboard/content/${item.id}`} 
+                  className="text-sm font-medium text-primary hover:underline whitespace-nowrap"
+                >
+                  View →
+                </Link>
+              </div>
             ))}
-          </ul>
+          </div>
         ) : (
           <div className="text-center text-muted-foreground py-8">
             <CheckCircle className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />

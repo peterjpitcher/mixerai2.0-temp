@@ -17,6 +17,7 @@ import { BrandLogoUpload } from '@/components/ui/brand-logo-upload';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 import { Checkbox } from '@/components/ui/checkbox';
 import { v4 as uuidv4 } from 'uuid';
+import { useFormPersistence } from '@/hooks/use-form-persistence';
 
 // Define UserSessionData interface (can be moved to a shared types file later)
 interface UserSessionData {
@@ -124,8 +125,17 @@ export default function NewBrandPage() {
     logo_url: null as string | null,
   });
 
+  // Setup form persistence
+  const { restoreFormData, clearSavedData } = useFormPersistence(formData, {
+    debounceMs: 500,
+    excludeFields: ['logo_url'], // Don't persist uploaded files
+    onRestore: (savedData) => {
+      setFormData(prev => ({ ...prev, ...savedData }));
+      toast.success('Restored your previous form data');
+    }
+  });
+
   const [allVettingAgencies, setAllVettingAgencies] = useState<VettingAgency[]>([]);
-  const [customAgencyInput, setCustomAgencyInput] = useState('');
   const priorityOrder: Array<'High' | 'Medium' | 'Low'> = ['High', 'Medium', 'Low'];
 
   const [masterClaimBrands, setMasterClaimBrands] = useState<MasterClaimBrand[]>([]);
@@ -169,6 +179,9 @@ export default function NewBrandPage() {
           setCurrentUser(data.user);
           if (data.user.user_metadata?.role !== 'admin') {
             setIsForbidden(true);
+          } else {
+            // User has permission, try to restore form data
+            restoreFormData();
           }
         } else {
           setCurrentUser(null);
@@ -184,7 +197,7 @@ export default function NewBrandPage() {
       }
     };
     fetchCurrentUser();
-  }, []);
+  }, [restoreFormData]);
 
   // Effect for fetching vetting agencies
   useEffect(() => {
@@ -394,7 +407,18 @@ export default function NewBrandPage() {
         throw new Error(data.error || 'Failed to create brand');
       }
       toast.success('Brand created successfully!');
-      router.push(`/dashboard/brands/${data.data.id}`);
+      
+      // Clear saved form data after successful save
+      clearSavedData();
+      
+      // Permission-aware redirect logic
+      // Only redirect to brand detail page if user is a global admin
+      // Non-admin users should go to the brands list instead
+      if (currentUser?.user_metadata?.role === 'admin') {
+        router.push(`/dashboard/brands/${data.data.id}`);
+      } else {
+        router.push('/dashboard/brands');
+      }
     } catch (error) {
       toast.error((error as Error).message || 'Failed to create brand.');
     } finally {

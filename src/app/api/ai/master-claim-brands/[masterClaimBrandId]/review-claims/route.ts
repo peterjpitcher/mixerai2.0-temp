@@ -14,6 +14,14 @@ interface ClaimReview {
   compliance_issues?: string[];
 }
 
+interface AIClaimReview {
+  claim_index?: number;
+  status: 'approved' | 'needs_revision' | 'rejected';
+  feedback: string;
+  suggested_revision?: string;
+  compliance_issues?: string[];
+}
+
 interface ReviewResult {
   master_claim_brand_id: string;
   country_code: string;
@@ -26,7 +34,7 @@ interface ReviewResult {
   claim_reviews: ClaimReview[];
 }
 
-export const GET = withAuth(async (req: NextRequest, user: User, context?: any) => {
+export const GET = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
   try {
     const { params } = context as { params: { masterClaimBrandId: string } };
     const { masterClaimBrandId } = params;
@@ -161,14 +169,17 @@ Respond in JSON format:
     }
 
     // Process the AI review results
-    const claimReviews: ClaimReview[] = reviewData.claim_reviews.map((review: any, index: number) => ({
-      claim_id: claims[review.claim_index || index].id,
-      original_claim: claims[review.claim_index || index].claim_text,
-      status: review.status,
-      feedback: review.feedback,
-      suggested_revision: review.suggested_revision,
-      compliance_issues: review.compliance_issues || []
-    }));
+    const claimReviews: ClaimReview[] = reviewData.claim_reviews.map((review: AIClaimReview, index: number) => {
+      const claimIndex = review.claim_index ?? index;
+      return {
+        claim_id: claims[claimIndex].id,
+        original_claim: claims[claimIndex].claim_text,
+        status: review.status,
+        feedback: review.feedback,
+        suggested_revision: review.suggested_revision,
+        compliance_issues: review.compliance_issues || []
+      };
+    });
 
     // Calculate summary statistics
     const approvedClaims = claimReviews.filter(r => r.status === 'approved').length;
@@ -191,7 +202,8 @@ Respond in JSON format:
       claim_reviews: claimReviews
     };
 
-    // TODO: Store the review result in the database once claim_reviews table is created
+    // Store the review result in the database
+    // TODO: Uncomment after claim_reviews table is added to database types
     // const { error: insertError } = await supabase
     //   .from('claim_reviews')
     //   .insert({

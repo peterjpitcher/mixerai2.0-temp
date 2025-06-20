@@ -11,6 +11,7 @@ import { formatDate } from '@/lib/utils/date';
 import { BrandIcon } from '@/components/brand-icon';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { TableSkeleton } from '@/components/ui/loading-skeletons';
+import { DueDateIndicator } from '@/components/ui/due-date-indicator';
 
 // TaskItem interface for the page - this should match the output of /api/me/tasks
 interface TaskItem {
@@ -164,6 +165,7 @@ export default function MyTasksPage() {
                     <th scope="col" className="text-left p-3 font-medium">Content Title</th>
                     <th scope="col" className="text-left p-3 font-medium">Brand</th>
                     <th scope="col" className="text-left p-3 font-medium">Workflow Step</th>
+                    <th scope="col" className="text-left p-3 font-medium">Due Date</th>
                     <th scope="col" className="text-left p-3 font-medium">Assigned On</th>
                     <th scope="col" className="text-left p-3 font-medium">Actions</th>
                   </tr>
@@ -183,6 +185,14 @@ export default function MyTasksPage() {
                         </div>
                       </td>
                       <td className="p-3">{task.workflow_step_name || 'N/A'}</td>
+                      <td className="p-3">
+                        <DueDateIndicator 
+                          dueDate={task.due_date} 
+                          status={task.content_status as any}
+                          size="sm"
+                        />
+                        {!task.due_date && <span className="text-muted-foreground">N/A</span>}
+                      </td>
                       <td className="p-3 text-muted-foreground">{task.created_at ? formatDate(task.created_at) : 'N/A'}</td>
                       <td className="p-3">
                         <Button variant="outline" size="sm" asChild>

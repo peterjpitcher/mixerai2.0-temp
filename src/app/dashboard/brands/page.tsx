@@ -176,11 +176,11 @@ export default function BrandsPage() {
               <MoreVertical className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
             <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation();
-                router.push(`/dashboard/brands/${row.id}`);
+                router.push(`/dashboard/brands/${row.id}/edit`);
               }}
             >
               <Eye className="mr-2 h-4 w-4" />
@@ -200,6 +200,7 @@ export default function BrandsPage() {
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onSelect={(e) => e.preventDefault()}
+                onClick={(e) => e.stopPropagation()}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
@@ -276,7 +277,7 @@ export default function BrandsPage() {
               options: languageOptions,
             },
           ]}
-          onRowClick={(row) => router.push(`/dashboard/brands/${row.id}`)}
+          onRowClick={(row) => router.push(`/dashboard/brands/${row.id}/edit`)}
           emptyState={
             <TableEmptyState 
               icon={PackageOpen}

@@ -18,6 +18,7 @@ import { debounce } from 'lodash';
 import { cn } from '@/lib/utils';
 import { BrandIcon } from '@/components/brand-icon';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
+import { useFormPersistence } from '@/hooks/use-form-persistence';
 
 /**
  * NewWorkflowPage allows users to create a new content approval workflow.
@@ -164,7 +165,31 @@ export default function NewWorkflowPage() {
   const [assigneeInputs, setAssigneeInputs] = useState<string[]>(() => new Array(workflow.steps.length).fill(''));
   const [userSearchResults, setUserSearchResults] = useState<Record<number, UserOption[]>>({});
   const [userSearchLoading, setUserSearchLoading] = useState<Record<number, boolean>>({});
+  
+  // Form persistence - combine workflow data and other form state
+  const formData = useMemo(() => ({
+    workflow,
+    selectedTemplateId,
+    assigneeInputs
+  }), [workflow, selectedTemplateId, assigneeInputs]);
+  
+  // Set up form persistence
+  const { restoreFormData, clearSavedData } = useFormPersistence(formData, {
+    storageKey: 'workflow-new',
+    debounceMs: 2000,
+    onRestore: (data) => {
+      if (data.workflow) setWorkflow(data.workflow);
+      if (data.selectedTemplateId) setSelectedTemplateId(data.selectedTemplateId);
+      if (data.assigneeInputs) setAssigneeInputs(data.assigneeInputs);
+      toast.info('Form data restored from previous session');
+    }
+  });
 
+  // Restore form data on mount
+  useEffect(() => {
+    restoreFormData();
+  }, [restoreFormData]);
+  
   useEffect(() => {
     const fetchCurrentUser = async () => {
       setIsLoadingUser(true);
@@ -630,6 +655,7 @@ export default function NewWorkflowPage() {
         throw new Error(data.error || 'Failed to create workflow. Please try again.');
       }
       toast.success('Workflow created successfully!');
+      clearSavedData(); // Clear persisted data after successful save
       router.push(`/dashboard/workflows`); // Navigate to workflows list page
     } catch (error) {
       console.error('Error creating workflow:', error);

@@ -18,7 +18,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -65,6 +64,8 @@ interface ToolRunHistoryItem {
   run_at: string; 
   status: 'success' | 'failure';
   error_message?: string | null;
+  batch_id?: string | null;
+  batch_sequence?: number | null;
 }
 
 interface EnhancedHistoryItem extends ToolRunHistoryItem {
@@ -300,48 +301,54 @@ export default function MetadataGeneratorPage() {
     let overallSuccessCount = 0;
     let overallErrorCount = 0;
 
-    for (let i = 0; i < urls.length; i++) {
-      const currentUrl = urls[i];
-      try {
-        const response = await fetch('/api/tools/metadata-generator', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            urls: [currentUrl], // Send one URL at a time
-            language: selectedLanguage, // Pass selected language
-          }),
+    try {
+      // Send all URLs at once as a batch
+      const response = await fetch('/api/tools/metadata-generator', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          urls: urls, // Send all URLs at once
+          language: selectedLanguage,
+          processBatch: true, // Flag to indicate batch processing
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        const errorMsg = data.error || 'API request failed.';
+        toast.error(errorMsg);
+        // Create error results for all URLs
+        urls.forEach(url => {
+          setResults(prevResults => [...prevResults, { url, error: errorMsg }]);
         });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-          const errorMsg = data.error || 'API request failed for this URL.';
-          setResults(prevResults => [...prevResults, { url: currentUrl, error: errorMsg }]);
-          overallErrorCount++;
-        } else if (data.success && Array.isArray(data.results) && data.results.length > 0) {
-          const resultItem = data.results[0]; 
-          setResults(prevResults => [...prevResults, resultItem]);
-          if (!resultItem.error && (resultItem.metaTitle || resultItem.metaDescription)) {
+        overallErrorCount = urls.length;
+      } else if (data.success && Array.isArray(data.results)) {
+        // Process all results at once
+        setResults(data.results);
+        data.results.forEach(result => {
+          if (!result.error && (result.metaTitle || result.metaDescription)) {
             overallSuccessCount++;
           } else {
-            // If there's an error field in the result item, or no data, count as error
             overallErrorCount++;
           }
-        } else {
-          setResults(prevResults => [...prevResults, { url: currentUrl, error: data.error || 'Unexpected server response for this URL.' }]);
-          overallErrorCount++;
-        }
-      } catch (error) {
-        setResults(prevResults => [...prevResults, { url: currentUrl, error: error instanceof Error ? error.message : 'Client-side error processing this URL.' }]);
-        overallErrorCount++;
-      } finally {
-        setProcessedCount(prevCount => prevCount + 1);
-        if (i < urls.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay
-        }
+        });
+        setProcessedCount(urls.length);
+      } else {
+        const errorMsg = data.error || 'Unexpected server response.';
+        urls.forEach(url => {
+          setResults(prevResults => [...prevResults, { url, error: errorMsg }]);
+        });
+        overallErrorCount = urls.length;
       }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Client-side error processing URLs.';
+      urls.forEach(url => {
+        setResults(prevResults => [...prevResults, { url, error: errorMsg }]);
+      });
+      overallErrorCount = urls.length;
     }
 
     setIsLoading(false);
@@ -515,10 +522,12 @@ export default function MetadataGeneratorPage() {
               <div className="flex flex-col items-end">
                 {isLoading && totalCount > 0 && (
                     <div className="w-full mb-2">
-                        <Progress value={(processedCount / totalCount) * 100} className="w-full h-2" />
-                        <p className="text-sm text-muted-foreground mt-1 text-right">
-                            Processing URL {processedCount} of {totalCount}...
-                        </p>
+                        <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                            <p className="text-sm text-muted-foreground">
+                                Processing {totalCount} {totalCount === 1 ? 'URL' : 'URLs'} as a batch...
+                            </p>
+                        </div>
                     </div>
                 )}
                 <Button type="submit" disabled={isLoading}>
@@ -690,11 +699,18 @@ export default function MetadataGeneratorPage() {
                     <TableRow key={run.id}>
                       <TableCell>{format(new Date(run.run_at), 'MMMM d, yyyy, HH:mm')}</TableCell>
                       <TableCell>
-                        {run.urlCount !== undefined ? (
-                          <span className="text-sm">{run.urlCount} {run.urlCount === 1 ? 'URL' : 'URLs'}</span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">-</span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {run.urlCount !== undefined ? (
+                            <span className="text-sm">{run.urlCount} {run.urlCount === 1 ? 'URL' : 'URLs'}</span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
+                          )}
+                          {run.batch_id && (
+                            <Badge variant="outline" className="text-xs">
+                              Batch
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

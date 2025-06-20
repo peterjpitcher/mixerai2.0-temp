@@ -107,12 +107,15 @@ interface ToolRunHistoryItem {
   run_at: string; // Assuming TIMESTAMPTZ comes as string
   status: 'success' | 'failure';
   error_message?: string | null;
+  batch_id?: string | null;
+  batch_sequence?: number | null;
 }
 
 interface EnhancedHistoryItem extends ToolRunHistoryItem {
   imageCount?: number;
   successCount?: number;
   failureCount?: number;
+  domain?: string;
 }
 
 /**
@@ -143,6 +146,17 @@ export default function AltTextGeneratorPage() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [enhancedHistory, setEnhancedHistory] = useState<EnhancedHistoryItem[]>([]);
 
+  // Extract domain from URL
+  const getDomainFromUrl = (url: string): string => {
+    try {
+      if (url.startsWith('data:')) return 'data:image';
+      const urlObj = new URL(url);
+      return urlObj.hostname;
+    } catch {
+      return 'invalid';
+    }
+  };
+
   // Enhance history items with additional metadata
   const enhanceHistory = (items: ToolRunHistoryItem[]): EnhancedHistoryItem[] => {
     return items.map(item => {
@@ -152,6 +166,11 @@ export default function AltTextGeneratorPage() {
       if (item.inputs && typeof item.inputs === 'object' && 'imageUrls' in item.inputs) {
         const imageUrls = item.inputs.imageUrls as string[];
         enhanced.imageCount = Array.isArray(imageUrls) ? imageUrls.length : 0;
+        
+        // Extract domain from first valid URL
+        if (Array.isArray(imageUrls) && imageUrls.length > 0) {
+          enhanced.domain = getDomainFromUrl(imageUrls[0]);
+        }
       }
       
       if (item.outputs && typeof item.outputs === 'object' && 'results' in item.outputs) {
@@ -298,47 +317,54 @@ export default function AltTextGeneratorPage() {
     let overallSuccessCount = 0;
     let overallErrorCount = 0;
 
-    for (let i = 0; i < urls.length; i++) {
-      const currentUrl = urls[i];
-      try {
-        const response = await fetch('/api/tools/alt-text-generator', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            imageUrls: [currentUrl], // Send one URL at a time
-            language: selectedLanguage, // Pass selected language
-          }), 
+    try {
+      // Send all image URLs at once as a batch
+      const response = await fetch('/api/tools/alt-text-generator', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          imageUrls: urls, // Send all URLs at once
+          language: selectedLanguage,
+          processBatch: true, // Flag to indicate batch processing
+        }), 
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        const errorMsg = data.error || 'API request failed.';
+        toast.error(errorMsg);
+        // Create error results for all URLs
+        urls.forEach(url => {
+          setResults(prevResults => [...prevResults, { imageUrl: url, error: errorMsg }]);
         });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-          const errorMsg = data.error || 'API request failed for this image.';
-          setResults(prevResults => [...prevResults, { imageUrl: currentUrl, error: errorMsg }]);
-          overallErrorCount++;
-        } else if (data.success && Array.isArray(data.results) && data.results.length > 0) {
-          const resultItem = data.results[0];
-          setResults(prevResults => [...prevResults, resultItem]);
-          if (resultItem.altText && !resultItem.error) {
+        overallErrorCount = urls.length;
+      } else if (data.success && Array.isArray(data.results)) {
+        // Process all results at once
+        setResults(data.results);
+        data.results.forEach(result => {
+          if (result.altText && !result.error) {
             overallSuccessCount++;
           } else {
             overallErrorCount++;
           }
-        } else {
-          setResults(prevResults => [...prevResults, { imageUrl: currentUrl, error: data.error || 'Unexpected server response for this image.' }]);
-          overallErrorCount++;
-        }
-      } catch (error) {
-        setResults(prevResults => [...prevResults, { imageUrl: currentUrl, error: error instanceof Error ? error.message : 'Client-side error processing this image.' }]);
-        overallErrorCount++;
-      } finally {
-        setProcessedCount(prevCount => prevCount + 1);
-        if (i < urls.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 500)); 
-        }
+        });
+        setProcessedCount(urls.length);
+      } else {
+        const errorMsg = data.error || 'Unexpected server response.';
+        urls.forEach(url => {
+          setResults(prevResults => [...prevResults, { imageUrl: url, error: errorMsg }]);
+        });
+        overallErrorCount = urls.length;
       }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Client-side error processing images.';
+      urls.forEach(url => {
+        setResults(prevResults => [...prevResults, { imageUrl: url, error: errorMsg }]);
+      });
+      overallErrorCount = urls.length;
     }
 
     setIsLoading(false);
@@ -519,10 +545,12 @@ export default function AltTextGeneratorPage() {
               <div className="flex flex-col items-end">
                 {isLoading && totalCount > 0 && (
                   <div className="w-full mb-2">
-                    <Progress value={(processedCount / totalCount) * 100} className="w-full h-2" />
-                    <p className="text-sm text-muted-foreground mt-1 text-right">
-                      Processing URL {processedCount} of {totalCount}...
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      <p className="text-sm text-muted-foreground">
+                        Processing {totalCount} {totalCount === 1 ? 'image' : 'images'} as a batch...
+                      </p>
+                    </div>
                   </div>
                 )}
                 <Button type="submit" disabled={isLoading}>
@@ -696,48 +724,55 @@ export default function AltTextGeneratorPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead scope="col">Run Date</TableHead>
-                    <TableHead scope="col">Images</TableHead>
-                    <TableHead scope="col">Results</TableHead>
-                    <TableHead scope="col" className="text-right">Actions</TableHead>
+                    <TableHead scope="col">Domain</TableHead>
+                    <TableHead scope="col">URLs</TableHead>
+                    <TableHead scope="col">Date</TableHead>
+                    <TableHead scope="col" className="text-right">Details</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {enhancedHistory.map((run) => (
                     <TableRow key={run.id}>
-                      <TableCell>{format(new Date(run.run_at), 'MMMM d, yyyy, HH:mm')}</TableCell>
                       <TableCell>
-                        {run.imageCount !== undefined ? (
-                          <span className="text-sm">{run.imageCount} {run.imageCount === 1 ? 'image' : 'images'}</span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">-</span>
-                        )}
+                        <span className="text-sm font-medium truncate max-w-[200px] block" title={run.domain}>
+                          {run.domain || '-'}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {run.successCount !== undefined && run.successCount > 0 && (
-                            <Badge variant="default" className="text-xs">
-                              {run.successCount} success
-                            </Badge>
+                          {run.imageCount !== undefined ? (
+                            <span className="text-sm">{run.imageCount} {run.imageCount === 1 ? 'URL' : 'URLs'}</span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
                           )}
-                          {run.failureCount !== undefined && run.failureCount > 0 && (
-                            <Badge variant="destructive" className="text-xs">
-                              {run.failureCount} failed
-                            </Badge>
-                          )}
-                          {(run.successCount === undefined && run.failureCount === undefined) && (
-                            <Badge variant={run.status === 'success' ? 'default' : 'destructive'}>
-                              {run.status}
+                          {run.batch_id && (
+                            <Badge variant="outline" className="text-xs">
+                              Batch
                             </Badge>
                           )}
                         </div>
                       </TableCell>
+                      <TableCell>
+                        <span className="text-sm">{format(new Date(run.run_at), 'MMM d, yyyy, HH:mm')}</span>
+                      </TableCell>
                       <TableCell className="text-right">
-                        <Link href={`/dashboard/tools/history/${run.id}`} passHref>
-                          <Button variant="outline" size="sm">
-                            View Details <ExternalLink className="ml-2 h-3 w-3" />
-                          </Button>
-                        </Link>
+                        <div className="flex items-center justify-end gap-2">
+                          {run.successCount !== undefined && run.successCount > 0 && (
+                            <Badge variant="default" className="text-xs">
+                              {run.successCount} ✓
+                            </Badge>
+                          )}
+                          {run.failureCount !== undefined && run.failureCount > 0 && (
+                            <Badge variant="destructive" className="text-xs">
+                              {run.failureCount} ✗
+                            </Badge>
+                          )}
+                          <Link href={`/dashboard/tools/history/${run.id}`} passHref>
+                            <Button variant="outline" size="sm">
+                              View <ExternalLink className="ml-2 h-3 w-3" />
+                            </Button>
+                          </Link>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

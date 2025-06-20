@@ -1,6 +1,6 @@
 /* Import Quill CSS */
-@import 'react-quill/dist/quill.core.css';
-@import 'react-quill/dist/quill.snow.css';
+@import 'quill/dist/quill.core.css';
+@import 'quill/dist/quill.snow.css';
 
 /* Import Tailwind CSS */
 @tailwind base;
@@ -143,3 +143,66 @@
   } 
 }
 */
+
+/* Quill Editor Fixes */
+.quill-wrapper {
+  position: relative;
+}
+
+.quill {
+  min-height: 150px;
+}
+
+.ql-container {
+  min-height: 120px;
+  font-family: inherit;
+  border: 1px solid #e5e7eb;
+  border-top: none;
+  border-radius: 0 0 0.375rem 0.375rem;
+}
+
+.ql-toolbar {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem 0.375rem 0 0;
+  background: #f9fafb;
+}
+
+.ql-editor {
+  min-height: 120px;
+  padding: 12px 15px;
+}
+
+.ql-editor.ql-blank::before {
+  font-style: italic;
+  opacity: 0.6;
+}
+
+/* Prevent duplicate toolbars */
+.quill-wrapper .ql-toolbar + .ql-toolbar {
+  display: none;
+}
+
+/* Ensure Quill content is visible */
+.ql-editor p,
+.ql-editor h1,
+.ql-editor h2,
+.ql-editor h3,
+.ql-editor ul,
+.ql-editor ol {
+  margin-bottom: 0.75em;
+}
+
+.ql-editor h1 {
+  font-size: 2em;
+  font-weight: bold;
+}
+
+.ql-editor h2 {
+  font-size: 1.5em;
+  font-weight: bold;
+}
+
+.ql-editor h3 {
+  font-size: 1.17em;
+  font-weight: bold;
+}

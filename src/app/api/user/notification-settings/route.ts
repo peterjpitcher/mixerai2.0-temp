@@ -14,14 +14,20 @@ export async function GET() {
       );
     }
 
-    // TODO: Get user's notification settings from profile once email_notifications_enabled and email_preferences columns are added
-    // For now, return default settings
+    // Get user's notification preferences from profile
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('email_notifications_enabled, email_preferences')
+      .eq('id', user.id)
+      .single();
+      
+    const emailPrefs = profile?.email_preferences as any || {};
     const settings = {
-      emailNotifications: true,
-      contentUpdates: true,
-      newComments: true,
-      taskReminders: false,
-      marketingEmails: false,
+      emailNotifications: profile?.email_notifications_enabled ?? true,
+      contentUpdates: emailPrefs.content_approved !== false && emailPrefs.content_rejected !== false,
+      newComments: emailPrefs.comments_mentions ?? true,
+      taskReminders: emailPrefs.deadline_reminders ?? false,
+      marketingEmails: emailPrefs.marketing ?? false,
     };
 
     return NextResponse.json({
@@ -54,8 +60,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // TODO: Update user's notification settings once email_notifications_enabled and email_preferences columns are added
-    // For now, just return success
+    const emailPreferences = {
+      content_approved: body.contentUpdates ?? true,
+      content_rejected: body.contentUpdates ?? true,
+      workflow_assigned: body.contentUpdates ?? true,
+      workflow_completed: body.contentUpdates ?? true,
+      brand_invitation: true,
+      weekly_summary: body.marketingEmails ?? false,
+      deadline_reminders: body.taskReminders ?? false,
+      comments_mentions: body.newComments ?? true,
+      marketing: body.marketingEmails ?? false
+    };
+
+    // Update user's notification settings in profile
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .upsert({ 
+        id: user.id,
+        email_notifications_enabled: body.emailNotifications ?? true,
+        email_preferences: emailPreferences,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', user.id);
+
+    if (updateError) {
+      throw updateError;
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Notification preferences updated successfully'
@@ -86,26 +117,21 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // Get current settings
-    // TODO: Get current settings from profile once columns are added
-    const currentSettings = {
-      emailNotifications: true,
-      contentUpdates: true,
-      newComments: true,
-      taskReminders: false,
-      marketingEmails: false,
-    };
-
-    // Merge with body
     const updatedSettings = {
-      ...currentSettings,
-      ...body
+      emailNotifications: body.emailNotifications ?? true,
+      contentUpdates: body.contentUpdates ?? true,
+      newComments: body.newComments ?? true,
+      taskReminders: body.taskReminders ?? false,
+      marketingEmails: body.marketingEmails ?? false,
     };
 
-    // Map back to database fields
     const emailPreferences = {
-      task_assignments: updatedSettings.contentUpdates || updatedSettings.taskReminders,
-      workflow_updates: updatedSettings.contentUpdates,
+      content_approved: updatedSettings.contentUpdates,
+      content_rejected: updatedSettings.contentUpdates,
+      workflow_assigned: updatedSettings.contentUpdates,
+      workflow_completed: updatedSettings.contentUpdates,
+      brand_invitation: true,
+      weekly_summary: updatedSettings.marketingEmails,
       deadline_reminders: updatedSettings.taskReminders,
       comments_mentions: updatedSettings.newComments,
       marketing: updatedSettings.marketingEmails

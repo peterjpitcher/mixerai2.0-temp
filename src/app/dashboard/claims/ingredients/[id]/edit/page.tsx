@@ -90,7 +90,7 @@ export default function EditIngredientPage() {
           throw new Error(ingredientResult.error || "Failed to parse ingredient details.");
         }
 
-        const productsResponse = await fetch(`/api/products`);
+        const productsResponse = await fetch(`/api/products?limit=1000`);
         if (!productsResponse.ok) {
           const errorData = await productsResponse.json().catch(() => ({}));
           throw new Error(errorData.error || "Failed to fetch products.");

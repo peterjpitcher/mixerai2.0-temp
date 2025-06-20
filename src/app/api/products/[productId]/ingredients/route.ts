@@ -24,21 +24,59 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
         return NextResponse.json({ success: false, error: 'Product ID is required and must be a string.' }, { status: 400 });
     }
 
-    // TODO: Permission check - user should have access to the product id
-
     try {
         const supabase = createSupabaseAdminClient();
 
-        // Check if product exists first (optional, but good practice)
+        // Check if product exists and user has access through brand permissions
 
         const { data: productData, error: productError } = await supabase.from('products')
-            .select('id')
-            .eq('id', productId) // Changed from id to productId
+            .select('id, master_brand_id')
+            .eq('id', productId)
             .single();
 
         if (productError || !productData) {
-            console.warn(`[API /products/${productId}/ingredients GET] Product not found or error checking product:`, productError); // Changed from id to productId
+            console.warn(`[API /products/${productId}/ingredients GET] Product not found or error checking product:`, productError);
             return NextResponse.json({ success: false, error: 'Product not found.' }, { status: 404 });
+        }
+
+        // Check if user has permission to access this product's brand
+        if (!productData.master_brand_id) {
+            return NextResponse.json({ success: false, error: 'Product has no associated brand' }, { status: 400 });
+        }
+
+        // First check if user is platform admin
+        const isPlatformAdmin = user.user_metadata?.role === 'admin' && await (async () => {
+            const { count } = await supabase
+                .from('user_brand_permissions')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', user.id);
+            return count === 0;
+        })();
+
+        if (!isPlatformAdmin) {
+            // Get the mixerai_brand_id from master_claim_brands
+            const { data: masterBrand, error: masterBrandError } = await supabase
+                .from('master_claim_brands')
+                .select('mixerai_brand_id')
+                .eq('id', productData.master_brand_id)
+                .single();
+
+            if (masterBrandError || !masterBrand || !masterBrand.mixerai_brand_id) {
+                console.warn(`[API /products/${productId}/ingredients GET] Master brand not linked to MixerAI brand`);
+                return NextResponse.json({ success: false, error: 'Product brand configuration error.' }, { status: 403 });
+            }
+            
+            const { data: brandPermission, error: permissionError } = await supabase
+                .from('user_brand_permissions')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('brand_id', masterBrand.mixerai_brand_id)
+                .single();
+
+            if (permissionError || !brandPermission) {
+                console.warn(`[API /products/${productId}/ingredients GET] User lacks permission to access product brand`);
+                return NextResponse.json({ success: false, error: 'Insufficient permissions to access this product.' }, { status: 403 });
+            }
         }
 
         // Fetch associated ingredients
@@ -57,7 +95,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
         // The data from Supabase with this type of join will be an array of objects like:
         // [{ ingredients: { id: '...', name: '...', ... } }, ... ]
         // We need to map this to an array of IngredientDetails
-        const ingredients: IngredientDetails[] = Array.isArray(data) ? data.map((item: {ingredients: {id: string; name: string; description: string | null}}) => {
+        const ingredients: IngredientDetails[] = Array.isArray(data) ? data.map((item: any) => {
             if (item.ingredients) { // Check if ingredients object exists
                 return {
                     id: item.ingredients.id,

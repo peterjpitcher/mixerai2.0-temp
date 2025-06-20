@@ -3,7 +3,7 @@ import { generateAltText } from '@/lib/azure/openai';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { Database, Json } from '@/types/supabase';
+// import { Database, Json } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
 
 // In-memory rate limiting
 const rateLimit = new Map<string, { count: number, timestamp: number }>();
@@ -13,6 +13,7 @@ const MAX_REQUESTS_PER_MINUTE = 10; // Allow 10 requests per minute per IP
 interface AltTextGenerationRequest {
   imageUrls: string[];
   language?: string; // Add language field from request
+  processBatch?: boolean; // Add batch processing flag
 }
 
 interface AltTextResultItem {
@@ -202,9 +203,11 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
           guardrails: ''
         };
         
-        console.log(`[Delay] Alt-Text Gen: Waiting 5 seconds before AI call for ${imageUrl}...`);
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        console.log(`[Delay] Alt-Text Gen: Finished 5-second wait. Calling AI for ${imageUrl}...`);
+        // Add delay between image processing to avoid rate limiting (except for the first image)
+        if (results.length > 0) {
+          console.log(`[Delay] Alt-Text Gen: Waiting 2 seconds before processing next image...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
 
         // console.log(`[AltTextGen] Generating for ${imageUrl} with lang: ${language}, country: ${country}`);
         const generatedAltTextResult = await generateAltText(
@@ -260,15 +263,23 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
     // Log to tool_run_history in all cases (success or failure)
     try {
       if (apiInputs) { // Only log if inputs were parsed or an attempt was made
+        // Generate a batch_id if processBatch is true and there are multiple image URLs
+        const batchId = (apiInputs.processBatch && apiInputs.imageUrls.length > 1) 
+          ? crypto.randomUUID() 
+          : null;
+
+        // For batch processing, create a single history entry with all image URLs
         await supabaseAdmin.from('tool_run_history').insert({
             user_id: user.id,
             tool_name: 'alt_text_generator',
-            inputs: apiInputs as unknown as Json,
-            outputs: apiOutputs || { error: historyErrorMessage || 'Unknown error before output generation' } as unknown as Json,
+            inputs: apiInputs as any, // TODO: Type as Json when types are regenerated
+            outputs: apiOutputs || { error: historyErrorMessage || 'Unknown error before output generation' } as any, // TODO: Type as Json when types are regenerated
             status: historyEntryStatus,
             error_message: historyErrorMessage,
-            brand_id: null // Alt text generator is not brand-specific for history
-        } as Database['public']['Tables']['tool_run_history']['Insert']);
+            brand_id: null, // Alt text generator is not brand-specific for history
+            batch_id: batchId,
+            batch_sequence: batchId ? 1 : null
+        } as any); // TODO: Type as Database['public']['Tables']['tool_run_history']['Insert'] when types are regenerated
       } else {
         // This case might happen if request.json() itself fails catastrophically before apiInputs is set
         // Or if a rate limit error occurred very early before apiInputs could be determined

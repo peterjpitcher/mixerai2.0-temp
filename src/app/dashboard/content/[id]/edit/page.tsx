@@ -15,11 +15,14 @@ import { createBrowserClient } from '@supabase/ssr';
 import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandIcon,  } from '@/components/brand-icon';
+import { BreadcrumbNav } from '@/components/ui/breadcrumb-nav';
 import { ArrowLeft, Loader2, ShieldAlert, XCircle, CheckCircle, Clock, MessageSquare, UserCircle,  } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format as formatDateFns } from 'date-fns';
 import { DatePicker } from '@/components/ui/date-picker';
 import { RegenerationPanel } from '@/components/content/regeneration-panel';
+import { useAutoSave } from '@/hooks/use-auto-save';
+import { SaveStatusIndicator } from '@/components/ui/save-status';
 
 
 interface ContentEditPageProps {
@@ -102,25 +105,6 @@ interface Template {
   fields: TemplateFields;
 }
 
-// Placeholder Breadcrumbs component
-const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
-  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
-    <ol className="flex items-center space-x-1.5">
-      {items.map((item, index) => (
-        <li key={index} className="flex items-center">
-          {item.href ? (
-            <Link href={item.href} className="hover:underline">
-              {item.label}
-            </Link>
-          ) : (
-            <span>{item.label}</span>
-          )}
-          {index < items.length - 1 && <span className="mx-1.5">/</span>}
-        </li>
-      ))}
-    </ol>
-  </nav>
-);
 
 /**
  * ContentEditPage allows users to modify an existing piece of content.
@@ -133,6 +117,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const fetchingRef = React.useRef(false);
   
   // User and Permissions State
@@ -401,6 +386,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setContent(prev => ({ ...prev, [name]: value }));
+    setHasUnsavedChanges(true);
   };
   
   // Handler for dynamic output field changes
@@ -415,6 +401,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         },
       },
     }));
+    setHasUnsavedChanges(true);
   };
   
   const handleSave = async (): Promise<boolean> => {
@@ -475,6 +462,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
           return newState;
         });
       }
+      setHasUnsavedChanges(false);
       success = true;
     } catch (error: unknown) {
       console.error('Error updating content:', error);
@@ -514,8 +502,35 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         },
       },
     }));
+    setHasUnsavedChanges(true);
     toast.success('Field added successfully!');
   };
+  
+  // Configure auto-save
+  const {
+    isSaving: isAutoSaving,
+    lastSaved,
+    error: saveError,
+    save: triggerSave,
+    hasUnsavedChanges: autoSaveHasChanges
+  } = useAutoSave({
+    data: content,
+    onSave: async () => {
+      const success = await handleSave();
+      if (!success) {
+        throw new Error('Failed to save content');
+      }
+    },
+    debounceMs: 3000, // Auto-save after 3 seconds of inactivity
+    enabled: isAllowedToEdit && !isLoading && content.id !== '',
+    onError: (error) => {
+      console.error('Auto-save error:', error);
+      toast.error('Auto-save failed. Your changes are not being saved automatically.');
+    },
+    onSuccess: () => {
+      console.log('Auto-save successful');
+    }
+  });
 
   if (isLoadingUser || isLoading || isCheckingPermissions) {
     return (
@@ -577,7 +592,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs items={[
+      <BreadcrumbNav items={[
         { label: "Dashboard", href: "/dashboard" },
         { label: "Content", href: "/dashboard/content" },
         { label: content.title || "Loading Content...", href: `/dashboard/content/${id}` },
@@ -600,9 +615,18 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         title={`Edit: ${content.title || 'Content'}`}
         description="Modify the title, body, and other generated fields for this piece of content."
         actions={
-          <Button variant="outline" onClick={() => router.push(`/dashboard/content/${id}`)}>
-            View Content (Read-only)
-          </Button>
+          <div className="flex items-center gap-4">
+            <SaveStatusIndicator
+              status={isAutoSaving || isSaving ? 'saving' : saveError ? 'error' : lastSaved ? 'saved' : 'idle'}
+              lastSaved={lastSaved}
+              error={saveError?.message}
+              onRetry={triggerSave}
+              showTimestamp={true}
+            />
+            <Button variant="outline" onClick={() => router.push(`/dashboard/content/${id}`)}>
+              View Content (Read-only)
+            </Button>
+          </div>
         }
       />
       
@@ -625,7 +649,10 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
                 <Label htmlFor="due-date">Due Date (Optional)</Label>
                 <DatePicker
                   date={content.due_date ? new Date(content.due_date) : undefined}
-                  onDateChange={(date) => setContent(prev => ({ ...prev, due_date: date?.toISOString() || null }))}
+                  onDateChange={(date) => {
+                    setContent(prev => ({ ...prev, due_date: date?.toISOString() || null }));
+                    setHasUnsavedChanges(true);
+                  }}
                   placeholder="Select a due date"
                   disabled={false}
                 />
@@ -773,8 +800,8 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         <Button variant="outline" onClick={() => router.push(`/dashboard/content/${id}`)} disabled={isSaving}>
             Cancel
         </Button>
-        <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
+        <Button onClick={handleSave} disabled={isSaving || isAutoSaving}>
+            {(isSaving || isAutoSaving) ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
         </Button>
       </div>
     </div>

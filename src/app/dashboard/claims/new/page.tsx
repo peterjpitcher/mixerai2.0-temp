@@ -120,7 +120,7 @@ export default function NewClaimPage() {
     if (errors[name as keyof ClaimFormData]) setErrors(prev => ({ ...prev, [name]: undefined }));
   };
 
-  const handleSelectChange = (name: keyof ClaimFormData, value: string) => {
+  const handleSelectChange = (name: keyof ClaimFormData, value: string | null) => {
     setFormData(prev => {
       const newState = { ...prev, [name]: value };
       // Reset related IDs when level changes
@@ -354,12 +354,12 @@ export default function NewClaimPage() {
             <div className="grid grid-cols-12 gap-4">
               <Label htmlFor="workflow_id" className="col-span-12 sm:col-span-3 text-left sm:text-right pt-2">Approval Workflow (Optional)</Label>
               <div className="col-span-12 sm:col-span-9">
-                <Select name="workflow_id" value={formData.workflow_id || ""} onValueChange={(value) => handleSelectChange('workflow_id', value)} disabled={isLoadingWorkflows}>
+                <Select name="workflow_id" value={formData.workflow_id || "none"} onValueChange={(value) => handleSelectChange('workflow_id', value === "none" ? null : value)} disabled={isLoadingWorkflows}>
                   <SelectTrigger>
                     <SelectValue placeholder={isLoadingWorkflows ? "Loading workflows..." : "Select workflow (optional)"} />
                   </SelectTrigger>
                   <SelectContent className="max-h-60">
-                    <SelectItem value="">No workflow</SelectItem>
+                    <SelectItem value="none">No workflow</SelectItem>
                     {workflows.map(workflow => (
                       <SelectItem key={workflow.id} value={workflow.id}>
                         <span className="truncate">{workflow.name} {workflow.brand_name ? `(${workflow.brand_name})` : ""}</span>

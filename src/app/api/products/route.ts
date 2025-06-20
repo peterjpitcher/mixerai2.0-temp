@@ -27,7 +27,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
         
         // Validate pagination parameters
         const validatedPage = Math.max(1, page);
-        const validatedLimit = Math.min(Math.max(1, limit), 100); // Max 100 items per page
+        const validatedLimit = Math.min(Math.max(1, limit), 1000); // Max 1000 items per page
         const offset = (validatedPage - 1) * validatedLimit;
         if (isBuildPhase()) {
             console.log('[API Products GET] Build phase: returning empty array.');
@@ -40,20 +40,72 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
         const isPlatAdmin = await isPlatformAdmin(user, supabase);
         
         // Get user's accessible brands if not platform admin
-        let accessibleBrands: string[] = [];
+        let accessibleMasterBrandIds: string[] = [];
         if (!isPlatAdmin) {
-            accessibleBrands = await getUserAccessibleBrands(user.id, supabase);
+            // Get user's MixerAI brand permissions
+            const mixerAIBrandIds = await getUserAccessibleBrands(user.id, supabase);
+            
+            console.log('[API Products GET] User MixerAI brand IDs:', mixerAIBrandIds);
             
             // If user has no brand access, return empty result
-            if (accessibleBrands.length === 0) {
+            if (mixerAIBrandIds.length === 0) {
                 return NextResponse.json({
                     success: true,
                     data: [],
-                    meta: {
-                        total: 0,
+                    pagination: {
                         page: validatedPage,
                         limit: validatedLimit,
-                        totalPages: 0
+                        total: 0,
+                        totalPages: 0,
+                        hasNextPage: false,
+                        hasPreviousPage: false
+                    }
+                });
+            }
+            
+            // Get master claim brands linked to these MixerAI brands
+            const { data: masterBrands, error: masterBrandsError } = await supabase
+                .from('master_claim_brands')
+                .select('id, mixerai_brand_id')
+                .in('mixerai_brand_id', mixerAIBrandIds);
+                
+            console.log('[API Products GET] Master brands found:', masterBrands);
+                
+            if (masterBrandsError) {
+                console.error('[API Products GET] Error fetching master brands:', masterBrandsError);
+                return handleApiError(masterBrandsError, 'Failed to fetch brand associations');
+            }
+            
+            accessibleMasterBrandIds = masterBrands?.map(mb => mb.id) || [];
+            
+            // Also check if any of the user's brands have a master_claim_brand_id set
+            const { data: brandsWithMasterClaim, error: brandsError } = await supabase
+                .from('brands')
+                .select('master_claim_brand_id')
+                .in('id', mixerAIBrandIds)
+                .not('master_claim_brand_id', 'is', null);
+                
+            if (!brandsError && brandsWithMasterClaim) {
+                const additionalMasterBrandIds = brandsWithMasterClaim
+                    .map(b => b.master_claim_brand_id)
+                    .filter(id => id && !accessibleMasterBrandIds.includes(id));
+                accessibleMasterBrandIds.push(...additionalMasterBrandIds);
+            }
+            
+            console.log('[API Products GET] Accessible master brand IDs:', accessibleMasterBrandIds);
+            
+            // If no master brands found for user's MixerAI brands, return empty
+            if (accessibleMasterBrandIds.length === 0) {
+                return NextResponse.json({
+                    success: true,
+                    data: [],
+                    pagination: {
+                        page: validatedPage,
+                        limit: validatedLimit,
+                        total: 0,
+                        totalPages: 0,
+                        hasNextPage: false,
+                        hasPreviousPage: false
                     }
                 });
             }
@@ -65,15 +117,15 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
             .order('name');
         
         // Apply brand filter if not platform admin
-        if (!isPlatAdmin && accessibleBrands.length > 0) {
-            query = query.in('master_brand_id', accessibleBrands);
+        if (!isPlatAdmin && accessibleMasterBrandIds.length > 0) {
+            query = query.in('master_brand_id', accessibleMasterBrandIds);
         }
         
         // Filter by specific brand if requested
         const brandIdParam = req.nextUrl.searchParams.get('brand_id');
         if (brandIdParam) {
             // Verify user has access to this brand
-            if (!isPlatAdmin && !accessibleBrands.includes(brandIdParam)) {
+            if (!isPlatAdmin && !accessibleMasterBrandIds.includes(brandIdParam)) {
                 return NextResponse.json(
                     { success: false, error: 'Access denied to this brand' },
                     { status: 403 }

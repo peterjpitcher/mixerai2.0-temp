@@ -49,11 +49,11 @@ interface WorkflowDetails {
 
 // Define the role card selection component
 const roles = [
-  { id: 'lrc', name: 'LRC', description: 'Labelling and Regulatory Compliance - Reviews claims for accuracy, regulatory requirements, and labelling standards across all markets' },
-  { id: 'bdt', name: 'BDT', description: 'Brand Development Team - Ensures claims align with brand positioning, messaging strategy, and marketing objectives' },
-  { id: 'mat', name: 'MAT', description: 'Market Activation Team - Validates claims for local market requirements, cultural appropriateness, and regional compliance' },
-  { id: 'legal', name: 'Legal', description: 'Legal review and compliance - Verifies claims meet all legal requirements, substantiation standards, and risk management protocols' },
-  { id: 'sme', name: 'SME', description: 'Subject Matter Expert - Provides technical expertise on specific ingredients, formulations, or scientific claims' },
+  { id: 'lrc', name: 'Labelling and Regulatory Compliance', description: 'Reviews claims for accuracy, regulatory requirements, and labelling standards across all markets' },
+  { id: 'bdt', name: 'Brand Development Team', description: 'Ensures claims align with brand positioning, messaging strategy, and marketing objectives' },
+  { id: 'mat', name: 'Market Activation Team', description: 'Validates claims for local market requirements, cultural appropriateness, and regional compliance' },
+  { id: 'legal', name: 'Legal', description: 'Verifies claims meet all legal requirements, substantiation standards, and risk management protocols' },
+  { id: 'sme', name: 'Subject Matter Expert', description: 'Provides technical expertise on specific ingredients, formulations, or scientific claims' },
 ];
 
 interface RoleSelectionCardsProps {
@@ -159,25 +159,35 @@ export default function EditClaimsWorkflowPage() {
       
       try {
         const response = await fetch(`/api/users/search?query=${encodeURIComponent(query)}`);
+        
+        if (!response.ok) {
+          console.error('User search failed with status:', response.status);
+          const errorText = await response.text();
+          console.error('Error response:', errorText);
+          throw new Error(`Search failed: ${response.status}`);
+        }
+        
         const data = await response.json();
         
         if (data.success && Array.isArray(data.users)) {
+          console.log(`Found ${data.users.length} users for query "${query}"`);
           // Filter out already assigned users
           const currentAssigneeIds = steps[stepIndex].assignees.map(a => a.id);
           const filteredUsers = data.users.filter((user: UserOption) => !currentAssigneeIds.includes(user.id));
           setUserSearchResults(prev => ({ ...prev, [stepIndex]: filteredUsers }));
         } else {
+          console.log('No users found or invalid response:', data);
           setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
         }
       } catch (error) {
         console.error('Error searching users:', error);
+        toast.error('Failed to search users. Please try again.');
         setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
       } finally {
         setUserSearchLoading(prev => ({ ...prev, [stepIndex]: false }));
       }
     }, 300),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [steps]
   );
 
   const handleAssigneeInputChange = (stepIndex: number, value: string) => {

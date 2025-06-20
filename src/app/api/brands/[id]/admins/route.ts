@@ -46,7 +46,7 @@ export const GET = withAuth(async (
     // The data structure will be [{ profiles: { id, full_name } }, ...]
     // We need to flatten it and ensure no null profiles are passed.
     const formattedAdmins: BrandAdmin[] = admins
-      ? admins.map(item => item.profiles).filter(profile => profile !== null) as BrandAdmin[]
+      ? admins.map(item => item.profiles as any).filter(profile => profile !== null) as BrandAdmin[]
       : [];
 
     return NextResponse.json({ success: true, admins: formattedAdmins });

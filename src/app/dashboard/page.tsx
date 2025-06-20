@@ -2,17 +2,14 @@ import { Suspense } from 'react';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { getProfileWithAssignedBrands } from '@/lib/auth/user-profile';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '@/types/supabase';
+// import type { Database } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
 import { TeamActivityFeed } from '@/components/dashboard/team-activity-feed';
 import { MostAgedContent } from '@/components/dashboard/most-aged-content';
 import { TasksSkeleton } from '@/components/dashboard/dashboard-skeleton';
 import { MyTasks } from '@/components/dashboard/my-tasks';
 import { DashboardMetrics } from '@/components/dashboard/dashboard-metrics';
-import { StatCard } from '@/components/dashboard/stat-card';
-import { FileText, BarChart3, Clock, CheckCircle2 } from 'lucide-react';
-import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 
-async function getTeamActivity(supabase: SupabaseClient<Database>, profile: { role?: string; assigned_brands?: string[] } | null) {
+async function getTeamActivity(supabase: SupabaseClient<any>, profile: { role?: string; assigned_brands?: string[] } | null) { // TODO: Type as SupabaseClient<Database> when types are regenerated
   if (!profile) return [];
 
   let query = supabase
@@ -35,7 +32,7 @@ async function getTeamActivity(supabase: SupabaseClient<Database>, profile: { ro
     
   const { data, error } = await query
     .order('created_at', { ascending: false })
-    .limit(10);
+    .limit(30);
 
   if (error) {
     console.error('Error fetching team activity:', error);
@@ -46,7 +43,7 @@ async function getTeamActivity(supabase: SupabaseClient<Database>, profile: { ro
     id: item.id,
     type: item.status === 'draft' ? 'content_created' as const : 'content_updated' as const,
     created_at: item.created_at || new Date().toISOString(),
-    user: item.profiles,
+    user: item.profiles as any, // TODO: Remove type assertion when types are regenerated
     target: {
       id: item.id,
       name: item.title,
@@ -55,12 +52,12 @@ async function getTeamActivity(supabase: SupabaseClient<Database>, profile: { ro
   }));
 }
 
-async function getMostAgedContent(supabase: SupabaseClient<Database>, profile: { role?: string; assigned_brands?: string[] } | null) {
+async function getMostAgedContent(supabase: SupabaseClient<any>, profile: { role?: string; assigned_brands?: string[] } | null) { // TODO: Type as SupabaseClient<Database> when types are regenerated
   if (!profile) return [];
 
   let query = supabase
     .from('content')
-    .select('id, title, updated_at, status, brand_id, brands ( name, brand_color )')
+    .select('id, title, updated_at, status, brand_id, brands ( name, brand_color, logo_url )')
     // @ts-ignore - Type issue with Supabase query builder
     .in('status', ['draft', 'pending_review']);
 
@@ -81,15 +78,19 @@ async function getMostAgedContent(supabase: SupabaseClient<Database>, profile: {
 
   return (data || [])
     .filter((item) => item.updated_at !== null)
-    .map((item) => ({
-      ...item,
-      updated_at: item.updated_at!,
-      brandName: item.brands?.name || 'N/A',
-      brandColor: item.brands?.brand_color || '#888'
-    }));
+    .map((item) => {
+      const { brands, ...rest } = item;
+      return {
+        ...rest,
+        updated_at: item.updated_at!,
+        brands: brands as any, // TODO: Remove type assertion when types are regenerated
+        brandName: (brands as any)?.name || 'N/A',
+        brandColor: (brands as any)?.brand_color || '#888'
+      };
+    });
 }
 
-async function getDashboardMetrics(supabase: SupabaseClient<Database>, profile: { role?: string; assigned_brands?: string[] } | null) {
+async function getDashboardMetrics(supabase: SupabaseClient<any>, profile: { role?: string; assigned_brands?: string[] } | null) { // TODO: Type as SupabaseClient<Database> when types are regenerated
   if (!profile) return { totalContent: 0, totalBrands: 0, totalWorkflows: 0, pendingTasks: 0, completedThisWeek: 0, pendingReviews: 0 };
 
   // Get the current user
@@ -191,8 +192,6 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <Breadcrumbs items={[{ label: "Dashboard" }]} />
-      
       {/* Header with welcome message */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Welcome back{userProfile?.full_name ? `, ${userProfile.full_name}` : ''}</h1>
@@ -205,58 +204,6 @@ export default async function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-4">
         {/* Left Column - Main Content */}
         <div className="lg:col-span-3 space-y-6">
-          {/* All Key Metrics at the top (smaller) */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            <div className="scale-[0.85] origin-top-left">
-              <StatCard
-                title="Total Content"
-                value={metrics.totalContent}
-                icon={FileText}
-                description="across all brands"
-              />
-            </div>
-            <div className="scale-[0.85] origin-top-left">
-              <StatCard
-                title="Pending Tasks"
-                value={metrics.pendingTasks}
-                icon={Clock}
-                description="awaiting action"
-              />
-            </div>
-            <div className="scale-[0.85] origin-top-left">
-              <StatCard
-                title="Completed"
-                value={metrics.completedThisWeek}
-                icon={CheckCircle2}
-                description="this week"
-              />
-            </div>
-            <div className="scale-[0.85] origin-top-left">
-              <StatCard
-                title="In Review"
-                value={metrics.pendingReviews}
-                icon={BarChart3}
-                description="content items"
-              />
-            </div>
-            <div className="scale-[0.85] origin-top-left">
-              <StatCard
-                title="Total Brands"
-                value={metrics.totalBrands}
-                icon={FileText}
-                description="active brands"
-              />
-            </div>
-            <div className="scale-[0.85] origin-top-left">
-              <StatCard
-                title="Workflows"
-                value={metrics.totalWorkflows}
-                icon={FileText}
-                description="active workflows"
-              />
-            </div>
-          </div>
-
           {/* My Tasks */}
           <Suspense fallback={<TasksSkeleton />}>
             <MyTasks />
@@ -269,10 +216,12 @@ export default async function DashboardPage() {
         </div>
         
         {/* Right Column - Team Activity (Condensed, Full Height) */}
-        <div className="lg:col-span-1 lg:sticky lg:top-6 lg:h-[calc(100vh-120px)]">
-          <Suspense fallback={<TasksSkeleton />}>
-            <TeamActivityFeed initialActivity={teamActivity} condensed={true} />
-          </Suspense>
+        <div className="lg:col-span-1">
+          <div className="lg:sticky lg:top-24 lg:h-[calc(100vh-6rem)]">
+            <Suspense fallback={<TasksSkeleton />}>
+              <TeamActivityFeed initialActivity={teamActivity} condensed={true} />
+            </Suspense>
+          </div>
         </div>
       </div>
     </div>

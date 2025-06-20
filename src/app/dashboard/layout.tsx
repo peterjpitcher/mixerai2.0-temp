@@ -12,7 +12,8 @@ import { LogOut, UserCircle2, Loader2 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
 import Image from 'next/image';
 import { DevelopmentOnly } from "@/components/development-only";
-import { FeatureErrorBoundary } from "@/components/error-boundary";
+import { ErrorBoundary } from "@/components/error-boundary";
+import { SessionTimeoutProvider } from "@/components/providers/session-timeout-provider";
 
 // Define UserSessionData interface (can be shared if defined elsewhere)
 interface UserSessionData {
@@ -105,8 +106,9 @@ export default function DashboardLayout({
   const avatarUrl = currentUser?.avatar_url || currentUser?.user_metadata?.avatar_url;
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <header className="border-b bg-secondary text-secondary-foreground sticky top-0 z-40 h-16">
+    <SessionTimeoutProvider warningMinutes={25} sessionMinutes={30}>
+      <div className="flex min-h-screen flex-col bg-background">
+        <header className="border-b bg-secondary text-secondary-foreground sticky top-0 z-40 h-16">
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between h-full">
           <div className="flex items-center gap-2 font-semibold">
             <Image 
@@ -174,12 +176,13 @@ export default function DashboardLayout({
               {/* This will be populated client-side */}
             </div>
           </DevelopmentOnly>
-          <FeatureErrorBoundary>
+          <ErrorBoundary>
             {children}
-          </FeatureErrorBoundary>
+          </ErrorBoundary>
         </main>
       </div>
       <BottomMobileNavigation />
     </div>
+    </SessionTimeoutProvider>
   );
 } 

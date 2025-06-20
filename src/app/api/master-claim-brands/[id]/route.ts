@@ -248,6 +248,26 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context?: un
         }
         // --- Permission Check End ---
 
+        // Check if there are any claims referencing this master claim brand
+        const { count: claimsCount, error: claimsError } = await supabase
+            .from('claims')
+            .select('*', { count: 'exact', head: true })
+            .eq('master_brand_id', id);
+
+        if (claimsError) {
+            console.error(`[API MasterClaimBrands DELETE /${id}] Error checking claims:`, claimsError);
+            return handleApiError(claimsError, 'Failed to check for existing claims.');
+        }
+
+        if (claimsCount && claimsCount > 0) {
+            return NextResponse.json(
+                { 
+                    success: false, 
+                    error: `Cannot delete this master claim brand because it has ${claimsCount} associated claim${claimsCount > 1 ? 's' : ''}. Please delete or reassign the claims first.` 
+                },
+                { status: 400 }
+            );
+        }
 
         const { error, count } = await supabase.from('master_claim_brands') // Renamed table
             .delete({ count: 'exact' })
@@ -255,6 +275,16 @@ export const DELETE = withAuth(async (req: NextRequest, user: User, context?: un
 
         if (error) {
             console.error(`[API MasterClaimBrands DELETE /${id}] Error deleting master claim brand:`, error);
+            // Check for constraint violation
+            if (error.code === '23514' || error.message?.includes('chk_claim_level_reference')) {
+                return NextResponse.json(
+                    { 
+                        success: false, 
+                        error: 'Cannot delete this master claim brand because it has associated claims. Please delete or reassign the claims first.' 
+                    },
+                    { status: 400 }
+                );
+            }
             return handleApiError(error, 'Failed to delete master claim brand.');
         }
 

@@ -42,7 +42,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
         }
 
         // Get user details for assigned users
-        const workflowData = data as Record<string, unknown>;
+        const workflowData = data as unknown as Record<string, unknown>;
         if (workflowData.claims_workflow_steps && Array.isArray(workflowData.claims_workflow_steps) && workflowData.claims_workflow_steps.length > 0) {
             const allUserIds = (workflowData.claims_workflow_steps as Array<Record<string, unknown>>)
                 .flatMap((step) => (step.assigned_user_ids as string[]) || [])
