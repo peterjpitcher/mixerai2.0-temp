@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 interface ClaimWithRelations {
   id: string;
   claim_text: string;
-  claim_type: 'allowed' | 'disallowed' | 'mandatory';
+  claim_type: 'allowed' | 'disallowed';
   level: 'brand' | 'product' | 'ingredient';
   master_brand_id?: string | null;
   product_id?: string | null;
@@ -30,37 +30,26 @@ interface ClaimWithRelations {
   ingredients?: { name: string } | null;
 }
 
-// Define the expected schema for a single claim entry in the database
-const dbClaimSchema = z.object({
-  claim_text: z.string().min(1),
-  claim_type: z.enum(['allowed', 'disallowed', 'mandatory']),
-  level: z.enum(['brand', 'product', 'ingredient']),
-  master_brand_id: z.string().uuid().optional().nullable(),
-  product_id: z.string().uuid().optional().nullable(),
-  ingredient_id: z.string().uuid().optional().nullable(),
-  country_code: z.string().min(2), // e.g., 'US', 'GB', or '__GLOBAL__'
-  description: z.string().optional().nullable(),
-  created_by: z.string().uuid().optional().nullable(),
-});
 
 // Define the schema for the incoming request body from the form
 const requestBodySchema = z.object({
   claim_text: z.string().min(1, "Claim text is required."),
-  claim_type: z.enum(['allowed', 'disallowed', 'mandatory'], { message: "Invalid claim type." }),
+  claim_type: z.enum(['allowed', 'disallowed'], { message: "Invalid claim type." }),
   level: z.enum(['brand', 'product', 'ingredient'], { message: "Invalid claim level." }),
   description: z.string().optional().nullable(),
   master_brand_id: z.string().uuid().optional().nullable(),
-  ingredient_id: z.string().uuid().optional().nullable(),
+  ingredient_id: z.string().uuid().optional().nullable(), // Deprecated, for backward compatibility
+  ingredient_ids: z.array(z.string().uuid()).optional().default([]), // New field for multiple ingredients
   product_ids: z.array(z.string().uuid()).optional().default([]),
   country_codes: z.array(z.string().min(2)).min(1, "At least one country/market must be selected."),
   workflow_id: z.string().uuid().optional().nullable(), // Added for workflow support
 }).refine(data => {
   if (data.level === 'brand' && !data.master_brand_id) return false;
   if (data.level === 'product' && (!data.product_ids || data.product_ids.length === 0)) return false;
-  if (data.level === 'ingredient' && !data.ingredient_id) return false;
+  if (data.level === 'ingredient' && !data.ingredient_id && (!data.ingredient_ids || data.ingredient_ids.length === 0)) return false;
   return true;
 }, {
-  message: "An appropriate entity ID (brand, product(s), or ingredient) must be provided for the selected claim level.",
+  message: "An appropriate entity ID (brand, product(s), or ingredient(s)) must be provided for the selected claim level.",
   path: ['level'],
 });
 
@@ -89,13 +78,21 @@ export const GET = withAuth(async (req: NextRequest) => {
 
         const supabase = createSupabaseAdminClient();
         
-        let selectStatement = '*, workflow_id, workflow_status, current_workflow_step,';
-        if (includeMasterBrandName) selectStatement += 'master_claim_brands(name),';
-        if (includeProductNames) selectStatement += 'products!claims_product_id_fkey(name),';
-        if (includeIngredientName) selectStatement += 'ingredients(name),';
-        selectStatement = selectStatement.slice(0, -1); // remove last ','
+        // Build select statement with proper joins
+        let selectStatement = '*, workflow_id, workflow_status, current_workflow_step';
+        
+        // Add joins for related entities
+        if (includeMasterBrandName) {
+            selectStatement += ', master_claim_brands!claims_master_brand_id_fkey(name)';
+        }
+        
+        if (includeIngredientName) {
+            selectStatement += ', ingredients!claims_ingredient_id_fkey(name)';
+        }
+        
+        // Note: Product names will be fetched separately due to junction table
 
-        let query = supabase.from('claims').select(selectStatement);
+        let query = supabase.from('claims').select(selectStatement, { count: 'exact' });
 
         if (countryCodeFilter) {
             query = query.eq('country_code', countryCodeFilter);
@@ -123,12 +120,39 @@ export const GET = withAuth(async (req: NextRequest) => {
         // Process data to flatten joined names
         // Type assertion after error check - data is definitely not an error at this point
         const claims = data as unknown as ClaimWithRelations[] | null;
+        
+        // If we need product names and have claims, fetch them from junction table
+        const productNamesByClaimId: Record<string, string[]> = {};
+        if (includeProductNames && claims && claims.length > 0) {
+            const claimIds = claims.map(c => c.id);
+            
+            // Fetch product associations from junction table
+            const { data: productAssociations, error: productError } = await supabase
+                .from('claim_products')
+                .select('claim_id, products(id, name)')
+                .in('claim_id', claimIds);
+            
+            if (!productError && productAssociations) {
+                // Group product names by claim ID
+                productAssociations.forEach((assoc: any) => {
+                    if (!productNamesByClaimId[assoc.claim_id]) {
+                        productNamesByClaimId[assoc.claim_id] = [];
+                    }
+                    if (assoc.products && typeof assoc.products === 'object' && 'name' in assoc.products) {
+                        productNamesByClaimId[assoc.claim_id].push(assoc.products.name);
+                    }
+                });
+            }
+        }
+        
         const processedData = claims && Array.isArray(claims) ? 
             claims.map((claimData) => ({
                 ...claimData,
-                master_brand_name: claimData.master_claim_brands?.name || null,
-                product_names: claimData['products!claims_product_id_fkey']?.name ? [claimData['products!claims_product_id_fkey'].name] : [],
-                ingredient_name: claimData.ingredients?.name || null,
+                master_brand_name: claimData['master_claim_brands!claims_master_brand_id_fkey']?.name || claimData.master_claim_brands?.name || null,
+                // Get product names from junction table or fall back to deprecated product_id
+                product_names: productNamesByClaimId[claimData.id] || 
+                    (claimData['products!claims_product_id_fkey']?.name ? [claimData['products!claims_product_id_fkey'].name] : []),
+                ingredient_name: claimData['ingredients!claims_ingredient_id_fkey']?.name || claimData.ingredients?.name || null,
                 // Ensure country_codes is an array for client-side consistency.
                 // This API returns one record per country_code, so we set it up as an array of one.
                 country_codes: [claimData.country_code]
@@ -192,6 +216,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
         description,
         master_brand_id,
         ingredient_id,
+        ingredient_ids,
         product_ids,
         country_codes,
         workflow_id 
@@ -243,106 +268,66 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
     }
     // --- Permission Check End ---
 
-    const claimsToInsert: Array<Omit<z.infer<typeof dbClaimSchema>, 'created_by'> & { created_by: string }> = [];
-
-    for (const country_code of country_codes) {
-        if (level === 'brand' && master_brand_id) {
-            claimsToInsert.push({
-                claim_text,
-                claim_type,
-                level,
-                master_brand_id,
-                country_code,
-                description,
-                created_by: user.id,
-                product_id: null, 
-                ingredient_id: null,
-            });
-        } else if (level === 'ingredient' && ingredient_id) {
-            claimsToInsert.push({
-                claim_text,
-                claim_type,
-                level,
-                ingredient_id,
-                country_code,
-                description,
-                created_by: user.id,
-                product_id: null,
-                master_brand_id: null,
-            });
-        } else if (level === 'product' && product_ids && product_ids.length > 0) {
-            for (const product_id of product_ids) {
-                claimsToInsert.push({
-                    claim_text,
-                    claim_type,
-                    level,
-                    product_id,
-                    country_code,
-                    description,
-                    created_by: user.id,
-                    master_brand_id: null,
-                    ingredient_id: null,
-                });
-            }
-        } else {
-            return NextResponse.json({ success: false, error: 'Mismatch in claim level and provided entity IDs (should be caught by Zod).' }, { status: 400 });
-        }
-    }
-
-    if (claimsToInsert.length === 0) {
-        return NextResponse.json({ success: false, error: 'No valid claims were generated for insertion.' }, { status: 400 });
-    }
-    
-    const validatedClaimsToInsert = claimsToInsert.map(claim => {
-        const finalClaimPayload = {
-            ...claim,
-            description: claim.description === undefined ? null : claim.description,
-        };
-        const validationResult = dbClaimSchema.safeParse(finalClaimPayload);
-        if (!validationResult.success) {
-            console.error("Failed to validate a claim object before DB insert:", validationResult.error.flatten());
-            throw new Error("Internal validation error before database operation."); 
-        }
-        return validationResult.data;
-    });
-
     try {
-        const { data, error } = await supabase.from('claims').insert(validatedClaimsToInsert).select();
+        // Handle backward compatibility - if ingredient_ids is provided, use it; otherwise fall back to ingredient_id
+        let finalIngredientIds = ingredient_ids;
+        if (level === 'ingredient' && (!ingredient_ids || ingredient_ids.length === 0) && ingredient_id) {
+            finalIngredientIds = [ingredient_id];
+        }
+
+        // Use the create_claim_with_associations function to create claim with junction tables
+        const { data: claimId, error } = await supabase.rpc('create_claim_with_associations', {
+            p_claim_text: claim_text,
+            p_claim_type: claim_type,
+            p_level: level,
+            p_master_brand_id: level === 'brand' ? master_brand_id : null,
+            p_ingredient_id: null, // Deprecated parameter, passing null
+            p_ingredient_ids: level === 'ingredient' ? finalIngredientIds : [],
+            p_product_ids: level === 'product' ? product_ids : [],
+            p_country_codes: country_codes,
+            p_description: description,
+            p_created_by: user.id,
+            p_workflow_id: workflow_id
+        });
 
         if (error) {
-            console.error('Supabase error inserting claims:', error);
+            console.error('Supabase error creating claim:', error);
             if (error.code === '23505') {
-                return NextResponse.json({ success: false, error: 'One or more claims already exist with the same text, level, entity, country, and type.', details: error.message }, { status: 409 });
+                return NextResponse.json({ success: false, error: 'A claim already exists with the same text, level, and entity.', details: error.message }, { status: 409 });
             }
-            return NextResponse.json({ success: false, error: 'Failed to save claims to database.', details: error.message }, { status: 500 });
+            return NextResponse.json({ success: false, error: 'Failed to create claim.', details: error.message }, { status: 500 });
         }
 
-        // If workflow_id is provided, assign workflow to each created claim
-        if (workflow_id && data && data.length > 0) {
-            console.log(`[API Claims POST] Assigning workflow ${workflow_id} to ${data.length} claim(s)`);
-            
-            for (const claim of data) {
-                const { data: workflowResult, error: workflowError } = await supabase.rpc('assign_workflow_to_claim', {
-                    p_claim_id: claim.id,
-                    p_workflow_id: workflow_id
-                });
-
-                if (workflowError) {
-                    console.error(`[API Claims POST] Error assigning workflow to claim ${claim.id}:`, workflowError);
-                    // Continue with other claims even if one fails
-                } else {
-                    console.log(`[API Claims POST] Workflow assigned to claim ${claim.id}:`, workflowResult);
-                }
-            }
+        if (!claimId) {
+            return NextResponse.json({ success: false, error: 'Failed to create claim - no ID returned.' }, { status: 500 });
         }
 
-        return NextResponse.json({ success: true, message: `${data ? data.length : 0} claim(s) created successfully.`, claims: data });
+        // Fetch the created claim with all its details
+        const { data: createdClaim, error: fetchError } = await supabase
+            .from('claims')
+            .select('*')
+            .eq('id', claimId)
+            .single();
+
+        if (fetchError) {
+            console.error('[API Claims POST] Error fetching created claim:', fetchError);
+            // Claim was created but we couldn't fetch it - still return success
+            return NextResponse.json({ 
+                success: true, 
+                message: 'Claim created successfully.',
+                claimId: claimId 
+            });
+        }
+
+        return NextResponse.json({ 
+            success: true, 
+            message: 'Claim created successfully with associations to multiple countries/entities.', 
+            claim: createdClaim,
+            claimId: claimId
+        });
     } catch (e: unknown) {
         console.error('Catch block error in POST /api/claims:', e);
         const errorMessage = e instanceof Error ? e.message : String(e);
-        if (errorMessage === "Internal validation error before database operation.") {
-            return NextResponse.json({ success: false, error: 'Internal server error during data validation.' }, { status: 500 });
-        }
         return NextResponse.json({ success: false, error: 'An unexpected error occurred.', details: errorMessage }, { status: 500 });
     }
 }); 

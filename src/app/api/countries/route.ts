@@ -1,24 +1,16 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { withAuth } from '@/lib/auth/api-auth';
+import { handleApiError } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
-
-// Initialize Supabase client
-// Ensure your environment variables are correctly set up
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error("Supabase URL or Anon Key is missing. Check environment variables.");
-  // Depending on strictness, you might throw an error or handle this case
-}
-
-const supabase = createClient(supabaseUrl!, supabaseAnonKey!);
 
 // Original GET logic, now to be wrapped by withAuth
 async function getCountriesHandler() {
   try {
+    const supabase = createSupabaseServerClient();
+    
+    // Try to fetch from database first
     const { data, error } = await supabase
       .from('countries')
       .select('code, name')
@@ -26,15 +18,37 @@ async function getCountriesHandler() {
       .order('name', { ascending: true });
 
     if (error) {
+      // If countries table doesn't exist, return a default list
+      if (error.code === '42P01') { // Table does not exist
+        console.warn('Countries table does not exist, returning default list');
+        const defaultCountries = [
+          { code: 'US', name: 'United States' },
+          { code: 'GB', name: 'United Kingdom' },
+          { code: 'CA', name: 'Canada' },
+          { code: 'AU', name: 'Australia' },
+          { code: 'DE', name: 'Germany' },
+          { code: 'FR', name: 'France' },
+          { code: 'IT', name: 'Italy' },
+          { code: 'ES', name: 'Spain' },
+          { code: 'NL', name: 'Netherlands' },
+          { code: 'JP', name: 'Japan' },
+          { code: 'CN', name: 'China' },
+          { code: 'IN', name: 'India' },
+          { code: 'BR', name: 'Brazil' },
+          { code: 'MX', name: 'Mexico' },
+          { code: 'KR', name: 'South Korea' },
+        ];
+        return NextResponse.json({ success: true, data: defaultCountries });
+      }
+      
       console.error('Error fetching countries:', error);
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, data: data });
+    return NextResponse.json({ success: true, data: data || [] });
 
-  } catch (e: unknown) {
-    console.error('Unexpected error in GET /api/countries handler:', e);
-    return NextResponse.json({ success: false, error: (e as Error).message || 'An unexpected server error occurred' }, { status: 500 });
+  } catch (error) {
+    return handleApiError(error, 'Error fetching countries');
   }
 }
 

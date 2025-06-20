@@ -90,7 +90,7 @@ export const MultiSelectCheckboxCombobox: React.FC<MultiSelectCheckboxComboboxPr
                     }}
                   >
                     {option.label}
-                    <X className="h-3 w-3 text-muted-foreground hover:text-foreground cursor-pointer" />
+                    <X className="h-3 w-3 text-muted-foreground hover:text-foreground cursor-pointer" aria-label={`Remove ${option.label}`} />
                   </Badge>
                 ))}
                 {displayedSelectedOptions.length !== options.length && displayedSelectedOptions.length > 2 && (
@@ -126,7 +126,7 @@ export const MultiSelectCheckboxCombobox: React.FC<MultiSelectCheckboxComboboxPr
                             return (
                                 <CommandItem
                                 key={option.value}
-                                value={option.value}
+                                value={option.label} // Changed from option.value to option.label for cmdk's internal search
                                 onSelect={() => !disabled && handleSelect(option.value)}
                                 className={cn("flex items-center justify-between", disabled ? "cursor-not-allowed opacity-75" : "cursor-pointer")}
                                 >

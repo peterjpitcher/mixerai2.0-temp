@@ -6,7 +6,7 @@ import { handleApiError } from '@/lib/api-utils'; // Added for using in catch bl
 // import { verifyEmailTemplates } from '@/lib/auth/email-templates'; // Added for sending invites
 import { withAuth } from '@/lib/auth/api-auth'; // Import withAuth
 import type { User } from '@supabase/supabase-js';
-import type { Json } from '@/types/supabase';
+// import type { Json } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
 
@@ -278,13 +278,13 @@ export const PUT = withAuth(async (
           // const templateIdForDesc = body.template_id !== undefined ? body.template_id : currentWorkflowData.template_id;
           const stepsForDesc = body.steps || currentWorkflowData.steps || [];
 
-          let brandNameForDesc = currentWorkflowData.brands?.name;
+          let brandNameForDesc = (currentWorkflowData.brands as any)?.name;
           if (body.brand_id && body.brand_id !== currentWorkflowData.brand_id) {
             const { data: brandData } = await supabase.from('brands').select('name').eq('id', body.brand_id).single();
             brandNameForDesc = brandData?.name;
           }
 
-          let resolvedTemplateNameForDesc: string | null | undefined = currentWorkflowData.content_templates?.name;
+          let resolvedTemplateNameForDesc: string | null | undefined = (currentWorkflowData.content_templates as any)?.name;
           if (body.template_id !== undefined && body.template_id !== currentWorkflowData.template_id) {
              if (body.template_id === null) { // template is being removed
                 resolvedTemplateNameForDesc = null;
@@ -403,10 +403,10 @@ export const PUT = withAuth(async (
       p_workflow_id: workflowId,
       p_name: body.name || null,
       p_brand_id: body.brand_id || null,
-      p_steps: processedStepsForRpc as Json, // Cast to Json type
+      p_steps: processedStepsForRpc as any, // TODO: Cast to Json type when types are regenerated
       p_template_id: body.template_id || null,
       p_description: body.description ?? workflowDescriptionToUpdate ?? null,
-      p_new_invitation_items: newInvitationItemsForRpc as Json // Cast to Json type
+      p_new_invitation_items: newInvitationItemsForRpc as any // TODO: Cast to Json type when types are regenerated
     };
 
     console.log('Calling RPC update_workflow_and_handle_invites with params:', JSON.stringify(paramsToPass, null, 2));

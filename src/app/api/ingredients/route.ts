@@ -15,18 +15,30 @@ interface Ingredient {
 }
 
 // GET handler for all ingredients
-export const GET = withAuth(async () => {
+export const GET = withAuth(async (req: NextRequest) => {
     try {
         if (isBuildPhase()) {
             console.log('[API Ingredients GET] Build phase: returning empty array.');
             return NextResponse.json({ success: true, isMockData: true, data: [] });
         }
 
+        // Parse query parameters
+        const searchParams = req.nextUrl.searchParams;
+        const limit = parseInt(searchParams.get('limit') || '20', 10);
+        const validatedLimit = Math.min(Math.max(1, limit), 1000); // Max 1000 items
+
         const supabase = createSupabaseAdminClient();
 
-        const { data, error } = await supabase.from('ingredients')
+        let query = supabase.from('ingredients')
             .select('*')
             .order('name');
+
+        // Apply limit if specified
+        if (limit) {
+            query = query.limit(validatedLimit);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
             console.error('[API Ingredients GET] Error fetching ingredients:', error);

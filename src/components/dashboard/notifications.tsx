@@ -93,28 +93,59 @@ export function NotificationsButton() {
     fetchNotifications();
   }, []);
   
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(notification => ({ ...notification, isRead: true })));
-    setUnreadCount(0);
-    // TODO: API call to mark all as read on backend
-  };
-  
-  const markAsRead = (id: string) => {
-    setNotifications(notifications.map(notification => {
-      if (notification.id === id && !notification.isRead) {
-        setUnreadCount(prev => Math.max(0, prev - 1)); // Ensure count doesn't go below 0
-        // TODO: API call to mark specific notification as read on backend
-        return { ...notification, isRead: true };
+  const markAllAsRead = async () => {
+    try {
+      const response = await fetch('/api/notifications/mark-read', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ markAll: true }),
+      });
+
+      if (response.ok) {
+        setNotifications(notifications.map(notification => ({ ...notification, isRead: true })));
+        setUnreadCount(0);
       }
-      return notification;
-    }));
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
   };
   
-  const clearAll = () => {
-    setNotifications([]);
-    setUnreadCount(0);
-    setIsOpen(false);
-    // TODO: API call to clear all notifications on backend (or implement soft delete/archive)
+  const markAsRead = async (id: string) => {
+    try {
+      const response = await fetch('/api/notifications/mark-read', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notificationId: id }),
+      });
+
+      if (response.ok) {
+        setNotifications(notifications.map(notification => {
+          if (notification.id === id && !notification.isRead) {
+            setUnreadCount(prev => Math.max(0, prev - 1)); // Ensure count doesn't go below 0
+            return { ...notification, isRead: true };
+          }
+          return notification;
+        }));
+      }
+    } catch (error) {
+      console.error('Error marking as read:', error);
+    }
+  };
+  
+  const clearAll = async () => {
+    try {
+      const response = await fetch('/api/notifications/clear', {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setNotifications([]);
+        setUnreadCount(0);
+        setIsOpen(false);
+      }
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+    }
   };
   
   const handleActionClick = (notification: Notification) => {

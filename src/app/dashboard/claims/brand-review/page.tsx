@@ -22,11 +22,6 @@ interface CountryOption {
     name: string;
 }
 
-interface MandatoryClaim {
-  text: string;
-  level: string;
-}
-
 interface GroupedClaims {
   level: string;
   allowed_claims: string[];
@@ -35,16 +30,9 @@ interface GroupedClaims {
 
 interface StyledClaimsData {
   introductory_sentence: string;
-  mandatory_claims: MandatoryClaim[];
   grouped_claims: GroupedClaims[];
 }
 
-interface RawClaimForAI {
-  text: string;
-  type: string;
-  level: string;
-  market: string;
-}
 
 const BrandClaimsOutputPage = () => {
     const router = useRouter();
@@ -58,7 +46,6 @@ const BrandClaimsOutputPage = () => {
     const [selectedCountry, setSelectedCountry] = useState<string>('all');
     const [brandNameForDisplay, setBrandNameForDisplay] = useState<string>('');
     const [styledClaims, setStyledClaims] = useState<StyledClaimsData | null>(null);
-    const [rawClaimsForAI, setRawClaimsForAI] = useState<RawClaimForAI[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isGenerating, setIsGenerating] = useState<boolean>(false);
     const [hasGenerated, setHasGenerated] = useState<boolean>(false);
@@ -96,7 +83,6 @@ const BrandClaimsOutputPage = () => {
         setIsGenerating(true);
         setHasGenerated(true);
         setStyledClaims(null);
-        setRawClaimsForAI([]);
         setBrandNameForDisplay('');
 
         try {
@@ -117,7 +103,6 @@ const BrandClaimsOutputPage = () => {
             if (result.success) {
                 setBrandNameForDisplay(result.brandName);
                 setStyledClaims(result.styledClaims || null);
-                setRawClaimsForAI(result.rawClaimsForAI || []);
                 toast.success('Styled claims generated successfully!');
                 if (!result.styledClaims || (result.styledClaims.mandatory_claims.length === 0 && result.styledClaims.grouped_claims.every((g: GroupedClaims) => g.allowed_claims.length === 0 && g.disallowed_claims.length === 0))) {
                    toast.info("No claims found for the selected criteria.");
@@ -144,11 +129,6 @@ const BrandClaimsOutputPage = () => {
         
         claimsText += `${styledClaims.introductory_sentence}\n\n`;
 
-        if (styledClaims.mandatory_claims.length > 0) {
-            claimsText += '--- Mandatory Claims ---\n';
-            styledClaims.mandatory_claims.forEach(claim => claimsText += `- ${claim.text} (${claim.level})\n`);
-            claimsText += '\n';
-        }
 
         styledClaims.grouped_claims.forEach(group => {
             if (group.allowed_claims.length > 0 || group.disallowed_claims.length > 0) {
@@ -203,22 +183,6 @@ const BrandClaimsOutputPage = () => {
                 <CardContent>
                     <p className="mb-6 text-sm text-gray-600 italic">{styledClaims.introductory_sentence}</p>
                     
-                    {styledClaims.mandatory_claims.length > 0 && (
-                        <div className="mb-4">
-                            <h3 className="font-semibold text-lg mb-2">Mandatory Claims</h3>
-                            <ul className="list-disc pl-5">
-                                {styledClaims.mandatory_claims.map((claim, index) => (
-                                    <li key={index} className="mb-1">
-                                        {claim.text}
-                                        <span className="ml-2 text-xs text-gray-500 capitalize bg-gray-100 px-2 py-1 rounded-full">
-                                            {claim.level}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-
                     <Accordion type="multiple" defaultValue={styledClaims.grouped_claims.map(g => g.level)}>
                         {styledClaims.grouped_claims.map((group) => (
                              (group.allowed_claims.length > 0 || group.disallowed_claims.length > 0) && (
@@ -294,19 +258,6 @@ const BrandClaimsOutputPage = () => {
             </Card>
 
             {renderOutput()}
-            
-            {rawClaimsForAI.length > 0 && !isGenerating && (
-                <details className="mt-4">
-                    <summary className="cursor-pointer text-sm font-medium">View Raw Claims Sent to AI</summary>
-                    <Card className="mt-2">
-                        <CardContent className="p-4">
-                            <pre className="text-xs whitespace-pre-wrap">
-                                {JSON.stringify(rawClaimsForAI, null, 2)}
-                            </pre>
-                        </CardContent>
-                    </Card>
-                </details>
-            )}
         </div>
     );
 };

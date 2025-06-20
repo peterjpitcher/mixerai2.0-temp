@@ -35,7 +35,8 @@ export function CreateContentDropdown() {
         throw new Error('Failed to fetch templates');
       }
       const data = await response.json();
-      setTemplates(data.data || []);
+      // API returns templates under 'templates' key, not 'data'
+      setTemplates(data.templates || data.data || []);
     } catch (error) {
       console.error('Error fetching templates:', error);
       toast.error('Failed to load content templates');

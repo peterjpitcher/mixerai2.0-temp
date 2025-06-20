@@ -3,7 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
-import { TablesUpdate } from '@/types/supabase';
+// import { TablesUpdate } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
 
 export const dynamic = "force-dynamic";
 
@@ -34,12 +34,12 @@ export const POST = withAuth(async (request: NextRequest, user: User, context?: 
     
     // Explicitly check if brand and brand_admin_id were loaded.
     // The !inner join in select should ensure brand is present if content is found, but good to be safe.
-    if (!currentContent.brand || typeof currentContent.brand !== 'object' || !currentContent.brand.brand_admin_id) {
+    if (!currentContent.brand || typeof currentContent.brand !== 'object' || !(currentContent.brand as any).brand_admin_id) {
         return NextResponse.json({ success: false, error: 'Brand admin information not found for this content.' }, { status: 404 });
     }
 
     // 2. Verify user is the brand_admin_id for this content's brand
-    if (currentContent.brand.brand_admin_id !== user.id) {
+    if ((currentContent.brand as any).brand_admin_id !== user.id) {
       return NextResponse.json({ success: false, error: 'User is not authorized to restart this workflow.' }, { status: 403 });
     }
 
@@ -78,7 +78,7 @@ export const POST = withAuth(async (request: NextRequest, user: User, context?: 
       console.warn(`Workflow ${currentContent.workflow_id} has no steps defined.`);
     }
     
-    const updatePayload: TablesUpdate<'content'> = {
+    const updatePayload: any = { // TODO: Type as TablesUpdate<'content'> when types are regenerated
       current_step: firstStepId, 
       assigned_to: firstStepAssignees,
       status: 'pending_review',

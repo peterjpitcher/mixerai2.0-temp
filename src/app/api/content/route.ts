@@ -6,11 +6,11 @@ export const dynamic = "force-dynamic";
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
-import { TablesInsert, Enums } from '@/types/supabase';
+// import { TablesInsert, Enums } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
 import { User } from '@supabase/supabase-js';
 
 // Define the specific type for content status using Enums if available, or define manually
-type ContentStatus = Enums<"content_status">;
+type ContentStatus = 'draft' | 'pending_review' | 'approved' | 'published' | 'rejected' | 'cancelled'; // TODO: Use Enums<"content_status"> when types are regenerated
 
 const VALID_STATUSES: ContentStatus[] = ['draft', 'pending_review', 'approved', 'published', 'rejected', 'cancelled'];
 
@@ -384,7 +384,7 @@ export const POST = withAuth(async (request: NextRequest, user: User) => {
       }
     }
 
-    const newContentPayload: TablesInsert<'content'> = {
+    const newContentPayload: any = { // TODO: Type as TablesInsert<'content'> when types are regenerated
       brand_id: data.brand_id,
       title: data.title,
       body: data.body,

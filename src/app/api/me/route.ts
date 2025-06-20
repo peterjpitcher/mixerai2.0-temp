@@ -74,7 +74,7 @@ export const GET = withRouteAuth(async (request: NextRequest, authUser: User) =>
     const typedBrandPermissions = (rawBrandPermissions || []).map((p) => ({
         ...p,
         brand_id: p.brand_id as string, // Asserting brand_id is a string, as it's a FK
-        brand: p.brand as { id: string; name: string; master_claim_brand_id?: string | null; } | null // Explicitly type the joined brand
+        brand: p.brand as unknown as { id: string; name: string; master_claim_brand_id?: string | null; } | null // Explicitly type the joined brand
     })).filter((p) => p.brand_id != null) as UserProfileResponse['brand_permissions'];
 
     // Combine all data into the final user object

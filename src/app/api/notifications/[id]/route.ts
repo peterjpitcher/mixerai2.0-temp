@@ -4,7 +4,7 @@ import { User } from '@supabase/supabase-js';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 
 // PATCH - Mark a specific notification as read
-export const PATCH = withAuth(async (req: NextRequest, user: User, context?: any) => {
+export const PATCH = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
   try {
     const { params } = context as { params: { id: string } };
     const { id } = params;
@@ -73,7 +73,7 @@ export const PATCH = withAuth(async (req: NextRequest, user: User, context?: any
 });
 
 // DELETE - Delete a specific notification (soft delete)
-export const DELETE = withAuth(async (req: NextRequest, user: User, context?: any) => {
+export const DELETE = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
   try {
     const { params } = context as { params: { id: string } };
     const { id } = params;

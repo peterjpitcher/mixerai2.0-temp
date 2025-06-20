@@ -105,13 +105,26 @@ export function UnifiedNavigation() {
   const userWorkflowsFetched = useRef(false);
 
   useEffect(() => {
-    const fetchCurrentUser = async () => {
+    const fetchCurrentUser = async (retryCount = 0) => {
       setIsLoadingUser(true);
       try {
-        const response = await fetch('/api/me'); 
+        const response = await fetch('/api/me', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include', // Ensure cookies are sent
+        }); 
+        
         if (!response.ok) {
-          throw new Error('Failed to fetch user session');
+          // If we get 401, user is not authenticated - this is expected
+          if (response.status === 401) {
+            setCurrentUser(null);
+            return;
+          }
+          throw new Error(`Failed to fetch user session: ${response.status}`);
         }
+        
         const data = await response.json();
         if (data.success && data.user) {
           setCurrentUser(data.user);
@@ -119,6 +132,14 @@ export function UnifiedNavigation() {
           setCurrentUser(null);
         }
       } catch (error) {
+        // Only log non-network errors, network errors during navigation are expected
+        if (error instanceof TypeError && error.message === 'Failed to fetch') {
+          // This is likely a network error during navigation, retry once
+          if (retryCount === 0) {
+            setTimeout(() => fetchCurrentUser(1), 1000);
+            return;
+          }
+        }
         console.error('[UnifiedNavigation] Error fetching current user:', error);
         setCurrentUser(null);
       } finally {
@@ -149,9 +170,11 @@ export function UnifiedNavigation() {
           setUserTemplates(data.templates);
         } else {
           console.error('[UnifiedNavigation] Failed to fetch templates:', data.error);
+          setUserTemplates([]);
         }
       } catch (error) {
         console.error('[UnifiedNavigation] Error fetching templates:', error);
+        setUserTemplates([]);
       } finally {
         setIsLoadingTemplates(false);
       }
@@ -222,7 +245,13 @@ export function UnifiedNavigation() {
   };
 
   let filteredContentItems: NavItem[] = [];
-  if (isLoadingTemplates || ( (isScopedAdmin || isEditor) && isLoadingUserWorkflows && !isPlatformAdmin) ) {
+  
+  // Don't show templates until we know the user's role
+  if (isLoadingUser) {
+    filteredContentItems = [
+      { href: '#', label: 'Loading...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }
+    ];
+  } else if (isLoadingTemplates || ( (isScopedAdmin || isEditor) && isLoadingUserWorkflows && !isPlatformAdmin) ) {
     filteredContentItems = [
       { href: '#', label: 'Loading templates...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }
     ];

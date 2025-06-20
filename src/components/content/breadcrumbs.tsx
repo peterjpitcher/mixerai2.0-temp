@@ -1,33 +1,26 @@
-import Link from 'next/link';
+/**
+ * @deprecated Use BreadcrumbNav from '@/components/ui/breadcrumb-nav' instead
+ * This file provides backward compatibility during migration
+ */
 
-interface BreadcrumbItem {
-  label: string;
-  href?: string;
-}
+import { BreadcrumbNav, type BreadcrumbItem } from '@/components/ui/breadcrumb-nav';
+import { cn } from '@/lib/utils';
 
 interface BreadcrumbsProps {
   items: BreadcrumbItem[];
 }
 
+// Legacy component wrapper for backward compatibility
 export function Breadcrumbs({ items }: BreadcrumbsProps) {
   return (
-    <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
-      <ol className="flex items-center space-x-1.5">
-        {items.map((item, index) => (
-          <li key={index} className="flex items-center">
-            {item.href ? (
-              <Link href={item.href} className="hover:underline">
-                {item.label}
-              </Link>
-            ) : (
-              <span>{item.label}</span>
-            )}
-            {index < items.length - 1 && (
-              <span className="ml-1.5 text-muted-foreground">/</span>
-            )}
-          </li>
-        ))}
-      </ol>
-    </nav>
+    <BreadcrumbNav 
+      items={items} 
+      className={cn("mb-4")}
+      showHome={false} // Legacy behavior didn't auto-add home
+      separator="/" // Legacy used forward slash
+    />
   );
 }
+
+// Re-export types
+export type { BreadcrumbItem };

@@ -33,10 +33,11 @@ export const GET = withAuth(async (_req: NextRequest, user: User) => {
       });
     }
     
-    // Get all pending claims (remove user filter to show all claims)
+    // Get pending claims where the current user is an assignee
     const { data: pendingClaims, error } = await supabase
       .from('claims_pending_approval')
       .select('*')
+      .contains('current_step_assignees', [user.id])
       .order('created_at', { ascending: false });
 
     if (error) {

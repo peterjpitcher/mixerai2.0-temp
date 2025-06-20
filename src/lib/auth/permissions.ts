@@ -152,7 +152,14 @@ export async function canAccessProduct(
   supabase: ReturnType<typeof createServerClient<Database>>
 ): Promise<boolean> {
   try {
-    // First get the product's brand
+    // First check if user is platform admin
+    const { data: userData } = await supabase.auth.getUser();
+    if (userData?.user) {
+      const isAdmin = await isPlatformAdmin(userData.user, supabase);
+      if (isAdmin) return true;
+    }
+
+    // First get the product's master brand
     const { data: product, error: productError } = await supabase
       .from('products')
       .select('master_brand_id')
@@ -163,8 +170,22 @@ export async function canAccessProduct(
       return false;
     }
 
-    // Check if user has access to the brand
-    return hasAccessToBrand(userId, product.master_brand_id, supabase);
+    // Get the mixerai_brand_id from master_claim_brands
+    const { data: masterBrand, error: masterBrandError } = await supabase
+      .from('master_claim_brands')
+      .select('mixerai_brand_id')
+      .eq('id', product.master_brand_id)
+      .single();
+
+    if (masterBrandError || !masterBrand || !masterBrand.mixerai_brand_id) {
+      // Master brand not linked to a MixerAI brand
+      // For unlinked master brands, only platform admins can access
+      console.log(`Master brand ${product.master_brand_id} not linked to MixerAI brand - access denied for non-admin user ${userId}`);
+      return false;
+    }
+
+    // Check if user has access to the MixerAI brand
+    return hasAccessToBrand(userId, masterBrand.mixerai_brand_id, supabase);
   } catch (e) {
     console.error('Exception in canAccessProduct:', e);
     return false;

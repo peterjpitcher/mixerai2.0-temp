@@ -49,13 +49,32 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // TODO: Add email preference checks once email_notifications_enabled and email_preferences columns are added to profiles table
-    // For now, send all emails
+    // Check user's email preferences
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('email_notifications_enabled, email_preferences')
+      .eq('id', body.userId)
+      .single();
+      
+    if (!profile?.email_notifications_enabled) {
+      return NextResponse.json(
+        { success: true, message: 'Email notifications disabled for user' },
+        { status: 200 }
+      );
+    }
     
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mixerai.com';
     
     switch (body.type) {
       case 'task_assignment': {
+        // Check if user wants workflow assignment emails
+        const emailPrefs = profile?.email_preferences as any || {};
+        if (emailPrefs.workflow_assigned === false) {
+          return NextResponse.json(
+            { success: true, message: 'User has disabled workflow assignment emails' },
+            { status: 200 }
+          );
+        }
         if (!body.taskId) {
           return NextResponse.json(
             { success: false, error: 'Task ID required for task assignment' },
@@ -103,6 +122,15 @@ export async function POST(request: NextRequest) {
       }
       
       case 'workflow_action': {
+        // Check if user wants workflow action emails
+        const emailPrefs = profile?.email_preferences as any || {};
+        const prefKey = body.action === 'approved' ? 'content_approved' : 'content_rejected';
+        if (emailPrefs[prefKey] === false) {
+          return NextResponse.json(
+            { success: true, message: `User has disabled ${body.action} emails` },
+            { status: 200 }
+          );
+        }
         if (!body.contentId || !body.action) {
           return NextResponse.json(
             { success: false, error: 'Content ID and action required for workflow action' },
@@ -150,11 +178,11 @@ export async function POST(request: NextRequest) {
           userName: creatorName,
           appUrl,
           contentTitle: content.title,
-          brandName: content.brands?.name || 'Unknown Brand',
+          brandName: (content.brands as any)?.name || 'Unknown Brand',
           action: body.action,
           feedback: body.feedback,
           reviewerName: userName || 'Reviewer',
-          nextStep: body.action === 'approved' ? content.workflow_steps?.name : undefined
+          nextStep: body.action === 'approved' ? (content.workflow_steps as any)?.name : undefined
         });
         
         await sendEmail({
@@ -166,6 +194,14 @@ export async function POST(request: NextRequest) {
       }
       
       case 'deadline_reminder': {
+        // Check if user wants deadline reminder emails
+        const emailPrefs = profile?.email_preferences as any || {};
+        if (emailPrefs.deadline_reminders === false) {
+          return NextResponse.json(
+            { success: true, message: 'User has disabled deadline reminder emails' },
+            { status: 200 }
+          );
+        }
         if (!body.contentId) {
           return NextResponse.json(
             { success: false, error: 'Content ID required for deadline reminder' },
@@ -173,11 +209,12 @@ export async function POST(request: NextRequest) {
           );
         }
         
-        // Get content details
+        // Get content details including due_date
         const { data: content } = await supabase
           .from('content')
           .select(`
             title,
+            due_date,
             brands (name),
             workflow_steps!current_step (name)
           `)
@@ -191,11 +228,28 @@ export async function POST(request: NextRequest) {
           );
         }
         
-        // TODO: Add due date support once due_date column is added to content table
-        return NextResponse.json(
-          { success: false, error: 'Due date reminders not yet supported' },
-          { status: 501 }
-        );
+        if (!content.due_date) {
+          return NextResponse.json(
+            { success: false, error: 'Content has no due date set' },
+            { status: 400 }
+          );
+        }
+        
+        const emailData = deadlineReminderTemplate({
+          userName: userName || 'User',
+          appUrl,
+          contentTitle: content.title,
+          brandName: (content.brands as any)?.name || 'Unknown Brand',
+          workflowStep: (content.workflow_steps as any)?.name || 'Unknown Step',
+          dueDate: format(new Date(content.due_date), 'MMM dd, yyyy')
+        });
+        
+        await sendEmail({
+          to: userEmail,
+          ...emailData
+        });
+        
+        break;
       }
       
       default:

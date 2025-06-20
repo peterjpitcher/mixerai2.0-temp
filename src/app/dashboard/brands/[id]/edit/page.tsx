@@ -13,6 +13,8 @@ import { toast } from 'sonner';
 import { Loader2, X, PlusCircle, ArrowLeft, AlertTriangle, Sparkles, Info } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
 import { BrandLogoUpload } from '@/components/ui/brand-logo-upload';
+import { useAutoSave } from '@/hooks/use-auto-save';
+import { SaveStatusIndicator } from '@/components/ui/save-status';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 import { Checkbox } from '@/components/ui/checkbox';
 import { v4 as uuidv4 } from 'uuid';
@@ -20,6 +22,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { apiClient } from '@/lib/api-client';
+import { BreadcrumbNav } from '@/components/ui/breadcrumb-nav';
 
 // export const metadata: Metadata = {
 //   title: 'Edit Brand | MixerAI 2.0',
@@ -83,24 +86,7 @@ const getPriorityAgencyStyles = (priority: 'High' | 'Medium' | 'Low' | null | un
   return 'font-normal text-gray-700 dark:text-gray-300';
 };
 
-const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
-  <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
-    <ol className="flex items-center space-x-1.5">
-      {items.map((item, index) => (
-        <li key={index} className="flex items-center">
-          {item.href ? (
-            <Link href={item.href} className="hover:underline">
-              {item.label}
-            </Link>
-          ) : (
-            <span>{item.label}</span>
-          )}
-          {index < items.length - 1 && <span className="mx-1.5">/</span>}
-        </li>
-      ))}
-    </ol>
-  </nav>
-);
+// Remove inline Breadcrumbs - now using BreadcrumbNav
 
 export default function BrandEditPage({ params }: BrandEditPageProps) {
   const router = useRouter();
@@ -111,6 +97,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   const [isLoadingBrand, setIsLoadingBrand] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [lastSaveError, setLastSaveError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
 
@@ -395,13 +382,14 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (isManualSave = false) => {
     if (!formData.name.trim()) {
       toast.error('Brand name is required.');
       setActiveTab('basic');
-      return;
+      throw new Error('Brand name is required');
     }
     setIsSaving(true);
+    setLastSaveError(null);
     try {
       const payload: Record<string, unknown> = { 
       ...formData,
@@ -430,14 +418,42 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to update brand');
       }
-      toast.success('Brand updated successfully!');
-      router.push('/dashboard/brands');
+      
+      // Only show success toast and redirect on manual save
+      if (isManualSave) {
+        toast.success('Brand updated successfully!');
+        router.push('/dashboard/brands');
+      }
     } catch (error) {
-      toast.error((error instanceof Error ? error.message : String(error)) || 'Failed to update brand.');
+      const errorMessage = (error instanceof Error ? error.message : String(error)) || 'Failed to update brand.';
+      setLastSaveError(errorMessage);
+      toast.error(errorMessage);
+      throw error; // Re-throw for auto-save hook
     } finally {
       setIsSaving(false);
     }
   };
+  
+  // Configure auto-save
+  const {
+    isSaving: isAutoSaving,
+    lastSaved,
+    error: autoSaveError,
+    save: triggerSave,
+    hasUnsavedChanges
+  } = useAutoSave({
+    data: formData,
+    onSave: () => handleSave(false), // Explicitly pass false for auto-save
+    debounceMs: 3000, // Auto-save after 3 seconds of inactivity
+    enabled: !isForbidden && !error && !!brand,
+    onError: (error) => {
+      console.error('Auto-save error:', error);
+      // Don't show toast for auto-save errors, already shown in handleSave
+    },
+    onSuccess: () => {
+      console.log('Auto-save successful');
+    }
+  });
 
   const countryName = COUNTRIES.find(c => c.value === formData.country)?.label || formData.country || 'Select country';
   const languageName = LANGUAGES.find(l => l.value === formData.language)?.label || formData.language || 'Select language';
@@ -487,7 +503,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs items={breadcrumbItems} />
+      <BreadcrumbNav items={breadcrumbItems} className="mb-4" showHome={false} separator="/" />
       
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -518,6 +534,15 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
             <h1 className="text-3xl font-bold tracking-tight">Edit Brand: {formData.name || 'Loading...'}</h1>
             <p className="text-muted-foreground">Update the details, identity, and settings for this brand.</p>
           </div>
+        </div>
+        <div className="flex items-center">
+          <SaveStatusIndicator
+            status={isAutoSaving || isSaving ? 'saving' : (autoSaveError || lastSaveError) ? 'error' : lastSaved ? 'saved' : 'idle'}
+            lastSaved={lastSaved}
+            error={autoSaveError?.message || lastSaveError || undefined}
+            onRetry={triggerSave}
+            showTimestamp={true}
+          />
         </div>
       </div>
        
@@ -597,8 +622,8 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
               <Button variant="outline" onClick={() => router.push('/dashboard/brands')} disabled={isSaving || isGenerating}>
                   Cancel
               </Button>
-              <Button onClick={handleSave} disabled={isSaving || isGenerating}>
-                  {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
+              <Button onClick={() => handleSave(true)} disabled={isSaving || isAutoSaving || isGenerating}>
+                  {(isSaving || isAutoSaving) ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
               </Button>
             </CardFooter>
           </Card>
@@ -839,8 +864,8 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
               <Button variant="outline" onClick={() => router.push('/dashboard/brands')} disabled={isSaving || isGenerating}>
                   Cancel
               </Button>
-              <Button onClick={handleSave} disabled={isSaving || isGenerating}>
-                  {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
+              <Button onClick={() => handleSave(true)} disabled={isSaving || isAutoSaving || isGenerating}>
+                  {(isSaving || isAutoSaving) ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
               </Button>
             </CardFooter>
           </Card>

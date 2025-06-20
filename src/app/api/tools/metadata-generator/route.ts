@@ -4,7 +4,7 @@ import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { fetchWebPageContent } from '@/lib/utils/web-scraper';
 import { handleApiError } from '@/lib/api-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { Database, Json } from '@/types/supabase';
+// import { Database, Json } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
 
 // In-memory rate limiting
 const rateLimit = new Map<string, { count: number, timestamp: number }>();
@@ -14,6 +14,7 @@ const MAX_REQUESTS_PER_MINUTE = 10; // Allow 10 requests per minute per IP
 interface MetadataGenerationRequest {
   urls: string[];
   language?: string;
+  processBatch?: boolean;
 }
 
 // Define the result item type matching the frontend
@@ -68,7 +69,7 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
             status: historyEntryStatus,
             error_message: historyErrorMessage,
             brand_id: null
-        } as Database['public']['Tables']['tool_run_history']['Insert']);
+        } as any); // TODO: Type as Database['public']['Tables']['tool_run_history']['Insert'] when types are regenerated
       } catch (logError) {
         console.error('[HistoryLoggingError] Failed to log rate limit error for metadata-generator:', logError);
       }
@@ -99,7 +100,9 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
     const results: MetadataResultItem[] = [];
     const requestedLanguage = data.language || 'en';
 
-    for (const url of data.urls) {
+    // Process URLs with appropriate delays to avoid rate limiting
+    for (let i = 0; i < data.urls.length; i++) {
+      const url = data.urls[i];
       try {
         new URL(url);
 
@@ -117,9 +120,11 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
           console.warn(`[MetadataGen] Failed to fetch content for URL ${url}: ${(fetchError as Error).message}`);
         }
         
-        console.log(`[Delay] Metadata Gen: Waiting 5 seconds before AI call for ${url}...`);
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        console.log(`[Delay] Metadata Gen: Finished 5-second wait. Calling AI for ${url}...`);
+        // Add delay between URLs to avoid rate limiting (except for the first URL)
+        if (i > 0) {
+          console.log(`[Delay] Metadata Gen: Waiting 2 seconds before processing next URL...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
 
         const generatedMetadata = await generateMetadata(
           url,
@@ -179,26 +184,34 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
     // Log to tool_run_history in all cases (success or failure)
     try {
       if (apiInputs) {
+        // Generate a batch_id if processBatch is true and there are multiple URLs
+        const batchId = (apiInputs.processBatch && apiInputs.urls.length > 1) 
+          ? crypto.randomUUID() 
+          : null;
+
+        // For batch processing, create a single history entry with all URLs
         await supabaseAdmin.from('tool_run_history').insert({
             user_id: user.id,
             tool_name: 'metadata_generator',
-            inputs: apiInputs as unknown as Json,
-            outputs: apiOutputs as unknown as Json || { error: historyErrorMessage || 'Unknown error before output generation' },
+            inputs: apiInputs as any, // TODO: Type as Json when types are regenerated
+            outputs: apiOutputs as any || { error: historyErrorMessage || 'Unknown error before output generation' }, // TODO: Type as Json when types are regenerated
             status: historyEntryStatus,
             error_message: historyErrorMessage,
-            brand_id: null
-        } as Database['public']['Tables']['tool_run_history']['Insert']);
+            brand_id: null,
+            batch_id: batchId,
+            batch_sequence: batchId ? 1 : null
+        } as any); // TODO: Type as Database['public']['Tables']['tool_run_history']['Insert'] when types are regenerated
       } else {
         if (historyEntryStatus === 'failure' && historyErrorMessage) {
              await supabaseAdmin.from('tool_run_history').insert({
                 user_id: user.id,
                 tool_name: 'metadata_generator',
-                inputs: { error: 'Failed to parse request or early error' } as unknown as Json,
-                outputs: { error: historyErrorMessage } as unknown as Json,
+                inputs: { error: 'Failed to parse request or early error' } as any, // TODO: Type as Json when types are regenerated
+                outputs: { error: historyErrorMessage } as any, // TODO: Type as Json when types are regenerated
                 status: 'failure',
                 error_message: historyErrorMessage,
                 brand_id: null
-            } as Database['public']['Tables']['tool_run_history']['Insert']);
+            } as any); // TODO: Type as Database['public']['Tables']['tool_run_history']['Insert'] when types are regenerated
         }
       }
     } catch (logError) {

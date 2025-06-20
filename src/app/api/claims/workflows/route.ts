@@ -50,7 +50,7 @@ export const GET = withAuth(async (req: NextRequest) => {
         }
 
         // Format the response
-        const formattedData = (data || []).map((workflow: Record<string, unknown>) => ({
+        const formattedData = ((data || []) as unknown as Record<string, unknown>[]).map((workflow: Record<string, unknown>) => ({
             id: workflow.id,
             name: workflow.name,
             description: workflow.description,

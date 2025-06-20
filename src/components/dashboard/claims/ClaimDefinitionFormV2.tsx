@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, ChevronRight, Info, Building2, Package, FlaskConical } from 'lucide-react';
 import { ALL_COUNTRIES_CODE, ALL_COUNTRIES_NAME } from "@/lib/constants/country-codes";
+import { COUNTRIES } from '@/lib/constants/countries';
 import { cn } from '@/lib/utils';
 
 interface Entity {
@@ -38,7 +39,8 @@ export interface ClaimDefinitionData {
   level: 'brand' | 'product' | 'ingredient' | string;
   description?: string | null;
   master_brand_id?: string | null;
-  ingredient_id?: string | null;
+  ingredient_id?: string | null; // Deprecated, for backward compatibility
+  ingredient_ids?: string[]; // New field for multiple ingredients
   product_ids?: string[];
   country_codes: string[];
   workflow_id?: string | null;
@@ -82,10 +84,10 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
   const [level, setLevel] = useState('');
   const [description, setDescription] = useState('');
   const [selectedMasterBrand, setSelectedMasterBrand] = useState('');
-  const [selectedIngredient, setSelectedIngredient] = useState('');
+  const [selectedIngredientValues, setSelectedIngredientValues] = useState<string[]>([]);
   const [selectedProductValues, setSelectedProductValues] = useState<string[]>([]);
   const [selectedCountryCodes, setSelectedCountryCodes] = useState<string[]>([]);
-  const [selectedWorkflow, setSelectedWorkflow] = useState('');
+  const [selectedWorkflow, setSelectedWorkflow] = useState('none');
 
   // Options state
   const [masterBrandOptions, setMasterBrandOptions] = useState<ComboboxOption[]>([]);
@@ -107,10 +109,17 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
       setLevel(initialData.level || '');
       setDescription(initialData.description || '');
       setSelectedMasterBrand(initialData.master_brand_id || '');
-      setSelectedIngredient(initialData.ingredient_id || '');
+      // Support both single ingredient_id (backward compatibility) and multiple ingredient_ids
+      if (initialData.ingredient_id) {
+        setSelectedIngredientValues([initialData.ingredient_id]);
+      } else if (initialData.ingredient_ids) {
+        setSelectedIngredientValues(initialData.ingredient_ids);
+      } else {
+        setSelectedIngredientValues([]);
+      }
       setSelectedProductValues(initialData.product_ids || []);
       setSelectedCountryCodes(initialData.country_codes || []);
-      setSelectedWorkflow(initialData.workflow_id || '');
+      setSelectedWorkflow(initialData.workflow_id || 'none');
     }
   }, [initialData]);
 
@@ -137,8 +146,8 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
     };
 
     fetchData('/api/master-claim-brands', setMasterBrandOptions, 'master brands');
-    fetchData('/api/products', setProductOptions, 'products');
-    fetchData('/api/ingredients', setIngredientOptions, 'ingredients');
+    fetchData('/api/products?limit=1000', setProductOptions, 'products'); // Increase limit to get all products
+    fetchData('/api/ingredients?limit=1000', setIngredientOptions, 'ingredients'); // Increase limit to get all ingredients
 
     // Fetch claims workflows
     async function fetchClaimsWorkflows() {
@@ -164,12 +173,8 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
 
     fetchClaimsWorkflows();
 
-    // TODO: Fetch country codes from API or use proper country list
-    // For now, just add the "All Countries" option
-    setCountryOptions([{
-      value: ALL_COUNTRIES_CODE,
-      label: ALL_COUNTRIES_NAME
-    }]);
+    // Set country options from constants
+    setCountryOptions([...COUNTRIES]);
     setIsLoadingCountries(false);
   }, []);
 
@@ -181,7 +186,7 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
       case 2:
         if (level === 'brand') return !!selectedMasterBrand;
         if (level === 'product') return selectedProductValues.length > 0;
-        if (level === 'ingredient') return !!selectedIngredient;
+        if (level === 'ingredient') return selectedIngredientValues.length > 0;
         return false;
       case 3:
         return !!claimText && !!claimType;
@@ -213,10 +218,10 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
       level,
       description: description || null,
       master_brand_id: level === 'brand' ? selectedMasterBrand : null,
-      ingredient_id: level === 'ingredient' ? selectedIngredient : null,
+      ingredient_ids: level === 'ingredient' ? selectedIngredientValues : undefined,
       product_ids: level === 'product' ? selectedProductValues : undefined,
       country_codes: selectedCountryCodes,
-      workflow_id: selectedWorkflow || null,
+      workflow_id: selectedWorkflow && selectedWorkflow !== 'none' ? selectedWorkflow : null,
     };
 
     if (isEditMode && initialData) {
@@ -323,7 +328,7 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
       {currentStep === 2 && (
         <Card>
           <CardHeader>
-            <CardTitle>Step 2: Select {level === 'brand' ? 'Brand' : level === 'product' ? 'Products' : 'Ingredient'}</CardTitle>
+            <CardTitle>Step 2: Select {level === 'brand' ? 'Brand' : level === 'product' ? 'Products' : 'Ingredients'}</CardTitle>
             <CardDescription>
               Choose the specific {level} this claim will be associated with.
             </CardDescription>
@@ -360,17 +365,14 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
 
             {level === 'ingredient' && (
               <div className="space-y-2">
-                <Label htmlFor="ingredient">Ingredient <span className="text-red-500">*</span></Label>
-                <Select value={selectedIngredient} onValueChange={setSelectedIngredient}>
-                  <SelectTrigger id="ingredient">
-                    <SelectValue placeholder="Select ingredient" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ingredientOptions.map(ingredient => (
-                      <SelectItem key={ingredient.value} value={ingredient.value}>{ingredient.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Ingredients <span className="text-red-500">*</span></Label>
+                <MultiSelectCheckboxCombobox
+                  options={ingredientOptions}
+                  selectedValues={selectedIngredientValues}
+                  onChange={setSelectedIngredientValues}
+                  placeholder="Select ingredients"
+                  searchPlaceholder="Search ingredients..."
+                />
               </div>
             )}
           </CardContent>
@@ -414,12 +416,6 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
                       <div className="text-xs text-muted-foreground">Can be used freely in content</div>
                     </div>
                   </SelectItem>
-                  <SelectItem value="mandatory">
-                    <div>
-                      <div className="font-medium text-blue-600">Mandatory</div>
-                      <div className="text-xs text-muted-foreground">Must be included in relevant content</div>
-                    </div>
-                  </SelectItem>
                   <SelectItem value="disallowed">
                     <div>
                       <div className="font-medium text-red-600">Disallowed</div>
@@ -437,7 +433,7 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
                   <SelectValue placeholder={isLoadingWorkflows ? "Loading workflows..." : "Select workflow (optional)"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No workflow</SelectItem>
+                  <SelectItem value="none">No workflow</SelectItem>
                   {workflowOptions.map(workflow => (
                     <SelectItem key={workflow.value} value={workflow.value}>{workflow.label}</SelectItem>
                   ))}

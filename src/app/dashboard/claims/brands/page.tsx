@@ -28,6 +28,7 @@ import {
 import { Trash2, PlusCircle, Search, AlertTriangle, Loader2, Globe, Pencil, MoreVertical } from "lucide-react";
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
+import { apiClient } from '@/lib/api-client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -88,9 +89,7 @@ export default function MasterClaimBrandsPage() {
 
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/master-claim-brands/${itemToDelete.id}`, { 
-        method: 'DELETE',
-      });
+      const response = await apiClient.delete(`/api/master-claim-brands/${itemToDelete.id}`);
       const data = await response.json();
       if (data.success) {
         toast.success("Master Claim Brand deleted successfully"); 

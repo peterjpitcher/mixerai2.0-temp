@@ -47,6 +47,16 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
   try {
     const data: ContentGenerationRequest = await request.json();
     
+    // DEBUG: Log incoming request
+    console.log('\n========== CONTENT GENERATION API ==========');
+    console.log('Brand ID:', data.brand_id);
+    console.log('Template:', data.template?.name);
+    console.log('Input Fields:');
+    data.template?.inputFields.forEach(field => {
+      console.log(`  ${field.name} (${field.id}): "${field.value}"`);
+    });
+    console.log('==========================================\n');
+    
     if (!data.brand_id) {
       return NextResponse.json(
         { success: false, error: 'Brand ID is required' },
@@ -70,10 +80,9 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
     }
 
     if (!brandData.language || !brandData.country) {
-      return NextResponse.json(
-        { success: false, error: 'Brand language and country are required for localized content generation and are missing for this brand.' },
-        { status: 400 }
-      );
+      // Use defaults if missing
+      brandData.language = brandData.language || 'en';
+      brandData.country = brandData.country || 'US';
     }
     
     if (data.template && data.template.id) {

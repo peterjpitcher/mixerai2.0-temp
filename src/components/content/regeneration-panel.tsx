@@ -54,7 +54,11 @@ export function RegenerationPanel({
     setIsRegenerating(true);
     
     try {
-      const payload: any = { feedback };
+      const payload: { 
+        feedback?: string; 
+        sections?: string[]; 
+        fieldId?: string;
+      } = { feedback };
       
       if (regenerationType === 'sections') {
         payload.sections = selectedSections;

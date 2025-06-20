@@ -261,7 +261,6 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
           );
           
           brandPermissions.push({
-            id: existingPermission?.id, // Preserve the ID if it exists
             brand_id: brandId,
             role
           });
@@ -275,11 +274,11 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          full_name: form.full_name,
-          job_title: form.job_title,
-          company: form.company,
-          role: form.globalRole, // Send globalRole as 'role' in the payload
-          brand_permissions: brandPermissions
+          full_name: form.full_name || null,
+          job_title: form.job_title || null,
+          company: form.company || null,
+          role: form.globalRole || null, // Send globalRole as 'role' in the payload
+          brand_permissions: brandPermissions.length > 0 ? brandPermissions : null
         })
       });
       
@@ -291,6 +290,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
         // Navigate back to the user details page
         router.push(`/dashboard/users/${user.id}`);
       } else {
+        console.error('Update failed:', data);
         throw new Error(data.error || 'Failed to update user.');
       }
     } catch (error) {

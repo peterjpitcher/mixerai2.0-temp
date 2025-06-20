@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import RootLayoutWrapper from "@/components/layout/root-layout-wrapper";
 import { Toaster as SonnerToaster } from "@/components/sonner";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { AppProviders } from "@/providers/app-providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -27,17 +28,19 @@ export default function RootLayout({
       <head>
       </head>
       <body className={inter.className}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <ErrorBoundary>
-            <RootLayoutWrapper>{children}</RootLayoutWrapper>
-          </ErrorBoundary>
-          <SonnerToaster />
-        </ThemeProvider>
+        <AppProviders>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <ErrorBoundary>
+              <RootLayoutWrapper>{children}</RootLayoutWrapper>
+            </ErrorBoundary>
+            <SonnerToaster />
+          </ThemeProvider>
+        </AppProviders>
       </body>
     </html>
   );

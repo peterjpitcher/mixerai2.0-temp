@@ -52,9 +52,32 @@ export const POST = withAdminAuth(async (request: NextRequest, adminUser) => {
       // For this phase, simply inform that user exists.
       let message = `User with email ${emailToInvite} already exists.`;
       if (body.brand_id && body.role) {
-        // Placeholder: Logic to update permissions for existingUser.id, body.brand_id, body.role
-        console.log(`[API /api/users/invite] TODO: Update permissions for existing user ${existingUser.id} for brand ${body.brand_id} with role ${body.role}.`);
-        message += ` Manual permission update may be required or use dedicated permission management tools.`
+        // Update or create permission for existing user
+        const { error: permissionError } = await supabase
+          .from('user_brand_permissions')
+          .upsert({
+            user_id: existingUser.id,
+            brand_id: body.brand_id,
+            role: body.role.toLowerCase(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id,brand_id'
+          });
+
+        if (permissionError) {
+          console.error(`[API /api/users/invite] Error updating permissions for existing user:`, permissionError);
+          return NextResponse.json(
+            { success: false, error: 'Failed to update user permissions' },
+            { status: 500 }
+          );
+        }
+
+        message = `User already exists and has been granted ${body.role} access to the brand.`;
+        return NextResponse.json(
+          { success: true, message, user_exists: true, user_id: existingUser.id },
+          { status: 200 }
+        );
       }
       return NextResponse.json(
         { success: false, error: message, user_exists: true, user_id: existingUser.id },

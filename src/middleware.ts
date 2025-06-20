@@ -41,7 +41,8 @@ export async function middleware(request: NextRequest) {
     } else {
       rateLimitConfig = rateLimitConfigs.ai;
     }
-  } else if (pathForRateLimit.includes('/users') || pathForRateLimit.includes('/workflows')) {
+  } else if (pathForRateLimit.includes('/workflows') && pathForRateLimit.includes('/assign')) {
+    // Only use sensitive rate limit for workflow assignment operations
     rateLimitConfig = rateLimitConfigs.sensitive;
   }
   

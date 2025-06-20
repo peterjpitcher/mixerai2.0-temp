@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
-import { Database } from '@/types/supabase';
+// import { Database } from '@/types/supabase'; // TODO: Uncomment when supabase types are generated
 import { User } from '@supabase/supabase-js';
 
 export const dynamic = "force-dynamic";
@@ -300,7 +300,7 @@ export const PUT = withAuth(async (request: NextRequest, user: User, context?: u
       if (body.hasOwnProperty(key)) {
         // Add specific validation if needed (e.g., for status enum)
         if (key === 'status') {
-          const validStatuses: Database['public']['Enums']['content_status'][] = [
+          const validStatuses: string[] = [ // TODO: Type as Database['public']['Enums']['content_status'][] when types are generated
             'draft', 'pending_review', 'approved', 'published', 'rejected'
           ];
           if (!validStatuses.includes(body.status)) {

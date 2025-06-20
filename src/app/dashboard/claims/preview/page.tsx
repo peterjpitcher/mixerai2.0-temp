@@ -5,7 +5,6 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
 import { 
@@ -304,14 +303,14 @@ const OverrideModalContent: React.FC<OverrideModalContentProps> = ({
         <DialogTitle>
            {modalContextData.cellData?.activeOverride ? 'Manage Market Override' : 'Create New Market Override'}
         </DialogTitle>
-        <DialogDescription>
-            Product: <span className="font-semibold">{modalContextData.product.name}</span><br />
-            Market: <span className="font-semibold">{getCountryName(selectedCountry)}</span><br />
-            Claim Text: &quot;<span className="font-semibold">{modalContextData.claimTextInfo.text}</span>&quot;
+        <DialogDescription className="space-y-1">
+            <div className="truncate">Product: <span className="font-semibold">{modalContextData.product.name}</span></div>
+            <div className="truncate">Market: <span className="font-semibold">{getCountryName(selectedCountry)}</span></div>
+            <div>Claim Text: &quot;<span className="font-semibold">{modalContextData.claimTextInfo.text}</span>&quot;</div>
             {modalContextData.cellData?.activeOverride && 
-              <span className="text-xs block mt-1 text-muted-foreground">Override ID: {modalContextData.cellData.activeOverride.overrideId}</span>}
+              <span className="text-xs block mt-1 text-muted-foreground truncate">Override ID: {modalContextData.cellData.activeOverride.overrideId}</span>}
             {modalContextData?.cellData?.sourceMasterClaimId && 
-               <span className="text-xs block mt-1 text-muted-foreground">Master Claim ID: {modalContextData.cellData.sourceMasterClaimId}</span>}
+               <span className="text-xs block mt-1 text-muted-foreground truncate">Master Claim ID: {modalContextData.cellData.sourceMasterClaimId}</span>}
         </DialogDescription>
       </DialogHeader>
       <div className="py-4 space-y-4">
@@ -697,10 +696,10 @@ export default function ClaimsPreviewPage() {
 
   return (
     <div className={cn(
-      "flex flex-col h-screen", // Ensure the main div can take full screen height
-      isFullScreen ? "fixed inset-0 bg-background z-50 p-4" : "space-y-0 p-y-0 sm:py-0.5 lg:py-1 relative" 
+      "flex flex-col",
+      isFullScreen ? "fixed inset-0 bg-background z-50 p-4" : "h-[calc(100vh-4rem)]" 
     )}> 
-      <div className={cn("flex-shrink-0", isFullScreen && "hidden")}> 
+      <div className={cn("flex-shrink-0", isFullScreen && "hidden", !isFullScreen && "px-6 pt-6")}> 
         <Button 
           variant="ghost" 
           size="sm" 
@@ -714,43 +713,53 @@ export default function ClaimsPreviewPage() {
         <PageHeader title={pageTitle} description={pageDescription} /> 
       </div>
       
-      <div className={cn("mb-2 flex items-center gap-4", isFullScreen && "hidden")}> 
-        <div className="flex items-center gap-2"> 
-          <Label htmlFor="matrix_country_code" className="text-sm">Country:</Label> 
-          <Select value={selectedCountry} onValueChange={setSelectedCountry} disabled={isLoadingCountries}>
-            <SelectTrigger id="matrix_country_code" className="h-9 w-[200px]"><SelectValue /></SelectTrigger> 
-            <SelectContent>
-              <SelectItem value={ALL_COUNTRIES_CODE}>{ALL_COUNTRIES_NAME} ({ALL_COUNTRIES_CODE})</SelectItem> 
-              {availableCountries.map(c => <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>)} 
-            </SelectContent>
-          </Select>
+      <div className={cn("flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-shrink-0", isFullScreen && "hidden", !isFullScreen && "px-6 mt-4")}> 
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto"> 
+            <Label htmlFor="matrix_country_code" className="text-sm whitespace-nowrap">Country:</Label> 
+            <Select value={selectedCountry} onValueChange={setSelectedCountry} disabled={isLoadingCountries}>
+              <SelectTrigger id="matrix_country_code" className="h-9 w-full sm:w-[280px] truncate">
+                <SelectValue className="truncate" />
+              </SelectTrigger> 
+              <SelectContent className="max-w-[90vw] sm:max-w-md">
+                <SelectItem value={ALL_COUNTRIES_CODE} className="truncate">
+                  <span className="truncate">{ALL_COUNTRIES_NAME} ({ALL_COUNTRIES_CODE})</span>
+                </SelectItem> 
+                {availableCountries.map(c => (
+                  <SelectItem key={c.code} value={c.code} className="truncate">
+                    <span className="truncate">{c.name} ({c.code})</span>
+                  </SelectItem>
+                ))} 
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto"> 
+            <Label htmlFor="matrix_brand_filter" className="text-sm whitespace-nowrap">Brand:</Label> 
+            <Select value={selectedBrandId} onValueChange={setSelectedBrandId} disabled={isLoadingBrands}> 
+              <SelectTrigger id="matrix_brand_filter" className="h-9 w-full sm:w-[200px] truncate">
+                <SelectValue placeholder={isLoadingBrands ? "Loading..." : "All Brands"} className="truncate" />
+              </SelectTrigger> 
+              <SelectContent className="max-w-[90vw] sm:max-w-md">
+                <SelectItem value="all">All Brands</SelectItem> 
+                {availableBrands.map(b => (
+                  <SelectItem key={b.id} value={b.id} className="truncate">
+                    <span className="truncate">{b.name}</span>
+                  </SelectItem>
+                ))} 
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <div className="flex items-center gap-2"> 
-          <Label htmlFor="matrix_brand_filter" className="text-sm">Brand:</Label> 
-          <Select value={selectedBrandId} onValueChange={setSelectedBrandId} disabled={isLoadingBrands}> 
-            <SelectTrigger id="matrix_brand_filter" className="h-9 w-[200px]"><SelectValue placeholder={isLoadingBrands ? "Loading..." : "All Brands"} /></SelectTrigger> 
-            <SelectContent>
-              <SelectItem value="all">All Brands</SelectItem> 
-              {availableBrands.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)} 
-            </SelectContent>
-          </Select>
-        </div> 
+        <Button onClick={toggleFullScreen} variant="outline" size="icon" className="h-8 w-8">
+          <Maximize className="h-4 w-4" />
+          <span className="sr-only">Enter Fullscreen</span>
+        </Button>
       </div>
-
-      {/* This button is for non-fullscreen mode, appears next to filters */}
-      {!isFullScreen && (
-        <div className="mb-2 flex justify-end">
-            <Button onClick={toggleFullScreen} variant="outline" size="icon" className="h-8 w-8">
-                <Maximize className="h-4 w-4" />
-                <span className="sr-only">Enter Fullscreen</span>
-            </Button>
-        </div>
-      )}
 
       <div 
         className={cn(
-          "flex-grow overflow-auto border rounded-md relative",
-          isFullScreen ? "h-full w-full" : "h-[calc(100vh-300px)]" // Adjusted height to account for header and filters
+          "flex-grow overflow-hidden border rounded-md relative min-h-0 mt-4",
+          isFullScreen ? "h-full w-full" : "mx-6 mb-6"
         )}
       >
         {/* This button is for fullscreen mode, absolutely positioned */}
@@ -773,43 +782,47 @@ export default function ClaimsPreviewPage() {
         {!isLoading && !error && matrixData && matrixData.productsAsCols.length > 0 && matrixData.claimTextsAsRows.length === 0 && ( <div className="flex flex-col items-center justify-center h-full text-muted-foreground"><FileText className="h-10 w-10 mb-3 opacity-50" /><p>No claims found.</p></div> )}
         
         {!isLoading && !error && matrixData && matrixData.productsAsCols.length > 0 && matrixData.claimTextsAsRows.length > 0 && (
-            <Table className="min-w-full border-collapse h-full">
-              <TableHeader className={cn("sticky top-0 z-20 shadow-sm", isFullScreen ? "bg-background" : "bg-white")}>
-                <TableRow>
-                  <TableHead 
+          <div className="w-full h-full overflow-auto relative">
+            <table className="min-w-full border-collapse">
+              <thead>
+                <tr>
+                  <th 
                     className={cn(
-                        "sticky left-0 z-30 p-2 text-sm font-semibold text-muted-foreground min-w-[200px] sm:min-w-[250px] border",
-                        isFullScreen ? "bg-background" : "bg-white"
+                        "sticky left-0 top-0 z-30 p-2 text-sm font-semibold text-muted-foreground min-w-[200px] sm:min-w-[250px] border text-left",
+                        "shadow-[2px_2px_4px_-1px_rgba(0,0,0,0.1)]",
+                        isFullScreen ? "bg-background" : "bg-background"
                     )}
                   >
                     Claim Text
-                  </TableHead>
+                  </th>
                   {matrixData.productsAsCols.map(product => (
-                    <TableHead 
+                    <th 
                       key={product.id} 
                       className={cn(
-                        "p-2 text-sm font-semibold text-muted-foreground min-w-[120px] sm:min-w-[140px] text-center whitespace-normal break-words border",
-                        isFullScreen ? "bg-background" : "bg-white"
+                        "sticky top-0 z-20 p-2 text-sm font-semibold text-muted-foreground min-w-[120px] sm:min-w-[140px] text-center whitespace-normal break-words border",
+                        "shadow-[0_2px_4px_-1px_rgba(0,0,0,0.1)]",
+                        isFullScreen ? "bg-background" : "bg-background"
                         )}
                       title={product.name}
                     >
                       {product.name}
-                    </TableHead>
+                    </th>
                   ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+                </tr>
+              </thead>
+              <tbody>
                 {matrixData.claimTextsAsRows.map(claimTextInfo => (
-                  <TableRow key={claimTextInfo.text}>
-                    <TableCell 
+                  <tr key={claimTextInfo.text} className="hover:bg-muted/50 border-b transition-colors">
+                    <td 
                       className={cn(
                         "sticky left-0 z-10 p-1 text-xs font-medium min-w-[160px] sm:min-w-[200px] whitespace-normal break-words border",
+                        "shadow-[2px_0_4px_-1px_rgba(0,0,0,0.1)]",
                         isFullScreen ? "bg-background hover:bg-muted/30" : "bg-background hover:bg-muted/50"
                       )}
                       title={claimTextInfo.text}
                     >
                       {claimTextInfo.text}
-                    </TableCell>
+                    </td>
                     {matrixData.productsAsCols.map(product => {
                       const cell = matrixData.cellData[claimTextInfo.text]?.[product.id] || null;
                       return (
@@ -825,10 +838,11 @@ export default function ClaimsPreviewPage() {
                         </td>
                       );
                     })}
-                  </TableRow>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
+          </div>
         )}
       </div> 
 

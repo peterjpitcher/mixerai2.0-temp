@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import {
   OutputField, 
   ContentTemplate 
 } from '@/types/template';
+import { useFormPersistence } from '@/hooks/use-form-persistence';
 
 type TemplateData = ContentTemplate;
 
@@ -46,6 +47,24 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
   );
   const [isAddingField, setIsAddingField] = useState(false);
   const [editingField, setEditingField] = useState<Field | null>(null);
+  
+  // Form persistence
+  const { restoreFormData, clearSavedData } = useFormPersistence(templateData, {
+    storageKey: `template-form-${initialData?.id || 'new'}`,
+    debounceMs: 2000,
+    excludeFields: ['id', 'created_at', 'created_by', 'updated_at'],
+    onRestore: (data) => {
+      setTemplateData(data);
+      toast.info('Form data restored from previous session');
+    }
+  });
+  
+  // Restore data on mount
+  useEffect(() => {
+    if (!initialData) { // Only restore for new templates
+      restoreFormData();
+    }
+  }, [restoreFormData, initialData]);
 
   const handleBasicInfoChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -183,6 +202,7 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
       
       toast.success(initialData?.id && initialData.id !== 'new' ? 'Template updated successfully' : 'Template created successfully');
       
+      clearSavedData(); // Clear persisted data after successful save
       router.push('/dashboard/templates');
       router.refresh();
     } catch (error: unknown) {
@@ -197,8 +217,15 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
     <form onSubmit={handleSubmit} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Basic Information</CardTitle>
-          <CardDescription>Set the name and description for your template.</CardDescription>
+          <div className="flex justify-between items-start">
+            <div className="space-y-1">
+              <CardTitle>Basic Information</CardTitle>
+              <CardDescription>Set the name and description for your template.</CardDescription>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Auto-save enabled
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>

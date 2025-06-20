@@ -12,6 +12,8 @@ interface Brand {
   brand_identity?: string | null;
   tone_of_voice?: string | null;
   guardrails?: string | null;
+  language?: string | null;
+  country?: string | null;
 }
 
 interface BrandSelectorProps {
@@ -32,7 +34,7 @@ export function BrandSelector({
   const selectedBrandData = brands.find(b => b.id === selectedBrand);
   
   return (
-    <div>
+    <div className="space-y-2">
       <Label htmlFor="brand">Brand *</Label>
       <Select 
         value={selectedBrand} 
@@ -70,6 +72,12 @@ export function BrandSelector({
           ))}
         </SelectContent>
       </Select>
+      {selectedBrandData && (
+        <div className="text-sm text-muted-foreground">
+          Language: {selectedBrandData.language || 'Not set (defaulting to English)'} | 
+          Country: {selectedBrandData.country || 'Not set (defaulting to US)'}
+        </div>
+      )}
     </div>
   );
 }

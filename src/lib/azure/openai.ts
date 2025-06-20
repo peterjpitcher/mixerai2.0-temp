@@ -255,19 +255,62 @@ export async function generateContentFromTemplate(
   }
 ) {
   // console.log(`Generating template-based content for brand: ${brand.name} using template: ${template.name}`);
-  // console.log(`Targeting Language: ${brand.language || 'not specified'}, Country: ${brand.country || 'not specified'}`);
+  // console.log(`Brand localization - Language: ${brand.language || 'not specified'}, Country: ${brand.country || 'not specified'}`);
   
   const deploymentName = getModelName();
-  // console.log(`Using deployment name: "${deploymentName}"`);
   
+  // Language code to full name mapping
+  const languageNames: Record<string, string> = {
+    'en': 'English',
+    'es': 'Spanish',
+    'fr': 'French',
+    'de': 'German',
+    'it': 'Italian',
+    'pt': 'Portuguese',
+    'nl': 'Dutch',
+    'pl': 'Polish',
+    'ru': 'Russian',
+    'ja': 'Japanese',
+    'ko': 'Korean',
+    'zh': 'Chinese',
+    'ar': 'Arabic',
+    'hi': 'Hindi'
+  };
+
+  const countryNames: Record<string, string> = {
+    'US': 'United States',
+    'GB': 'United Kingdom',
+    'UK': 'United Kingdom',
+    'FR': 'France',
+    'DE': 'Germany',
+    'ES': 'Spain',
+    'IT': 'Italy',
+    'CA': 'Canada',
+    'AU': 'Australia',
+    'JP': 'Japan',
+    'CN': 'China',
+    'IN': 'India',
+    'BR': 'Brazil',
+    'MX': 'Mexico'
+  };
+
   // Build the system prompt with brand information
   let systemPrompt = `You are an expert content creator for the brand "${brand.name}".`;
   
   // Add localization instructions if provided
   if (brand.language && brand.country) {
-    systemPrompt += ` Generate content in ${brand.language} for an audience in ${brand.country}.`;
+    const languageName = languageNames[brand.language] || brand.language;
+    const countryName = countryNames[brand.country] || brand.country;
+    
+    systemPrompt += ` IMPORTANT: You MUST generate ALL content in ${languageName} language for an audience in ${countryName}.`;
+    systemPrompt += ` This means all text, headlines, body copy, and any other content MUST be written in ${languageName}.`;
+    
+    if (brand.language !== 'en') {
+      systemPrompt += ` Do NOT generate content in English. Generate ONLY in ${languageName}.`;
+    }
   } else if (brand.language) {
-    systemPrompt += ` Generate content in ${brand.language}.`;
+    const languageName = languageNames[brand.language] || brand.language;
+    systemPrompt += ` Generate ALL content in ${languageName} language.`;
   }
   
   // Add the new content rules
@@ -333,6 +376,11 @@ The product context is provided in the user prompt.
   template.inputFields.forEach(field => {
     const fieldValue = field.value || '';
     userPrompt += `- ${field.name}: ${fieldValue}\n`;
+    
+    // Log if a field is empty that might be expected to have a value
+    if (!fieldValue && field.name.toLowerCase().includes('title')) {
+      console.warn(`[Template ${template.name}] Input field "${field.name}" (ID: ${field.id}) is empty but appears to be a title field`);
+    }
   });
   
   userPrompt += `\nIMPORTANT: You MUST generate content for ALL ${template.outputFields.length} output fields listed below. Each field must be clearly marked and separated.\n\n`;
@@ -383,9 +431,9 @@ The product context is provided in the user prompt.
             console.log(`[Field ${field.id}] Found matching input field for "${fieldName}": ${inputField.value.substring(0, 50)}...`);
             return inputField.value;
           } else {
-            console.log(`[Field ${field.id}] Found input field "${fieldName}" but it has no value, removing placeholder`);
-            // For empty values, return empty string to remove the placeholder
-            return '';
+            console.log(`[Field ${field.id}] Found input field "${fieldName}" but it has no value, keeping placeholder for context`);
+            // Keep the field name so the AI has context about what's expected
+            return `[${inputField.name}]`;
           }
         } else {
           console.log(`[Field ${field.id}] No matching input field found for "${fieldName}", keeping placeholder`);
@@ -402,6 +450,12 @@ The product context is provided in the user prompt.
         .replace(/\(\s*\)/g, '') // Remove any remaining empty parentheses
         .replace(/\s+/g, ' ') // Normalize whitespace
         .trim();
+      
+      // If the prompt becomes too short or incomplete after replacements, add context
+      if (fieldAIPrompt && fieldAIPrompt.split(' ').length < 3) {
+        console.warn(`[Field ${field.id}] AI prompt seems incomplete after processing: "${fieldAIPrompt}"`);
+        fieldAIPrompt = `${fieldAIPrompt} based on the provided brand context and input values`;
+      }
     }
     
     if (fieldAIPrompt || fieldSpecificInstruction) {
@@ -429,8 +483,28 @@ The product context is provided in the user prompt.
     userPrompt += `\nAdditional instructions: ${input.additionalInstructions}\n`;
   }
   
+  // Language reminder if not English
+  if (brand.language && brand.language !== 'en') {
+    const languageName = languageNames[brand.language] || brand.language;
+    userPrompt += `\n\nCRITICAL LANGUAGE REQUIREMENT: ALL content MUST be generated in ${languageName}. Do NOT generate any content in English.`;
+  }
+  
   // Final reminder
   userPrompt += `\nREMINDER: You must generate content for ALL ${template.outputFields.length} fields listed above. Each field must be wrapped with its specific ##FIELD_ID:...## markers.`;
+  
+  // DEBUG: Log the complete prompt being sent to AI
+  console.log('\n========== AI GENERATION DEBUG ==========');
+  console.log('Template:', template.name);
+  console.log('Brand:', brand.name);
+  console.log('\n--- System Prompt ---');
+  console.log(systemPrompt);
+  console.log('\n--- User Prompt ---');
+  console.log(userPrompt);
+  console.log('\n--- Input Fields ---');
+  template.inputFields.forEach(field => {
+    console.log(`  ${field.name} (ID: ${field.id}): "${field.value || '[EMPTY]'}"`);
+  });
+  console.log('========================================\n');
   
   // Make the API call with error handling
   try {

@@ -4,7 +4,7 @@ import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
 // import { v4 as uuidv4 } from 'uuid';
-import { TablesInsert } from '@/types/supabase';
+// import { TablesInsert } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +89,7 @@ export const POST = withAuth(async (request: NextRequest, user: User, context?: 
     }
     
     // 2. Create the new workflow shell (without steps in JSONB)
-    const newWorkflowShellData: TablesInsert<'workflows'> = {
+    const newWorkflowShellData: any = { // TODO: Type as TablesInsert<'workflows'> when types are regenerated
       name: `Copy of ${originalWorkflow.name}`,
       brand_id: null,
       template_id: null, // originalWorkflow.template_id if you want to copy it

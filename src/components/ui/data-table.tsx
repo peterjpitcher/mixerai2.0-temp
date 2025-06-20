@@ -224,6 +224,7 @@ export function DataTable<TData>({
                         size="sm"
                         className="-ml-3 h-8 data-[state=open]:bg-accent"
                         onClick={() => toggleSorting(column.id)}
+                        aria-label={`Sort by ${typeof column.header === "string" ? column.header : column.id} ${getIsSorted(column.id) === "asc" ? "descending" : getIsSorted(column.id) === "desc" ? "ascending" : ""}`}
                       >
                         {typeof column.header === "function"
                           ? column.header({ column: columnForHeader })

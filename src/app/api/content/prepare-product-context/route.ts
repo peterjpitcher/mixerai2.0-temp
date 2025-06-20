@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
-import { generateTextCompletion } from '@/lib/azure/openai';
 import { withAuth } from '@/lib/auth/api-auth';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { formatClaimsDirectly, deduplicateClaims } from '@/lib/claims-formatter';
 
 type Claim = {
   claim_text: string;
-  claim_type: 'mandatory' | 'allowed' | 'disallowed';
+  claim_type: 'allowed' | 'disallowed';
   level: 'brand' | 'product' | 'ingredient';
   country_code: string;
 };
@@ -111,9 +111,7 @@ async function fetchAllBrandClaims(supabase: ReturnType<typeof createSupabaseAdm
 }
 
 function sortClaims(a: Claim, b: Claim): number {
-  if (a.claim_type === 'mandatory' && b.claim_type !== 'mandatory') return -1;
-  if (a.claim_type !== 'mandatory' && b.claim_type === 'mandatory') return 1;
-
+  // Sort by level order: product > ingredient > brand
   const levelOrder = { product: 1, ingredient: 2, brand: 3 };
   const aLevel = levelOrder[a.level];
   const bLevel = levelOrder[b.level];
@@ -121,6 +119,7 @@ function sortClaims(a: Claim, b: Claim): number {
     return aLevel - bLevel;
   }
 
+  // Sort by market specificity: specific market > all countries
   const allCountriesCode = '__ALL_COUNTRIES__';
   const aIsGlobal = a.country_code === allCountriesCode;
   const bIsGlobal = b.country_code === allCountriesCode;
@@ -204,85 +203,43 @@ async function prepareProductContextHandler(request: NextRequest) {
 
     const sortedClaims = allClaims.sort(sortClaims);
 
-    const uniqueClaimsMap = new Map<string, Claim>();
-    for (const claim of sortedClaims) {
-      if (!uniqueClaimsMap.has(claim.claim_text)) {
-        uniqueClaimsMap.set(claim.claim_text, claim);
-      }
-    }
-    const uniqueClaims = Array.from(uniqueClaimsMap.values());
+    // Deduplicate claims while preserving priority
+    const uniqueClaims = deduplicateClaims(
+      sortedClaims.map((claim, index) => ({
+        id: `${claim.claim_text}_${index}`,
+        claim_text: claim.claim_text,
+        claim_type: claim.claim_type,
+        level: claim.level.charAt(0).toUpperCase() + claim.level.slice(1), // Capitalize level
+        country_code: claim.country_code,
+        priority: sortedClaims.length - index // Higher priority for earlier items
+      }))
+    );
 
-    const claimsForAI = uniqueClaims.map(claim => ({
-      text: claim.claim_text,
-      type: claim.claim_type,
-      level: claim.level,
-      market: claim.country_code
-    }));
+    // Get master brand name for context
+    const { data: brandData } = await supabase
+      .from('master_claim_brands')
+      .select('name')
+      .eq('id', masterClaimBrandId)
+      .single();
 
-    const systemPrompt = `You are an expert marketing copywriter. Your task is to take a JSON object of product claims and transform it into a structured JSON output.
+    // Format claims directly without AI
+    const formattedClaims = formatClaimsDirectly(
+      uniqueClaims,
+      productName,
+      brandData?.name
+    );
 
-The final output must be a single JSON object with the following structure:
-{
-  "introductory_sentence": "A brief sentence identifying the brand, and product/market if specified.",
-  "mandatory_claims": [
-    { "text": "Rewritten mandatory claim.", "level": "Product" }
-  ],
-  "grouped_claims": [
-    {
-      "level": "Product",
-      "allowed_claims": [],
-      "disallowed_claims": []
-    },
-    {
-      "level": "Ingredient",
-      "allowed_claims": [],
-      "disallowed_claims": []
-    },
-    {
-      "level": "Brand",
-      "allowed_claims": [],
-      "disallowed_claims": []
-    }
-  ]
-}
-
-Instructions:
-1.  **Rewrite Each Claim**: Rewrite the "text" of each input claim to be more natural and readable for a marketing professional.
-2.  **Populate the Structure**:
-    - Create a concise introductory sentence.
-    - For 'mandatory' claims, place them in the \`mandatory_claims\` array as objects, including both the rewritten \`text\` and the original \`level\`.
-    - For all other claims, place them in the correct \`allowed_claims\` or \`disallowed_claims\` array within the object that matches their \`level\`.
-    - Ensure every level group ('Product', 'Ingredient', 'Brand') is present in the \`grouped_claims\` array, even if its claim arrays are empty.
-3.  **Return ONLY JSON**: The final output must be only the JSON object. Do not include any other text, formatting, or explanations.`;
-    
-    const userPrompt = `
-Product ID: "${productId}"
-Claims to style:
----
-${JSON.stringify(claimsForAI, null, 2)}
----
-`;
-
-    const aiData = await generateTextCompletion(systemPrompt, userPrompt, 2000, 0.5);
-
-    if (!aiData || typeof aiData !== 'string') {
-      throw new Error('AI processing failed to return valid data.');
-    }
-
-    let parsedAIResponse;
-    try {
-      const cleanedAiData = aiData.replace(/^```json\n|```json|```$/g, '').trim();
-      parsedAIResponse = JSON.parse(cleanedAiData);
-    } catch (e: unknown) {
-      throw new Error(`Failed to parse AI response: ${(e as Error).message}`);
-    }
-
-    console.log('[prepare-product-context] Successfully parsed AI response:', JSON.stringify(parsedAIResponse, null, 2));
+    console.log('[prepare-product-context] Formatted claims without AI:', {
+      productName,
+      brandName: brandData?.name,
+      totalUniqueClaimsCount: uniqueClaims.length,
+      totalClaimsCount: allClaims.length
+    });
 
     return NextResponse.json({
       success: true,
       productName,
-      styledClaims: parsedAIResponse,
+      styledClaims: formattedClaims,
     });
 
   } catch (error: unknown) {
