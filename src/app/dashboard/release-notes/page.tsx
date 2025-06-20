@@ -23,6 +23,48 @@ export default function ReleaseNotesPage() {
       
       <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
         
+        {/* Release: 20 June 2025 */}
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold border-b pb-2 mb-4">Release: 20 June 2025</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Priority UI/UX and functionality fixes focusing on dashboard improvements, navigation reliability, and claims system enhancements.
+          </p>
+
+          <h3>🎯 Key Features</h3>
+          <ul>
+            <li><strong>Dashboard Team Activity</strong> - Simplified display grouped by time periods (Today, Yesterday, This Week, Last Week) showing last 30 changes [39e0491]</li>
+            <li><strong>Claims Multiple Products/Ingredients</strong> - Enabled tagging multiple products and ingredients per claim using junction tables [39e0491]</li>
+            <li><strong>Environment Validation</strong> - Added production environment variable validation for Vercel deployments [39e0491]</li>
+            <li><strong>Global Error Boundary</strong> - Added production-ready error handling for better user experience [39e0491]</li>
+          </ul>
+
+          <h3>✨ Improvements</h3>
+          <ul>
+            <li><strong>Dashboard Layout</strong> - Removed metric cards for cleaner, more focused interface [39e0491]</li>
+            <li><strong>Stalled Content Display</strong> - Enhanced formatting with visual hierarchy and status badges [39e0491]</li>
+            <li><strong>Team Activity Panel</strong> - Made full height of page for better visibility [39e0491]</li>
+            <li><strong>Navigation Templates</strong> - Fixed content templates not showing due to role detection timing [39e0491]</li>
+            <li><strong>Claims UI Spacing</strong> - Added proper spacing between filters and tables on preview page [39e0491]</li>
+            <li><strong>Search Functionality</strong> - Fixed MultiSelectCheckboxCombobox search by using label instead of value [39e0491]</li>
+          </ul>
+
+          <h3>🐛 Bug Fixes</h3>
+          <ul>
+            <li><strong>Delete Brand Action</strong> - Fixed event propagation causing navigation instead of delete dialog [39e0491]</li>
+            <li><strong>Products API Permissions</strong> - Corrected permission checks for master claim brands [39e0491]</li>
+            <li><strong>Claims Product Display</strong> - Fixed empty results by increasing fetch limits and checking correct permissions [39e0491]</li>
+            <li><strong>React Ref Warnings</strong> - Fixed AlertDialog components with proper forwardRef implementation [39e0491]</li>
+            <li><strong>Claims Type Restriction</strong> - Limited claim types to "allowed" and "disallowed" only [39e0491]</li>
+          </ul>
+
+          <h3>📚 Documentation</h3>
+          <ul>
+            <li>Created MixerAI 2.0 migration announcement email template</li>
+            <li>Added claims system review and type restriction discovery documentation</li>
+            <li>Updated CLAUDE.md with latest command references</li>
+          </ul>
+        </section>
+
         {/* Release: 18 June 2025 */}
         <section className="mb-12">
           <h2 className="text-xl font-semibold border-b pb-2 mb-4">Release: 18 June 2025</h2>
