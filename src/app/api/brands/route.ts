@@ -31,6 +31,7 @@ const createBrandSchema = z.object({
   brand_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color').optional().nullable(),
   logo_url: commonSchemas.url.optional().nullable(),
   master_claim_brand_id: commonSchemas.uuid.optional().nullable(),
+  master_claim_brand_ids: z.array(commonSchemas.uuid).optional().nullable(), // NEW: Array for multiple master claim brands
   selected_agency_ids: z.array(commonSchemas.uuid).optional().nullable(),
   approved_content_types: z.array(z.string()).optional().nullable(),
   admin_users: z.array(z.object({
@@ -471,6 +472,26 @@ export const POST = withAuth(async (req: NextRequest, user) => {
         if (agencyError) {
           // console.warn('[API /api/brands POST] Error linking new agencies to brand:', agencyError);
           // Log and continue, as brand creation itself was successful.
+        }
+      }
+    }
+
+    // Handle master_claim_brand_ids array if provided using the new junction table
+    if (body.master_claim_brand_ids !== undefined && Array.isArray(body.master_claim_brand_ids)) {
+      if (body.master_claim_brand_ids.length > 0) {
+        const newLinks = body.master_claim_brand_ids.map((masterClaimBrandId: string) => ({
+          brand_id: newBrandId,
+          master_claim_brand_id: masterClaimBrandId,
+          created_by: user.id
+        }));
+        
+        const { error: insertError } = await supabase
+          .from('brand_master_claim_brands')
+          .insert(newLinks);
+        
+        if (insertError) {
+          console.error(`[API /api/brands POST] Error inserting master claim brand links for brand ${newBrandId}:`, insertError);
+          // Continue anyway as the brand was created successfully
         }
       }
     }

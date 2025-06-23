@@ -2,9 +2,10 @@
 
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { RichTextEditor } from './rich-text-editor';
+import { QuillEditor } from './quill-editor';
 import { RefreshCw, AlertCircle } from 'lucide-react';
 import type { OutputField } from '@/types/template';
+import 'quill/dist/quill.snow.css';
 
 interface GeneratedContentPreviewProps {
   generatedOutputs: Record<string, string>;
@@ -67,7 +68,8 @@ export function GeneratedContentPreview({
             </div>
             
             {field.type === 'richText' ? (
-              <RichTextEditor
+              <QuillEditor
+                key={`${field.id}-${value?.length || 0}`} // Force remount on content changes
                 value={value}
                 onChange={(content) => onOutputChange(field.id, content)}
                 placeholder="Generated content will appear here"

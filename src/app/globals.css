@@ -1,6 +1,4 @@
 /* Import Quill CSS */
-@import 'quill/dist/quill.core.css';
-@import 'quill/dist/quill.snow.css';
 
 /* Import Tailwind CSS */
 @tailwind base;

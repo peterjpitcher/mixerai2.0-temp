@@ -44,28 +44,28 @@ export const GET = withAuth(async (
       }
     }
 
-    // Fetch the master brand link from the master_claim_brands table.
-    // This is the correct way to link a brand to its products.
-    const { data: masterBrandLink, error: masterBrandLinkError } = await supabase
-      .from('master_claim_brands')
-      .select('id') // This ID is the master_brand_id for the products table
-      .eq('mixerai_brand_id', brandId) // We link using the brand's actual ID
-      .single();
+    // Fetch all master brand links from the junction table.
+    // Multiple master claim brands can be linked to one MixerAI brand.
+    const { data: masterBrandLinks, error: masterBrandLinkError } = await supabase
+      .from('brand_master_claim_brands')
+      .select('master_claim_brand_id')
+      .eq('brand_id', brandId);
 
     if (masterBrandLinkError) throw masterBrandLinkError;
     
-    if (!masterBrandLink) {
-      // If there's no entry in master_claim_brands, then this brand has no products.
+    if (!masterBrandLinks || masterBrandLinks.length === 0) {
+      // If there are no entries in the junction table, then this brand has no products.
       return NextResponse.json({ success: true, products: [] });
     }
 
-    const masterBrandId = masterBrandLink.id;
+    // Collect all master brand IDs
+    const masterBrandIds = masterBrandLinks.map(link => link.master_claim_brand_id);
 
-    // Now, fetch the products for that master_brand_id
+    // Now, fetch the products for all master_brand_ids
     let query = supabase
       .from('products')
       .select('id, name')
-      .eq('master_brand_id', masterBrandId);
+      .in('master_brand_id', masterBrandIds);
 
     if (q) {
       query = query.ilike('name', `%${q}%`);

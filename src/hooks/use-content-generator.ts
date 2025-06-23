@@ -181,6 +181,7 @@ export function useContentGenerator(templateId?: string | null) {
     fetchSpecificWorkflow();
   }, [selectedBrand, templateId]);
   
+  
   // Handle template field changes
   const handleTemplateFieldChange = useCallback(async (fieldId: string, value: string, fieldType?: FieldType) => {
     setTemplateFieldValues(prev => ({ ...prev, [fieldId]: value }));

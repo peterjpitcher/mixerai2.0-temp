@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, Sparkles, ShieldAlert, Info } from 'lucide-react';
 import { toast } from 'sonner';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 
 // Import our new components
 import { ContentHeader } from './content-header';
@@ -19,7 +19,6 @@ import { GeneratedContentPreview } from './generated-content-preview';
 import { ClaimsViewerSection } from './claims-viewer-section';
 import { useContentGenerator } from '@/hooks/use-content-generator';
 import { DatePicker } from '@/components/ui/date-picker';
-import { useFormPersistence } from '@/hooks/use-form-persistence';
 
 interface ContentGeneratorFormProps {
   templateId?: string | null;
@@ -69,35 +68,6 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     router.push('/dashboard/content');
   };
   
-  // Form persistence - combine all form data
-  const formData = useMemo(() => ({
-    selectedBrand,
-    title,
-    templateFieldValues,
-    dueDate: dueDate?.toISOString() || null,
-    generatedOutputs
-  }), [selectedBrand, title, templateFieldValues, dueDate, generatedOutputs]);
-  
-  // Set up form persistence
-  const { restoreFormData, clearSavedData, saveFormData } = useFormPersistence(formData, {
-    storageKey: `content-generator-${templateId}`,
-    debounceMs: 2000,
-    excludeFields: [],
-    onRestore: (data) => {
-      // Restore form state
-      if (data.selectedBrand) setSelectedBrand(data.selectedBrand);
-      if (data.title) setTitle(data.title);
-      if (data.templateFieldValues) setTemplateFieldValues(data.templateFieldValues);
-      if (data.dueDate) setDueDate(new Date(data.dueDate));
-      if (data.generatedOutputs) setGeneratedOutputs(data.generatedOutputs);
-      toast.info('Form data restored from previous session');
-    }
-  });
-  
-  // Restore data on mount
-  useEffect(() => {
-    restoreFormData();
-  }, [restoreFormData]);
 
 
   const handleSuggestion = async (fieldId: string) => {
@@ -225,7 +195,6 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     try {
       const contentId = await saveContent();
       if (contentId) {
-        clearSavedData(); // Clear persisted data after successful save
         router.push(`/dashboard/content/${contentId}/edit`);
       }
     } catch {
@@ -319,9 +288,6 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
                 <CardDescription>
                   Fill in the required information to generate your {template?.name || 'content'}
                 </CardDescription>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Auto-save enabled
               </div>
             </div>
           </CardHeader>

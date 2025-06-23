@@ -14,7 +14,8 @@ import { BrandIcon } from '@/components/brand-icon';
 // import { RadioGroup, RadioGroupItem } from '@/components/radio-group'; // File not found, commenting out import
 import { scrapeUrlsFromText, extractUrls } from '@/lib/utils/url-scraper';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { RichTextEditor } from '@/components/content/rich-text-editor';
+import { QuillEditor } from '@/components/content/quill-editor';
+import 'quill/dist/quill.snow.css';
 import { ArticleDetailsSidebar } from './article-details-sidebar';
 import type { Brand } from '@/types/models'; // Import the new Brand type
 
@@ -1431,7 +1432,7 @@ export function ArticleGeneratorForm() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <RichTextEditor 
+                    <QuillEditor 
                       value={editableContent} 
                       onChange={handleContentChange} 
                       placeholder="Article content will appear here after generation..."
