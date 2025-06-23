@@ -65,6 +65,7 @@
     "express-rate-limit": "^7.5.0",
     "ipaddr.js": "^2.2.0",
     "js-cookie": "^3.0.5",
+    "lodash": "^4.17.21",
     "lodash.debounce": "^4.0.8",
     "lucide-react": "^0.508.0",
     "next": "14.2.30",
@@ -73,12 +74,12 @@
     "pg": "^8.16.0",
     "playwright": "^1.53.1",
     "postcss": "^8.4.32",
+    "quill": "^2.0.3",
     "react": "18.2.0",
     "react-day-picker": "^9.7.0",
     "react-dom": "18.2.0",
     "react-hook-form": "^7.56.3",
     "react-markdown": "^10.1.0",
-    "react-quill": "^2.0.0",
     "remark-gfm": "^4.0.1",
     "resend": "^4.6.0",
     "sanitize-html": "^2.17.0",
@@ -105,8 +106,5 @@
     "node-fetch": "^2.7.0",
     "ts-jest": "^29.3.2",
     "typescript": "^5.3.3"
-  },
-  "overrides": {
-    "quill": "^2.0.3"
   }
 }

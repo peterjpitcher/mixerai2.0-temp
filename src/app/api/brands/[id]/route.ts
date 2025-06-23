@@ -211,6 +211,40 @@ export const PUT = withAuth(async (
         );
     }
 
+    // Handle master_claim_brand_ids array if provided using the new junction table
+    if (body.master_claim_brand_ids !== undefined && Array.isArray(body.master_claim_brand_ids)) {
+      // First, delete all existing links for this brand
+      const { error: deleteError } = await supabase
+        .from('brand_master_claim_brands')
+        .delete()
+        .eq('brand_id', brandIdToUpdate);
+      
+      if (deleteError) {
+        console.error(`[API Brands PUT /${brandIdToUpdate}] Error deleting existing master claim brand links:`, deleteError);
+      }
+      
+      // Then, insert new links
+      if (body.master_claim_brand_ids.length > 0) {
+        const newLinks = body.master_claim_brand_ids.map((masterClaimBrandId: string) => ({
+          brand_id: brandIdToUpdate,
+          master_claim_brand_id: masterClaimBrandId,
+          created_by: authenticatedUser.id
+        }));
+        
+        const { error: insertError } = await supabase
+          .from('brand_master_claim_brands')
+          .insert(newLinks);
+        
+        if (insertError) {
+          console.error(`[API Brands PUT /${brandIdToUpdate}] Error inserting master claim brand links:`, insertError);
+          return NextResponse.json(
+            { success: false, error: 'Failed to update master claim brand associations.' },
+            { status: 500 }
+          );
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: updatedBrandData, // Using 'data' for consistency with POST endpoint

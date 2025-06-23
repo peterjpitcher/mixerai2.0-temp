@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { RichTextEditor } from './rich-text-editor';
+import { QuillEditor } from './quill-editor';
+import 'quill/dist/quill.snow.css';
 import { useRouter } from 'next/navigation';
 import { BrandIcon } from '@/components/brand-icon';
 import { toast } from 'sonner';
@@ -750,7 +751,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
                           case 'longText':
                             return <Textarea id={field.id} value={templateFieldValues[field.id] || ''} onChange={(e) => handleTemplateFieldChange(field.id, e.target.value)} placeholder={`Enter ${field.name}`} />;
                           case 'richText':
-                            return <RichTextEditor value={templateFieldValues[field.id] || ''} onChange={(content) => handleTemplateFieldChange(field.id, content)} />;
+                            return <QuillEditor value={templateFieldValues[field.id] || ''} onChange={(content) => handleTemplateFieldChange(field.id, content)} />;
                           case 'select':
                             const options = field.options as SelectOptions;
                             return (
@@ -834,7 +835,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
                     readOnly={retryingFieldId === outputField.id}
                   />
                 ) : (
-                  <RichTextEditor 
+                  <QuillEditor 
                     value={generatedOutputs[outputField.id] || ''}
                     onChange={(value) => {
                       if (retryingFieldId !== outputField.id) {

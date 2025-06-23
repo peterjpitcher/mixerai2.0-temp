@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MultiSelectCheckboxCombobox, ComboboxOption } from '@/components/ui/MultiSelectCheckboxCombobox';
 import { toast } from 'sonner';
 import { Loader2, X, PlusCircle, ArrowLeft, AlertTriangle, Sparkles, Info } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
@@ -115,7 +116,8 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     tone_of_voice: '',
     guardrails: '',
     content_vetting_agencies: [] as string[],
-    master_claim_brand_id: null as string | null,
+    master_claim_brand_id: null as string | null, // Keep for backward compatibility
+    master_claim_brand_ids: [] as string[], // NEW: Array for multiple master claim brands
     logo_url: null as string | null,
   });
 
@@ -213,6 +215,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                                       ? data.brand.selected_vetting_agencies.map((agency: unknown) => (agency as { id: string }).id)
                                       : [],
           master_claim_brand_id: data.brand.master_claim_brand_id || null,
+          master_claim_brand_ids: [], // Will be populated separately
           logo_url: data.brand.logo_url || null,
         });
 
@@ -251,6 +254,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     const fetchMasterClaimBrands = async () => {
       setIsLoadingMasterClaimBrands(true);
       try {
+        // Fetch all master claim brands
         const response = await fetch('/api/master-claim-brands');
         if (!response.ok) throw new Error('Failed to fetch Master Claim Brands');
         const data = await response.json();
@@ -258,6 +262,19 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
           setMasterClaimBrands(data.data);
         } else {
           throw new Error(data.error || 'Failed to parse Master Claim Brands');
+        }
+        
+        // Fetch which master claim brands are linked to this brand
+        const linkedResponse = await fetch(`/api/brands/${id}/master-claim-brands`);
+        if (linkedResponse.ok) {
+          const linkedData = await linkedResponse.json();
+          if (linkedData.success && Array.isArray(linkedData.data)) {
+            // Update the form with the linked master claim brand IDs
+            setFormData(prev => ({
+              ...prev,
+              master_claim_brand_ids: linkedData.data.map((link: { master_claim_brand_id: string }) => link.master_claim_brand_id)
+            }));
+          }
         }
       } catch (err) {
         console.error('Error fetching Master Claim Brands:', err);
@@ -285,6 +302,10 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
 
   const handleMasterClaimBrandChange = (value: string) => {
     setFormData(prev => ({ ...prev, master_claim_brand_id: value === 'NO_SELECTION' ? null : value }));
+  };
+
+  const handleMasterClaimBrandsChange = (values: string[]) => {
+    setFormData(prev => ({ ...prev, master_claim_brand_ids: values }));
   };
 
   const handleAddAdditionalUrlField = () => {
@@ -394,6 +415,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       const payload: Record<string, unknown> = { 
       ...formData,
         selected_agency_ids: formData.content_vetting_agencies,
+        master_claim_brand_ids: formData.master_claim_brand_ids, // Include the array of master claim brand IDs
       };
       
       Object.keys(payload).forEach(key => {
@@ -595,25 +617,18 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
               </div>
 
               <div className="grid grid-cols-12 gap-4 items-start">
-                <Label htmlFor="master_claim_brand_id" className="col-span-12 sm:col-span-3 text-left sm:text-right sm:pt-2">Product Claims Brand</Label>
+                <Label htmlFor="master_claim_brand_ids" className="col-span-12 sm:col-span-3 text-left sm:text-right sm:pt-2">Product Claims Brands</Label>
                 <div className="col-span-12 sm:col-span-9 space-y-1">
-                  <Select 
-                    value={formData.master_claim_brand_id || 'NO_SELECTION'} 
-                    onValueChange={handleMasterClaimBrandChange}
+                  <MultiSelectCheckboxCombobox
+                    options={masterClaimBrands.map(mcb => ({ value: mcb.id, label: mcb.name }))}
+                    selectedValues={formData.master_claim_brand_ids}
+                    onChange={handleMasterClaimBrandsChange}
+                    placeholder={isLoadingMasterClaimBrands ? "Loading claim brands..." : "Select Product Claims Brands..."}
+                    searchPlaceholder="Search brands..."
                     disabled={isLoadingMasterClaimBrands}
-                  >
-                    <SelectTrigger id="master_claim_brand_id">
-                      <SelectValue placeholder={isLoadingMasterClaimBrands ? "Loading claim brands..." : "Link to a Product Claims Brand..."} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="NO_SELECTION">No specific Product Claims Brand</SelectItem>
-                      {masterClaimBrands.map(mcb => (
-                        <SelectItem key={mcb.id} value={mcb.id}>{mcb.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  />
                   <p className="text-xs text-muted-foreground flex items-center">
-                    <Info className="h-3 w-3 mr-1" /> Link this MixerAI brand to a central Product Claims Brand if applicable.
+                    <Info className="h-3 w-3 mr-1" /> Link this MixerAI brand to one or more Product Claims Brands. Products from all selected brands will be available.
                   </p>
                 </div>
               </div>

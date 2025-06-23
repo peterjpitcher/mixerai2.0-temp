@@ -9,7 +9,8 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { RichTextEditor } from '@/components/content/rich-text-editor';
+import { QuillEditor } from '@/components/content/quill-editor';
+import 'quill/dist/quill.snow.css';
 import { toast } from 'sonner';
 import { createBrowserClient } from '@supabase/ssr';
 import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
@@ -20,9 +21,7 @@ import { ArrowLeft, Loader2, ShieldAlert, XCircle, CheckCircle, Clock, MessageSq
 import { Skeleton } from '@/components/ui/skeleton';
 import { format as formatDateFns } from 'date-fns';
 import { DatePicker } from '@/components/ui/date-picker';
-import { RegenerationPanel } from '@/components/content/regeneration-panel';
 import { useAutoSave } from '@/hooks/use-auto-save';
-import { SaveStatusIndicator } from '@/components/ui/save-status';
 
 
 interface ContentEditPageProps {
@@ -506,7 +505,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     toast.success('Field added successfully!');
   };
   
-  // Configure auto-save
+  // Configure auto-save (DISABLED per user request - manual save only)
   const {
     isSaving: isAutoSaving,
     lastSaved,
@@ -522,7 +521,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       }
     },
     debounceMs: 3000, // Auto-save after 3 seconds of inactivity
-    enabled: isAllowedToEdit && !isLoading && content.id !== '',
+    enabled: false, // DISABLED - manual save only
     onError: (error) => {
       console.error('Auto-save error:', error);
       toast.error('Auto-save failed. Your changes are not being saved automatically.');
@@ -616,13 +615,11 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         description="Modify the title, body, and other generated fields for this piece of content."
         actions={
           <div className="flex items-center gap-4">
-            <SaveStatusIndicator
-              status={isAutoSaving || isSaving ? 'saving' : saveError ? 'error' : lastSaved ? 'saved' : 'idle'}
-              lastSaved={lastSaved}
-              error={saveError?.message}
-              onRetry={triggerSave}
-              showTimestamp={true}
-            />
+            {hasUnsavedChanges && (
+              <span className="text-sm text-muted-foreground">
+                You have unsaved changes
+              </span>
+            )}
             <Button variant="outline" onClick={() => router.push(`/dashboard/content/${id}`)}>
               View Content (Read-only)
             </Button>
@@ -691,7 +688,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
                           className="min-h-[120px] border shadow-sm focus-visible:ring-1 focus-visible:ring-ring"
                         />
                       ) : field.type === 'richText' ? (
-                        <RichTextEditor
+                        <QuillEditor
                           value={fieldValue}
                           onChange={(value) => handleGeneratedOutputChange(field.id, value)}
                           placeholder={`Enter content for ${field.name}...`}
@@ -738,17 +735,6 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
           )}
           {!content.workflow && <Card><CardContent><p className="text-muted-foreground py-4">No workflow associated with this content.</p></CardContent></Card>}
 
-          {/* Regeneration Panel */}
-          <RegenerationPanel
-            contentId={content.id}
-            currentStepName={content.current_step ? (content.workflow?.steps as any[])?.find((step: any) => step?.id === content.current_step)?.name || undefined : undefined}
-            canRegenerate={isAllowedToEdit}
-            outputFields={template?.fields?.outputFields || []}
-            onRegenerationComplete={() => {
-              // Reload content to show regenerated data
-              window.location.reload();
-            }}
-          />
 
           {/* New Card for Version History on Edit Page */}
           {versions && versions.length > 0 && (

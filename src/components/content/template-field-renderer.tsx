@@ -6,7 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Sparkles, Loader2 } from 'lucide-react';
-import { RichTextEditor } from './rich-text-editor';
+import { QuillEditor } from './quill-editor';
+import 'quill/dist/quill.snow.css';
 import { ProductSelect } from './product-select';
 import { RecipeUrlField } from './recipe-url-field';
 import type { InputField, FieldType, SelectOptions, ShortTextOptions, LongTextOptions, RichTextOptions, UrlOptions, RecipeUrlOptions } from '@/types/template';
@@ -63,7 +64,7 @@ export function TemplateFieldRenderer({
         
       case 'richText':
         return (
-          <RichTextEditor
+          <QuillEditor
             value={value}
             onChange={(content) => onChange(field.id, content)}
             placeholder={(field.options as RichTextOptions)?.placeholder}
