@@ -57,16 +57,30 @@ export async function middleware(request: NextRequest) {
   
   // If rate limit exceeded, return 429 Too Many Requests
   if (!rateLimitResult.allowed) {
+    // For API routes, always return JSON
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+      return new NextResponse(
+        JSON.stringify({
+          success: false,
+          error: rateLimitConfig.message || 'Too many requests. Please try again later.',
+          retryAfter: rateLimitResult.retryAfter,
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            ...Object.fromEntries(response.headers.entries()),
+          },
+        }
+      );
+    }
+    // For non-API routes, return a simple text response
     return new NextResponse(
-      JSON.stringify({
-        success: false,
-        error: rateLimitConfig.message || 'Too many requests. Please try again later.',
-        retryAfter: rateLimitResult.retryAfter,
-      }),
+      rateLimitConfig.message || 'Too many requests. Please try again later.',
       {
         status: 429,
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'text/plain',
           ...Object.fromEntries(response.headers.entries()),
         },
       }
@@ -84,7 +98,7 @@ export async function middleware(request: NextRequest) {
         { 
           status: 403, 
           headers: { 
-            'content-type': 'application/json',
+            'Content-Type': 'application/json',
             ...Object.fromEntries(response.headers.entries())
           } 
         }
@@ -242,7 +256,7 @@ export async function middleware(request: NextRequest) {
               }),
               { 
                 status: 401, 
-                headers: { 'content-type': 'application/json' } // Base headers for JSON response
+                headers: { 'Content-Type': 'application/json' } // Base headers for JSON response
               }
             );
             // Apply existing headers to the new 401 response
