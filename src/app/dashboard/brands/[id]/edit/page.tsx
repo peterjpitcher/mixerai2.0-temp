@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MultiSelectCheckboxCombobox, ComboboxOption } from '@/components/ui/MultiSelectCheckboxCombobox';
+import { MultiSelectCheckboxCombobox } from '@/components/ui/MultiSelectCheckboxCombobox';
 import { toast } from 'sonner';
 import { Loader2, X, PlusCircle, ArrowLeft, AlertTriangle, Sparkles, Info } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
@@ -19,7 +19,6 @@ import { SaveStatusIndicator } from '@/components/ui/save-status';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 import { Checkbox } from '@/components/ui/checkbox';
 import { v4 as uuidv4 } from 'uuid';
-import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { apiClient } from '@/lib/api-client';
@@ -436,6 +435,18 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       console.log('Logo URL in payload:', payload.logo_url);
       
       const response = await apiClient.put(`/api/brands/${id}`, payload);
+      
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        // If not JSON, try to get text for error message
+        const text = await response.text();
+        console.error('Non-JSON response:', text);
+        throw new Error(response.status === 403 ? 'Permission denied' : 
+                       response.status === 429 ? 'Too many requests. Please try again later.' :
+                       'Server error. Please try again.');
+      }
+      
       const data = await response.json();
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to update brand');
