@@ -24,10 +24,32 @@ export const GET = withAuth(async (
   context?: unknown
 ) => {
   const { params } = context as { params: { id: string } };
+  
+  // DEBUG: Log the entire request context
+  console.log('[DEBUG] Content Template GET Request:', {
+    url: request.url,
+    headers: Object.fromEntries(request.headers.entries()),
+    params,
+    user: {
+      id: user?.id,
+      email: user?.email,
+      role: user?.user_metadata?.role,
+      metadata: user?.user_metadata
+    },
+    timestamp: new Date().toISOString()
+  });
+  
   try {
     // Role check: Allow Admins (Platform/Scoped) and Editors to fetch a specific content template
     const userRole = user.user_metadata?.role;
     if (!(userRole === 'admin' || userRole === 'editor')) {
+      console.log('[DEBUG] Permission denied for user:', {
+        userId: user?.id,
+        email: user?.email,
+        actualRole: userRole,
+        allowedRoles: ['admin', 'editor']
+      });
+      
       return createApiErrorResponse(
         'You do not have permission to access this resource.',
         403 // Will be converted to 401 to avoid Vercel interception
