@@ -4,6 +4,7 @@ import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import type { InputField, OutputField } from '@/types/template'; // Import field types
 import { User } from '@supabase/supabase-js';
+import { createApiErrorResponse } from '@/lib/api-error-handler';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -27,9 +28,9 @@ export const GET = withAuth(async (
     // Role check: Allow Admins (Platform/Scoped) and Editors to fetch a specific content template
     const userRole = user.user_metadata?.role;
     if (!(userRole === 'admin' || userRole === 'editor')) {
-      return NextResponse.json(
-        { success: false, error: 'Forbidden: You do not have permission to access this resource.' },
-        { status: 403 }
+      return createApiErrorResponse(
+        'You do not have permission to access this resource.',
+        403 // Will be converted to 401 to avoid Vercel interception
       );
     }
 
@@ -229,9 +230,9 @@ export const DELETE = withAuth(async (
   try {
     // Role check: Only Global Admins can delete content templates
     if (user.user_metadata?.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: 'Forbidden: You do not have permission to delete this resource.' },
-        { status: 403 }
+      return createApiErrorResponse(
+        'You do not have permission to delete this resource.',
+        403 // Will be converted to 401 to avoid Vercel interception
       );
     }
 
