@@ -186,15 +186,48 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
       
       const method = initialData?.id && initialData.id !== 'new' ? 'PUT' : 'POST';
       
+      console.log('[DEBUG] Template Save Request:', {
+        url,
+        method,
+        payload,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Get CSRF token from cookie
+      const csrfToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('csrf-token='))
+        ?.split('=')[1];
+      
+      console.log('[DEBUG] CSRF Token:', csrfToken ? 'Found' : 'Not found');
+      
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken || '', // Add CSRF token to headers
         },
         body: JSON.stringify(payload),
       });
       
+      console.log('[DEBUG] Template Save Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        url: response.url,
+        ok: response.ok
+      });
+      
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('[DEBUG] Non-JSON Response Body:', text);
+        throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 100)}...`);
+      }
+      
       const data = await response.json();
+      console.log('[DEBUG] Parsed Response Data:', data);
       
       if (!data.success) {
         throw new Error(data.error || 'Failed to save template');
