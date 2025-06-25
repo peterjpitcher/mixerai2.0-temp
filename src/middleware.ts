@@ -24,6 +24,11 @@ export async function middleware(request: NextRequest) {
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-XSS-Protection', '1; mode=block');
   response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+  
+  // Force JSON responses for API routes to prevent Vercel HTML error pages
+  if (request.nextUrl.pathname.startsWith('/api/')) {
+    response.headers.set('x-api-route', 'true');
+  }
 
   // Rate Limiting
   const pathForRateLimit = request.nextUrl.pathname;
