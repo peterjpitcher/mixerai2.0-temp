@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { isBrandAdmin } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
 
@@ -106,7 +107,7 @@ export const GET = withAuth(async (
 });
 
 // PUT endpoint to update a brand
-export const PUT = withAuth(async (
+export const PUT = withAuthAndCSRF(async (
   request: NextRequest,
   authenticatedUser: User, 
   context?: unknown
@@ -269,7 +270,7 @@ export const PUT = withAuth(async (
 });
 
 // DELETE a brand by ID (logic remains largely unchanged as it was already Supabase-centric)
-export const DELETE = withAuth(async (
+export const DELETE = withAuthAndCSRF(async (
   request: NextRequest,
   user: User,
   context?: unknown

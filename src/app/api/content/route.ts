@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 // import { TablesInsert, Enums } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
 import { User } from '@supabase/supabase-js';
 
@@ -76,7 +77,9 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       .order('updated_at', { ascending: false });
 
     if (query) {
-      queryBuilder = queryBuilder.or(`title.ilike.%${query}%,meta_description.ilike.%${query}%`);
+      // Escape special characters to prevent SQL injection
+      const escapedQuery = query.replace(/[%_]/g, '\\$&');
+      queryBuilder = queryBuilder.or(`title.ilike.%${escapedQuery}%,meta_description.ilike.%${escapedQuery}%`);
     }
 
     if (requestedBrandId) {
@@ -317,7 +320,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
   }
 });
 
-export const POST = withAuth(async (request: NextRequest, user: User) => {
+export const POST = withAuthAndCSRF(async (request: NextRequest, user: User) => {
   try {
     const data = await request.json();
     

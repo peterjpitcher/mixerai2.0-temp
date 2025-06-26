@@ -1,11 +1,12 @@
 import { NextResponse, NextRequest } from 'next/server';
 // import { createSupabaseServerClient } from '@/lib/supabase/server'; // For DB access with RLS
 import { generateTextCompletion } from '@/lib/azure/openai';
-import { withAuth } from '@/lib/auth/api-auth'; // Use the withAuth wrapper
+ // Use the withAuth wrapper
 import type { ContentTemplate as Template } from '@/types/template';
 import type { Brand } from '@/types/models'; // Corrected Brand type import
 import { User } from '@supabase/supabase-js';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 // Helper function to get template details
 async function getTemplateDetails(templateId: string, supabaseClient: ReturnType<typeof createSupabaseAdminClient>): Promise<Template | null> {
@@ -75,7 +76,7 @@ function interpolatePrompt(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export const POST = withAuth(async (req: NextRequest, _user: User) => {
+export const POST = withAuthAndCSRF(async (req: NextRequest, _user: User): Promise<Response> => {
   const supabase = createSupabaseAdminClient();
   try {
     const body = await req.json();
@@ -153,7 +154,6 @@ export const POST = withAuth(async (req: NextRequest, _user: User) => {
     } else if (outputFieldToGenerate.type === 'html') {
       singleFieldMaxTokens = 1500; // Potentially longer for HTML
     }
-
 
     const generatedText = await generateTextCompletion(
       systemPrompt,

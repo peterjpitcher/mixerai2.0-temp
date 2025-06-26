@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { z } from 'zod';
 import { validateRequest, commonSchemas } from '@/lib/api/validation';
 
@@ -203,7 +204,7 @@ export const GET = withAuth(async (request: NextRequest, user: unknown) => {
 /**
  * POST: Create a new content template, withAuth applied directly.
  */
-export const POST = withAuth(async (request: NextRequest, user: unknown) => {
+export const POST = withAuthAndCSRF(async (request: NextRequest, user: unknown) => {
   try {
     // Role check: Only Global Admins can create content templates
     if ((user as { user_metadata?: { role?: string } }).user_metadata?.role !== 'admin') {
@@ -284,7 +285,7 @@ export const POST = withAuth(async (request: NextRequest, user: unknown) => {
 /**
  * DELETE: Delete a content template, withAuth applied directly.
  */
-export const DELETE = withAuth(async (request: NextRequest, user: unknown) => {
+export const DELETE = withAuthAndCSRF(async (request: NextRequest, user: unknown) => {
   try {
     // Role check: Only Global Admins can delete content templates
     if ((user as { user_metadata?: { role?: string } }).user_metadata?.role !== 'admin') {

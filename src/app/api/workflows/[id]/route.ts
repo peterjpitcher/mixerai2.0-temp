@@ -4,7 +4,8 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 // import { v4 as uuidv4 } from 'uuid';
 import { handleApiError } from '@/lib/api-utils'; // Added for using in catch blocks
 // import { verifyEmailTemplates } from '@/lib/auth/email-templates'; // Added for sending invites
-import { withAuth } from '@/lib/auth/api-auth'; // Import withAuth
+import { withAuth } from '@/lib/auth/api-auth';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf'; // Import withAuth
 import type { User } from '@supabase/supabase-js';
 // import type { Json } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
 // Force dynamic rendering for this route
@@ -195,7 +196,7 @@ export const GET = withAuth(async (
 /**
  * PUT endpoint to update a specific workflow
  */
-export const PUT = withAuth(async (
+export const PUT = withAuthAndCSRF(async (
   request: NextRequest,
   user: User, // The authenticated user object from withAuth
   context?: unknown
@@ -472,7 +473,7 @@ export const PUT = withAuth(async (
 /**
  * DELETE endpoint to remove a specific workflow
  */
-export const DELETE = withAuth(async (
+export const DELETE = withAuthAndCSRF(async (
   _request: NextRequest,
   user: User, // The authenticated user object from withAuth
   context?: unknown

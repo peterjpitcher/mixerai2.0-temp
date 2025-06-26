@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
-import { withAuth } from '@/lib/auth/api-auth';
+
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { formatClaimsDirectly } from '@/lib/claims-formatter';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 type Claim = {
   claim_text: string;
@@ -135,4 +136,4 @@ async function styleBrandClaimsHandler(request: NextRequest) {
   }
 }
 
-export const POST = withAuth(styleBrandClaimsHandler); 
+export const POST = withAuthAndCSRF(styleBrandClaimsHandler); 

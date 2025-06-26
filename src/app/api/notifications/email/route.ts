@@ -4,6 +4,7 @@ import { handleApiError } from '@/lib/api-utils';
 import { sendEmail } from '@/lib/email/resend';
 import { taskAssignmentTemplate, workflowActionTemplate, deadlineReminderTemplate } from '@/lib/email/templates';
 import { format } from 'date-fns';
+import { withCSRF } from '@/lib/api/with-csrf';
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ interface EmailNotificationRequest {
   feedback?: string;
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withCSRF(async function (request: NextRequest) {
   try {
     const body: EmailNotificationRequest = await request.json();
     
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('email_notifications_enabled, email_preferences')
-      .eq('id', body.userId)
+      .eq('id', body.userId!)
       .single();
       
     if (!profile?.email_notifications_enabled) {
@@ -283,4 +284,4 @@ export async function POST(request: NextRequest) {
     console.error('Email notification error:', error);
     return handleApiError(error, 'Failed to send email notification');
   }
-}
+});

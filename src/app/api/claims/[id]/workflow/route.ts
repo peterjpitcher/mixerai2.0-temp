@@ -4,6 +4,7 @@ import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
 import { z } from 'zod';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ const workflowActionSchema = z.object({
 });
 
 // POST /api/claims/[id]/workflow - Assign workflow to claim
-export const POST = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+export const POST = withAuthAndCSRF(async (req: NextRequest, user: User, context?: unknown): Promise<Response> => {
   const { params } = context as { params: { id: string } };
   const claimId = params.id;
 
@@ -92,7 +93,7 @@ export const POST = withAuth(async (req: NextRequest, user: User, context?: unkn
 });
 
 // PUT /api/claims/[id]/workflow - Perform workflow action (approve/reject)
-export const PUT = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?: unknown): Promise<Response> => {
   const { params } = context as { params: { id: string } };
   const claimId = params.id;
 

@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { User } from '@supabase/supabase-js';
 import { canAccessProduct } from '@/lib/auth/permissions';
 
@@ -72,7 +73,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
 });
 
 // PUT handler for updating a product by ID
-export const PUT = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?: unknown) => {
     const { params } = context as { params: { productId: string } };
     const { productId } = params;
     if (!productId) {
@@ -229,7 +230,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context?: unkno
 });
 
 // DELETE handler for a product by ID
-export const DELETE = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+export const DELETE = withAuthAndCSRF(async (req: NextRequest, user: User, context?: unknown) => {
     const { params } = context as { params: { productId: string } };
     const { productId } = params;
     if (!productId) {

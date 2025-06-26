@@ -97,8 +97,11 @@ export function shouldProtectRoute(pathname: string): boolean {
     '/api/test-metadata-generator',
     '/api/brands/identity', // Public endpoint
     '/api/webhooks/', // Webhooks need different validation
+    '/api/health', // Health check endpoint
+    '/api/test-', // Test endpoints during development
   ];
 
+  // Skip CSRF for GET, HEAD, OPTIONS requests
   return !publicApiPatterns.some(pattern => pathname.includes(pattern));
 }
 

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { z } from 'zod';
+import { withCSRF } from '@/lib/api/with-csrf';
 
 const markReadSchema = z.object({
   notificationId: z.string().uuid().optional(),
   markAll: z.boolean().optional(),
 });
 
-export async function PUT(request: NextRequest) {
+export const PUT = withCSRF(async function (request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient();
     
@@ -55,4 +56,4 @@ export async function PUT(request: NextRequest) {
     console.error('Error in mark-read endpoint:', error);
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
   }
-}
+})

@@ -4,7 +4,8 @@ import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
 // import { v4 as uuidv4 } from 'uuid';
-// import { TablesInsert } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
+// import { TablesInsert } from '@/types/supabase';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf'; // TODO: Uncomment when types are regenerated
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ const prepareStepForTableInsertion = (sourceStep: unknown, newWorkflowId: string
   };
 };
 
-export const POST = withAuth(async (request: NextRequest, user: User, context?: unknown) => {
+export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, context?: unknown): Promise<Response> => {
   const { params } = context as { params: { id: string } };
   const originalWorkflowId = params.id;
 

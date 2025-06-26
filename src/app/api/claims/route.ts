@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { User } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { checkProductClaimsPermission } from '@/lib/api/claims-helpers';
@@ -188,7 +189,7 @@ export const GET = withAuth(async (req: NextRequest) => {
 });
 
 // POST handler for creating new claim(s)
-export const POST = withAuth(async (req: NextRequest, user: User) => {
+export const POST = withAuthAndCSRF(async (req: NextRequest, user: User) => {
     const supabase = createSupabaseAdminClient();
     
     let rawBody;
@@ -280,14 +281,14 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
             p_claim_text: claim_text,
             p_claim_type: claim_type,
             p_level: level,
-            p_master_brand_id: level === 'brand' ? master_brand_id : null,
-            p_ingredient_id: null, // Deprecated parameter, passing null
+            p_master_brand_id: level === 'brand' && master_brand_id ? master_brand_id : undefined,
+            p_ingredient_id: undefined, // Deprecated parameter, passing undefined
             p_ingredient_ids: level === 'ingredient' ? finalIngredientIds : [],
             p_product_ids: level === 'product' ? product_ids : [],
             p_country_codes: country_codes,
-            p_description: description,
+            p_description: description || undefined,
             p_created_by: user.id,
-            p_workflow_id: workflow_id
+            p_workflow_id: workflow_id || undefined
         });
 
         if (error) {

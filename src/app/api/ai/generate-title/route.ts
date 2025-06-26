@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/auth/api-auth';
+
 import { handleApiError } from '@/lib/api-utils';
 import { generateContentTitleFromContext } from '@/lib/azure/openai';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { extractCleanDomain } from '@/lib/utils/url-utils';
-// import { Database } from '@/types/supabase'; // TODO: Uncomment when supabase types are generated
+// import { Database } from '@/types/supabase';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf'; // TODO: Uncomment when supabase types are generated
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +27,7 @@ interface AIBrandContext {
     keywords?: string[] | null;
 }
 
-export const POST = withAuth(async (request: NextRequest) => {
+export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Response> => {
   try {
     const body: TitleGenerationRequest = await request.json();
 

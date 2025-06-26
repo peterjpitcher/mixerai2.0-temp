@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 export const dynamic = "force-dynamic";
 
@@ -91,7 +92,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
 });
 
 // PUT handler for updating a claims workflow
-export const PUT = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?: unknown): Promise<Response> => {
     const { params } = context as { params: { id: string } };
     try {
         const { id } = params;
@@ -197,7 +198,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context?: unkno
 });
 
 // DELETE handler for deleting a claims workflow
-export const DELETE = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+export const DELETE = withAuthAndCSRF(async (req: NextRequest, user: User, context?: unknown): Promise<Response> => {
     const { params } = context as { params: { id: string } };
     try {
         const { id } = params;

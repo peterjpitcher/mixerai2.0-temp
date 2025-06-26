@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withRouteAuth } from '@/lib/auth/route-handlers';
 import { User } from '@supabase/supabase-js';
+import { withCSRF } from '@/lib/api/with-csrf';
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
 
@@ -70,16 +71,23 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: User, contex
     });
 
     // Prepare RPC parameters
-    const rpcParams: Record<string, unknown> = {
+    const rpcParams: {
+      p_user_id: string;
+      p_full_name: string;
+      p_job_title: string;
+      p_company: string;
+      p_role?: string;
+      p_brand_permissions?: any;
+    } = {
       p_user_id: params.id,
-      p_full_name: body.full_name || null,
-      p_job_title: body.job_title || null,
-      p_company: body.company || null,
+      p_full_name: body.full_name || '',
+      p_job_title: body.job_title || '',
+      p_company: body.company || '',
     };
 
     // Only include role and brand_permissions if user is global admin
     if (isGlobalAdmin) {
-      rpcParams.p_role = body.role || null;
+      rpcParams.p_role = body.role || undefined;
       // Ensure role values in brand_permissions are valid enum values
       if (body.brand_permissions && Array.isArray(body.brand_permissions)) {
         const validRoles = ['admin', 'editor', 'viewer'];

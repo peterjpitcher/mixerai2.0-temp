@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/auth/server';
+import { withCSRF } from '@/lib/api/with-csrf';
 
-export async function POST(request: NextRequest) {
+export const POST = withCSRF(async (request: NextRequest): Promise<Response> => {
   try {
     const body = await request.json();
     const supabase = createSupabaseServerClient();
@@ -42,4 +43,4 @@ export async function POST(request: NextRequest) {
       error: 'Failed to track error' 
     }, { status: 500 });
   }
-}
+});

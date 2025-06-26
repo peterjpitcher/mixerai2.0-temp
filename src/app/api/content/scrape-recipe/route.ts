@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/auth/api-auth';
+
 import { z } from 'zod';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 // Schema for the request
 const scrapeRecipeSchema = z.object({
@@ -173,7 +174,7 @@ function parseRecipeFromHtml(html: string, url: string): RecipeData | null {
 }
 
 // POST /api/content/scrape-recipe
-export const POST = withAuth(async (req: NextRequest) => {
+export const POST = withAuthAndCSRF(async (req: NextRequest): Promise<Response> => {
   try {
     const body = await req.json();
     const validatedData = scrapeRecipeSchema.parse(body);

@@ -6,6 +6,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +64,7 @@ export const GET = withAuth(async () => {
 });
 
 // POST handler for creating a new master claim brand
-export const POST = withAuth(async (req: NextRequest, user: User) => {
+export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promise<Response> => {
     try {
         const body = await req.json();
         const { name, mixerai_brand_id } = body;

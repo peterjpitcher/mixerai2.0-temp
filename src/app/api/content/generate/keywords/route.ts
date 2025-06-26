@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/auth/api-auth';
+
 import { handleApiError } from '@/lib/api-utils';
 import { generateSuggestions } from '@/lib/azure/openai';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,7 @@ interface RequestBody {
  * POST: Generate keyword suggestions based on provided content.
  * Requires authentication.
  */
-export const POST = withAuth(async (request: NextRequest) => {
+export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Response> => {
   try {
     const body: RequestBody = await request.json();
 

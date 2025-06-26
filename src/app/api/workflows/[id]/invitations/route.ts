@@ -5,6 +5,7 @@ import { withAuth } from '@/lib/auth/api-auth';
 import { v4 as uuidv4 } from 'uuid';
 import { verifyEmailTemplates } from '@/lib/auth/email-templates';
 import { User } from '@supabase/supabase-js';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -53,7 +54,7 @@ const extractCompanyFromEmail = (email: string) => {
  * POST endpoint to invite users to a workflow step
  * This handles sending new invitations for users who don't yet have accounts
  */
-export const POST = withAuth(async (request: NextRequest, user: User, context?: unknown) => {
+export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, context?: unknown): Promise<Response> => {
   const { params } = context as { params: { id: string } };
   try {
     const workflowId = params?.id;

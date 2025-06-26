@@ -3,7 +3,8 @@ import { transCreateContent } from '@/lib/azure/openai';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-// import { Database, Json } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
+// import { Database, Json } from '@/types/supabase';
+ // TODO: Uncomment when types are regenerated
 
 // In-memory rate limiting
 const rateLimit = new Map<string, { count: number, timestamp: number }>();
