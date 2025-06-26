@@ -20,6 +20,7 @@ import {
   ContentTemplate 
 } from '@/types/template';
 import { useFormPersistence } from '@/hooks/use-form-persistence';
+import { apiClient } from '@/lib/api-client-csrf';
 
 type TemplateData = ContentTemplate;
 
@@ -193,22 +194,9 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
         timestamp: new Date().toISOString()
       });
       
-      // Get CSRF token from cookie
-      const csrfToken = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('csrf-token='))
-        ?.split('=')[1];
-      
-      console.log('[DEBUG] CSRF Token:', csrfToken ? 'Found' : 'Not found');
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': csrfToken || '', // Add CSRF token to headers
-        },
-        body: JSON.stringify(payload),
-      });
+      const response = initialData?.id && initialData.id !== 'new' 
+        ? await apiClient.put(url, payload)
+        : await apiClient.post(url, payload);
       
       console.log('[DEBUG] Template Save Response:', {
         status: response.status,
