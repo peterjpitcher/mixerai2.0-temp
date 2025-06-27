@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { User } from '@supabase/supabase-js';
 import { getUserAccessibleBrands, isPlatformAdmin } from '@/lib/auth/permissions';
 
@@ -88,7 +89,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
             if (!brandsError && brandsWithMasterClaim) {
                 const additionalMasterBrandIds = brandsWithMasterClaim
                     .map(b => b.master_claim_brand_id)
-                    .filter(id => id && !accessibleMasterBrandIds.includes(id));
+                    .filter((id): id is string => id !== null && !accessibleMasterBrandIds.includes(id));
                 accessibleMasterBrandIds.push(...additionalMasterBrandIds);
             }
             
@@ -136,7 +137,9 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
         
         // Add search filter if provided
         if (search) {
-            query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+            // Escape special characters to prevent SQL injection
+            const escapedSearch = search.replace(/[%_]/g, '\\$&');
+            query = query.or(`name.ilike.%${escapedSearch}%,description.ilike.%${escapedSearch}%`);
         }
         
         // Apply pagination
@@ -183,7 +186,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
 });
 
 // POST handler for creating a new product
-export const POST = withAuth(async (req: NextRequest, user: User) => {
+export const POST = withAuthAndCSRF(async (req: NextRequest, user: User) => {
     try {
         const body = await req.json();
         const { name, description, master_brand_id } = body; // Renamed global_brand_id

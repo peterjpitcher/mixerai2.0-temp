@@ -1,9 +1,10 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { isBuildPhase } from '@/lib/api-utils';
-import { withAuth } from '@/lib/auth/api-auth';
+
 import { generateTextCompletion } from '@/lib/azure/openai';
 import { ClaimTypeEnum, Product, MasterClaimBrand as MasterClaimBrandSummary } from '@/lib/claims-utils';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 export const dynamic = "force-dynamic";
 
@@ -78,7 +79,7 @@ async function getProductAndFullBrandDetails(supabase: ReturnType<typeof createS
     return { product, brandDetails };
 }
 
-export const POST = withAuth(async (req: NextRequest) => {
+export const POST = withAuthAndCSRF(async (req: NextRequest): Promise<Response> => {
     try {
         const body: SuggestReplacementClaimsRequest = await req.json();
         const {

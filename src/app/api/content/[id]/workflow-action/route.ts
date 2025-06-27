@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
-import { withAuth } from '@/lib/auth/api-auth';
+
 import { User } from '@supabase/supabase-js';
 // import { TablesUpdate, TablesInsert } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
 import { executeTransaction } from '@/lib/db/transactions';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ async function getNextVersionNumber(supabase: ReturnType<typeof createSupabaseAd
   return (data?.version_number || 0) + 1;
 }
 
-export const POST = withAuth(async (request: NextRequest, user: User, context?: unknown) => {
+export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, context?: unknown): Promise<Response> => {
   const { params } = context as { params: { id: string } };
   const contentId = params.id;
   let requestData: WorkflowActionRequest;

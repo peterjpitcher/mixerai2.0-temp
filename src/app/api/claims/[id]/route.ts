@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { User } from '@supabase/supabase-js';
 import { hasAccessToBrand, canAccessProduct, canAccessIngredient } from '@/lib/auth/permissions';
 
@@ -117,7 +118,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
 });
 
 // PUT handler for updating a claim by ID
-export const PUT = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?: unknown) => {
     const { params } = context as RequestContext;
     const { id } = params;
     if (!id) {
@@ -131,7 +132,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context?: unkno
         // Level and associated entity IDs (product_id, master_brand_id, ingredient_id) are not updatable here.
         // To change those, one would typically delete and recreate the claim if necessary.
 
-        const updatePayload: Partial<Omit<Claim, 'id' | 'level' | 'master_brand_id' | 'product_id' | 'ingredient_id' | 'created_by' | 'created_at'> & { updated_at: string }> = {
+        const updatePayload: Record<string, any> = {
             updated_at: new Date().toISOString(),
         };
 
@@ -304,7 +305,7 @@ export const PUT = withAuth(async (req: NextRequest, user: User, context?: unkno
 });
 
 // DELETE handler for a claim by ID
-export const DELETE = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+export const DELETE = withAuthAndCSRF(async (req: NextRequest, user: User, context?: unknown) => {
     const { params } = context as RequestContext;
     const { id } = params;
     if (!id) {

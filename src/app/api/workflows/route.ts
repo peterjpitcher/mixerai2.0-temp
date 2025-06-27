@@ -8,6 +8,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { v4 as uuidv4 } from 'uuid';
 import { withAuth } from '@/lib/auth/api-auth';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { verifyEmailTemplates } from '@/lib/auth/email-templates';
 // import type { Json } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
 import { z } from 'zod';
@@ -173,7 +174,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
 /**
  * POST endpoint to create a new workflow
  */
-export const POST = withAuth(async (request: NextRequest, user) => {
+export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
   try {
     const supabase = createSupabaseAdminClient();
     

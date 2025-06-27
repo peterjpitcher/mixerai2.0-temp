@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { withCSRF } from '@/lib/api/with-csrf';
 
-export async function DELETE(request: NextRequest) {
+export const DELETE = withCSRF(async function (request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient();
     
@@ -27,4 +28,4 @@ export async function DELETE(request: NextRequest) {
     console.error('Error in clear notifications endpoint:', error);
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
   }
-}
+})

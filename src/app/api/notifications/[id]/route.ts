@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/auth/api-auth';
+
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { User } from '@supabase/supabase-js';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 
 // PATCH - Mark a specific notification as read
-export const PATCH = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+export const PATCH = withAuthAndCSRF(async (req: NextRequest, user: User, context?: unknown) => {
   try {
     const { params } = context as { params: { id: string } };
     const { id } = params;
@@ -73,7 +74,7 @@ export const PATCH = withAuth(async (req: NextRequest, user: User, context?: unk
 });
 
 // DELETE - Delete a specific notification (soft delete)
-export const DELETE = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
+export const DELETE = withAuthAndCSRF(async (req: NextRequest, user: User, context?: unknown) => {
   try {
     const { params } = context as { params: { id: string } };
     const { id } = params;

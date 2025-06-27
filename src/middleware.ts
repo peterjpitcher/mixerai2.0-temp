@@ -94,12 +94,21 @@ export async function middleware(request: NextRequest) {
 
   // CSRF Protection for API routes
   if (request.nextUrl.pathname.startsWith('/api/')) {
+    const method = request.method.toUpperCase();
     const isProtectedRoute = shouldProtectRoute(request.nextUrl.pathname);
+    const isMutationMethod = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
     
-    if (isProtectedRoute && !validateCSRFToken(request)) {
+    // Enforce CSRF for all mutation methods on protected routes
+    if (isProtectedRoute && isMutationMethod && !validateCSRFToken(request)) {
+      console.warn(`CSRF validation failed for ${method} ${request.nextUrl.pathname}`);
+      
       // Return 403 Forbidden for invalid CSRF token
       return new NextResponse(
-        JSON.stringify(CSRF_ERROR_RESPONSE),
+        JSON.stringify({
+          ...CSRF_ERROR_RESPONSE,
+          method,
+          path: request.nextUrl.pathname
+        }),
         { 
           status: 403, 
           headers: { 
@@ -124,6 +133,31 @@ export async function middleware(request: NextRequest) {
     });
   }
 
+  // Define public routes that don't need authentication
+  const publicRoutes = [
+    '/auth/login',
+    '/auth/register',
+    '/auth/callback',
+    '/auth/forgot-password',
+    '/auth/reset-password',
+    '/api/env-check',
+    '/api/test-connection',
+    '/api/test-metadata-generator',
+    '/api/brands/identity',
+    '/api/auth/callback',
+    '/api/auth/signup',
+    '/api/auth/forgot-password',
+    '/api/auth/reset-password',
+    '/api/health'
+  ];
+  
+  const isPublicRoute = publicRoutes.some(route => request.nextUrl.pathname.startsWith(route));
+  
+  // Skip authentication for public routes
+  if (isPublicRoute) {
+    return response;
+  }
+  
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   
@@ -324,15 +358,13 @@ export const config = {
   matcher: [
     /*
      * Match all paths except for:
-     * 1. Public API routes that don't need auth
-     * 2. /_next (Next.js internals)
-     * 3. /public (public files)
-     * 4. all root files inside /public (e.g. /favicon.ico)
+     * 1. _next/static (static files)
+     * 2. _next/image (image optimization files)
+     * 3. favicon.ico, robots.txt, sitemap.xml (static files)
+     * 4. Images and other static assets
+     * 
+     * The auth check will handle public vs protected routes
      */
-    '/((?!api/env-check|api/test-connection|api/test-metadata-generator|_next/static|_next/image|public|favicon.ico).*)',
-    '/brands/:path*',
-    '/workflows/:path*',
-    '/content/:path*',
-    '/users/:path*',
+    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)',
   ],
 }; 

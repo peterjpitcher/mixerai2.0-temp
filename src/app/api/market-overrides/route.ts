@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,7 @@ async function getClaimProperties(supabase: ReturnType<typeof createSupabaseAdmi
 
 
 // POST handler for creating a new market claim override
-export const POST = withAuth(async (req: NextRequest, user: User) => {
+export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promise<Response> => {
     try {
         const body: MarketClaimOverridePostPayload = await req.json();
         const { 

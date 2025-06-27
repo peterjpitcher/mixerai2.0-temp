@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import type { InputField, OutputField } from '@/types/template'; // Import field types
 import { User } from '@supabase/supabase-js';
 import { createApiErrorResponse } from '@/lib/api-error-handler';
@@ -113,7 +114,7 @@ export const GET = withAuth(async (
 /**
  * PUT: Update a specific content template
  */
-export const PUT = withAuth(async (
+export const PUT = withAuthAndCSRF(async (
   request: NextRequest,
   user: User,
   context?: unknown
@@ -243,7 +244,7 @@ export const PUT = withAuth(async (
 /**
  * DELETE: Remove a content template atomically using an RPC.
  */
-export const DELETE = withAuth(async (
+export const DELETE = withAuthAndCSRF(async (
   request: NextRequest,
   user: User,
   context?: unknown

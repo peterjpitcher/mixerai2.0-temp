@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError } from '@/lib/api-utils';
-import { withAuth } from '@/lib/auth/api-auth';
+
 import { getModelName } from '@/lib/azure/openai';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -21,7 +22,7 @@ interface GenerationRequest {
 /**
  * POST: Generate content for output fields using AI
  */
-export const POST = withAuth(async (request: NextRequest) => {
+export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Response> => {
   try {
     const data: GenerationRequest = await request.json();
     

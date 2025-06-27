@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { generateTextCompletion } from '@/lib/azure/openai'; // Import the actual AI utility
+import { generateTextCompletion } from '@/lib/azure/openai';
+import { withCSRF } from '@/lib/api/with-csrf'; // Import the actual AI utility
 
 // Define the expected request body schema
 const TemplateContextSchema = z.object({
@@ -23,7 +24,7 @@ async function getAITemplateDescription(prompt: string): Promise<string | null> 
   }
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withCSRF(async function (request: NextRequest) {
   try {
     const body = await request.json();
     const validationResult = TemplateContextSchema.safeParse(body);
@@ -72,4 +73,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}) 

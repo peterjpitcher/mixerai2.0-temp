@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/auth/api-auth';
+
 import { handleApiError } from '@/lib/api-utils';
 import { generateTextCompletion } from '@/lib/azure/openai';
 import { User } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ const simplifyClaimsSchema = z.object({
   mixeraiBrandId: z.string().uuid().optional(),
 });
 
-export const POST = withAuth(async (req: NextRequest, user: User) => {
+export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promise<Response> => {
   try {
     const body = await req.json();
     const validationResult = simplifyClaimsSchema.safeParse(body);

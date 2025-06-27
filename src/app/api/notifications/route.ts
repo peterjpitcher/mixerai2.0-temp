@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/api-auth';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { User } from '@supabase/supabase-js';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 
@@ -56,7 +57,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
 });
 
 // POST - Create a new notification (usually called by system/other APIs)
-export const POST = withAuth(async (req: NextRequest, user: User) => {
+export const POST = withAuthAndCSRF(async (req: NextRequest, user: User) => {
   try {
     const body = await req.json();
     const supabase = createSupabaseAdminClient();
@@ -106,7 +107,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 });
 
 // PATCH - Mark all notifications as read
-export const PATCH = withAuth(async (req: NextRequest, user: User) => {
+export const PATCH = withAuthAndCSRF(async (req: NextRequest, user: User) => {
   try {
     const supabase = createSupabaseAdminClient();
     
@@ -138,7 +139,7 @@ export const PATCH = withAuth(async (req: NextRequest, user: User) => {
 });
 
 // DELETE - Clear all notifications (soft delete)
-export const DELETE = withAuth(async (req: NextRequest, user: User) => {
+export const DELETE = withAuthAndCSRF(async (req: NextRequest, user: User) => {
   try {
     const supabase = createSupabaseAdminClient();
     

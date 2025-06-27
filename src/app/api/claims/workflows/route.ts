@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,7 @@ export const GET = withAuth(async (req: NextRequest) => {
 });
 
 // POST handler for creating new claims workflow
-export const POST = withAuth(async (req: NextRequest, user: User) => {
+export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promise<Response> => {
     try {
         const body = await req.json();
         const { name, description, brand_id, is_active = true, steps } = body;

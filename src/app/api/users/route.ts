@@ -39,27 +39,32 @@ export const GET = withAuth(async (_req: NextRequest, user) => {
 
     const supabase = createSupabaseAdminClient();
     
-    const { data: authUsersData, error: authError } = await supabase.auth.admin.listUsers();
+    // Fetch all required data in parallel for better performance
+    // This reduces the total request time from sequential to concurrent
+    const [authUsersResult, profilesResult, invitationStatusResult] = await Promise.all([
+      supabase.auth.admin.listUsers(),
+      supabase
+        .from('profiles')
+        .select(`
+          *,
+          user_brand_permissions:user_brand_permissions(
+            id,
+            brand_id,
+            role
+          )
+        `)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('user_invitation_status')
+        .select('*')
+    ]);
+    
+    const { data: authUsersData, error: authError } = authUsersResult;
+    const { data: profilesData, error: profilesError } = profilesResult;
+    const { data: invitationStatusData, error: invitationError } = invitationStatusResult;
     
     if (authError) throw authError;
     if (!authUsersData) throw new Error('Failed to fetch auth users list.');
-
-    const { data: profilesData, error: profilesError } = await supabase
-      .from('profiles')
-      .select(`
-        *,
-        user_brand_permissions:user_brand_permissions(
-          id,
-          brand_id,
-          role
-        )
-      `)
-      .order('created_at', { ascending: false });
-    
-    // Fetch invitation status from the view
-    const { data: invitationStatusData, error: invitationError } = await supabase
-      .from('user_invitation_status')
-      .select('*');
     
     if (invitationError) {
       console.error('Error fetching invitation status:', invitationError);
@@ -68,9 +73,17 @@ export const GET = withAuth(async (_req: NextRequest, user) => {
     if (profilesError) throw profilesError;
     if (!profilesData) throw new Error('Failed to fetch profiles data.');
     
+    // Create Maps for O(1) lookups instead of O(n) find operations
+    const profilesMap = new Map<string, ProfileRecord>(
+      (profilesData as ProfileRecord[]).map(p => [p.id, p])
+    );
+    const invitationStatusMap = new Map<string, Record<string, unknown>>(
+      invitationStatusData?.map((inv: Record<string, unknown>) => [inv.id as string, inv]) || []
+    );
+    
     const mergedUsers = authUsersData.users.map(authUser => {
-      const profile = (profilesData as ProfileRecord[]).find(p => p.id === authUser.id);
-      const invitationStatus = invitationStatusData?.find((inv: Record<string, unknown>) => inv.id === authUser.id);
+      const profile = profilesMap.get(authUser.id);
+      const invitationStatus = invitationStatusMap.get(authUser.id);
       
       let highestRole = 'viewer';
       if (profile?.user_brand_permissions && Array.isArray(profile.user_brand_permissions) && profile.user_brand_permissions.length > 0) {

@@ -1,9 +1,10 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
-import { withAuth } from '@/lib/auth/api-auth';
+
 import { User } from '@supabase/supabase-js';
 import { canAccessProduct, canAccessIngredient, canEditInBrand } from '@/lib/auth/permissions';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ interface ProductIngredientAssociation {
 }
 
 // POST handler for associating a product with an ingredient
-export const POST = withAuth(async (req: NextRequest, user: User) => {
+export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promise<Response> => {
     try {
         const body = await req.json();
         const { product_id, ingredient_id } = body;
@@ -95,7 +96,6 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
             ingredient_id
         };
 
-
         const { data, error } = await supabase.from('product_ingredients')
             .insert(newAssociation)
             .select()
@@ -137,7 +137,7 @@ export const POST = withAuth(async (req: NextRequest, user: User) => {
 });
 
 // DELETE handler for removing a product-ingredient association
-export const DELETE = withAuth(async (req: NextRequest, user: User) => {
+export const DELETE = withAuthAndCSRF(async (req: NextRequest, user: User): Promise<Response> => {
     try {
         const body = await req.json();
         const { product_id, ingredient_id } = body;
@@ -202,7 +202,6 @@ export const DELETE = withAuth(async (req: NextRequest, user: User) => {
                 { status: 403 }
             );
         }
-
 
         const { error, count } = await supabase.from('product_ingredients')
             .delete({ count: 'exact' })

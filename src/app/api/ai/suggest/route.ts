@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError } from '@/lib/api-utils';
-import { withAuth } from '@/lib/auth/api-auth';
+
 import { generateTextCompletion } from '@/lib/azure/openai';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { Brand } from '@/types/models';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ interface SuggestionRequest {
 /**
  * POST: Generate suggestions for a field using AI
  */
-export const POST = withAuth(async (request: NextRequest) => {
+export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Response> => {
   try {
     const body: SuggestionRequest = await request.json();
 

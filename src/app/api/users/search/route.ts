@@ -57,10 +57,12 @@ export const GET = withAuth(async (request: NextRequest) => {
 
     } else {
       // If there is a search query, search in profiles table using OR condition
+      // Escape special characters to prevent SQL injection
+      const escapedQuery = searchQuery.replace(/[%_]/g, '\\$&');
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('id, full_name, email, avatar_url, job_title')
-        .or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`)
+        .or(`full_name.ilike.%${escapedQuery}%,email.ilike.%${escapedQuery}%`)
         .limit(limit);
 
       if (profilesError) throw profilesError;

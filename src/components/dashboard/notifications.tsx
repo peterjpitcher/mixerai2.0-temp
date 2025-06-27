@@ -31,11 +31,20 @@ export function NotificationsButton() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
     // In a real implementation, we would fetch from an API
     const fetchNotifications = async () => {
-      const mockNotifications: Notification[] = [
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        const mockNotifications: Notification[] = [
         {
           id: '1',
           title: 'Content Approved',
@@ -86,8 +95,14 @@ export function NotificationsButton() {
         }
       ];
       
-      setNotifications(mockNotifications);
-      setUnreadCount(mockNotifications.filter(n => !n.isRead).length);
+        setNotifications(mockNotifications);
+        setUnreadCount(mockNotifications.filter(n => !n.isRead).length);
+      } catch (err) {
+        console.error('Failed to fetch notifications:', err);
+        setError('Failed to load notifications');
+      } finally {
+        setIsLoading(false);
+      }
     };
     
     fetchNotifications();
@@ -220,7 +235,27 @@ export function NotificationsButton() {
         
         <ScrollArea className="max-h-[calc(80vh-120px)] h-[400px]">
           <div className="p-4 space-y-3">
-            {notifications.length > 0 ? (
+            {isLoading ? (
+              // Loading state
+              <div className="flex flex-col items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <p className="text-sm text-muted-foreground mt-2">Loading notifications...</p>
+              </div>
+            ) : error ? (
+              // Error state
+              <div className="flex flex-col items-center justify-center py-8">
+                <AlertCircle className="h-8 w-8 text-destructive mb-2" />
+                <p className="text-sm text-muted-foreground">{error}</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2"
+                  onClick={() => window.location.reload()}
+                >
+                  Try again
+                </Button>
+              </div>
+            ) : notifications.length > 0 ? (
               notifications.map((notification) => (
                 <Card 
                   key={notification.id} 

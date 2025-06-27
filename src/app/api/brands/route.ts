@@ -2,14 +2,15 @@ import { NextResponse, NextRequest } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
-import { createErrorResponse, createSuccessResponse } from '@/lib/api/error-handler';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+
 // import { Pool } from 'pg'; // Removed - using Supabase instead
 import { getUserAuthByEmail, inviteNewUserWithAppMetadata } from '@/lib/auth/user-management';
-import { extractCleanDomain } from '@/lib/utils/url-utils'; // Added import
+ // Added import
 import { User } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { validateRequest, commonSchemas } from '@/lib/api/validation';
-import { executeTransaction, CompensatingTransaction } from '@/lib/db/transactions';
+import { executeTransaction } from '@/lib/db/transactions';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -217,7 +218,9 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     
     // Add search filter if provided
     if (search) {
-      brandsQuery = brandsQuery.or(`name.ilike.%${search}%,brand_summary.ilike.%${search}%`);
+      // Escape special characters and use filter to prevent SQL injection
+      const escapedSearch = search.replace(/[%_]/g, '\\$&');
+      brandsQuery = brandsQuery.or(`name.ilike.%${escapedSearch}%,brand_summary.ilike.%${escapedSearch}%`);
     }
     
     // Apply ordering and pagination
@@ -305,7 +308,7 @@ export const GET = withAuth(async (req: NextRequest, user) => {
 });
 
 // Authenticated POST handler for creating brands
-export const POST = withAuth(async (req: NextRequest, user) => {
+export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
   // Role check: Only Global Admins can create new brands
   if (user.user_metadata?.role !== 'admin') {
     return NextResponse.json(

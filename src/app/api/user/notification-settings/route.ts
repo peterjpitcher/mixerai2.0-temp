@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { withCSRF } from '@/lib/api/with-csrf';
 
 export async function GET() {
   try {
@@ -46,7 +47,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withCSRF(async function (request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient();
     const body = await request.json();
@@ -101,9 +102,9 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
 
-export async function PATCH(request: NextRequest) {
+export const PATCH = withCSRF(async function (request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient();
     const body = await request.json();
@@ -166,4 +167,4 @@ export async function PATCH(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+})

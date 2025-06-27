@@ -37,10 +37,20 @@ export async function trackError(
 
   // In production, send to error tracking service
   try {
-    // Example: Send to your error tracking endpoint
+    // Get CSRF token from cookie
+    const getCsrfToken = (): string => {
+      if (typeof document === 'undefined') return '';
+      const match = document.cookie.match(/csrf-token=([^;]+)/);
+      return match ? match[1] : '';
+    };
+
+    // Send to error tracking endpoint
     await fetch('/api/errors/track', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-csrf-token': getCsrfToken(),
+      },
       body: JSON.stringify(errorInfo),
     });
   } catch (trackingError) {

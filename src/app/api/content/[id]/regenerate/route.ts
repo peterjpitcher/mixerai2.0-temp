@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
-import { withAuth } from '@/lib/auth/api-auth';
+
 import { User } from '@supabase/supabase-js';
 import { generateTextCompletion } from '@/lib/azure/openai';
 // import { TablesInsert, Database } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
-import { TemplateFields, TemplateOutputField, ContentData } from '@/types/content-templates';
+import { TemplateFields, TemplateOutputField } from '@/types/content-templates';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ interface RegenerationRequest {
   fieldId?: string; // For regenerating specific template output fields
 }
 
-export const POST = withAuth(async (request: NextRequest, user: User, context?: unknown) => {
+export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, context?: unknown): Promise<Response> => {
   const { params } = context as { params: { id: string } };
   const contentId = params.id;
   

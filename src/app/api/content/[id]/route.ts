@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 // import { Database } from '@/types/supabase'; // TODO: Uncomment when supabase types are generated
 import { User } from '@supabase/supabase-js';
 
@@ -208,7 +209,7 @@ export const GET = withAuth(async (request: NextRequest, user: User, context?: u
   }
 });
 
-export const PUT = withAuth(async (request: NextRequest, user: User, context?: unknown) => {
+export const PUT = withAuthAndCSRF(async (request: NextRequest, user: User, context?: unknown) => {
   const { params } = context as { params: { id: string } };
   const id = params.id;
   
@@ -358,7 +359,7 @@ export const PUT = withAuth(async (request: NextRequest, user: User, context?: u
   }
 });
 
-export const DELETE = withAuth(async (request: NextRequest, user: User, context?: unknown) => {
+export const DELETE = withAuthAndCSRF(async (request: NextRequest, user: User, context?: unknown) => {
   const { params } = context as { params: { id: string } };
   const { id } = params;
 
@@ -456,7 +457,7 @@ export const DELETE = withAuth(async (request: NextRequest, user: User, context?
 });
 
 // Placeholder for DELETE - to be implemented as needed
-// export const DELETE = withAuth(async (request: NextRequest, { params }: { params: { id: string } }, user) => {
+// export const DELETE = withAuthAndCSRF(async (request: NextRequest, { params }: { params: { id: string } }, user) => {
 //   const { id } = params;
 //   // ... implementation ...
 //   return NextResponse.json({ success: true, message: `Content ${id} deleted` });

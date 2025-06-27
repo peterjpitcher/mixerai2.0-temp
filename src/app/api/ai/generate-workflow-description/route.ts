@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { generateTextCompletion } from '@/lib/azure/openai';
+import { withCSRF } from '@/lib/api/with-csrf';
 
 // Define the expected request body schema
 const WorkflowDetailsSchema = z.object({
@@ -12,7 +13,7 @@ const WorkflowDetailsSchema = z.object({
   brandLanguage: z.string().optional(),
 });
 
-export async function POST(request: NextRequest) {
+export const POST = withCSRF(async function (request: NextRequest) {
   try {
     const body = await request.json();
     const validationResult = WorkflowDetailsSchema.safeParse(body);
@@ -75,4 +76,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}) 

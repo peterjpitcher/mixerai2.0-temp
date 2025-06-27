@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
-import { withAuth } from '@/lib/auth/api-auth';
+
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { formatClaimsDirectly, deduplicateClaims } from '@/lib/claims-formatter';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 type Claim = {
   claim_text: string;
@@ -71,8 +72,9 @@ async function fetchAllBrandClaims(supabase: ReturnType<typeof createSupabaseAdm
 
   // Add country filter if provided
   if (countryCode) {
-    brandQuery = brandQuery.or(`country_code.eq.${countryCode},country_code.eq.__GLOBAL__`);
-    if (productQuery) productQuery = productQuery.or(`country_code.eq.${countryCode},country_code.eq.__GLOBAL__`);
+    // Use parameterized filters to prevent SQL injection
+    brandQuery = brandQuery.or(`country_code.eq.${countryCode.replace(/[^a-zA-Z0-9_-]/g, '')},country_code.eq.__GLOBAL__`);
+    if (productQuery) productQuery = productQuery.or(`country_code.eq.${countryCode.replace(/[^a-zA-Z0-9_-]/g, '')},country_code.eq.__GLOBAL__`);
     // Filter ingredient claims by country
     ingredientClaims = ingredientClaims.filter(claim => 
       claim.country_code === countryCode || claim.country_code === '__GLOBAL__'
@@ -248,4 +250,4 @@ async function prepareProductContextHandler(request: NextRequest) {
   }
 }
 
-export const POST = withAuth(prepareProductContextHandler); 
+export const POST = withAuthAndCSRF(prepareProductContextHandler); 

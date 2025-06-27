@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-// import { Database } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
+// import { Database } from '@/types/supabase';
+import { withCSRF } from '@/lib/api/with-csrf'; // TODO: Uncomment when types are regenerated
 
 // Initialize Supabase client with SERVICE_ROLE_KEY for admin actions
 // Ensure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in your environment variables
@@ -9,7 +10,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
-export async function POST(request: Request) {
+export const POST = withCSRF(async function (request: Request) {
   try {
     const { email } = await request.json();
 
@@ -53,4 +54,4 @@ export async function POST(request: Request) {
     console.error('Unexpected error in resend-invite route:', error);
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'An unexpected error occurred.' }, { status: 500 });
   }
-} 
+}); 

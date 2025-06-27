@@ -56,8 +56,8 @@ export function getModelName(): string {
     return deploymentName;
   }
   
-  // Default to gpt-4o which supports vision capabilities
-  return "gpt-4o";
+  // No default deployment name - throw error if not configured
+  throw new Error("Azure OpenAI deployment name is not configured. Please set AZURE_OPENAI_DEPLOYMENT_NAME or AZURE_OPENAI_DEPLOYMENT environment variable.");
 }
 
 // New function for generic text completion
