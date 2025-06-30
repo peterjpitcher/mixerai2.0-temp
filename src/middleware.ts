@@ -126,7 +126,7 @@ export async function middleware(request: NextRequest) {
     response.cookies.set({
       name: 'csrf-token',
       value: csrfToken,
-      httpOnly: true,
+      httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       path: '/'
