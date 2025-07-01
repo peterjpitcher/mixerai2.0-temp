@@ -102,6 +102,8 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: User, contex
 
     console.log('RPC params:', rpcParams);
 
+    // Note: The enhanced update_user_details function that returns reassignment data
+    // is not yet deployed. Once deployed, we can capture reassignment results.
     const { error: rpcError } = await supabase.rpc('update_user_details', rpcParams);
 
     if (rpcError) {
