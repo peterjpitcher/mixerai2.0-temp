@@ -127,7 +127,7 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
     };
 
     fetchData('/api/master-claim-brands', setMasterBrandOptions, 'master brands');
-    fetchData('/api/products', setProductOptions, 'products');
+    fetchData('/api/products?limit=1000', setProductOptions, 'products');
     fetchData('/api/ingredients', setIngredientOptions, 'ingredients');
 
     // Fetch claims workflows

@@ -274,7 +274,7 @@ export default function ClaimsPage() {
         const [claimsRes, brandsRes, productsRes, ingredientsRes] = await Promise.all([
           fetch('/api/claims?limit=1000&includeProductNames=true&includeMasterBrandName=true&includeIngredientName=true'),
           fetch('/api/master-claim-brands'),
-          fetch('/api/products'),
+          fetch('/api/products?limit=1000'),
           fetch('/api/ingredients'),
         ]);
 
