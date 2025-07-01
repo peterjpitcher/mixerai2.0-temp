@@ -150,7 +150,7 @@ export default function NewBrandPage() {
       if (isForbidden || isLoadingUser) return;
       setIsLoadingMasterClaimBrands(true);
       try {
-        const response = await fetch('/api/master-claim-brands');
+        const response = await apiFetch('/api/master-claim-brands');
         if (!response.ok) throw new Error('Failed to fetch Master Claim Brands');
         const data = await response.json();
         if (data.success && Array.isArray(data.data)) {
@@ -175,7 +175,7 @@ export default function NewBrandPage() {
     const fetchCurrentUser = async () => {
       setIsLoadingUser(true);
       try {
-        const response = await fetch('/api/me');
+        const response = await apiFetch('/api/me');
         if (!response.ok) throw new Error('Failed to fetch user session');
         const data = await response.json();
         if (data.success && data.user) {
@@ -209,7 +209,7 @@ export default function NewBrandPage() {
       const apiUrl = '/api/content-vetting-agencies';
       setIsLoading(true);
       try {
-        const response = await fetch(apiUrl);
+        const response = await apiFetch(apiUrl);
         if (!response.ok) throw new Error('Failed to fetch vetting agencies');
         const data = await response.json();
         if (data.success && Array.isArray(data.data)) {
