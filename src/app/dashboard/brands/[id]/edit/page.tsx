@@ -435,7 +435,8 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       console.log('Updating brand with payload:', payload);
       console.log('Logo URL in payload:', payload.logo_url);
       
-      const response = await apiClient.put(`/api/brands/${id}`, payload);
+      // Temporary workaround for CloudFlare 403 issue with PUT requests
+      const response = await apiClient.post(`/api/brands/${id}?_method=PUT`, payload);
       
       // Check if response is JSON
       const contentType = response.headers.get('content-type');

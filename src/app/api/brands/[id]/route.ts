@@ -106,8 +106,8 @@ export const GET = withAuth(async (
   }
 });
 
-// PUT endpoint to update a brand
-export const PUT = withAuthAndCSRF(async (
+// Core PUT handler logic
+const putHandlerCore = async (
   request: NextRequest,
   authenticatedUser: User, 
   context?: unknown
@@ -267,7 +267,10 @@ export const PUT = withAuthAndCSRF(async (
     console.error(`[API Brands PUT /${brandIdToUpdate}] General error:`, error);
     return handleApiError(error, 'Error updating brand');
   }
-});
+};
+
+// PUT endpoint to update a brand
+export const PUT = withAuthAndCSRF(putHandlerCore);
 
 // DELETE a brand by ID (logic remains largely unchanged as it was already Supabase-centric)
 export const DELETE = withAuthAndCSRF(async (
@@ -376,3 +379,24 @@ export const DELETE = withAuthAndCSRF(async (
     return handleApiError(error, 'Error deleting brand');
   }
 }); 
+
+// Temporary POST handler that delegates to PUT for CloudFlare WAF workaround
+export const POST = withAuthAndCSRF(async (request, user, context) => {
+  const url = new URL(request.url);
+  
+  // Check if this is a method override request
+  if (url.searchParams.get('_method') === 'PUT') {
+    // Call the PUT handler logic directly
+    return putHandlerCore(request, user, context);
+  }
+  
+  // If not a method override, return method not allowed
+  return NextResponse.json(
+    { 
+      success: false, 
+      error: 'Method not allowed',
+      message: 'POST is not supported for this endpoint'
+    },
+    { status: 405 }
+  );
+});
