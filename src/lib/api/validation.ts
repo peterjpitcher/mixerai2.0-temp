@@ -96,6 +96,79 @@ export const commonSchemas = {
   
   // Optional but non-empty string
   optionalNonEmptyString: z.string().min(1).optional().nullable(),
+  
+  // Brand permissions
+  brandPermission: z.object({
+    brand_id: z.string().uuid(),
+    role: z.enum(['admin', 'editor', 'viewer'])
+  }),
+  
+  // Status enums
+  contentStatus: z.enum(['draft', 'in_review', 'approved', 'published', 'archived']),
+  workflowStatus: z.enum(['active', 'inactive', 'archived']),
+  
+  // Content filters
+  contentFilters: z.object({
+    status: z.enum(['draft', 'in_review', 'approved', 'published', 'archived']).optional(),
+    brand_id: z.string().uuid().optional(),
+    search: z.string().optional(),
+    start_date: z.string().datetime().optional(),
+    end_date: z.string().datetime().optional()
+  }),
+  
+  // User reference
+  userReference: z.object({
+    id: z.string().uuid(),
+    email: z.string().email().optional(),
+    full_name: z.string().optional()
+  }),
+  
+  // File upload
+  fileUpload: z.object({
+    filename: z.string().min(1),
+    mimetype: z.string().min(1),
+    size: z.number().positive().max(10 * 1024 * 1024) // 10MB max
+  }),
+  
+  // Sort configuration
+  sortConfig: z.object({
+    column: z.string().min(1),
+    direction: z.enum(['asc', 'desc']).default('desc')
+  }),
+  
+  // ID array
+  idArray: z.array(z.string().uuid()).min(1),
+  
+  // Search query
+  searchQuery: z.string().min(1).max(100),
+  
+  // Date range
+  dateRange: z.object({
+    start: z.string().datetime(),
+    end: z.string().datetime()
+  }).refine(data => new Date(data.start) <= new Date(data.end), {
+    message: "Start date must be before or equal to end date"
+  }),
+  
+  // Workflow step
+  workflowStep: z.object({
+    name: z.string().min(1),
+    description: z.string().optional(),
+    order_index: z.number().int().min(0),
+    assignees: z.array(z.object({
+      id: z.string().uuid(),
+      email: z.string().email(),
+      full_name: z.string().optional()
+    })).min(1),
+    role: z.string().optional(),
+    approvalRequired: z.boolean().optional()
+  }),
+  
+  // Batch operation
+  batchOperation: z.object({
+    ids: z.array(z.string().uuid()).min(1).max(100),
+    action: z.enum(['delete', 'archive', 'restore', 'publish'])
+  })
 };
 
 /**
