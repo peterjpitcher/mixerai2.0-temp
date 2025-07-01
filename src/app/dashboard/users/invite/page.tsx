@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle } from 'lucide-react';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
+import { apiFetch } from '@/lib/api-client';
 
 interface Brand {
   id: string;
@@ -169,7 +170,7 @@ export default function InviteUserPage() {
       setIsSending(true);
       
       // Send invitation request
-      const response = await fetch('/api/users/invite', {
+      const response = await apiFetch('/api/users/invite', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

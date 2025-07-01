@@ -16,6 +16,7 @@ import { AvatarUpload } from '@/components/ui/avatar-upload';
 import { validatePassword } from '@/lib/auth/session-config';
 import { AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/api-client';
 
 // Page metadata should ideally be exported from a server component or the page file if it's RSC.
 // For client components, this is more of a placeholder for what should be set.
@@ -175,7 +176,7 @@ export default function AccountPage() {
     
     try {
       // Persist individual setting change
-      const response = await fetch('/api/user/notification-settings', {
+      const response = await apiFetch('/api/user/notification-settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [id]: checked })
@@ -266,7 +267,7 @@ export default function AccountPage() {
     setIsSubmitting(true);
     try {
       // Check if re-authentication is required
-      const reauthResponse = await fetch('/api/auth/check-reauthentication', {
+      const reauthResponse = await apiFetch('/api/auth/check-reauthentication', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ operation: 'change-password' }),
@@ -305,7 +306,7 @@ export default function AccountPage() {
     setIsSubmitting(true);
     try {
       // Save all notification settings
-      const response = await fetch('/api/user/notification-settings', {
+      const response = await apiFetch('/api/user/notification-settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(notificationSettings)

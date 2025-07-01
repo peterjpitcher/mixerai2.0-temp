@@ -28,6 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { apiFetch } from '@/lib/api-client';
 
 interface UserSessionData {
   id: string;
@@ -163,7 +164,7 @@ export default function WorkflowsPage() {
   const handleDuplicateWorkflow = async (workflowId: string) => {
     setIsDuplicating(workflowId);
     try {
-      const response = await fetch(`/api/workflows/${workflowId}/duplicate`, {
+      const response = await apiFetch(`/api/workflows/${workflowId}/duplicate`, {
         method: 'POST',
       });
       const result = await response.json();
@@ -336,7 +337,7 @@ export default function WorkflowsPage() {
 
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/workflows/${workflowToDelete.id}`, {
+      const response = await apiFetch(`/api/workflows/${workflowToDelete.id}`, {
         method: 'DELETE',
       });
       const data = await response.json();

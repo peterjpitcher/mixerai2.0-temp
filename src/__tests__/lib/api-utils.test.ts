@@ -50,7 +50,7 @@ describe('API Utilities', () => {
   describe('handleApiError', () => {
     it('should handle Error objects correctly', () => {
       const error = new Error('Test error message');
-      const result = handleApiError(error, 'Custom message');
+      handleApiError(error, 'Custom message');
 
       expect(NextResponse.json).toHaveBeenCalledWith(
         {
@@ -63,7 +63,7 @@ describe('API Utilities', () => {
 
     it('should handle objects with message property', () => {
       const error = { message: 'Object error message' };
-      const result = handleApiError(error, 'API Error', 400);
+      handleApiError(error, 'API Error', 400);
 
       expect(NextResponse.json).toHaveBeenCalledWith(
         {
@@ -76,7 +76,7 @@ describe('API Utilities', () => {
 
     it('should handle objects with error property', () => {
       const error = { error: 'Error property message' };
-      const result = handleApiError(error, 'API Error');
+      handleApiError(error, 'API Error');
 
       expect(NextResponse.json).toHaveBeenCalledWith(
         {
@@ -89,7 +89,7 @@ describe('API Utilities', () => {
 
     it('should handle string errors', () => {
       const error = 'String error message';
-      const result = handleApiError(error);
+      handleApiError(error);
 
       expect(NextResponse.json).toHaveBeenCalledWith(
         {
@@ -102,7 +102,7 @@ describe('API Utilities', () => {
 
     it('should handle unknown error types', () => {
       const error = 12345;
-      const result = handleApiError(error, 'Unknown error');
+      handleApiError(error, 'Unknown error');
 
       expect(NextResponse.json).toHaveBeenCalledWith(
         {
@@ -115,7 +115,7 @@ describe('API Utilities', () => {
 
     it('should use default message when not provided', () => {
       const error = new Error('Test');
-      const result = handleApiError(error);
+      handleApiError(error);
 
       expect(NextResponse.json).toHaveBeenCalledWith(
         {

@@ -22,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format as formatDateFns } from 'date-fns';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useAutoSave } from '@/hooks/use-auto-save';
+import { apiFetch } from '@/lib/api-client';
 
 
 interface ContentEditPageProps {
@@ -442,7 +443,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       console.log('Payload being sent to API (stringified):', JSON.stringify(payloadToSave, null, 2));
       console.log('--- End In handleSave --- ContentEditPage ---');
 
-      const response = await fetch(`/api/content/${id}`, {
+      const response = await apiFetch(`/api/content/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payloadToSave),

@@ -47,6 +47,7 @@ import { format as formatDateFns } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { BrandIcon } from '@/components/brand-icon';
+import { apiFetch } from '@/lib/api-client';
 
 // export const metadata: Metadata = {
 //   title: 'Manage Users | MixerAI 2.0',
@@ -267,7 +268,7 @@ export default function UsersPage() {
     if (!userToDelete) return;
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/users/${userToDelete.id}`, {
+      const response = await apiFetch(`/api/users/${userToDelete.id}`, {
         method: 'DELETE',
       });
       const data = await response.json();
@@ -289,7 +290,7 @@ export default function UsersPage() {
   const handleResendInvite = async (userId: string, email: string) => {
     setResendingInviteToUserId(userId);
     try {
-      const response = await fetch('/api/users/resend-invite', {
+      const response = await apiFetch('/api/users/resend-invite', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

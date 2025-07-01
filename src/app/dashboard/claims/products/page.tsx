@@ -29,6 +29,7 @@ import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { touchFriendly } from '@/lib/utils/touch-target';
+import { apiFetch } from '@/lib/api-client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -127,7 +128,7 @@ export default function ProductsPage() {
 
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/products/${itemToDelete.id}`, {
+      const response = await apiFetch(`/api/products/${itemToDelete.id}`, {
         method: 'DELETE',
       });
       const data = await response.json();

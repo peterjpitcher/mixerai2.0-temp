@@ -14,6 +14,7 @@ import Image from 'next/image';
 import { DevelopmentOnly } from "@/components/development-only";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { SessionTimeoutProvider } from "@/components/providers/session-timeout-provider";
+import { apiFetch } from '@/lib/api-client';
 
 // Define UserSessionData interface (can be shared if defined elsewhere)
 interface UserSessionData {
@@ -81,7 +82,7 @@ export default function DashboardLayout({
       
       // Invalidate all sessions for this user
       if (user) {
-        await fetch('/api/auth/logout', {
+        await apiFetch('/api/auth/logout', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

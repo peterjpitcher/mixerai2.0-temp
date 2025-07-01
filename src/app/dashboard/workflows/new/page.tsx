@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { BrandIcon } from '@/components/brand-icon';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { useFormPersistence } from '@/hooks/use-form-persistence';
+import { apiFetch } from '@/lib/api-client';
 
 /**
  * NewWorkflowPage allows users to create a new content approval workflow.
@@ -489,7 +490,7 @@ export default function NewWorkflowPage() {
     setStepDescLoading(prev => ({ ...prev, [stepIndex]: true }));
     try {
       const step = workflow.steps[stepIndex];
-      const response = await fetch('/api/ai/generate-step-description', {
+      const response = await apiFetch('/api/ai/generate-step-description', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -645,7 +646,7 @@ export default function NewWorkflowPage() {
     };
 
     try {
-      const response = await fetch('/api/workflows', {
+      const response = await apiFetch('/api/workflows', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(workflowToSave),

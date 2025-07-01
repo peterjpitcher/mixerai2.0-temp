@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { CardGridSkeleton } from '@/components/ui/loading-skeletons';
 import { BreadcrumbNav } from '@/components/ui/breadcrumb-nav';
+import { apiFetch } from '@/lib/api-client';
 
 interface Template {
   id: string;
@@ -158,7 +159,7 @@ export default function TemplatesPage() {
         brand_id: templateToDuplicate.brand_id,
       };
 
-      const response = await fetch('/api/content-templates', {
+      const response = await apiFetch('/api/content-templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newTemplateData),
@@ -191,7 +192,7 @@ export default function TemplatesPage() {
     try {
       // Note: System templates (article-template, product-template) are handled on their edit page.
       // This delete is for user-created templates.
-      const response = await fetch(`/api/content-templates/${templateToDelete.id}`, {
+      const response = await apiFetch(`/api/content-templates/${templateToDelete.id}`, {
         method: 'DELETE',
       });
       const data = await response.json();

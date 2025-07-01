@@ -18,6 +18,7 @@ import {
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
+import { apiFetch } from '@/lib/api-client';
 
 // export const metadata: Metadata = {
 //   title: 'Edit User | MixerAI 2.0',
@@ -268,7 +269,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
       });
       
       // Send the update to the API
-      const response = await fetch(`/api/users/${user.id}`, {
+      const response = await apiFetch(`/api/users/${user.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'

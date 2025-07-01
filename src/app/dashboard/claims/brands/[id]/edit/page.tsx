@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Save, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
+import { apiFetch } from '@/lib/api-client';
 
 interface MasterClaimBrand { 
   id: string;
@@ -120,7 +121,7 @@ export default function EditMasterClaimBrandPage() {
 
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/master-claim-brands/${id}`, { 
+      const response = await apiFetch(`/api/master-claim-brands/${id}`, { 
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

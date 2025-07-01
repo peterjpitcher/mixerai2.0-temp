@@ -22,6 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { apiFetch } from '@/lib/api-client';
 // import { } from "@/lib/constants/country-codes"; // Removed - empty import
 
 // Base Entity interface
@@ -238,7 +239,7 @@ export default function MarketOverridesPage() {
                 }
             }
 
-            const claimResponse = await fetch('/api/claims', {
+            const claimResponse = await apiFetch('/api/claims', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newClaimPayload)
@@ -256,7 +257,7 @@ export default function MarketOverridesPage() {
     }
 
     try {
-        const response = await fetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(overridePayload) });
+        const response = await apiFetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(overridePayload) });
         const result = await response.json();
         if (!response.ok || !result.success) { throw new Error(result.error || `Failed to ${method === 'POST' ? 'create' : 'update'} override`); }
         toast.success(`Market override ${method === 'POST' ? 'created' : 'updated'} successfully!`);
@@ -270,7 +271,7 @@ export default function MarketOverridesPage() {
     if (!overrideToDelete) return;
     setIsLoading(true); 
     try {
-        const response = await fetch(`/api/market-overrides/${overrideToDelete.id}`, { method: 'DELETE' });
+        const response = await apiFetch(`/api/market-overrides/${overrideToDelete.id}`, { method: 'DELETE' });
         const result = await response.json();
         if (!response.ok || !result.success) { throw new Error(result.error || 'Failed to delete override');}
         toast.success('Market override removed successfully!');

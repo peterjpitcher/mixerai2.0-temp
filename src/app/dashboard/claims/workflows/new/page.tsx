@@ -18,6 +18,7 @@ import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { cn } from '@/lib/utils';
 import { debounce } from 'lodash';
+import { apiFetch } from '@/lib/api-client';
 
 interface WorkflowStep {
   id: string;
@@ -218,7 +219,7 @@ export default function NewClaimsWorkflowPage() {
     setStepDescLoading(prev => ({ ...prev, [stepIndex]: true }));
     try {
       const step = steps[stepIndex];
-      const response = await fetch('/api/ai/generate-step-description', {
+      const response = await apiFetch('/api/ai/generate-step-description', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -333,7 +334,7 @@ export default function NewClaimsWorkflowPage() {
     setIsSaving(true);
 
     try {
-      const response = await fetch('/api/claims/workflows', {
+      const response = await apiFetch('/api/claims/workflows', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

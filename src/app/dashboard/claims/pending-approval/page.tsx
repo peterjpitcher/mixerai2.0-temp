@@ -31,6 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
+import { apiFetch } from '@/lib/api-client';
 
 interface PendingClaim {
   id: string;
@@ -183,7 +184,7 @@ export default function ClaimsPendingApprovalPage() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/claims/${selectedClaim.id}/workflow`, {
+      const response = await apiFetch(`/api/claims/${selectedClaim.id}/workflow`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

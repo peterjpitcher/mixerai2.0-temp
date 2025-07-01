@@ -18,6 +18,7 @@ import { format } from 'date-fns';
 import { Table, TableHeader, TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table";
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { Checkbox } from '@/components/ui/checkbox';
+import { apiFetch } from '@/lib/api-client';
 
 
 // Language options - can be kept for source language or if no brand is selected (though API requires brand)
@@ -336,7 +337,7 @@ export default function ContentTransCreatorPage() {
         for (let i = 0; i < contentItems.length; i++) {
           const contentItem = contentItems[i];
           try {
-            const response = await fetch('/api/tools/content-transcreator', {
+            const response = await apiFetch('/api/tools/content-transcreator', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -402,7 +403,7 @@ export default function ContentTransCreatorPage() {
       setResults(null);
       
       try {
-        const response = await fetch('/api/tools/content-transcreator', {
+        const response = await apiFetch('/api/tools/content-transcreator', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

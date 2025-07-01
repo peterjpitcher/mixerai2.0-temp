@@ -21,6 +21,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { cn } from '@/lib/utils';
 import { BrandIcon } from '@/components/brand-icon';
 import { ActiveBrandIndicator } from '@/components/ui/active-brand-indicator';
+import { apiFetch } from '@/lib/api-client';
 // Assuming UserOption might be defined elsewhere or keep it local if specific
 // import { MultiSelectUserCombobox, UserOption } from '@/components/ui/multi-select-user-combobox';
 
@@ -496,7 +497,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
       try {
       const currentBrand = allFetchedBrands.find(b => b.id === workflow.brand_id);
       const currentTemplate = contentTemplates.find(ct => ct.id === selectedTemplateId);
-      const response = await fetch('/api/ai/generate-step-description', {
+      const response = await apiFetch('/api/ai/generate-step-description', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -675,7 +676,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
       
       if (isDuplicated) {
         // For duplicated workflows, create a new workflow instead of updating
-        response = await fetch('/api/workflows', {
+        response = await apiFetch('/api/workflows', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(workflowToSave)
@@ -688,7 +689,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         toast.success('Workflow created successfully!');
       } else {
         // For existing workflows, update as normal
-        response = await fetch(`/api/workflows/${id}`, {
+        response = await apiFetch(`/api/workflows/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(workflowToSave)
@@ -714,7 +715,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
     setIsDeleting(true);
     setShowDeleteConfirm(false);
     try {
-      const response = await fetch(`/api/workflows/${id}`, {
+      const response = await apiFetch(`/api/workflows/${id}`, {
         method: 'DELETE',
       });
       const data = await response.json();

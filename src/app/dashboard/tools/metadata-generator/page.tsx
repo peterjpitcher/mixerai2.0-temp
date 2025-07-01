@@ -29,6 +29,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
+import { apiFetch } from '@/lib/api-client';
 
 
 interface MetadataResultItem {
@@ -303,7 +304,7 @@ export default function MetadataGeneratorPage() {
 
     try {
       // Send all URLs at once as a batch
-      const response = await fetch('/api/tools/metadata-generator', {
+      const response = await apiFetch('/api/tools/metadata-generator', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

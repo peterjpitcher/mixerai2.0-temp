@@ -18,6 +18,7 @@ import { BrandLogoUpload } from '@/components/ui/brand-logo-upload';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 import { Checkbox } from '@/components/ui/checkbox';
 import { v4 as uuidv4 } from 'uuid';
+import { apiFetch } from '@/lib/api-client';
 import { useFormPersistence } from '@/hooks/use-form-persistence';
 
 // Define UserSessionData interface (can be moved to a shared types file later)
@@ -334,7 +335,7 @@ export default function NewBrandPage() {
     setIsGenerating(true);
     toast.info('Generating brand identity...');
     try {
-      const response = await fetch('/api/brands/identity', {
+      const response = await apiFetch('/api/brands/identity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -404,7 +405,7 @@ export default function NewBrandPage() {
       console.log('Creating brand with payload:', payload);
       console.log('Logo URL in payload:', payload.logo_url);
       
-      const response = await fetch('/api/brands', {
+      const response = await apiFetch('/api/brands', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

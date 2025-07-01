@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { DueDateIndicator } from '@/components/ui/due-date-indicator';
+import { apiFetch } from '@/lib/api-client';
 
 // Define types
 type ContentFilterStatus = 'active' | 'approved' | 'rejected' | 'all';
@@ -266,7 +267,7 @@ export default function ContentPageClient() {
     }
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/content/${itemToDelete.id}`, {
+      const response = await apiFetch(`/api/content/${itemToDelete.id}`, {
         method: 'DELETE',
       });
       const result = await response.json();
