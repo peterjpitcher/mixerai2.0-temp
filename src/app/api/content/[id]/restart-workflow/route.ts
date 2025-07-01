@@ -35,12 +35,12 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
     
     // Explicitly check if brand and brand_admin_id were loaded.
     // The !inner join in select should ensure brand is present if content is found, but good to be safe.
-    if (!currentContent.brand || typeof currentContent.brand !== 'object' || !(currentContent.brand as any).brand_admin_id) {
+    if (!currentContent.brand || typeof currentContent.brand !== 'object' || !(currentContent.brand as Record<string, unknown>).brand_admin_id) {
         return NextResponse.json({ success: false, error: 'Brand admin information not found for this content.' }, { status: 404 });
     }
 
     // 2. Verify user is the brand_admin_id for this content's brand
-    if ((currentContent.brand as any).brand_admin_id !== user.id) {
+    if ((currentContent.brand as Record<string, unknown>).brand_admin_id !== user.id) {
       return NextResponse.json({ success: false, error: 'User is not authorized to restart this workflow.' }, { status: 403 });
     }
 
@@ -79,7 +79,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
       console.warn(`Workflow ${currentContent.workflow_id} has no steps defined.`);
     }
     
-    const updatePayload: any = { // TODO: Type as TablesUpdate<'content'> when types are regenerated
+    const updatePayload: Record<string, unknown> = { // TODO: Type as TablesUpdate<'content'> when types are regenerated
       current_step: firstStepId, 
       assigned_to: firstStepAssignees,
       status: 'pending_review',

@@ -38,7 +38,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
       return NextResponse.json({ success: false, error: 'brand_id or websiteUrlForBrandDetection is required' }, { status: 400 });
     }
 
-    let brandForContext: any | null = null; // TODO: Type as Database['public']['Tables']['brands']['Row'] when types are generated
+    let brandForContext: Record<string, unknown> | null = null; // TODO: Type as Database['public']['Tables']['brands']['Row'] when types are generated
     const supabase = createSupabaseAdminClient();
 
     if (body.brand_id) {
@@ -81,11 +81,11 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
     }
 
     const aiBrandContext: AIBrandContext = {
-      name: brandForContext.name,
-      brand_identity: brandForContext.brand_identity,
-      tone_of_voice: brandForContext.tone_of_voice,
-      language: brandForContext.language,
-      country: brandForContext.country,
+      name: brandForContext.name as string,
+      brand_identity: brandForContext.brand_identity as string,
+      tone_of_voice: brandForContext.tone_of_voice as string,
+      language: brandForContext.language as string,
+      country: brandForContext.country as string,
       topic: body.topic,      
       keywords: body.keywords,  
     };
@@ -95,8 +95,8 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
     return NextResponse.json({
       success: true, 
       title: title,
-      brand_id_used: brandForContext?.id || null,
-      brand_name_used: brandForContext?.name || null,
+      brand_id_used: (brandForContext?.id as string) || null,
+      brand_name_used: (brandForContext?.name as string) || null,
       detection_source: body.brand_id ? 'brand_id' : (body.websiteUrlForBrandDetection && brandForContext ? 'url_detection' : 'none')
     });
 

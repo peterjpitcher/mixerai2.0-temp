@@ -10,7 +10,8 @@ import { QuillEditor } from './quill-editor';
 import 'quill/dist/quill.snow.css';
 import { ProductSelect } from './product-select';
 import { RecipeUrlField } from './recipe-url-field';
-import type { InputField, FieldType, SelectOptions, ShortTextOptions, LongTextOptions, RichTextOptions, UrlOptions, RecipeUrlOptions } from '@/types/template';
+import { SlugInput } from '@/components/ui/slug-input';
+import type { InputField, FieldType, SelectOptions, ShortTextOptions, LongTextOptions, RichTextOptions, UrlOptions, RecipeUrlOptions, SlugOptions } from '@/types/template';
 
 interface TemplateFieldRendererProps {
   field: InputField;
@@ -121,6 +122,20 @@ export function TemplateFieldRenderer({
             options={field.options as RecipeUrlOptions}
             helpText={field.helpText}
             onRecipeDataExtracted={onRecipeDataExtracted}
+          />
+        );
+        
+      case 'slug':
+        const slugOptions = field.options as SlugOptions;
+        return (
+          <SlugInput
+            value={value}
+            onChange={(val) => onChange(field.id, val, 'slug')}
+            sourceValue={slugOptions?.sourceField ? '' : undefined} // TODO: Get source field value
+            required={isRequired}
+            description={field.helpText}
+            placeholder="article-url-slug"
+            autoGenerate={slugOptions?.autoGenerate !== false}
           />
         );
         

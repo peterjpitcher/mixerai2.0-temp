@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { withCSRF } from '@/lib/api/with-csrf';
 
-export const DELETE = withCSRF(async function (request: NextRequest) {
+export const DELETE = withCSRF(async function () {
   try {
     const supabase = createSupabaseServerClient();
     

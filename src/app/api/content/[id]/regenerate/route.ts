@@ -4,7 +4,9 @@ import { handleApiError } from '@/lib/api-utils';
 
 import { User } from '@supabase/supabase-js';
 import { generateTextCompletion } from '@/lib/azure/openai';
-// import { TablesInsert, Database } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
+import { Database, Json } from '@/types/supabase';
+
+type ContentVersionInsert = Database['public']['Tables']['content_versions']['Insert'];
 import { TemplateFields, TemplateOutputField } from '@/types/content-templates';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
@@ -64,7 +66,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
     }
     
     // Save current version before regeneration
-    const versionPayload: any = { // TODO: Type as TablesInsert<'content_versions'> when types are regenerated
+    const versionPayload: ContentVersionInsert = {
       content_id: contentId,
       workflow_step_identifier: content.current_step || 'manual_regeneration',
       step_name: 'Content Regeneration',
@@ -75,7 +77,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
         meta_title: content.meta_title,
         meta_description: content.meta_description,
         content_data: content.content_data
-      },
+      } as Json,
       action_status: 'regeneration_requested',
       feedback: body.feedback || 'Manual regeneration requested',
       reviewer_id: user.id
@@ -106,7 +108,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
       ...content,
       brands: brand,
       content_templates: template
-    } as any; // TODO: Type properly when Database types are generated
+    } as Record<string, unknown>; // TODO: Type properly when Database types are generated
     
     // Handle specific field regeneration
     const templateFields = template.fields as unknown as TemplateFields;
@@ -123,7 +125,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
       const fieldPrompt = buildFieldRegenerationPrompt(
         field,
         contentWithRelations,
-        contentWithRelations.brands,
+        contentWithRelations.brands as Record<string, unknown>,
         body.feedback
       );
       
@@ -139,7 +141,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
       }
       
       // Update specific field in content_data
-      const currentContentData = (content.content_data || {}) as any;
+      const currentContentData = (content.content_data || {}) as Record<string, unknown>;
       const currentGeneratedOutputs = (currentContentData?.generatedOutputs && typeof currentContentData.generatedOutputs === 'object') 
         ? currentContentData.generatedOutputs 
         : {};
@@ -153,7 +155,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
       };
       
       // If this is the primary body field, also update main body
-      const updatePayload: any = { 
+      const updatePayload: Record<string, unknown> = { 
         content_data: updatedContentData
       };
       if (isBodyField(field, templateFields.outputFields)) {
@@ -180,7 +182,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
     
     // Handle full content regeneration
     const sections = body.sections || ['body'];
-    const updates: Partial<any> = {}; // TODO: Type as Partial<Database['public']['Tables']['content']['Update']> when types are regenerated
+    const updates: Partial<Record<string, unknown>> = {}; // TODO: Type as Partial<Database['public']['Tables']['content']['Update']> when types are regenerated
     
     for (const section of sections) {
       const prompt = buildSectionRegenerationPrompt(
@@ -246,11 +248,11 @@ async function getNextVersionNumber(
 
 function buildFieldRegenerationPrompt(
   field: TemplateOutputField,
-  content: any, // TODO: Type as Database['public']['Tables']['content']['Row'] & {...} when types are regenerated
-  brand: any, // TODO: Type as Database['public']['Tables']['brands']['Row'] when types are regenerated
+  content: Record<string, unknown>, // TODO: Type as Database['public']['Tables']['content']['Row'] & {...} when types are regenerated
+  brand: Record<string, unknown>, // TODO: Type as Database['public']['Tables']['brands']['Row'] when types are regenerated
   feedback?: string
 ): string {
-  const contentData = content.content_data as any;
+  const contentData = content.content_data as Record<string, unknown>;
   const inputValues = contentData?.templateInputValues || {};
   
   let prompt = `You are regenerating the "${field.name}" field for existing content.\n\n`;
@@ -261,7 +263,7 @@ function buildFieldRegenerationPrompt(
   
   prompt += `Content Context:\n`;
   prompt += `- Title: ${content.title}\n`;
-  prompt += `- Template: ${content.content_templates?.name}\n`;
+  prompt += `- Template: ${(content.content_templates as Record<string, unknown>)?.name || 'Unknown'}\n`;
   prompt += `- Brand: ${brand.name}\n\n`;
   
   prompt += `Input Values:\n`;
@@ -277,12 +279,12 @@ function buildFieldRegenerationPrompt(
 
 function buildSectionRegenerationPrompt(
   section: string,
-  content: any, // TODO: Type as Database['public']['Tables']['content']['Row'] & {...} when types are regenerated
-  brand: any, // TODO: Type as Database['public']['Tables']['brands']['Row'] when types are regenerated
-  template: any, // TODO: Type as Database['public']['Tables']['content_templates']['Row'] when types are regenerated
+  content: Record<string, unknown>, // TODO: Type as Database['public']['Tables']['content']['Row'] & {...} when types are regenerated
+  brand: Record<string, unknown>, // TODO: Type as Database['public']['Tables']['brands']['Row'] when types are regenerated
+  template: Record<string, unknown>, // TODO: Type as Database['public']['Tables']['content_templates']['Row'] when types are regenerated
   feedback?: string
 ): string {
-  const contentData = content.content_data as any;
+  const contentData = content.content_data as Record<string, unknown>;
   const inputValues = contentData?.templateInputValues || {};
   
   let prompt = `You are regenerating the ${section} for existing content.\n\n`;

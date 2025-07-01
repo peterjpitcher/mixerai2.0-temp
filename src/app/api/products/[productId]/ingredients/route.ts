@@ -95,12 +95,13 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
         // The data from Supabase with this type of join will be an array of objects like:
         // [{ ingredients: { id: '...', name: '...', ... } }, ... ]
         // We need to map this to an array of IngredientDetails
-        const ingredients: IngredientDetails[] = Array.isArray(data) ? data.map((item: any) => {
+        const ingredients: IngredientDetails[] = Array.isArray(data) ? data.map((item: Record<string, unknown>) => {
             if (item.ingredients) { // Check if ingredients object exists
+                const ingredient = item.ingredients as Record<string, unknown>;
                 return {
-                    id: item.ingredients.id,
-                    name: item.ingredients.name,
-                    description: item.ingredients.description,
+                    id: ingredient.id,
+                    name: ingredient.name,
+                    description: ingredient.description,
                     // associated_at: item.created_at // from product_ingredients table if needed
                 };
             }

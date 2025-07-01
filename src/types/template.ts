@@ -14,6 +14,7 @@ export type FieldType =
   | 'date' 
   | 'tags' 
   | 'url'
+  | 'slug'
   | 'fileUpload'
   | 'plainText'
   | 'html'
@@ -29,6 +30,13 @@ export interface NumberOptions { min?: number; max?: number; step?: number; plac
 export interface DateOptions { disablePast?: boolean; disableFuture?: boolean; format?: string; includeTime?: boolean; }
 export interface TagsOptions { maxTags?: number; placeholder?: string; suggestions?: string[]; }
 export interface UrlOptions { placeholder?: string; validateUrl?: boolean; }
+export interface SlugOptions { 
+  sourceField?: string; 
+  autoGenerate?: boolean; 
+  prefix?: string; 
+  maxLength?: number; 
+  validateUniqueness?: boolean; 
+}
 export interface FileUploadOptions { maxSizeMB?: number; allowedTypes?: string[]; acceptedTypes?: string; maxSize?: number; }
 export interface ProductSelectorOptions { allowMultiple?: boolean; }
 export interface RecipeUrlOptions { 
@@ -71,12 +79,13 @@ export type InputFieldOptionType =
   | ({ type: 'date'; options?: DateOptions })
   | ({ type: 'tags'; options?: TagsOptions })
   | ({ type: 'url'; options?: UrlOptions })
+  | ({ type: 'slug'; options?: SlugOptions })
   | ({ type: 'fileUpload'; options?: FileUploadOptions })
   | ({ type: 'product-selector', options?: ProductSelectorOptions })
   | ({ type: 'recipeUrl'; options?: RecipeUrlOptions });
 
 export interface InputField extends BaseField {
-  type: Extract<FieldType, 'shortText' | 'longText' | 'richText' | 'select' | 'multiselect' | 'number' | 'date' | 'tags' | 'url' | 'fileUpload' | 'product-selector' | 'recipeUrl'>;
+  type: Extract<FieldType, 'shortText' | 'longText' | 'richText' | 'select' | 'multiselect' | 'number' | 'date' | 'tags' | 'url' | 'slug' | 'fileUpload' | 'product-selector' | 'recipeUrl'>;
   options?: InputFieldOptionType['options'];
   aiSuggester?: boolean;
 }

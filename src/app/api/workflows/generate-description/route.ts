@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // OpenAI import removed as the client instance was unused and direct fetch is used.
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
-import { withAuthAndCSRF } from '@/lib/api/with-csrf'; // Import for consistent error handling
+// import { withAuthAndCSRF } from '@/lib/api/with-csrf'; // Import for consistent error handling - not used
 
 // const openai = new OpenAI({ ... }); // Unused OpenAI client initialization removed
 

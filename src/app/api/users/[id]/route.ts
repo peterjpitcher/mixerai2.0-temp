@@ -3,7 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withRouteAuth } from '@/lib/auth/route-handlers';
 import { User } from '@supabase/supabase-js';
-import { withCSRF } from '@/lib/api/with-csrf';
+// import { withCSRF } from '@/lib/api/with-csrf'; - not used
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
 
@@ -77,7 +77,7 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: User, contex
       p_job_title: string;
       p_company: string;
       p_role?: string;
-      p_brand_permissions?: any;
+      p_brand_permissions?: Array<{ brand_id: string; role: string }>;
     } = {
       p_user_id: params.id,
       p_full_name: body.full_name || '',
@@ -91,12 +91,12 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: User, contex
       // Ensure role values in brand_permissions are valid enum values
       if (body.brand_permissions && Array.isArray(body.brand_permissions)) {
         const validRoles = ['admin', 'editor', 'viewer'];
-        rpcParams.p_brand_permissions = body.brand_permissions.map((perm: any) => ({
+        rpcParams.p_brand_permissions = body.brand_permissions.map((perm: Record<string, unknown>) => ({
           brand_id: perm.brand_id,
-          role: validRoles.includes(perm.role) ? perm.role : 'viewer' // Default to viewer if invalid
+          role: validRoles.includes(perm.role as string) ? perm.role : 'viewer' // Default to viewer if invalid
         }));
       } else {
-        rpcParams.p_brand_permissions = null;
+        rpcParams.p_brand_permissions = undefined;
       }
     }
 

@@ -7,6 +7,12 @@ import { toast } from 'sonner';
 import { createBrowserClient } from '@supabase/ssr';
 import Image from 'next/image';
 import { Spinner } from '@/components/spinner';
+import { 
+  validateFile, 
+  validateFileContent, 
+  generateUniqueFileName, 
+  validateImageDimensions 
+} from '@/lib/validation/file-upload';
 
 interface AvatarUploadProps {
   currentAvatarUrl?: string | null;
@@ -36,27 +42,38 @@ export function AvatarUpload({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
-      toast.error('Please select a valid image file (JPEG, PNG, or WebP)');
+    // Validate file using comprehensive validation
+    const validationResult = validateFile(file, { category: 'avatar' });
+    if (!validationResult.valid) {
+      toast.error(validationResult.error || 'Invalid file');
       return;
     }
 
-    // Validate file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
-      toast.error('Image size must be less than 5MB');
+    // Validate file content for security
+    const contentValidation = await validateFileContent(file);
+    if (!contentValidation.valid) {
+      toast.error(contentValidation.error || 'File content validation failed');
+      return;
+    }
+
+    // Validate image dimensions (optional but recommended for avatars)
+    const dimensionValidation = await validateImageDimensions(file, {
+      minWidth: 100,
+      maxWidth: 2000,
+      minHeight: 100,
+      maxHeight: 2000,
+      aspectRatio: { min: 0.5, max: 2 } // Prevent extremely wide or tall images
+    });
+    if (!dimensionValidation.valid) {
+      toast.error(dimensionValidation.error || 'Invalid image dimensions');
       return;
     }
 
     setIsUploading(true);
 
     try {
-      // Create a unique file name
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${userId}-${Date.now()}.${fileExt}`;
-      const filePath = `${userId}/${fileName}`;
+      // Generate a unique, sanitized filename
+      const filePath = generateUniqueFileName(file.name, userId);
 
       // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage

@@ -135,12 +135,13 @@ export const GET = withAuth(async (req: NextRequest) => {
             
             if (!productError && productAssociations) {
                 // Group product names by claim ID
-                productAssociations.forEach((assoc: any) => {
-                    if (!productNamesByClaimId[assoc.claim_id]) {
-                        productNamesByClaimId[assoc.claim_id] = [];
+                productAssociations.forEach((assoc) => {
+                    const claimId = assoc.claim_id as string;
+                    if (!productNamesByClaimId[claimId]) {
+                        productNamesByClaimId[claimId] = [];
                     }
                     if (assoc.products && typeof assoc.products === 'object' && 'name' in assoc.products) {
-                        productNamesByClaimId[assoc.claim_id].push(assoc.products.name);
+                        productNamesByClaimId[claimId].push((assoc.products as Record<string, unknown>).name as string);
                     }
                 });
             }

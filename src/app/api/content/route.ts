@@ -387,7 +387,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User) => 
       }
     }
 
-    const newContentPayload: any = { // TODO: Type as TablesInsert<'content'> when types are regenerated
+    const newContentPayload: Record<string, unknown> = { // TODO: Type as TablesInsert<'content'> when types are regenerated
       brand_id: data.brand_id,
       title: data.title,
       body: data.body,
@@ -405,7 +405,21 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User) => 
 
     const { data: newContentData, error: newContentError } = await supabase
       .from('content')
-      .insert(newContentPayload)
+      .insert({
+        brand_id: data.brand_id,
+        title: data.title,
+        body: data.body,
+        meta_title: data.meta_title || null,
+        meta_description: data.meta_description || null,
+        content_type_id: data.content_type_id || null,
+        template_id: data.template_id || null,
+        created_by: user.id,
+        workflow_id: data.workflow_id || null,
+        current_step: currentWorkflowStepId,
+        assigned_to: assignedToUsersForContent,
+        status: data.status || 'draft',
+        content_data: data.content_data || {},
+      })
       .select()
       .single();
 

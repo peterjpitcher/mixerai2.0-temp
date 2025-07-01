@@ -69,7 +69,7 @@ export const POST = withCSRF(async function (request: NextRequest) {
     switch (body.type) {
       case 'task_assignment': {
         // Check if user wants workflow assignment emails
-        const emailPrefs = profile?.email_preferences as any || {};
+        const emailPrefs = (profile?.email_preferences as Record<string, unknown>) || {};
         if (emailPrefs.workflow_assigned === false) {
           return NextResponse.json(
             { success: true, message: 'User has disabled workflow assignment emails' },
@@ -124,7 +124,7 @@ export const POST = withCSRF(async function (request: NextRequest) {
       
       case 'workflow_action': {
         // Check if user wants workflow action emails
-        const emailPrefs = profile?.email_preferences as any || {};
+        const emailPrefs = (profile?.email_preferences as Record<string, unknown>) || {};
         const prefKey = body.action === 'approved' ? 'content_approved' : 'content_rejected';
         if (emailPrefs[prefKey] === false) {
           return NextResponse.json(
@@ -179,11 +179,11 @@ export const POST = withCSRF(async function (request: NextRequest) {
           userName: creatorName,
           appUrl,
           contentTitle: content.title,
-          brandName: (content.brands as any)?.name || 'Unknown Brand',
+          brandName: (content.brands as Record<string, unknown>)?.name as string || 'Unknown Brand',
           action: body.action,
           feedback: body.feedback,
           reviewerName: userName || 'Reviewer',
-          nextStep: body.action === 'approved' ? (content.workflow_steps as any)?.name : undefined
+          nextStep: body.action === 'approved' ? (content.workflow_steps as Record<string, unknown>)?.name as string : undefined
         });
         
         await sendEmail({
@@ -196,7 +196,7 @@ export const POST = withCSRF(async function (request: NextRequest) {
       
       case 'deadline_reminder': {
         // Check if user wants deadline reminder emails
-        const emailPrefs = profile?.email_preferences as any || {};
+        const emailPrefs = (profile?.email_preferences as Record<string, unknown>) || {};
         if (emailPrefs.deadline_reminders === false) {
           return NextResponse.json(
             { success: true, message: 'User has disabled deadline reminder emails' },
@@ -240,8 +240,8 @@ export const POST = withCSRF(async function (request: NextRequest) {
           userName: userName || 'User',
           appUrl,
           contentTitle: content.title,
-          brandName: (content.brands as any)?.name || 'Unknown Brand',
-          workflowStep: (content.workflow_steps as any)?.name || 'Unknown Step',
+          brandName: (content.brands as Record<string, unknown>)?.name as string || 'Unknown Brand',
+          workflowStep: (content.workflow_steps as Record<string, unknown>)?.name as string || 'Unknown Step',
           dueDate: format(new Date(content.due_date), 'MMM dd, yyyy')
         });
         

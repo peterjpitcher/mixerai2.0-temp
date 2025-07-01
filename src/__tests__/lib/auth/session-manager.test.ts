@@ -10,7 +10,7 @@ import {
 // Mock crypto.randomUUID
 global.crypto = {
   randomUUID: jest.fn(() => 'test-session-id-' + Date.now())
-} as any;
+} as unknown as Crypto;
 
 describe('Session Manager', () => {
   const testUserId = 'user-123';

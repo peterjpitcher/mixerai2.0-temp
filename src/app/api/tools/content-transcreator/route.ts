@@ -3,8 +3,7 @@ import { transCreateContent } from '@/lib/azure/openai';
 import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-// import { Database, Json } from '@/types/supabase';
- // TODO: Uncomment when types are regenerated
+import { Json } from '@/types/supabase';
 
 // In-memory rate limiting
 const rateLimit = new Map<string, { count: number, timestamp: number }>();
@@ -55,14 +54,14 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
         await supabaseAdmin.from('tool_run_history').insert({
             user_id: user.id,
             tool_name: 'content_transcreator',
-            inputs: { error: 'Rate limit exceeded for initial request' } as any, // TODO: Type as Json when types are regenerated
-            outputs: { error: 'Rate limit exceeded' } as any, // TODO: Type as Json when types are regenerated
+            inputs: { error: 'Rate limit exceeded for initial request' } as unknown as Json,
+            outputs: { error: 'Rate limit exceeded' } as unknown as Json,
             status: historyEntryStatus,
             error_message: historyErrorMessage,
             brand_id: data.brand_id,
             batch_id: data.batch_id || null,
             batch_sequence: data.batch_sequence || null
-        } as any); // TODO: Type as Database['public']['Tables']['tool_run_history']['Insert'] when types are regenerated
+        });
       } catch (logError) {
         console.error('[HistoryLoggingError] Failed to log rate limit error for content-transcreator:', logError);
       }
@@ -172,27 +171,27 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
         await supabaseAdmin.from('tool_run_history').insert({
             user_id: user.id,
             tool_name: 'content_transcreator',
-            inputs: apiInputs as any, // TODO: Type as Json when types are regenerated
-            outputs: apiOutputs as any || { error: historyErrorMessage || 'Unknown error before output generation' }, // TODO: Type as Json when types are regenerated
+            inputs: apiInputs as unknown as Json,
+            outputs: ((apiOutputs as unknown as Json) || { error: historyErrorMessage || 'Unknown error before output generation' } as Json),
             status: historyEntryStatus,
             error_message: historyErrorMessage,
             brand_id: data.brand_id,
             batch_id: data.batch_id || null,
             batch_sequence: data.batch_sequence || null
-        } as any); // TODO: Type as Database['public']['Tables']['tool_run_history']['Insert'] when types are regenerated
+        });
       } else {
         if (historyEntryStatus === 'failure' && historyErrorMessage) {
              await supabaseAdmin.from('tool_run_history').insert({
                 user_id: user.id,
                 tool_name: 'content_transcreator',
-                inputs: { error: 'Failed to parse request or early error' } as any, // TODO: Type as Json when types are regenerated
-                outputs: { error: historyErrorMessage } as any, // TODO: Type as Json when types are regenerated
+                inputs: { error: 'Failed to parse request or early error' } as unknown as Json,
+                outputs: { error: historyErrorMessage } as unknown as Json,
                 status: 'failure',
                 error_message: historyErrorMessage,
                 brand_id: null,
                 batch_id: null,
                 batch_sequence: null
-            } as any); // TODO: Type as Database['public']['Tables']['tool_run_history']['Insert'] when types are regenerated
+            });
         }
       }
     } catch (logError) {

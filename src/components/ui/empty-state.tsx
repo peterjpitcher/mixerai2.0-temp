@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 import { LucideIcon } from 'lucide-react';
+import { TYPOGRAPHY } from '@/lib/utils/ui-standards';
 
 interface EmptyStateProps {
   icon?: LucideIcon;
@@ -17,16 +18,20 @@ export function EmptyState({
   className 
 }: EmptyStateProps) {
   return (
-    <div className={cn("text-center py-8", className)}>
+    <div className={cn(
+      "flex flex-col items-center justify-center text-center",
+      "py-12 px-6 sm:px-8",
+      className
+    )}>
       {Icon && (
-        <Icon className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+        <Icon className="h-12 w-12 text-muted-foreground mb-4" aria-hidden="true" />
       )}
       {title && (
-        <h3 className="text-lg font-medium text-foreground mb-2">{title}</h3>
+        <h3 className={cn(TYPOGRAPHY.h3, "mb-2")}>{title}</h3>
       )}
-      <p className="text-muted-foreground">{message}</p>
+      <p className={cn(TYPOGRAPHY.body, "text-muted-foreground max-w-md")}>{message}</p>
       {action && (
-        <div className="mt-4">
+        <div className="mt-6">
           {action}
         </div>
       )}

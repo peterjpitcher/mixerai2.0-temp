@@ -6,11 +6,11 @@ export const dynamic = "force-dynamic";
 
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
-import { v4 as uuidv4 } from 'uuid';
+// import { v4 as uuidv4 } from 'uuid'; - not used
 import { withAuth } from '@/lib/auth/api-auth';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { verifyEmailTemplates } from '@/lib/auth/email-templates';
-// import type { Json } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
+import type { Json } from '@/types/supabase';
 import { z } from 'zod';
 import { validateRequest, commonSchemas } from '@/lib/api/validation';
 
@@ -337,9 +337,9 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
     const rpcParams = {
       p_name: String(body.name),
       p_brand_id: String(body.brand_id),
-      p_steps_definition: processedStepsForRPC as any, // TODO: Type as Json when types are regenerated
+      p_steps_definition: processedStepsForRPC as unknown as Json,
       p_created_by: user.id,
-      p_invitation_items: invitationItems as any // TODO: Type as Json when types are regenerated
+      p_invitation_items: invitationItems as unknown as Json
     };
 
     const { data: newWorkflowId, error: rpcError } = await supabase.rpc(

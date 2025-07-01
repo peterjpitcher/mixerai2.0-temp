@@ -22,7 +22,7 @@ export async function GET() {
       .eq('id', user.id)
       .single();
       
-    const emailPrefs = profile?.email_preferences as any || {};
+    const emailPrefs = (profile?.email_preferences as Record<string, unknown>) || {};
     const settings = {
       emailNotifications: profile?.email_notifications_enabled ?? true,
       contentUpdates: emailPrefs.content_approved !== false && emailPrefs.content_rejected !== false,

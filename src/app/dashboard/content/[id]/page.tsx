@@ -14,6 +14,8 @@ import { createBrowserClient } from '@supabase/ssr';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandIcon,  } from '@/components/brand-icon';
 import { ArrowLeft, Edit3, MessageSquare, CheckCircle, XCircle, Clock, UserCircle } from 'lucide-react';
+import { RestartWorkflowButton } from '@/components/content/restart-workflow-button';
+import { RejectionFeedbackCard } from '@/components/content/rejection-feedback-card';
 import { format as formatDateFns } from 'date-fns';
 
 interface TemplateOutputField {
@@ -385,7 +387,21 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
           </div>
         </div>
         <div className="flex-shrink-0">
-          {content.status !== 'approved' && content.status !== 'published' ? (
+          {content.status === 'rejected' ? (
+            <div className="flex gap-2">
+              <Button asChild variant="default">
+                <Link href={`${pathname}/edit`}>
+                  <Edit3 className="mr-2 h-4 w-4" /> Edit Content
+                </Link>
+              </Button>
+              <RestartWorkflowButton
+                contentId={content.id}
+                contentTitle={content.title}
+                onRestart={handleWorkflowAction}
+                variant="outline"
+              />
+            </div>
+          ) : content.status !== 'approved' && content.status !== 'published' ? (
             <Button asChild variant="default">
               <Link href={`${pathname}/edit`}>
                 <Edit3 className="mr-2 h-4 w-4" /> Edit Content
@@ -402,6 +418,22 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
         <div className="lg:col-span-2 space-y-6">
+          {content.status === 'rejected' && (() => {
+            // Find the most recent rejection feedback
+            const rejectionVersion = versions
+              .slice()
+              .reverse()
+              .find(v => v.action_status === 'rejected' && v.feedback);
+            
+            return rejectionVersion ? (
+              <RejectionFeedbackCard
+                feedback={rejectionVersion.feedback}
+                reviewerName={rejectionVersion.reviewer?.full_name}
+                rejectedAt={rejectionVersion.created_at}
+              />
+            ) : null;
+          })()}
+          
           <Card>
             <CardHeader>
               <CardTitle>Current Topic: {currentStepObject?.name || `Review Step ${content.current_step || 1}`}</CardTitle>
