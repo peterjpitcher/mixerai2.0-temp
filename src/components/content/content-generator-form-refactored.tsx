@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Loader2, Sparkles, ShieldAlert, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/api-client';
 
 // Import our new components
 import { ContentHeader } from './content-header';
@@ -91,9 +92,8 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         fieldNameToValueMap[inputField.name] = templateFieldValues[inputField.id] || '';
       });
       
-      const response = await fetch('/api/ai/suggest', {
+      const response = await apiFetch('/api/ai/suggest', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           brand_id: selectedBrand,
           prompt: field.aiPrompt,
@@ -142,9 +142,8 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         value: templateFieldValues[field.id] || ''
       }));
 
-      const response = await fetch('/api/content/generate', {
+      const response = await apiFetch('/api/content/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           brand_id: selectedBrand,
           template: {
