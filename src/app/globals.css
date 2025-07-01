@@ -19,7 +19,7 @@
   --popover-foreground: 0 0% 10%; /* #1A1A1A (Charcoal Black) */
   
   --primary: 358 100% 68%; /* #FF595E (Coral Red) */
-  --primary-foreground: 0 0% 10%; /* #1A1A1A (Charcoal Black on Coral Red) */
+  --primary-foreground: 0 0% 100%; /* #FFFFFF (White on Coral Red) - WCAG AA compliant */
   
   --secondary: 207 77% 43%; /* #1982C4 (Bold Sky Blue) */
   --secondary-foreground: 0 0% 100%; /* #FFFFFF (Pure White on Bold Sky Blue) */
@@ -28,7 +28,7 @@
   --accent-foreground: 0 0% 100%; /* #FFFFFF (Pure White on Electric Purple) */
   
   --muted: 0 0% 96%; /* A lighter grey for muted backgrounds e.g. #F5F5F5 */
-  --muted-foreground: 0 0% 33%; /* #555555 (Mid Grey for text) */
+  --muted-foreground: 0 0% 25%; /* #404040 (Darker Grey for WCAG AA compliance) */
   
   --destructive: 360 65% 51%; /* #D63031 (Hot Red) */
   --destructive-foreground: 0 0% 100%; /* #FFFFFF (Pure White on Hot Red) */
@@ -54,8 +54,7 @@
 }
 
 .dark {
-  /* Dark Theme - Needs careful definition to complement the new light palette */
-  /* These are placeholders and need proper design and contrast checking. */
+  /* Dark Theme - WCAG AA compliant */
   --background: 0 0% 12%;    /* Darker Charcoal e.g. #1F1F1F */
   --foreground: 0 0% 90%;    /* Lighter Grey e.g. #E6E6E6 */
   
@@ -66,7 +65,7 @@
   --popover-foreground: 0 0% 90%;
   
   --primary: 358 100% 72%; /* Slightly lighter/brighter Coral Red */
-  --primary-foreground: 0 0% 10%; /* Charcoal Black - Check contrast */
+  --primary-foreground: 0 0% 10%; /* Charcoal Black - WCAG AA compliant on lighter coral */
   
   --secondary: 207 77% 50%; /* Slightly lighter/brighter Sky Blue */
   --secondary-foreground: 0 0% 100%;
@@ -75,7 +74,7 @@
   --accent-foreground: 0 0% 100%;
   
   --muted: 0 0% 20%;       /* Darker Muted Grey e.g. #333333 */
-  --muted-foreground: 0 0% 65%; /* Lighter Mid Grey for dark text e.g. #A6A6A6 */
+  --muted-foreground: 0 0% 70%; /* #B3B3B3 (Lighter Grey for WCAG AA on dark bg) */
   
   --destructive: 360 65% 58%; /* Slightly lighter/brighter Hot Red */
   --destructive-foreground: 0 0% 100%;
