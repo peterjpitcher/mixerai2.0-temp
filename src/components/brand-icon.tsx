@@ -3,6 +3,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { getBestTextColor } from "@/lib/utils/color-contrast";
 
 export interface BrandIconProps {
   name: string | null | undefined;
@@ -60,15 +61,19 @@ export function BrandIcon({
   }
   
   // Otherwise, show initials with background color
+  // Determine the best text color for contrast
+  const textColor = getBestTextColor(color);
+  
   return (
     <div 
       className={cn(
-        "rounded-full flex items-center justify-center font-bold text-white", 
+        "rounded-full flex items-center justify-center font-bold", 
         sizeClasses[size],
         className
       )}
       style={{ 
-        backgroundColor: color
+        backgroundColor: color,
+        color: textColor
       }}
     >
       {initial}
