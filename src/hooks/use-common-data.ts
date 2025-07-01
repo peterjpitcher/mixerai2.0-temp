@@ -42,82 +42,94 @@ interface VettingAgency {
  * Hook to fetch current user data with caching and deduplication
  */
 export function useCurrentUser() {
-  return useQuery({
+  const query = useQuery({
     queryKey: commonQueryKeys.currentUser,
     queryFn: async () => {
-      const response = await apiFetch('/api/me');
-      if (!response.ok) throw new Error('Failed to fetch user session');
-      const data = await response.json();
-      
-      if (data.success && data.user) {
-        return data.user as UserSessionData;
+      try {
+        const response = await apiFetch('/api/me');
+        if (!response.ok) throw new Error('Failed to fetch user session');
+        const data = await response.json();
+        
+        if (data.success && data.user) {
+          return data.user as UserSessionData;
+        }
+        throw new Error('Invalid user data');
+      } catch (error) {
+        console.error('Error fetching current user:', error);
+        toast.error('Could not verify your permissions.');
+        throw error;
       }
-      throw new Error('Invalid user data');
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
     retry: 2,
-    onError: (error: Error) => {
-      console.error('Error fetching current user:', error);
-      toast.error('Could not verify your permissions.');
-    },
   });
+  
+  return query;
 }
 
 /**
  * Hook to fetch master claim brands with caching and deduplication
  */
 export function useMasterClaimBrands() {
-  return useQuery({
+  const query = useQuery({
     queryKey: commonQueryKeys.masterClaimBrands,
     queryFn: async () => {
-      const response = await apiFetch('/api/master-claim-brands');
-      if (!response.ok) throw new Error('Failed to fetch Master Claim Brands');
-      const data = await response.json();
-      
-      if (data.success && Array.isArray(data.data)) {
-        return data.data as MasterClaimBrand[];
+      try {
+        const response = await apiFetch('/api/master-claim-brands');
+        if (!response.ok) throw new Error('Failed to fetch Master Claim Brands');
+        const data = await response.json();
+        
+        if (data.success && Array.isArray(data.data)) {
+          return data.data as MasterClaimBrand[];
+        }
+        throw new Error(data.error || 'Invalid master claim brands data');
+      } catch (error) {
+        console.error('Error fetching Master Claim Brands:', error);
+        toast.error('Failed to fetch Master Claim Brands list.');
+        throw error;
       }
-      throw new Error(data.error || 'Invalid master claim brands data');
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 15 * 60 * 1000, // 15 minutes
     retry: 2,
-    onError: (error: Error) => {
-      console.error('Error fetching Master Claim Brands:', error);
-      toast.error('Failed to fetch Master Claim Brands list.');
-    },
   });
+  
+  return query;
 }
 
 /**
  * Hook to fetch vetting agencies with caching and deduplication
  */
 export function useVettingAgencies() {
-  return useQuery({
+  const query = useQuery({
     queryKey: commonQueryKeys.vettingAgencies,
     queryFn: async () => {
-      const response = await apiFetch('/api/content-vetting-agencies');
-      if (!response.ok) throw new Error('Failed to fetch vetting agencies');
-      const data = await response.json();
-      
-      if (data.success && Array.isArray(data.data)) {
-        // Transform numeric priority to string labels
-        return data.data.map((agency: any) => ({
-          ...agency,
-          priority: mapNumericPriorityToLabel(agency.priority),
-        })) as VettingAgency[];
+      try {
+        const response = await apiFetch('/api/content-vetting-agencies');
+        if (!response.ok) throw new Error('Failed to fetch vetting agencies');
+        const data = await response.json();
+        
+        if (data.success && Array.isArray(data.data)) {
+          // Transform numeric priority to string labels
+          return data.data.map((agency: any) => ({
+            ...agency,
+            priority: mapNumericPriorityToLabel(agency.priority),
+          })) as VettingAgency[];
+        }
+        throw new Error(data.error || 'Invalid vetting agencies data');
+      } catch (error) {
+        console.error('Error fetching vetting agencies:', error);
+        toast.error('Failed to fetch vetting agencies list.');
+        throw error;
       }
-      throw new Error(data.error || 'Invalid vetting agencies data');
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 15 * 60 * 1000, // 15 minutes
     retry: 2,
-    onError: (error: Error) => {
-      console.error('Error fetching vetting agencies:', error);
-      toast.error('Failed to fetch vetting agencies list.');
-    },
   });
+  
+  return query;
 }
 
 // Helper function to map numeric priority to string label
