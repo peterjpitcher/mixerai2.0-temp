@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Save } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { apiFetch } from '@/lib/api-client';
 
 interface MasterClaimBrandFormData { 
   name: string;
@@ -51,7 +52,7 @@ export default function NewMasterClaimBrandPage() {
 
     setIsSaving(true);
     try {
-      const response = await fetch('/api/master-claim-brands', { 
+      const response = await apiFetch('/api/master-claim-brands', { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

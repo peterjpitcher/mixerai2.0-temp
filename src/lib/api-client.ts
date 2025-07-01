@@ -11,11 +11,24 @@
 function getCSRFToken(): string | null {
   if (typeof document === 'undefined') return null;
   
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; csrf-token=`);
-  if (parts.length === 2) {
-    return parts.pop()?.split(';').shift() || null;
+  // Use regex to extract csrf-token from cookie string
+  const csrfMatch = document.cookie.match(/(?:^|;\s*)csrf-token=([^;]+)/);
+  if (csrfMatch && csrfMatch[1]) {
+    return csrfMatch[1];
   }
+  
+  // Fallback: split and parse cookies manually
+  const cookies = document.cookie.split(';');
+  
+  for (const cookie of cookies) {
+    const trimmedCookie = cookie.trim();
+    const [name, value] = trimmedCookie.split('=');
+    
+    if (name === 'csrf-token' && value) {
+      return value;
+    }
+  }
+  
   return null;
 }
 

@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea"; // Added for description
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Save,  } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { apiFetch } from '@/lib/api-client';
 
 interface IngredientFormData {
   name: string;
@@ -53,7 +54,7 @@ export default function NewIngredientPage() {
 
     setIsSaving(true);
     try {
-      const response = await fetch('/api/ingredients', {
+      const response = await apiFetch('/api/ingredients', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

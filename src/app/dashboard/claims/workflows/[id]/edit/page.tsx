@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { cn } from '@/lib/utils';
 import { debounce } from 'lodash';
+import { apiFetch } from '@/lib/api-client';
 
 interface WorkflowStep {
   id: string;
@@ -281,7 +282,7 @@ export default function EditClaimsWorkflowPage() {
     setStepDescLoading(prev => ({ ...prev, [stepIndex]: true }));
     try {
       const step = steps[stepIndex];
-      const response = await fetch('/api/ai/generate-step-description', {
+      const response = await apiFetch('/api/ai/generate-step-description', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -404,7 +405,7 @@ export default function EditClaimsWorkflowPage() {
         })),
       };
 
-      const response = await fetch(`/api/claims/workflows/${workflowId}`, {
+      const response = await apiFetch(`/api/claims/workflows/${workflowId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 // import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { apiFetch } from "@/lib/api-client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Save,  } from "lucide-react";
@@ -171,7 +172,7 @@ export default function NewClaimPage() {
     if (formData.level === 'ingredient') payload.ingredient_id = formData.ingredient_id;
 
     try {
-      const response = await fetch('/api/claims', {
+      const response = await apiFetch('/api/claims', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

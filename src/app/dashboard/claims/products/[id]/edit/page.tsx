@@ -18,6 +18,7 @@ import {
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 import { ALL_COUNTRIES_CODE, ALL_COUNTRIES_NAME } from '@/lib/constants/country-codes';
+import { apiFetch } from '@/lib/api-client';
 import { Claim, ClaimTypeEnum, ClaimLevelEnum } from "@/lib/claims-utils"; // Import from claims-utils
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -319,7 +320,7 @@ export default function EditProductPage() {
     setIsSaving(true);
     try {
       // 1. Update Product Details
-      const productUpdateResponse = await fetch(`/api/products/${id}`, {
+      const productUpdateResponse = await apiFetch(`/api/products/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData), 
@@ -335,7 +336,7 @@ export default function EditProductPage() {
       const ingredientsToRemove = initialSelectedIngredientIds.filter(ingId => !selectedIngredientIds.includes(ingId));
 
       const addPromises = ingredientsToAdd.map(ingredientId => 
-        fetch('/api/product-ingredients', {
+        apiFetch('/api/product-ingredients', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ product_id: id, ingredient_id: ingredientId }),
@@ -349,7 +350,7 @@ export default function EditProductPage() {
       );
 
       const removePromises = ingredientsToRemove.map(ingredientId =>
-        fetch('/api/product-ingredients', { 
+        apiFetch('/api/product-ingredients', { 
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ product_id: id, ingredient_id: ingredientId }),

@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Save,  } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { apiFetch } from '@/lib/api-client';
 
 interface ProductFormData {
   name: string;
@@ -100,7 +101,7 @@ export default function NewProductPage() {
 
     setIsSaving(true);
     try {
-      const response = await fetch('/api/products', {
+      const response = await apiFetch('/api/products', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

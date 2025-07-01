@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { TableSkeleton } from '@/components/ui/loading-skeletons';
+import { apiFetch } from '@/lib/api-client';
 
 interface ClaimsWorkflow {
   id: string;
@@ -89,7 +90,7 @@ export default function ClaimsWorkflowsPage() {
 
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/claims/workflows/${workflowToDelete.id}`, {
+      const response = await apiFetch(`/api/claims/workflows/${workflowToDelete.id}`, {
         method: 'DELETE',
       });
       const data = await response.json();

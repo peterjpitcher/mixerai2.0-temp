@@ -30,6 +30,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
+import { apiFetch } from '@/lib/api-client';
 
 
 interface AltTextResultItem {
@@ -319,7 +320,7 @@ export default function AltTextGeneratorPage() {
 
     try {
       // Send all image URLs at once as a batch
-      const response = await fetch('/api/tools/alt-text-generator', {
+      const response = await apiFetch('/api/tools/alt-text-generator', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

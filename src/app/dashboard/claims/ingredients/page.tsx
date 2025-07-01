@@ -28,6 +28,7 @@ import { Trash2, PlusCircle, Search, AlertTriangle, Loader2, Sprout, Pencil, Mor
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { touchFriendly } from '@/lib/utils/touch-target';
+import { apiFetch } from '@/lib/api-client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -89,7 +90,7 @@ export default function IngredientsPage() {
 
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/ingredients/${itemToDelete.id}`, {
+      const response = await apiFetch(`/api/ingredients/${itemToDelete.id}`, {
         method: 'DELETE',
       });
       const data = await response.json();

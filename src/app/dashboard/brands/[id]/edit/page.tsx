@@ -18,6 +18,7 @@ import { useAutoSave } from '@/hooks/use-auto-save';
 import { SaveStatusIndicator } from '@/components/ui/save-status';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 import { Checkbox } from '@/components/ui/checkbox';
+import { apiFetch } from '@/lib/api-client';
 import { v4 as uuidv4 } from 'uuid';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
@@ -363,7 +364,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     setIsGenerating(true);
     toast.info('Generating brand identity...');
     try {
-      const response = await fetch('/api/brands/identity', {
+      const response = await apiFetch('/api/brands/identity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

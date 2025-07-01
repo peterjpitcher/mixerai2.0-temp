@@ -13,6 +13,7 @@ import { Loader2, ArrowLeft, Save, AlertTriangle,  } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { apiFetch } from '@/lib/api-client';
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Ingredient {
@@ -168,7 +169,7 @@ export default function EditIngredientPage() {
     setIsSaving(true);
     try {
       // 1. Update Ingredient Details
-      const ingredientUpdateResponse = await fetch(`/api/ingredients/${id}`, {
+      const ingredientUpdateResponse = await apiFetch(`/api/ingredients/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -191,7 +192,7 @@ export default function EditIngredientPage() {
       const productsToRemove = initialSelectedProductIds.filter(pid => !selectedProductIds.includes(pid));
 
       const addPromises = productsToAdd.map(productId => 
-        fetch(`/api/product-ingredients`, {
+        apiFetch(`/api/product-ingredients`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ product_id: productId, ingredient_id: id }),
@@ -205,7 +206,7 @@ export default function EditIngredientPage() {
       );
 
       const removePromises = productsToRemove.map(productId =>
-        fetch(`/api/product-ingredients`, { 
+        apiFetch(`/api/product-ingredients`, { 
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ product_id: productId, ingredient_id: id }),
