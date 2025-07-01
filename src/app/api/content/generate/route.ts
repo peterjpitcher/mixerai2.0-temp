@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateContentFromTemplate } from '@/lib/azure/openai';
-import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
+import { withAuthMonitoringAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import type { StyledClaims } from '@/types/claims';
@@ -43,7 +43,7 @@ interface ContentGenerationRequest {
   };
 }
 
-export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
+export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user) => {
   try {
     const data: ContentGenerationRequest = await request.json();
     

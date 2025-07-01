@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { Database } from '@/types/supabase';
 import { User } from '@supabase/supabase-js';
+import { withCSRF } from '@/lib/api/with-csrf';
 
 /**
  * Wrapper for Next.js App Router route handlers that require authentication
@@ -67,4 +68,17 @@ export function withRouteAuth(
       );
     }
   };
+}
+
+/**
+ * Wrapper for Next.js App Router route handlers that require authentication and CSRF protection
+ * Specifically designed for dynamic routes with URL parameters
+ * 
+ * @param handler The API route handler function that requires authentication
+ * @returns A new route handler with authentication and CSRF protection
+ */
+export function withRouteAuthAndCSRF(
+  handler: (req: NextRequest, user: User, context: Record<string, unknown>) => Promise<Response>
+) {
+  return withCSRF(withRouteAuth(handler));
 } 

@@ -2,7 +2,7 @@
 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BrandIcon } from '@/components/brand-icon';
+import { BrandDisplay } from '@/components/ui/brand-display';
 
 interface Brand {
   id: string;
@@ -44,30 +44,32 @@ export function BrandSelector({
         <SelectTrigger id="brand" className="w-full">
           <SelectValue placeholder={isLoading ? "Loading brands..." : "Select a brand"}>
             {selectedBrandData && (
-              <div className="flex items-center gap-2">
-                <BrandIcon 
-                  name={selectedBrandData.name} 
-                  color={selectedBrandData.brand_color}
-                  logoUrl={selectedBrandData.logo_url}
-                  size="sm"
-                />
-                <span>{selectedBrandData.name}</span>
-              </div>
+              <BrandDisplay
+                brand={{
+                  id: selectedBrandData.id,
+                  name: selectedBrandData.name,
+                  brand_color: selectedBrandData.brand_color,
+                  logo_url: selectedBrandData.logo_url
+                }}
+                variant="inline"
+                size="sm"
+              />
             )}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {brands.map((brand) => (
             <SelectItem key={brand.id} value={brand.id}>
-              <div className="flex items-center gap-2">
-                <BrandIcon 
-                  name={brand.name} 
-                  color={brand.brand_color}
-                  logoUrl={brand.logo_url}
-                  size="sm"
-                />
-                <span>{brand.name}</span>
-              </div>
+              <BrandDisplay
+                brand={{
+                  id: brand.id,
+                  name: brand.name,
+                  brand_color: brand.brand_color,
+                  logo_url: brand.logo_url
+                }}
+                variant="inline"
+                size="sm"
+              />
             </SelectItem>
           ))}
         </SelectContent>

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/auth/api-auth';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { requiresReauthentication } from '@/lib/auth/session-manager';
 
-export const POST = withAuth(async (req: NextRequest, user) => {
+export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
   try {
     const body = await req.json();
     const { operation } = body;

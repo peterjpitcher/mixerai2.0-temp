@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
 import { ApiError, PostgresError, isPostgresError } from '@/types/api';
+import { isRLSError } from '@/lib/api/rls-helpers';
 
 /**
  * Get environment mode (development, production, test)
@@ -125,6 +126,25 @@ export const handleApiError = (
         isFallback: true,
       },
       { status: 503 } // Service Unavailable
+    );
+  }
+  
+  // Check for RLS (Row Level Security) errors
+  if (isRLSError(error)) {
+    console.error('[RLS Policy Violation]', {
+      message,
+      errorDetails,
+      originalError: error
+    });
+    
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'You do not have permission to perform this action.',
+        code: 'PERMISSION_DENIED',
+        details: isProduction() ? undefined : errorDetails.message
+      },
+      { status: 403 } // Forbidden
     );
   }
   

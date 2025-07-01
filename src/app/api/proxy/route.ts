@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
+import { withAuthMonitoringAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import dns from 'dns';
 import ipaddr from 'ipaddr.js'; // Using ipaddr.js for robust IP checking
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * MITIGATION: Basic SSRF protection implemented by blocking requests to private/reserved IP ranges.
  * RECOMMENDATION: For enhanced security, replace this basic check with a strict allowlist of permitted target domains/protocols.
  */
-export const GET = withAuthAndMonitoring(async (request: NextRequest) => {
+export const GET = withAuthMonitoringAndCSRF(async (request: NextRequest) => {
   try {
     const urlToProxy = request.nextUrl.searchParams.get('url');
     

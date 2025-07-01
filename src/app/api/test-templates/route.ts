@@ -85,6 +85,13 @@ const mockTemplates = [
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const GET = withAdminAuth(async (request: NextRequest, _user: User) => {
+  // Restrict to development environment only
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json(
+      { success: false, error: 'Not found' },
+      { status: 404 }
+    );
+  }
   // Console.log removed
   try {
     const url = new URL(request.url);

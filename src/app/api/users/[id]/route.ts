@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
-import { withRouteAuth } from '@/lib/auth/route-handlers';
+import { withRouteAuth, withRouteAuthAndCSRF } from '@/lib/auth/route-handlers';
 import { User } from '@supabase/supabase-js';
-// import { withCSRF } from '@/lib/api/with-csrf'; - not used
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
 
@@ -47,7 +46,7 @@ export const GET = withRouteAuth(async (_request: NextRequest, user: User, conte
 });
 
 // Update user
-export const PUT = withRouteAuth(async (request: NextRequest, user: User, context: Record<string, unknown>) => {
+export const PUT = withRouteAuthAndCSRF(async (request: NextRequest, user: User, context: Record<string, unknown>) => {
   const { params } = context as { params: { id: string } };
   try {
     const supabase = createSupabaseAdminClient();
@@ -132,7 +131,7 @@ export const PUT = withRouteAuth(async (request: NextRequest, user: User, contex
 });
 
 // Delete user
-export const DELETE = withRouteAuth(async (_request: NextRequest, user: User, context: Record<string, unknown>) => {
+export const DELETE = withRouteAuthAndCSRF(async (_request: NextRequest, user: User, context: Record<string, unknown>) => {
   const { params } = context as { params: { id: string } };
   try {
     const supabase = createSupabaseAdminClient();

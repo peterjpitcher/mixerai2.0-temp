@@ -1,22 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { z } from 'zod';
-import { withCSRF } from '@/lib/api/with-csrf';
+import { withAuthAndCSRF } from '@/lib/auth/api-auth';
+import { User } from '@supabase/supabase-js';
 
 const markReadSchema = z.object({
   notificationId: z.string().uuid().optional(),
   markAll: z.boolean().optional(),
 });
 
-export const PUT = withCSRF(async function (request: NextRequest) {
+export const PUT = withAuthAndCSRF(async function (request: NextRequest, user: User) {
   try {
     const supabase = createSupabaseServerClient();
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
 
     const body = await request.json();
     const { notificationId, markAll } = markReadSchema.parse(body);

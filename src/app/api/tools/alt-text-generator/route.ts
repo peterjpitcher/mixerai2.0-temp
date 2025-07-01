@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateAltText } from '@/lib/azure/openai';
-import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
+import { withAuthMonitoringAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { Json } from '@/types/supabase';
@@ -76,7 +76,7 @@ function getLangCountryFromUrl(imageUrl: string): { language: string; country: s
   return getDefaultLangCountry();
 }
 
-export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
+export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user) => {
   const supabaseAdmin = createSupabaseAdminClient();
   let historyEntryStatus: 'success' | 'failure' = 'success';
   let historyErrorMessage: string | undefined = undefined;

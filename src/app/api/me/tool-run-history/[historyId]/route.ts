@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
+import { withAuthMonitoringAndCSRF } from '@/lib/auth/api-auth';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { User } from '@supabase/supabase-js';
 
@@ -9,7 +9,7 @@ interface RouteParams {
   };
 }
 
-export const GET = withAuthAndMonitoring(async (request: NextRequest, user: User, context?: unknown) => {
+export const GET = withAuthMonitoringAndCSRF(async (request: NextRequest, user: User, context?: unknown) => {
   const { params } = context as RouteParams;
   try {
     const supabase = createSupabaseServerClient();

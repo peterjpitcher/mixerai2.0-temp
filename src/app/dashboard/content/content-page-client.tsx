@@ -14,7 +14,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { createBrowserClient } from '@supabase/ssr';
 
 import { PageHeader } from "@/components/dashboard/page-header";
-import { BrandIcon } from '@/components/brand-icon'; 
+import { BrandDisplay } from '@/components/ui/brand-display'; 
 import { FileText, AlertTriangle, PlusCircle, Edit3, RefreshCw, CheckCircle, XCircle, ListFilter, Archive, Trash2, HelpCircle, MoreVertical, Pencil } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { TableSkeleton } from '@/components/ui/loading-skeletons';
@@ -383,10 +383,13 @@ export default function ContentPageClient() {
               <AccordionTrigger className="bg-muted hover:bg-muted/90 px-4 py-3">
                 <div className="flex items-center">
                   {items.length > 0 && 
-                    <BrandIcon 
-                      name={brandName} 
-                      color={items[0].brand_color ?? undefined}
-                      logoUrl={items[0].brand_logo_url} 
+                    <BrandDisplay 
+                      brand={{
+                        name: brandName,
+                        brand_color: items[0].brand_color,
+                        logo_url: items[0].brand_logo_url
+                      }}
+                      variant="compact"
                       size="sm" 
                       className="mr-2" 
                     />}

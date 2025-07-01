@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 // import { Database } from '@/types/supabase';
-import { withCSRF } from '@/lib/api/with-csrf'; // TODO: Uncomment when types are regenerated
+import { withAdminAuthAndCSRF } from '@/lib/auth/api-auth';
+import { User } from '@supabase/supabase-js';
 
 // Initialize Supabase client with SERVICE_ROLE_KEY for admin actions
 // Ensure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in your environment variables
@@ -10,7 +11,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
-export const POST = withCSRF(async function (request: Request) {
+export const POST = withAdminAuthAndCSRF(async function (request: NextRequest, _user: User) {
   try {
     const { email } = await request.json();
 

@@ -4,7 +4,8 @@ import { handleApiError } from '@/lib/api-utils';
 import { sendEmail } from '@/lib/email/resend';
 import { taskAssignmentTemplate, workflowActionTemplate, deadlineReminderTemplate } from '@/lib/email/templates';
 import { format } from 'date-fns';
-import { withCSRF } from '@/lib/api/with-csrf';
+import { withAuthAndCSRF } from '@/lib/auth/api-auth';
+import { User } from '@supabase/supabase-js';
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,8 @@ interface EmailNotificationRequest {
   feedback?: string;
 }
 
-export const POST = withCSRF(async function (request: NextRequest) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const POST = withAuthAndCSRF(async function (request: NextRequest, _user: User) {
   try {
     const body: EmailNotificationRequest = await request.json();
     

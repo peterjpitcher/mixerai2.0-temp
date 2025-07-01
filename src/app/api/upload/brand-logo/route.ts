@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/auth/api-auth';
+import { withAuthAndCSRF } from '@/lib/auth/api-auth';
 import { withFileUploadValidation } from '@/lib/api/middleware/file-upload';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { sanitizeFileName } from '@/lib/validation/file-upload';
@@ -7,7 +7,7 @@ import { sanitizeFileName } from '@/lib/validation/file-upload';
 /**
  * Upload brand logo endpoint with comprehensive file validation
  */
-export const POST = withAuth(async (req: NextRequest, user) => {
+export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
   const uploadHandler = withFileUploadValidation(
     async (req: NextRequest, file: File) => {
       try {

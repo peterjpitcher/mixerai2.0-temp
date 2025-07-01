@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from '@/components/ui/button';
-import { BrandIcon } from "@/components/brand-icon";
+import { BrandCell } from "@/components/ui/brand-display";
 import { COUNTRIES, LANGUAGES } from "@/lib/constants";
 import { PackageOpen, AlertTriangle, Eye, Pencil, Trash2, Plus, MoreVertical } from "lucide-react";
 import { toast } from 'sonner';
@@ -114,15 +114,16 @@ export default function BrandsPage() {
       id: "name",
       header: "Brand",
       cell: ({ row }) => (
-        <div className="flex items-center gap-3">
-          <BrandIcon 
-            name={row.name} 
-            color={row.brand_color}
-            logoUrl={row.logo_url} 
-            size="sm"
-          />
-          <div className="font-medium">{row.name}</div>
-        </div>
+        <BrandCell 
+          brand={{
+            id: row.id,
+            name: row.name,
+            brand_color: row.brand_color,
+            logo_url: row.logo_url,
+            country: row.country,
+            language: row.language
+          }}
+        />
       ),
       enableSorting: true,
     },

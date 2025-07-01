@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateMetadata } from '@/lib/azure/openai';
-import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
+import { withAuthMonitoringAndCSRF } from '@/lib/auth/api-auth';
 import { fetchWebPageContent } from '@/lib/utils/web-scraper';
 import { handleApiError } from '@/lib/api-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
@@ -31,7 +31,7 @@ interface MetadataResultItem {
 // export async function POST(request: NextRequest) { ... } // Content of this function is removed for brevity
 
 // Keep the original authenticated route - RENAMING to POST
-export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
+export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user) => {
   const supabaseAdmin = createSupabaseAdminClient();
   let historyEntryStatus: 'success' | 'failure' = 'success';
   let historyErrorMessage: string | undefined = undefined;

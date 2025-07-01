@@ -3,7 +3,7 @@ import { generateMetadata } from '@/lib/azure/openai';
 import { fetchWebPageContent } from '@/lib/utils/web-scraper';
 import { handleApiError } from '@/lib/api-utils'; // Import for consistent error handling
 // import { withAuth } from '@/lib/auth/api-auth'; // No longer used
-import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
+import { withAdminAuthAndCSRF } from '@/lib/auth/api-auth'; // Use withAdminAuthAndCSRF
 import { User } from '@supabase/supabase-js';
 
 // WARNING: This is a test endpoint that allows calls to Azure OpenAI services.
@@ -21,7 +21,7 @@ interface MetadataGenerationRequest {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export const POST = withAdminAuth(async (request: NextRequest, _user: User) => {
+export const POST = withAdminAuthAndCSRF(async (request: NextRequest, _user: User) => {
   // console.log removed
   try {
     const data: MetadataGenerationRequest = await request.json();

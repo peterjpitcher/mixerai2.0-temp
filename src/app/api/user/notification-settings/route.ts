@@ -1,19 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { withCSRF } from '@/lib/api/with-csrf';
+import { withAuthAndCSRF } from '@/lib/auth/api-auth';
+import { User } from '@supabase/supabase-js';
 
-export async function GET() {
+export const GET = withAuthAndCSRF(async function (req: NextRequest, user: User) {
   try {
     const supabase = createSupabaseServerClient();
-    
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
 
     // Get user's notification preferences from profile
     const { data: profile } = await supabase
@@ -45,21 +37,12 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
+});
 
-export const POST = withCSRF(async function (request: NextRequest) {
+export const POST = withAuthAndCSRF(async function (request: NextRequest, user: User) {
   try {
     const supabase = createSupabaseServerClient();
     const body = await request.json();
-    
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
 
     const emailPreferences = {
       content_approved: body.contentUpdates ?? true,
@@ -104,19 +87,10 @@ export const POST = withCSRF(async function (request: NextRequest) {
   }
 });
 
-export const PATCH = withCSRF(async function (request: NextRequest) {
+export const PATCH = withAuthAndCSRF(async function (request: NextRequest, user: User) {
   try {
     const supabase = createSupabaseServerClient();
     const body = await request.json();
-    
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
 
     const updatedSettings = {
       emailNotifications: body.emailNotifications ?? true,

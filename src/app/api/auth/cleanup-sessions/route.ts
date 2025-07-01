@@ -5,12 +5,22 @@ import { cleanupExpiredSessions } from '@/lib/auth/session-manager';
 // to clean up expired sessions
 export async function POST(req: NextRequest) {
   try {
-    // Simple security check - in production, use a more secure method
-    // like verifying a secret key or checking if request comes from an internal service
+    // Security check - ensure proper authorization
     const authHeader = req.headers.get('authorization');
-    const expectedToken = process.env.INTERNAL_API_KEY || 'development-only-token';
+    const expectedToken = process.env.INTERNAL_API_KEY;
     
-    if (authHeader !== `Bearer ${expectedToken}`) {
+    // In production, require a proper internal API key
+    if (process.env.NODE_ENV === 'production' && !expectedToken) {
+      console.error('INTERNAL_API_KEY not configured for session cleanup endpoint');
+      return NextResponse.json(
+        { success: false, error: 'Service unavailable' },
+        { status: 503 }
+      );
+    }
+    
+    // Verify the authorization token
+    const providedToken = authHeader?.replace('Bearer ', '');
+    if (!providedToken || providedToken !== expectedToken) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
