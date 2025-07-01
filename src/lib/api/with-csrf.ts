@@ -36,12 +36,12 @@ export function withCSRF<T extends any[]>(
  * @example
  * import { withAuthAndCSRF } from '@/lib/api/with-csrf';
  * 
- * export const POST = withAuthAndCSRF(async (req, user) => {
+ * export const POST = withAuthAndCSRF(async (req, user, context) => {
  *   // Your handler code here
  * });
  */
 export function withAuthAndCSRF(
-  handler: (req: NextRequest, user: any) => Promise<Response>
+  handler: (req: NextRequest, user: any, context?: unknown) => Promise<Response>
 ) {
   // Import withAuth dynamically to avoid circular dependencies
   const { withAuth } = require('@/lib/auth/api-auth');
