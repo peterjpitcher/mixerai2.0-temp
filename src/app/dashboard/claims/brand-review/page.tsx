@@ -11,6 +11,7 @@ import { Loader2, Copy, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { fetchCountries, fetchProducts } from '@/lib/api-utils';
 import { apiFetch } from '@/lib/api-client';
+import { Label } from '@/components/ui/label';
 
 // Types
 interface SelectOption {
@@ -105,7 +106,7 @@ const BrandClaimsOutputPage = () => {
                 setBrandNameForDisplay(result.brandName);
                 setStyledClaims(result.styledClaims || null);
                 toast.success('Styled claims generated successfully!');
-                if (!result.styledClaims || (result.styledClaims.mandatory_claims.length === 0 && result.styledClaims.grouped_claims.every((g: GroupedClaims) => g.allowed_claims.length === 0 && g.disallowed_claims.length === 0))) {
+                if (!result.styledClaims || result.styledClaims.grouped_claims.every((g: GroupedClaims) => g.allowed_claims.length === 0 && g.disallowed_claims.length === 0)) {
                    toast.info("No claims found for the selected criteria.");
                 }
             } else {
@@ -232,29 +233,72 @@ const BrandClaimsOutputPage = () => {
                     <CardDescription>Choose the brand, and optionally refine by product and market.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                        <Select value={selectedBrand} onValueChange={setSelectedBrand} disabled={isLoading || isGenerating}>
-                            <SelectTrigger><SelectValue placeholder="Select Brand" /></SelectTrigger>
-                            <SelectContent>{brands.map(brand => (<SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>))}</SelectContent>
-                        </Select>
-                        <Select value={selectedProduct} onValueChange={setSelectedProduct} disabled={isLoading || isGenerating}>
-                            <SelectTrigger><SelectValue placeholder="Select a Product" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Products</SelectItem>
-                                {products.map(p => (<SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>))}
-                            </SelectContent>
-                        </Select>
-                        <Select value={selectedCountry} onValueChange={setSelectedCountry} disabled={isLoading || isGenerating}>
-                            <SelectTrigger><SelectValue placeholder="Select a Market" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Markets</SelectItem>
-                                {countries.map(c => (<SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>))}
-                            </SelectContent>
-                        </Select>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="brand-select">Brand *</Label>
+                            <Select value={selectedBrand} onValueChange={setSelectedBrand} disabled={isLoading || isGenerating}>
+                                <SelectTrigger id="brand-select" className="w-full">
+                                    <SelectValue placeholder="Select a brand" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {brands.map(brand => (
+                                        <SelectItem key={brand.id} value={brand.id}>
+                                            {brand.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        
+                        <div className="space-y-2">
+                            <Label htmlFor="product-select">Product (Optional)</Label>
+                            <Select value={selectedProduct} onValueChange={setSelectedProduct} disabled={isLoading || isGenerating}>
+                                <SelectTrigger id="product-select" className="w-full">
+                                    <SelectValue placeholder="Select a product or choose all" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Products</SelectItem>
+                                    {products.map(p => (
+                                        <SelectItem key={p.id} value={p.id} title={p.name}>
+                                            {p.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        
+                        <div className="space-y-2">
+                            <Label htmlFor="market-select">Market (Optional)</Label>
+                            <Select value={selectedCountry} onValueChange={setSelectedCountry} disabled={isLoading || isGenerating}>
+                                <SelectTrigger id="market-select" className="w-full">
+                                    <SelectValue placeholder="Select a market or choose all" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Markets</SelectItem>
+                                    {countries.map(c => (
+                                        <SelectItem key={c.code} value={c.code}>
+                                            {c.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        
+                        <Button 
+                            onClick={handleGenerate} 
+                            disabled={isGenerating || isLoading || !selectedBrand} 
+                            className="w-full"
+                        >
+                            {isGenerating ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Generating...
+                                </>
+                            ) : (
+                                'Generate Styled Claims'
+                            )}
+                        </Button>
                     </div>
-                    <Button onClick={handleGenerate} disabled={isGenerating || isLoading || !selectedBrand} className="w-full mt-4">
-                        {isGenerating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</> : 'Generate Styled Claims'}
-                    </Button>
                 </CardContent>
             </Card>
 

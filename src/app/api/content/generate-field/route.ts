@@ -64,13 +64,24 @@ function interpolatePrompt(
 
   // Replace generic brand placeholders if they are used in the promptText
   if (brandDetails) {
+    // Replace the new format used by the UI
+    interpolated = interpolated.replace(/{{brand\.name}}/g, brandDetails.name || '');
+    interpolated = interpolated.replace(/{{brand\.identity}}/g, brandDetails.brand_identity || '');
+    interpolated = interpolated.replace(/{{brand\.tone_of_voice}}/g, brandDetails.tone_of_voice || '');
+    interpolated = interpolated.replace(/{{brand\.guardrails}}/g, brandDetails.guardrails || '');
+    interpolated = interpolated.replace(/{{brand\.summary}}/g, brandDetails.brand_identity || ''); // Use brand_identity as summary
+    interpolated = interpolated.replace(/{{brand}}/g, JSON.stringify({
+      name: brandDetails.name,
+      identity: brandDetails.brand_identity,
+      tone_of_voice: brandDetails.tone_of_voice,
+      guardrails: brandDetails.guardrails
+    }));
+    
+    // Also support the old format for backward compatibility
     interpolated = interpolated.replace(/{{Brand Name}}/g, brandDetails.name || '');
     interpolated = interpolated.replace(/{{Brand Identity}}/g, brandDetails.brand_identity || '');
     interpolated = interpolated.replace(/{{Tone of Voice}}/g, brandDetails.tone_of_voice || '');
     interpolated = interpolated.replace(/{{Guardrails}}/g, brandDetails.guardrails || '');
-    // Note: {{Brand Summary}} and {{Generic Brand Object}} are not directly mapped here
-    // as their exact source/meaning from brandDetails is unclear.
-    // If 'brand_identity' is considered 'Brand Summary', that's covered.
   }
   return interpolated;
 }

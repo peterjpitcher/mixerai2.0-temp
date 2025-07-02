@@ -19,7 +19,6 @@ import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 import { Checkbox } from '@/components/ui/checkbox';
 import { v4 as uuidv4 } from 'uuid';
 import { apiFetch } from '@/lib/api-client';
-import { useFormPersistence } from '@/hooks/use-form-persistence';
 
 // Define UserSessionData interface (can be moved to a shared types file later)
 interface UserSessionData {
@@ -128,15 +127,6 @@ export default function NewBrandPage() {
     logo_url: null as string | null,
   });
 
-  // Setup form persistence
-  const { restoreFormData, clearSavedData } = useFormPersistence(formData, {
-    debounceMs: 500,
-    excludeFields: ['logo_url'], // Don't persist uploaded files
-    onRestore: (savedData) => {
-      setFormData(prev => ({ ...prev, ...savedData }));
-      toast.success('Restored your previous form data');
-    }
-  });
 
   const [allVettingAgencies, setAllVettingAgencies] = useState<VettingAgency[]>([]);
   const priorityOrder: Array<'High' | 'Medium' | 'Low'> = ['High', 'Medium', 'Low'];
@@ -182,9 +172,6 @@ export default function NewBrandPage() {
           setCurrentUser(data.user);
           if (data.user.user_metadata?.role !== 'admin') {
             setIsForbidden(true);
-          } else {
-            // User has permission, try to restore form data
-            restoreFormData();
           }
         } else {
           setCurrentUser(null);
@@ -200,7 +187,7 @@ export default function NewBrandPage() {
       }
     };
     fetchCurrentUser();
-  }, [restoreFormData]);
+  }, []);
 
   // Effect for fetching vetting agencies
   useEffect(() => {
@@ -415,9 +402,6 @@ export default function NewBrandPage() {
         throw new Error(data.error || 'Failed to create brand');
       }
       toast.success('Brand created successfully!');
-      
-      // Clear saved form data after successful save
-      clearSavedData();
       
       // Permission-aware redirect logic
       // Only redirect to brand detail page if user is a global admin

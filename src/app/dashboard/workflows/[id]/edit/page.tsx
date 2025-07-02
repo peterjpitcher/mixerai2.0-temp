@@ -655,7 +655,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
       template_id: selectedTemplateId === 'NO_TEMPLATE_SELECTED' ? null : selectedTemplateId,
       steps: workflow.steps.map((step, index) => ({
         // Ensure only necessary fields are sent, especially if step.id is temporary client-side ID
-        id: step.id && !step.id.startsWith('temp_') && !step.id.startsWith('email_') ? step.id : uuidv4(), // Generate a proper UUID for new steps
+        id: step.id && typeof step.id === 'string' && !step.id.startsWith('temp_') && !step.id.startsWith('email_') ? step.id : uuidv4(), // Generate a proper UUID for new steps
         name: step.name,
         description: step.description,
         role: step.role,
@@ -663,7 +663,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         step_order: index + 1, // Add step_order based on array position
         assignees: step.assignees.map(a => ({ 
           email: a.email, 
-          id: a.id && !a.id.startsWith('temp_') && !a.id.startsWith('email_') ? a.id : '', 
+          id: a.id && typeof a.id === 'string' && !a.id.startsWith('temp_') && !a.id.startsWith('email_') ? a.id : '', 
           full_name: a.full_name || null 
         }))
       })),
@@ -702,7 +702,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         toast.success('Workflow updated successfully!');
       }
       
-      router.push(`/dashboard/workflows/${newWorkflowId}`);
+      router.push('/dashboard/workflows');
     } catch (error) {
       console.error('Error saving workflow:', error);
       toast.error((error as Error).message || 'An unexpected error occurred.');

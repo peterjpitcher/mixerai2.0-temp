@@ -29,7 +29,8 @@ export function ProductSelect({ brandId, value, onChange }: ProductSelectProps) 
     if (debouncedSearchTerm) {
       params.append('q', debouncedSearchTerm);
     }
-    // We can add limit/offset here in the future
+    // Increase limit to fetch more products (default is 20)
+    params.append('limit', '200');
     return `/api/brands/${brandId}/products?${params.toString()}`;
   }, [brandId, debouncedSearchTerm]);
 

@@ -18,7 +18,6 @@ import { debounce } from 'lodash';
 import { cn } from '@/lib/utils';
 import { BrandIcon } from '@/components/brand-icon';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
-import { useFormPersistence } from '@/hooks/use-form-persistence';
 import { apiFetch } from '@/lib/api-client';
 
 /**
@@ -167,29 +166,6 @@ export default function NewWorkflowPage() {
   const [userSearchResults, setUserSearchResults] = useState<Record<number, UserOption[]>>({});
   const [userSearchLoading, setUserSearchLoading] = useState<Record<number, boolean>>({});
   
-  // Form persistence - combine workflow data and other form state
-  const formData = useMemo(() => ({
-    workflow,
-    selectedTemplateId,
-    assigneeInputs
-  }), [workflow, selectedTemplateId, assigneeInputs]);
-  
-  // Set up form persistence
-  const { restoreFormData, clearSavedData } = useFormPersistence(formData, {
-    storageKey: 'workflow-new',
-    debounceMs: 2000,
-    onRestore: (data) => {
-      if (data.workflow) setWorkflow(data.workflow);
-      if (data.selectedTemplateId) setSelectedTemplateId(data.selectedTemplateId);
-      if (data.assigneeInputs) setAssigneeInputs(data.assigneeInputs);
-      toast.info('Form data restored from previous session');
-    }
-  });
-
-  // Restore form data on mount
-  useEffect(() => {
-    restoreFormData();
-  }, [restoreFormData]);
   
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -636,12 +612,16 @@ export default function NewWorkflowPage() {
 
     const workflowToSave = {
       ...workflow,
-      steps: workflow.steps.map(step => ({
-        ...step,
-        // Ensure assignees are just an array of user IDs or emails if that's what backend expects.
-        // If backend expects UserOption[], then this map might not be needed for assignees.
-        // For now, assuming backend handles UserOption[] or that this structure is what's saved.
-        // Example: assignees: step.assignees.map(a => a.id) if only IDs are needed.
+      steps: workflow.steps.map((step, index) => ({
+        name: step.name,
+        description: step.description || '',
+        order_index: index,
+        assignees: step.assignees.map(a => ({
+          id: a.id,
+          email: a.email || '',
+          name: a.full_name || ''
+        })),
+        deadline_days: 0 // Add default deadline_days if needed
       }))
     };
 
@@ -656,7 +636,6 @@ export default function NewWorkflowPage() {
         throw new Error(data.error || 'Failed to create workflow. Please try again.');
       }
       toast.success('Workflow created successfully!');
-      clearSavedData(); // Clear persisted data after successful save
       router.push(`/dashboard/workflows`); // Navigate to workflows list page
     } catch (error) {
       console.error('Error creating workflow:', error);
