@@ -80,7 +80,7 @@ export default function NewClaimPage() {
       try {
         const [brandsRes, productsRes, ingredientsRes, countriesRes, workflowsRes] = await Promise.allSettled([
           fetch('/api/master-claim-brands').then(res => res.json()),
-          fetch('/api/products').then(res => res.json()),
+          fetch('/api/products?limit=1000').then(res => res.json()),
           fetch('/api/ingredients').then(res => res.json()),
           fetch('/api/countries').then(res => res.json()),
           fetch('/api/claims/workflows').then(res => res.json()),

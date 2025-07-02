@@ -87,9 +87,9 @@ export function useContentGenerator(templateId?: string | null) {
       }
       
       const [templateResult, brandsResult, workflowsResult] = await Promise.allSettled([
-        fetch(`/api/content-templates/${templateId}`).then(res => res.json()),
-        fetch('/api/brands').then(res => res.json()),
-        fetch(`/api/workflows?template_id=${templateId}`).then(res => res.json())
+        apiFetch(`/api/content-templates/${templateId}`).then(res => res.json()),
+        apiFetch('/api/brands').then(res => res.json()),
+        apiFetch(`/api/workflows?template_id=${templateId}`).then(res => res.json())
       ]);
       
       if (templateResult.status === 'fulfilled' && templateResult.value.success) {
@@ -163,7 +163,7 @@ export function useContentGenerator(templateId?: string | null) {
     const fetchSpecificWorkflow = async () => {
       setIsFetchingAssociatedWorkflow(true);
       try {
-        const response = await fetch(`/api/workflows?brand_id=${selectedBrand}&template_id=${templateId}`);
+        const response = await apiFetch(`/api/workflows?brand_id=${selectedBrand}&template_id=${templateId}`);
         const data = await response.json();
         
         if (data.success && data.data && data.data.length > 0) {
@@ -252,9 +252,8 @@ export function useContentGenerator(templateId?: string | null) {
         value: templateFieldValues[field.id] || ''
       }));
 
-      const response = await fetch('/api/content/generate', {
+      const response = await apiFetch('/api/content/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           brand_id: selectedBrand,
           template: {
@@ -307,9 +306,8 @@ export function useContentGenerator(templateId?: string | null) {
 
     setIsGeneratingTitle(true);
     try {
-      const response = await fetch('/api/ai/generate-title', {
+      const response = await apiFetch('/api/ai/generate-title', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contentBody: contentBody,
           brand_id: selectedBrand,
@@ -372,9 +370,8 @@ export function useContentGenerator(templateId?: string | null) {
         finalTitle = `${template.name} - ${format(new Date(), 'MMMM d, yyyy')}`;
       }
 
-      const response = await fetch('/api/content', {
+      const response = await apiFetch('/api/content', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           brand_id: selectedBrand,
           template_id: template.id,

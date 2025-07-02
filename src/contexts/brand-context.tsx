@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './auth-context';
+import { apiFetch } from '@/lib/api-client';
 
 interface Brand {
   id: string;
@@ -54,13 +55,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   const fetchBrands = async (): Promise<Brand[]> => {
     if (!user) return [];
 
-    const response = await fetch('/api/brands', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-    });
+    const response = await apiFetch('/api/brands');
 
     if (!response.ok) {
       throw new Error(`Failed to fetch brands: ${response.status}`);
@@ -79,13 +74,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   const fetchBrand = async (brandId: string): Promise<Brand | null> => {
     if (!user || !brandId) return null;
 
-    const response = await fetch(`/api/brands/${brandId}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-    });
+    const response = await apiFetch(`/api/brands/${brandId}`);
 
     if (!response.ok) {
       if (response.status === 404) return null;
