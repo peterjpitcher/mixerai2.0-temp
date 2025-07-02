@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateAltText } from '@/lib/azure/openai';
-import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
+import { withAuthMonitoringAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-// import { Database, Json } from '@/types/supabase';
- // TODO: Uncomment when types are regenerated
+import { Json } from '@/types/supabase';
 
 // In-memory rate limiting
 const rateLimit = new Map<string, { count: number, timestamp: number }>();
@@ -77,7 +76,7 @@ function getLangCountryFromUrl(imageUrl: string): { language: string; country: s
   return getDefaultLangCountry();
 }
 
-export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
+export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user) => {
   const supabaseAdmin = createSupabaseAdminClient();
   let historyEntryStatus: 'success' | 'failure' = 'success';
   let historyErrorMessage: string | undefined = undefined;
@@ -155,10 +154,47 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       let processingError: string | undefined = undefined;
 
       try {
-        // Validate URL structure before attempting to parse for TLD
-        // Data URLs are valid but won't have a TLD for language detection
-        if (!imageUrl.startsWith('data:')) {
-            new URL(imageUrl);
+        // Validate URL structure and safety
+        if (imageUrl.startsWith('data:')) {
+          // Validate data URL format
+          const dataUrlRegex = /^data:image\/(jpeg|jpg|png|webp|gif);base64,/;
+          if (!dataUrlRegex.test(imageUrl)) {
+            throw new Error('Invalid data URL format. Only image data URLs are allowed.');
+          }
+          // Check data URL size (rough estimate - base64 is ~33% larger than binary)
+          const base64Data = imageUrl.split(',')[1];
+          const estimatedSize = (base64Data.length * 3) / 4;
+          if (estimatedSize > 15 * 1024 * 1024) { // 15MB limit for images
+            throw new Error('Data URL image is too large (max 15MB)');
+          }
+        } else {
+          // Validate regular URL
+          const url = new URL(imageUrl);
+          
+          // Block potentially dangerous protocols
+          if (!['http:', 'https:'].includes(url.protocol)) {
+            throw new Error(`Invalid protocol: ${url.protocol}. Only HTTP(S) URLs are allowed.`);
+          }
+          
+          // Block localhost and internal IPs
+          const hostname = url.hostname.toLowerCase();
+          if (hostname === 'localhost' || 
+              hostname === '127.0.0.1' || 
+              hostname.startsWith('192.168.') ||
+              hostname.startsWith('10.') ||
+              hostname.startsWith('172.')) {
+            throw new Error('Internal or localhost URLs are not allowed');
+          }
+          
+          // Validate image file extension if present in URL
+          const pathname = url.pathname.toLowerCase();
+          const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.svg'];
+          const hasImageExtension = imageExtensions.some(ext => pathname.endsWith(ext));
+          
+          // Warn if no image extension (but don't block - some image URLs don't have extensions)
+          if (!hasImageExtension && !pathname.includes('/')) {
+            console.warn(`[AltTextGen] URL may not be an image: ${imageUrl}`);
+          }
         }
         
         if (requestedLanguage) {
@@ -273,14 +309,14 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
         await supabaseAdmin.from('tool_run_history').insert({
             user_id: user.id,
             tool_name: 'alt_text_generator',
-            inputs: apiInputs as any, // TODO: Type as Json when types are regenerated
-            outputs: apiOutputs || { error: historyErrorMessage || 'Unknown error before output generation' } as any, // TODO: Type as Json when types are regenerated
+            inputs: apiInputs as unknown as Json,
+            outputs: (apiOutputs || { error: historyErrorMessage || 'Unknown error before output generation' }) as unknown as Json,
             status: historyEntryStatus,
             error_message: historyErrorMessage,
             brand_id: null, // Alt text generator is not brand-specific for history
             batch_id: batchId,
             batch_sequence: batchId ? 1 : null
-        } as any); // TODO: Type as Database['public']['Tables']['tool_run_history']['Insert'] when types are regenerated
+        });
       } else {
         // This case might happen if request.json() itself fails catastrophically before apiInputs is set
         // Or if a rate limit error occurred very early before apiInputs could be determined
@@ -288,8 +324,8 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
              await supabaseAdmin.from('tool_run_history').insert({
                 user_id: user.id,
                 tool_name: 'alt_text_generator',
-                inputs: { error: 'Failed to parse request or early error' },
-                outputs: { error: historyErrorMessage },
+                inputs: { error: 'Failed to parse request or early error' } as Json,
+                outputs: { error: historyErrorMessage } as Json,
                 status: 'failure',
                 error_message: historyErrorMessage,
                 brand_id: null

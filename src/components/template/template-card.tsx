@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { touchFriendly } from '@/lib/utils/touch-target';
+import { apiFetch } from '@/lib/api-client';
 
 interface TemplateCardProps {
   id: string;
@@ -28,7 +29,7 @@ export function TemplateCard({ id, name, description, inputFieldCount, outputFie
     try {
       setIsDeleting(true);
       
-      const response = await fetch(`/api/content-templates/${id}`, {
+      const response = await apiFetch(`/api/content-templates/${id}`, {
         method: 'DELETE',
       });
       

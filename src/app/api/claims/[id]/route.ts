@@ -132,7 +132,7 @@ export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?
         // Level and associated entity IDs (product_id, master_brand_id, ingredient_id) are not updatable here.
         // To change those, one would typically delete and recreate the claim if necessary.
 
-        const updatePayload: Record<string, any> = {
+        const updatePayload: Record<string, unknown> = {
             updated_at: new Date().toISOString(),
         };
 

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
+import { withAuthMonitoringAndCSRF } from '@/lib/auth/api-auth';
 import { createSupabaseServerClient } from '@/lib/supabase/server'; // Using server client
 
 export const dynamic = 'force-dynamic';
 
-export const GET = withAuthAndMonitoring(async (request: NextRequest) => {
+export const GET = withAuthMonitoringAndCSRF(async (request: NextRequest) => {
   try {
     const supabase = createSupabaseServerClient();
     const { searchParams } = new URL(request.url);

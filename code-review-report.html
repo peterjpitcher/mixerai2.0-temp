@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MixerAI Code Review Report</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #13599f;
+            border-bottom: 3px solid #13599f;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #333;
+            margin-top: 30px;
+        }
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+        }
+        .stat-card.error {
+            border-color: #dc3545;
+            background: #fff5f5;
+        }
+        .stat-card.warning {
+            border-color: #ffc107;
+            background: #fffdf5;
+        }
+        .stat-card.success {
+            border-color: #28a745;
+            background: #f5fff5;
+        }
+        .stat-number {
+            font-size: 36px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .check-result {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        .check-result.passed {
+            background: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .check-result.warning {
+            background: #fff3cd;
+            border-color: #ffeeba;
+        }
+        .check-result.error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .issue {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .recommendation {
+            background: #e7f3ff;
+            border-left: 4px solid #13599f;
+            padding: 10px 15px;
+            margin: 10px 0;
+        }
+        .timestamp {
+            color: #6c757d;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MixerAI Code Review Report</h1>
+        <p class="timestamp">Generated: 7/1/2025, 11:57:26 AM</p>
+        
+        <h2>Summary</h2>
+        <div class="summary">
+            <div class="stat-card error">
+                <div>Total Issues</div>
+                <div class="stat-number">42</div>
+            </div>
+            <div class="stat-card success">
+                <div>ESLint Errors</div>
+                <div class="stat-number">0</div>
+            </div>
+            <div class="stat-card success">
+                <div>ESLint Warnings</div>
+                <div class="stat-number">0</div>
+            </div>
+            <div class="stat-card error">
+                <div>TypeScript Errors</div>
+                <div class="stat-number">42</div>
+            </div>
+        </div>
+        
+        <h2>Check Results</h2>
+        
+            <div class="check-result error">
+                <h3>Dependencies - ERROR</h3>
+                
+                    <div>Found 1 issues:</div>
+                    
+                        <div class="issue">
+                            
+                            Command failed: npm ls --depth=0 --json
+npm error code ELSPROBLEMS
+npm error invalid: @anthropic-ai/claude-code@1.0.21 /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/@anthropic-ai/claude-code
+npm error A complete log of this run can be found in: /Users/peterpitcher/.npm/_logs/2025-07-01T10_57_26_419Z-debug-0.log
+
+                        </div>
+                    
+                    
+                
+            </div>
+        
+            <div class="check-result error">
+                <h3>ESLint - ERROR</h3>
+                
+                    <div>Found 1 issues:</div>
+                    
+                        <div class="issue">
+                            
+                            Command failed: npx next lint
+
+./src/__tests__/lib/auth/session-manager.test.ts
+13:6  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/__tests__/types/api.test.ts
+69:52  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/ai/generate-title/route.ts
+41:26  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/brands/[id]/admins/route.ts
+49:45  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/claims/[id]/route.ts
+135:45  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/claims/route.ts
+138:53  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/content/[id]/regenerate/route.ts
+67:27  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+109:10  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+142:66  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+156:28  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+183:28  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+249:12  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+250:10  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+253:47  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+280:12  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+281:10  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+282:13  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+285:47  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/content/[id]/restart-workflow/route.ts
+38:104  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+43:34  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+82:26  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/content/[id]/workflow-action/route.ts
+17:16  Error: 'getNextVersionNumber' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/api/content/route.ts
+390:30  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/health/route.ts
+33:27  Error: 'request' is defined but never used.  @typescript-eslint/no-unused-vars
+87:21  Error: 'session' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+139:14  Error: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/api/me/tool-run-history/[historyId]/route.ts
+58:49  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+59:136  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/notifications/clear/route.ts
+5:48  Error: 'request' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/api/notifications/email/route.ts
+72:58  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+127:58  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+182:41  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+186:77  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+199:58  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+243:41  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+244:52  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/products/[productId]/ingredients/route.ts
+98:88  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/tools/alt-text-generator/route.ts
+276:34  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+277:114  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+283:14  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/tools/content-transcreator/route.ts
+58:77  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+59:58  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+65:14  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+175:34  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+176:36  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+182:14  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+188:80  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+189:60  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+195:18  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/tools/metadata-generator/route.ts
+73:14  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+197:34  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+198:36  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+204:14  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+210:80  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+211:60  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+215:18  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/user/notification-settings/route.ts
+25:54  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/users/[id]/route.ts
+6:10  Error: 'withCSRF' is defined but never used.  @typescript-eslint/no-unused-vars
+80:29  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+94:75  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/users/fix-role/route.ts
+7:10  Error: 'withAuthAndCSRF' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/api/users/invite/route.ts
+5:10  Error: 'withCSRF' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/api/workflows/[id]/duplicate/route.ts
+4:10  Error: 'withAuth' is defined but never used.  @typescript-eslint/no-unused-vars
+93:33  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/workflows/[id]/route.ts
+282:65  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+288:114  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+407:40  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+410:59  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/workflows/generate-description/route.ts
+5:10  Error: 'withAuthAndCSRF' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/api/workflows/route.ts
+9:16  Error: 'uuidv4' is defined but never used.  @typescript-eslint/no-unused-vars
+340:51  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+342:46  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/dashboard/account/page.tsx
+17:10  Error: 'AlertCircle' is defined but never used.  @typescript-eslint/no-unused-vars
+188:14  Error: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/dashboard/brands/[id]/edit/page.tsx
+303:9  Error: 'handleMasterClaimBrandChange' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+478:5  Error: 'hasUnsavedChanges' is a
+                        </div>
+                    
+                    
+                
+            </div>
+        
+            <div class="check-result error">
+                <h3>TypeScript - ERROR</h3>
+                
+                    <div>Found 42 issues:</div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/account-lockout.test.ts:122:7 - 
+                            Unused '@ts-expect-error' directive.
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/account-lockout.test.ts:146:21 - 
+                            Property 'success' does not exist on type 'void'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/account-lockout.test.ts:157:21 - 
+                            Property 'success' does not exist on type 'void'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/account-lockout.test.ts:169:7 - 
+                            Unused '@ts-expect-error' directive.
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/account-lockout.test.ts:182:21 - 
+                            Property 'cleaned' does not exist on type 'void'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/account-lockout.test.ts:200:21 - 
+                            Property 'cleaned' does not exist on type 'void'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/account-lockout.test.ts:202:7 - 
+                            Unused '@ts-expect-error' directive.
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/account-lockout.test.ts:227:23 - 
+                            Argument of type 'Promise<{ attempts: number; locked: boolean; remainingAttempts: number; }>' is not assignable to parameter of type 'never'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/account-lockout.test.ts:234:26 - 
+                            Property 'locked' does not exist on type 'never'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/account-lockout.test.ts:235:26 - 
+                            Property 'attempts' does not exist on type 'never'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/session-config.test.ts:5:3 - 
+                            Module '"@/lib/auth/session-config"' has no exported member 'checkReauthenticationRequired'.
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/session-config.test.ts:21:23 - 
+                            Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/session-config.test.ts:29:21 - 
+                            Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/session-config.test.ts:36:21 - 
+                            Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/session-config.test.ts:43:21 - 
+                            Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/session-config.test.ts:50:21 - 
+                            Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/session-config.test.ts:57:21 - 
+                            Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/session-config.test.ts:64:21 - 
+                            Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/session-config.test.ts:75:21 - 
+                            Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?
+                        </div>
+                    
+                        <div class="issue">
+                            src/__tests__/lib/auth/session-config.test.ts:82:21 - 
+                            Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?
+                        </div>
+                    
+                    <div>... and 22 more</div>
+                
+            </div>
+        
+            <div class="check-result passed">
+                <h3>Build Readiness - PASSED</h3>
+                <div>✅ No issues found</div>
+            </div>
+        
+        
+        
+            <h2>Recommendations</h2>
+            
+                <div class="recommendation">Fix 42 TypeScript errors</div>
+            
+        
+    </div>
+</body>
+</html>

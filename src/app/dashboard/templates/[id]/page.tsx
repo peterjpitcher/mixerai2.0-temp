@@ -19,6 +19,7 @@ import {
 import { toast } from 'sonner';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import type { ContentTemplate } from '@/types/template';
+import { apiFetch } from '@/lib/api-client';
 
 // Define UserSessionData interface
 interface UserSessionData {
@@ -187,7 +188,7 @@ export default function TemplateEditPage() {
     const fetchCurrentUser = async () => {
       setIsLoadingUser(true);
       try {
-        const response = await fetch('/api/me');
+        const response = await apiFetch('/api/me');
         if (!response.ok) throw new Error('Failed to fetch user session');
         const data = await response.json();
         if (data.success && data.user) {
@@ -311,7 +312,7 @@ export default function TemplateEditPage() {
     }
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/content-templates/${id}`, { method: 'DELETE' });
+      const response = await apiFetch(`/api/content-templates/${id}`, { method: 'DELETE' });
       const data = await response.json();
       if (data.success) {
         toast.success(`Template "${template.name}" deleted successfully.`);

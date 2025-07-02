@@ -66,7 +66,7 @@ describe('API Type Guards', () => {
     });
 
     it('should reject Error objects with non-string code', () => {
-      const error = new Error('Database error') as any;
+      const error = new Error('Database error') as Error & { code: unknown };
       error.code = 123; // number instead of string
       
       expect(isPostgresError(error)).toBe(false);

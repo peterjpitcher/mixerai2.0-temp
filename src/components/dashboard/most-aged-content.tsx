@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Hourglass, CheckCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow, differenceInDays } from 'date-fns';
-import { BrandIcon } from '@/components/brand-icon';
+import { BrandDisplay } from '@/components/ui/brand-display';
 
 interface AgedItem {
   id: string;
@@ -54,10 +54,13 @@ export function MostAgedContent({ initialContent }: MostAgedContentProps) {
                     <div className="flex items-center gap-2 mt-1">
                       {item.brands?.name && (
                         <div className="flex items-center gap-1.5">
-                          <BrandIcon 
-                            name={item.brands.name} 
-                            color={item.brands.brand_color || undefined}
-                            logoUrl={item.brands.logo_url || undefined}
+                          <BrandDisplay 
+                            brand={{
+                              name: item.brands.name,
+                              brand_color: item.brands.brand_color,
+                              logo_url: item.brands.logo_url
+                            }}
+                            variant="compact"
                             size="sm"
                             className="h-3.5 w-3.5"
                           />

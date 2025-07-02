@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { apiFetch } from '@/lib/api-client';
 
 // Types for AI Suggestions (matching API)
 interface AISuggestion {
@@ -595,7 +596,7 @@ export default function ClaimsPreviewPage() {
                 ...associatedIdField
             };
             console.log("Submitting new claim payload to /api/claims:", JSON.stringify(newClaimPayload, null, 2));
-            const claimResponse = await fetch('/api/claims', { 
+            const claimResponse = await apiFetch('/api/claims', { 
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' }, 
                 body: JSON.stringify(newClaimPayload) 
@@ -647,7 +648,7 @@ export default function ClaimsPreviewPage() {
     }
 
     try {
-      const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(finalOverridePayload) });
+      const response = await apiFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(finalOverridePayload) });
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.error || `Failed to ${isEditing ? 'update' : 'apply'} override.`);
       toast.success(`Override ${isEditing ? 'Updated' : 'Applied'}`);
@@ -667,7 +668,7 @@ export default function ClaimsPreviewPage() {
     }
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/market-overrides/${idToDelete}`, { method: 'DELETE' });
+      const response = await apiFetch(`/api/market-overrides/${idToDelete}`, { method: 'DELETE' });
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.error || 'Failed to delete override.');
       toast.success('Override Removed (Unblocked)');

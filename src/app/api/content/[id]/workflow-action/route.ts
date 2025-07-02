@@ -14,20 +14,6 @@ interface WorkflowActionRequest {
   feedback?: string;
 }
 
-async function getNextVersionNumber(supabase: ReturnType<typeof createSupabaseAdminClient>, contentId: string): Promise<number> {
-  const { data, error } = await supabase
-    .from('content_versions')
-    .select('version_number')
-    .eq('content_id', contentId)
-    .order('version_number', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error && error.code !== 'PGRST116') { 
-    throw error;
-  }
-  return (data?.version_number || 0) + 1;
-}
 
 export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, context?: unknown): Promise<Response> => {
   const { params } = context as { params: { id: string } };

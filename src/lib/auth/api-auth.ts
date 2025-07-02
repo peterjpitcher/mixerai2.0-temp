@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
 import { Database } from '@/types/supabase';
 import { User } from '@supabase/supabase-js';
+import { withCSRF } from '@/lib/api/with-csrf';
 
 /**
  * Higher-order function to wrap API handlers with authentication
@@ -262,6 +263,39 @@ export function withAdminAuth(
       );
     }
   };
+}
+
+/**
+ * Higher-order function to wrap API handlers with authentication and CSRF protection
+ * @param handler The API route handler function to be protected
+ * @returns A new handler function that first checks authentication and CSRF token
+ */
+export function withAuthAndCSRF(
+  handler: (req: NextRequest, user: User, context?: unknown) => Promise<Response>
+) {
+  return withCSRF(withAuth(handler));
+}
+
+/**
+ * Higher-order function to wrap API handlers with admin-level authentication and CSRF protection
+ * @param handler The API route handler function to be protected
+ * @returns A new handler function that first checks authentication, admin role, and CSRF token
+ */
+export function withAdminAuthAndCSRF(
+  handler: (req: NextRequest, user: User, context?: unknown) => Promise<Response>
+) {
+  return withCSRF(withAdminAuth(handler));
+}
+
+/**
+ * Higher-order function that adds authentication, monitoring, and CSRF protection
+ * @param handler The API route handler function to be protected and monitored
+ * @returns A new handler function with auth checks, monitoring, and CSRF protection
+ */
+export function withAuthMonitoringAndCSRF(
+  handler: (req: NextRequest, user: User, context?: unknown) => Promise<Response>
+) {
+  return withCSRF(withAuthAndMonitoring(handler));
 }
 
 /**

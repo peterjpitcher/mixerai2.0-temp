@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
+import { withAuthMonitoringAndCSRF } from '@/lib/auth/api-auth';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { User } from '@supabase/supabase-js';
 
@@ -9,7 +9,7 @@ interface RouteParams {
   };
 }
 
-export const GET = withAuthAndMonitoring(async (request: NextRequest, user: User, context?: unknown) => {
+export const GET = withAuthMonitoringAndCSRF(async (request: NextRequest, user: User, context?: unknown) => {
   const { params } = context as RouteParams;
   try {
     const supabase = createSupabaseServerClient();
@@ -55,8 +55,8 @@ export const GET = withAuthAndMonitoring(async (request: NextRequest, user: User
     
     // Double check ownership if user is not an admin, RLS should handle this, but belt and suspenders.
     const userRole = user.user_metadata?.role;
-    if (userRole !== 'admin' && (historyItem as any).user_id !== user.id) {
-        console.warn(`[ToolRunHistoryItemAPI] User ${user.id} attempted to access history item ${historyId} owned by ${(historyItem as any).user_id}`);
+    if (userRole !== 'admin' && (historyItem as Record<string, unknown>).user_id !== user.id) {
+        console.warn(`[ToolRunHistoryItemAPI] User ${user.id} attempted to access history item ${historyId} owned by ${(historyItem as Record<string, unknown>).user_id}`);
         return NextResponse.json(
             { success: false, error: 'Access denied to this history item.' },
             { status: 403 }

@@ -14,7 +14,6 @@ import Link from 'next/link';
 import { HelpCircle } from 'lucide-react';
 import { AvatarUpload } from '@/components/ui/avatar-upload';
 import { validatePassword } from '@/lib/auth/session-config';
-import { AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api-client';
 
@@ -185,7 +184,7 @@ export default function AccountPage() {
       if (!response.ok) {
         throw new Error('Failed to update notification setting');
       }
-    } catch (error) {
+    } catch {
       // Revert on error
       setNotificationSettings(prev => ({ ...prev, [id]: !checked }));
       toast.error('Failed to update notification preference', { description: 'Please try again' });

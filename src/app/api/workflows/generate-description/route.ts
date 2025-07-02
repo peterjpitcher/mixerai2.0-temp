@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 // OpenAI import removed as the client instance was unused and direct fetch is used.
-import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
+import { withAuthMonitoringAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
-import { withAuthAndCSRF } from '@/lib/api/with-csrf'; // Import for consistent error handling
+// import { withAuthAndCSRF } from '@/lib/api/with-csrf'; // Import for consistent error handling - not used
 
 // const openai = new OpenAI({ ... }); // Unused OpenAI client initialization removed
 
-export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
+export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user) => {
   try {
     const body = await request.json();
     const { type, stepName, existingDescription, otherSteps, brandContext } = body;
     
-    // userId for auditing is available via the 'user' object from withAuthAndMonitoring
+    // userId for auditing is available via the 'user' object from withAuthMonitoringAndCSRF
     // Example: user.id
     
     if (!type || !stepName) {
@@ -101,7 +101,7 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
       return NextResponse.json({
         success: true,
         description,
-        userId: user.id // Included from withAuthAndMonitoring
+        userId: user.id // Included from withAuthMonitoringAndCSRF
       }, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

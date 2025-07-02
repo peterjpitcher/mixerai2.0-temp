@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
-import { withAuth } from '@/lib/auth/api-auth';
+// import { withAuth } from '@/lib/auth/api-auth'; - not used
 import { User } from '@supabase/supabase-js';
 // import { v4 as uuidv4 } from 'uuid';
 // import { TablesInsert } from '@/types/supabase';
@@ -90,7 +90,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
     }
     
     // 2. Create the new workflow shell (without steps in JSONB)
-    const newWorkflowShellData: any = { // TODO: Type as TablesInsert<'workflows'> when types are regenerated
+    const newWorkflowShellData: Record<string, unknown> = { // TODO: Type as TablesInsert<'workflows'> when types are regenerated
       name: `Copy of ${originalWorkflow.name}`,
       brand_id: null,
       template_id: null, // originalWorkflow.template_id if you want to copy it
@@ -103,7 +103,14 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
 
     const { data: newWorkflow, error: insertWorkflowError } = await supabase
       .from('workflows')
-      .insert(newWorkflowShellData)
+      .insert({
+        name: `Copy of ${originalWorkflow.name}`,
+        brand_id: null,
+        template_id: null,
+        status: 'draft',
+        created_by: user.id,
+        steps: []
+      })
       .select()
       .single();
 

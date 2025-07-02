@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { withCSRF } from '@/lib/api/with-csrf';
+import { withAuthAndCSRF } from '@/lib/auth/api-auth';
+import { User } from '@supabase/supabase-js';
 
-export const DELETE = withCSRF(async function (request: NextRequest) {
+export const DELETE = withAuthAndCSRF(async function (req: NextRequest, user: User) {
   try {
     const supabase = createSupabaseServerClient();
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
 
     // Delete all notifications for the user
     const { error } = await supabase

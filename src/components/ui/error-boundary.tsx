@@ -4,6 +4,7 @@ import React, { Component, ReactNode } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { apiFetch } from '@/lib/api-client';
 
 interface Props {
   children: ReactNode;
@@ -32,11 +33,10 @@ export class ErrorBoundary extends Component<Props, State> {
     
     // Log to error tracking service
     if (typeof window !== 'undefined') {
-      fetch('/api/errors/track', {
+      apiFetch('/api/errors/track', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-csrf-token': this.getCsrfToken(),
         },
         body: JSON.stringify({
           error: {
@@ -60,11 +60,6 @@ export class ErrorBoundary extends Component<Props, State> {
     }
   }
 
-  getCsrfToken(): string {
-    if (typeof document === 'undefined') return '';
-    const match = document.cookie.match(/csrf-token=([^;]+)/);
-    return match ? match[1] : '';
-  }
 
   handleReset = () => {
     this.setState({ hasError: false, error: null, errorInfo: null });

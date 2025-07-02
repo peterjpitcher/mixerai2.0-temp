@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/auth/api-auth';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { signOut } from '@/lib/auth/session-manager';
 
-export const POST = withAuth(async (_req: NextRequest, user) => {
+export const POST = withAuthAndCSRF(async (_req: NextRequest, user) => {
   try {
     // Sign out and invalidate all sessions
     await signOut(user);

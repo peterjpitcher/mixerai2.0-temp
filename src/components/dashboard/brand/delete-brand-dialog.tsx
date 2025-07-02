@@ -13,6 +13,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import { apiFetch } from '@/lib/api-client';
 
 interface Brand {
   id: string;
@@ -40,7 +41,7 @@ export function DeleteBrandDialog({ brand, onSuccess, children }: DeleteBrandDia
         url.searchParams.append('deleteCascade', 'true');
       }
       
-      const response = await fetch(url.toString(), {
+      const response = await apiFetch(url.toString(), {
         method: 'DELETE',
       });
       

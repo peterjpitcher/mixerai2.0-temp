@@ -1,0 +1,127 @@
+'use client';
+
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
+import { apiFetch } from '@/lib/api-client';
+
+interface RestartWorkflowButtonProps {
+  contentId: string;
+  contentTitle: string;
+  onRestart?: () => void;
+  size?: 'default' | 'sm' | 'lg' | 'icon';
+  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+}
+
+export function RestartWorkflowButton({
+  contentId,
+  contentTitle,
+  onRestart,
+  size = 'default',
+  variant = 'outline',
+}: RestartWorkflowButtonProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isRestarting, setIsRestarting] = useState(false);
+
+  const handleRestart = async () => {
+    setIsRestarting(true);
+    try {
+      const response = await apiFetch(`/api/content/${contentId}/restart-workflow`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to restart workflow');
+      }
+
+      toast.success('Workflow restarted successfully', {
+        description: 'The content has been moved back to the first workflow step for review.',
+      });
+
+      setIsOpen(false);
+      
+      // Call the optional callback
+      if (onRestart) {
+        onRestart();
+      }
+    } catch (error) {
+      console.error('Error restarting workflow:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to restart workflow',
+        {
+          description: 'Please try again or contact support if the issue persists.',
+        }
+      );
+    } finally {
+      setIsRestarting(false);
+    }
+  };
+
+  return (
+    <>
+      <Button
+        onClick={() => setIsOpen(true)}
+        variant={variant}
+        size={size}
+        disabled={isRestarting}
+      >
+        <RefreshCw className="mr-2 h-4 w-4" />
+        Restart Workflow
+      </Button>
+
+      <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restart Workflow?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to restart the workflow for "{contentTitle}"?
+              <br /><br />
+              This will:
+              <ul className="list-disc list-inside space-y-1 mt-2">
+                <li>Move the content back to the first workflow step</li>
+                <li>Reset the approval status to "pending review"</li>
+                <li>Reassign the content to the first step's reviewers</li>
+                <li>Preserve all feedback and version history</li>
+              </ul>
+              <br />
+              This action is typically done after addressing rejection feedback.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRestarting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRestart}
+              disabled={isRestarting}
+              className="bg-primary"
+            >
+              {isRestarting ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Restarting...
+                </>
+              ) : (
+                'Restart Workflow'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}

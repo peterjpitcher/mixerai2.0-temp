@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateMetadata } from '@/lib/azure/openai';
-import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
+import { withAuthMonitoringAndCSRF } from '@/lib/auth/api-auth';
 import { fetchWebPageContent } from '@/lib/utils/web-scraper';
 import { handleApiError } from '@/lib/api-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-// import { Database, Json } from '@/types/supabase';
+import { Json } from '@/types/supabase';
  // TODO: Uncomment when types are regenerated
 
 // In-memory rate limiting
@@ -31,7 +31,7 @@ interface MetadataResultItem {
 // export async function POST(request: NextRequest) { ... } // Content of this function is removed for brevity
 
 // Keep the original authenticated route - RENAMING to POST
-export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => {
+export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user) => {
   const supabaseAdmin = createSupabaseAdminClient();
   let historyEntryStatus: 'success' | 'failure' = 'success';
   let historyErrorMessage: string | undefined = undefined;
@@ -65,12 +65,12 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
         await supabaseAdmin.from('tool_run_history').insert({
             user_id: user.id,
             tool_name: 'metadata_generator',
-            inputs: { error: 'Rate limit exceeded for initial request' },
-            outputs: { error: 'Rate limit exceeded' },
+            inputs: { error: 'Rate limit exceeded for initial request' } as Json,
+            outputs: { error: 'Rate limit exceeded' } as Json,
             status: historyEntryStatus,
             error_message: historyErrorMessage,
             brand_id: null
-        } as any); // TODO: Type as Database['public']['Tables']['tool_run_history']['Insert'] when types are regenerated
+        });
       } catch (logError) {
         console.error('[HistoryLoggingError] Failed to log rate limit error for metadata-generator:', logError);
       }
@@ -194,25 +194,25 @@ export const POST = withAuthAndMonitoring(async (request: NextRequest, user) => 
         await supabaseAdmin.from('tool_run_history').insert({
             user_id: user.id,
             tool_name: 'metadata_generator',
-            inputs: apiInputs as any, // TODO: Type as Json when types are regenerated
-            outputs: apiOutputs as any || { error: historyErrorMessage || 'Unknown error before output generation' }, // TODO: Type as Json when types are regenerated
+            inputs: apiInputs as unknown as Json,
+            outputs: ((apiOutputs as unknown as Json) || { error: historyErrorMessage || 'Unknown error before output generation' } as Json),
             status: historyEntryStatus,
             error_message: historyErrorMessage,
             brand_id: null,
             batch_id: batchId,
             batch_sequence: batchId ? 1 : null
-        } as any); // TODO: Type as Database['public']['Tables']['tool_run_history']['Insert'] when types are regenerated
+        });
       } else {
         if (historyEntryStatus === 'failure' && historyErrorMessage) {
              await supabaseAdmin.from('tool_run_history').insert({
                 user_id: user.id,
                 tool_name: 'metadata_generator',
-                inputs: { error: 'Failed to parse request or early error' } as any, // TODO: Type as Json when types are regenerated
-                outputs: { error: historyErrorMessage } as any, // TODO: Type as Json when types are regenerated
+                inputs: { error: 'Failed to parse request or early error' } as unknown as Json,
+                outputs: { error: historyErrorMessage } as unknown as Json,
                 status: 'failure',
                 error_message: historyErrorMessage,
                 brand_id: null
-            } as any); // TODO: Type as Database['public']['Tables']['tool_run_history']['Insert'] when types are regenerated
+            });
         }
       }
     } catch (logError) {

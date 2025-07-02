@@ -1,0 +1,296 @@
+{
+  "timestamp": "2025-07-01T10:57:26.278Z",
+  "summary": {
+    "totalIssues": 42,
+    "eslintErrors": 0,
+    "eslintWarnings": 0,
+    "typeScriptErrors": 42,
+    "buildErrors": 0,
+    "passed": false
+  },
+  "checks": [
+    {
+      "name": "Dependencies",
+      "status": "error",
+      "issues": [
+        "Command failed: npm ls --depth=0 --json\nnpm error code ELSPROBLEMS\nnpm error invalid: @anthropic-ai/claude-code@1.0.21 /Users/peterpitcher/Cursor/MixerAI2.0/node_modules/@anthropic-ai/claude-code\nnpm error A complete log of this run can be found in: /Users/peterpitcher/.npm/_logs/2025-07-01T10_57_26_419Z-debug-0.log\n"
+      ]
+    },
+    {
+      "name": "ESLint",
+      "status": "error",
+      "issues": [
+        "Command failed: npx next lint\n\n./src/__tests__/lib/auth/session-manager.test.ts\n13:6  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/__tests__/types/api.test.ts\n69:52  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/ai/generate-title/route.ts\n41:26  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/brands/[id]/admins/route.ts\n49:45  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/claims/[id]/route.ts\n135:45  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/claims/route.ts\n138:53  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/content/[id]/regenerate/route.ts\n67:27  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n109:10  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n142:66  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n156:28  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n183:28  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n249:12  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n250:10  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n253:47  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n280:12  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n281:10  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n282:13  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n285:47  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/content/[id]/restart-workflow/route.ts\n38:104  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n43:34  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n82:26  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/content/[id]/workflow-action/route.ts\n17:16  Error: 'getNextVersionNumber' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/app/api/content/route.ts\n390:30  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/health/route.ts\n33:27  Error: 'request' is defined but never used.  @typescript-eslint/no-unused-vars\n87:21  Error: 'session' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n139:14  Error: 'error' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/app/api/me/tool-run-history/[historyId]/route.ts\n58:49  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n59:136  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/notifications/clear/route.ts\n5:48  Error: 'request' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/app/api/notifications/email/route.ts\n72:58  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n127:58  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n182:41  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n186:77  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n199:58  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n243:41  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n244:52  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/products/[productId]/ingredients/route.ts\n98:88  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/tools/alt-text-generator/route.ts\n276:34  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n277:114  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n283:14  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/tools/content-transcreator/route.ts\n58:77  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n59:58  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n65:14  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n175:34  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n176:36  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n182:14  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n188:80  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n189:60  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n195:18  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/tools/metadata-generator/route.ts\n73:14  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n197:34  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n198:36  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n204:14  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n210:80  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n211:60  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n215:18  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/user/notification-settings/route.ts\n25:54  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/users/[id]/route.ts\n6:10  Error: 'withCSRF' is defined but never used.  @typescript-eslint/no-unused-vars\n80:29  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n94:75  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/users/fix-role/route.ts\n7:10  Error: 'withAuthAndCSRF' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/app/api/users/invite/route.ts\n5:10  Error: 'withCSRF' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/app/api/workflows/[id]/duplicate/route.ts\n4:10  Error: 'withAuth' is defined but never used.  @typescript-eslint/no-unused-vars\n93:33  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/workflows/[id]/route.ts\n282:65  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n288:114  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n407:40  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n410:59  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/workflows/generate-description/route.ts\n5:10  Error: 'withAuthAndCSRF' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/app/api/workflows/route.ts\n9:16  Error: 'uuidv4' is defined but never used.  @typescript-eslint/no-unused-vars\n340:51  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n342:46  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/dashboard/account/page.tsx\n17:10  Error: 'AlertCircle' is defined but never used.  @typescript-eslint/no-unused-vars\n188:14  Error: 'error' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/app/dashboard/brands/[id]/edit/page.tsx\n303:9  Error: 'handleMasterClaimBrandChange' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n478:5  Error: 'hasUnsavedChanges' is a"
+      ]
+    },
+    {
+      "name": "TypeScript",
+      "status": "error",
+      "issues": [
+        {
+          "file": "src/__tests__/lib/auth/account-lockout.test.ts",
+          "line": 122,
+          "column": 7,
+          "message": "Unused '@ts-expect-error' directive."
+        },
+        {
+          "file": "src/__tests__/lib/auth/account-lockout.test.ts",
+          "line": 146,
+          "column": 21,
+          "message": "Property 'success' does not exist on type 'void'."
+        },
+        {
+          "file": "src/__tests__/lib/auth/account-lockout.test.ts",
+          "line": 157,
+          "column": 21,
+          "message": "Property 'success' does not exist on type 'void'."
+        },
+        {
+          "file": "src/__tests__/lib/auth/account-lockout.test.ts",
+          "line": 169,
+          "column": 7,
+          "message": "Unused '@ts-expect-error' directive."
+        },
+        {
+          "file": "src/__tests__/lib/auth/account-lockout.test.ts",
+          "line": 182,
+          "column": 21,
+          "message": "Property 'cleaned' does not exist on type 'void'."
+        },
+        {
+          "file": "src/__tests__/lib/auth/account-lockout.test.ts",
+          "line": 200,
+          "column": 21,
+          "message": "Property 'cleaned' does not exist on type 'void'."
+        },
+        {
+          "file": "src/__tests__/lib/auth/account-lockout.test.ts",
+          "line": 202,
+          "column": 7,
+          "message": "Unused '@ts-expect-error' directive."
+        },
+        {
+          "file": "src/__tests__/lib/auth/account-lockout.test.ts",
+          "line": 227,
+          "column": 23,
+          "message": "Argument of type 'Promise<{ attempts: number; locked: boolean; remainingAttempts: number; }>' is not assignable to parameter of type 'never'."
+        },
+        {
+          "file": "src/__tests__/lib/auth/account-lockout.test.ts",
+          "line": 234,
+          "column": 26,
+          "message": "Property 'locked' does not exist on type 'never'."
+        },
+        {
+          "file": "src/__tests__/lib/auth/account-lockout.test.ts",
+          "line": 235,
+          "column": 26,
+          "message": "Property 'attempts' does not exist on type 'never'."
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-config.test.ts",
+          "line": 5,
+          "column": 3,
+          "message": "Module '\"@/lib/auth/session-config\"' has no exported member 'checkReauthenticationRequired'."
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-config.test.ts",
+          "line": 21,
+          "column": 23,
+          "message": "Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?"
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-config.test.ts",
+          "line": 29,
+          "column": 21,
+          "message": "Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?"
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-config.test.ts",
+          "line": 36,
+          "column": 21,
+          "message": "Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?"
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-config.test.ts",
+          "line": 43,
+          "column": 21,
+          "message": "Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?"
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-config.test.ts",
+          "line": 50,
+          "column": 21,
+          "message": "Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?"
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-config.test.ts",
+          "line": 57,
+          "column": 21,
+          "message": "Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?"
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-config.test.ts",
+          "line": 64,
+          "column": 21,
+          "message": "Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?"
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-config.test.ts",
+          "line": 75,
+          "column": 21,
+          "message": "Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?"
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-config.test.ts",
+          "line": 82,
+          "column": 21,
+          "message": "Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?"
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-config.test.ts",
+          "line": 92,
+          "column": 23,
+          "message": "Property 'isValid' does not exist on type '{ valid: boolean; errors: string[]; }'. Did you mean 'valid'?"
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-config.test.ts",
+          "line": 163,
+          "column": 28,
+          "message": "Property 'maxAge' does not exist on type '{ readonly absoluteTimeout: number; readonly idleTimeout: number; readonly renewalThreshold: number; readonly maxConcurrentSessions: 5; readonly lockout: { readonly maxAttempts: 5; readonly duration: number; readonly checkWindow: number; }; }'."
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-config.test.ts",
+          "line": 169,
+          "column": 28,
+          "message": "Property 'reauthTimeout' does not exist on type '{ readonly absoluteTimeout: number; readonly idleTimeout: number; readonly renewalThreshold: number; readonly maxConcurrentSessions: 5; readonly lockout: { readonly maxAttempts: 5; readonly duration: number; readonly checkWindow: number; }; }'."
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-manager.test.ts",
+          "line": 4,
+          "column": 3,
+          "message": "Module '\"@/lib/auth/session-manager\"' has no exported member 'renewSession'."
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-manager.test.ts",
+          "line": 6,
+          "column": 3,
+          "message": "'\"@/lib/auth/session-manager\"' has no exported member named 'invalidateAllUserSessions'. Did you mean 'invalidateUserSessions'?"
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-manager.test.ts",
+          "line": 20,
+          "column": 5,
+          "message": "Unused '@ts-expect-error' directive."
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-manager.test.ts",
+          "line": 37,
+          "column": 7,
+          "message": "Unused '@ts-expect-error' directive."
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-manager.test.ts",
+          "line": 71,
+          "column": 7,
+          "message": "Unused '@ts-expect-error' directive."
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-manager.test.ts",
+          "line": 85,
+          "column": 7,
+          "message": "Unused '@ts-expect-error' directive."
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-manager.test.ts",
+          "line": 98,
+          "column": 7,
+          "message": "Unused '@ts-expect-error' directive."
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-manager.test.ts",
+          "line": 115,
+          "column": 7,
+          "message": "Unused '@ts-expect-error' directive."
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-manager.test.ts",
+          "line": 136,
+          "column": 7,
+          "message": "Unused '@ts-expect-error' directive."
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-manager.test.ts",
+          "line": 153,
+          "column": 21,
+          "message": "Property 'success' does not exist on type 'void'."
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-manager.test.ts",
+          "line": 155,
+          "column": 7,
+          "message": "Unused '@ts-expect-error' directive."
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-manager.test.ts",
+          "line": 162,
+          "column": 21,
+          "message": "Property 'success' does not exist on type 'void'."
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-manager.test.ts",
+          "line": 180,
+          "column": 7,
+          "message": "Unused '@ts-expect-error' directive."
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-manager.test.ts",
+          "line": 201,
+          "column": 7,
+          "message": "Unused '@ts-expect-error' directive."
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-manager.test.ts",
+          "line": 208,
+          "column": 21,
+          "message": "Property 'cleaned' does not exist on type 'void'."
+        },
+        {
+          "file": "src/__tests__/lib/auth/session-manager.test.ts",
+          "line": 217,
+          "column": 21,
+          "message": "Property 'cleaned' does not exist on type 'void'."
+        },
+        {
+          "file": "src/__tests__/lib/rate-limit.test.ts",
+          "line": 27,
+          "column": 5,
+          "message": "Unused '@ts-expect-error' directive."
+        },
+        {
+          "file": "src/__tests__/lib/rate-limit.test.ts",
+          "line": 113,
+          "column": 59,
+          "message": "Expected 2 arguments, but got 3."
+        },
+        {
+          "file": "src/__tests__/lib/rate-limit.test.ts",
+          "line": 118,
+          "column": 60,
+          "message": "Expected 2 arguments, but got 3."
+        }
+      ],
+      "summary": {
+        "errors": 42
+      }
+    },
+    {
+      "name": "Build Readiness",
+      "status": "passed",
+      "issues": []
+    }
+  ],
+  "recommendations": [
+    "Fix 42 TypeScript errors"
+  ]
+}

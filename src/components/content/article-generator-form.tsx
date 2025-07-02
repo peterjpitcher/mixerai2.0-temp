@@ -18,6 +18,7 @@ import { QuillEditor } from '@/components/content/quill-editor';
 import 'quill/dist/quill.snow.css';
 import { ArticleDetailsSidebar } from './article-details-sidebar';
 import type { Brand } from '@/types/models'; // Import the new Brand type
+import { apiFetch } from '@/lib/api-client';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -63,7 +64,7 @@ export function ArticleGeneratorForm() {
     // Fetch brands
     const fetchBrands = async () => {
       try {
-        const response = await fetch('/api/brands');
+        const response = await apiFetch('/api/brands');
         const data = await response.json();
         
         if (data.success && Array.isArray(data.brands)) {
@@ -122,7 +123,7 @@ export function ArticleGeneratorForm() {
     setIsGeneratingTitles(true);
     
     try {
-      const response = await fetch('/api/content/generate/article-titles', {
+      const response = await apiFetch('/api/content/generate/article-titles', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -298,7 +299,7 @@ export function ArticleGeneratorForm() {
       const generatedSlug = generateSlug(selectedTitle, focusKeyword);
       setUrlSlug(generatedSlug);
       
-      const response = await fetch('/api/content/generate', {
+      const response = await apiFetch('/api/content/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -436,7 +437,7 @@ export function ArticleGeneratorForm() {
     
     try {
       // Call the API for AI-generated keywords
-      const response = await fetch('/api/content/generate/keywords', {
+      const response = await apiFetch('/api/content/generate/keywords', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -465,7 +466,7 @@ export function ArticleGeneratorForm() {
       
       // Make a direct call to generate keywords through Azure OpenAI
       try {
-        const aiResponse = await fetch('/api/tools/metadata-generator', {
+        const aiResponse = await apiFetch('/api/tools/metadata-generator', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -601,7 +602,7 @@ export function ArticleGeneratorForm() {
       // Parse primary keywords to pass to the API
       const primaryKeywordsArray = primaryKeywords.split(',').map(k => k.trim()).filter(k => k);
       
-      const response = await fetch('/api/content/generate/keywords', {
+      const response = await apiFetch('/api/content/generate/keywords', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -962,7 +963,7 @@ export function ArticleGeneratorForm() {
     
     try {
       // Find content type ID for "Article"
-      const contentTypeResponse = await fetch('/api/content-types');
+      const contentTypeResponse = await apiFetch('/api/content-types');
       const contentTypeData = await contentTypeResponse.json();
       
       if (!contentTypeData.success || !Array.isArray(contentTypeData.contentTypes)) {
@@ -978,7 +979,7 @@ export function ArticleGeneratorForm() {
       }
       
       // Create content in the database
-      const response = await fetch('/api/content', {
+      const response = await apiFetch('/api/content', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1064,7 +1065,7 @@ export function ArticleGeneratorForm() {
     
     try {
       // Use Azure OpenAI to generate the best focus keyword
-      const response = await fetch('/api/tools/metadata-generator', {
+      const response = await apiFetch('/api/tools/metadata-generator', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

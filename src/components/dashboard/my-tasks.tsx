@@ -8,7 +8,7 @@ import { TasksSkeleton } from './dashboard-skeleton';
 import { Task } from '@/types/task';
 import { formatDistanceToNow } from 'date-fns';
 import { CheckSquare } from 'lucide-react';
-import { BrandIcon } from '@/components/brand-icon';
+import { BrandDisplay } from '@/components/ui/brand-display';
 
 async function fetchTasks(): Promise<Task[]> {
   try {
@@ -57,10 +57,13 @@ export function MyTasks() {
             {tasks.map((task) => (
               <li key={task.id} className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3">
-                   <BrandIcon 
-                     name={task.brand_name} 
-                     color={task.brand_color}
-                     logoUrl={task.brand_logo_url}
+                   <BrandDisplay 
+                     brand={{
+                       name: task.brand_name || 'Unknown Brand',
+                       brand_color: task.brand_color,
+                       logo_url: task.brand_logo_url
+                     }}
+                     variant="compact"
                      size="md"
                    />
                    <div>

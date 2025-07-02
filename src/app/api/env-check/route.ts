@@ -12,6 +12,13 @@ export const dynamic = "force-dynamic"; // Ensures the route is always dynamic
  * It should be REMOVED or STRICTLY SECURED if kept in deployment.
  */
 export const GET = withAdminAuth(async (_request: NextRequest, user) => {
+  // Restrict to development environment only
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json(
+      { success: false, error: 'Not found' },
+      { status: 404 }
+    );
+  }
   
   try {
     // Check environment variables

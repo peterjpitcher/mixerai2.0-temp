@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DueDateIndicator } from '@/components/ui/due-date-indicator';
-import { BrandIcon } from '@/components/brand-icon';
+import { BrandDisplay } from '@/components/ui/brand-display';
 
 interface ContentWithDeadline {
   id: string;
@@ -128,10 +128,13 @@ export function UpcomingDeadlinesWidget({
                   <p className="font-medium text-sm truncate">{item.title}</p>
                   {item.brand_name && (
                     <div className="flex items-center gap-1.5">
-                      <BrandIcon 
-                        name={item.brand_name} 
-                        color={item.brand_color || undefined}
-                        logoUrl={item.brand_logo_url || undefined}
+                      <BrandDisplay 
+                        brand={{
+                          name: item.brand_name,
+                          brand_color: item.brand_color,
+                          logo_url: item.brand_logo_url
+                        }}
+                        variant="compact"
                         size="sm"
                         className="h-4 w-4"
                       />

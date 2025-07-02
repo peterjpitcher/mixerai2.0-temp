@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { COUNTRIES } from '@/lib/constants';
-import { withAuthAndMonitoring } from '@/lib/auth/api-auth';
+import { withAuthMonitoringAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import axios from 'axios';
 import sanitizeHtml from 'sanitize-html';
@@ -92,7 +92,7 @@ async function scrapeWebsiteContent(url: string): Promise<string> {
   }
 }
 
-export const POST = withAuthAndMonitoring(async (req: NextRequest) => {
+export const POST = withAuthMonitoringAndCSRF(async (req: NextRequest) => {
   try {
     const body = await req.json();
     const name = body.name || body.brandName;

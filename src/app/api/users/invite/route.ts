@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { withAdminAuth } from '@/lib/auth/api-auth';
+import { withAdminAuthAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
-import { withCSRF } from '@/lib/api/with-csrf';
 // import { verifyEmailTemplates } from '@/lib/auth/email-templates'; // verifyEmailTemplates only logs in dev, can be removed if not essential for flow logic
 import { getUserAuthByEmail, inviteNewUserWithAppMetadata } from '@/lib/auth/user-management';
 
@@ -10,7 +9,7 @@ import { getUserAuthByEmail, inviteNewUserWithAppMetadata } from '@/lib/auth/use
  * POST endpoint to invite a new user
  * Only global administrators can invite users.
  */
-export const POST = withAdminAuth(async (request: NextRequest, adminUser) => {
+export const POST = withAdminAuthAndCSRF(async (request: NextRequest, adminUser) => {
   console.log('[API /api/users/invite] Received POST request');
   try {
     const supabase = createSupabaseAdminClient();

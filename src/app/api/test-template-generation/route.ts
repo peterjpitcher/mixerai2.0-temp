@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError } from '@/lib/api-utils'; // For consistent error handling
 // import { withAuth } from '@/lib/auth/api-auth'; // No longer used
-import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
+import { withAdminAuthAndCSRF } from '@/lib/auth/api-auth'; // Use withAdminAuthAndCSRF
 import { User } from '@supabase/supabase-js';
 
 // Template-based brand identity generation (Non-AI)
@@ -55,7 +55,7 @@ function generateContentTemplate(title: string, contentType: string, _brandIdent
  * It should be REMOVED or STRICTLY SECURED if kept in deployment.
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export const POST = withAdminAuth(async (req: NextRequest, _user: User) => {
+export const POST = withAdminAuthAndCSRF(async (req: NextRequest, _user: User) => {
   try {
     const payload = await req.json();
     const { type, brandName, country, language, contentType, title } = payload;

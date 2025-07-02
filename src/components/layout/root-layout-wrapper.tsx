@@ -7,6 +7,7 @@ import { NotificationCenter } from "@/components/dashboard/notification-center";
 import { User, LayoutDashboard, Tags, Users2, GitFork, FileText, Settings, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import React from "react";
+import { SkipLink } from '@/components/ui/skip-link';
 
 /**
  * RootLayoutWrapper component.
@@ -58,8 +59,9 @@ export default function RootLayoutWrapper({
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <SkipLink />
       {/* Header: Updated to use primary theme color */}
-      <header className="border-b bg-primary text-primary-foreground sticky top-0 z-40 shadow-sm">
+      <header className="border-b bg-primary text-primary-foreground sticky top-0 z-40 shadow-sm" role="banner">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <Link href="/" className="flex items-center space-x-2">
@@ -92,7 +94,7 @@ export default function RootLayoutWrapper({
       <div className="flex flex-1 container mx-auto">
         {/* Sidebar: Simplified or potentially removed if this layout is very generic */}
         {/* For now, keeping a simplified version, links point to dashboard routes */}
-        <aside className="w-56 border-r bg-card p-4 space-y-2 hidden md:block shrink-0 h-[calc(100vh-var(--header-height,61px))] sticky top-[var(--header-height,61px)] overflow-y-auto">
+        <nav role="navigation" aria-label="Main navigation" className="w-56 border-r bg-card p-4 space-y-2 hidden md:block shrink-0 h-[calc(100vh-var(--header-height,61px))] sticky top-[var(--header-height,61px)] overflow-y-auto">
           <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider px-2">Menu</span>
           {navLinks.map((link) => (
             <Link 
@@ -127,16 +129,16 @@ export default function RootLayoutWrapper({
               </Link>
             ))}
           </div>
-        </aside>
+        </nav>
 
         {/* Mobile navigation not implemented for this generic wrapper, focus on dashboard nav */}
 
-        <main className="flex-1 overflow-auto p-4 sm:p-6">
+        <main id="main-content" role="main" className="flex-1 overflow-auto p-4 sm:p-6">
           {children}
         </main>
       </div>
       
-      <footer className="border-t py-4 bg-muted/40 text-center">
+      <footer role="contentinfo" className="border-t py-4 bg-muted/40 text-center">
         <div className="container mx-auto px-4">
           <p className="text-xs text-muted-foreground">
             &copy; {new Date().getFullYear()} MixerAI. All rights reserved.

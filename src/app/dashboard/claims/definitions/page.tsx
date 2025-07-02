@@ -5,6 +5,7 @@ import { ClaimDefinitionFormV2, ClaimDefinitionData } from '@/components/dashboa
 import { toast } from 'sonner';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { PageHeader } from '@/components/dashboard/page-header';
+import { apiFetch } from '@/lib/api-client';
 
 export default function DefineClaimsPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -13,7 +14,7 @@ export default function DefineClaimsPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/claims', {
+      const response = await apiFetch('/api/claims', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

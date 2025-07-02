@@ -7,6 +7,13 @@ import { toast } from 'sonner';
 import { createBrowserClient } from '@supabase/ssr';
 import Image from 'next/image';
 import { Spinner } from '@/components/spinner';
+import { 
+  validateFile, 
+  validateFileContent, 
+  generateUniqueFileName, 
+  validateImageDimensions,
+  sanitizeFileName
+} from '@/lib/validation/file-upload';
 
 interface BrandLogoUploadProps {
   currentLogoUrl?: string | null;
@@ -36,25 +43,41 @@ export function BrandLogoUpload({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/svg+xml'];
-    if (!validTypes.includes(file.type)) {
-      toast.error('Please select a valid image file (JPEG, PNG, WebP, or SVG)');
+    // Validate file using comprehensive validation
+    const validationResult = validateFile(file, { category: 'brandLogo' });
+    if (!validationResult.valid) {
+      toast.error(validationResult.error || 'Invalid file');
       return;
     }
 
-    // Validate file size (max 10MB)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      toast.error('Logo size must be less than 10MB');
+    // Validate file content for security (allow SVG for brand logos)
+    const contentValidation = await validateFileContent(file, { allowSVG: true });
+    if (!contentValidation.valid) {
+      toast.error(contentValidation.error || 'File content validation failed');
       return;
+    }
+
+    // Validate image dimensions for brand logos
+    if (!file.type.includes('svg')) {
+      const dimensionValidation = await validateImageDimensions(file, {
+        minWidth: 200,
+        maxWidth: 4000,
+        minHeight: 200,
+        maxHeight: 4000,
+        aspectRatio: { min: 0.8, max: 1.25 } // Prefer square-ish logos
+      });
+      if (!dimensionValidation.valid) {
+        toast.error(dimensionValidation.error || 'Invalid image dimensions');
+        return;
+      }
     }
 
     setIsUploading(true);
 
     try {
-      // Create a unique file name
-      const fileExt = file.name.split('.').pop();
+      // Generate a unique, sanitized filename
+      const sanitized = sanitizeFileName(file.name);
+      const fileExt = sanitized.split('.').pop();
       const fileName = `${brandId}-${Date.now()}.${fileExt}`;
       const filePath = fileName;
 
@@ -75,14 +98,10 @@ export function BrandLogoUpload({
         .from('brand-logos')
         .getPublicUrl(filePath);
 
-      console.log('BrandLogoUpload - Generated public URL:', publicUrl);
-      console.log('BrandLogoUpload - File path:', filePath);
-
       // Update the preview
       setPreviewUrl(publicUrl);
       
       // Call the parent callback
-      console.log('BrandLogoUpload - Calling onLogoChange with:', publicUrl);
       onLogoChange(publicUrl);
       
       toast.success('Brand logo uploaded successfully');

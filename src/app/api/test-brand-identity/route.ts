@@ -29,6 +29,14 @@ const mockResponse = {
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const GET = withAdminAuth(async (_request: NextRequest, _user) => {
+  // Restrict to development environment only
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json(
+      { success: false, error: 'Not found' },
+      { status: 404 }
+    );
+  }
+  
   try {
     // Check if we're in a build environment and use mock data
     if (isBuildEnvironment) {
@@ -62,7 +70,7 @@ export const GET = withAdminAuth(async (_request: NextRequest, _user) => {
     const testLanguage = "en";
     const testCountry = "US";
 
-    console.log(`GET /api/test-brand-identity: Testing with Brand: ${testBrandName}, URL: ${testUrls[0]}, Lang: ${testLanguage}, Country: ${testCountry}`);
+    // Console.log removed for production security
     
     const identityData = await generateBrandIdentityFromUrls(
       testBrandName, 
@@ -71,7 +79,7 @@ export const GET = withAdminAuth(async (_request: NextRequest, _user) => {
       testCountry
     );
     
-    console.log("Brand identity GET test successful:", identityData);
+    // Console.log removed for production security
     
     return NextResponse.json({
       success: true,

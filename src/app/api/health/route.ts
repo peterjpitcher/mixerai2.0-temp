@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ const startTime = Date.now();
  * Returns 200 if all critical services are operational
  * Returns 503 if any critical service is down
  */
-export async function GET(request: NextRequest): Promise<Response> {
+export async function GET(): Promise<Response> {
   const healthStatus: HealthStatus = {
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     const supabase = createSupabaseServerClient();
     
     // Check if auth service is responding
-    const { data: { session } } = await supabase.auth.getSession();
+    await supabase.auth.getSession();
     const authResponseTime = Date.now() - authStart;
     
     healthStatus.checks.authentication = {

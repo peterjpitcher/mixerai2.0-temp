@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/auth/api-auth';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { processInviteCompletion } from '@/lib/auth/invite-completion-service'; // Import the service
 import { User } from '@supabase/supabase-js';
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
  * This endpoint assigns permissions based on metadata stored during the invite.
  * Requires authentication (user should be logged in after confirming).
  */
-export const POST = withAuth(async (request: NextRequest, user: User) => {
+export const POST = withAuthAndCSRF(async (request: NextRequest, user: User) => {
   const supabase = createSupabaseAdminClient();
   const result = await processInviteCompletion(user, supabase);
 
