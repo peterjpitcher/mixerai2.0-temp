@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { UserCircle } from 'lucide-react';
 import { format as formatDateFns } from 'date-fns';
+import { apiFetch } from '@/lib/api-client';
 
 interface User {
   id: string;
@@ -80,7 +81,7 @@ export function UserProfile({ user, isCurrentUser = false, canEdit = false, onUs
     try {
       setIsSubmitting(true);
       
-      const response = await fetch(`/api/users/${user.id}`, {
+      const response = await apiFetch(`/api/users/${user.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'

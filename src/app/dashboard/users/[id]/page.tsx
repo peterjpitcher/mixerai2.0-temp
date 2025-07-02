@@ -28,6 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { touchFriendly } from '@/lib/utils/touch-target';
 import { BrandIcon } from '@/components/brand-icon';
 import { Label } from '@/components/ui/label';
+import { apiFetch } from '@/lib/api-client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -156,7 +157,7 @@ export default function UserDetailPage() {
     
     try {
       // Call the API route to handle user deletion
-      const response = await fetch(`/api/users/${params.id}`, {
+      const response = await apiFetch(`/api/users/${params.id}`, {
         method: 'DELETE',
       });
       

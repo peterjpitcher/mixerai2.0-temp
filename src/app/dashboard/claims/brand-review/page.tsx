@@ -10,6 +10,7 @@ import { Heading } from '@/components/ui/heading';
 import { Loader2, Copy, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { fetchCountries, fetchProducts } from '@/lib/api-utils';
+import { apiFetch } from '@/lib/api-client';
 
 // Types
 interface SelectOption {
@@ -56,7 +57,7 @@ const BrandClaimsOutputPage = () => {
             setIsLoading(true);
             try {
                 const [brandsRes, productsRes, countriesRes] = await Promise.all([
-                    fetch('/api/master-claim-brands'),
+                    apiFetch('/api/master-claim-brands'),
                     fetchProducts(),
                     fetchCountries()
                 ]);
@@ -86,7 +87,7 @@ const BrandClaimsOutputPage = () => {
         setBrandNameForDisplay('');
 
         try {
-            const response = await fetch('/api/ai/style-brand-claims', {
+            const response = await apiFetch('/api/ai/style-brand-claims', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

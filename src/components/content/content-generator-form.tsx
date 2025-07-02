@@ -19,6 +19,7 @@ import Link from 'next/link';
 import type { InputField, OutputField, ContentTemplate as Template, SelectOptions, FieldType } from '@/types/template';
 import { ProductSelect } from './product-select';
 import type { ProductContext } from '@/types/claims';
+import { apiFetch } from '@/lib/api-client';
 
 interface Brand {
   id: string;
@@ -262,7 +263,7 @@ function ContentGeneratorFormOriginal({ templateId }: ContentGeneratorFormProps)
         const abortController = new AbortController();
         
         try {
-          const response = await fetch('/api/content/prepare-product-context', {
+          const response = await apiFetch('/api/content/prepare-product-context', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ productId: value }),
@@ -371,7 +372,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
         prompt: populatedPrompt,
       };
 
-      const response = await fetch('/api/ai/suggest', {
+      const response = await apiFetch('/api/ai/suggest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
@@ -430,7 +431,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
         }
       };
 
-      const response = await fetch('/api/content/generate', { 
+      const response = await apiFetch('/api/content/generate', { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify(generationRequestBody) 
@@ -481,7 +482,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
               keywords: keywordsField ? (templateFieldValues[keywordsField.id] || '').split(',').map(k => k.trim()).filter(k => k) : undefined,
             };
 
-            const titleResponse = await fetch('/api/ai/generate-title', {
+            const titleResponse = await apiFetch('/api/ai/generate-title', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(titleRequestContext)
@@ -538,7 +539,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
         workflow_id: associatedWorkflowDetails?.id,
       };
 
-      const response = await fetch('/api/content/generate-field', {
+      const response = await apiFetch('/api/content/generate-field', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
@@ -605,7 +606,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
             generatedOutputs: generatedOutputs
         }
       };
-      const response = await fetch('/api/content', { 
+      const response = await apiFetch('/api/content', { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify(payload) 

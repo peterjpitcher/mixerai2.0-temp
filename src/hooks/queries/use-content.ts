@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { apiFetch } from '@/lib/api-client';
 
 // Query keys
 export const contentQueryKeys = {
@@ -77,7 +78,7 @@ export function useCreateContent() {
 
   return useMutation({
     mutationFn: async (contentData: any) => {
-      const response = await fetch('/api/content', {
+      const response = await apiFetch('/api/content', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -110,7 +111,7 @@ export function useUpdateContent(id: string) {
 
   return useMutation({
     mutationFn: async (contentData: any) => {
-      const response = await fetch(`/api/content/${id}`, {
+      const response = await apiFetch(`/api/content/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -144,7 +145,7 @@ export function useDeleteContent() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/content/${id}`, {
+      const response = await apiFetch(`/api/content/${id}`, {
         method: 'DELETE',
         credentials: 'include',
       });

@@ -2,6 +2,8 @@
  * Error tracking utility for centralized error reporting
  */
 
+import { apiFetch } from '@/lib/api-client';
+
 interface ErrorDetails {
   errorId?: string;
   userId?: string;
@@ -37,19 +39,11 @@ export async function trackError(
 
   // In production, send to error tracking service
   try {
-    // Get CSRF token from cookie
-    const getCsrfToken = (): string => {
-      if (typeof document === 'undefined') return '';
-      const match = document.cookie.match(/csrf-token=([^;]+)/);
-      return match ? match[1] : '';
-    };
-
     // Send to error tracking endpoint
-    await fetch('/api/errors/track', {
+    await apiFetch('/api/errors/track', {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'x-csrf-token': getCsrfToken(),
       },
       body: JSON.stringify(errorInfo),
     });

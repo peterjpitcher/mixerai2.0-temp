@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { debounce } from 'lodash';
+import { apiFetch } from '@/lib/api-client';
 
 interface FormPersistenceOptions<T> {
   storageKey?: string;
@@ -152,7 +153,7 @@ export function useSessionTimeout(
         // User wants to continue, reset timers
         resetTimers();
         // Optionally refresh the session here
-        fetch('/api/auth/refresh', { method: 'POST' }).catch(() => {});
+        apiFetch('/api/auth/refresh', { method: 'POST' }).catch(() => {});
       }
     }, warningMinutes * 60 * 1000);
 

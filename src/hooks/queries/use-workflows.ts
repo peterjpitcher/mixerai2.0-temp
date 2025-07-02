@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { apiFetch } from '@/lib/api-client';
 
 // Query keys
 export const workflowQueryKeys = {
@@ -79,7 +80,7 @@ export function useCreateWorkflow() {
 
   return useMutation({
     mutationFn: async (workflowData: any) => {
-      const response = await fetch('/api/workflows', {
+      const response = await apiFetch('/api/workflows', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -112,7 +113,7 @@ export function useUpdateWorkflow(id: string) {
 
   return useMutation({
     mutationFn: async (workflowData: any) => {
-      const response = await fetch(`/api/workflows/${id}`, {
+      const response = await apiFetch(`/api/workflows/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -146,7 +147,7 @@ export function useDeleteWorkflow() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/workflows/${id}`, {
+      const response = await apiFetch(`/api/workflows/${id}`, {
         method: 'DELETE',
         credentials: 'include',
       });

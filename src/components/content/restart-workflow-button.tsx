@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiFetch } from '@/lib/api-client';
 
 interface RestartWorkflowButtonProps {
   contentId: string;
@@ -36,7 +37,7 @@ export function RestartWorkflowButton({
   const handleRestart = async () => {
     setIsRestarting(true);
     try {
-      const response = await fetch(`/api/content/${contentId}/restart-workflow`, {
+      const response = await apiFetch(`/api/content/${contentId}/restart-workflow`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

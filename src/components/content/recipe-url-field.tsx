@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { RecipeUrlOptions } from '@/types/template';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
+import { apiFetch } from '@/lib/api-client';
 
 interface RecipeUrlFieldProps {
   id: string;
@@ -68,7 +69,7 @@ export function RecipeUrlField({
 
     setIsLoading(true);
     try {
-      const response = await fetch('/api/content/scrape-recipe', {
+      const response = await apiFetch('/api/content/scrape-recipe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

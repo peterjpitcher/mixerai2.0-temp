@@ -18,6 +18,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { RefreshCw, Loader2, Sparkles, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiFetch } from '@/lib/api-client';
 
 interface RegenerationPanelProps {
   contentId: string;
@@ -66,7 +67,7 @@ export function RegenerationPanel({
         payload.fieldId = selectedFields[0];
       }
       
-      const response = await fetch(`/api/content/${contentId}/regenerate`, {
+      const response = await apiFetch(`/api/content/${contentId}/regenerate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

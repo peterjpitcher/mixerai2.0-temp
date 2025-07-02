@@ -11,6 +11,7 @@ import { CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { apiFetch } from '@/lib/api-client';
 
 export interface WorkflowStep {
   id: string | number;
@@ -115,7 +116,7 @@ export function ContentApprovalWorkflow({
 
     console.log('[ContentApprovalWorkflow] Submitting action:', action, 'with feedback:', feedback);
     try {
-      const response = await fetch(`/api/content/${contentId}/workflow-action`, {
+      const response = await apiFetch(`/api/content/${contentId}/workflow-action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, feedback }),

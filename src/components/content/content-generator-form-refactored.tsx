@@ -20,6 +20,7 @@ import { GeneratedContentPreview } from './generated-content-preview';
 import { ClaimsViewerSection } from './claims-viewer-section';
 import { useContentGenerator } from '@/hooks/use-content-generator';
 import { DatePicker } from '@/components/ui/date-picker';
+import { apiFetch } from '@/lib/api-client';
 
 interface ContentGeneratorFormProps {
   templateId?: string | null;

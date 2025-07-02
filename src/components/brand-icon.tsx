@@ -57,7 +57,7 @@ export function BrandIcon({
   
   // Otherwise, show initials with background color
   // Determine the best text color for contrast
-  const textColor = getBestTextColor(color);
+  const textColor = getBestTextColor(brandColor);
   
   return (
     <div 
@@ -67,8 +67,8 @@ export function BrandIcon({
         className
       )}
       style={{ 
-          backgroundColor: brandColor,
-          color: textColor
+        backgroundColor: brandColor,
+        color: textColor
       }}
     >
       {initial}

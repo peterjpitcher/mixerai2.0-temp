@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { apiFetch } from '@/lib/api-client';
 
 interface Notification {
   id: string;
@@ -110,7 +111,7 @@ export function NotificationsButton() {
   
   const markAllAsRead = async () => {
     try {
-      const response = await fetch('/api/notifications/mark-read', {
+      const response = await apiFetch('/api/notifications/mark-read', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ markAll: true }),
@@ -127,7 +128,7 @@ export function NotificationsButton() {
   
   const markAsRead = async (id: string) => {
     try {
-      const response = await fetch('/api/notifications/mark-read', {
+      const response = await apiFetch('/api/notifications/mark-read', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notificationId: id }),
@@ -149,7 +150,7 @@ export function NotificationsButton() {
   
   const clearAll = async () => {
     try {
-      const response = await fetch('/api/notifications/clear', {
+      const response = await apiFetch('/api/notifications/clear', {
         method: 'DELETE',
       });
 
