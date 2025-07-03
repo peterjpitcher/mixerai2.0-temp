@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+
+// Force dynamic rendering to prevent static generation errors
+export const dynamic = 'force-dynamic';
 // import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
