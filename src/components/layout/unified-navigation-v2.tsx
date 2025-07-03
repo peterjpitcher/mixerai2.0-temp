@@ -179,7 +179,6 @@ export function UnifiedNavigationV2({ className }: UnifiedNavigationProps) {
         { href: '/dashboard/claims', label: 'Claims', icon: <ShieldCheck className="h-4 w-4" />, segment: 'claims' },
         { href: '/dashboard/claims/pending-approval', label: 'Pending', icon: <ClipboardList className="h-4 w-4" />, segment: 'pending-approval' },
         { href: '/dashboard/claims/preview', label: 'Matrix', icon: <LayoutGrid className="h-4 w-4" />, segment: 'claims-matrix' },
-        { href: '/dashboard/claims/definitions', label: 'Definitions', icon: <BookOpen className="h-4 w-4" />, segment: 'definitions' },
         { href: '/dashboard/claims/workflows', label: 'Workflows', icon: <GitBranch className="h-4 w-4" />, segment: 'workflows' },
         { href: '/dashboard/claims/overrides', label: 'Overrides', icon: <Globe2 className="h-4 w-4" />, segment: 'overrides' },
         { href: '/dashboard/claims/brand-review', label: 'Review', icon: <SearchCheck className="h-4 w-4" />, segment: 'brand-review' },
@@ -221,13 +220,6 @@ export function UnifiedNavigationV2({ className }: UnifiedNavigationProps) {
       label: 'Account',
       icon: <Settings className="h-5 w-5" />,
       segment: 'account',
-      show: () => isAuthenticatedUser
-    },
-    {
-      href: '/dashboard/release-notes',
-      label: 'Release Notes',
-      icon: <Info className="h-5 w-5" />,
-      segment: 'release-notes',
       show: () => isAuthenticatedUser
     },
     {
