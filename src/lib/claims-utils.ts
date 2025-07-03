@@ -1,4 +1,5 @@
 import { createSupabaseAdminClient } from './supabase/client';
+import { ALL_COUNTRIES_CODE } from '@/lib/constants/country-codes';
 
 // Types mirroring database schema and API responses
 // These might be better placed in a central types file (e.g., src/types/claims.ts) if used widely
@@ -80,6 +81,7 @@ export interface MarketClaimOverride {
   replacement_claim_id: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  replacement_claim?: Claim | null; // For when replacement claim is joined
 }
 
 // Intermediate type for processing claims with priority
@@ -187,18 +189,22 @@ export async function getStackedClaimsForProduct(
       brandClaims = await fetchClaimsForLevel('brand', [masterBrandId]);
     }
 
-    // 6. Fetch Market Claim Overrides for this product and country
+    // 6. Fetch Market Claim Overrides for this product and country (including global overrides)
     const { data: marketOverridesData, error: overridesError } = await supabase
         .from('market_claim_overrides')
         .select('*, replacement_claim:claims!replacement_claim_id(*)') // Eager load replacement claim details
         .eq('target_product_id', productId)
-        .eq('market_country_code', countryCode);
+        .in('market_country_code', [countryCode, ALL_COUNTRIES_CODE]); // Include global overrides
 
     if (overridesError) {
         console.error(`[getStackedClaimsForProduct] Error fetching market overrides for product ${productId}, country ${countryCode}:`, overridesError);
         // Continue, but overrides won't apply
     }
     const marketOverrides: MarketClaimOverride[] = (marketOverridesData as MarketClaimOverride[]) || [];
+    
+    // Separate country-specific and global overrides for precedence handling
+    const countrySpecificOverrides = marketOverrides.filter(o => o.market_country_code === countryCode);
+    const globalOverrides = marketOverrides.filter(o => o.market_country_code === ALL_COUNTRIES_CODE);
 
 
     // 7. Consolidate and determine effective claims
@@ -248,7 +254,14 @@ export async function getStackedClaimsForProduct(
         let overrideApplied: MarketClaimOverride | undefined = undefined;
 
         if (masterClaimIdForOverrideCheck) {
-            overrideApplied = marketOverrides.find(ovr => ovr.master_claim_id === masterClaimIdForOverrideCheck);
+            // Check country-specific override first (higher precedence)
+            overrideApplied = countrySpecificOverrides.find(ovr => ovr.master_claim_id === masterClaimIdForOverrideCheck);
+            
+            // If no country-specific override, check global override
+            if (!overrideApplied) {
+                overrideApplied = globalOverrides.find(ovr => ovr.master_claim_id === masterClaimIdForOverrideCheck);
+            }
+            
             if (overrideApplied) {
                 isOverridden = true;
                 if (overrideApplied.is_blocked && !overrideApplied.replacement_claim_id) {
@@ -260,14 +273,15 @@ export async function getStackedClaimsForProduct(
                         original_master_claim_id_if_overridden: masterClaimIdForOverrideCheck,
                         is_blocked_override: true,
                         isActuallyMaster: false,
-                        description: `Master claim "${claim.claim_text}" blocked in ${countryCode} for product ${productId}.`,
+                        description: overrideApplied.market_country_code === ALL_COUNTRIES_CODE 
+                            ? `Master claim "${claim.claim_text}" blocked globally for product ${productId}.`
+                            : `Master claim "${claim.claim_text}" blocked in ${countryCode} for product ${productId}.`,
                         applies_to_product_id: productId,
                         applies_to_country_code: countryCode,
                         original_claim_country_code: '__GLOBAL__', // Master claims are global
                     });
                 } else if (overrideApplied.replacement_claim_id) {
-                    // @ts-expect-error - replacement_claim is joined but types don't reflect it
-                    const replacementClaim = overrideApplied.replacement_claim as Claim | null;
+                    const replacementClaim = (overrideApplied as any).replacement_claim as Claim | null;
                     if (replacementClaim) {
                         effectiveClaimsMap.set(claim.claim_text, {
                             claim_text: replacementClaim.claim_text, // Could be different text if replacement changes it, though unusual for override
@@ -277,7 +291,9 @@ export async function getStackedClaimsForProduct(
                             original_master_claim_id_if_overridden: masterClaimIdForOverrideCheck,
                             is_replacement_override: true,
                             isActuallyMaster: false,
-                            description: replacementClaim.description || `Master claim "${claim.claim_text}" replaced by "${replacementClaim.claim_text}" in ${countryCode}.`,
+                            description: replacementClaim.description || (overrideApplied.market_country_code === ALL_COUNTRIES_CODE 
+                                ? `Master claim "${claim.claim_text}" replaced globally by "${replacementClaim.claim_text}".`
+                                : `Master claim "${claim.claim_text}" replaced by "${replacementClaim.claim_text}" in ${countryCode}.`),
                             applies_to_product_id: productId,
                             applies_to_country_code: countryCode,
                             original_claim_country_code: replacementClaim.country_code, // Country of the replacement claim

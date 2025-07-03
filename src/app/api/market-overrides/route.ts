@@ -4,6 +4,7 @@ import { handleApiError, isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { ALL_COUNTRIES_CODE } from '@/lib/constants/country-codes';
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,9 @@ interface MarketClaimOverridePostPayload {
     target_product_id: string;
     is_blocked?: boolean; // Defaults to true in DB if not provided, API could enforce it or let DB handle
     replacement_claim_id?: string | null;
+    forceGlobal?: boolean; // For overriding existing country-specific overrides
 }
+
 
 // Helper to validate claim properties via a Supabase call
 async function getClaimProperties(supabase: ReturnType<typeof createSupabaseAdminClient>, claimId: string): Promise<{ country_code: string; id: string } | null> {
@@ -42,6 +45,70 @@ async function getClaimProperties(supabase: ReturnType<typeof createSupabaseAdmi
     return data as { country_code: string; id: string };
 }
 
+// Helper function to check for conflicts
+async function checkForConflicts(supabase: ReturnType<typeof createSupabaseAdminClient>, data: { masterClaimId: string; targetProductId: string; marketCountryCode: string }) {
+    if (data.marketCountryCode !== ALL_COUNTRIES_CODE) {
+        // Check if global override exists
+        const { data: globalOverride } = await supabase
+            .from('market_claim_overrides')
+            .select('id')
+            .eq('master_claim_id', data.masterClaimId)
+            .eq('target_product_id', data.targetProductId)
+            .eq('market_country_code', ALL_COUNTRIES_CODE)
+            .single();
+            
+        return {
+            hasConflicts: !!globalOverride,
+            details: globalOverride ? [{
+                type: 'global_exists',
+                message: 'A global override already exists for this claim'
+            }] : []
+        };
+    }
+    
+    // For global overrides, check country-specific ones
+    const { data: countryOverrides } = await supabase
+        .from('market_claim_overrides')
+        .select('market_country_code, is_blocked')
+        .eq('master_claim_id', data.masterClaimId)
+        .eq('target_product_id', data.targetProductId)
+        .neq('market_country_code', ALL_COUNTRIES_CODE);
+        
+    return {
+        hasConflicts: (countryOverrides?.length || 0) > 0,
+        details: countryOverrides?.map((o) => ({
+            type: 'country_specific_exists',
+            country: o.market_country_code,
+            isBlocked: o.is_blocked
+        }))
+    };
+}
+
+// Helper to audit global operations
+async function auditGlobalOperation(supabase: ReturnType<typeof createSupabaseAdminClient>, data: {
+    overrideId: string;
+    action: string;
+    userId: string;
+    affectedCountries: string[];
+    newState: unknown;
+    previousState?: unknown;
+}) {
+    const { error } = await (supabase as any)
+        .from('global_override_audit')
+        .insert({
+            override_id: data.overrideId,
+            action: data.action,
+            user_id: data.userId,
+            affected_countries: data.affectedCountries,
+            new_state: data.newState,
+            previous_state: data.previousState
+        });
+        
+    if (error) {
+        console.error('[API MarketOverrides] Error auditing global operation:', error);
+    }
+}
+
 
 // POST handler for creating a new market claim override
 export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promise<Response> => {
@@ -52,27 +119,48 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
             market_country_code, 
             target_product_id, 
             is_blocked = true, // Default to true if not provided by client
-            replacement_claim_id 
+            replacement_claim_id,
+            forceGlobal
         } = body;
 
         // Basic validation
         if (!master_claim_id || !market_country_code || !target_product_id) {
             return NextResponse.json({ success: false, error: 'Missing required fields: master_claim_id, market_country_code, target_product_id.' }, { status: 400 });
         }
+        
+        // Allow __ALL_COUNTRIES__ but not __GLOBAL__
         if (market_country_code === '__GLOBAL__') {
             return NextResponse.json({ success: false, error: 'market_country_code cannot be __GLOBAL__ for an override.' }, { status: 400 });
         }
+        
         if (replacement_claim_id === master_claim_id) {
             return NextResponse.json({ success: false, error: 'Replacement claim cannot be the same as the master claim.'}, { status: 400 });
         }
 
         const supabase = createSupabaseAdminClient();
+        
+        // Validate country code (either __ALL_COUNTRIES__ or active country)
+        if (market_country_code !== ALL_COUNTRIES_CODE) {
+            const { data: countryData } = await supabase
+                .from('countries')
+                .select('code')
+                .eq('code', market_country_code)
+                .eq('is_active', true)
+                .single();
+                
+            if (!countryData) {
+                return NextResponse.json({ 
+                    success: false, 
+                    error: `Invalid or inactive country code: ${market_country_code}` 
+                }, { status: 400 });
+            }
+        }
 
         // --- Permission Check Start ---
         let hasPermission = user?.user_metadata?.role === 'admin';
+        let userRole = 'viewer'; // default
 
         if (!hasPermission && target_product_id) {
-
             const { data: productData, error: productError } = await supabase
                 .from('products')
                 .select('master_brand_id')
@@ -83,7 +171,6 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
                 console.error(`[API MarketOverrides POST] Error fetching product/MCB for permissions (Product ID: ${target_product_id}):`, productError);
                 // Deny permission if product or its MCB link is not found
             } else {
-
                 const { data: mcbData, error: mcbError } = await supabase
                     .from('master_claim_brands')
                     .select('mixerai_brand_id')
@@ -94,29 +181,33 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
                     console.error(`[API MarketOverrides POST] Error fetching MCB or MCB not linked for permissions (MCB ID: ${productData.master_brand_id}):`, mcbError);
                     // Deny permission if MCB not found or not linked to a core MixerAI brand
                 } else {
-
                     const { data: permissionsData, error: permissionsError } = await supabase
                         .from('user_brand_permissions')
                         .select('role')
                         .eq('user_id', user.id)
                         .eq('brand_id', mcbData.mixerai_brand_id)
-                        .eq('role', 'admin') // Must be an admin of the core MixerAI brand
-                        .limit(1);
+                        .single();
 
                     if (permissionsError) {
                         console.error(`[API MarketOverrides POST] Error fetching user_brand_permissions:`, permissionsError);
-                    } else if (permissionsData && permissionsData.length > 0) {
-                        hasPermission = true;
+                    } else if (permissionsData) {
+                        userRole = permissionsData.role;
+                        hasPermission = permissionsData.role === 'admin';
                     }
                 }
             }
-        } else if (!target_product_id && !hasPermission) {
-            // If target_product_id is missing and user is not admin, deny (though already caught by basic validation)
-            // This case is mostly for completeness, as the initial check `!master_claim_id || ...` should catch missing target_product_id.
         }
 
         if (!hasPermission) {
             return NextResponse.json({ success: false, error: 'You do not have permission to create market overrides for this product.' }, { status: 403 });
+        }
+        
+        // Additional permission check for global operations
+        if (market_country_code === ALL_COUNTRIES_CODE && userRole !== 'admin') {
+            return NextResponse.json({ 
+                success: false, 
+                error: 'Insufficient permissions for global operations. Admin role required.' 
+            }, { status: 403 });
         }
         // --- Permission Check End ---
 
@@ -135,9 +226,32 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
             if (!replacementClaimProps) {
                 return NextResponse.json({ success: false, error: `Replacement claim with ID ${replacement_claim_id} not found.` }, { status: 400 });
             }
-            if (replacementClaimProps.country_code !== market_country_code) {
+            // For global overrides, replacement claim should be global too
+            if (market_country_code === ALL_COUNTRIES_CODE) {
+                if (replacementClaimProps.country_code !== '__GLOBAL__') {
+                    return NextResponse.json({ 
+                        success: false, 
+                        error: `For global overrides, replacement claim must be global. Claim ${replacement_claim_id} is for country ${replacementClaimProps.country_code}.` 
+                    }, { status: 400 });
+                }
+            } else if (replacementClaimProps.country_code !== market_country_code) {
                 return NextResponse.json({ success: false, error: `Replacement claim ID ${replacement_claim_id} is for country ${replacementClaimProps.country_code}, not for the market ${market_country_code}.` }, { status: 400 });
             }
+        }
+        
+        // Check for conflicts
+        const conflicts = await checkForConflicts(supabase, {
+            masterClaimId: master_claim_id,
+            targetProductId: target_product_id,
+            marketCountryCode: market_country_code
+        });
+        
+        if (conflicts.hasConflicts && !forceGlobal) {
+            return NextResponse.json({
+                error: 'Conflicts detected',
+                conflicts: conflicts.details,
+                requiresConfirmation: true
+            }, { status: 409 });
         }
         
         const newRecord: Omit<MarketClaimOverride, 'id' | 'created_at' | 'updated_at' | 'created_by'> & { created_by: string } = {
@@ -178,8 +292,35 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
             }
             return handleApiError(error, 'Failed to create market claim override.');
         }
+        
+        // Audit global operations
+        if (market_country_code === ALL_COUNTRIES_CODE) {
+            // Get list of active countries
+            const { data: activeCountries } = await supabase
+                .from('countries')
+                .select('code')
+                .eq('is_active', true);
+                
+            await auditGlobalOperation(supabase, {
+                overrideId: data.id,
+                action: 'created',
+                userId: user.id,
+                affectedCountries: activeCountries?.map(c => c.code) || [],
+                newState: data
+            });
+        }
 
-        return NextResponse.json({ success: true, data: data as MarketClaimOverride }, { status: 201 });
+        // Prepare response with warnings if applicable
+        const response: { success: boolean; data: MarketClaimOverride; warnings?: unknown } = { success: true, data: data as MarketClaimOverride };
+        
+        if (conflicts.hasConflicts && forceGlobal) {
+            response.warnings = {
+                message: 'Global override created. Some country-specific overrides remain active.',
+                conflicts: conflicts.details
+            };
+        }
+
+        return NextResponse.json(response, { status: 201 });
 
     } catch (error: unknown) {
         console.error('[API MarketOverrides POST] Catched error:', error);
@@ -225,8 +366,10 @@ export const GET = withAuth(async (req: NextRequest) => {
             query = query.eq('target_product_id', target_product_id);
         }
         if (market_country_code) {
-
             query = query.eq('market_country_code', market_country_code);
+        } else if (target_product_id) {
+            // When fetching for a product without specific country, include global overrides
+            query = query.or(`market_country_code.eq.${ALL_COUNTRIES_CODE},market_country_code.neq.${ALL_COUNTRIES_CODE}`);
         }
         
 

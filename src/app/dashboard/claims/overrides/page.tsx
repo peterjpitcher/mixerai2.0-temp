@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { ComboboxOption } from '@/components/ui/MultiSelectCheckboxCombobox';
 import { Claim, MarketClaimOverride, ClaimTypeEnum } from '@/lib/claims-utils'; 
 import { Heading } from '@/components/ui/heading';
-import { Edit3, Trash2, MoreVertical } from 'lucide-react';
+import { Edit3, Trash2, MoreVertical, Globe } from 'lucide-react';
 import { touchFriendly } from '@/lib/utils/touch-target';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -23,7 +23,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { apiFetch } from '@/lib/api-client';
-// import { } from "@/lib/constants/country-codes"; // Removed - empty import
+import { ALL_COUNTRIES_CODE } from '@/lib/constants/country-codes';
+import { GlobalOverrideIndicator } from '@/components/ui/GlobalOverrideIndicator';
+import { GlobalOverrideWarning } from '@/components/ui/GlobalOverrideWarning';
+import { GlobalOverrideConfirmDialog } from '@/components/ui/GlobalOverrideConfirmDialog';
+import { Switch } from '@/components/ui/switch';
 
 // Base Entity interface
 interface Entity {
@@ -57,6 +61,15 @@ export default function MarketOverridesPage() {
   const [availableCountries, setAvailableCountries] = useState<ComboboxOption[]>([]); 
   const [isLoadingCountries, setIsLoadingCountries] = useState<boolean>(true); 
   const [selectedCountryCode, setSelectedCountryCode] = useState<string>('all'); // Default to 'all'
+  const [isGlobalOverride, setIsGlobalOverride] = useState<boolean>(false);
+  const [showGlobalConfirm, setShowGlobalConfirm] = useState<boolean>(false);
+  const [pendingOverride, setPendingOverride] = useState<Partial<MarketClaimOverride> | null>(null);
+  const [conflicts, setConflicts] = useState<Array<{
+    type: string;
+    country: string;
+    countryName?: string;
+    isBlocked: boolean;
+  }>>([]);
   
   // No longer fetching masterClaimsForProduct, directly fetch and display overrides
   // const [masterClaimsForProduct, setMasterClaimsForProduct] = useState<Claim[]>([]);
@@ -166,6 +179,15 @@ export default function MarketOverridesPage() {
     fetchMarketOverrides();
   }, [selectedProductId, selectedCountryCode, fetchMarketOverrides]);
   
+  const handleGlobalToggle = useCallback((checked: boolean) => {
+    setIsGlobalOverride(checked);
+    if (checked) {
+      setSelectedCountryCode(ALL_COUNTRIES_CODE);
+    } else {
+      setSelectedCountryCode('all');
+    }
+  }, []);
+  
   const handleSaveOverride = async () => {
     setIsLoading(true);
     let overridePayload: Partial<MarketClaimOverride> = {};
@@ -205,6 +227,32 @@ export default function MarketOverridesPage() {
         };
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         masterClaimContextId = currentMasterClaimToOverride.id;
+        
+        // Check for conflicts if creating global override
+        if (selectedCountryCode === ALL_COUNTRIES_CODE && !pendingOverride) {
+            try {
+                const conflictResponse = await apiFetch('/api/market-overrides/check-conflicts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        masterClaimId: currentMasterClaimToOverride.id,
+                        marketCountryCode: selectedCountryCode,
+                        targetProductId: selectedProductId
+                    })
+                });
+                const conflictResult = await conflictResponse.json();
+                if (conflictResult.conflicts?.length > 0) {
+                    setConflicts(conflictResult.conflicts);
+                    setPendingOverride(overridePayload);
+                    setShowGlobalConfirm(true);
+                    setIsLoading(false);
+                    return;
+                }
+            } catch (error) {
+                console.error('Error checking conflicts:', error);
+                // Continue without conflict check
+            }
+        }
     } else {
         toast.error('Invalid state for saving override.'); setIsLoading(false); return;
     }
@@ -379,6 +427,30 @@ export default function MarketOverridesPage() {
   return (
     <div className="space-y-6">
       <Heading title="Manage Market Claim Overrides" description="Block or replace Master (Global) claims for specific products in selected markets." />
+      {/* Global Override Toggle */}
+      <Card className="p-4 border-purple-200 bg-purple-50/50 mb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Globe className="h-5 w-5 text-purple-600" />
+            <div>
+              <Label htmlFor="global-override" className="text-base font-medium">
+                Global Override Mode
+              </Label>
+              <p className="text-sm text-gray-600">
+                Apply overrides to all countries at once
+              </p>
+            </div>
+          </div>
+          <Switch
+            id="global-override"
+            checked={isGlobalOverride}
+            onCheckedChange={handleGlobalToggle}
+            aria-label="Toggle global override mode"
+            disabled={isLoading}
+          />
+        </div>
+      </Card>
+      
       <Card className="mb-6"> 
         <CardHeader><CardTitle>Context Selection</CardTitle><CardDescription>Choose a product and a target market to manage its overrides.</CardDescription></CardHeader>
         <CardContent className="space-y-4 md:space-y-0 md:flex md:space-x-4 items-end">
@@ -398,18 +470,27 @@ export default function MarketOverridesPage() {
                 </SelectContent>
             </Select>
           </div>
-          <div className="flex-1 min-w-[200px]">
-            <Label htmlFor="country-select">Market/Country</Label>
-            <Select value={selectedCountryCode} onValueChange={setSelectedCountryCode} disabled={isLoadingCountries || isLoading}>
-              <SelectTrigger id="country-select"><SelectValue placeholder={isLoadingCountries ? "Loading markets..." : "Select market or All Markets"} /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Markets</SelectItem> 
-                {availableCountries.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+          {!isGlobalOverride && (
+            <div className="flex-1 min-w-[200px]">
+              <Label htmlFor="country-select">Market/Country</Label>
+              <Select value={selectedCountryCode} onValueChange={setSelectedCountryCode} disabled={isLoadingCountries || isLoading || isGlobalOverride}>
+                <SelectTrigger id="country-select"><SelectValue placeholder={isLoadingCountries ? "Loading markets..." : "Select market or All Markets"} /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Markets</SelectItem> 
+                  {availableCountries.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                 </SelectContent>
-            </Select>
-          </div>
+              </Select>
+            </div>
+          )}
         </CardContent>
       </Card>
+      
+      {/* Global override warning */}
+      {isGlobalOverride && (
+        <GlobalOverrideWarning 
+          affectedCountries={availableCountries.length}
+        />
+      )}
 
       {/* Remove isLoadingMasterClaims, rely on isLoadingOverrides */}
       {isLoadingOverrides && <p className="text-center py-4">Loading market overrides...</p>}
@@ -454,7 +535,15 @@ export default function MarketOverridesPage() {
                     return (
                       <TableRow key={override.id}>
                         <TableCell>{productName || override.target_product_id}</TableCell>
-                        <TableCell>{marketName || override.market_country_code}</TableCell>
+                        <TableCell>
+                          {override.market_country_code === ALL_COUNTRIES_CODE ? (
+                            <GlobalOverrideIndicator />
+                          ) : (
+                            <Badge variant="outline">
+                              {marketName || override.market_country_code}
+                            </Badge>
+                          )}
+                        </TableCell>
                         <TableCell className="max-w-xs break-words">{override.master_claim_text || 'N/A'}</TableCell>
                         <TableCell>
                           {override.is_blocked ? (
@@ -549,6 +638,40 @@ export default function MarketOverridesPage() {
             </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Global Override Confirmation Dialog */}
+      <GlobalOverrideConfirmDialog
+        open={showGlobalConfirm}
+        onOpenChange={setShowGlobalConfirm}
+        onConfirm={async ({ forceGlobal }) => {
+          if (pendingOverride) {
+            const payload = { ...pendingOverride, forceGlobal };
+            try {
+              const response = await apiFetch('/api/market-overrides', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              });
+              const result = await response.json();
+              if (!response.ok || !result.success) {
+                throw new Error(result.error || 'Failed to create global override');
+              }
+              toast.success('Global override created successfully!');
+              fetchMarketOverrides();
+              setIsCreateOverrideDialogOpen(false);
+              setPendingOverride(null);
+              setConflicts([]);
+            } catch (error: unknown) {
+              console.error('Error creating global override:', error);
+              toast.error(error instanceof Error ? error.message : 'Failed to create global override.');
+            }
+          }
+          setShowGlobalConfirm(false);
+        }}
+        claimText={currentMasterClaimToOverride?.claim_text || ''}
+        affectedCountries={availableCountries.length}
+        conflicts={conflicts}
+      />
     </div>
   );
 } 
