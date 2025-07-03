@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
 import { 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  Loader2, AlertTriangle, Search, FileText, Edit3, XOctagon, CornerDownRight, Info, CheckCircle2, MinusCircle, ShieldQuestion, Settings2, Trash2, Undo2, Replace, Save, Sparkles, Maximize, Minimize, ArrowLeft
+  Loader2, AlertTriangle, Search, FileText, Edit3, XOctagon, CornerDownRight, Info, CheckCircle2, MinusCircle, ShieldQuestion, Settings2, Trash2, Undo2, Replace, Save, Sparkles, Maximize, Minimize, ArrowLeft, Shield
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
@@ -36,6 +36,9 @@ import {
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { apiFetch } from '@/lib/api-client';
+import { GlobalOverrideWarning } from "@/components/ui/GlobalOverrideWarning";
+import { GlobalOverrideConfirmDialog } from "@/components/ui/GlobalOverrideConfirmDialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Types for AI Suggestions (matching API)
 interface AISuggestion {
@@ -154,8 +157,12 @@ const MatrixDisplayCell = React.memo<MatrixDisplayCellProps>(({
     cellInteractionClass = "cursor-pointer";
     canOpenModal = true;
     cellBorderClassName = "border-2 border-orange-500 ring-2 ring-orange-500 ring-offset-1";
-  } else if (cell?.sourceMasterClaimId && selectedCountry !== ALL_COUNTRIES_CODE) {
-    tooltipText = `Master Claim: ${claimTextInfo.text}. Effective status: ${displayConfig.text}. Click to override for ${getCountryName(selectedCountry)}.`;
+  } else if (cell?.sourceMasterClaimId) {
+    if (selectedCountry === ALL_COUNTRIES_CODE) {
+      tooltipText = `Master Claim: ${claimTextInfo.text}. Effective status: ${displayConfig.text}. Click to create a global override.`;
+    } else {
+      tooltipText = `Master Claim: ${claimTextInfo.text}. Effective status: ${displayConfig.text}. Click to override for ${getCountryName(selectedCountry)}.`;
+    }
     cellInteractionClass = "cursor-pointer";
     canOpenModal = true;
     cellBorderClassName = "border-2 border-blue-400";
@@ -312,6 +319,12 @@ const OverrideModalContent: React.FC<OverrideModalContentProps> = ({
               <span className="text-xs block mt-1 text-muted-foreground truncate">Override ID: {modalContextData.cellData.activeOverride.overrideId}</span>}
             {modalContextData?.cellData?.sourceMasterClaimId && 
                <span className="text-xs block mt-1 text-muted-foreground truncate">Master Claim ID: {modalContextData.cellData.sourceMasterClaimId}</span>}
+            {selectedCountry === ALL_COUNTRIES_CODE && (
+              <div className="flex items-center gap-2 mt-2 text-amber-600">
+                <Shield className="h-4 w-4" />
+                <span className="font-semibold">Global Override (All Countries)</span>
+              </div>
+            )}
         </DialogDescription>
       </DialogHeader>
       <div className="py-4 space-y-4">
@@ -409,6 +422,7 @@ OverrideModalContent.displayName = 'OverrideModalContent';
 
 export default function ClaimsPreviewPage() {
   const router = useRouter();
+  
   const [matrixData, setMatrixData] = useState<ClaimsMatrixApiResponseData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -422,6 +436,10 @@ export default function ClaimsPreviewPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalContext, setModalContext] = useState<ModalContext | null>(null);
+  
+  const [showGlobalConfirmDialog, setShowGlobalConfirmDialog] = useState(false);
+  const [pendingGlobalOverride, setPendingGlobalOverride] = useState<any>(null);
+  const [conflictDetails, setConflictDetails] = useState<any>(null);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [marketSpecificClaims, setMarketSpecificClaims] = useState<Claim[]>([]);
@@ -530,10 +548,7 @@ export default function ClaimsPreviewPage() {
   };
 
   const handleOpenModal = (product: ApiProductInfo, claimTextInfo: ApiClaimTextInfo, cell: MatrixCell | null) => {
-    if (selectedCountry === ALL_COUNTRIES_CODE && !(cell?.activeOverride)) {
-        toast.info("Overrides are Market-Specific", { description: "Please select a specific market to apply an override." });
-        return;
-    }
+    // Let the API handle permission checks for global overrides
     setModalContext({ product, claimTextInfo, cellData: cell });
     setIsModalOpen(true);
   };
@@ -565,7 +580,42 @@ export default function ClaimsPreviewPage() {
     if (isReplacingWithNewText && (!replacementText || !replacementText.trim())){
         toast.error("New replacement claim text cannot be empty."); return;
     }
+    
+    // Check for conflicts if creating a global override
+    if (selectedCountry === ALL_COUNTRIES_CODE && !existingOverrideId && masterClaimIdToOverride) {
+        try {
+            const conflictCheckResponse = await apiFetch('/api/market-overrides/check-conflicts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    masterClaimId: masterClaimIdToOverride,
+                    targetProductId: product.id,
+                    marketCountryCode: ALL_COUNTRIES_CODE
+                })
+            });
+            
+            const conflictResult = await conflictCheckResponse.json();
+            
+            if (conflictResult.hasConflicts) {
+                // Store the override data and show confirmation dialog
+                setPendingGlobalOverride(dataFromModal);
+                setConflictDetails(conflictResult.details);
+                setShowGlobalConfirmDialog(true);
+                return;
+            }
+        } catch (error) {
+            console.error('Failed to check conflicts:', error);
+            // Continue with override creation if conflict check fails
+        }
+    }
 
+    // Continue with normal flow
+    await performOverrideSubmission(dataFromModal);
+  };
+  
+  const performOverrideSubmission = async (dataFromModal: any) => {
+    const { product, cellData, isBlocked, replacementText, replacementType, isReplacingWithNewText, existingOverrideId, masterClaimIdToOverride, forceGlobal } = dataFromModal;
+    
     setIsSubmitting(true); 
     let actualReplacementClaimId: string | null = null;
 
@@ -633,6 +683,11 @@ export default function ClaimsPreviewPage() {
              return;
         }
         finalOverridePayload.master_claim_id = masterClaimIdToOverride;
+        
+        // Add forceGlobal flag if this is a confirmed global override with conflicts
+        if (forceGlobal && selectedCountry === ALL_COUNTRIES_CODE) {
+            finalOverridePayload.forceGlobal = true;
+        }
     }
     
     if (actualReplacementClaimId && !finalOverridePayload.is_blocked) {
@@ -683,6 +738,28 @@ export default function ClaimsPreviewPage() {
   const pageDescription = `View and manage claim overrides for products in ${selectedCountry === ALL_COUNTRIES_CODE ? ALL_COUNTRIES_NAME : getCountryName(selectedCountry)}${selectedBrandId === 'all' ? ' (All Brands)' : availableBrands.find(b => b.id === selectedBrandId) ? ` (${availableBrands.find(b => b.id === selectedBrandId)?.name})` : ''}.`; 
 
   const toggleFullScreen = () => setIsFullScreen(!isFullScreen);
+  
+  const handleConfirmGlobalOverride = async () => {
+    if (!pendingGlobalOverride) return;
+    
+    setShowGlobalConfirmDialog(false);
+    
+    // Re-create the override with forceGlobal flag
+    const dataWithForce = { ...pendingGlobalOverride, forceGlobal: true };
+    
+    // Clear pending data
+    setPendingGlobalOverride(null);
+    setConflictDetails(null);
+    
+    // Continue with the original submission
+    await performOverrideSubmission(dataWithForce);
+  };
+  
+  const handleCancelGlobalOverride = () => {
+    setShowGlobalConfirmDialog(false);
+    setPendingGlobalOverride(null);
+    setConflictDetails(null);
+  };
 
   useEffect(() => {
     if (isFullScreen) {
@@ -756,6 +833,12 @@ export default function ClaimsPreviewPage() {
           <span className="sr-only">Enter Fullscreen</span>
         </Button>
       </div>
+      
+      {selectedCountry === ALL_COUNTRIES_CODE && !isFullScreen && (
+        <div className="mx-6 mt-4">
+          <GlobalOverrideWarning />
+        </div>
+      )}
 
       <div 
         className={cn(
@@ -860,6 +943,17 @@ export default function ClaimsPreviewPage() {
           />
         </Dialog>
       )}
+      
+      <GlobalOverrideConfirmDialog
+        open={showGlobalConfirmDialog}
+        onOpenChange={(open) => {
+          if (!open) handleCancelGlobalOverride();
+        }}
+        onConfirm={() => handleConfirmGlobalOverride()}
+        claimText={pendingGlobalOverride?.claimTextInfo?.text || ''}
+        affectedCountries={availableCountries ? availableCountries.length - 1 : 0} // All countries except __ALL_COUNTRIES__
+        conflicts={conflictDetails}
+      />
     </div>
   );
 } 
