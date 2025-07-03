@@ -62,7 +62,6 @@ export function MostAgedContent({ initialContent }: MostAgedContentProps) {
                             }}
                             variant="compact"
                             size="sm"
-                            className="h-3.5 w-3.5"
                           />
                           <span className="text-sm text-muted-foreground">{item.brands.name}</span>
                         </div>

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSessionTimeout } from '@/hooks/use-form-persistence';
+import { useSessionTimeout } from '@/hooks/use-session-timeout';
 import { toast } from 'sonner';
 
 interface SessionTimeoutContextValue {

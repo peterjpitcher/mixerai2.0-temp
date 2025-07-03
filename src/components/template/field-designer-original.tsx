@@ -561,15 +561,20 @@ export function FieldDesigner({
     const textArea = aiPromptRef.current;
     if (!textArea) return;
 
-    const currentPrompt = textArea.value || '';
-    const selectionStart = textArea.selectionStart ?? currentPrompt.length;
-    const selectionEnd = textArea.selectionEnd ?? currentPrompt.length;
+    // Get the current selection position
+    const selectionStart = textArea.selectionStart ?? 0;
+    const selectionEnd = textArea.selectionEnd ?? 0;
     
+    // Get current value from the textarea (not state, to get the most current value)
+    const currentPrompt = textArea.value || '';
+    
+    // Create the new prompt with the inserted text
     const newPrompt = 
       currentPrompt.substring(0, selectionStart) + 
       textToInsert + 
       currentPrompt.substring(selectionEnd);
     
+    // Update the state
     setFieldData(prev => {
       if (isInputField(prev)) {
         return { ...prev, aiPrompt: newPrompt } as InputField;
@@ -578,13 +583,16 @@ export function FieldDesigner({
       }
     });
     
-    // After inserting, set cursor to the end of the inserted text
+    // Calculate new cursor position
     const newCursorPosition = selectionStart + textToInsert.length;
     
-    // Defer focusing and setting selection to ensure DOM is updated
+    // Set focus and cursor position immediately
+    // We need a small delay to ensure React has updated the textarea value
     setTimeout(() => {
-      textArea.focus();
-      textArea.setSelectionRange(newCursorPosition, newCursorPosition);
+      if (textArea) {
+        textArea.focus();
+        textArea.setSelectionRange(newCursorPosition, newCursorPosition);
+      }
     }, 0);
   };
 
@@ -881,7 +889,9 @@ export function FieldDesigner({
                                 key={inputField.id} 
                                 size="sm"
                                 variant="outline"
-                                onClick={() => insertPlaceholder(`{{${inputField.name}}}`)}
+                                onClick={() => {
+                                  insertPlaceholder(`{{${inputField.name}}}`);
+                                }}
                                 className="text-xs"
                             >
                                 {`{{${inputField.name}}}`}
@@ -902,22 +912,52 @@ export function FieldDesigner({
                     Insert Generic Brand Placeholders:
                   </Label>
                   <div className="flex flex-wrap gap-2 mt-1">
-                    <Button type="button" size="sm" variant="outline" onClick={() => insertBrandDataOrPlaceholder('name')}>
+                    <Button 
+                      type="button" 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => insertBrandDataOrPlaceholder('name')}
+                    >
                       Brand Name
                     </Button>
-                    <Button type="button" size="sm" variant="outline" onClick={() => insertBrandDataOrPlaceholder('identity')}>
+                    <Button 
+                      type="button" 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => insertBrandDataOrPlaceholder('identity')}
+                    >
                       Brand Identity
                     </Button>
-                    <Button type="button" size="sm" variant="outline" onClick={() => insertBrandDataOrPlaceholder('tone_of_voice')}>
+                    <Button 
+                      type="button" 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => insertBrandDataOrPlaceholder('tone_of_voice')}
+                    >
                       Tone of Voice
                     </Button>
-                    <Button type="button" size="sm" variant="outline" onClick={() => insertBrandDataOrPlaceholder('guardrails')}>
+                    <Button 
+                      type="button" 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => insertBrandDataOrPlaceholder('guardrails')}
+                    >
                       Guardrails
                     </Button>
-                    <Button type="button" size="sm" variant="outline" onClick={() => insertBrandDataOrPlaceholder('summary')}>
+                    <Button 
+                      type="button" 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => insertBrandDataOrPlaceholder('summary')}
+                    >
                       Brand Summary
                     </Button>
-                    <Button type="button" size="sm" variant="outline" onClick={() => insertBrandDataOrPlaceholder('brandObject')}>
+                    <Button 
+                      type="button" 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => insertBrandDataOrPlaceholder('brandObject')}
+                    >
                       Generic Brand Object
                     </Button>
                   </div>

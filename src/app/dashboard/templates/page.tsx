@@ -349,7 +349,7 @@ export default function TemplatesPage() {
   if (isLoadingUser || loading) { // Combined loading state
     return (
       <div className="space-y-8">
-        <BreadcrumbNav items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Content Templates" }]} />
+        <BreadcrumbNav items={[{ label: "Content Templates" }]} />
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Content Templates</h1>
@@ -378,7 +378,7 @@ export default function TemplatesPage() {
 
   return (
     <div className="space-y-8">
-      <BreadcrumbNav items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Content Templates" }]} />
+      <BreadcrumbNav items={[{ label: "Content Templates" }]} />
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Content Templates</h1>

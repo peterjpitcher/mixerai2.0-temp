@@ -32,12 +32,12 @@ interface WorkflowAssignee {
 }
 
 interface WorkflowStep {
-  id: number;
+  id: string; // Changed to string to support UUIDs
   name: string;
   description: string;
   role: string;
   approvalRequired?: boolean;
-  assignees?: WorkflowAssignee[];
+  assignees: WorkflowAssignee[];
 }
 
 /**
@@ -156,7 +156,7 @@ export const GET = withAuth(async (
           }).filter(assignee => assignee !== null) as WorkflowAssignee[]; // Filter out any nulls from skipped user IDs
         }
         return {
-          id: typeof step.id === 'string' ? parseInt(step.id, 10) : step.id, // Convert string id to number
+          id: step.id, // Keep ID as string (UUID)
           name: step.name,
           description: step.description || '', // Provide empty string if null
           role: step.role || '', // Provide empty string if null

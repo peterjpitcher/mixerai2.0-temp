@@ -117,7 +117,8 @@ export default function DashboardLayout({
               alt="MixerAI 2.0 Logo"
               width={225}
               height={52}
-              priority 
+              priority
+              style={{ height: 'auto' }}
             />
           </div>
           <div className="flex items-center space-x-2 sm:space-x-4">
