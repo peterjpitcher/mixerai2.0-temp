@@ -954,7 +954,7 @@ export default function ClaimsPreviewPage() {
         }}
         onConfirm={() => handleConfirmGlobalOverride()}
         claimText={pendingGlobalOverride?.claimTextInfo?.text || ''}
-        affectedCountries={availableCountries ? availableCountries.length - 1 : 0} // All countries except __ALL_COUNTRIES__
+        affectedCountries={Array.isArray(availableCountries) ? availableCountries.length - 1 : 0} // All countries except __ALL_COUNTRIES__
         conflicts={conflictDetails}
       />
     </div>
