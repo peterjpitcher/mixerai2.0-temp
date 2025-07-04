@@ -600,16 +600,34 @@ export default function AltTextGeneratorPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead scope="col" className="w-[30%]">Image URL</TableHead>
-                      <TableHead scope="col" className="w-[40%]">Generated Alt Text / Error</TableHead>
-                      <TableHead scope="col" className="w-[30%] text-center">Preview</TableHead>
+                      <TableHead scope="col" className="w-[25%]">Image URL</TableHead>
+                      <TableHead scope="col" className="w-[50%]">Generated Alt Text / Error</TableHead>
+                      <TableHead scope="col" className="w-[25%] text-center">Preview</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {results.map((item, index) => (
                       <TableRow key={`${index}-${item.imageUrl}`} className={item.error ? "bg-destructive/10 hover:bg-destructive/20" : ""}>
-                        <TableCell className="py-2 align-top font-medium break-all">
-                            <span className="text-xs text-muted-foreground truncate" title={item.imageUrl}>{item.imageUrl}</span>
+                        <TableCell className="py-2 align-top font-medium">
+                            <div className="max-w-[300px]">
+                                <span 
+                                    className="text-xs text-muted-foreground block truncate cursor-help" 
+                                    title={item.imageUrl}
+                                >
+                                    {item.imageUrl.length > 50 
+                                        ? `${item.imageUrl.substring(0, 30)}...${item.imageUrl.substring(item.imageUrl.length - 15)}`
+                                        : item.imageUrl
+                                    }
+                                </span>
+                                {!item.imageUrl.startsWith('data:') && (
+                                    <button
+                                        onClick={() => window.open(item.imageUrl, '_blank')}
+                                        className="text-xs text-blue-600 hover:text-blue-800 hover:underline mt-1"
+                                    >
+                                        Open image ↗
+                                    </button>
+                                )}
+                            </div>
                         </TableCell>
                         <TableCell className="py-2 align-top whitespace-pre-wrap">
                           {item.error ? (

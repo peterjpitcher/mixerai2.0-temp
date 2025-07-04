@@ -10,6 +10,9 @@ export function GlobalOverrideWarning({
   affectedCountries,
   existingOverrides = []
 }: GlobalOverrideWarningProps) {
+  // Ensure existingOverrides is always an array
+  const overrides = existingOverrides || [];
+  
   return (
     <Alert variant="destructive" className="mb-4">
       <AlertTriangle className="h-4 w-4" />
@@ -18,9 +21,9 @@ export function GlobalOverrideWarning({
         <p>
           This action will block the claim across {affectedCountries || 'all'} countries worldwide.
         </p>
-        {existingOverrides.length > 0 && (
+        {overrides.length > 0 && (
           <p className="text-sm">
-            Note: Existing country-specific overrides in {existingOverrides.join(', ')} 
+            Note: Existing country-specific overrides in {overrides.join(', ')} 
             will remain active and take precedence.
           </p>
         )}

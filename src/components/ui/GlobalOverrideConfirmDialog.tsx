@@ -37,6 +37,9 @@ export function GlobalOverrideConfirmDialog({
   conflicts = []
 }: GlobalOverrideConfirmDialogProps) {
   const [forceGlobal, setForceGlobal] = useState(false);
+  
+  // Ensure conflicts is always an array
+  const conflictList = conflicts || [];
 
   const handleConfirm = () => {
     onConfirm({ forceGlobal });
@@ -63,18 +66,18 @@ export function GlobalOverrideConfirmDialog({
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
                   This action will affect <strong>{affectedCountries} countries</strong> worldwide.
-                  {conflicts.length > 0 && (
+                  {conflictList.length > 0 && (
                     <span className="block mt-2">
-                      Note: {conflicts.length} country-specific override(s) exist and will take precedence.
+                      Note: {conflictList.length} country-specific override(s) exist and will take precedence.
                     </span>
                   )}
                 </AlertDescription>
               </Alert>
-              {conflicts.length > 0 && (
+              {conflictList.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Existing country overrides:</p>
                   <ul className="text-sm text-gray-600 list-disc list-inside max-h-32 overflow-y-auto">
-                    {conflicts.map(conflict => (
+                    {conflictList.map(conflict => (
                       <li key={conflict.country}>
                         {conflict.countryName || conflict.country}: {conflict.isBlocked ? 'Blocked' : 'Replaced'}
                       </li>

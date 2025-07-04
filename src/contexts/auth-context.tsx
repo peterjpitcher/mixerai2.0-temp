@@ -47,6 +47,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError || !user) {
+        // Don't throw or log errors for unauthenticated users
+        // This is a normal state when users haven't logged in yet
         return null;
       }
 
@@ -90,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     queryFn: fetchUser,
     staleTime: 5 * 60 * 1000, // Consider fresh for 5 minutes
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
-    retry: 1,
+    retry: false, // Don't retry auth failures - they're usually intentional (not logged in)
   });
 
   // Listen for auth state changes

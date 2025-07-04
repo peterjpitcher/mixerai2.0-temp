@@ -197,7 +197,8 @@ export async function middleware(request: NextRequest) {
     );
 
     const { data: { user: refreshedUser }, error: userError } = await supabase.auth.getUser();
-    if (userError) {
+    if (userError && !request.nextUrl.pathname.startsWith('/auth/')) {
+        // Only log errors for authenticated routes, not for auth pages
         console.warn('Middleware: supabase.auth.getUser() error:', userError.message);
     }
     

@@ -65,7 +65,10 @@ export function LoginForm() {
           setError(`${signInError.message}${remainingAttempts < 3 ? ` (${remainingAttempts} attempt${remainingAttempts > 1 ? 's' : ''} remaining)` : ''}`);
         }
         
-        toast.error(signInError.message);
+        // Only show toast for actual login attempts, not for session validation errors
+        if (email && password) {
+          toast.error(signInError.message);
+        }
       } else {
         // Record successful attempt
         await recordLoginAttempt(email, ip, true);
