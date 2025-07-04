@@ -24,6 +24,35 @@
 .DS_Store
 *.pem
 .env
+*.bak
+*.log
+*.tmp
+*~
+*.swp
+*.swo
+.idea/
+.vscode/
+thumbs.db
+
+# temporary files and directories
+/temp/
+/tmp/
+/backups/
+/backup/
+*.backup
+*.old
+*.orig
+
+# SQL files in root (should be in proper directories)
+/*.sql
+
+# Work-in-progress documentation
+/discovery-report*.md
+/fix-*.md
+/enhancement-*.md
+/implementation-*.md
+/*-report.md
+/*-audit.md
 
 # debug
 npm-debug.log*
