@@ -156,10 +156,13 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
       try {
         // Validate URL structure and safety
         if (imageUrl.startsWith('data:')) {
-          // Validate data URL format
+          // Validate data URL format and check for SVG
+          if (imageUrl.startsWith('data:image/svg')) {
+            throw new Error('SVG images are not supported. Please use PNG, JPG, WEBP, or other raster image formats.');
+          }
           const dataUrlRegex = /^data:image\/(jpeg|jpg|png|webp|gif);base64,/;
           if (!dataUrlRegex.test(imageUrl)) {
-            throw new Error('Invalid data URL format. Only image data URLs are allowed.');
+            throw new Error('Invalid data URL format. Only image data URLs (PNG, JPG, WEBP, GIF) are allowed.');
           }
           // Check data URL size (rough estimate - base64 is ~33% larger than binary)
           const base64Data = imageUrl.split(',')[1];
@@ -188,8 +191,22 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
           
           // Validate image file extension if present in URL
           const pathname = url.pathname.toLowerCase();
-          const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.svg'];
-          const hasImageExtension = imageExtensions.some(ext => pathname.endsWith(ext));
+          const supportedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'];
+          const unsupportedExtensions = ['.svg', '.ico', '.tiff', '.tif'];
+          
+          // Check if URL contains SVG or other unsupported formats
+          const hasUnsupportedExtension = unsupportedExtensions.some(ext => pathname.endsWith(ext));
+          if (hasUnsupportedExtension) {
+            throw new Error('SVG and other vector/unsupported image formats cannot be processed. Please use PNG, JPG, WEBP, or other raster image formats.');
+          }
+          
+          // Check query parameters for potential SVG content type hints
+          if (url.search.toLowerCase().includes('format=svg') || 
+              url.search.toLowerCase().includes('type=svg')) {
+            throw new Error('SVG images are not supported. Please use PNG, JPG, WEBP, or other raster image formats.');
+          }
+          
+          const hasImageExtension = supportedExtensions.some(ext => pathname.endsWith(ext));
           
           // Warn if no image extension (but don't block - some image URLs don't have extensions)
           if (!hasImageExtension && !pathname.includes('/')) {

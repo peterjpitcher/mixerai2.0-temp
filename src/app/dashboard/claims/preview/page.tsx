@@ -839,7 +839,9 @@ export default function ClaimsPreviewPage() {
       
       {selectedCountry === ALL_COUNTRIES_CODE && !isFullScreen && (
         <div className="mx-6 mt-4">
-          <GlobalOverrideWarning />
+          <GlobalOverrideWarning 
+            affectedCountries={availableCountries ? availableCountries.length - 1 : 0}
+          />
         </div>
       )}
 

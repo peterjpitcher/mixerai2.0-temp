@@ -530,3 +530,107 @@ Remember: The goal is not just working code, but maintainable, secure, and perfo
 - `cn()` - Classname utility (clsx + tailwind-merge)
 - `formatDate()` - Date formatting helper
 - `truncate()` - Text truncation utility
+
+## 🗂️ Directory Organization & Maintenance
+
+### Directory Structure Rules
+1. **NO temporary files in root** - All work files, reports, and temporary SQL files should be in appropriate subdirectories or deleted after use
+2. **Documentation belongs in /docs** - All .md files (except README.md, SECURITY.md, CLAUDE.md) should be in the docs directory
+3. **Keep backups out of git** - Backup directories should be in .gitignore
+4. **Clean up after yourself** - Remove test files, temporary reports, and work-in-progress files before committing
+
+### File Naming Conventions
+- Use kebab-case for all files: `user-profile.tsx`, not `userProfile.tsx`
+- Date-prefixed files should use ISO format: `2025-07-04-report.md`
+- Test files: `[name].test.ts` or `[name].spec.ts`
+- Type definition files: `[name].types.ts`
+
+### Documentation Standards
+- Every major directory should have a README.md explaining its purpose
+- Keep documentation up to date - outdated docs are worse than no docs
+- Remove fix/issue specific documentation after the fix is merged
+- Archive old documentation rather than deleting if historically important
+
+### Date Handling
+**CRITICAL**: Never hardcode dates or rely on AI to know the current date. Always get dates programmatically:
+
+```typescript
+// ❌ WRONG - AI doesn't know the actual date
+const reportDate = '2025-07-04'; // AI will often get this wrong
+
+// ✅ CORRECT - Always get date programmatically
+const reportDate = new Date().toISOString().split('T')[0]; // 2025-07-04
+const timestamp = new Date().toISOString(); // Full ISO timestamp
+
+// For file names
+const datePrefix = new Date().toISOString().split('T')[0].replace(/-/g, '');
+const fileName = `${datePrefix}-backup.sql`; // 20250704-backup.sql
+
+// For display
+import { format } from 'date-fns';
+const displayDate = format(new Date(), 'MMM d, yyyy'); // Jul 4, 2025
+```
+
+### Cleanup Checklist
+Before any major commit or PR:
+- [ ] Remove all .DS_Store files: `find . -name ".DS_Store" -type f -delete`
+- [ ] Delete temporary SQL files from root
+- [ ] Remove work-in-progress .md files from root
+- [ ] Clean up backup directories
+- [ ] Remove console.log statements
+- [ ] Delete commented-out code
+- [ ] Update relevant README files
+
+### Git Hygiene
+- Use .gitignore properly - add patterns for:
+  - `.DS_Store`
+  - `*.bak`
+  - `/temp`
+  - `/backups`
+  - `*.log`
+  - Work-in-progress files
+- Commit organized changes, not cleanup mixed with features
+- Use meaningful commit messages that describe what changed
+
+### Regular Maintenance Tasks
+Weekly:
+- Clean up root directory of temporary files
+- Archive old issue-specific documentation
+- Update directory README files if structure changed
+- Remove unused dependencies: `npm prune`
+
+Monthly:
+- Review and clean up /docs directory
+- Archive old migration files
+- Update this CLAUDE.md file with new patterns
+- Clean up unused components and utilities
+
+## 🎯 Important Instruction Reminders
+
+### Core Principles
+1. **Do what has been asked; nothing more, nothing less**
+2. **NEVER create files unless they're absolutely necessary** for achieving the goal
+3. **ALWAYS prefer editing an existing file** to creating a new one
+4. **NEVER proactively create documentation files** (*.md) or README files unless explicitly requested
+
+### When Working on Tasks
+- Focus on the specific task at hand
+- Don't add "nice to have" features unless requested
+- Don't refactor unrelated code unless it's blocking the task
+- Don't create helper files unless the implementation requires it
+- Don't write documentation unless asked
+
+### Communication
+- Be concise and direct
+- Report what was done, not what could be done
+- If something can't be done, explain why briefly
+- Don't suggest additional improvements unless asked
+- Keep status updates factual and brief
+
+### Before Creating Any File Ask Yourself:
+1. Did the user explicitly ask for this file?
+2. Is this file absolutely necessary for the feature to work?
+3. Can I implement this by modifying an existing file instead?
+4. Am I creating this just to be "helpful" or "complete"?
+
+If the answer to #4 is yes, or #1 and #2 are no - DON'T CREATE THE FILE.
