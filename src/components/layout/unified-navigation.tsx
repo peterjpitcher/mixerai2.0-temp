@@ -30,7 +30,7 @@ import {
   LayoutGrid
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 
@@ -140,7 +140,7 @@ export function UnifiedNavigation() {
             return;
           }
         }
-        console.error('[UnifiedNavigation] Error fetching current user:', error);
+        // Only log critical errors, not expected network errors during navigation
         setCurrentUser(null);
       } finally {
         setIsLoadingUser(false);
@@ -157,30 +157,65 @@ export function UnifiedNavigation() {
   const isAdmin = userRole === 'admin';
   const isPlatformAdmin = isAdmin && userBrandPermissions.length === 0; 
   const isScopedAdmin = isAdmin && userBrandPermissions.length > 0;
+  
+  // Reset fetch flags when user changes
+  useEffect(() => {
+    if (currentUser) {
+      // Reset fetch flags to ensure data is refetched for the current user
+      templatesFetched.current = false;
+      userWorkflowsFetched.current = false;
+    }
+  }, [currentUser]);
 
   useEffect(() => {
+    // Only fetch templates after user is loaded and authenticated
+    if (isLoadingUser || !currentUser) {
+      // Skip template fetch if user is not ready
+      return;
+    }
+    
     const fetchTemplates = async () => {
-      if (templatesFetched.current || isLoadingTemplates) return;
+      // Check if already loading
+      if (isLoadingTemplates) {
+        // Already loading templates, skip
+        return;
+      }
+      
+      // Check if already fetched successfully
+      if (templatesFetched.current && userTemplates.length > 0) {
+        // Templates already fetched
+        return;
+      }
+      
+      // Start fetching templates
+      
       setIsLoadingTemplates(true);
-      templatesFetched.current = true;
+      
       try {
         const response = await fetch('/api/content-templates');
         const data = await response.json();
+        // Process templates API response
+        
         if (data.success && data.templates) {
           setUserTemplates(data.templates);
+          templatesFetched.current = true; // Only set to true on success
+          // Templates loaded successfully
         } else {
-          console.error('[UnifiedNavigation] Failed to fetch templates:', data.error);
+          // Failed to fetch templates
           setUserTemplates([]);
+          templatesFetched.current = false; // Reset on failure
         }
       } catch (error) {
-        console.error('[UnifiedNavigation] Error fetching templates:', error);
+        // Error fetching templates
         setUserTemplates([]);
+        templatesFetched.current = false; // Reset on error
       } finally {
         setIsLoadingTemplates(false);
       }
     };
+    
     fetchTemplates();
-  }, [isLoadingTemplates]);
+  }, [isLoadingUser, currentUser, userRole, isPlatformAdmin, isScopedAdmin, userTemplates.length]); // Added userTemplates.length to re-run if templates are cleared
 
   useEffect(() => {
     const fetchUserWorkflows = async () => {
@@ -198,12 +233,12 @@ export function UnifiedNavigation() {
           if (data.success && Array.isArray(data.data)) {
             setUserWorkflows(data.data as WorkflowDataType[]);
           } else {
-            console.error('[UnifiedNavigation] Failed to fetch user workflows:', data.error);
+            // Failed to fetch user workflows
             toast.error('Could not load workflows for content creation links.');
             setUserWorkflows([]);
           }
         } catch (error) {
-          console.error('[UnifiedNavigation] Error fetching user workflows:', error);
+          // Error fetching user workflows
           toast.error('Error loading workflows for navigation.');
           setUserWorkflows([]);
         } finally {
@@ -244,48 +279,100 @@ export function UnifiedNavigation() {
     }));
   };
 
-  let filteredContentItems: NavItem[] = [];
-  
-  // Don't show templates until we know the user's role
-  if (isLoadingUser) {
-    filteredContentItems = [
-      { href: '#', label: 'Loading...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }
-    ];
-  } else if (isLoadingTemplates || ( (isScopedAdmin || isEditor) && isLoadingUserWorkflows && !isPlatformAdmin) ) {
-    filteredContentItems = [
-      { href: '#', label: 'Loading templates...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }
-    ];
-  } else if (userTemplates.length > 0) {
-    if (isPlatformAdmin) {
-      filteredContentItems = userTemplates.map(template => ({
-        href: `/dashboard/content/new?template=${template.id}`,
-        label: template.name,
-        icon: <FileText className="h-4 w-4" />,
-        segment: template.id
-      }));
-    } else if (isScopedAdmin || isEditor) {
-      const userBrandIds = (currentUser?.brand_permissions || []).map(p => p.brand_id).filter(Boolean);
-      if (userBrandIds.length > 0 && userWorkflows.length > 0) {
-        filteredContentItems = userTemplates
-          .filter(template => 
-            userWorkflows.some(workflow => 
-              workflow.template_id === template.id && 
-              userBrandIds.includes(workflow.brand_id)
+  // Calculate filtered content items reactively using useMemo
+  const filteredContentItems = useMemo<NavItem[]>(() => {
+    // Don't show templates until we know the user's role
+    if (isLoadingUser) {
+      return [
+        { href: '#', label: 'Loading...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }
+      ];
+    }
+    
+    if (isLoadingTemplates || ((isScopedAdmin || isEditor) && isLoadingUserWorkflows && !isPlatformAdmin)) {
+      return [
+        { href: '#', label: 'Loading templates...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }
+      ];
+    }
+    
+    // Calculate filtered content items based on user role and templates
+    
+    if (userTemplates.length > 0) {
+      // Templates available for filtering
+      
+      if (isPlatformAdmin) {
+        const items = userTemplates.map(template => ({
+          href: `/dashboard/content/new?template=${template.id}`,
+          label: template.name,
+          icon: <FileText className="h-4 w-4" />,
+          segment: template.id
+        }));
+        // Platform Admin - Return all templates
+        return items;
+      } else if (isScopedAdmin) {
+        // Scoped admins should see all templates - they can create content for their brands
+        const items = userTemplates.map(template => ({
+          href: `/dashboard/content/new?template=${template.id}`,
+          label: template.name,
+          icon: <FileText className="h-4 w-4" />,
+          segment: template.id
+        }));
+        // Scoped Admin - Show all templates
+        return items;
+      } else if (isEditor) {
+        // Editors see templates based on workflows for their brands
+        const userBrandIds = (currentUser?.brand_permissions || []).map(p => p.brand_id).filter(Boolean);
+        if (userBrandIds.length > 0 && userWorkflows.length > 0) {
+          const items = userTemplates
+            .filter(template => 
+              userWorkflows.some(workflow => 
+                workflow.template_id === template.id && 
+                userBrandIds.includes(workflow.brand_id)
+              )
             )
-          )
-          .map(template => ({
-            href: `/dashboard/content/new?template=${template.id}`,
-            label: template.name,
-            icon: <FileText className="h-4 w-4" />,
-            segment: template.id
-          }));
+            .map(template => ({
+              href: `/dashboard/content/new?template=${template.id}`,
+              label: template.name,
+              icon: <FileText className="h-4 w-4" />,
+              segment: template.id
+            }));
+          return items;
+        }
+        // If no workflows, still show all templates for editors
+        const items = userTemplates.map(template => ({
+          href: `/dashboard/content/new?template=${template.id}`,
+          label: template.name,
+          icon: <FileText className="h-4 w-4" />,
+          segment: template.id
+        }));
+        // Editor - Show all templates (no workflow filtering)
+        return items;
       } else {
-        filteredContentItems = [];
+        // Not admin or editor - no templates shown
+        return [];
       }
     } else {
-      filteredContentItems = [];
+      // No templates to display
+      
+      // If we're still loading, show loading state
+      if (isLoadingTemplates) {
+        return [
+          { href: '#', label: 'Loading templates...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }
+        ];
+      }
+      
+      return [];
     }
-  }
+  }, [
+    isLoadingUser,
+    isLoadingTemplates,
+    isLoadingUserWorkflows,
+    userTemplates,
+    isPlatformAdmin,
+    isScopedAdmin,
+    isEditor,
+    currentUser,
+    userWorkflows
+  ]);
   
   const hasAssignedBrandWithMasterClaimId = () => {
     if (!currentUser || !userBrandPermissions) return false;
@@ -323,9 +410,7 @@ export function UnifiedNavigation() {
       defaultOpen: true,
       show: () => isAuthenticatedUser && !isViewer,
       items: filteredContentItems.length > 0 ? filteredContentItems : 
-             (isLoadingTemplates || ((isScopedAdmin || isEditor) && isLoadingUserWorkflows && !isPlatformAdmin) ? 
-               [{ href: '#', label: 'Loading...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }] :
-               [{ href: '#', label: 'No content types available', icon: <MessageSquareWarning className="h-4 w-4" />, segment: 'no-content' }])
+             [{ href: '#', label: 'No content types available', icon: <MessageSquareWarning className="h-4 w-4" />, segment: 'no-content' }]
     },
     { type: 'divider', show: () => isAuthenticatedUser },
     {
@@ -454,6 +539,8 @@ export function UnifiedNavigation() {
 
     return false;
   };
+
+  // Component state is now managed without debug logging
 
   if (isLoadingUser) {
     return (

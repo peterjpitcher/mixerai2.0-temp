@@ -89,7 +89,6 @@ export function withAuthAndMonitoring(
   handler: (req: NextRequest, user: User, context?: unknown) => Promise<Response>
 ) {
   return async (req: NextRequest, context?: unknown) => {
-    const startTime = Date.now();
     const path = req.nextUrl.pathname;
     
     try {
@@ -140,15 +139,12 @@ export function withAuthAndMonitoring(
       // Authentication successful, call the handler
       const response = await handler(req, user, context);
       
-      // Log request completion time
-      const duration = Date.now() - startTime;
-      console.log(`API ${path} completed in ${duration}ms`);
+      // Request completed successfully
       
       return response;
     } catch (error) {
       // Log error with details
-      const duration = Date.now() - startTime;
-      console.error(`API ${path} error after ${duration}ms:`, error);
+      console.error(`API ${path} error:`, error);
       
       // Return 500 Internal Server Error
       return new Response(

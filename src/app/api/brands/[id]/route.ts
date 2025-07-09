@@ -65,8 +65,7 @@ export const GET = withAuth(async (
       throw rpcError;
     }
 
-    console.log('[API Brands GET] Brand details from RPC:', brandDetails);
-    console.log('[API Brands GET] Logo URL from RPC:', (brandDetails as Record<string, unknown>)?.logo_url);
+    // Brand details fetched successfully from RPC
 
     if (!brandDetails) {
       return NextResponse.json(
@@ -130,8 +129,7 @@ const putHandlerCore = async (
     }
 
     const body = await request.json();
-    console.log(`[API PUT /brands/${brandIdToUpdate}] Received body:`, body);
-    console.log(`[API PUT /brands/${brandIdToUpdate}] Logo URL:`, body.logo_url);
+    // Process brand update request
     
     if (!body.name || body.name.trim() === '') {
       return NextResponse.json(
@@ -170,8 +168,7 @@ const putHandlerCore = async (
       p_logo_url: body.logo_url || null // Pass logo_url to RPC function
     };
 
-    console.log('[API Brands PUT] RPC params:', rpcParams);
-    console.log('[API Brands PUT] Logo URL in RPC params:', rpcParams.p_logo_url);
+    // Execute brand update via RPC
 
     const { data: updatedBrandData, error: rpcError } = await supabase.rpc(
       'update_brand_with_agencies',

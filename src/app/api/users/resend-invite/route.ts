@@ -11,7 +11,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
-export const POST = withAdminAuthAndCSRF(async function (request: NextRequest, _user: User) {
+export const POST = withAdminAuthAndCSRF(async function (request: NextRequest) {
   try {
     const { email } = await request.json();
 

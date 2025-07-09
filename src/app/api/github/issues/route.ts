@@ -260,7 +260,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prepare issue body
+    // Upload screenshot first if provided
+    let screenshotUrl: string | null = null;
+    if (validatedData.screenshot) {
+      screenshotUrl = await uploadScreenshot(
+        owner,
+        repo,
+        validatedData.screenshot,
+        githubToken
+      );
+      
+      if (!screenshotUrl) {
+        console.warn('Screenshot upload failed, continuing without screenshot');
+      }
+    }
+    
+    // Prepare issue body with screenshot URL if available
     const issueBody = formatIssueBody({
       ...validatedData,
       user: {
@@ -268,6 +283,7 @@ export async function POST(request: NextRequest) {
         email: user.email || 'Unknown',
         name: user.user_metadata?.full_name || user.user_metadata?.name || 'Unknown User',
       },
+      screenshotUrl, // Pass the URL to include in the body
     });
 
     // Prepare labels
@@ -305,17 +321,6 @@ export async function POST(request: NextRequest) {
     }
 
     const createdIssue = await githubResponse.json();
-
-    // If screenshot exists, add it as a comment
-    if (validatedData.screenshot) {
-      await addScreenshotComment(
-        owner,
-        repo,
-        createdIssue.number,
-        validatedData.screenshot,
-        githubToken
-      );
-    }
 
     return NextResponse.json({
       success: true,
@@ -377,6 +382,7 @@ interface IssueBodyData {
   };
   consoleLogs?: ConsoleLog[];
   networkLogs?: NetworkLog[];
+  screenshotUrl?: string | null;
 }
 
 interface ConsoleLog {
@@ -395,10 +401,21 @@ interface NetworkLog {
   error?: string;
 }
 
+function truncateString(str: string, maxLength: number, suffix = '...[truncated]'): string {
+  if (str.length <= maxLength) return str;
+  return str.substring(0, maxLength - suffix.length) + suffix;
+}
+
 function formatIssueBody(data: IssueBodyData): string {
-  const { user, description, environment, consoleLogs, networkLogs } = data;
+  const { user, description, environment, consoleLogs, networkLogs, screenshotUrl } = data;
+  const MAX_BODY_LENGTH = 65000; // Leave some buffer from GitHub's 65536 limit
   
   let body = `## Issue Description\n\n${description}\n\n`;
+  
+  // Screenshot if available
+  if (screenshotUrl) {
+    body += `## Screenshot\n\n![Screenshot](${screenshotUrl})\n\n`;
+  }
   
   // User Information
   body += `## Reporter Information\n\n`;
@@ -413,17 +430,20 @@ function formatIssueBody(data: IssueBodyData): string {
   body += `- **Viewport**: ${environment.viewport.width}x${environment.viewport.height}\n`;
   body += `- **Reported At**: ${environment.timestamp}\n\n`;
   
-  // Console Logs
+  // Console Logs - limit to last 50 entries to avoid exceeding GitHub's limit
   if (consoleLogs && consoleLogs.length > 0) {
+    const logsToShow = consoleLogs.slice(-50); // Take last 50 logs
     body += `## Console Logs\n\n`;
-    body += `<details>\n<summary>View console logs (${consoleLogs.length} entries)</summary>\n\n`;
+    body += `<details>\n<summary>View console logs (showing last ${logsToShow.length} of ${consoleLogs.length} entries)</summary>\n\n`;
     body += '```\n';
     
-    consoleLogs.forEach((log) => {
+    logsToShow.forEach((log) => {
       const time = new Date(log.timestamp).toLocaleTimeString();
-      body += `[${time}] [${log.level.toUpperCase()}] ${log.message}\n`;
-      if (log.stack) {
-        body += `${log.stack}\n`;
+      const logMessage = truncateString(log.message, 500); // Limit each log message
+      body += `[${time}] [${log.level.toUpperCase()}] ${logMessage}\n`;
+      if (log.stack && log.level === 'error') {
+        const stackTrace = truncateString(log.stack, 300);
+        body += `${stackTrace}\n`;
       }
       body += '\n';
     });
@@ -431,18 +451,20 @@ function formatIssueBody(data: IssueBodyData): string {
     body += '```\n</details>\n\n';
   }
   
-  // Network Logs
+  // Network Logs - limit to last 30 entries
   if (networkLogs && networkLogs.length > 0) {
+    const logsToShow = networkLogs.slice(-30); // Take last 30 requests
     body += `## Network Activity\n\n`;
-    body += `<details>\n<summary>View network logs (${networkLogs.length} requests)</summary>\n\n`;
+    body += `<details>\n<summary>View network logs (showing last ${logsToShow.length} of ${networkLogs.length} requests)</summary>\n\n`;
     body += '| Time | Method | URL | Status | Duration |\n';
     body += '|------|--------|-----|--------|----------|\n';
     
-    networkLogs.forEach((log) => {
+    logsToShow.forEach((log) => {
       const time = new Date(log.timestamp).toLocaleTimeString();
       const status = log.status || log.error || 'N/A';
       const duration = log.duration ? `${log.duration}ms` : 'N/A';
-      body += `| ${time} | ${log.method} | ${log.url} | ${status} | ${duration} |\n`;
+      const url = truncateString(log.url, 100); // Limit URL length
+      body += `| ${time} | ${log.method} | ${url} | ${status} | ${duration} |\n`;
     });
     
     body += '\n</details>\n\n';
@@ -451,43 +473,74 @@ function formatIssueBody(data: IssueBodyData): string {
   body += `---\n\n`;
   body += `*This issue was automatically reported via the in-app issue reporter.*`;
   
+  // Final check to ensure we don't exceed GitHub's limit
+  if (body.length > MAX_BODY_LENGTH) {
+    body = truncateString(body, MAX_BODY_LENGTH, '\n\n...[Issue body truncated due to size limits]');
+  }
+  
   return body;
 }
 
-async function addScreenshotComment(
+async function uploadScreenshot(
   owner: string,
   repo: string,
-  issueNumber: number,
   screenshot: string,
   token: string
-): Promise<void> {
+): Promise<string | null> {
   try {
-    // Extract base64 data and convert to markdown image
-    const imageData = screenshot.split(',')[1] || screenshot;
-    const imageSizeKB = Math.round((imageData.length * 3) / 4 / 1024);
+    // Extract base64 data
+    const base64Data = screenshot.split(',')[1] || screenshot;
     
-    const comment = `## Screenshot\n\n`;
-    const imageMarkdown = `![Screenshot](data:image/jpeg;base64,${imageData})`;
+    // Create a unique filename with timestamp
+    const timestamp = new Date().toISOString().replace(/[:.-]/g, '');
+    const randomId = Math.random().toString(36).substring(2, 8);
+    const filename = `screenshot-${timestamp}-${randomId}.png`;
+    const path = `.github/issue-screenshots/${filename}`;
     
-    // GitHub has a limit on comment size, so we'll add a note if the image is large
-    const fullComment = imageSizeKB > 1000 
-      ? `${comment}*Note: Screenshot is ${imageSizeKB}KB. If it doesn't display properly, please download the issue data.*\n\n${imageMarkdown}`
-      : `${comment}${imageMarkdown}`;
+    // Check if directory exists, if not this will fail gracefully
+    // The directory should be created manually or via setup script
     
-    await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/comments`, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/vnd.github+json',
-        'Authorization': `Bearer ${token}`,
-        'X-GitHub-Api-Version': '2022-11-28',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        body: fullComment,
-      }),
-    });
+    // Upload the image using GitHub Contents API
+    const uploadResponse = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Accept': 'application/vnd.github+json',
+          'Authorization': `Bearer ${token}`,
+          'X-GitHub-Api-Version': '2022-11-28',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: `Add screenshot for issue report`,
+          content: base64Data,
+          branch: 'main', // You might want to make this configurable
+        }),
+      }
+    );
+    
+    if (!uploadResponse.ok) {
+      const error = await uploadResponse.json();
+      console.error('Failed to upload screenshot:', error);
+      
+      // Common error: directory doesn't exist
+      if (uploadResponse.status === 404 && error.message?.includes('path')) {
+        console.error(
+          'Screenshot directory does not exist. Please run "npm run setup:screenshots" to create it.'
+        );
+      }
+      
+      return null;
+    }
+    
+    const uploadResult = await uploadResponse.json();
+    
+    // Return the URL to the uploaded file
+    // Use the download URL for direct image access
+    return uploadResult.content.download_url;
   } catch (error) {
-    console.error('Failed to add screenshot comment:', error);
-    // Don't throw - the issue was created successfully even if the screenshot failed
+    console.error('Error uploading screenshot:', error);
+    return null;
   }
 }
+
