@@ -15,6 +15,7 @@ import { DevelopmentOnly } from "@/components/development-only";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { SessionTimeoutProvider } from "@/components/providers/session-timeout-provider";
 import { apiFetch } from '@/lib/api-client';
+import { IssueReporter } from '@/components/issue-reporter';
 
 // Define UserSessionData interface (can be shared if defined elsewhere)
 interface UserSessionData {
@@ -184,6 +185,7 @@ export default function DashboardLayout({
         </main>
       </div>
       <BottomMobileNavigation />
+      <IssueReporter />
     </div>
     </SessionTimeoutProvider>
   );
