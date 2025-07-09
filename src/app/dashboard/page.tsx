@@ -122,9 +122,7 @@ async function getDashboardMetrics(supabase: SupabaseClient<any>, profile: { rol
     const { count: pendingTasksCount } = await supabase
       .from('user_tasks')
       .select('*', { count: 'exact', head: true })
-      // @ts-expect-error - Type issue with Supabase
       .eq('assigned_to', user.id)
-      // @ts-expect-error - Type issue with Supabase
       .eq('status', 'pending');
 
     // Get completed tasks this week
@@ -133,11 +131,8 @@ async function getDashboardMetrics(supabase: SupabaseClient<any>, profile: { rol
     const { count: completedThisWeekCount } = await supabase
       .from('user_tasks')
       .select('*', { count: 'exact', head: true })
-      // @ts-expect-error - Type issue with Supabase
       .eq('assigned_to', user.id)
-      // @ts-expect-error - Type issue with Supabase
       .eq('status', 'completed')
-      // @ts-expect-error - Type issue with Supabase
       .gte('updated_at', weekAgo.toISOString());
 
     return {
