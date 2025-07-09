@@ -172,13 +172,27 @@ export function UnifiedNavigation() {
         isViewer,
         currentUser
       });
+      
+      // Reset fetch flags to ensure data is refetched for the current user
+      templatesFetched.current = false;
+      userWorkflowsFetched.current = false;
     }
   }, [currentUser, userRole, userBrandPermissions, isPlatformAdmin, isScopedAdmin, isEditor, isViewer]);
 
   useEffect(() => {
+    // Only fetch templates after user is loaded and authenticated
+    if (isLoadingUser || !currentUser) {
+      console.log('[UnifiedNavigation] Skipping template fetch - user not ready:', { isLoadingUser, hasUser: !!currentUser });
+      return;
+    }
+    
     const fetchTemplates = async () => {
       if (templatesFetched.current || isLoadingTemplates) return;
-      console.log('[UnifiedNavigation] Starting to fetch templates...');
+      console.log('[UnifiedNavigation] Starting to fetch templates...', { 
+        userRole,
+        isPlatformAdmin,
+        isScopedAdmin 
+      });
       setIsLoadingTemplates(true);
       templatesFetched.current = true;
       try {
@@ -200,7 +214,7 @@ export function UnifiedNavigation() {
       }
     };
     fetchTemplates();
-  }, [isLoadingTemplates]);
+  }, [isLoadingUser, currentUser, userRole, isPlatformAdmin, isScopedAdmin]);
 
   useEffect(() => {
     const fetchUserWorkflows = async () => {
@@ -357,11 +371,26 @@ export function UnifiedNavigation() {
       icon: <BookOpen className="h-5 w-5" />,
       segment: 'content',
       defaultOpen: true,
-      show: () => isAuthenticatedUser && !isViewer,
-      items: filteredContentItems.length > 0 ? filteredContentItems : 
-             (isLoadingTemplates || ((isScopedAdmin || isEditor) && isLoadingUserWorkflows && !isPlatformAdmin) ? 
-               [{ href: '#', label: 'Loading...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }] :
-               [{ href: '#', label: 'No content types available', icon: <MessageSquareWarning className="h-4 w-4" />, segment: 'no-content' }])
+      show: () => {
+        const shouldShow = isAuthenticatedUser && !isViewer;
+        console.log('[UnifiedNavigation] Create Content menu visibility:', {
+          shouldShow,
+          isAuthenticatedUser,
+          isViewer,
+          filteredContentItemsLength: filteredContentItems.length,
+          isLoadingTemplates,
+          isLoadingUserWorkflows
+        });
+        return shouldShow;
+      },
+      items: (() => {
+        const items = filteredContentItems.length > 0 ? filteredContentItems : 
+               (isLoadingTemplates || ((isScopedAdmin || isEditor) && isLoadingUserWorkflows && !isPlatformAdmin) ? 
+                 [{ href: '#', label: 'Loading...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }] :
+                 [{ href: '#', label: 'No content types available', icon: <MessageSquareWarning className="h-4 w-4" />, segment: 'no-content' }]);
+        console.log('[UnifiedNavigation] Create Content menu items:', items);
+        return items;
+      })()
     },
     { type: 'divider', show: () => isAuthenticatedUser },
     {

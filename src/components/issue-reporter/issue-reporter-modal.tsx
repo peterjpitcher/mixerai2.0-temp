@@ -218,7 +218,13 @@ export function IssueReporterModal({ isOpen, onClose }: IssueReporterModalProps)
           </div>
         ) : (
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 overflow-hidden flex flex-col">
+            <form onSubmit={form.handleSubmit(onSubmit, (errors) => {
+              console.error('Form validation errors:', errors);
+              const firstError = Object.values(errors)[0];
+              if (firstError?.message) {
+                toast.error(`Validation failed: ${firstError.message}`);
+              }
+            })} className="flex-1 overflow-hidden flex flex-col">
               <div className="flex-1 overflow-y-auto px-1">
                 <div className="space-y-4">
                   <FormField
