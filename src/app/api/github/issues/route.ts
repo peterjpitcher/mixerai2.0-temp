@@ -306,15 +306,40 @@ export async function POST(request: NextRequest) {
 
     const createdIssue = await githubResponse.json();
 
-    // If screenshot exists, add it as a comment
+    // If screenshot exists, upload it and add as a comment
     if (validatedData.screenshot) {
-      await addScreenshotComment(
+      const screenshotUrl = await uploadScreenshot(
         owner,
         repo,
-        createdIssue.number,
         validatedData.screenshot,
+        createdIssue.number,
         githubToken
       );
+      
+      if (screenshotUrl) {
+        await addScreenshotComment(
+          owner,
+          repo,
+          createdIssue.number,
+          screenshotUrl,
+          githubToken
+        );
+      } else {
+        // Fallback: Add a comment indicating screenshot upload failed
+        console.warn('Screenshot upload failed, adding note to issue');
+        await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${createdIssue.number}/comments`, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/vnd.github+json',
+            'Authorization': `Bearer ${githubToken}`,
+            'X-GitHub-Api-Version': '2022-11-28',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            body: '*Note: A screenshot was captured but could not be uploaded. Please check the browser console for more details.*',
+          }),
+        });
+      }
     }
 
     return NextResponse.json({
@@ -454,25 +479,70 @@ function formatIssueBody(data: IssueBodyData): string {
   return body;
 }
 
+async function uploadScreenshot(
+  owner: string,
+  repo: string,
+  screenshot: string,
+  issueNumber: number,
+  token: string
+): Promise<string | null> {
+  try {
+    // Extract base64 data
+    const base64Data = screenshot.split(',')[1] || screenshot;
+    
+    // Create a unique filename
+    const timestamp = new Date().toISOString().replace(/[:.-]/g, '');
+    const filename = `issue-${issueNumber}-${timestamp}.png`;
+    const path = `.github/issue-screenshots/${filename}`;
+    
+    // Check if directory exists, if not this will fail gracefully
+    // The directory should be created manually or via setup script
+    
+    // Upload the image using GitHub Contents API
+    const uploadResponse = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Accept': 'application/vnd.github+json',
+          'Authorization': `Bearer ${token}`,
+          'X-GitHub-Api-Version': '2022-11-28',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: `Add screenshot for issue #${issueNumber}`,
+          content: base64Data,
+          branch: 'main', // You might want to make this configurable
+        }),
+      }
+    );
+    
+    if (!uploadResponse.ok) {
+      const error = await uploadResponse.json();
+      console.error('Failed to upload screenshot:', error);
+      return null;
+    }
+    
+    const uploadResult = await uploadResponse.json();
+    
+    // Return the URL to the uploaded file
+    // Use the download URL for direct image access
+    return uploadResult.content.download_url;
+  } catch (error) {
+    console.error('Error uploading screenshot:', error);
+    return null;
+  }
+}
+
 async function addScreenshotComment(
   owner: string,
   repo: string,
   issueNumber: number,
-  screenshot: string,
+  screenshotUrl: string,
   token: string
 ): Promise<void> {
   try {
-    // Extract base64 data and convert to markdown image
-    const imageData = screenshot.split(',')[1] || screenshot;
-    const imageSizeKB = Math.round((imageData.length * 3) / 4 / 1024);
-    
-    const comment = `## Screenshot\n\n`;
-    const imageMarkdown = `![Screenshot](data:image/jpeg;base64,${imageData})`;
-    
-    // GitHub has a limit on comment size, so we'll add a note if the image is large
-    const fullComment = imageSizeKB > 1000 
-      ? `${comment}*Note: Screenshot is ${imageSizeKB}KB. If it doesn't display properly, please download the issue data.*\n\n${imageMarkdown}`
-      : `${comment}${imageMarkdown}`;
+    const comment = `## Screenshot\n\n![Screenshot](${screenshotUrl})\n\n*Screenshot captured at issue creation time*`;
     
     await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/comments`, {
       method: 'POST',
@@ -483,7 +553,7 @@ async function addScreenshotComment(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        body: fullComment,
+        body: comment,
       }),
     });
   } catch (error) {

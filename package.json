@@ -15,7 +15,8 @@
     "check": "next lint && tsc --noEmit",
     "review": "node scripts/code-review.js",
     "review:fix": "next lint --fix && npm run review",
-    "db:types": "./scripts/regenerate-types.sh"
+    "db:types": "./scripts/regenerate-types.sh",
+    "setup:screenshots": "node scripts/setup-issue-screenshots.js"
   },
   "keywords": [
     "wrapper"

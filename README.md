@@ -37,7 +37,13 @@ MixerAI 2.0 is an application that creates AI-generated content with Azure OpenA
         -   (Refer to `docs/database.md` and `docs/azure_openai_integration.md` for more details on these variables).
 4.  **Database Setup**:
     -   Ensure your Supabase database schema is set up. You might need to apply migrations or run schema scripts. See `docs/database.md` and the `supabase-schema.sql` file.
-5.  **Start the development server**:
+5.  **Issue Reporter Setup** (Optional):
+    -   If you want to enable screenshot uploads in the issue reporter, run:
+    ```bash
+    npm run setup:screenshots
+    ```
+    -   This creates a directory in your GitHub repo for storing issue screenshots.
+6.  **Start the development server**:
     ```bash
     npm run dev
     ```
