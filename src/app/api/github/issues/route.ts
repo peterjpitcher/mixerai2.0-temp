@@ -336,7 +336,12 @@ export async function POST(request: NextRequest) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            body: '*Note: A screenshot was captured but could not be uploaded. Please check the browser console for more details.*',
+            body: `*Note: A screenshot was captured but could not be uploaded.*\n\n` +
+                  `**Possible reasons:**\n` +
+                  `- The screenshot directory doesn't exist. Run \`npm run setup:screenshots\` to create it.\n` +
+                  `- Insufficient permissions to write to the repository.\n` +
+                  `- The repository branch protection rules may be preventing file uploads.\n\n` +
+                  `Please check the browser console for more details.`,
           }),
         });
       }
@@ -536,6 +541,14 @@ async function uploadScreenshot(
     if (!uploadResponse.ok) {
       const error = await uploadResponse.json();
       console.error('Failed to upload screenshot:', error);
+      
+      // Common error: directory doesn't exist
+      if (uploadResponse.status === 404 && error.message?.includes('path')) {
+        console.error(
+          'Screenshot directory does not exist. Please run "npm run setup:screenshots" to create it.'
+        );
+      }
+      
       return null;
     }
     

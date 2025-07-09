@@ -66,8 +66,35 @@ async function setupScreenshotDirectory() {
     const githubDirCheck = await makeGitHubRequest('/contents/.github');
     
     if (githubDirCheck.status === 404) {
-      console.log('.github directory does not exist. Please create it first.');
-      return;
+      console.log('.github directory does not exist. Creating it first...');
+      
+      // Create .github directory with a README
+      const githubReadmeContent = `# .github
+
+This directory contains GitHub-specific files and configurations.
+
+## Contents
+
+- \`issue-screenshots/\` - Automatically uploaded screenshots from issue reports
+`;
+      const githubReadmeBase64 = Buffer.from(githubReadmeContent).toString('base64');
+      
+      const createGithubDir = await makeGitHubRequest(
+        '/contents/.github/README.md',
+        'PUT',
+        {
+          message: 'Create .github directory',
+          content: githubReadmeBase64,
+          branch: 'main',
+        }
+      );
+      
+      if (createGithubDir.status !== 201) {
+        console.error('Failed to create .github directory');
+        return;
+      }
+      
+      console.log('✓ Created .github directory');
     }
 
     // Check if screenshots directory already exists
