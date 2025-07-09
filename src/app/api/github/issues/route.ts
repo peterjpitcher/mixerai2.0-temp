@@ -260,7 +260,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prepare issue body
+    // Upload screenshot first if provided
+    let screenshotUrl: string | null = null;
+    if (validatedData.screenshot) {
+      screenshotUrl = await uploadScreenshot(
+        owner,
+        repo,
+        validatedData.screenshot,
+        githubToken
+      );
+      
+      if (!screenshotUrl) {
+        console.warn('Screenshot upload failed, continuing without screenshot');
+      }
+    }
+    
+    // Prepare issue body with screenshot URL if available
     const issueBody = formatIssueBody({
       ...validatedData,
       user: {
@@ -268,6 +283,7 @@ export async function POST(request: NextRequest) {
         email: user.email || 'Unknown',
         name: user.user_metadata?.full_name || user.user_metadata?.name || 'Unknown User',
       },
+      screenshotUrl, // Pass the URL to include in the body
     });
 
     // Prepare labels
@@ -305,47 +321,6 @@ export async function POST(request: NextRequest) {
     }
 
     const createdIssue = await githubResponse.json();
-
-    // If screenshot exists, upload it and add as a comment
-    if (validatedData.screenshot) {
-      const screenshotUrl = await uploadScreenshot(
-        owner,
-        repo,
-        validatedData.screenshot,
-        createdIssue.number,
-        githubToken
-      );
-      
-      if (screenshotUrl) {
-        await addScreenshotComment(
-          owner,
-          repo,
-          createdIssue.number,
-          screenshotUrl,
-          githubToken
-        );
-      } else {
-        // Fallback: Add a comment indicating screenshot upload failed
-        console.warn('Screenshot upload failed, adding note to issue');
-        await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${createdIssue.number}/comments`, {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/vnd.github+json',
-            'Authorization': `Bearer ${githubToken}`,
-            'X-GitHub-Api-Version': '2022-11-28',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            body: `*Note: A screenshot was captured but could not be uploaded.*\n\n` +
-                  `**Possible reasons:**\n` +
-                  `- The screenshot directory doesn't exist. Run \`npm run setup:screenshots\` to create it.\n` +
-                  `- Insufficient permissions to write to the repository.\n` +
-                  `- The repository branch protection rules may be preventing file uploads.\n\n` +
-                  `Please check the browser console for more details.`,
-          }),
-        });
-      }
-    }
 
     return NextResponse.json({
       success: true,
@@ -407,6 +382,7 @@ interface IssueBodyData {
   };
   consoleLogs?: ConsoleLog[];
   networkLogs?: NetworkLog[];
+  screenshotUrl?: string | null;
 }
 
 interface ConsoleLog {
@@ -431,10 +407,15 @@ function truncateString(str: string, maxLength: number, suffix = '...[truncated]
 }
 
 function formatIssueBody(data: IssueBodyData): string {
-  const { user, description, environment, consoleLogs, networkLogs } = data;
+  const { user, description, environment, consoleLogs, networkLogs, screenshotUrl } = data;
   const MAX_BODY_LENGTH = 65000; // Leave some buffer from GitHub's 65536 limit
   
   let body = `## Issue Description\n\n${description}\n\n`;
+  
+  // Screenshot if available
+  if (screenshotUrl) {
+    body += `## Screenshot\n\n![Screenshot](${screenshotUrl})\n\n`;
+  }
   
   // User Information
   body += `## Reporter Information\n\n`;
@@ -504,16 +485,16 @@ async function uploadScreenshot(
   owner: string,
   repo: string,
   screenshot: string,
-  issueNumber: number,
   token: string
 ): Promise<string | null> {
   try {
     // Extract base64 data
     const base64Data = screenshot.split(',')[1] || screenshot;
     
-    // Create a unique filename
+    // Create a unique filename with timestamp
     const timestamp = new Date().toISOString().replace(/[:.-]/g, '');
-    const filename = `issue-${issueNumber}-${timestamp}.png`;
+    const randomId = Math.random().toString(36).substring(2, 8);
+    const filename = `screenshot-${timestamp}-${randomId}.png`;
     const path = `.github/issue-screenshots/${filename}`;
     
     // Check if directory exists, if not this will fail gracefully
@@ -531,7 +512,7 @@ async function uploadScreenshot(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: `Add screenshot for issue #${issueNumber}`,
+          message: `Add screenshot for issue report`,
           content: base64Data,
           branch: 'main', // You might want to make this configurable
         }),
@@ -563,30 +544,3 @@ async function uploadScreenshot(
   }
 }
 
-async function addScreenshotComment(
-  owner: string,
-  repo: string,
-  issueNumber: number,
-  screenshotUrl: string,
-  token: string
-): Promise<void> {
-  try {
-    const comment = `## Screenshot\n\n![Screenshot](${screenshotUrl})\n\n*Screenshot captured at issue creation time*`;
-    
-    await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/comments`, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/vnd.github+json',
-        'Authorization': `Bearer ${token}`,
-        'X-GitHub-Api-Version': '2022-11-28',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        body: comment,
-      }),
-    });
-  } catch (error) {
-    console.error('Failed to add screenshot comment:', error);
-    // Don't throw - the issue was created successfully even if the screenshot failed
-  }
-}
