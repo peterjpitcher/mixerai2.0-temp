@@ -157,17 +157,37 @@ export function UnifiedNavigation() {
   const isAdmin = userRole === 'admin';
   const isPlatformAdmin = isAdmin && userBrandPermissions.length === 0; 
   const isScopedAdmin = isAdmin && userBrandPermissions.length > 0;
+  
+  // Diagnostic logging to understand user permissions
+  useEffect(() => {
+    if (currentUser) {
+      console.log('[UnifiedNavigation] User Diagnostics:', {
+        userRole,
+        isAdmin,
+        brandPermissionsCount: userBrandPermissions.length,
+        brandPermissions: userBrandPermissions,
+        isPlatformAdmin,
+        isScopedAdmin,
+        isEditor,
+        isViewer,
+        currentUser
+      });
+    }
+  }, [currentUser, userRole, userBrandPermissions, isPlatformAdmin, isScopedAdmin, isEditor, isViewer]);
 
   useEffect(() => {
     const fetchTemplates = async () => {
       if (templatesFetched.current || isLoadingTemplates) return;
+      console.log('[UnifiedNavigation] Starting to fetch templates...');
       setIsLoadingTemplates(true);
       templatesFetched.current = true;
       try {
         const response = await fetch('/api/content-templates');
         const data = await response.json();
+        console.log('[UnifiedNavigation] Templates API response:', data);
         if (data.success && data.templates) {
           setUserTemplates(data.templates);
+          console.log('[UnifiedNavigation] Templates loaded:', data.templates.length, 'templates');
         } else {
           console.error('[UnifiedNavigation] Failed to fetch templates:', data.error);
           setUserTemplates([]);
@@ -256,6 +276,14 @@ export function UnifiedNavigation() {
       { href: '#', label: 'Loading templates...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }
     ];
   } else if (userTemplates.length > 0) {
+    console.log('[UnifiedNavigation] Template Filtering:', {
+      userTemplatesCount: userTemplates.length,
+      isPlatformAdmin,
+      isScopedAdmin,
+      isEditor,
+      userTemplates
+    });
+    
     if (isPlatformAdmin) {
       filteredContentItems = userTemplates.map(template => ({
         href: `/dashboard/content/new?template=${template.id}`,
@@ -263,6 +291,7 @@ export function UnifiedNavigation() {
         icon: <FileText className="h-4 w-4" />,
         segment: template.id
       }));
+      console.log('[UnifiedNavigation] Platform Admin - Showing all templates:', filteredContentItems);
     } else if (isScopedAdmin || isEditor) {
       const userBrandIds = (currentUser?.brand_permissions || []).map(p => p.brand_id).filter(Boolean);
       if (userBrandIds.length > 0 && userWorkflows.length > 0) {
@@ -283,8 +312,15 @@ export function UnifiedNavigation() {
         filteredContentItems = [];
       }
     } else {
+      console.log('[UnifiedNavigation] Not admin or editor - no templates shown');
       filteredContentItems = [];
     }
+  } else {
+    console.log('[UnifiedNavigation] No templates loaded yet:', {
+      userTemplatesLength: userTemplates.length,
+      isLoadingTemplates,
+      templatesFetched: templatesFetched.current
+    });
   }
   
   const hasAssignedBrandWithMasterClaimId = () => {
