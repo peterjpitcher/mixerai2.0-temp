@@ -161,7 +161,6 @@ export default async function DashboardPage() {
     const { data } = await supabase
       .from('profiles')
       .select('full_name')
-      // @ts-expect-error - Type issue with Supabase  
       .eq('id', user.id)
       .single();
     userProfile = data as any;

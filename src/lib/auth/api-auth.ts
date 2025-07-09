@@ -144,8 +144,7 @@ export function withAuthAndMonitoring(
       return response;
     } catch (error) {
       // Log error with details
-      const duration = Date.now() - startTime;
-      console.error(`API ${path} error after ${duration}ms:`, error);
+      console.error(`API ${path} error:`, error);
       
       // Return 500 Internal Server Error
       return new Response(
