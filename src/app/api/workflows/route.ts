@@ -114,17 +114,17 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     
     if (requestedBrandId) {
       if (globalRole !== 'admin' && permittedBrandIds && !permittedBrandIds.includes(requestedBrandId)) {
-        console.log(`[API Workflows GET] Non-admin user access denied for requested brand_id: ${requestedBrandId}`);
+        // Non-admin user access denied for requested brand_id
         return NextResponse.json({ success: true, data: [] }); // Or return 403 error
       }
-      console.log(`[API Workflows GET] Filtering by requested brand_id: ${requestedBrandId}`);
+      // Filter by requested brand_id
       query = query.eq('brand_id', requestedBrandId);
     } else if (globalRole !== 'admin' && permittedBrandIds) {
       // If no specific brand requested, and user is not admin, filter by their permitted brands
-      console.log(`[API Workflows GET] Non-admin user. Filtering workflows by permitted brand IDs: ${permittedBrandIds.join(', ')}`);
+      // Non-admin user - filter workflows by permitted brand IDs
       query = query.in('brand_id', permittedBrandIds);
     } else if (globalRole === 'admin') {
-      console.log('[API Workflows GET] Admin user. Fetching all workflows (or specific brand if requestedBrandId set).');
+      // Admin user - fetch all workflows (or specific brand if requestedBrandId set)
       // Admins can see all, or specific if requestedBrandId is set (handled by the first if block)
     }
     

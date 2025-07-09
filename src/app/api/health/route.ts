@@ -136,7 +136,7 @@ export async function GET(): Promise<Response> {
         status: 'pass',
         message: 'Redis connection available',
       };
-    } catch (error) {
+    } catch {
       healthStatus.checks.redis = {
         status: 'warn',
         message: 'Redis unavailable, using in-memory rate limiting',

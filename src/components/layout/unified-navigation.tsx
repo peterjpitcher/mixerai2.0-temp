@@ -140,7 +140,7 @@ export function UnifiedNavigation() {
             return;
           }
         }
-        console.error('[UnifiedNavigation] Error fetching current user:', error);
+        // Only log critical errors, not expected network errors during navigation
         setCurrentUser(null);
       } finally {
         setIsLoadingUser(false);
@@ -158,82 +158,55 @@ export function UnifiedNavigation() {
   const isPlatformAdmin = isAdmin && userBrandPermissions.length === 0; 
   const isScopedAdmin = isAdmin && userBrandPermissions.length > 0;
   
-  // Diagnostic logging to understand user permissions
+  // Reset fetch flags when user changes
   useEffect(() => {
     if (currentUser) {
-      console.log('[UnifiedNavigation] User Diagnostics:', {
-        userRole,
-        isAdmin,
-        brandPermissionsCount: userBrandPermissions.length,
-        brandPermissions: userBrandPermissions,
-        isPlatformAdmin,
-        isScopedAdmin,
-        isEditor,
-        isViewer,
-        currentUser
-      });
-      
       // Reset fetch flags to ensure data is refetched for the current user
       templatesFetched.current = false;
       userWorkflowsFetched.current = false;
     }
-  }, [currentUser, userRole, userBrandPermissions, isPlatformAdmin, isScopedAdmin, isEditor, isViewer]);
+  }, [currentUser]);
 
   useEffect(() => {
     // Only fetch templates after user is loaded and authenticated
     if (isLoadingUser || !currentUser) {
-      console.log('[UnifiedNavigation] Skipping template fetch - user not ready:', { isLoadingUser, hasUser: !!currentUser });
+      // Skip template fetch if user is not ready
       return;
     }
     
     const fetchTemplates = async () => {
       // Check if already loading
       if (isLoadingTemplates) {
-        console.log('[UnifiedNavigation] Already loading templates, skipping...');
+        // Already loading templates, skip
         return;
       }
       
       // Check if already fetched successfully
       if (templatesFetched.current && userTemplates.length > 0) {
-        console.log('[UnifiedNavigation] Templates already fetched:', userTemplates.length);
+        // Templates already fetched
         return;
       }
       
-      console.log('[UnifiedNavigation] Starting to fetch templates...', { 
-        userRole,
-        isPlatformAdmin,
-        isScopedAdmin,
-        templatesFetchedBefore: templatesFetched.current,
-        existingTemplatesCount: userTemplates.length
-      });
+      // Start fetching templates
       
       setIsLoadingTemplates(true);
       
       try {
         const response = await fetch('/api/content-templates');
         const data = await response.json();
-        console.log('[UnifiedNavigation] Templates API response:', {
-          status: response.status,
-          success: data.success,
-          templatesCount: data.templates?.length || 0,
-          templates: data.templates,
-          error: data.error
-        });
+        // Process templates API response
         
         if (data.success && data.templates) {
           setUserTemplates(data.templates);
           templatesFetched.current = true; // Only set to true on success
-          console.log('[UnifiedNavigation] Templates loaded successfully:', {
-            count: data.templates.length,
-            templates: data.templates.map(t => ({ id: t.id, name: t.name }))
-          });
+          // Templates loaded successfully
         } else {
-          console.error('[UnifiedNavigation] Failed to fetch templates:', data.error || 'Unknown error');
+          // Failed to fetch templates
           setUserTemplates([]);
           templatesFetched.current = false; // Reset on failure
         }
       } catch (error) {
-        console.error('[UnifiedNavigation] Error fetching templates:', error);
+        // Error fetching templates
         setUserTemplates([]);
         templatesFetched.current = false; // Reset on error
       } finally {
@@ -260,12 +233,12 @@ export function UnifiedNavigation() {
           if (data.success && Array.isArray(data.data)) {
             setUserWorkflows(data.data as WorkflowDataType[]);
           } else {
-            console.error('[UnifiedNavigation] Failed to fetch user workflows:', data.error);
+            // Failed to fetch user workflows
             toast.error('Could not load workflows for content creation links.');
             setUserWorkflows([]);
           }
         } catch (error) {
-          console.error('[UnifiedNavigation] Error fetching user workflows:', error);
+          // Error fetching user workflows
           toast.error('Error loading workflows for navigation.');
           setUserWorkflows([]);
         } finally {
@@ -321,20 +294,10 @@ export function UnifiedNavigation() {
       ];
     }
     
-    console.log('[UnifiedNavigation] filteredContentItems calculation:', {
-      userTemplatesLength: userTemplates.length,
-      userTemplates: userTemplates.map(t => ({ id: t.id, name: t.name })),
-      isPlatformAdmin,
-      isScopedAdmin,
-      isEditor,
-      isLoadingUser,
-      isLoadingTemplates,
-      isLoadingUserWorkflows,
-      currentUser: currentUser ? { role: currentUser.user_metadata?.role, brandPermissions: currentUser.brand_permissions?.length } : null
-    });
+    // Calculate filtered content items based on user role and templates
     
     if (userTemplates.length > 0) {
-      console.log('[UnifiedNavigation] Templates available for filtering');
+      // Templates available for filtering
       
       if (isPlatformAdmin) {
         const items = userTemplates.map(template => ({
@@ -343,12 +306,20 @@ export function UnifiedNavigation() {
           icon: <FileText className="h-4 w-4" />,
           segment: template.id
         }));
-        console.log('[UnifiedNavigation] Platform Admin - Returning all templates:', {
-          count: items.length,
-          items: items.map(i => ({ href: i.href, label: i.label }))
-        });
+        // Platform Admin - Return all templates
         return items;
-      } else if (isScopedAdmin || isEditor) {
+      } else if (isScopedAdmin) {
+        // Scoped admins should see all templates - they can create content for their brands
+        const items = userTemplates.map(template => ({
+          href: `/dashboard/content/new?template=${template.id}`,
+          label: template.name,
+          icon: <FileText className="h-4 w-4" />,
+          segment: template.id
+        }));
+        // Scoped Admin - Show all templates
+        return items;
+      } else if (isEditor) {
+        // Editors see templates based on workflows for their brands
         const userBrandIds = (currentUser?.brand_permissions || []).map(p => p.brand_id).filter(Boolean);
         if (userBrandIds.length > 0 && userWorkflows.length > 0) {
           const items = userTemplates
@@ -366,23 +337,21 @@ export function UnifiedNavigation() {
             }));
           return items;
         }
-        return [];
+        // If no workflows, still show all templates for editors
+        const items = userTemplates.map(template => ({
+          href: `/dashboard/content/new?template=${template.id}`,
+          label: template.name,
+          icon: <FileText className="h-4 w-4" />,
+          segment: template.id
+        }));
+        // Editor - Show all templates (no workflow filtering)
+        return items;
       } else {
-        console.log('[UnifiedNavigation] Not admin or editor - no templates shown');
+        // Not admin or editor - no templates shown
         return [];
       }
     } else {
-      console.log('[UnifiedNavigation] No templates to display:', {
-        userTemplatesLength: userTemplates.length,
-        isLoadingTemplates,
-        templatesFetched: templatesFetched.current,
-        userRole,
-        isPlatformAdmin,
-        currentUser: currentUser ? 'exists' : 'null',
-        isAdmin,
-        isEditor,
-        isViewer
-      });
+      // No templates to display
       
       // If we're still loading, show loading state
       if (isLoadingTemplates) {
@@ -439,24 +408,7 @@ export function UnifiedNavigation() {
       icon: <BookOpen className="h-5 w-5" />,
       segment: 'content',
       defaultOpen: true,
-      show: () => {
-        const shouldShow = isAuthenticatedUser && !isViewer;
-        console.log('[UnifiedNavigation] Create Content menu visibility check:', {
-          shouldShow,
-          isAuthenticatedUser,
-          isViewer,
-          currentUser: currentUser ? { 
-            role: currentUser.user_metadata?.role,
-            hasUser: true 
-          } : { hasUser: false },
-          filteredContentItemsLength: filteredContentItems.length,
-          filteredContentItems: filteredContentItems.slice(0, 3).map(i => i.label),
-          isLoadingTemplates,
-          isLoadingUserWorkflows,
-          userTemplatesLength: userTemplates.length
-        });
-        return shouldShow;
-      },
+      show: () => isAuthenticatedUser && !isViewer,
       items: filteredContentItems.length > 0 ? filteredContentItems : 
              [{ href: '#', label: 'No content types available', icon: <MessageSquareWarning className="h-4 w-4" />, segment: 'no-content' }]
     },
@@ -588,22 +540,7 @@ export function UnifiedNavigation() {
     return false;
   };
 
-  // Debug info (remove after fixing)
-  useEffect(() => {
-    const debugInfo = {
-      currentUser: currentUser ? { role: currentUser.user_metadata?.role, id: currentUser.id } : null,
-      userRole,
-      isPlatformAdmin,
-      isScopedAdmin,
-      isAdmin,
-      userTemplates: userTemplates.map(t => ({ id: t.id, name: t.name })),
-      filteredContentItems: filteredContentItems.map(i => ({ label: i.label, href: i.href })),
-      isLoadingUser,
-      isLoadingTemplates,
-      templatesFetched: templatesFetched.current
-    };
-    console.log('[UnifiedNavigation] DEBUG STATE UPDATE:', debugInfo);
-  }, [currentUser, userRole, isPlatformAdmin, userTemplates, filteredContentItems, isLoadingUser, isLoadingTemplates]);
+  // Component state is now managed without debug logging
 
   if (isLoadingUser) {
     return (

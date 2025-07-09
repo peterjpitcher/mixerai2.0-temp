@@ -7,7 +7,6 @@ import { TeamActivityFeed } from '@/components/dashboard/team-activity-feed';
 import { MostAgedContent } from '@/components/dashboard/most-aged-content';
 import { TasksSkeleton } from '@/components/dashboard/dashboard-skeleton';
 import { MyTasks } from '@/components/dashboard/my-tasks';
-import { DashboardMetrics } from '@/components/dashboard/dashboard-metrics';
 
 async function getTeamActivity(supabase: SupabaseClient<any>, profile: { role?: string; assigned_brands?: string[] } | null) { // TODO: Type as SupabaseClient<Database> when types are regenerated
   if (!profile) return [];
@@ -26,7 +25,6 @@ async function getTeamActivity(supabase: SupabaseClient<any>, profile: { role?: 
 
   if (profile.role !== 'admin') {
     if (!profile.assigned_brands || profile.assigned_brands.length === 0) return [];
-    // @ts-ignore - Type issue with Supabase query builder
     query = query.in('brand_id', profile.assigned_brands);
   }
     
@@ -58,12 +56,10 @@ async function getMostAgedContent(supabase: SupabaseClient<any>, profile: { role
   let query = supabase
     .from('content')
     .select('id, title, updated_at, status, brand_id, brands ( name, brand_color, logo_url )')
-    // @ts-ignore - Type issue with Supabase query builder
     .in('status', ['draft', 'pending_review']);
 
   if (profile.role !== 'admin') {
     if (!profile.assigned_brands || profile.assigned_brands.length === 0) return [];
-    // @ts-ignore - Type issue with Supabase query builder
     query = query.in('brand_id', profile.assigned_brands);
   }
 
@@ -108,12 +104,9 @@ async function getDashboardMetrics(supabase: SupabaseClient<any>, profile: { rol
       if (!profile.assigned_brands || profile.assigned_brands.length === 0) {
         return { totalContent: 0, totalBrands: 0, totalWorkflows: 0, pendingTasks: 0, completedThisWeek: 0, pendingReviews: 0 };
       }
-      // @ts-ignore - Type issue with Supabase query builder
-      contentQuery = contentQuery.in('brand_id', profile.assigned_brands);
-      // @ts-ignore - Type issue with Supabase query builder
-      brandsQuery = brandsQuery.in('id', profile.assigned_brands);
-      // @ts-ignore - Type issue with Supabase query builder
-      workflowsQuery = workflowsQuery.in('brand_id', profile.assigned_brands);
+        contentQuery = contentQuery.in('brand_id', profile.assigned_brands);
+        brandsQuery = brandsQuery.in('id', profile.assigned_brands);
+        workflowsQuery = workflowsQuery.in('brand_id', profile.assigned_brands);
     }
 
     const [contentResult, brandsResult, workflowsResult] = await Promise.all([
@@ -129,9 +122,9 @@ async function getDashboardMetrics(supabase: SupabaseClient<any>, profile: { rol
     const { count: pendingTasksCount } = await supabase
       .from('user_tasks')
       .select('*', { count: 'exact', head: true })
-      // @ts-ignore - Type issue with Supabase
+      // @ts-expect-error - Type issue with Supabase
       .eq('assigned_to', user.id)
-      // @ts-ignore - Type issue with Supabase
+      // @ts-expect-error - Type issue with Supabase
       .eq('status', 'pending');
 
     // Get completed tasks this week
@@ -140,11 +133,11 @@ async function getDashboardMetrics(supabase: SupabaseClient<any>, profile: { rol
     const { count: completedThisWeekCount } = await supabase
       .from('user_tasks')
       .select('*', { count: 'exact', head: true })
-      // @ts-ignore - Type issue with Supabase
+      // @ts-expect-error - Type issue with Supabase
       .eq('assigned_to', user.id)
-      // @ts-ignore - Type issue with Supabase
+      // @ts-expect-error - Type issue with Supabase
       .eq('status', 'completed')
-      // @ts-ignore - Type issue with Supabase
+      // @ts-expect-error - Type issue with Supabase
       .gte('updated_at', weekAgo.toISOString());
 
     return {
@@ -173,7 +166,7 @@ export default async function DashboardPage() {
     const { data } = await supabase
       .from('profiles')
       .select('full_name')
-      // @ts-ignore - Type issue with Supabase  
+      // @ts-expect-error - Type issue with Supabase  
       .eq('id', user.id)
       .single();
     userProfile = data as any;

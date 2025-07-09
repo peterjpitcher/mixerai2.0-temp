@@ -64,10 +64,10 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       .in('status', ['draft', 'pending_review']);
 
     if (globalRole !== 'admin' && permittedBrandIds) {
-      console.log(`[API Tasks GET] Non-admin user. Filtering tasks by permitted brand IDs: ${permittedBrandIds.join(', ')}`);
+      // Non-admin user - filter tasks by permitted brand IDs
       contentQuery = contentQuery.in('brand_id', permittedBrandIds);
     } else if (globalRole === 'admin') {
-      console.log('[API Tasks GET] Admin user. Fetching tasks from all brands.');
+      // Admin user - fetch tasks from all brands
     }
 
     const { data: contentItems, error } = await contentQuery.order('updated_at', { ascending: false });
