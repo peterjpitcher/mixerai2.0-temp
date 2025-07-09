@@ -187,34 +187,62 @@ export function UnifiedNavigation() {
     }
     
     const fetchTemplates = async () => {
-      if (templatesFetched.current || isLoadingTemplates) return;
+      // Check if already loading
+      if (isLoadingTemplates) {
+        console.log('[UnifiedNavigation] Already loading templates, skipping...');
+        return;
+      }
+      
+      // Check if already fetched successfully
+      if (templatesFetched.current && userTemplates.length > 0) {
+        console.log('[UnifiedNavigation] Templates already fetched:', userTemplates.length);
+        return;
+      }
+      
       console.log('[UnifiedNavigation] Starting to fetch templates...', { 
         userRole,
         isPlatformAdmin,
-        isScopedAdmin 
+        isScopedAdmin,
+        templatesFetchedBefore: templatesFetched.current,
+        existingTemplatesCount: userTemplates.length
       });
+      
       setIsLoadingTemplates(true);
-      templatesFetched.current = true;
+      
       try {
         const response = await fetch('/api/content-templates');
         const data = await response.json();
-        console.log('[UnifiedNavigation] Templates API response:', data);
+        console.log('[UnifiedNavigation] Templates API response:', {
+          status: response.status,
+          success: data.success,
+          templatesCount: data.templates?.length || 0,
+          templates: data.templates,
+          error: data.error
+        });
+        
         if (data.success && data.templates) {
           setUserTemplates(data.templates);
-          console.log('[UnifiedNavigation] Templates loaded:', data.templates.length, 'templates');
+          templatesFetched.current = true; // Only set to true on success
+          console.log('[UnifiedNavigation] Templates loaded successfully:', {
+            count: data.templates.length,
+            templates: data.templates.map(t => ({ id: t.id, name: t.name }))
+          });
         } else {
-          console.error('[UnifiedNavigation] Failed to fetch templates:', data.error);
+          console.error('[UnifiedNavigation] Failed to fetch templates:', data.error || 'Unknown error');
           setUserTemplates([]);
+          templatesFetched.current = false; // Reset on failure
         }
       } catch (error) {
         console.error('[UnifiedNavigation] Error fetching templates:', error);
         setUserTemplates([]);
+        templatesFetched.current = false; // Reset on error
       } finally {
         setIsLoadingTemplates(false);
       }
     };
+    
     fetchTemplates();
-  }, [isLoadingUser, currentUser, userRole, isPlatformAdmin, isScopedAdmin]);
+  }, [isLoadingUser, currentUser, userRole, isPlatformAdmin, isScopedAdmin, userTemplates.length]); // Added userTemplates.length to re-run if templates are cleared
 
   useEffect(() => {
     const fetchUserWorkflows = async () => {
@@ -293,14 +321,20 @@ export function UnifiedNavigation() {
       ];
     }
     
+    console.log('[UnifiedNavigation] filteredContentItems calculation:', {
+      userTemplatesLength: userTemplates.length,
+      userTemplates: userTemplates.map(t => ({ id: t.id, name: t.name })),
+      isPlatformAdmin,
+      isScopedAdmin,
+      isEditor,
+      isLoadingUser,
+      isLoadingTemplates,
+      isLoadingUserWorkflows,
+      currentUser: currentUser ? { role: currentUser.user_metadata?.role, brandPermissions: currentUser.brand_permissions?.length } : null
+    });
+    
     if (userTemplates.length > 0) {
-      console.log('[UnifiedNavigation] Template Filtering:', {
-        userTemplatesCount: userTemplates.length,
-        isPlatformAdmin,
-        isScopedAdmin,
-        isEditor,
-        userTemplates
-      });
+      console.log('[UnifiedNavigation] Templates available for filtering');
       
       if (isPlatformAdmin) {
         const items = userTemplates.map(template => ({
@@ -309,7 +343,10 @@ export function UnifiedNavigation() {
           icon: <FileText className="h-4 w-4" />,
           segment: template.id
         }));
-        console.log('[UnifiedNavigation] Platform Admin - Showing all templates:', items);
+        console.log('[UnifiedNavigation] Platform Admin - Returning all templates:', {
+          count: items.length,
+          items: items.map(i => ({ href: i.href, label: i.label }))
+        });
         return items;
       } else if (isScopedAdmin || isEditor) {
         const userBrandIds = (currentUser?.brand_permissions || []).map(p => p.brand_id).filter(Boolean);
@@ -335,11 +372,25 @@ export function UnifiedNavigation() {
         return [];
       }
     } else {
-      console.log('[UnifiedNavigation] No templates loaded yet:', {
+      console.log('[UnifiedNavigation] No templates to display:', {
         userTemplatesLength: userTemplates.length,
         isLoadingTemplates,
-        templatesFetched: templatesFetched.current
+        templatesFetched: templatesFetched.current,
+        userRole,
+        isPlatformAdmin,
+        currentUser: currentUser ? 'exists' : 'null',
+        isAdmin,
+        isEditor,
+        isViewer
       });
+      
+      // If we're still loading, show loading state
+      if (isLoadingTemplates) {
+        return [
+          { href: '#', label: 'Loading templates...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }
+        ];
+      }
+      
       return [];
     }
   }, [
@@ -390,13 +441,19 @@ export function UnifiedNavigation() {
       defaultOpen: true,
       show: () => {
         const shouldShow = isAuthenticatedUser && !isViewer;
-        console.log('[UnifiedNavigation] Create Content menu visibility:', {
+        console.log('[UnifiedNavigation] Create Content menu visibility check:', {
           shouldShow,
           isAuthenticatedUser,
           isViewer,
+          currentUser: currentUser ? { 
+            role: currentUser.user_metadata?.role,
+            hasUser: true 
+          } : { hasUser: false },
           filteredContentItemsLength: filteredContentItems.length,
+          filteredContentItems: filteredContentItems.slice(0, 3).map(i => i.label),
           isLoadingTemplates,
-          isLoadingUserWorkflows
+          isLoadingUserWorkflows,
+          userTemplatesLength: userTemplates.length
         });
         return shouldShow;
       },
@@ -530,6 +587,23 @@ export function UnifiedNavigation() {
 
     return false;
   };
+
+  // Debug info (remove after fixing)
+  useEffect(() => {
+    const debugInfo = {
+      currentUser: currentUser ? { role: currentUser.user_metadata?.role, id: currentUser.id } : null,
+      userRole,
+      isPlatformAdmin,
+      isScopedAdmin,
+      isAdmin,
+      userTemplates: userTemplates.map(t => ({ id: t.id, name: t.name })),
+      filteredContentItems: filteredContentItems.map(i => ({ label: i.label, href: i.href })),
+      isLoadingUser,
+      isLoadingTemplates,
+      templatesFetched: templatesFetched.current
+    };
+    console.log('[UnifiedNavigation] DEBUG STATE UPDATE:', debugInfo);
+  }, [currentUser, userRole, isPlatformAdmin, userTemplates, filteredContentItems, isLoadingUser, isLoadingTemplates]);
 
   if (isLoadingUser) {
     return (
