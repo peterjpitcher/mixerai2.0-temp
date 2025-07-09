@@ -104,9 +104,11 @@ export default function TemplatesPage() {
   }, []);
 
   useEffect(() => {
-    // Fetch templates only if user is loaded and is an admin or editor
+    // Fetch templates only if user is loaded and is an admin
     const userRole = currentUser?.user_metadata?.role;
-    const canViewTemplates = userRole === 'admin' || userRole === 'editor';
+    const userBrandPermissions = currentUser?.brand_permissions || [];
+    const isAdmin = userRole === 'admin';
+    const canViewTemplates = isAdmin; // Only admins can view templates
     
     if (!isLoadingUser && (!currentUser || !canViewTemplates)) {
       setLoading(false); // Stop loading templates if user doesn't have permission
@@ -211,7 +213,12 @@ export default function TemplatesPage() {
     }
   };
 
-  const isGlobalAdmin = currentUser?.user_metadata?.role === 'admin';
+  const userRole = currentUser?.user_metadata?.role;
+  const userBrandPermissions = currentUser?.brand_permissions || [];
+  const isAdmin = userRole === 'admin';
+  const isPlatformAdmin = isAdmin && userBrandPermissions.length === 0;
+  const isScopedAdmin = isAdmin && userBrandPermissions.length > 0;
+  const isGlobalAdmin = isPlatformAdmin || isScopedAdmin; // Admin users can see templates
   
   // Define columns for the data table
   const columns: DataTableColumn<Template>[] = [
