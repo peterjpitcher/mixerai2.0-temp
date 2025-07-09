@@ -49,9 +49,10 @@ type FormData = z.infer<typeof formSchema>;
 interface IssueReporterModalProps {
   isOpen: boolean;
   onClose: () => void;
+  preloadedScreenshot?: string | null;
 }
 
-export function IssueReporterModal({ isOpen, onClose }: IssueReporterModalProps) {
+export function IssueReporterModal({ isOpen, onClose, preloadedScreenshot }: IssueReporterModalProps) {
   const [isCapturing, setIsCapturing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [screenshot, setScreenshot] = useState<string | null>(null);
@@ -93,16 +94,27 @@ export function IssueReporterModal({ isOpen, onClose }: IssueReporterModalProps)
       const netLogs = consoleCapture.getNetworkLogs();
       setNetworkLogs(netLogs);
       
-      // Capture screenshot
-      const screenshotData = await captureScreenshot();
-      if (screenshotData) {
-        // Compress if needed
-        const size = getScreenshotSize(screenshotData);
+      // Use preloaded screenshot if available
+      if (preloadedScreenshot) {
+        // Check if compression is needed
+        const size = getScreenshotSize(preloadedScreenshot);
         if (size > 500) {
-          const compressed = await compressImage(screenshotData, 500);
+          const compressed = await compressImage(preloadedScreenshot, 500);
           setScreenshot(compressed);
         } else {
-          setScreenshot(screenshotData);
+          setScreenshot(preloadedScreenshot);
+        }
+      } else {
+        // Fallback: capture screenshot now (though this will include the modal)
+        const screenshotData = await captureScreenshot();
+        if (screenshotData) {
+          const size = getScreenshotSize(screenshotData);
+          if (size > 500) {
+            const compressed = await compressImage(screenshotData, 500);
+            setScreenshot(compressed);
+          } else {
+            setScreenshot(screenshotData);
+          }
         }
       }
     } catch (err) {

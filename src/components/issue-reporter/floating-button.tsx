@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Bug } from 'lucide-react';
+import { Bug, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface FloatingIssueButtonProps {
@@ -9,6 +9,7 @@ interface FloatingIssueButtonProps {
   isEnabled?: boolean;
   zIndex?: number;
   onOpen: () => void;
+  isLoading?: boolean;
 }
 
 export function FloatingIssueButton({
@@ -16,6 +17,7 @@ export function FloatingIssueButton({
   isEnabled = true,
   zIndex = 9999,
   onOpen,
+  isLoading = false,
 }: FloatingIssueButtonProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
@@ -71,8 +73,9 @@ export function FloatingIssueButton({
   };
 
   const handleClick = (e: React.MouseEvent) => {
-    // Only trigger if not dragging
-    if (Math.abs(e.clientX - dragStartPos.current.x) < 5 && 
+    // Only trigger if not dragging and not loading
+    if (!isLoading &&
+        Math.abs(e.clientX - dragStartPos.current.x) < 5 && 
         Math.abs(e.clientY - dragStartPos.current.y) < 5) {
       onOpen();
     }
@@ -117,7 +120,11 @@ export function FloatingIssueButton({
       title="Report an issue"
       aria-label="Report an issue"
     >
-      <Bug className="h-6 w-6" />
+      {isLoading ? (
+        <Loader2 className="h-6 w-6 animate-spin" />
+      ) : (
+        <Bug className="h-6 w-6" />
+      )}
       <span className="sr-only">Report an issue</span>
     </button>
   );

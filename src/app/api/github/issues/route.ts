@@ -420,8 +420,14 @@ interface NetworkLog {
   error?: string;
 }
 
+function truncateString(str: string, maxLength: number, suffix = '...[truncated]'): string {
+  if (str.length <= maxLength) return str;
+  return str.substring(0, maxLength - suffix.length) + suffix;
+}
+
 function formatIssueBody(data: IssueBodyData): string {
   const { user, description, environment, consoleLogs, networkLogs } = data;
+  const MAX_BODY_LENGTH = 65000; // Leave some buffer from GitHub's 65536 limit
   
   let body = `## Issue Description\n\n${description}\n\n`;
   
@@ -438,17 +444,20 @@ function formatIssueBody(data: IssueBodyData): string {
   body += `- **Viewport**: ${environment.viewport.width}x${environment.viewport.height}\n`;
   body += `- **Reported At**: ${environment.timestamp}\n\n`;
   
-  // Console Logs
+  // Console Logs - limit to last 50 entries to avoid exceeding GitHub's limit
   if (consoleLogs && consoleLogs.length > 0) {
+    const logsToShow = consoleLogs.slice(-50); // Take last 50 logs
     body += `## Console Logs\n\n`;
-    body += `<details>\n<summary>View console logs (${consoleLogs.length} entries)</summary>\n\n`;
+    body += `<details>\n<summary>View console logs (showing last ${logsToShow.length} of ${consoleLogs.length} entries)</summary>\n\n`;
     body += '```\n';
     
-    consoleLogs.forEach((log) => {
+    logsToShow.forEach((log) => {
       const time = new Date(log.timestamp).toLocaleTimeString();
-      body += `[${time}] [${log.level.toUpperCase()}] ${log.message}\n`;
-      if (log.stack) {
-        body += `${log.stack}\n`;
+      const logMessage = truncateString(log.message, 500); // Limit each log message
+      body += `[${time}] [${log.level.toUpperCase()}] ${logMessage}\n`;
+      if (log.stack && log.level === 'error') {
+        const stackTrace = truncateString(log.stack, 300);
+        body += `${stackTrace}\n`;
       }
       body += '\n';
     });
@@ -456,18 +465,20 @@ function formatIssueBody(data: IssueBodyData): string {
     body += '```\n</details>\n\n';
   }
   
-  // Network Logs
+  // Network Logs - limit to last 30 entries
   if (networkLogs && networkLogs.length > 0) {
+    const logsToShow = networkLogs.slice(-30); // Take last 30 requests
     body += `## Network Activity\n\n`;
-    body += `<details>\n<summary>View network logs (${networkLogs.length} requests)</summary>\n\n`;
+    body += `<details>\n<summary>View network logs (showing last ${logsToShow.length} of ${networkLogs.length} requests)</summary>\n\n`;
     body += '| Time | Method | URL | Status | Duration |\n';
     body += '|------|--------|-----|--------|----------|\n';
     
-    networkLogs.forEach((log) => {
+    logsToShow.forEach((log) => {
       const time = new Date(log.timestamp).toLocaleTimeString();
       const status = log.status || log.error || 'N/A';
       const duration = log.duration ? `${log.duration}ms` : 'N/A';
-      body += `| ${time} | ${log.method} | ${log.url} | ${status} | ${duration} |\n`;
+      const url = truncateString(log.url, 100); // Limit URL length
+      body += `| ${time} | ${log.method} | ${url} | ${status} | ${duration} |\n`;
     });
     
     body += '\n</details>\n\n';
@@ -475,6 +486,11 @@ function formatIssueBody(data: IssueBodyData): string {
   
   body += `---\n\n`;
   body += `*This issue was automatically reported via the in-app issue reporter.*`;
+  
+  // Final check to ensure we don't exceed GitHub's limit
+  if (body.length > MAX_BODY_LENGTH) {
+    body = truncateString(body, MAX_BODY_LENGTH, '\n\n...[Issue body truncated due to size limits]');
+  }
   
   return body;
 }
