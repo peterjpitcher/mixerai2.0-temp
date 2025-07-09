@@ -30,7 +30,7 @@ import {
   LayoutGrid
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 
@@ -278,64 +278,81 @@ export function UnifiedNavigation() {
     }));
   };
 
-  let filteredContentItems: NavItem[] = [];
-  
-  // Don't show templates until we know the user's role
-  if (isLoadingUser) {
-    filteredContentItems = [
-      { href: '#', label: 'Loading...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }
-    ];
-  } else if (isLoadingTemplates || ( (isScopedAdmin || isEditor) && isLoadingUserWorkflows && !isPlatformAdmin) ) {
-    filteredContentItems = [
-      { href: '#', label: 'Loading templates...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }
-    ];
-  } else if (userTemplates.length > 0) {
-    console.log('[UnifiedNavigation] Template Filtering:', {
-      userTemplatesCount: userTemplates.length,
-      isPlatformAdmin,
-      isScopedAdmin,
-      isEditor,
-      userTemplates
-    });
+  // Calculate filtered content items reactively using useMemo
+  const filteredContentItems = useMemo<NavItem[]>(() => {
+    // Don't show templates until we know the user's role
+    if (isLoadingUser) {
+      return [
+        { href: '#', label: 'Loading...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }
+      ];
+    }
     
-    if (isPlatformAdmin) {
-      filteredContentItems = userTemplates.map(template => ({
-        href: `/dashboard/content/new?template=${template.id}`,
-        label: template.name,
-        icon: <FileText className="h-4 w-4" />,
-        segment: template.id
-      }));
-      console.log('[UnifiedNavigation] Platform Admin - Showing all templates:', filteredContentItems);
-    } else if (isScopedAdmin || isEditor) {
-      const userBrandIds = (currentUser?.brand_permissions || []).map(p => p.brand_id).filter(Boolean);
-      if (userBrandIds.length > 0 && userWorkflows.length > 0) {
-        filteredContentItems = userTemplates
-          .filter(template => 
-            userWorkflows.some(workflow => 
-              workflow.template_id === template.id && 
-              userBrandIds.includes(workflow.brand_id)
+    if (isLoadingTemplates || ((isScopedAdmin || isEditor) && isLoadingUserWorkflows && !isPlatformAdmin)) {
+      return [
+        { href: '#', label: 'Loading templates...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }
+      ];
+    }
+    
+    if (userTemplates.length > 0) {
+      console.log('[UnifiedNavigation] Template Filtering:', {
+        userTemplatesCount: userTemplates.length,
+        isPlatformAdmin,
+        isScopedAdmin,
+        isEditor,
+        userTemplates
+      });
+      
+      if (isPlatformAdmin) {
+        const items = userTemplates.map(template => ({
+          href: `/dashboard/content/new?template=${template.id}`,
+          label: template.name,
+          icon: <FileText className="h-4 w-4" />,
+          segment: template.id
+        }));
+        console.log('[UnifiedNavigation] Platform Admin - Showing all templates:', items);
+        return items;
+      } else if (isScopedAdmin || isEditor) {
+        const userBrandIds = (currentUser?.brand_permissions || []).map(p => p.brand_id).filter(Boolean);
+        if (userBrandIds.length > 0 && userWorkflows.length > 0) {
+          const items = userTemplates
+            .filter(template => 
+              userWorkflows.some(workflow => 
+                workflow.template_id === template.id && 
+                userBrandIds.includes(workflow.brand_id)
+              )
             )
-          )
-          .map(template => ({
-            href: `/dashboard/content/new?template=${template.id}`,
-            label: template.name,
-            icon: <FileText className="h-4 w-4" />,
-            segment: template.id
-          }));
+            .map(template => ({
+              href: `/dashboard/content/new?template=${template.id}`,
+              label: template.name,
+              icon: <FileText className="h-4 w-4" />,
+              segment: template.id
+            }));
+          return items;
+        }
+        return [];
       } else {
-        filteredContentItems = [];
+        console.log('[UnifiedNavigation] Not admin or editor - no templates shown');
+        return [];
       }
     } else {
-      console.log('[UnifiedNavigation] Not admin or editor - no templates shown');
-      filteredContentItems = [];
+      console.log('[UnifiedNavigation] No templates loaded yet:', {
+        userTemplatesLength: userTemplates.length,
+        isLoadingTemplates,
+        templatesFetched: templatesFetched.current
+      });
+      return [];
     }
-  } else {
-    console.log('[UnifiedNavigation] No templates loaded yet:', {
-      userTemplatesLength: userTemplates.length,
-      isLoadingTemplates,
-      templatesFetched: templatesFetched.current
-    });
-  }
+  }, [
+    isLoadingUser,
+    isLoadingTemplates,
+    isLoadingUserWorkflows,
+    userTemplates,
+    isPlatformAdmin,
+    isScopedAdmin,
+    isEditor,
+    currentUser,
+    userWorkflows
+  ]);
   
   const hasAssignedBrandWithMasterClaimId = () => {
     if (!currentUser || !userBrandPermissions) return false;
@@ -383,14 +400,8 @@ export function UnifiedNavigation() {
         });
         return shouldShow;
       },
-      items: (() => {
-        const items = filteredContentItems.length > 0 ? filteredContentItems : 
-               (isLoadingTemplates || ((isScopedAdmin || isEditor) && isLoadingUserWorkflows && !isPlatformAdmin) ? 
-                 [{ href: '#', label: 'Loading...', icon: <Loader2 className="h-4 w-4 animate-spin" />, segment: 'loading' }] :
-                 [{ href: '#', label: 'No content types available', icon: <MessageSquareWarning className="h-4 w-4" />, segment: 'no-content' }]);
-        console.log('[UnifiedNavigation] Create Content menu items:', items);
-        return items;
-      })()
+      items: filteredContentItems.length > 0 ? filteredContentItems : 
+             [{ href: '#', label: 'No content types available', icon: <MessageSquareWarning className="h-4 w-4" />, segment: 'no-content' }]
     },
     { type: 'divider', show: () => isAuthenticatedUser },
     {
