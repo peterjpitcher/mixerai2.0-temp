@@ -103,31 +103,166 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
       }
     }
 
-    // Use transactional function to update workflow status
-    const transactionResult = await executeTransaction<{ new_status: string; new_step: number }>(
-      supabase,
-      'update_content_workflow_status',
-      {
-        p_content_id: contentId,
-        p_user_id: user.id,
-        p_action: action,
-        p_comments: feedback || null,
-        p_new_assignee_id: nextAssigneeId,
-        p_version_data: {
+    // Handle the workflow action without relying on missing RPC function
+    let new_status: string;
+    let new_step: string | null = null;
+    
+    if (action === 'reject') {
+      // For rejection: update content status to 'rejected' and clear assignments
+      new_status = 'rejected';
+      
+      // Update content status and remove from assigned_to
+      const { error: updateError } = await supabase
+        .from('content')
+        .update({
+          status: 'rejected',
+          assigned_to: [],
+          current_step: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', contentId);
+        
+      if (updateError) {
+        console.error('Error updating content for rejection:', updateError);
+        throw updateError;
+      }
+      
+      // Mark any pending user_tasks as completed/rejected
+      const { error: taskError } = await supabase
+        .from('user_tasks')
+        .update({
+          status: 'completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('content_id', contentId)
+        .eq('status', 'pending');
+        
+      if (taskError) {
+        console.error('Error updating user tasks for rejection:', taskError);
+      }
+      
+      // Create a version record for the rejection
+      const { error: versionError } = await supabase
+        .from('content_versions')
+        .insert({
+          content_id: contentId,
           workflow_step_identifier: currentDbStep.id,
           step_name: currentDbStep.name,
+          version_number: 1,
           content_json: currentContent.content_data,
-          action_status: action,
-          feedback: feedback || null
+          action_status: 'rejected',
+          feedback: feedback || null,
+          reviewer_id: user.id
+        });
+        
+      if (versionError) {
+        console.error('Error creating version record:', versionError);
+      }
+      
+    } else if (action === 'approve') {
+      // For approval: move to next step or mark as approved
+      const { data: nextDbStep, error: nextStepError } = await supabase
+        .from('workflow_steps')
+        .select('id, assigned_user_ids, step_order')
+        .eq('workflow_id', currentContent.workflow_id)
+        .gt('step_order', currentDbStep.step_order)
+        .order('step_order', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+        
+      if (nextStepError) {
+        console.error("Error fetching next step:", nextStepError);
+        throw nextStepError;
+      }
+      
+      if (nextDbStep) {
+        // Move to next step
+        new_status = 'pending_review';
+        new_step = nextDbStep.id;
+        
+        // Update content with next step and assignees
+        const { error: updateError } = await supabase
+          .from('content')
+          .update({
+            status: 'pending_review',
+            current_step: nextDbStep.id,
+            assigned_to: nextDbStep.assigned_user_ids || [],
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', contentId);
+          
+        if (updateError) {
+          console.error('Error updating content for approval:', updateError);
+          throw updateError;
+        }
+        
+        // Mark current tasks as completed
+        const { error: taskError } = await supabase
+          .from('user_tasks')
+          .update({
+            status: 'completed',
+            updated_at: new Date().toISOString()
+          })
+          .eq('content_id', contentId)
+          .eq('workflow_step_id', currentDbStep.id)
+          .eq('status', 'pending');
+          
+        if (taskError) {
+          console.error('Error completing current tasks:', taskError);
+        }
+        
+      } else {
+        // No more steps - mark as fully approved
+        new_status = 'approved';
+        
+        const { error: updateError } = await supabase
+          .from('content')
+          .update({
+            status: 'approved',
+            current_step: null,
+            assigned_to: [],
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', contentId);
+          
+        if (updateError) {
+          console.error('Error updating content for final approval:', updateError);
+          throw updateError;
+        }
+        
+        // Mark all tasks as completed
+        const { error: taskError } = await supabase
+          .from('user_tasks')
+          .update({
+            status: 'completed',
+            updated_at: new Date().toISOString()
+          })
+          .eq('content_id', contentId)
+          .eq('status', 'pending');
+          
+        if (taskError) {
+          console.error('Error completing all tasks:', taskError);
         }
       }
-    );
-
-    if (!transactionResult.success || !transactionResult.data) {
-      throw new Error(transactionResult.error || 'Failed to update workflow status');
+      
+      // Create a version record for the approval
+      const { error: versionError } = await supabase
+        .from('content_versions')
+        .insert({
+          content_id: contentId,
+          workflow_step_identifier: currentDbStep.id,
+          step_name: currentDbStep.name,
+          version_number: 1,
+          content_json: currentContent.content_data,
+          action_status: 'approved',
+          feedback: feedback || null,
+          reviewer_id: user.id
+        });
+        
+      if (versionError) {
+        console.error('Error creating version record:', versionError);
+      }
     }
-
-    const { new_status, new_step } = transactionResult.data[0];
 
     // Handle multiple assignees if needed (the transaction only handles the first one)
     if (action === 'approve' && new_step && currentContent.workflow_id) {
