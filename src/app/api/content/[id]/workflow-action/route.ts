@@ -302,9 +302,17 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
         
       if (content) {
         // Send notification to content creator about the action
-        await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/notifications/email`, {
+        const protocol = request.headers.get('x-forwarded-proto') || 'https';
+        const host = request.headers.get('host') || request.headers.get('x-forwarded-host');
+        const baseUrl = host ? `${protocol}://${host}` : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        
+        await fetch(`${baseUrl}/api/notifications/email`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': request.headers.get('authorization') || '',
+            'x-csrf-token': request.headers.get('x-csrf-token') || ''
+          },
           body: JSON.stringify({
             type: 'workflow_action',
             userId: content.created_by,
@@ -342,9 +350,13 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
               
             if (newTask) {
               // Send email notification for the task
-              await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/notifications/email`, {
+              await fetch(`${baseUrl}/api/notifications/email`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': request.headers.get('authorization') || '',
+                  'x-csrf-token': request.headers.get('x-csrf-token') || ''
+                },
                 body: JSON.stringify({
                   type: 'task_assignment',
                   userId: assigneeId,

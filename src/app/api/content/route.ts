@@ -414,6 +414,65 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User) => 
       throw newContentError;
     }
 
+    // Send email notifications to assigned users if workflow is set
+    if (data.workflow_id && assignedToUsersForContent && assignedToUsersForContent.length > 0) {
+      try {
+        // Create user tasks for tracking
+        for (const assigneeId of assignedToUsersForContent) {
+          // Create task record
+          const { data: newTask } = await supabase
+            .from('user_tasks')
+            .insert({
+              user_id: assigneeId,
+              content_id: newContentData.id,
+              workflow_id: data.workflow_id,
+              workflow_step_id: currentWorkflowStepId,
+              status: 'pending',
+              created_at: new Date().toISOString()
+            })
+            .select()
+            .single();
+          
+          if (newTask) {
+            // Send email notification using the email API endpoint
+            try {
+              // Get the absolute URL for the API
+              const protocol = request.headers.get('x-forwarded-proto') || 'https';
+              const host = request.headers.get('host') || request.headers.get('x-forwarded-host');
+              const baseUrl = host ? `${protocol}://${host}` : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+              
+              const emailResponse = await fetch(`${baseUrl}/api/notifications/email`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  // Forward the authorization header for the email API
+                  'Authorization': request.headers.get('authorization') || '',
+                  // Forward CSRF token if present
+                  'x-csrf-token': request.headers.get('x-csrf-token') || ''
+                },
+                body: JSON.stringify({
+                  type: 'task_assignment',
+                  userId: assigneeId,
+                  taskId: newTask.id,
+                  contentId: newContentData.id
+                })
+              });
+              
+              if (!emailResponse.ok) {
+                console.error('Failed to send email notification:', await emailResponse.text());
+              }
+            } catch (emailError) {
+              console.error('Error sending email notification:', emailError);
+              // Don't fail the content creation if email fails
+            }
+          }
+        }
+      } catch (notificationError) {
+        console.error('Error creating tasks or sending notifications:', notificationError);
+        // Don't fail the content creation if notifications fail
+      }
+    }
+
     return NextResponse.json({ success: true, data: newContentData });
   } catch (error) {
     return handleApiError(error);

@@ -1043,6 +1043,10 @@ If the image is decorative and doesn't convey information, you can indicate that
     // Start tracking the request
     const requestId = activityTracker.startRequest('generateAltText');
     
+    // Add timeout to prevent gateway timeouts
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+    
     const response = await fetch(endpointUrl, {
       method: 'POST',
       headers: {
@@ -1050,6 +1054,9 @@ If the image is decorative and doesn't convey information, you can indicate that
         'api-key': apiKey,
       },
       body: JSON.stringify(completionRequest),
+      signal: controller.signal,
+    }).finally(() => {
+      clearTimeout(timeoutId);
     });
 
     // Extract rate limit headers (Azure OpenAI format)
@@ -1092,8 +1099,13 @@ If the image is decorative and doesn't convey information, you can indicate that
 
   } catch (error) {
     console.error(`[generateAltText] Error generating alt text for ${imageUrl}:`, error);
+    
+    // Handle abort/timeout specifically
     if (error instanceof Error) {
-        throw error;
+      if (error.name === 'AbortError') {
+        throw new Error('Request timed out after 25 seconds. Please try again with a smaller image or check your connection.');
+      }
+      throw error;
     }
     throw new Error(`Failed to generate alt text: ${String(error)}`);
   }
