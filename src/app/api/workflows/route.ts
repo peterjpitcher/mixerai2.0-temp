@@ -41,7 +41,7 @@ const workflowStepSchema = z.object({
 const createWorkflowSchema = z.object({
   name: commonSchemas.nonEmptyString,
   brand_id: commonSchemas.uuid,
-  template_id: commonSchemas.uuid.optional().nullable(),
+  template_id: commonSchemas.uuid,
   steps: z.array(workflowStepSchema).min(1, 'At least one step is required')
 });
 

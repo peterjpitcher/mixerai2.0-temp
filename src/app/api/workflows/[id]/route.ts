@@ -324,6 +324,14 @@ export const PUT = withAuthAndCSRF(async (
     }
     // --- End AI Description Generation ---
 
+    // Validate template_id is provided
+    if (body.template_id === null || body.template_id === undefined) {
+      return NextResponse.json(
+        { success: false, error: 'Content template is required' },
+        { status: 400 }
+      );
+    }
+    
     if (body.steps && !Array.isArray(body.steps)) {
       return NextResponse.json(
         { success: false, error: 'Steps must be an array' },

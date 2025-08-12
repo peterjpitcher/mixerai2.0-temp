@@ -623,6 +623,10 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
       toast.error('Please select a brand for the workflow.');
       return false;
     }
+    if (!selectedTemplateId || selectedTemplateId === 'NO_TEMPLATE_SELECTED') {
+      toast.error('Please select a content template for the workflow.');
+      return false;
+    }
     if (workflow.steps.length === 0) {
       toast.error('A workflow must have at least one step.');
       return false;
@@ -902,7 +906,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="contentTemplate">Content Template (Optional)</Label>
+                <Label htmlFor="contentTemplate">Content Template <span className="text-destructive">*</span></Label>
                 <Select 
                   value={selectedTemplateId || 'NO_TEMPLATE_SELECTED'} 
                   onValueChange={handleUpdateTemplate} 

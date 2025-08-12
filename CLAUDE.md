@@ -186,8 +186,10 @@ src/
 npm run lint:fix       # Fix any style issues
 npm run check         # Verify types and lint
 npm run test          # All tests must pass
-npm run build         # Production build must succeed
+npm run build         # Production build must succeed - MANDATORY BEFORE ANY COMMIT
 npm run review        # Comprehensive code review
+
+# 🔴 CRITICAL: NEVER commit to GitHub without running build first!
 
 # Manual Testing Checklist
 - [ ] Test happy path

@@ -104,7 +104,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
     }
 
     // Handle the workflow action without relying on missing RPC function
-    let new_status: string;
+    let new_status: string = 'pending_review';
     let new_step: string | null = null;
     
     if (action === 'reject') {
@@ -269,8 +269,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
       const { data: nextDbStep } = await supabase
         .from('workflow_steps')
         .select('id, assigned_user_ids')
-        .eq('workflow_id', currentContent.workflow_id)
-        .eq('step_order', new_step)
+        .eq('id', new_step)
         .single();
 
       if (nextDbStep && nextDbStep.assigned_user_ids && nextDbStep.assigned_user_ids.length > 1) {
@@ -327,8 +326,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
           const { data: nextDbStep } = await supabase
             .from('workflow_steps')
             .select('id, assigned_user_ids')
-            .eq('workflow_id', currentContent.workflow_id)
-            .eq('step_order', new_step)
+            .eq('id', new_step)
             .single();
             
           if (nextDbStep && nextDbStep.assigned_user_ids && Array.isArray(nextDbStep.assigned_user_ids)) {

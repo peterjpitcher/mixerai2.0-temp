@@ -222,6 +222,7 @@ export default function NewWorkflowPage() {
         if (!templatesResponse.ok) throw new Error(`Failed to fetch content templates: ${templatesResponse.status}`);
         const templatesData = await templatesResponse.json();
         if (!templatesData.success) throw new Error(templatesData.error || 'Failed to fetch content templates data');
+        console.log('Fetched templates:', templatesData.templates);
         setContentTemplates(Array.isArray(templatesData.templates) ? templatesData.templates : []);
 
       } catch (error) {
@@ -585,6 +586,10 @@ export default function NewWorkflowPage() {
       toast.error('Please select a brand for the workflow.');
       return false;
     }
+    if (!workflow.template_id) {
+      toast.error('Please select a content template for the workflow.');
+      return false;
+    }
     if (workflow.steps.length === 0) {
       toast.error('A workflow must have at least one step.');
       return false;
@@ -770,7 +775,7 @@ export default function NewWorkflowPage() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="contentTemplate">Content Template (Optional)</Label>
+                <Label htmlFor="contentTemplate">Content Template <span className="text-destructive">*</span></Label>
                 <Select 
                   value={selectedTemplateId} 
                   onValueChange={handleUpdateTemplate}
@@ -780,12 +785,17 @@ export default function NewWorkflowPage() {
                     <SelectValue placeholder={!workflow.brand_id ? "Select a brand first" : isLoadingBrandWorkflows ? "Loading templates..." : "Select a content template"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="NO_TEMPLATE_SELECTED">No Template</SelectItem>
-                    {availableContentTemplates.map((template) => (
-                      <SelectItem key={template.id} value={template.id}>
-                        {template.name}
-                      </SelectItem>
-                    ))}
+                    {availableContentTemplates.length === 0 && contentTemplates.length === 0 ? (
+                      <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                        No templates available. Please create a content template first.
+                      </div>
+                    ) : (
+                      availableContentTemplates.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          {template.name}
+                        </SelectItem>
+                      ))
+                    )}
                     {workflow.brand_id && !isLoadingBrandWorkflows && availableContentTemplates.length === 0 && contentTemplates.length > 0 && (
                         <div className="px-2 py-3 text-sm text-muted-foreground text-center">
                             All templates are in use for this brand.
