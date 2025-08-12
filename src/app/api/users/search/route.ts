@@ -41,11 +41,29 @@ export const GET = withAuth(async (request: NextRequest) => {
     const supabase = createSupabaseAdminClient();
     let users: UserSearchResult[] = [];
 
+    // First, get list of active (non-deleted) users from auth.users
+    const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+    
+    if (authError) {
+      console.error('Error fetching auth users:', authError);
+      throw authError;
+    }
+    
+    // Get IDs of active users (not deleted)
+    const activeUserIds = authUsers.users
+      .filter(user => !(user as any).deleted_at && !(user as any).is_anonymous)
+      .map(user => user.id);
+    
+    if (activeUserIds.length === 0) {
+      return NextResponse.json({ success: true, users: [] });
+    }
+
     if (!searchQuery) {
-      // If no search query, return a list of recently active or all users (first N profiles for now)
+      // If no search query, return a list of recently active users (first N profiles for now)
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('id, full_name, email, avatar_url, job_title')
+        .in('id', activeUserIds) // Only return active users
         .order('updated_at', { ascending: false }) // Example: order by recent activity
         .limit(limit);
 
@@ -62,6 +80,7 @@ export const GET = withAuth(async (request: NextRequest) => {
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('id, full_name, email, avatar_url, job_title')
+        .in('id', activeUserIds) // Only return active users
         .or(`full_name.ilike.%${escapedQuery}%,email.ilike.%${escapedQuery}%`)
         .limit(limit);
 

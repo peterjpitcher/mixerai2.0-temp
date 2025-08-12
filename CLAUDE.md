@@ -518,9 +518,10 @@ Remember: The goal is not just working code, but maintainable, secure, and perfo
 - `validateRequest()` - Zod schema validation wrapper
 
 ### AI Integration
-- `generateContent()` - Main content generation
+- `generateContent()` - Main content generation with Azure OpenAI
 - `streamContent()` - Streaming AI responses
 - `calculateTokens()` - Token estimation
+- **Fallback Behavior**: When Azure OpenAI is unavailable, the system automatically falls back to template-based generation. Always handle this gracefully and notify users when using fallback content.
 
 ### Database Helpers
 - `withTransaction()` - Database transaction wrapper
@@ -530,6 +531,32 @@ Remember: The goal is not just working code, but maintainable, secure, and perfo
 - `cn()` - Classname utility (clsx + tailwind-merge)
 - `formatDate()` - Date formatting helper
 - `truncate()` - Text truncation utility
+
+## 🐳 Local Development with PostgreSQL
+
+### Docker Setup
+```bash
+# Start PostgreSQL container
+docker-compose up -d
+
+# Run with local database
+./scripts/use-local-db.sh
+```
+
+### Database Utility Scripts
+- `./scripts/reset-database.sh` - Complete database reset with clean schema
+- `./scripts/clean-database.sh` - Remove dummy data, preserve schema
+- `./scripts/add-test-user.sh` - Add test user for authentication
+- `./scripts/create-sample-brands.sh` - Add sample brands matching UI
+
+### Local Database Environment Variables
+```bash
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=mixerai
+```
 
 ## 🗂️ Directory Organization & Maintenance
 
@@ -604,6 +631,165 @@ Monthly:
 - Archive old migration files
 - Update this CLAUDE.md file with new patterns
 - Clean up unused components and utilities
+
+## 🔧 Common Development Workflows
+
+### Adding a New API Endpoint
+1. Create route file: `src/app/api/[resource]/route.ts`
+2. Use the API Route Pattern (see Implementation Patterns section)
+3. Add TypeScript types in `src/types/[resource].types.ts`
+4. Test with: `curl -X GET http://localhost:3000/api/[resource]`
+5. Add integration test in `src/app/api/[resource]/route.test.ts`
+
+### Adding a New Dashboard Feature
+1. Create page: `src/app/dashboard/[feature]/page.tsx`
+2. Use the Component Pattern with TanStack Query
+3. Add navigation item in `src/components/layout/sidebar.tsx`
+4. Implement loading, error, and empty states
+5. Test all user roles and permissions
+6. Verify mobile responsiveness
+
+### Implementing AI-Powered Features
+1. Check Azure OpenAI connectivity: `node scripts/test-azure-openai.js`
+2. Use `generateContent()` from `src/lib/azure/openai.ts`
+3. Implement template-based fallback
+4. Add proper error handling and user feedback
+5. Test with `FORCE_OPENAI_FALLBACK=true`
+
+## 🐛 Bug Fixing Workflow
+
+### QA Issue Resolution Process
+When working on issues reported by QA:
+
+#### 1. Issue Discovery
+```bash
+# List all open issues
+gh issue list --repo gmi-common/mixerai2.0
+
+# View specific issue details
+gh issue view [issue-number] --repo gmi-common/mixerai2.0
+```
+
+#### 2. Run Discovery Protocol for Each Issue
+- Run full pre-development discovery (see above)
+- Create issue-specific discovery report
+- Analyze the bug reproduction steps
+- Identify affected components
+
+#### 3. Implementation Process
+1. Create a todo list for all issues to track
+2. For each issue:
+   - Mark as in_progress in todo list
+   - Reproduce the issue locally
+   - Implement the fix
+   - Run verification tests
+   - Mark as completed in todo list
+
+#### 4. Issue Labeling
+```bash
+# Create 'Ready for QA' label if it doesn't exist
+gh label create "Ready for QA" --description "Fix implemented and ready for QA testing" --color 0E8A16
+
+# Label issue when fix is complete
+gh issue edit [issue-number] --add-label "Ready for QA"
+```
+
+#### 5. Final Steps
+- Commit all fixes together after all issues are resolved
+- Create comprehensive PR with all fixes
+- Reference all fixed issues in PR description
+
+### Bug Fix Verification Checklist
+- [ ] Issue reproduced locally
+- [ ] Root cause identified
+- [ ] Fix implemented following existing patterns
+- [ ] No regressions introduced
+- [ ] All tests passing
+- [ ] Build succeeds
+- [ ] Manual testing completed
+- [ ] Issue labeled as 'Ready for QA'
+
+## 🚑 Troubleshooting Guide
+
+### Build Errors
+```bash
+# Memory issues during build
+NODE_OPTIONS="--max-old-space-size=8192" npm run build
+
+# Clear all caches
+rm -rf .next node_modules/.cache
+npm run build
+
+# TypeScript errors
+npm run check
+npm run db:types  # Regenerate DB types if needed
+```
+
+### Database Connection Issues
+```bash
+# Test Supabase connection
+node scripts/test-db-connection.js
+
+# Check environment variables
+env | grep SUPABASE
+env | grep POSTGRES
+
+# Reset local database
+./scripts/reset-database.sh
+
+# View detailed logs
+DEBUG=supabase:* npm run dev
+```
+
+### Authentication Problems
+```bash
+# Test auth flow
+node scripts/test-auth-flow.js
+
+# Clear auth cookies (in browser DevTools)
+# Application > Cookies > Clear all
+
+# Add test user
+./scripts/add-test-user.sh
+
+# Check session
+# Browser DevTools > Application > Local Storage > supabase.auth.token
+```
+
+### AI Integration Issues
+```bash
+# Test Azure OpenAI
+node scripts/test-azure-openai.js
+
+# Force fallback mode
+FORCE_OPENAI_FALLBACK=true npm run dev
+
+# Check rate limits
+# Look for 429 errors in Network tab
+
+# Verify credentials
+env | grep AZURE_OPENAI
+```
+
+### Common Error Messages & Solutions
+
+#### "Invalid hook call"
+- Check for duplicate React versions: `npm ls react`
+- Ensure hooks are only called from React components
+
+#### "Hydration failed"
+- Check for date/time rendering without proper formatting
+- Ensure consistent server/client rendering
+- Use `suppressHydrationWarning` sparingly
+
+#### "NEXT_REDIRECT"
+- This is normal behavior for Next.js redirects
+- Not an actual error, just informational
+
+#### "Too many re-renders"
+- Check for setState calls in render
+- Verify useEffect dependencies
+- Use React DevTools Profiler
 
 ## 🎯 Important Instruction Reminders
 
