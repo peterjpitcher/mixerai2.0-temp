@@ -808,11 +808,11 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
       <Button 
         variant="ghost" 
         size="sm" 
-        onClick={() => router.push(isDuplicated ? '/dashboard/workflows' : `/dashboard/workflows/${id}`)}
+        onClick={() => router.push('/dashboard/workflows')}
         className="mb-4"
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to {isDuplicated ? 'Workflows' : 'Workflow'}
+        Back to Workflows
       </Button>
 
       {currentBrandForDisplay && (

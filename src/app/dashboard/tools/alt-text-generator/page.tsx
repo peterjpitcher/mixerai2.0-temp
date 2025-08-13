@@ -610,15 +610,14 @@ export default function AltTextGeneratorPage() {
                       <TableRow key={`${index}-${item.imageUrl}`} className={item.error ? "bg-destructive/10 hover:bg-destructive/20" : ""}>
                         <TableCell className="py-2 align-top font-medium">
                             <div className="max-w-[300px]">
-                                <span 
-                                    className="text-xs text-muted-foreground block truncate cursor-help" 
-                                    title={item.imageUrl}
-                                >
-                                    {item.imageUrl.length > 50 
-                                        ? `${item.imageUrl.substring(0, 30)}...${item.imageUrl.substring(item.imageUrl.length - 15)}`
-                                        : item.imageUrl
-                                    }
-                                </span>
+                                <div className="space-y-1">
+                                    <span 
+                                        className="text-xs text-muted-foreground block break-all cursor-help" 
+                                        title={item.imageUrl}
+                                    >
+                                        {item.imageUrl}
+                                    </span>
+                                </div>
                                 {!item.imageUrl.startsWith('data:') && (
                                     <button
                                         onClick={() => {
@@ -699,13 +698,13 @@ export default function AltTextGeneratorPage() {
                         </TableCell>
                         <TableCell className="py-2 align-top text-center">
                             {item.imageUrl && !item.error && (
-                                <div className="flex justify-center items-center h-full">
+                                <div className="flex flex-col justify-center items-center gap-2 h-full">
                                     {item.imageUrl.startsWith('data:') ? (
                                         // eslint-disable-next-line @next/next/no-img-element
                                         <img 
                                             src={item.imageUrl} 
                                             alt=""
-                                            className="max-w-full h-auto max-h-24 rounded-md border object-contain hover:object-scale-down transition-all duration-300 ease-in-out cursor-pointer"
+                                            className="max-w-full h-auto max-h-32 rounded-md border object-contain hover:object-scale-down transition-all duration-300 ease-in-out cursor-pointer"
                                             onClick={(e) => {
                                                 const target = e.currentTarget as HTMLImageElement;
                                                 if (target.classList.contains('max-h-24')) {
@@ -722,7 +721,7 @@ export default function AltTextGeneratorPage() {
                                         <img 
                                             src={item.imageUrl} 
                                             alt=""
-                                            className="max-w-full h-auto max-h-24 rounded-md border object-contain hover:object-scale-down transition-all duration-300 ease-in-out cursor-pointer" 
+                                            className="max-w-full h-auto max-h-32 rounded-md border object-contain hover:object-scale-down transition-all duration-300 ease-in-out cursor-pointer" 
                                             onError={(e) => {
                                                 const target = e.currentTarget as HTMLImageElement;
                                                 target.style.display = 'none';
@@ -786,6 +785,16 @@ export default function AltTextGeneratorPage() {
                                             }}
                                         />
                                     )}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            window.open(item.imageUrl, '_blank');
+                                        }}
+                                        className="text-xs"
+                                    >
+                                        View Full Image
+                                    </Button>
                                 </div>
                             )}
                             {item.error && <span className="text-xs text-muted-foreground">Preview N/A</span>}

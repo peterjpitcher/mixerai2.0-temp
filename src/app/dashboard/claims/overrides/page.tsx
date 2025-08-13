@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -426,6 +427,11 @@ export default function MarketOverridesPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs items={[
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Claims", href: "/dashboard/claims" },
+        { label: "Overrides" }
+      ]} />
       <Heading title="Manage Market Claim Overrides" description="Block or replace Master (Global) claims for specific products in selected markets." />
       {/* Global Override Toggle */}
       <Card className="p-4 border-purple-200 bg-purple-50/50 mb-4">
