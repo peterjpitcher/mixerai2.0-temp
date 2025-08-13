@@ -14,11 +14,23 @@ export function createSupabaseServerClient() {
           return cookieStore.get(name)?.value;
         },
         set(name: string, value: string, options: CookieOptions) {
-          cookieStore.set({ name, value, ...options });
+          // Set cookie with 24-hour max age to match session duration
+          const enhancedOptions = {
+            ...options,
+            maxAge: options.maxAge || 24 * 60 * 60, // 24 hours in seconds
+            sameSite: 'lax' as const,
+            secure: process.env.NODE_ENV === 'production',
+          };
+          cookieStore.set({ name, value, ...enhancedOptions });
         },
         remove(name: string, options: CookieOptions) {
           cookieStore.set({ name, value: '', ...options });
         },
+      },
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
       },
     }
   );

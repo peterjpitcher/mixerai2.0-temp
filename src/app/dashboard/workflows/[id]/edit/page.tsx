@@ -545,6 +545,15 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
       ];
       setAssigneeInputs(prevInputs => [...prevInputs, '']);
       setUserSearchResults(prevResults => ({...prevResults, [newSteps.length -1]: []}));
+      
+      // Scroll to the new step after it's added
+      setTimeout(() => {
+        const newStepElement = document.getElementById(`step-${newStepId}`);
+        if (newStepElement) {
+          newStepElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+      
       return { ...prevWorkflow, steps: newSteps };
     });
   };
@@ -868,7 +877,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
               
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select value={workflow.status || 'draft'} onValueChange={handleUpdateWorkflowStatus} disabled={!canEditThisWorkflow}>
+                <Select value={workflow.status || 'active'} onValueChange={handleUpdateWorkflowStatus} disabled={!canEditThisWorkflow}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
@@ -958,7 +967,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
             ) : (
               <div className="space-y-6">
                 {workflow.steps.map((step: WorkflowStepDefinition, index: number) => (
-                  <div key={step.id || `step-${index}`} className="border rounded-lg p-4 bg-card">
+                  <div key={step.id || `step-${index}`} id={`step-${step.id}`} className="border rounded-lg p-4 bg-card">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
                         <span className="flex items-center justify-center w-6 h-6 bg-primary text-primary-foreground rounded-full text-xs font-medium">

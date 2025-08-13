@@ -23,7 +23,7 @@ export type FieldType =
   | 'recipeUrl';
 
 export interface ShortTextOptions { minLength?: number; maxLength?: number; placeholder?: string; }
-export interface LongTextOptions { minWords?: number; maxWords?: number; placeholder?: string; rows?: number; maxLength?: number; }
+export interface LongTextOptions { minWords?: number; maxWords?: number; placeholder?: string; rows?: number; maxRows?: number; maxLength?: number; }
 export interface RichTextOptions { placeholder?: string; allowImages?: boolean; toolbarOptions?: string[]; }
 export interface SelectOptions { choices?: Array<{ label: string; value: string }>; allowMultiple?: boolean; multiple?: boolean; }
 export interface NumberOptions { min?: number; max?: number; step?: number; placeholder?: string; }

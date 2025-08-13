@@ -8,6 +8,7 @@ interface QuillEditorProps {
   placeholder?: string;
   className?: string;
   readOnly?: boolean;
+  allowImages?: boolean;
 }
 
 export function QuillEditor({
@@ -15,7 +16,8 @@ export function QuillEditor({
   onChange,
   placeholder = 'Start typing...',
   className = '',
-  readOnly = false
+  readOnly = false,
+  allowImages = true
 }: QuillEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const quillRef = useRef<any>(null);
@@ -49,7 +51,7 @@ export function QuillEditor({
             [{ 'list': 'ordered'}, { 'list': 'bullet' }],
             [{ 'color': [] }, { 'background': [] }],
             [{ 'align': [] }],
-            ['link', 'image'],
+            allowImages ? ['link', 'image'] : ['link'],
           ]
         }
       });

@@ -967,6 +967,7 @@ export async function generateAltText(
   }
 ): Promise<{ // Return type updated to match expected JSON structure
   altText: string;
+  detectedLanguage?: string; // Add detected language to return type
 }> {
   const deploymentName = getModelName(); // Get the deployment/model name
 
@@ -984,7 +985,9 @@ Analyze the provided image and generate a descriptive alt text in ${brandLanguag
 Focus on the main subject, context, and any relevant text visible in the image.
 Be factual and avoid subjective interpretations.
 IMPORTANT: Do NOT include color descriptions in the alt text for accessibility reasons. Focus on shape, size, position, content, and function instead of colors.
-If the image is decorative and doesn't convey information, you can indicate that, but prefer descriptive text if possible.`;
+If the image is decorative and doesn't convey information, you can indicate that, but prefer descriptive text if possible.
+
+LANGUAGE DETECTION: If you detect any text in the image, identify its language using ISO 639-1 two-letter codes (e.g., 'en' for English, 'fr' for French, 'de' for German, 'es' for Spanish, etc.). If no text is visible or the language cannot be determined, omit the detectedLanguage field.`;
 
   if (brandContext?.toneOfVoice) {
     systemPrompt += `\nAdhere to the following tone of voice: ${brandContext.toneOfVoice}.`;
@@ -996,7 +999,16 @@ If the image is decorative and doesn't convey information, you can indicate that
     systemPrompt += `\nFollow these content guardrails: ${brandContext.guardrails}.`;
   }
   
-  systemPrompt += `\nYour response MUST be a JSON object with a single key "altText" containing the generated alt text string. For example: {"altText": "A descriptive alt text goes here."}. Do NOT include any other text, explanations, or the original URL in your response.`;
+  systemPrompt += `\nYour response MUST be a JSON object with:
+1. "altText" key containing the generated alt text string
+2. "detectedLanguage" key (optional) containing the ISO 639-1 code of any text detected in the image
+
+Examples:
+- If French text is detected: {"altText": "A product label with French text describing ingredients", "detectedLanguage": "fr"}
+- If no text is visible: {"altText": "A landscape photograph of mountains"}
+- If English text is detected: {"altText": "A sign displaying business hours", "detectedLanguage": "en"}
+
+Do NOT include any other text, explanations, or the original URL in your response.`;
 
   const userTextMessage = "Generate alt text for the provided image based on the system instructions.";
   
@@ -1087,7 +1099,17 @@ If the image is decorative and doesn't convey information, you can indicate that
       const parsedJson = JSON.parse(content.trim());
       if (typeof parsedJson.altText === 'string') {
         // console.log(`[generateAltText] Successfully parsed alt text: ${parsedJson.altText}`);
-        return { altText: parsedJson.altText.trim() };
+        const result: { altText: string; detectedLanguage?: string } = { 
+          altText: parsedJson.altText.trim() 
+        };
+        
+        // Include detected language if provided by AI
+        if (typeof parsedJson.detectedLanguage === 'string') {
+          result.detectedLanguage = parsedJson.detectedLanguage.toLowerCase();
+          // console.log(`[generateAltText] Language detected in image: ${result.detectedLanguage}`);
+        }
+        
+        return result;
       } else {
         console.error('[generateAltText] Parsed JSON does not contain a valid "altText" string field.', { parsedJson });
         throw new Error('AI response was valid JSON but missing "altText" field or it was not a string.');

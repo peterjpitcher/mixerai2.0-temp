@@ -138,6 +138,8 @@ export async function middleware(request: NextRequest) {
     '/auth/login',
     '/auth/register',
     '/auth/callback',
+    '/auth/confirm',
+    '/auth/update-password',
     '/auth/forgot-password',
     '/auth/reset-password',
     '/api/env-check',

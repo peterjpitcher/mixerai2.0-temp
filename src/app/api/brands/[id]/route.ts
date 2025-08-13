@@ -138,75 +138,119 @@ const putHandlerCore = async (
       );
     }
     
-    // Note: logo_url will be handled by the RPC function
-    
-    // Prepare parameters for the RPC call
-    const rpcParams = {
-      p_brand_id_to_update: brandIdToUpdate,
-      p_name: body.name,
-      p_website_url: body.website_url || null,
-      // Ensure additional_website_urls is an array of strings
-      p_additional_website_urls: Array.isArray(body.additional_website_urls) 
+    // Update brand directly without RPC
+    const brandUpdateData: Record<string, unknown> = {
+      name: body.name,
+      website_url: body.website_url || null,
+      additional_website_urls: Array.isArray(body.additional_website_urls) 
         ? body.additional_website_urls.filter((url: unknown) => typeof url === 'string') 
         : [],
-      p_country: body.country || null,
-      p_language: body.language || null,
-      p_brand_identity: body.brand_identity || null,
-      p_tone_of_voice: body.tone_of_voice || null,
-      p_guardrails: body.guardrails || null,
-      p_brand_color: body.brand_color || '#1982C4',
-      p_master_claim_brand_id: body.master_claim_brand_id === "@none@" || body.master_claim_brand_id === "" ? null : body.master_claim_brand_id,
-      // Ensure selected_agency_ids is an array of strings (UUIDs)
-      p_selected_agency_ids: Array.isArray(body.selected_agency_ids) 
-        ? body.selected_agency_ids.filter((id: unknown) => typeof id === 'string') 
-        : [],
-      // Ensure new_custom_agency_names is an array of strings
-      p_new_custom_agency_names: Array.isArray(body.new_custom_agency_names) 
-        ? body.new_custom_agency_names.filter((name: unknown) => typeof name === 'string') 
-        : [],
-      p_user_id: authenticatedUser.id, // Pass the authenticated user's ID
-      p_logo_url: body.logo_url || null // Pass logo_url to RPC function
+      country: body.country || null,
+      language: body.language || null,
+      brand_identity: body.brand_identity || null,
+      tone_of_voice: body.tone_of_voice || null,
+      guardrails: body.guardrails || null,
+      brand_color: body.brand_color || '#1982C4',
+      master_claim_brand_id: body.master_claim_brand_id === "@none@" || body.master_claim_brand_id === "" ? null : body.master_claim_brand_id,
+      logo_url: body.logo_url || null,
+      updated_at: new Date().toISOString()
     };
 
-    // Execute brand update via RPC
+    const { data: updatedBrandData, error: updateError } = await supabase
+      .from('brands')
+      .update(brandUpdateData)
+      .eq('id', brandIdToUpdate)
+      .select()
+      .single();
 
-    const { data: updatedBrandData, error: rpcError } = await supabase.rpc(
-      'update_brand_with_agencies',
-      rpcParams
-    );
-
-    if (rpcError) {
-      console.error(`[API Brands PUT /${brandIdToUpdate}] RPC Error:`, rpcError);
-      // Check if the error from RPC is already a JSON object with an 'error' field
-      if (rpcError.message && rpcError.message.includes('"{')) { // Simple check for JSON string
-          try {
-              const parsedError = JSON.parse(rpcError.message.substring(rpcError.message.indexOf('"{')));
-              if(parsedError.error) {
-                return handleApiError({ message: parsedError.error, details: rpcError }, 'Failed to update brand via RPC.');
-              }
-          } catch { /* Fall through to generic error */ }
-      }
-      return handleApiError(rpcError, 'Failed to update brand via RPC.');
+    if (updateError) {
+      console.error(`[API Brands PUT /${brandIdToUpdate}] Update Error:`, updateError);
+      return handleApiError(updateError, 'Failed to update brand.');
     }
 
-    // The RPC function is designed to return a JSON object representing the updated brand
-    // or an object like { success: false, error: 'message' } if it failed internally
-    if (updatedBrandData && typeof updatedBrandData === 'object' && (updatedBrandData as { error?: string }).error) {
-        // Error explicitly returned from the RPC function's EXCEPTION block
-        console.error(`[API Brands PUT /${brandIdToUpdate}] Error from RPC function:`, (updatedBrandData as { error?: string }).error);
-        return NextResponse.json(
-          { success: false, error: (updatedBrandData as { error?: string }).error },
-          { status: 500 }
-        );
-    }
-    
-    // If RPC was successful and returned brand data
     if (!updatedBrandData) {
-        console.error(`[API Brands PUT /${brandIdToUpdate}] RPC returned no data.`);
-        return NextResponse.json(
-          { success: false, error: 'Failed to update brand: No data returned from operation.' },
-          { status: 500 }
-        );
+      return NextResponse.json(
+        { success: false, error: 'Failed to update brand. No data returned.' },
+        { status: 500 }
+      );
+    }
+
+    // Handle vetting agencies if provided
+    if (body.selected_agency_ids !== undefined || body.new_custom_agency_names !== undefined) {
+      // First, delete existing associations
+      const { error: deleteAgenciesError } = await supabase
+        .from('brand_selected_agencies')
+        .delete()
+        .eq('brand_id', brandIdToUpdate);
+
+      if (deleteAgenciesError) {
+        console.error(`[API Brands PUT /${brandIdToUpdate}] Error deleting existing vetting agencies:`, deleteAgenciesError);
+      }
+
+      // Insert new agency associations if provided
+      if (Array.isArray(body.selected_agency_ids) && body.selected_agency_ids.length > 0) {
+        const agencyAssociations = body.selected_agency_ids.map((agency_id: string) => ({
+          brand_id: brandIdToUpdate,
+          agency_id: agency_id
+        }));
+
+        const { error: insertAgenciesError } = await supabase
+          .from('brand_selected_agencies')
+          .insert(agencyAssociations);
+
+        if (insertAgenciesError) {
+          console.error(`[API Brands PUT /${brandIdToUpdate}] Error inserting vetting agencies:`, insertAgenciesError);
+        }
+      }
+
+      // Handle custom agencies if provided  
+      if (Array.isArray(body.new_custom_agency_names) && body.new_custom_agency_names.length > 0) {
+        for (const agencyName of body.new_custom_agency_names) {
+          if (typeof agencyName === 'string' && agencyName.trim()) {
+            // Check if agency already exists
+            const { data: existingAgency } = await supabase
+              .from('content_vetting_agencies')
+              .select('id')
+              .eq('name', agencyName.trim())
+              .eq('country_code', body.country || null)
+              .single();
+
+            let agencyId: string;
+            if (existingAgency) {
+              agencyId = existingAgency.id;
+            } else {
+              // Create new agency
+              const { data: newAgency, error: createAgencyError } = await supabase
+                .from('content_vetting_agencies')
+                .insert({
+                  name: agencyName.trim(),
+                  country_code: body.country || null,
+                  created_by: authenticatedUser.id
+                })
+                .select('id')
+                .single();
+
+              if (createAgencyError || !newAgency) {
+                console.error(`[API Brands PUT /${brandIdToUpdate}] Error creating custom agency:`, createAgencyError);
+                continue;
+              }
+              agencyId = newAgency.id;
+            }
+
+            // Associate with brand
+            const { error: associateError } = await supabase
+              .from('brand_selected_agencies')
+              .insert({
+                brand_id: brandIdToUpdate,
+                agency_id: agencyId
+              });
+
+            if (associateError) {
+              console.error(`[API Brands PUT /${brandIdToUpdate}] Error associating custom agency:`, associateError);
+            }
+          }
+        }
+      }
     }
 
     // Handle master_claim_brand_ids array if provided using the new junction table

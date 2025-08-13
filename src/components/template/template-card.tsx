@@ -86,7 +86,7 @@ export function TemplateCard({ id, name, description, inputFieldCount, outputFie
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
-                  <Link href={`/dashboard/templates/${id}`}>View</Link>
+                  <Link href={`/dashboard/templates/${id}?mode=view`}>View</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href={`/dashboard/templates/${id}`}>Edit</Link>

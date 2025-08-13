@@ -94,7 +94,17 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
       return ''; // Replace with empty string instead of leaving the curly braces
     });
 
-    const systemPrompt = "You are a helpful assistant. Provide a concise suggestion based on the user's instructions. If the user asks for a title, it should be between 6 and 10 words long. If the user asks for a list, provide a comma-separated list.";
+    // Build system prompt with constraints if provided
+    let systemPrompt = "You are a helpful assistant. Provide a concise suggestion based on the user's instructions.";
+    
+    // Add maxLength constraint to system prompt if provided
+    if (body.options?.maxLength && typeof body.options.maxLength === 'number') {
+      systemPrompt += ` IMPORTANT: Your response MUST be no more than ${body.options.maxLength} characters long (including spaces and punctuation).`;
+    } else if (body.fieldType === 'shortText') {
+      systemPrompt += " For short text fields, keep your response brief and concise.";
+    }
+    
+    systemPrompt += " If the user asks for a title, it should be between 6 and 10 words long. If the user asks for a list, provide a comma-separated list.";
     
     // Log the final prompt being sent to AI, ensuring it does not get truncated in the logs
     console.log('[API /ai/suggest] Final user prompt being sent to generateTextCompletion (full):', userPrompt);
@@ -114,6 +124,14 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
     // It's possible the AI might use single quotes too, though less common for titles
     if (finalSuggestion.startsWith("'") && finalSuggestion.endsWith("'")) {
         finalSuggestion = finalSuggestion.substring(1, finalSuggestion.length - 1);
+    }
+    
+    // Apply maxLength constraint as a final safety check
+    if (body.options?.maxLength && typeof body.options.maxLength === 'number') {
+      if (finalSuggestion.length > body.options.maxLength) {
+        console.log(`[API /ai/suggest] Truncating suggestion from ${finalSuggestion.length} to ${body.options.maxLength} characters`);
+        finalSuggestion = finalSuggestion.substring(0, body.options.maxLength);
+      }
     }
 
     return NextResponse.json({

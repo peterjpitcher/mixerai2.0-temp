@@ -28,7 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CardGridSkeleton } from '@/components/ui/loading-skeletons';
-import { BreadcrumbNav } from '@/components/ui/breadcrumb-nav';
+import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { apiFetch } from '@/lib/api-client';
 
 interface Template {
@@ -153,11 +153,26 @@ export default function TemplatesPage() {
     }
     setIsDuplicating(templateToDuplicate.id);
     try {
+      // Check if template has valid field structure
+      if (!templateToDuplicate.fields?.inputFields || !templateToDuplicate.fields?.outputFields) {
+        toast.error('Template structure is invalid for duplication');
+        return;
+      }
+      
+      // Helper function to regenerate field IDs to avoid conflicts
+      const regenerateFieldIds = (fields: any[]) => 
+        fields.map(field => ({
+          ...field,
+          id: `${field.id}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+        }));
+      
       const newTemplateData = {
         name: `Copy of ${templateToDuplicate.name}`,
         description: templateToDuplicate.description,
         icon: templateToDuplicate.icon,
-        fields: JSON.parse(JSON.stringify(templateToDuplicate.fields)), // Deep copy
+        // Extract and regenerate inputFields and outputFields with unique IDs
+        inputFields: regenerateFieldIds(templateToDuplicate.fields.inputFields),
+        outputFields: regenerateFieldIds(templateToDuplicate.fields.outputFields),
         brand_id: templateToDuplicate.brand_id,
       };
 
@@ -356,7 +371,7 @@ export default function TemplatesPage() {
   if (isLoadingUser || loading) { // Combined loading state
     return (
       <div className="space-y-8">
-        <BreadcrumbNav items={[{ label: "Content Templates" }]} />
+        <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Content Templates" }]} />
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Content Templates</h1>
@@ -385,7 +400,7 @@ export default function TemplatesPage() {
 
   return (
     <div className="space-y-8">
-      <BreadcrumbNav items={[{ label: "Content Templates" }]} />
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Content Templates" }]} />
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Content Templates</h1>

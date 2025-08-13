@@ -13,7 +13,33 @@ function getSupabaseBrowserClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
   
-  supabaseBrowserClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey);
+  supabaseBrowserClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+      // Set session lifetime to 24 hours (in seconds)
+      // Note: This needs to be configured in Supabase dashboard as well
+      storage: {
+        getItem: (key: string) => {
+          if (typeof window !== 'undefined') {
+            return window.localStorage.getItem(key);
+          }
+          return null;
+        },
+        setItem: (key: string, value: string) => {
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(key, value);
+          }
+        },
+        removeItem: (key: string) => {
+          if (typeof window !== 'undefined') {
+            window.localStorage.removeItem(key);
+          }
+        },
+      },
+    },
+  });
   
   return supabaseBrowserClient;
 }

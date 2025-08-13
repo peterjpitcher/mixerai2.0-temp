@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { TemplateForm } from '@/components/template/template-form';
@@ -175,6 +175,8 @@ export default function TemplateEditPage() {
   const params = useParams();
   const id = String(params?.id || '');
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isViewMode = searchParams?.get('mode') === 'view';
   const [template, setTemplate] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -220,8 +222,10 @@ export default function TemplateEditPage() {
     // Wait for user to be loaded before deciding to fetch template data
     if (isLoadingUser) return;
 
-    // If user is loaded and not an admin, don't fetch template, setLoading to false
-    if (!currentUser || currentUser.user_metadata?.role !== 'admin') {
+    // If user is loaded and doesn't have at least viewer role, don't fetch template
+    const userRole = currentUser?.user_metadata?.role;
+    const canViewTemplate = userRole === 'admin' || userRole === 'editor' || userRole === 'viewer';
+    if (!currentUser || !canViewTemplate) {
       setLoading(false);
       return; 
     }
@@ -253,7 +257,10 @@ export default function TemplateEditPage() {
     fetchTemplate();
   }, [id, isLoadingUser, currentUser, router]); // Added router to dependencies due to potential use
 
-  const isGlobalAdmin = currentUser?.user_metadata?.role === 'admin';
+  const userRole = currentUser?.user_metadata?.role;
+  const isAdmin = userRole === 'admin';
+  const canEditTemplate = userRole === 'admin'; // Only admins can edit/delete templates
+  const canViewTemplate = userRole === 'admin' || userRole === 'editor' || userRole === 'viewer';
   const isSystemTemplate = defaultTemplates[id as keyof typeof defaultTemplates];
 
   if (isLoadingUser || loading) {
@@ -265,12 +272,12 @@ export default function TemplateEditPage() {
     );
   }
 
-  if (!isGlobalAdmin) {
+  if (!canViewTemplate) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
         <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
         <h3 className="text-xl font-bold mb-2">Access Denied</h3>
-        <p className="text-muted-foreground">You do not have permission to view or manage this Content Template.</p>
+        <p className="text-muted-foreground">You do not have permission to view this Content Template.</p>
         <Link href="/dashboard/templates">
           <Button variant="outline" className="mt-4">Back to Templates</Button>
         </Link>
@@ -292,16 +299,16 @@ export default function TemplateEditPage() {
   }
 
   const handleOpenDeleteDialog = () => {
-    if (!isGlobalAdmin || isSystemTemplate) {
-        toast.error(isSystemTemplate ? "System templates cannot be deleted." : "You don&apos;t have permission to delete templates.");
+    if (!canEditTemplate || isSystemTemplate) {
+        toast.error(isSystemTemplate ? "System templates cannot be deleted." : "You don't have permission to delete templates.");
         return;
     }
     setShowDeleteDialog(true);
   };
 
   const handleConfirmDelete = async () => {
-    if (!isGlobalAdmin || isSystemTemplate) {
-        toast.error(isSystemTemplate ? "System templates cannot be deleted." : "You don&apos;t have permission to delete templates.");
+    if (!canEditTemplate || isSystemTemplate) {
+        toast.error(isSystemTemplate ? "System templates cannot be deleted." : "You don't have permission to delete templates.");
         setIsDeleting(false);
         setShowDeleteDialog(false);
         return;
@@ -348,11 +355,13 @@ export default function TemplateEditPage() {
             Back
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">{String(template?.name || 'Edit Template')}</h1>
-            <p className="text-muted-foreground mt-1">Modify the fields and settings for this template.</p>
+            <h1 className="text-2xl font-bold tracking-tight">{String(template?.name || (isViewMode ? 'View Template' : 'Edit Template'))}</h1>
+            <p className="text-muted-foreground mt-1">
+              {isViewMode ? 'View the fields and settings for this template.' : 'Modify the fields and settings for this template.'}
+            </p>
           </div>
         </div>
-        {isGlobalAdmin && !isSystemTemplate && (
+        {canEditTemplate && !isSystemTemplate && !isViewMode && (
           <Button variant="destructive" onClick={handleOpenDeleteDialog} disabled={isDeleting}>
             <Trash2 className="mr-2 h-4 w-4" />
             Delete Template
@@ -360,17 +369,13 @@ export default function TemplateEditPage() {
         )}
       </div>
 
-      {/* Pass isReadOnly prop to TemplateForm if it's a system template and user is admin, 
-          or always if user is not admin (though they shouldn't reach here) 
-          Alternatively, TemplateForm needs its own internal permission checks or relies on API for saves
-      */}
+      {/* Pass isReadOnly prop to TemplateForm based on user permissions or view mode */}
       <TemplateForm 
         initialData={template as unknown as ContentTemplate | undefined} 
-        // If TemplateForm supports a readOnly prop for system templates, it would be like:
-        // isReadOnly={!!isSystemTemplate}
+        isReadOnly={!canEditTemplate || !!isSystemTemplate || isViewMode}
       />
 
-      {isGlobalAdmin && !isSystemTemplate && (
+      {canEditTemplate && !isSystemTemplate && (
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
           <AlertDialogContent>
             <AlertDialogHeader>

@@ -13,7 +13,13 @@ import {
   Edit,
   Loader2,
   UserCircle2,
-  MoreVertical
+  MoreVertical,
+  Activity,
+  FileText,
+  CheckCircle,
+  XCircle,
+  GitPullRequest,
+  LogIn
 } from 'lucide-react';
 import {
   Dialog,
@@ -87,6 +93,9 @@ export default function UserDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [activityStats, setActivityStats] = useState<any>(null);
+  const [isLoadingActivity, setIsLoadingActivity] = useState(false);
   
   useEffect(() => {
     async function fetchUserData() {
@@ -134,11 +143,32 @@ export default function UserDetailPage() {
         }
         
         setUser(data.user);
+        
+        // Fetch user activity after user data is loaded
+        fetchUserActivity(userId);
       } catch (error) {
         console.error('Error fetching user data:', error);
         toast.error('Failed to load user details. Please try again.');
       } finally {
         setIsLoading(false);
+      }
+    }
+    
+    async function fetchUserActivity(userId: string) {
+      setIsLoadingActivity(true);
+      try {
+        const response = await apiFetch(`/api/users/${userId}/activity`);
+        const data = await response.json();
+        
+        if (data.success) {
+          setActivities(data.activities || []);
+          setActivityStats(data.stats);
+        }
+      } catch (error) {
+        console.error('Error fetching user activity:', error);
+        // Don't show error toast as activity is supplementary info
+      } finally {
+        setIsLoadingActivity(false);
       }
     }
     
@@ -348,6 +378,81 @@ export default function UserDetailPage() {
             </ul>
           ) : (
             <p className="text-muted-foreground">This user has no specific brand permissions assigned.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* User Activity Log Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Activity className="mr-2 h-5 w-5 text-primary" /> User Activity Log
+          </CardTitle>
+          <CardDescription>Activity from the last 30 days</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoadingActivity ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : activities.length > 0 ? (
+            <div className="space-y-4">
+              {/* Activity Stats */}
+              {activityStats && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pb-4 border-b">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold">{activityStats.totalActivities}</p>
+                    <p className="text-sm text-muted-foreground">Total Activities</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold">{activityStats.contentCreated}</p>
+                    <p className="text-sm text-muted-foreground">Content Created</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold">{activityStats.contentUpdated}</p>
+                    <p className="text-sm text-muted-foreground">Content Updated</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold">{activityStats.templatesModified}</p>
+                    <p className="text-sm text-muted-foreground">Templates Modified</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Activity Timeline */}
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {activities.slice(0, 20).map((activity, index) => (
+                  <div key={index} className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="mt-1">
+                      {activity.type === 'content' && <FileText className="h-4 w-4 text-blue-500" />}
+                      {activity.type === 'workflow' && activity.action === 'approve' && <CheckCircle className="h-4 w-4 text-green-500" />}
+                      {activity.type === 'workflow' && activity.action === 'reject' && <XCircle className="h-4 w-4 text-red-500" />}
+                      {activity.type === 'workflow' && activity.action === 'request_changes' && <GitPullRequest className="h-4 w-4 text-yellow-500" />}
+                      {activity.type === 'template' && <FileText className="h-4 w-4 text-purple-500" />}
+                      {activity.type === 'auth' && <LogIn className="h-4 w-4 text-gray-500" />}
+                      {!['content', 'workflow', 'template', 'auth'].includes(activity.type) && <Activity className="h-4 w-4 text-gray-400" />}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm">{activity.description}</p>
+                      {activity.metadata?.comments && (
+                        <p className="text-xs text-muted-foreground mt-1">Comment: {activity.metadata.comments}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatDateFns(new Date(activity.timestamp), 'MMM d, yyyy h:mm a')}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {activities.length > 20 && (
+                <p className="text-sm text-muted-foreground text-center pt-2">
+                  Showing 20 of {activities.length} activities
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-8">No activity in the last 30 days</p>
           )}
         </CardContent>
       </Card>

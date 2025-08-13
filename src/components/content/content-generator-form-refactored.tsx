@@ -428,25 +428,27 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
           </CardFooter>
         </Card>
         
-        {/* Generated Content Section - Separate Card */}
+        {/* Content Title Section - System Field */}
         {hasGeneratedContent && (
           <Card>
             <CardHeader>
-              <CardTitle>Generated Content</CardTitle>
+              <CardTitle>Content Details</CardTitle>
               <CardDescription>
-                Review and edit the generated content before saving
+                Set the title for this content piece
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Title Field */}
+              {/* Title Field - System Required */}
               <div className="space-y-2">
-                <Label htmlFor="content-title">Title</Label>
+                <Label htmlFor="content-title">
+                  Content Title <span className="text-xs text-muted-foreground">(Required for saving)</span>
+                </Label>
                 <div className="flex gap-2">
                   <Input
                     id="content-title"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder={isGeneratingTitle ? "Generating title..." : "Enter content title"}
+                    placeholder={isGeneratingTitle ? "Generating title..." : "Enter a title for this content"}
                     disabled={isGeneratingTitle}
                     className="flex-1"
                   />
@@ -493,9 +495,20 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
                   <p className="text-sm text-muted-foreground">Using AI to create an engaging title...</p>
                 )}
               </div>
-              
-              <Separator />
-              
+            </CardContent>
+          </Card>
+        )}
+        
+        {/* Generated Content Section - Template Output Fields Only */}
+        {hasGeneratedContent && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Generated Content</CardTitle>
+              <CardDescription>
+                Review and edit the generated content fields
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
               <GeneratedContentPreview
                 generatedOutputs={generatedOutputs}
                 outputFields={template?.outputFields || []}

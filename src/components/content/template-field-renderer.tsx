@@ -52,23 +52,50 @@ export function TemplateFieldRenderer({
         );
         
       case 'longText':
+        const longTextOptions = field.options as LongTextOptions;
+        const handleLongTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+          let newValue = e.target.value;
+          
+          // Enforce maxRows if specified
+          if (longTextOptions?.maxRows && typeof longTextOptions.maxRows === 'number') {
+            const lines = newValue.split('\n');
+            if (lines.length > longTextOptions.maxRows) {
+              // Truncate to maxRows
+              newValue = lines.slice(0, longTextOptions.maxRows).join('\n');
+              // Note: toast is not available here, so we'll just truncate silently
+              // or we could pass a callback for notifications
+            }
+          }
+          
+          // Also check maxLength if specified
+          if (longTextOptions?.maxLength && typeof longTextOptions.maxLength === 'number') {
+            if (newValue.length > longTextOptions.maxLength) {
+              newValue = newValue.substring(0, longTextOptions.maxLength);
+            }
+          }
+          
+          onChange(field.id, newValue);
+        };
+        
         return (
           <Textarea
             id={field.id}
             value={value}
-            onChange={(e) => onChange(field.id, e.target.value)}
-            placeholder={(field.options as LongTextOptions)?.placeholder}
-            rows={(field.options as LongTextOptions)?.rows || 4}
+            onChange={handleLongTextChange}
+            placeholder={longTextOptions?.placeholder}
+            rows={longTextOptions?.rows || 4}
             required={isRequired}
           />
         );
         
       case 'richText':
+        const richTextOptions = field.options as RichTextOptions;
         return (
           <QuillEditor
             value={value}
             onChange={(content) => onChange(field.id, content)}
-            placeholder={(field.options as RichTextOptions)?.placeholder}
+            placeholder={richTextOptions?.placeholder}
+            allowImages={richTextOptions?.allowImages !== false} // Default to true if not specified
           />
         );
         

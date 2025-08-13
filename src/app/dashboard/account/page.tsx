@@ -346,7 +346,7 @@ export default function AccountPage() {
           </p>
         </div>
         <Link 
-          href="/dashboard/help?article=12-account" 
+          href="/dashboard/help#account" 
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <HelpCircle className="h-4 w-4" />

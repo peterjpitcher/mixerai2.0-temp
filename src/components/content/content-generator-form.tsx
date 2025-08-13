@@ -16,7 +16,7 @@ import { BrandIcon } from '@/components/brand-icon';
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Sparkles, Info, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
-import type { InputField, OutputField, ContentTemplate as Template, SelectOptions, FieldType } from '@/types/template';
+import type { InputField, OutputField, ContentTemplate as Template, SelectOptions, LongTextOptions, RichTextOptions, FieldType } from '@/types/template';
 import { ProductSelect } from './product-select';
 import type { ProductContext } from '@/types/claims';
 import { apiFetch } from '@/lib/api-client';
@@ -370,6 +370,8 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
       const requestBody = {
         brand_id: selectedBrand,
         prompt: populatedPrompt,
+        fieldType: field.type,
+        options: field.options || {},
       };
 
       const response = await apiFetch('/api/ai/suggest', {
@@ -381,7 +383,19 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
       const data = await response.json();
 
       if (data.success && data.suggestion) {
-        setTemplateFieldValues(prev => ({ ...prev, [field.id]: data.suggestion }));
+        // Apply maxLength constraint if defined for shortText fields
+        let finalSuggestion = data.suggestion;
+        if (field.type === 'shortText' && 
+            field.options && 
+            'maxLength' in field.options && 
+            typeof field.options.maxLength === 'number' && 
+            typeof finalSuggestion === 'string') {
+          if (finalSuggestion.length > field.options.maxLength) {
+            finalSuggestion = finalSuggestion.substring(0, field.options.maxLength);
+            toast.info(`Suggestion was truncated to ${field.options.maxLength} characters.`);
+          }
+        }
+        setTemplateFieldValues(prev => ({ ...prev, [field.id]: finalSuggestion }));
         toast.success(`Suggestion generated for ${field.name}`);
       } else {
         toast.error(data.error || `Failed to generate suggestion for ${field.name}.`);
@@ -655,7 +669,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
           </div>
         </div>
         <Link 
-          href="/dashboard/help?article=03-content" 
+          href="/dashboard/help#content" 
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <HelpCircle className="h-4 w-4" />
@@ -750,9 +764,49 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
                           case 'shortText':
                             return <Input id={field.id} value={templateFieldValues[field.id] || ''} onChange={(e) => handleTemplateFieldChange(field.id, e.target.value)} placeholder={`Enter ${field.name}`} />;
                           case 'longText':
-                            return <Textarea id={field.id} value={templateFieldValues[field.id] || ''} onChange={(e) => handleTemplateFieldChange(field.id, e.target.value)} placeholder={`Enter ${field.name}`} />;
+                            const longTextOptions = field.options as LongTextOptions;
+                            const handleLongTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                              let value = e.target.value;
+                              
+                              // Enforce maxRows if specified
+                              if (longTextOptions?.maxRows && typeof longTextOptions.maxRows === 'number') {
+                                const lines = value.split('\n');
+                                if (lines.length > longTextOptions.maxRows) {
+                                  // Truncate to maxRows
+                                  value = lines.slice(0, longTextOptions.maxRows).join('\n');
+                                  toast.warning(`Maximum ${longTextOptions.maxRows} rows allowed for ${field.name}`);
+                                }
+                              }
+                              
+                              // Also check maxLength if specified
+                              if (longTextOptions?.maxLength && typeof longTextOptions.maxLength === 'number') {
+                                if (value.length > longTextOptions.maxLength) {
+                                  value = value.substring(0, longTextOptions.maxLength);
+                                  toast.warning(`Maximum ${longTextOptions.maxLength} characters allowed for ${field.name}`);
+                                }
+                              }
+                              
+                              handleTemplateFieldChange(field.id, value);
+                            };
+                            
+                            return (
+                              <Textarea 
+                                id={field.id} 
+                                value={templateFieldValues[field.id] || ''} 
+                                onChange={handleLongTextChange}
+                                placeholder={longTextOptions?.placeholder || `Enter ${field.name}`}
+                                rows={longTextOptions?.rows || 4}
+                              />
+                            );
                           case 'richText':
-                            return <QuillEditor value={templateFieldValues[field.id] || ''} onChange={(content) => handleTemplateFieldChange(field.id, content)} />;
+                            const richTextOptions = field.options as RichTextOptions;
+                            return (
+                              <QuillEditor 
+                                value={templateFieldValues[field.id] || ''} 
+                                onChange={(content) => handleTemplateFieldChange(field.id, content)}
+                                allowImages={richTextOptions?.allowImages !== false} // Default to true if not specified
+                              />
+                            );
                           case 'select':
                             const options = field.options as SelectOptions;
                             return (

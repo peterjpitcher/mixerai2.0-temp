@@ -621,7 +621,58 @@ export default function AltTextGeneratorPage() {
                                 </span>
                                 {!item.imageUrl.startsWith('data:') && (
                                     <button
-                                        onClick={() => window.open(item.imageUrl, '_blank')}
+                                        onClick={() => {
+                                            // Try to open in new tab, but handle potential CORS issues
+                                            try {
+                                                const newWindow = window.open('', '_blank');
+                                                if (newWindow) {
+                                                    // Create a simple HTML page to display the image
+                                                    newWindow.document.write(`
+                                                        <!DOCTYPE html>
+                                                        <html>
+                                                        <head>
+                                                            <title>Image View</title>
+                                                            <style>
+                                                                body { 
+                                                                    margin: 0; 
+                                                                    display: flex; 
+                                                                    justify-content: center; 
+                                                                    align-items: center; 
+                                                                    min-height: 100vh; 
+                                                                    background: #f0f0f0;
+                                                                }
+                                                                img { 
+                                                                    max-width: 100%; 
+                                                                    max-height: 100vh; 
+                                                                    object-fit: contain;
+                                                                }
+                                                                .error {
+                                                                    text-align: center;
+                                                                    padding: 20px;
+                                                                    font-family: system-ui, -apple-system, sans-serif;
+                                                                }
+                                                            </style>
+                                                        </head>
+                                                        <body>
+                                                            <img src="${item.imageUrl}" 
+                                                                 alt="Image preview" 
+                                                                 onerror="this.style.display='none'; document.getElementById('error').style.display='block';">
+                                                            <div id="error" class="error" style="display:none;">
+                                                                <h2>Unable to load image</h2>
+                                                                <p>The image could not be loaded due to CORS restrictions or availability.</p>
+                                                                <p>URL: <a href="${item.imageUrl}" target="_blank">${item.imageUrl}</a></p>
+                                                            </div>
+                                                        </body>
+                                                        </html>
+                                                    `);
+                                                    newWindow.document.close();
+                                                }
+                                            } catch (error) {
+                                                console.error('Error opening image:', error);
+                                                // Fallback: try direct navigation
+                                                window.open(item.imageUrl, '_blank');
+                                            }
+                                        }}
                                         className="text-xs text-blue-600 hover:text-blue-800 hover:underline mt-1"
                                     >
                                         Open image ↗
@@ -683,7 +734,56 @@ export default function AltTextGeneratorPage() {
                                                     parentCell.appendChild(errorSpan);
                                                 }
                                             }}
-                                            onClick={() => { const newWindow = window.open(); if(newWindow) newWindow.location.href = item.imageUrl; }}
+                                            onClick={() => {
+                                                try {
+                                                    const newWindow = window.open('', '_blank');
+                                                    if (newWindow) {
+                                                        // Create a simple HTML page to display the image
+                                                        newWindow.document.write(`
+                                                            <!DOCTYPE html>
+                                                            <html>
+                                                            <head>
+                                                                <title>Image View</title>
+                                                                <style>
+                                                                    body { 
+                                                                        margin: 0; 
+                                                                        display: flex; 
+                                                                        justify-content: center; 
+                                                                        align-items: center; 
+                                                                        min-height: 100vh; 
+                                                                        background: #f0f0f0;
+                                                                    }
+                                                                    img { 
+                                                                        max-width: 100%; 
+                                                                        max-height: 100vh; 
+                                                                        object-fit: contain;
+                                                                    }
+                                                                    .error {
+                                                                        text-align: center;
+                                                                        padding: 20px;
+                                                                        font-family: system-ui, -apple-system, sans-serif;
+                                                                    }
+                                                                </style>
+                                                            </head>
+                                                            <body>
+                                                                <img src="${item.imageUrl}" 
+                                                                     alt="Image preview" 
+                                                                     onerror="this.style.display='none'; document.getElementById('error').style.display='block';">
+                                                                <div id="error" class="error" style="display:none;">
+                                                                    <h2>Unable to load image</h2>
+                                                                    <p>The image could not be loaded due to CORS restrictions or availability.</p>
+                                                                    <p>URL: <a href="${item.imageUrl}" target="_blank">${item.imageUrl}</a></p>
+                                                                </div>
+                                                            </body>
+                                                            </html>
+                                                        `);
+                                                        newWindow.document.close();
+                                                    }
+                                                } catch (error) {
+                                                    console.error('Error opening image:', error);
+                                                    window.open(item.imageUrl, '_blank');
+                                                }
+                                            }}
                                         />
                                     )}
                                 </div>

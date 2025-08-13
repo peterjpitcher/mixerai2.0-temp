@@ -20,6 +20,7 @@ interface AltTextResultItem {
   imageUrl: string;
   altText?: string;
   error?: string;
+  detectedLanguage?: string; // Add detected language to result
 }
 
 const tldToLangCountry: { [key: string]: { language: string; country: string } } = {
@@ -272,7 +273,8 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
         
         results.push({
           imageUrl,
-          altText: generatedAltTextResult.altText, // Assuming altText is directly on the result
+          altText: generatedAltTextResult.altText,
+          detectedLanguage: generatedAltTextResult.detectedLanguage || language, // Use detected language if available, otherwise use the requested/TLD language
           // error: generatedAltTextResult.error, // If your generateAltText can return partial errors
         });
 
