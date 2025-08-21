@@ -982,6 +982,12 @@ export async function generateAltText(
 
   let systemPrompt = `You are an AI assistant specialized in generating concise and accurate alternative text for images.
 Analyze the provided image and generate a descriptive alt text in ${brandLanguage}.
+
+CRITICAL REQUIREMENTS:
+1. The alt text MUST be 125 characters or less for SEO and accessibility.
+2. Be concise and focus only on the most important elements.
+3. Prioritize the main subject and essential context.
+
 Focus on the main subject, context, and any relevant text visible in the image.
 Be factual and avoid subjective interpretations.
 IMPORTANT: Do NOT include color descriptions in the alt text for accessibility reasons. Focus on shape, size, position, content, and function instead of colors.
@@ -1000,13 +1006,15 @@ LANGUAGE DETECTION: If you detect any text in the image, identify its language u
   }
   
   systemPrompt += `\nYour response MUST be a JSON object with:
-1. "altText" key containing the generated alt text string
+1. "altText" key containing the generated alt text string (MAXIMUM 125 CHARACTERS)
 2. "detectedLanguage" key (optional) containing the ISO 639-1 code of any text detected in the image
 
+IMPORTANT: The altText value MUST NOT exceed 125 characters. Be extremely concise.
+
 Examples:
-- If French text is detected: {"altText": "A product label with French text describing ingredients", "detectedLanguage": "fr"}
-- If no text is visible: {"altText": "A landscape photograph of mountains"}
-- If English text is detected: {"altText": "A sign displaying business hours", "detectedLanguage": "en"}
+- If French text is detected: {"altText": "Product label with French ingredient text", "detectedLanguage": "fr"}
+- If no text is visible: {"altText": "Mountain landscape photograph"}
+- If English text is detected: {"altText": "Business hours sign display", "detectedLanguage": "en"}
 
 Do NOT include any other text, explanations, or the original URL in your response.`;
 
@@ -1099,8 +1107,17 @@ Do NOT include any other text, explanations, or the original URL in your respons
       const parsedJson = JSON.parse(content.trim());
       if (typeof parsedJson.altText === 'string') {
         // console.log(`[generateAltText] Successfully parsed alt text: ${parsedJson.altText}`);
+        
+        // Enforce 125 character limit
+        let altText = parsedJson.altText.trim();
+        if (altText.length > 125) {
+          console.warn(`[generateAltText] Alt text exceeded 125 characters (${altText.length}), truncating...`);
+          // Truncate to 122 chars and add ellipsis
+          altText = altText.substring(0, 122) + '...';
+        }
+        
         const result: { altText: string; detectedLanguage?: string } = { 
-          altText: parsedJson.altText.trim() 
+          altText 
         };
         
         // Include detected language if provided by AI

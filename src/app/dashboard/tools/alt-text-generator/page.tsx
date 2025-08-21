@@ -689,9 +689,21 @@ export default function AltTextGeneratorPage() {
                             <div className="flex flex-col gap-2">
                                 <span className="text-sm">{item.altText || "N/A"}</span>
                                 {item.altText && (
-                                    <Button variant="ghost" size="sm" onClick={() => handleCopyText(item.altText, item.imageUrl)} className="w-fit h-auto p-1 text-xs">
-                                        <ClipboardCopy className="h-3 w-3 mr-1" /> Copy Text
-                                    </Button>
+                                    <>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-xs ${item.altText.length > 125 ? 'text-orange-500 font-semibold' : 'text-muted-foreground'}`}>
+                                                {item.altText.length}/125 characters
+                                            </span>
+                                            {item.altText.length > 125 && (
+                                                <Badge variant="outline" className="text-xs bg-orange-50">
+                                                    Exceeds limit
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <Button variant="ghost" size="sm" onClick={() => handleCopyText(item.altText, item.imageUrl)} className="w-fit h-auto p-1 text-xs">
+                                            <ClipboardCopy className="h-3 w-3 mr-1" /> Copy Text
+                                        </Button>
+                                    </>
                                 )}
                             </div>
                           )}
