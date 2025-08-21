@@ -141,6 +141,31 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
         console.error('Error updating user tasks for rejection:', taskError);
       }
       
+      // Enqueue notification for rejection
+      const { data: contentData } = await supabase
+        .from('content')
+        .select('title, brands!brand_id(name)')
+        .eq('id', contentId)
+        .single();
+      
+      if (contentData && currentContent.assigned_to && currentContent.assigned_to.length > 0) {
+        // Notify the content creator about rejection
+        // TODO: Uncomment after migration is applied
+        /* for (const userId of currentContent.assigned_to) {
+          await supabase.rpc('enqueue_workflow_notification', {
+            p_content_id: contentId,
+            p_workflow_id: currentContent.workflow_id,
+            p_step_id: currentContent.current_step,
+            p_recipient_id: userId,
+            p_action: 'rejected',
+            p_content_title: contentData.title || 'Content',
+            p_brand_name: (contentData.brands as any)?.name || 'Brand',
+            p_step_name: currentDbStep.name,
+            p_comment: feedback
+          });
+        } */
+      }
+      
       // Create a version record for the rejection
       const { error: versionError } = await supabase
         .from('content_versions')
@@ -211,6 +236,36 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
           console.error('Error completing current tasks:', taskError);
         }
         
+        // Enqueue notifications for next reviewers
+        const { data: contentData } = await supabase
+          .from('content')
+          .select('title, brands!brand_id(name)')
+          .eq('id', contentId)
+          .single();
+        
+        if (contentData && nextDbStep.assigned_user_ids && nextDbStep.assigned_user_ids.length > 0) {
+          const { data: nextStepData } = await supabase
+            .from('workflow_steps')
+            .select('name')
+            .eq('id', nextDbStep.id)
+            .single();
+            
+          // TODO: Uncomment after migration is applied
+          /* for (const userId of nextDbStep.assigned_user_ids) {
+            await supabase.rpc('enqueue_workflow_notification', {
+              p_content_id: contentId,
+              p_workflow_id: currentContent.workflow_id,
+              p_step_id: nextDbStep.id,
+              p_recipient_id: userId,
+              p_action: 'review_required',
+              p_content_title: contentData.title || 'Content',
+              p_brand_name: (contentData.brands as any)?.name || 'Brand',
+              p_step_name: nextStepData?.name || 'Review',
+              p_comment: feedback
+            });
+          } */
+        }
+        
       } else {
         // No more steps - mark as fully approved
         new_status = 'approved';
@@ -242,6 +297,28 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
           
         if (taskError) {
           console.error('Error completing all tasks:', taskError);
+        }
+        
+        // Enqueue notification for final approval
+        const { data: contentData } = await supabase
+          .from('content')
+          .select('title, brands!brand_id(name), created_by')
+          .eq('id', contentId)
+          .single();
+        
+        if (contentData && contentData.created_by) {
+          // TODO: Uncomment after migration is applied
+          /* await supabase.rpc('enqueue_workflow_notification', {
+            p_content_id: contentId,
+            p_workflow_id: currentContent.workflow_id,
+            p_step_id: currentDbStep.id,
+            p_recipient_id: contentData.created_by,
+            p_action: 'approved',
+            p_content_title: contentData.title || 'Content',
+            p_brand_name: (contentData.brands as any)?.name || 'Brand',
+            p_step_name: 'Final Approval',
+            p_comment: feedback
+          }); */
         }
       }
       

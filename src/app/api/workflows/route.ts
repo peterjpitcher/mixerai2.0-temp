@@ -283,15 +283,13 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
     
     const rawSteps = body.steps; // Already validated by Zod schema
     
-    const processedStepsForRPC: WorkflowStepData[] = [];
-    const invitationItems: RpcInvitationItem[] = []; 
     const pendingInvites: string[] = [];
 
-    for (const rawStep of rawSteps) {
-        const stepRole = 'editor'; // Default role for workflow steps
-        const processedAssigneesForStep: WorkflowAssignee[] = [];
-
-        // New steps don't have IDs yet
+    // Transform steps for the new RPC function format
+    const stepsForRPC = await Promise.all(rawSteps.map(async (rawStep, index) => {
+        const assignedUserIds: string[] = [];
+        const assignedRoles: string[] = [];
+        const roleMapping: Record<string, string> = {};
 
         if (rawStep.assignees && Array.isArray(rawStep.assignees)) {
             for (const assignee of rawStep.assignees) {
@@ -311,35 +309,42 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
                     continue;
                 }
                 
-                const processedAssignee = { ...assignee }; 
                 if (existingUser) {
-                    processedAssignee.id = existingUser.id;
+                    assignedUserIds.push(existingUser.id);
+                    // Determine role based on step type or default to reviewer
+                    const role = rawStep.name?.toLowerCase().includes('approv') ? 'approver' : 
+                                 rawStep.name?.toLowerCase().includes('edit') ? 'editor' : 'reviewer';
+                    assignedRoles.push(role);
+                    roleMapping[existingUser.id] = role;
                 } else {
-                    // For new workflows, we'll add invitations after steps are created
                     // Store email for later invitation
                     if (!pendingInvites.includes(assignee.email)) {
                         pendingInvites.push(assignee.email);
                     }
                 }
-                processedAssigneesForStep.push(processedAssignee);
             }
         }
 
-        const baseStepData = (typeof rawStep === 'object' && rawStep !== null) ? rawStep : {};
-        processedStepsForRPC.push({
-            ...baseStepData, 
-            // id will be assigned by database,
-            role: stepRole, 
-            assignees: processedAssigneesForStep 
-        });
-    }
+        return {
+            name: rawStep.name,
+            type: rawStep.name?.toLowerCase().includes('approv') ? 'approval' : 'review',
+            order_index: rawStep.order_index ?? index,
+            order: rawStep.order_index ?? index, // Fallback for compatibility
+            assigned_user_ids: assignedUserIds,
+            assigned_roles: assignedRoles,
+            role_mapping: roleMapping,
+            description: rawStep.description,
+            deadline_days: rawStep.deadline_days
+        };
+    }));
     
+    // TODO: Update to new RPC signature after migration is applied
     const rpcParams = {
       p_name: String(body.name),
       p_brand_id: String(body.brand_id),
-      p_steps_definition: processedStepsForRPC as unknown as Json,
+      p_steps_definition: stepsForRPC as unknown as Json,
       p_created_by: user.id,
-      p_invitation_items: invitationItems as unknown as Json
+      p_invitation_items: [] as unknown as Json // Empty for now, handled separately
     };
 
     const { data: newWorkflowId, error: rpcError } = await supabase.rpc(
@@ -356,11 +361,12 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
       throw new Error('Workflow creation failed, no ID returned from function.');
     }
     
+    // TODO: Remove this after migration - currently RPC doesn't handle description and template_id
     if (newWorkflowId) {
       const { error: updateError } = await supabase
         .from('workflows')
         .update({
-          description: workflowDescription, // This requires workflowDescription to be in scope
+          description: workflowDescription,
           template_id: body.template_id || null
         })
         .eq('id', newWorkflowId);
@@ -375,34 +381,16 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
         await verifyEmailTemplates();
         
         for (const email of pendingInvites) {
-          let highestRole: 'admin' | 'editor' | 'viewer' = 'viewer'; 
-          let firstStepIdForAssignment: number | string | null = null;
-
-          for (const item of invitationItems) { // RpcInvitationItem
-            if (item.email === email) {
-              if (firstStepIdForAssignment === null && typeof item.step_id === 'number') { // Ensure step_id is number
-                firstStepIdForAssignment = item.step_id;
-              }
-              // Type assertion for item.role as it's string in RpcInvitationItem
-              const currentRole = item.role as 'admin' | 'editor' | 'viewer';
-              if (currentRole === 'admin') {
-                highestRole = 'admin';
-              } else if (currentRole === 'editor' && highestRole !== 'admin') {
-                highestRole = 'editor';
-              }
-            }
-          }
+          // Default role for invited users
+          const inviteRole = 'viewer';
           
           const appMetadataPayload: Record<string, unknown> = {
             full_name: '',
-            role: highestRole,
+            role: inviteRole,
             invited_by: user.id,
-            invited_from_workflow: newWorkflowId
+            invited_from_workflow: newWorkflowId,
+            brand_id: body.brand_id
           };
-
-          if (firstStepIdForAssignment !== null) {
-            appMetadataPayload.step_id_for_assignment = firstStepIdForAssignment;
-          }
           
           const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
             data: appMetadataPayload
@@ -410,6 +398,8 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
           
           if (inviteError) {
             console.error(`Failed to send auth invite to ${email}:`, inviteError);
+          } else {
+            console.log(`Successfully sent invite to ${email} for workflow ${newWorkflowId}`);
           }
         }
       } catch (inviteProcessError) {
