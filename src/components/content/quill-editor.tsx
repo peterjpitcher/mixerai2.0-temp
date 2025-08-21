@@ -17,7 +17,7 @@ export function QuillEditor({
   placeholder = 'Start typing...',
   className = '',
   readOnly = false,
-  allowImages = true
+  allowImages = false // Default closed for security
 }: QuillEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const quillRef = useRef<any>(null);
@@ -58,6 +58,48 @@ export function QuillEditor({
 
       quillRef.current = quill;
 
+      // Add paste and drop handlers for image restriction
+      if (!allowImages) {
+        const Delta = Quill.import('delta');
+        
+        // Strip images from paste
+        quill.clipboard.addMatcher(Node.ELEMENT_NODE, (node: any, delta: any) => {
+          if (node.tagName === 'IMG') {
+            return new Delta(); // Return empty delta to strip image
+          }
+          // Also filter Delta operations
+          const filtered = new Delta();
+          delta.ops?.forEach((op: any) => {
+            if (!op.insert?.image) {
+              filtered.push(op);
+            }
+          });
+          return filtered;
+        });
+
+        // Prevent image drops
+        const editorElement = quill.root;
+        const handleDrop = (e: DragEvent) => {
+          const items = Array.from(e.dataTransfer?.items || []);
+          if (items.some(item => item.type.startsWith('image/'))) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Image drop prevented due to template restrictions');
+          }
+        };
+        
+        editorElement.addEventListener('drop', handleDrop);
+        editorElement.addEventListener('dragover', (e) => {
+          const items = Array.from(e.dataTransfer?.items || []);
+          if (items.some(item => item.type.startsWith('image/'))) {
+            e.preventDefault();
+          }
+        });
+        
+        // Store handler for cleanup
+        (quill as any)._dropHandler = handleDrop;
+      }
+
       // Set initial content if provided
       if (value && value.trim() !== '') {
         console.log('Setting initial HTML content:', value.substring(0, 100) + '...');
@@ -79,7 +121,14 @@ export function QuillEditor({
     // Cleanup
     return () => {
       if (quillRef.current) {
-        quillRef.current.off('text-change');
+        const quill = quillRef.current;
+        quill.off('text-change');
+        
+        // Remove drop handler if exists
+        if ((quill as any)._dropHandler) {
+          quill.root.removeEventListener('drop', (quill as any)._dropHandler);
+        }
+        
         quillRef.current = null;
       }
     };
