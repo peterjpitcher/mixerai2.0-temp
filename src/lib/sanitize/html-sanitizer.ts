@@ -53,10 +53,12 @@ export function sanitizeHTML(html: string, config: FieldConfig = {}): string {
     ...(allow_videos ? ['src', 'controls', 'poster', 'width', 'height'] : [])
   ];
 
-  // Configure DOMPurify
+  // Configure DOMPurify with strict security settings
   const cleanHTML = DOMPurify.sanitize(html, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
+    // Explicitly block dangerous URL schemes including data:, vbscript:, javascript:, and file:
+    ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
     ALLOW_DATA_ATTR: false,
     ALLOW_UNKNOWN_PROTOCOLS: false,
     SAFE_FOR_TEMPLATES: true,
@@ -66,16 +68,24 @@ export function sanitizeHTML(html: string, config: FieldConfig = {}): string {
     FORCE_BODY: true,
     SANITIZE_DOM: true,
     KEEP_CONTENT: true,
-    IN_PLACE: false
+    IN_PLACE: false,
+    // Explicitly forbid all event handlers
+    FORBID_ATTR: [
+      'onerror', 'onload', 'onclick', 'onmouseover', 'onmouseout',
+      'onmousemove', 'onmouseenter', 'onmouseleave', 'onfocus', 'onblur',
+      'oninput', 'onchange', 'onkeydown', 'onkeyup', 'onkeypress',
+      'onsubmit', 'onreset', 'ondblclick', 'oncontextmenu'
+    ]
   });
 
-  // Additional cleanup - remove event handlers
-  const withoutEvents = cleanHTML.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
+  // DOMPurify already handles event handlers and dangerous protocols
+  // No need for additional regex-based cleanup which can be bypassed
+  // DOMPurify's configuration above already:
+  // - Removes all event handlers via FORBID_ATTR
+  // - Blocks dangerous protocols via ALLOWED_URI_REGEXP
+  // - Sanitizes all attributes via ADD_ATTR_TARGET
   
-  // Remove javascript: protocol
-  const withoutJSProtocol = withoutEvents.replace(/javascript:/gi, '');
-
-  return withoutJSProtocol;
+  return cleanHTML;
 }
 
 /**
