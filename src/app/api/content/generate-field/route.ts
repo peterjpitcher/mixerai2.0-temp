@@ -7,6 +7,12 @@ import type { Brand } from '@/types/models'; // Corrected Brand type import
 import { User } from '@supabase/supabase-js';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { 
+  calculateMaxTokens, 
+  processAIResponse,
+  type FieldConstraints,
+  type TemplateField 
+} from '@/lib/ai/constrained-generation';
 
 // Helper function to get template details
 async function getTemplateDetails(templateId: string, supabaseClient: ReturnType<typeof createSupabaseAdminClient>): Promise<Template | null> {
@@ -157,32 +163,105 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, _user: User): Promi
     contextualizedUserPrompt += `${INDENT}Use the following instructions and input data (if any) to generate the content for this field:\n\n`;
     contextualizedUserPrompt += baseFieldSpecificInstructions;
 
-    const systemPrompt = `You are an AI assistant specialized in generating specific pieces of marketing content based on detailed instructions and brand context. Your goal is to produce accurate, high-quality text for the requested field ONLY. Do not add conversational fluff or any introductory/concluding remarks beyond the direct content for the field.`;
+    // Extract field constraints from options
+    const fieldOptions = outputFieldToGenerate.options || {};
+    const constraints: FieldConstraints = {};
     
-    let singleFieldMaxTokens = 250; // Default for plain text
-    if (outputFieldToGenerate.type === 'richText') {
-      singleFieldMaxTokens = 1000; // Longer for rich text
-    } else if (outputFieldToGenerate.type === 'html') {
-      singleFieldMaxTokens = 1500; // Potentially longer for HTML
+    // Map field options to constraints based on field type
+    if (outputFieldToGenerate.type === 'plainText' && 'maxLength' in fieldOptions) {
+      constraints.max_length = fieldOptions.maxLength as number;
+    } else if (outputFieldToGenerate.type === 'richText') {
+      if ('maxLength' in fieldOptions) {
+        constraints.max_length = fieldOptions.maxLength as number;
+      }
+      if ('maxRows' in fieldOptions) {
+        constraints.max_rows = fieldOptions.maxRows as number;
+      }
+    }
+    
+    // Build template field object for constrained generation
+    const templateField: TemplateField = {
+      name: outputFieldToGenerate.name,
+      type: outputFieldToGenerate.type === 'plainText' ? 'short_text' : 
+            outputFieldToGenerate.type === 'richText' ? 'long_text' : 
+            'long_text', // Default for html/image
+      config: constraints
+    };
+    
+    // Add constraint instructions to the prompt if constraints exist
+    let constraintInstructions = '';
+    if (constraints.max_length) {
+      constraintInstructions += `\n\nCRITICAL REQUIREMENT: The response MUST be ${constraints.max_length} characters or less. This is mandatory.`;
+    }
+    if (constraints.max_rows) {
+      constraintInstructions += `\nMAXIMUM LINES: ${constraints.max_rows} lines/rows only. Do not exceed this limit.`;
+    }
+    
+    const enhancedUserPrompt = contextualizedUserPrompt + constraintInstructions;
+    
+    const systemPrompt = `You are an AI assistant specialized in generating specific pieces of marketing content based on detailed instructions and brand context. Your goal is to produce accurate, high-quality text for the requested field ONLY. Do not add conversational fluff or any introductory/concluding remarks beyond the direct content for the field.${constraintInstructions ? ' IMPORTANT: You MUST respect all character and line limits specified.' : ''}`;
+    
+    // Calculate appropriate max tokens based on constraints
+    let singleFieldMaxTokens = calculateMaxTokens(constraints.max_length);
+    if (!singleFieldMaxTokens) {
+      // Fallback to type-based defaults if no max_length constraint
+      if (outputFieldToGenerate.type === 'richText') {
+        singleFieldMaxTokens = 1000;
+      } else if (outputFieldToGenerate.type === 'html') {
+        singleFieldMaxTokens = 1500;
+      } else {
+        singleFieldMaxTokens = 250;
+      }
     }
 
-    const generatedText = await generateTextCompletion(
-      systemPrompt,
-      contextualizedUserPrompt,
-      singleFieldMaxTokens,
-      0.7
-    );
+    // Use lower temperature for constrained generation
+    const temperature = constraints.max_length || constraints.max_rows ? 0.3 : 0.7;
+    
+    // Try generation with retries for constraint violations
+    let generatedText: string | null = null;
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts && !generatedText) {
+      attempts++;
+      
+      const rawResponse = await generateTextCompletion(
+        systemPrompt,
+        enhancedUserPrompt + (attempts > 1 ? `\n\nPREVIOUS ATTEMPT FAILED: Response exceeded constraints. Generate a shorter response that fits within ${constraints.max_length || 'the specified'} characters.` : ''),
+        singleFieldMaxTokens,
+        temperature
+      );
+      
+      if (!rawResponse) {
+        console.error(`[generate-field] AI generation attempt ${attempts} failed for field ${outputFieldToGenerate.name}`);
+        continue;
+      }
+      
+      // Process and validate the response against constraints
+      const processed = processAIResponse(rawResponse, templateField);
+      
+      if (processed.warnings.length === 0 || attempts === maxAttempts) {
+        // Either no violations or last attempt - use the processed result
+        generatedText = processed.value;
+        if (processed.warnings.length > 0) {
+          console.warn(`[generate-field] Using truncated response after ${attempts} attempts:`, processed.warnings);
+        }
+      } else {
+        console.warn(`[generate-field] Attempt ${attempts} violated constraints:`, processed.warnings);
+      }
+    }
 
     if (!generatedText) {
-      console.error(`[generate-field] AI generation failed for field ${outputFieldToGenerate.name} (ID: ${outputFieldToGenerate.id}). Prompt:`, contextualizedUserPrompt);
-      return NextResponse.json({ success: false, error: `AI failed to generate content for field: ${outputFieldToGenerate.name}` }, { status: 500 });
+      console.error(`[generate-field] AI generation failed after ${maxAttempts} attempts for field ${outputFieldToGenerate.name}`);
+      return NextResponse.json({ success: false, error: `AI failed to generate content within constraints for field: ${outputFieldToGenerate.name}` }, { status: 500 });
     }
 
     return NextResponse.json({
       success: true,
       generated_text: generatedText,
       field_id: outputFieldToGenerate.id,
-      field_name: outputFieldToGenerate.name
+      field_name: outputFieldToGenerate.name,
+      attempts_made: attempts
     });
 
   } catch (error: unknown) {

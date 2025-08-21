@@ -118,4 +118,5 @@ export interface ContentTemplate {
   created_at: string | null;
   created_by: string | null;
   updated_at: string | null;
+  include_title?: boolean; // Whether to include a title field when creating content
 } 

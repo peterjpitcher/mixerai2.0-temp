@@ -95,7 +95,7 @@ export function TemplateFieldRenderer({
             value={value}
             onChange={(content) => onChange(field.id, content)}
             placeholder={richTextOptions?.placeholder}
-            allowImages={richTextOptions?.allowImages !== false} // Default to true if not specified
+            allowImages={richTextOptions?.allowImages === true} // Only allow images if explicitly enabled
           />
         );
         

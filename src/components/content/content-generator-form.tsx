@@ -483,7 +483,8 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
           }
         }
 
-        if (contextForTitle) {
+        // Only generate title if template includes it
+        if (contextForTitle && template?.include_title !== false) {
           setIsGeneratingTitle(true);
           try {
             const topicField = (template.inputFields || []).find(f => f.id === 'topic' || f.name.toLowerCase().includes('topic'));
@@ -590,7 +591,8 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
         toast.info('Auto-generating title, please wait...'); 
         return; 
     }
-    if (!title && !isGeneratingTitle) {
+    // Only require title if template includes it
+    if (template?.include_title !== false && !title && !isGeneratingTitle) {
         toast.error('Content title is missing. Please set manually or wait for auto-generation.');
         return;
     }
@@ -612,7 +614,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
       const payload = {
         brand_id: selectedBrand,
         template_id: template?.id,
-        title,
+        title: template?.include_title !== false ? title : 'Untitled Content',
         workflow_id: associatedWorkflowDetails.id, 
         body: primaryBodyContent,
         content_data: {
@@ -845,10 +847,34 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
       {Object.keys(generatedOutputs).length > 0 && selectedBrand && canGenerateContent && (
         <Card>
           <CardHeader>
-            <CardTitle>Generated Content Review {isGeneratingTitle ? "(Generating Title...)" : (title ? `- \"${title}\"` : "")}</CardTitle>
+            <CardTitle>
+              Generated Content Review 
+              {template?.include_title !== false && (
+                isGeneratingTitle ? " (Generating Title...)" : (title ? ` - "${title}"` : "")
+              )}
+            </CardTitle>
             <CardDescription>Review and edit the generated content below.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Show title field if template includes it */}
+            {template?.include_title !== false && (
+              <div className="pt-2 space-y-1">
+                <Label htmlFor="content_title" className="text-base font-medium">
+                  Content Title
+                </Label>
+                <Input
+                  id="content_title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Enter content title..."
+                  className="border shadow-sm focus-visible:ring-1 focus-visible:ring-ring text-sm p-2 w-full"
+                  disabled={isGeneratingTitle}
+                />
+                {isGeneratingTitle && (
+                  <p className="text-xs text-muted-foreground">Auto-generating title...</p>
+                )}
+              </div>
+            )}
             {(template?.outputFields || []).map(outputField => (
               <div key={outputField.id} className="pt-2 space-y-1">
                 <div className="flex items-center justify-between">
@@ -950,7 +976,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
 
             <Button 
               onClick={handleSave} 
-              disabled={!canGenerateContent || !selectedBrand || !associatedWorkflowDetails?.id || isSaving || isGeneratingTitle || !title || retryingFieldId !== null || isLoading || isFetchingAssociatedWorkflow}
+              disabled={!canGenerateContent || !selectedBrand || !associatedWorkflowDetails?.id || isSaving || isGeneratingTitle || (template?.include_title !== false && !title) || retryingFieldId !== null || isLoading || isFetchingAssociatedWorkflow}
               className="flex items-center gap-2"
               title={!canGenerateContent || !associatedWorkflowDetails?.id ? "Cannot save: Workflow missing or not configured." : "Save the generated content"}
             >
