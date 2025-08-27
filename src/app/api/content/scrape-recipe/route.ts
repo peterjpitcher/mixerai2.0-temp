@@ -179,16 +179,71 @@ export const POST = withAuthAndCSRF(async (req: NextRequest): Promise<Response> 
     const body = await req.json();
     const validatedData = scrapeRecipeSchema.parse(body);
     
-    // Fetch the recipe page
-    const response = await fetch(validatedData.url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    // Try to fetch the recipe page
+    let response;
+    try {
+      // Create an AbortController for timeout
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      // Fetch the recipe page with more comprehensive headers
+      response = await fetch(validatedData.url, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'DNT': '1',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-User': '?1',
+          'Cache-Control': 'max-age=0'
+        }
+      });
+      
+      clearTimeout(timeout);
+    } catch (fetchError: any) {
+      console.error('Network error fetching recipe:', fetchError);
+      
+      // Handle specific error types
+      if (fetchError.name === 'AbortError') {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'Request timed out. The recipe website took too long to respond.' 
+          },
+          { status: 400 }
+        );
       }
-    });
+      
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Failed to connect to the recipe website. Please check the URL and try again.' 
+        },
+        { status: 400 }
+      );
+    }
 
     if (!response.ok) {
+      console.error(`Failed to fetch recipe from ${validatedData.url}: ${response.status} ${response.statusText}`);
+      
+      // Provide more helpful error messages
+      let errorMessage = `Failed to fetch recipe: ${response.status} ${response.statusText}`;
+      if (response.status === 403) {
+        errorMessage = 'The website has blocked automated access. Please try copying the recipe manually or try a different website.';
+      } else if (response.status === 404) {
+        errorMessage = 'Recipe page not found. Please check the URL is correct.';
+      } else if (response.status >= 500) {
+        errorMessage = 'The recipe website is currently unavailable. Please try again later.';
+      }
+      
       return NextResponse.json(
-        { success: false, error: `Failed to fetch recipe: ${response.status} ${response.statusText}` },
+        { success: false, error: errorMessage },
         { status: 400 }
       );
     }

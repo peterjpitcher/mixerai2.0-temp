@@ -1,7 +1,7 @@
 /**
  * Session configuration for the application
  */
-export const sessionConfig = {
+export const SESSION_CONFIG = {
   // Maximum session duration regardless of activity
   absoluteTimeout: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
   
@@ -21,6 +21,9 @@ export const sessionConfig = {
     checkWindow: 15 * 60 * 1000, // Count attempts within 15 minute window
   }
 } as const;
+
+// Also export as sessionConfig for backward compatibility
+export const sessionConfig = SESSION_CONFIG;
 
 /**
  * Password policy configuration

@@ -34,6 +34,9 @@
 .vscode/
 thumbs.db
 
+# Archive directory
+/.archive/
+
 # temporary files and directories
 /temp/
 /tmp/
@@ -42,6 +45,7 @@ thumbs.db
 *.backup
 *.old
 *.orig
+CLAUDE.md.backup-*
 
 # SQL files in root (should be in proper directories)
 /*.sql
@@ -53,6 +57,7 @@ thumbs.db
 /implementation-*.md
 /*-report.md
 /*-audit.md
+/qa-response-*.md
 
 # debug
 npm-debug.log*

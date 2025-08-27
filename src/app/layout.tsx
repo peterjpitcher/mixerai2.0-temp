@@ -6,6 +6,7 @@ import RootLayoutWrapper from "@/components/layout/root-layout-wrapper";
 import { Toaster as SonnerToaster } from "@/components/sonner";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { AppProviders } from "@/providers/app-providers";
+import { CSRFInitializer } from "@/components/csrf-initializer";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -28,6 +29,7 @@ export default function RootLayout({
       <head>
       </head>
       <body className={inter.className}>
+        <CSRFInitializer />
         <AppProviders>
           <ThemeProvider
             attribute="class"
