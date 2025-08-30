@@ -33,7 +33,7 @@ export const GET = withRouteAuth(async (_request: NextRequest, user: User, conte
       action: string;
       description: string;
       timestamp: string;
-      metadata: Record<string, any>;
+      metadata: Record<string, unknown>;
     }
     const activities: ActivityItem[] = [];
 

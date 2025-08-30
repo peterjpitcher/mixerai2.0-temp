@@ -206,11 +206,11 @@ export const POST = withAuthAndCSRF(async (req: NextRequest): Promise<Response> 
       });
       
       clearTimeout(timeout);
-    } catch (fetchError: any) {
+    } catch (fetchError) {
       console.error('Network error fetching recipe:', fetchError);
       
       // Handle specific error types
-      if (fetchError.name === 'AbortError') {
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
         return NextResponse.json(
           { 
             success: false, 

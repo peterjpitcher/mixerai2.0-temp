@@ -11,6 +11,7 @@ import 'quill/dist/quill.snow.css';
 import { ProductSelect } from './product-select';
 import { RecipeUrlField } from './recipe-url-field';
 import { SlugInput } from '@/components/ui/slug-input';
+import { ValidatedTextarea } from '@/components/form/validated-textarea';
 import type { InputField, FieldType, SelectOptions, ShortTextOptions, LongTextOptions, RichTextOptions, UrlOptions, RecipeUrlOptions, SlugOptions } from '@/types/template';
 
 interface TemplateFieldRendererProps {
@@ -53,38 +54,20 @@ export function TemplateFieldRenderer({
         
       case 'longText':
         const longTextOptions = field.options as LongTextOptions;
-        const handleLongTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-          let newValue = e.target.value;
-          
-          // Enforce maxRows if specified
-          if (longTextOptions?.maxRows && typeof longTextOptions.maxRows === 'number') {
-            const lines = newValue.split('\n');
-            if (lines.length > longTextOptions.maxRows) {
-              // Truncate to maxRows
-              newValue = lines.slice(0, longTextOptions.maxRows).join('\n');
-              // Note: toast is not available here, so we'll just truncate silently
-              // or we could pass a callback for notifications
-            }
-          }
-          
-          // Also check maxLength if specified
-          if (longTextOptions?.maxLength && typeof longTextOptions.maxLength === 'number') {
-            if (newValue.length > longTextOptions.maxLength) {
-              newValue = newValue.substring(0, longTextOptions.maxLength);
-            }
-          }
-          
-          onChange(field.id, newValue);
-        };
-        
         return (
-          <Textarea
-            id={field.id}
+          <ValidatedTextarea
             value={value}
-            onChange={handleLongTextChange}
-            placeholder={longTextOptions?.placeholder}
-            rows={longTextOptions?.rows || 4}
-            required={isRequired}
+            onChange={(v) => onChange(field.id, v)}
+            field={{
+              name: field.id,
+              label: undefined, // Label is rendered separately
+              placeholder: longTextOptions?.placeholder || `Enter ${field.name}`,
+              config: {
+                max_rows: longTextOptions?.maxRows,
+                max_length: longTextOptions?.maxLength,
+                required: isRequired,
+              },
+            }}
           />
         );
         

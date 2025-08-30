@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { QuillEditor } from './quill-editor';
 import 'quill/dist/quill.snow.css';
+import { ValidatedTextarea } from '@/components/form/validated-textarea';
 import { useRouter } from 'next/navigation';
 import { BrandIcon } from '@/components/brand-icon';
 import { toast } from 'sonner';
@@ -367,11 +368,20 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
     try {
       const populatedPrompt = interpolatePrompt(field.aiPrompt);
       
+      // Ensure maxLength is passed as a number for shortText and longText fields
+      const options: Record<string, any> = { ...(field.options || {}) };
+      if ((field.type === 'shortText' || field.type === 'longText') && options.maxLength) {
+        options.maxLength = Number(options.maxLength);
+      }
+      if (field.type === 'longText' && options.maxRows) {
+        options.maxRows = Number(options.maxRows);
+      }
+      
       const requestBody = {
         brand_id: selectedBrand,
         prompt: populatedPrompt,
         fieldType: field.type,
-        options: field.options || {},
+        options,
       };
 
       const response = await apiFetch('/api/ai/suggest', {
@@ -383,19 +393,18 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
       const data = await response.json();
 
       if (data.success && data.suggestion) {
-        // Apply maxLength constraint if defined for shortText fields
-        let finalSuggestion = data.suggestion;
-        if (field.type === 'shortText' && 
-            field.options && 
-            'maxLength' in field.options && 
-            typeof field.options.maxLength === 'number' && 
-            typeof finalSuggestion === 'string') {
-          if (finalSuggestion.length > field.options.maxLength) {
-            finalSuggestion = finalSuggestion.substring(0, field.options.maxLength);
-            toast.info(`Suggestion was truncated to ${field.options.maxLength} characters.`);
+        // Server has already applied constraints, just use the response
+        setTemplateFieldValues(prev => ({ ...prev, [field.id]: data.suggestion }));
+        
+        // Notify if content was truncated
+        if (data.truncated) {
+          if (data.maxLength) {
+            toast.info(`Suggestion was truncated to ${data.maxLength} characters.`);
+          } else if (data.maxRows) {
+            toast.info(`Suggestion was truncated to ${data.maxRows} rows.`);
           }
         }
-        setTemplateFieldValues(prev => ({ ...prev, [field.id]: finalSuggestion }));
+        
         toast.success(`Suggestion generated for ${field.name}`);
       } else {
         toast.error(data.error || `Failed to generate suggestion for ${field.name}.`);
@@ -484,7 +493,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
         }
 
         // Only generate title if template includes it
-        if (contextForTitle && template?.include_title !== false) {
+        if (contextForTitle && template?.include_title === true) {
           setIsGeneratingTitle(true);
           try {
             const topicField = (template.inputFields || []).find(f => f.id === 'topic' || f.name.toLowerCase().includes('topic'));
@@ -592,7 +601,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
         return; 
     }
     // Only require title if template includes it
-    if (template?.include_title !== false && !title && !isGeneratingTitle) {
+    if (template?.include_title === true && !title && !isGeneratingTitle) {
         toast.error('Content title is missing. Please set manually or wait for auto-generation.');
         return;
     }
@@ -614,7 +623,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
       const payload = {
         brand_id: selectedBrand,
         template_id: template?.id,
-        title: template?.include_title !== false ? title : 'Untitled Content',
+        title: template?.include_title === true ? title : 'Untitled Content',
         workflow_id: associatedWorkflowDetails.id, 
         body: primaryBodyContent,
         content_data: {
@@ -767,37 +776,20 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
                             return <Input id={field.id} value={templateFieldValues[field.id] || ''} onChange={(e) => handleTemplateFieldChange(field.id, e.target.value)} placeholder={`Enter ${field.name}`} />;
                           case 'longText':
                             const longTextOptions = field.options as LongTextOptions;
-                            const handleLongTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-                              let value = e.target.value;
-                              
-                              // Enforce maxRows if specified
-                              if (longTextOptions?.maxRows && typeof longTextOptions.maxRows === 'number') {
-                                const lines = value.split('\n');
-                                if (lines.length > longTextOptions.maxRows) {
-                                  // Truncate to maxRows
-                                  value = lines.slice(0, longTextOptions.maxRows).join('\n');
-                                  toast.warning(`Maximum ${longTextOptions.maxRows} rows allowed for ${field.name}`);
-                                }
-                              }
-                              
-                              // Also check maxLength if specified
-                              if (longTextOptions?.maxLength && typeof longTextOptions.maxLength === 'number') {
-                                if (value.length > longTextOptions.maxLength) {
-                                  value = value.substring(0, longTextOptions.maxLength);
-                                  toast.warning(`Maximum ${longTextOptions.maxLength} characters allowed for ${field.name}`);
-                                }
-                              }
-                              
-                              handleTemplateFieldChange(field.id, value);
-                            };
-                            
                             return (
-                              <Textarea 
-                                id={field.id} 
-                                value={templateFieldValues[field.id] || ''} 
-                                onChange={handleLongTextChange}
-                                placeholder={longTextOptions?.placeholder || `Enter ${field.name}`}
-                                rows={longTextOptions?.rows || 4}
+                              <ValidatedTextarea
+                                value={templateFieldValues[field.id] || ''}
+                                onChange={(v) => handleTemplateFieldChange(field.id, v)}
+                                field={{
+                                  name: field.id,
+                                  label: undefined, // Label is rendered separately
+                                  placeholder: longTextOptions?.placeholder || `Enter ${field.name}`,
+                                  config: {
+                                    max_rows: longTextOptions?.maxRows,
+                                    max_length: longTextOptions?.maxLength,
+                                    required: field.required,
+                                  },
+                                }}
                               />
                             );
                           case 'richText':
@@ -806,7 +798,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
                               <QuillEditor 
                                 value={templateFieldValues[field.id] || ''} 
                                 onChange={(content) => handleTemplateFieldChange(field.id, content)}
-                                allowImages={richTextOptions?.allowImages !== false} // Default to true if not specified
+                                allowImages={richTextOptions?.allowImages === true} // Only allow images if explicitly enabled
                               />
                             );
                           case 'select':
@@ -849,7 +841,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
           <CardHeader>
             <CardTitle>
               Generated Content Review 
-              {template?.include_title !== false && (
+              {template?.include_title === true && (
                 isGeneratingTitle ? " (Generating Title...)" : (title ? ` - "${title}"` : "")
               )}
             </CardTitle>
@@ -857,7 +849,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Show title field if template includes it */}
-            {template?.include_title !== false && (
+            {template?.include_title === true && (
               <div className="pt-2 space-y-1">
                 <Label htmlFor="content_title" className="text-base font-medium">
                   Content Title
@@ -976,7 +968,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
 
             <Button 
               onClick={handleSave} 
-              disabled={!canGenerateContent || !selectedBrand || !associatedWorkflowDetails?.id || isSaving || isGeneratingTitle || (template?.include_title !== false && !title) || retryingFieldId !== null || isLoading || isFetchingAssociatedWorkflow}
+              disabled={!canGenerateContent || !selectedBrand || !associatedWorkflowDetails?.id || isSaving || isGeneratingTitle || (template?.include_title === true && !title) || retryingFieldId !== null || isLoading || isFetchingAssociatedWorkflow}
               className="flex items-center gap-2"
               title={!canGenerateContent || !associatedWorkflowDetails?.id ? "Cannot save: Workflow missing or not configured." : "Save the generated content"}
             >

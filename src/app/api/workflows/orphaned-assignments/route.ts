@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import { User } from '@supabase/supabase-js';
 
 // GET /api/workflows/orphaned-assignments
 // Find workflows with assignments to users who no longer have access to the brand
-export const GET = withAuth(async (request: NextRequest, user: any) => {
+export const GET = withAuth(async (request: NextRequest, user: User) => {
   try {
     // Check if user is admin
     const isGlobalAdmin = user.user_metadata?.role === 'admin';
@@ -44,9 +45,10 @@ export const GET = withAuth(async (request: NextRequest, user: any) => {
       
       // Extract all user IDs from workflow steps
       if (workflow.steps && Array.isArray(workflow.steps)) {
-        workflow.steps.forEach((step: any) => {
-          if (step.assignees && Array.isArray(step.assignees)) {
-            step.assignees.forEach((assignee: any) => {
+        (workflow.steps as unknown[]).forEach((step) => {
+          const typedStep = step as {assignees?: Array<{id?: string}>};
+          if (typedStep.assignees && Array.isArray(typedStep.assignees)) {
+            typedStep.assignees.forEach((assignee) => {
               if (assignee.id) {
                 assignedUserIds.add(assignee.id);
               }
@@ -77,7 +79,7 @@ export const GET = withAuth(async (request: NextRequest, user: any) => {
             workflow_id: workflow.id,
             workflow_name: workflow.name,
             brand_id: workflow.brand_id,
-            brand_name: (workflow as any).brands?.name,
+            brand_name: (workflow.brands as {name?: string})?.name || '',
             orphaned_users: userDetails || []
           });
         }

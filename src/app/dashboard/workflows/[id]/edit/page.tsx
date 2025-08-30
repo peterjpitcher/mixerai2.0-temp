@@ -877,7 +877,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
               
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select value={workflow.status || 'active'} onValueChange={handleUpdateWorkflowStatus} disabled={!canEditThisWorkflow}>
+                <Select value={workflow.status || ''} onValueChange={handleUpdateWorkflowStatus} disabled={!canEditThisWorkflow}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>

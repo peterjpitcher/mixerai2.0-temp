@@ -42,6 +42,7 @@ const createWorkflowSchema = z.object({
   name: commonSchemas.nonEmptyString,
   brand_id: commonSchemas.uuid,
   template_id: commonSchemas.uuid,
+  status: z.enum(['active', 'draft', 'archived']).optional().default('draft'),
   steps: z.array(workflowStepSchema).min(1, 'At least one step is required')
 });
 
@@ -361,18 +362,19 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
       throw new Error('Workflow creation failed, no ID returned from function.');
     }
     
-    // TODO: Remove this after migration - currently RPC doesn't handle description and template_id
+    // TODO: Remove this after migration - currently RPC doesn't handle description, template_id, and status
     if (newWorkflowId) {
       const { error: updateError } = await supabase
         .from('workflows')
         .update({
           description: workflowDescription,
-          template_id: body.template_id || null
+          template_id: body.template_id || null,
+          status: body.status || 'draft' // Set the status field
         })
         .eq('id', newWorkflowId);
 
       if (updateError) {
-        console.error('Error updating workflow with description and template_id:', updateError);
+        console.error('Error updating workflow with description, template_id, and status:', updateError);
       }
     }
 

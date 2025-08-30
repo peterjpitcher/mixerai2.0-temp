@@ -8,46 +8,32 @@ import { User } from '@supabase/supabase-js';
 export const dynamic = "force-dynamic";
 
 // Deactivate user
-export const POST = withRouteAuthAndCSRF(async (_request: NextRequest, user: User, context: Record<string, unknown>) => {
+export const POST = withRouteAuthAndCSRF(async (_request: NextRequest, currentUser: User, context: Record<string, unknown>) => {
   const { params } = context as { params: { id: string } };
+  
+  if (currentUser.user_metadata?.role !== 'admin')
+    return NextResponse.json({ success: false, error: 'Only admins can deactivate users' }, { status: 403 });
+
+  if (currentUser.id === params.id)
+    return NextResponse.json({ success: false, error: 'You cannot deactivate your own account' }, { status: 400 });
+
   try {
     const supabase = createSupabaseAdminClient();
 
-    // Check permissions
-    if (user.id === params.id) {
-      return NextResponse.json(
-        { success: false, error: 'You cannot deactivate your own account.' },
-        { status: 403 }
-      );
-    }
-    
-    if (user.user_metadata?.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: 'Forbidden: You do not have permission to deactivate users.' },
-        { status: 403 }
-      );
-    }
-
-    // Update user status to inactive
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ user_status: 'inactive', updated_at: new Date().toISOString() })
+    // Update user to inactive
+    const { error } = await supabase
+      .from('users')
+      .update({ is_active: false })
       .eq('id', params.id);
 
-    if (updateError) throw updateError;
+    if (error) throw error;
 
-    // Get the updated user details
-    const { data: updatedUser, error: fetchError } = await supabase
-      .rpc('get_user_details', { p_user_id: params.id })
-      .single();
+    // Kill existing sessions - best effort
+    try { 
+      await supabase.auth.admin.signOut(params.id);
+    } catch { /* best-effort */ }
 
-    if (fetchError) throw fetchError;
-    
-    return NextResponse.json({
-      success: true,
-      message: 'User deactivated successfully',
-      user: updatedUser
-    });
+    return NextResponse.json({ success: true });
   } catch (error) {
     return handleApiError(error, 'Error deactivating user');
   }

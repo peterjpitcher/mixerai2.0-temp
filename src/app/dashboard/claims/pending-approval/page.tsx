@@ -472,7 +472,7 @@ export default function ClaimsPendingApprovalPage() {
                               
                               // Find history for this step
                               const stepHistory = claimDetails.history.filter((h) => 
-                                (h as any).workflow_step_id === step.id
+                                (h as {workflow_step_id?: string}).workflow_step_id === step.id
                               );
 
                               return (

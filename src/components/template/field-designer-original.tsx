@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { v4 as uuidv4 } from 'uuid';
 import { toast as sonnerToast } from 'sonner';
 import { Info } from 'lucide-react';
+import { ensureBooleanDefaults } from '@/lib/utils/object';
 import { 
   FieldType as GlobalFieldType,
   GenericField as Field,
@@ -443,7 +444,8 @@ const initializeFieldData = (fieldType: 'input' | 'output', initialData: Field |
     };
     return inputData;
   } else if (fieldType === 'output' && isOutputField(initialData)) {
-    const outputData: OutputField = {
+    // Ensure boolean fields have explicit values
+    const outputData: OutputField = ensureBooleanDefaults({
       id: initialData.id,
       name: initialData.name,
       type: initialData.type,
@@ -456,7 +458,7 @@ const initializeFieldData = (fieldType: 'input' | 'output', initialData: Field |
       useGuardrails: initialData.useGuardrails ?? false,
       description: initialData.description,
       helpText: initialData.helpText
-    };
+    }, ['aiAutoComplete', 'useBrandIdentity', 'useToneOfVoice', 'useGuardrails']);
     return outputData;
   }
   
@@ -479,6 +481,7 @@ export function FieldDesigner({
   
   const [activeTab, setActiveTab] = useState('basic');
   const aiPromptRef = useRef<HTMLTextAreaElement>(null);
+  const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
   
   useEffect(() => {
     setFieldData(initializeFieldData(fieldType, initialData));
@@ -567,6 +570,11 @@ export function FieldDesigner({
     });
   };
   
+  const onPromptSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+    const el = e.currentTarget;
+    setSelection({ start: el.selectionStart ?? 0, end: el.selectionEnd ?? 0 });
+  };
+  
   const insertTextIntoPrompt = (textToInsert: string) => {
     const textArea = aiPromptRef.current;
     if (!textArea) {
@@ -619,19 +627,39 @@ export function FieldDesigner({
   };
 
   const insertBrandDataOrPlaceholder = (placeholderKey: 'name' | 'identity' | 'tone_of_voice' | 'guardrails' | 'summary' | 'brandObject') => {
-    let placeholder = '';
-    switch (placeholderKey) {
-      case 'name': placeholder = '{{brand.name}}'; break;
-      case 'identity': placeholder = '{{brand.identity}}'; break;
-      case 'tone_of_voice': placeholder = '{{brand.tone_of_voice}}'; break;
-      case 'guardrails': placeholder = '{{brand.guardrails}}'; break;
-      case 'summary': placeholder = '{{brand.summary}}'; break;
-      case 'brandObject': placeholder = '{{brand}}'; break;
-      default: 
-        console.warn(`insertBrandDataOrPlaceholder called with unknown key: ${placeholderKey}`);
-        return; // Do nothing if key is unknown
-    }
-    insertTextIntoPrompt(placeholder);
+    const map = {
+      name: '{{brand.name}}',
+      identity: '{{brand.identity}}',
+      tone_of_voice: '{{brand.tone_of_voice}}',
+      guardrails: '{{brand.guardrails}}',
+      summary: '{{brand.summary}}',
+      brandObject: '{{brand}}',
+    } as const;
+
+    const insert = map[placeholderKey];
+    if (!insert) return;
+
+    setFieldData(prev => {
+      const current = prev.aiPrompt ?? '';
+      if (selection) {
+        const { start, end } = selection;
+        const next = current.slice(0, start) + insert + current.slice(end);
+        return { ...prev, aiPrompt: next } as Field;
+      }
+      // Fallback: append
+      const sep = current && !current.endsWith(' ') ? ' ' : '';
+      return { ...prev, aiPrompt: current + sep + insert } as Field;
+    });
+
+    // Best-effort focus + caret placement next frame
+    requestAnimationFrame(() => {
+      const el = aiPromptRef.current;
+      if (el) {
+        const caret = (selection?.start ?? (el.value?.length ?? 0)) + insert.length;
+        el.focus();
+        el.setSelectionRange(caret, caret);
+      }
+    });
   };
   
   // The useEffect for aiPromptRef focusing is now handled by insertTextIntoPrompt
@@ -689,7 +717,17 @@ export function FieldDesigner({
     if (!finalFieldData.options) {
         finalFieldData.options = {};
     }
-    onSave(finalFieldData as Field, isNew);
+    
+    // Ensure boolean fields are explicitly set for output fields
+    if (fieldType === 'output' && isOutputField(finalFieldData)) {
+      const outputField = ensureBooleanDefaults(
+        finalFieldData,
+        ['aiAutoComplete', 'useBrandIdentity', 'useToneOfVoice', 'useGuardrails']
+      );
+      onSave(outputField as Field, isNew);
+    } else {
+      onSave(finalFieldData as Field, isNew);
+    }
   };
   
   const inputFieldData = fieldType === 'input' ? fieldData as InputField : null;
@@ -887,6 +925,7 @@ export function FieldDesigner({
                     ref={aiPromptRef}
                     value={fieldData.aiPrompt || ''} 
                     onChange={handleAIPromptChange}
+                    onSelect={onPromptSelect}
                     placeholder={fieldType === 'input' 
                       ? "e.g., Suggest 3-5 relevant keywords for {{topic}}."
                       : "e.g., Write an article about {{topic}} using keywords: {{keywords}}."

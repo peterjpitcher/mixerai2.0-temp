@@ -23,6 +23,13 @@ export const POST = withAuthAndCSRF(async function (request: NextRequest, _user:
   try {
     const body: EmailNotificationRequest = await request.json();
     
+    console.log('[Email API] Received notification request:', {
+      type: body.type,
+      userId: body.userId,
+      contentId: body.contentId,
+      taskId: body.taskId
+    });
+    
     // Validate request
     if (!body.type) {
       return NextResponse.json(
@@ -116,10 +123,14 @@ export const POST = withAuthAndCSRF(async function (request: NextRequest, _user:
           dueDate: task.due_date ? format(new Date(task.due_date), 'MMM dd, yyyy') : undefined
         });
         
+        console.log('[Email API] Sending task assignment email to:', userEmail);
+        
         await sendEmail({
           to: userEmail,
           ...emailData
         });
+        
+        console.log('[Email API] Task assignment email sent successfully to:', userEmail);
         
         break;
       }

@@ -4,7 +4,7 @@ import { handleApiError } from '@/lib/api-utils';
 
 import { User } from '@supabase/supabase-js';
 // import { TablesUpdate, TablesInsert } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
-import { executeTransaction } from '@/lib/db/transactions';
+// import { executeTransaction } from '@/lib/db/transactions';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 export const dynamic = "force-dynamic";
@@ -82,7 +82,6 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
     }
 
     // Get next step info if approving
-    let nextAssigneeId: string | null = null;
     if (action === 'approve') {
       const { data: nextDbStep, error: nextStepError } = await supabase
         .from('workflow_steps')
@@ -99,7 +98,8 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
       }
 
       if (nextDbStep && nextDbStep.assigned_user_ids && nextDbStep.assigned_user_ids.length > 0) {
-        nextAssigneeId = nextDbStep.assigned_user_ids[0]; // For transaction, we'll handle multiple assignees separately
+        // Next assignee will be notified via the workflow system
+        // nextAssigneeId = nextDbStep.assigned_user_ids[0]; // For transaction, we'll handle multiple assignees separately
       }
     }
 
@@ -244,7 +244,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
           .single();
         
         if (contentData && nextDbStep.assigned_user_ids && nextDbStep.assigned_user_ids.length > 0) {
-          const { data: nextStepData } = await supabase
+          await supabase
             .from('workflow_steps')
             .select('name')
             .eq('id', nextDbStep.id)

@@ -442,6 +442,10 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User) => 
                 const host = request.headers.get('host') || request.headers.get('x-forwarded-host');
                 const baseUrl = host ? `${protocol}://${host}` : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
                 
+                console.log('[Email Notification] Attempting to send to user:', assigneeId);
+                console.log('[Email Notification] Task ID:', newTask.id);
+                console.log('[Email Notification] Content ID:', newContentData.id);
+                
                 const emailResponse = await fetch(`${baseUrl}/api/notifications/email`, {
                   method: 'POST',
                   headers: {
@@ -460,7 +464,11 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User) => 
                 });
                 
                 if (!emailResponse.ok) {
-                  console.error('Failed to send email notification:', await emailResponse.text());
+                  const errorText = await emailResponse.text();
+                  console.error('[Email Notification] Failed with status:', emailResponse.status);
+                  console.error('[Email Notification] Error response:', errorText);
+                } else {
+                  console.log('[Email Notification] Successfully queued for user:', assigneeId);
                 }
               } catch (emailError) {
                 console.error('Error sending email notification:', emailError);
