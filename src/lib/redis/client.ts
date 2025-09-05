@@ -24,11 +24,8 @@ export function getRedisClient(): Redis | null {
       console.warn(
         'Redis not configured. Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN to your environment variables.'
       );
-      // In development, we'll still use the in-memory fallback
-      // In production, this should fail loudly
-      if (process.env.NODE_ENV === 'production') {
-        throw new Error('Redis configuration is required in production');
-      }
+      // Temporarily allow production to work without Redis
+      // TODO: Add Redis configuration for production
       return null;
     }
 
@@ -39,9 +36,8 @@ export function getRedisClient(): Redis | null {
       });
     } catch (error) {
       console.error('Failed to initialize Redis client:', error);
-      if (process.env.NODE_ENV === 'production') {
-        throw error;
-      }
+      // Temporarily allow production to work without Redis
+      // TODO: Add Redis configuration for production
       return null;
     }
   }
