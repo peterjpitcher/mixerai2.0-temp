@@ -347,8 +347,10 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Ensure we always return JSON even for unexpected errors
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to create issue', message: errorMessage },
       { status: 500 }
     );
   }
@@ -543,4 +545,3 @@ async function uploadScreenshot(
     return null;
   }
 }
-

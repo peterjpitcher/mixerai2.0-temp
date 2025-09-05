@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { generateCSRFToken, validateCSRFToken } from '@/lib/csrf';
-import { checkRateLimit as checkRateLimitRedis, getRateLimitType } from '@/lib/rate-limit-redis';
-import { validateSession as validateSessionRedis, createSession as createSessionRedis, renewSession as renewSessionRedis } from '@/lib/auth/session-manager-redis';
+import { checkRateLimit, getRateLimitType } from '@/lib/rate-limit-simple';
+import { validateSession, createSession, renewSession } from '@/lib/auth/session-manager-simple';
 import { SESSION_CONFIG } from '@/lib/auth/session-config';
 import type { User } from '@supabase/supabase-js';
 
@@ -93,11 +93,11 @@ export async function middleware(request: NextRequest) {
   
   // Skip rate limiting for public routes to reduce overhead
   if (!isPublicRoute(pathname)) {
-    // Rate limiting with Redis (only for protected routes)
+    // Rate limiting (only for protected routes)
     const rateLimitType = getRateLimitType(pathname);
     const userId = request.headers.get('x-user-id') || undefined;
     
-    const rateLimitResult = await checkRateLimitRedis(request, rateLimitType, userId);
+    const rateLimitResult = await checkRateLimit(request, rateLimitType, userId);
     
     if (rateLimitResult.headers) {
       Object.entries(rateLimitResult.headers).forEach(([key, value]) => {
@@ -211,12 +211,12 @@ export async function middleware(request: NextRequest) {
     let isSessionValid = false;
     
     if (sessionId) {
-      const sessionValidation = await validateSessionRedis(sessionId);
+      const sessionValidation = await validateSession(sessionId);
       isSessionValid = sessionValidation.valid && sessionValidation.session?.userId === refreshedUser.id;
       
       if (!isSessionValid) {
         // Create new session if invalid
-        const newSession = await createSessionRedis(refreshedUser as User, {
+        const newSession = await createSession(refreshedUser as User, {
           userAgent: request.headers.get('user-agent') || undefined,
           ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || undefined,
         });
@@ -232,13 +232,13 @@ export async function middleware(request: NextRequest) {
         }
       } else if (sessionValidation.shouldRenew) {
         // Renew session asynchronously to avoid blocking
-        renewSessionRedis(sessionId).catch(err => 
+        renewSession(sessionId).catch(err => 
           console.error('Session renewal failed:', err)
         );
       }
     } else {
       // Create new session
-      const newSession = await createSessionRedis(refreshedUser as User, {
+      const newSession = await createSession(refreshedUser as User, {
         userAgent: request.headers.get('user-agent') || undefined,
         ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || undefined,
       });
