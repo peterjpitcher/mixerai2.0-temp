@@ -110,6 +110,9 @@ export const GET = withAuth(async (_req: NextRequest, user) => {
         else if (metadataRole === 'editor') highestRole = 'editor';
       }
       
+      // Check user status from metadata (set by deactivation) or invitation status view
+      const userStatus = authUser.user_metadata?.status || invitationStatus?.user_status || 'active';
+      
       return {
         id: authUser.id,
         full_name: profile?.full_name || authUser.user_metadata?.full_name || 'Unnamed User',
@@ -123,7 +126,7 @@ export const GET = withAuth(async (_req: NextRequest, user) => {
         brand_permissions: profile?.user_brand_permissions || [],
         invitation_status: invitationStatus?.invitation_status || null,
         invitation_expires_at: invitationStatus?.expires_at || null,
-        user_status: invitationStatus?.user_status || 'no_invitation',
+        user_status: userStatus,
         is_current_user: authUser.id === user.id
       };
     });

@@ -17,12 +17,12 @@ export const POST = withRouteAuthAndCSRF(async (_request: NextRequest, currentUs
   try {
     const supabase = createSupabaseAdminClient();
 
-    const { error } = await supabase
-      .from('users')
-      .update({ is_active: true })
-      .eq('id', params.id);
+    // Update user metadata to mark as active
+    const { error: updateError } = await supabase.auth.admin.updateUserById(params.id, {
+      user_metadata: { status: 'active' }
+    });
 
-    if (error) throw error;
+    if (updateError) throw updateError;
 
     return NextResponse.json({ success: true });
   } catch (error) {

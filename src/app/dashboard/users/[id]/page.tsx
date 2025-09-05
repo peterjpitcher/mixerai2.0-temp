@@ -72,6 +72,7 @@ interface User {
   brand_permissions?: BrandPermission[];
   job_title?: string;
   company?: string;
+  user_status?: string;
 }
 
 const formatBrandRole = (role: string): string => {
@@ -305,7 +306,7 @@ export default function UserDetailPage() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight">{user.full_name || user.email}</h1>
-              {user?.is_active === false && <Badge variant="secondary">Deactivated</Badge>}
+              {user?.user_status === 'inactive' && <Badge variant="secondary">Deactivated</Badge>}
             </div>
             <p className="text-muted-foreground mt-1">
               Details for {user.email}.
@@ -328,7 +329,7 @@ export default function UserDetailPage() {
                     </Link>
                   </DropdownMenuItem>
 
-                  {user?.is_active !== false ? (
+                  {user?.user_status !== 'inactive' ? (
                     <DropdownMenuItem onClick={() => setShowDeactivateDialog(true)}>
                       <UserX className="mr-2 h-4 w-4" /> Deactivate User
                     </DropdownMenuItem>

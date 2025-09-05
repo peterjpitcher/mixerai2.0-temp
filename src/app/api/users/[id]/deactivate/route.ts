@@ -20,13 +20,12 @@ export const POST = withRouteAuthAndCSRF(async (_request: NextRequest, currentUs
   try {
     const supabase = createSupabaseAdminClient();
 
-    // Update user to inactive
-    const { error } = await supabase
-      .from('users')
-      .update({ is_active: false })
-      .eq('id', params.id);
+    // Update user metadata to mark as inactive
+    const { error: updateError } = await supabase.auth.admin.updateUserById(params.id, {
+      user_metadata: { status: 'inactive' }
+    });
 
-    if (error) throw error;
+    if (updateError) throw updateError;
 
     // Kill existing sessions - best effort
     try { 
@@ -53,11 +52,10 @@ export const DELETE = withRouteAuthAndCSRF(async (_request: NextRequest, user: U
       );
     }
 
-    // Update user status to active
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ user_status: 'active', updated_at: new Date().toISOString() })
-      .eq('id', params.id);
+    // Update user metadata to mark as active
+    const { error: updateError } = await supabase.auth.admin.updateUserById(params.id, {
+      user_metadata: { status: 'active' }
+    });
 
     if (updateError) throw updateError;
 
