@@ -6,7 +6,6 @@
 
 import { User } from '@supabase/supabase-js';
 import { SESSION_CONFIG } from './session-config';
-import { randomBytes } from 'crypto';
 
 export interface Session {
   sessionId: string;
@@ -23,21 +22,36 @@ export interface Session {
 // In-memory session store
 const sessionStore = new Map<string, Session>();
 
-// Cleanup expired sessions every 5 minutes
-setInterval(() => {
+// Cleanup function for expired sessions (called on each operation)
+function cleanupExpiredSessions() {
   const now = new Date();
   for (const [sessionId, session] of sessionStore.entries()) {
     if (session.expiresAt < now) {
       sessionStore.delete(sessionId);
     }
   }
-}, 5 * 60 * 1000);
+}
 
 /**
- * Generate a secure session ID
+ * Generate a secure session ID using Web Crypto API (Edge Runtime compatible)
  */
 function generateSessionId(): string {
-  return randomBytes(32).toString('hex');
+  // Generate random bytes using Web Crypto API
+  const array = new Uint8Array(32);
+  if (typeof globalThis.crypto !== 'undefined') {
+    // Use Web Crypto API (available in both Node.js 18+ and Edge Runtime)
+    globalThis.crypto.getRandomValues(array);
+  } else {
+    // Fallback for older environments (shouldn't happen in Next.js 13+)
+    for (let i = 0; i < array.length; i++) {
+      array[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  
+  // Convert to hex string
+  return Array.from(array)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 /**
@@ -52,6 +66,9 @@ export async function createSession(
   }
 ): Promise<Session | null> {
   try {
+    // Cleanup expired sessions periodically
+    cleanupExpiredSessions();
+    
     const sessionId = generateSessionId();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + SESSION_CONFIG.absoluteTimeout);
