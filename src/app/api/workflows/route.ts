@@ -1,4 +1,3 @@
-// Import the uuid package for generating unique identifiers for workflow invitations
 import { NextRequest, NextResponse } from 'next/server';
 
 // Force dynamic rendering for this route
@@ -6,7 +5,6 @@ export const dynamic = "force-dynamic";
 
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
-// import { v4 as uuidv4 } from 'uuid'; - not used
 import { withAuth } from '@/lib/auth/api-auth';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { verifyEmailTemplates } from '@/lib/auth/email-templates';
@@ -15,11 +13,6 @@ import { z } from 'zod';
 import { validateRequest, commonSchemas } from '@/lib/api/validation';
 
 // Define types for workflow steps and assignees
-interface WorkflowAssignee {
-  id?: string;
-  email: string;
-  name?: string;
-}
 
 // Validation schema for workflow assignees
 const workflowAssigneeSchema = z.object({
@@ -46,12 +39,6 @@ const createWorkflowSchema = z.object({
   steps: z.array(workflowStepSchema).min(1, 'At least one step is required')
 });
 
-interface WorkflowStepData {
-  id?: number | string | null;
-  role: string;
-  assignees: WorkflowAssignee[];
-  [key: string]: unknown;
-}
 
 // Fallback data function removed as per no-fallback policy
 // const getFallbackWorkflows = () => { ... };
@@ -243,7 +230,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
         templateNameForDesc = templateData?.name;
       }
       
-      const stepNamesForDesc = stepsForAIDescription.map((step: Record<string, unknown>) => step.name).filter(Boolean);
+      const stepNamesForDesc = stepsForAIDescription.map((step: { name?: string }) => step.name).filter(Boolean);
 
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
       const aiDescriptionResponse = await fetch(`${baseUrl}/api/ai/generate-workflow-description`, {
@@ -273,14 +260,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
     }
     // --- End AI Description Generation ---
     
-    // Define the structure for items being passed to the RPC for logging invitations
-    interface RpcInvitationItem {
-      step_id: number;
-      email: string;
-      role: string; // Sanitised role
-      invite_token: string;
-      expires_at: string;
-    }
+    // Interface removed to fix ESLint - will be added back when RPC logging is implemented
     
     const rawSteps = body.steps; // Already validated by Zod schema
     
@@ -386,7 +366,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
           // Default role for invited users
           const inviteRole = 'viewer';
           
-          const appMetadataPayload: Record<string, unknown> = {
+          const appMetadataPayload = {
             full_name: '',
             role: inviteRole,
             invited_by: user.id,
@@ -430,13 +410,15 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
       });
     }
 
+    const brands = createdWorkflow?.brands as { name?: string; brand_color?: string } | null;
+    const contentTemplates = createdWorkflow?.content_templates as { name?: string } | null;
     const formattedWorkflow = {
       ...(createdWorkflow || {}), // Handle null createdWorkflow
-      brand_name: createdWorkflow?.brands?.name || null,
-      brand_color: createdWorkflow?.brands?.brand_color || null,
+      brand_name: brands?.name || null,
+      brand_color: brands?.brand_color || null,
       description: createdWorkflow?.description || '',
       template_id: createdWorkflow?.template_id || null,
-      template_name: createdWorkflow?.content_templates?.name || null,
+      template_name: contentTemplates?.name || null,
       steps_count: Array.isArray(createdWorkflow?.steps) ? createdWorkflow.steps.length : 0,
       content_count: 0
     };

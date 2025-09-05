@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -117,21 +117,7 @@ export default function ClaimsPendingApprovalPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isEditingClaim, setIsEditingClaim] = useState(false);
 
-  useEffect(() => {
-    fetchPendingClaims();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (selectedClaim) {
-      fetchClaimDetails(selectedClaim.id);
-      setEditedClaimText(selectedClaim.claim_text);
-      setComment('');
-      setIsEditingClaim(false);
-    }
-  }, [selectedClaim]);
-
-  const fetchPendingClaims = async () => {
+  const fetchPendingClaims = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await fetch('/api/claims/pending-approval');
@@ -153,7 +139,20 @@ export default function ClaimsPendingApprovalPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchPendingClaims();
+  }, [fetchPendingClaims]);
+
+  useEffect(() => {
+    if (selectedClaim) {
+      fetchClaimDetails(selectedClaim.id);
+      setEditedClaimText(selectedClaim.claim_text);
+      setComment('');
+      setIsEditingClaim(false);
+    }
+  }, [selectedClaim]);
 
   const fetchClaimDetails = async (claimId: string) => {
     setIsLoadingDetails(true);
@@ -227,14 +226,6 @@ export default function ClaimsPendingApprovalPage() {
     }
   };
 
-  const _getLevelIcon = (level: string) => {
-    switch (level) {
-      case 'brand': return '🏢';
-      case 'product': return '📦';
-      case 'ingredient': return '🧪';
-      default: return '📋';
-    }
-  };
 
   const isAssignedToUser = (claim: PendingClaim) => {
     return claim.current_step_assignees?.includes(currentUserId || '');
@@ -464,7 +455,6 @@ export default function ClaimsPendingApprovalPage() {
                           </h3>
                           <div className="relative">
                             {claimDetails.workflowSteps.map((step, index) => {
-                              const _isFirst = index === 0;
                               const isLast = index === claimDetails.workflowSteps.length - 1;
                               const isPrevious = step.is_completed;
                               const isCurrent = step.is_current;

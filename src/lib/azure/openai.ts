@@ -319,6 +319,10 @@ export async function generateContentFromTemplate(
 Content Rules:
 - NEVER mention the product's size or weight (e.g., '460 ml') in the generated content.
 - NEVER mention the brand's country of origin or the target country in the generated content.
+- Generate concise, high-quality content without repetition or filler.
+- Avoid redundant phrases and synonym chains.
+- Each section should be distinct and purposeful.
+- Stop generating when you've completed the requested fields - do not continue indefinitely.
 `;
   
   // Only add global brand information if there are no field-specific settings
@@ -491,6 +495,7 @@ The product context is provided in the user prompt.
   
   // Final reminder
   userPrompt += `\nREMINDER: You must generate content for ALL ${template.outputFields.length} fields listed above. Each field must be wrapped with its specific ##FIELD_ID:...## markers.`;
+  userPrompt += `\nWhen you have completed generating all ${template.outputFields.length} fields, end your response with: ##END_ALL_FIELDS##`;
   
   // DEBUG: Log the complete prompt being sent to AI
   console.log('\n========== AI GENERATION DEBUG ==========');
@@ -517,11 +522,12 @@ The product context is provided in the user prompt.
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
       ],
-      max_tokens: 2000,
+      max_tokens: 1500,  // Reduced to prevent overly long responses
       temperature: 0.7,
-      top_p: 0.95,
-      frequency_penalty: 0.5,
-      presence_penalty: 0.5,
+      top_p: 0.9,  // Slightly reduced for more focused output
+      frequency_penalty: 1.2,  // Increased to strongly discourage repetition
+      presence_penalty: 1.0,   // Increased to prevent semantic loops
+      stop: ["##END_ALL_FIELDS##"]  // Add stop sequence to prevent runaway generation
     };
     
     // Specify the deployment in the URL path

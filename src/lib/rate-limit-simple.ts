@@ -42,15 +42,15 @@ export type RateLimitType = keyof typeof RATE_LIMIT_CONFIGS;
 // In-memory store for rate limiting
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
-// Cleanup old entries every 5 minutes
-setInterval(() => {
+// Cleanup function for expired entries (called periodically during operations)
+function cleanupExpiredEntries() {
   const now = Date.now();
   for (const [key, value] of rateLimitStore.entries()) {
     if (value.resetTime < now) {
       rateLimitStore.delete(key);
     }
   }
-}, 5 * 60 * 1000);
+}
 
 /**
  * Get client identifier for rate limiting
@@ -109,6 +109,11 @@ export async function checkRateLimit(
   message?: string;
   headers?: Record<string, string>;
 }> {
+  // Cleanup expired entries periodically (every 100th request)
+  if (Math.random() < 0.01) {
+    cleanupExpiredEntries();
+  }
+  
   const config = RATE_LIMIT_CONFIGS[type];
   const identifier = getClientIdentifier(req, userId);
   const key = `${type}:${identifier}`;

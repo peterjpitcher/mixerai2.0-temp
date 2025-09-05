@@ -105,14 +105,7 @@ export default function EditClaimsWorkflowPage() {
   const [userSearchResults, setUserSearchResults] = useState<Record<number, UserOption[]>>({});
   const [userSearchLoading, setUserSearchLoading] = useState<Record<number, boolean>>({});
 
-  useEffect(() => {
-    if (workflowId) {
-      fetchWorkflow();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workflowId]);
-
-  const fetchWorkflow = async () => {
+  const fetchWorkflow = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await fetch(`/api/claims/workflows/${workflowId}`);
@@ -146,11 +139,16 @@ export default function EditClaimsWorkflowPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [router, workflowId]);
 
-  // Debounced user search function
-  const searchUsers = useCallback(
-    debounce(async (query: string, stepIndex: number) => {
+  useEffect(() => {
+    if (workflowId) {
+      fetchWorkflow();
+    }
+  }, [workflowId, fetchWorkflow]);
+
+  // Debounced user search function  
+  const debouncedSearchFn = debounce(async (query: string, stepIndex: number) => {
       if (!query || query.length < 2) {
         setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
         return;
@@ -187,9 +185,11 @@ export default function EditClaimsWorkflowPage() {
       } finally {
         setUserSearchLoading(prev => ({ ...prev, [stepIndex]: false }));
       }
-    }, 300),
-    [steps]
-  );
+    }, 300);
+    
+  const searchUsers = useCallback((query: string, stepIndex: number) => {
+    debouncedSearchFn(query, stepIndex);
+  }, [debouncedSearchFn]);
 
   const handleAssigneeInputChange = (stepIndex: number, value: string) => {
     setAssigneeInputs(prev => {

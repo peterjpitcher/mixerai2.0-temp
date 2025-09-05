@@ -52,19 +52,6 @@ interface VettingAgencyFromAPI {
   priority: 'High' | 'Medium' | 'Low' | number | null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-interface UserSessionData {
-  id: string;
-  email?: string;
-  user_metadata?: {
-    role?: string;
-    full_name?: string;
-  };
-  brand_permissions?: Array<{
-    brand_id: string;
-    role: string;
-  }>;
-}
 
 interface MasterClaimBrand {
   id: string;
@@ -93,8 +80,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   const router = useRouter();
   const { id } = params;
   
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [brand, setBrand] = useState<Record<string, unknown> | null>(null);
+  const [, setBrand] = useState<Record<string, unknown> | null>(null);
   const [isLoadingBrand, setIsLoadingBrand] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -212,7 +198,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
           tone_of_voice: data.brand.tone_of_voice || '',
           guardrails: data.brand.guardrails || '',
           content_vetting_agencies: Array.isArray(data.brand.selected_vetting_agencies) 
-                                      ? data.brand.selected_vetting_agencies.map((agency: unknown) => (agency as { id: string }).id)
+                                      ? data.brand.selected_vetting_agencies.map((agency: { id: string }) => agency.id)
                                       : [],
           master_claim_brand_id: data.brand.master_claim_brand_id || null,
           master_claim_brand_ids: [], // Will be populated separately
@@ -300,9 +286,6 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleMasterClaimBrandChange = (value: string) => {
-    setFormData(prev => ({ ...prev, master_claim_brand_id: value === 'NO_SELECTION' ? null : value }));
-  };
 
   const handleMasterClaimBrandsChange = (values: string[]) => {
     setFormData(prev => ({ ...prev, master_claim_brand_ids: values }));
@@ -419,7 +402,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       };
       
       Object.keys(payload).forEach(key => {
-        if (payload[key] === '' || (Array.isArray(payload[key]) && payload[key].length === 0) ) {
+        if (payload[key] === '' || (Array.isArray(payload[key]) && (payload[key] as unknown[]).length === 0) ) {
           payload[key] = null;
         }
       });
@@ -480,7 +463,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     data: formData,
     onSave: () => handleSave(false), // Explicitly pass false for auto-save
     debounceMs: 3000, // Auto-save after 3 seconds of inactivity
-    enabled: !isForbidden && !error && !!brand,
+    enabled: !isForbidden && !error && !isLoadingBrand && !!formData.name,
     onError: (error) => {
       console.error('Auto-save error:', error);
       // Don't show toast for auto-save errors, already shown in handleSave

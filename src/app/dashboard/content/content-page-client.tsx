@@ -15,7 +15,7 @@ import { createBrowserClient } from '@supabase/ssr';
 
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandDisplay } from '@/components/ui/brand-display'; 
-import { FileText, AlertTriangle, PlusCircle, Edit3, RefreshCw, CheckCircle, XCircle, ListFilter, Archive, Trash2, HelpCircle, MoreVertical, Pencil } from 'lucide-react';
+import { FileText, AlertTriangle, RefreshCw, CheckCircle, XCircle, ListFilter, Archive, Trash2, HelpCircle, MoreVertical, Pencil } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { TableSkeleton } from '@/components/ui/loading-skeletons';
 import { touchFriendly } from '@/lib/utils/touch-target';
@@ -104,8 +104,8 @@ export default function ContentPageClient() {
   const brandIdFromParams = searchParams?.get('brandId');
   const [activeBrandData, setActiveBrandData] = useState<{ id: string; name: string; brand_color?: string; logo_url?: string } | null>(null); 
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
-  const [userError, setUserError] = useState<string | null>(null);
+  const [, setIsLoadingUser] = useState(true);
+  const [, setUserError] = useState<string | null>(null);
 
   // State for delete confirmation
   const [itemToDelete, setItemToDelete] = useState<ContentItem | null>(null);
@@ -470,7 +470,7 @@ export default function ContentPageClient() {
                             <td className="p-3 whitespace-nowrap">
                               <DueDateIndicator 
                                 dueDate={item.due_date || null} 
-                                status={item.status as any}
+                                status={item.status === 'rejected' ? 'in_review' : (item.status === 'under_review' ? 'in_review' : item.status) as 'draft' | 'approved' | 'published' | 'in_review' | 'completed' | undefined}
                                 size="sm"
                               />
                               {!item.due_date && <span className="text-muted-foreground">N/A</span>}

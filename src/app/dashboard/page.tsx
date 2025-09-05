@@ -8,7 +8,7 @@ import { MostAgedContent } from '@/components/dashboard/most-aged-content';
 import { TasksSkeleton } from '@/components/dashboard/dashboard-skeleton';
 import { MyTasks } from '@/components/dashboard/my-tasks';
 
-async function getTeamActivity(supabase: SupabaseClient<any>, profile: { role?: string; assigned_brands?: string[] } | null) { // TODO: Type as SupabaseClient<Database> when types are regenerated
+async function getTeamActivity(supabase: SupabaseClient, profile: { role?: string; assigned_brands?: string[] } | null) { // TODO: Type as SupabaseClient<Database> when types are regenerated
   if (!profile) return [];
 
   let query = supabase
@@ -41,7 +41,11 @@ async function getTeamActivity(supabase: SupabaseClient<any>, profile: { role?: 
     id: item.id,
     type: item.status === 'draft' ? 'content_created' as const : 'content_updated' as const,
     created_at: item.created_at || new Date().toISOString(),
-    user: item.profiles as any, // TODO: Remove type assertion when types are regenerated
+    user: {
+      id: (item.profiles as any)?.[0]?.id || '',
+      full_name: (item.profiles as any)?.[0]?.full_name || null,
+      avatar_url: (item.profiles as any)?.[0]?.avatar_url || null,
+    },
     target: {
       id: item.id,
       name: item.title,

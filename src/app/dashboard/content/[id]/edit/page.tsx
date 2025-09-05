@@ -381,7 +381,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     } else {
       console.warn('[ContentEditPage] Conditions NOT met for fetchAllData. ID:', id, 'CurrentUser:', currentUser);
     }
-  }, [id, currentUser?.id]);
+  }, [id, currentUser]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -509,10 +509,10 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   // Configure auto-save (DISABLED per user request - manual save only)
   const {
     isSaving: isAutoSaving,
-    lastSaved,
-    error: saveError,
-    save: triggerSave,
-    hasUnsavedChanges: autoSaveHasChanges
+    lastSaved: _lastSaved,
+    error: _saveError,
+    save: _triggerSave,
+    hasUnsavedChanges: _autoSaveHasChanges
   } = useAutoSave({
     data: content,
     onSave: async () => {
