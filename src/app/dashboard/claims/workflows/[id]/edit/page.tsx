@@ -313,8 +313,9 @@ export default function EditClaimsWorkflowPage() {
   };
 
   const handleAddStep = () => {
+    const newStepId = `temp_step_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
     const newStep: WorkflowStep = {
-      id: `temp_step_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`,
+      id: newStepId,
       name: `Review Step ${steps.length + 1}`,
       description: '',
       role: 'lrc',
@@ -323,6 +324,14 @@ export default function EditClaimsWorkflowPage() {
     setSteps([...steps, newStep]);
     setAssigneeInputs(prev => [...prev, '']);
     setUserSearchResults(prev => ({ ...prev, [steps.length]: [] }));
+    
+    // Scroll to the new step after it's added
+    setTimeout(() => {
+      const newStepElement = document.getElementById(`step-${newStepId}`);
+      if (newStepElement) {
+        newStepElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
   };
 
   const handleRemoveStep = (index: number) => {
@@ -545,7 +554,7 @@ export default function EditClaimsWorkflowPage() {
               ) : (
                 <div className="space-y-6">
                   {steps.map((step, index) => (
-                    <div key={step.id} className="border rounded-lg p-4 bg-background">
+                    <div key={step.id} id={`step-${step.id}`} className="border rounded-lg p-4 bg-background">
                       {/* Step Header */}
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3 flex-1">

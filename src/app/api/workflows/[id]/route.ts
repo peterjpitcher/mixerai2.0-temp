@@ -324,6 +324,14 @@ export const PUT = withAuthAndCSRF(async (
     }
     // --- End AI Description Generation ---
 
+    // Validate template_id is provided
+    if (body.template_id === null || body.template_id === undefined) {
+      return NextResponse.json(
+        { success: false, error: 'Content template is required' },
+        { status: 400 }
+      );
+    }
+    
     if (body.steps && !Array.isArray(body.steps)) {
       return NextResponse.json(
         { success: false, error: 'Steps must be an array' },
@@ -515,6 +523,52 @@ export const DELETE = withAuthAndCSRF(async (
       }
     }
     // If global admin or brand admin, proceed with delete
+
+    // Check for pending content before deletion
+    const { data: pendingContent, error: checkError } = await supabase
+      .from('content')
+      .select('id, title, status')
+      .eq('workflow_id', workflowId)
+      .in('status', ['pending_review', 'approved'])
+      .limit(10);
+
+    if (checkError) {
+      return handleApiError(checkError, 'Error checking pending content');
+    }
+
+    if (pendingContent && pendingContent.length > 0) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Cannot delete workflow with pending content. Please complete or cancel all reviews first.',
+          pendingCount: pendingContent.length,
+          pendingItems: pendingContent.map(item => ({ id: item.id, title: item.title }))
+        },
+        { status: 400 }
+      );
+    }
+
+    // Check for active tasks
+    const { data: activeTasks, error: tasksError } = await supabase
+      .from('user_tasks')
+      .select('id')
+      .eq('workflow_id', workflowId)
+      .eq('status', 'pending')
+      .limit(1);
+
+    if (tasksError) {
+      console.error('Error checking active tasks:', tasksError);
+    }
+
+    if (activeTasks && activeTasks.length > 0) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Cannot delete workflow with active tasks. Please complete all tasks first.'
+        },
+        { status: 400 }
+      );
+    }
 
     // First, delete associated workflow steps to maintain data integrity if ON DELETE CASCADE is not set
     const { error: deleteStepsError } = await supabase

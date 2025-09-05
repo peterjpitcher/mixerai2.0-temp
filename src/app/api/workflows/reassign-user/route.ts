@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import { User } from '@supabase/supabase-js';
 import { z } from 'zod';
 
 // Schema for request validation
@@ -14,7 +15,7 @@ const ReassignUserSchema = z.object({
 
 // POST /api/workflows/reassign-user
 // Reassign workflows from one user to another
-export const POST = withAuth(async (request: NextRequest, user: any) => {
+export const POST = withAuth(async (request: NextRequest, user: User) => {
   try {
     // Check if user is admin
     const isGlobalAdmin = user.user_metadata?.role === 'admin';
@@ -67,9 +68,9 @@ export const POST = withAuth(async (request: NextRequest, user: any) => {
         if (fetchError || !workflow || !workflow.steps || !Array.isArray(workflow.steps)) continue;
 
         // Process steps to replace the user
-        const newSteps = (workflow.steps as any[]).map((step: any) => {
+        const newSteps = (workflow.steps as Array<{assignees?: Array<{id: string; email: string; full_name: string}>}>).map((step) => {
           if (step.assignees && Array.isArray(step.assignees)) {
-            step.assignees = step.assignees.map((assignee: any) => {
+            step.assignees = step.assignees.map((assignee) => {
               if (assignee.id === from_user_id) {
                 return {
                   id: to_user_id,

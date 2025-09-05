@@ -21,6 +21,7 @@ export const dynamic = "force-dynamic";
 const createBrandSchema = z.object({
   name: commonSchemas.nonEmptyString,
   website_url: commonSchemas.url.optional().nullable(),
+  additional_website_urls: z.array(z.string()).optional().nullable(), // Add missing field
   country: z.string().optional().nullable(),
   language: z.string().optional().nullable(),
   brand_identity: z.string().optional().nullable(),
@@ -372,6 +373,19 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
     }
 
     const newBrandId = transactionResult.data[0].brand_id;
+    
+    // Update brand with additional_website_urls if provided
+    if (body.additional_website_urls && Array.isArray(body.additional_website_urls) && body.additional_website_urls.length > 0) {
+      const { error: updateError } = await supabase
+        .from('brands')
+        .update({ additional_website_urls: body.additional_website_urls })
+        .eq('id', newBrandId);
+      
+      if (updateError) {
+        console.warn(`[API /api/brands POST] Error updating additional_website_urls for brand ${newBrandId}:`, updateError);
+        // Continue anyway as the brand was created successfully
+      }
+    }
     
     // --- Process Additional Brand Admins ---
     const adminUsers = body.admin_users || [];

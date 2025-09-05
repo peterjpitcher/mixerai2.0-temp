@@ -610,18 +610,20 @@ export default function AltTextGeneratorPage() {
                       <TableRow key={`${index}-${item.imageUrl}`} className={item.error ? "bg-destructive/10 hover:bg-destructive/20" : ""}>
                         <TableCell className="py-2 align-top font-medium">
                             <div className="max-w-[300px]">
-                                <span 
-                                    className="text-xs text-muted-foreground block truncate cursor-help" 
-                                    title={item.imageUrl}
-                                >
-                                    {item.imageUrl.length > 50 
-                                        ? `${item.imageUrl.substring(0, 30)}...${item.imageUrl.substring(item.imageUrl.length - 15)}`
-                                        : item.imageUrl
-                                    }
-                                </span>
+                                <div className="space-y-1">
+                                    <span 
+                                        className="text-xs text-muted-foreground block break-all cursor-help" 
+                                        title={item.imageUrl}
+                                    >
+                                        {item.imageUrl}
+                                    </span>
+                                </div>
                                 {!item.imageUrl.startsWith('data:') && (
                                     <button
-                                        onClick={() => window.open(item.imageUrl, '_blank')}
+                                        onClick={() => {
+                                            // Open image directly in new tab (safer approach)
+                                            window.open(item.imageUrl, '_blank', 'noopener,noreferrer');
+                                        }}
                                         className="text-xs text-blue-600 hover:text-blue-800 hover:underline mt-1"
                                     >
                                         Open image ↗
@@ -639,22 +641,34 @@ export default function AltTextGeneratorPage() {
                             <div className="flex flex-col gap-2">
                                 <span className="text-sm">{item.altText || "N/A"}</span>
                                 {item.altText && (
-                                    <Button variant="ghost" size="sm" onClick={() => handleCopyText(item.altText, item.imageUrl)} className="w-fit h-auto p-1 text-xs">
-                                        <ClipboardCopy className="h-3 w-3 mr-1" /> Copy Text
-                                    </Button>
+                                    <>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-xs ${item.altText.length > 125 ? 'text-orange-500 font-semibold' : 'text-muted-foreground'}`}>
+                                                {item.altText.length}/125 characters
+                                            </span>
+                                            {item.altText.length > 125 && (
+                                                <Badge variant="outline" className="text-xs bg-orange-50">
+                                                    Exceeds limit
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <Button variant="ghost" size="sm" onClick={() => handleCopyText(item.altText, item.imageUrl)} className="w-fit h-auto p-1 text-xs">
+                                            <ClipboardCopy className="h-3 w-3 mr-1" /> Copy Text
+                                        </Button>
+                                    </>
                                 )}
                             </div>
                           )}
                         </TableCell>
                         <TableCell className="py-2 align-top text-center">
                             {item.imageUrl && !item.error && (
-                                <div className="flex justify-center items-center h-full">
+                                <div className="flex flex-col justify-center items-center gap-2 h-full">
                                     {item.imageUrl.startsWith('data:') ? (
                                         // eslint-disable-next-line @next/next/no-img-element
                                         <img 
                                             src={item.imageUrl} 
                                             alt=""
-                                            className="max-w-full h-auto max-h-24 rounded-md border object-contain hover:object-scale-down transition-all duration-300 ease-in-out cursor-pointer"
+                                            className="max-w-full h-auto max-h-32 rounded-md border object-contain hover:object-scale-down transition-all duration-300 ease-in-out cursor-pointer"
                                             onClick={(e) => {
                                                 const target = e.currentTarget as HTMLImageElement;
                                                 if (target.classList.contains('max-h-24')) {
@@ -671,7 +685,7 @@ export default function AltTextGeneratorPage() {
                                         <img 
                                             src={item.imageUrl} 
                                             alt=""
-                                            className="max-w-full h-auto max-h-24 rounded-md border object-contain hover:object-scale-down transition-all duration-300 ease-in-out cursor-pointer" 
+                                            className="max-w-full h-auto max-h-32 rounded-md border object-contain hover:object-scale-down transition-all duration-300 ease-in-out cursor-pointer" 
                                             onError={(e) => {
                                                 const target = e.currentTarget as HTMLImageElement;
                                                 target.style.display = 'none';
@@ -683,9 +697,22 @@ export default function AltTextGeneratorPage() {
                                                     parentCell.appendChild(errorSpan);
                                                 }
                                             }}
-                                            onClick={() => { const newWindow = window.open(); if(newWindow) newWindow.location.href = item.imageUrl; }}
+                                            onClick={() => {
+                                                // Open image directly in new tab (safer approach)
+                                                window.open(item.imageUrl, '_blank', 'noopener,noreferrer');
+                                            }}
                                         />
                                     )}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            window.open(item.imageUrl, '_blank');
+                                        }}
+                                        className="text-xs"
+                                    >
+                                        View Full Image
+                                    </Button>
                                 </div>
                             )}
                             {item.error && <span className="text-xs text-muted-foreground">Preview N/A</span>}

@@ -8,6 +8,7 @@ interface QuillEditorProps {
   placeholder?: string;
   className?: string;
   readOnly?: boolean;
+  allowImages?: boolean;
 }
 
 export function QuillEditor({
@@ -15,7 +16,8 @@ export function QuillEditor({
   onChange,
   placeholder = 'Start typing...',
   className = '',
-  readOnly = false
+  readOnly = false,
+  allowImages = false // Default closed for security
 }: QuillEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const quillRef = useRef<any>(null);
@@ -49,12 +51,54 @@ export function QuillEditor({
             [{ 'list': 'ordered'}, { 'list': 'bullet' }],
             [{ 'color': [] }, { 'background': [] }],
             [{ 'align': [] }],
-            ['link', 'image'],
+            allowImages ? ['link', 'image'] : ['link'],
           ]
         }
       });
 
       quillRef.current = quill;
+
+      // Add paste and drop handlers for image restriction
+      if (!allowImages) {
+        const Delta = Quill.import('delta');
+        
+        // Strip images from paste
+        quill.clipboard.addMatcher(Node.ELEMENT_NODE, (node: any, delta: any) => {
+          if (node.tagName === 'IMG') {
+            return new Delta(); // Return empty delta to strip image
+          }
+          // Also filter Delta operations
+          const filtered = new Delta();
+          delta.ops?.forEach((op: any) => {
+            if (!op.insert?.image) {
+              filtered.push(op);
+            }
+          });
+          return filtered;
+        });
+
+        // Prevent image drops
+        const editorElement = quill.root;
+        const handleDrop = (e: DragEvent) => {
+          const items = Array.from(e.dataTransfer?.items || []);
+          if (items.some(item => item.type.startsWith('image/'))) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Image drop prevented due to template restrictions');
+          }
+        };
+        
+        editorElement.addEventListener('drop', handleDrop);
+        editorElement.addEventListener('dragover', (e) => {
+          const items = Array.from(e.dataTransfer?.items || []);
+          if (items.some(item => item.type.startsWith('image/'))) {
+            e.preventDefault();
+          }
+        });
+        
+        // Store handler for cleanup
+        (quill as any)._dropHandler = handleDrop;
+      }
 
       // Set initial content if provided
       if (value && value.trim() !== '') {
@@ -77,7 +121,14 @@ export function QuillEditor({
     // Cleanup
     return () => {
       if (quillRef.current) {
-        quillRef.current.off('text-change');
+        const quill = quillRef.current;
+        quill.off('text-change');
+        
+        // Remove drop handler if exists
+        if ((quill as any)._dropHandler) {
+          quill.root.removeEventListener('drop', (quill as any)._dropHandler);
+        }
+        
         quillRef.current = null;
       }
     };

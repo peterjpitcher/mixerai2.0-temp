@@ -129,7 +129,7 @@ export default function MyTasksPage() {
           <p className="text-muted-foreground">Content items assigned to you that are currently active and require your action.</p>
         </div>
         <Link 
-          href="/dashboard/help?article=08-my-tasks" 
+          href="/dashboard/help#my-tasks" 
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <HelpCircle className="h-4 w-4" />
@@ -144,7 +144,7 @@ export default function MyTasksPage() {
             <h3 className="text-xl font-semibold">All caught up!</h3>
             <p className="text-muted-foreground mt-2">You have no pending tasks assigned to you.</p>
             <Link 
-              href="/dashboard/help?article=08-my-tasks" 
+              href="/dashboard/help#my-tasks" 
               className="inline-block mt-4 text-sm text-primary hover:underline"
             >
               Learn about tasks →

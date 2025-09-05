@@ -83,24 +83,35 @@ export default function DashboardLayout({
       
       // Invalidate all sessions for this user
       if (user) {
-        await apiFetch('/api/auth/logout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+        try {
+          await apiFetch('/api/auth/logout', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+        } catch (apiError) {
+          // Log the API error but continue with client-side logout
+          console.error('Server logout error:', apiError);
+        }
       }
       
       const { error } = await supabase.auth.signOut();
       if (error) {
-        throw error;
+        // Log the error but still redirect to login
+        console.error('Supabase signOut error:', error);
       }
+      
+      // Always redirect to login page regardless of errors
       sonnerToast.success("You have been successfully signed out.");
-
       router.push('/auth/login');
       router.refresh(); // Ensures the layout re-evaluates auth state
     } catch (error) {
-      sonnerToast.error((error as Error)?.message || "There was a problem signing out. Please try again.");
+      console.error('Logout error:', error);
+      // Even on error, try to redirect to login page
+      sonnerToast.warning("There was an issue during logout, but you have been redirected to the login page.");
+      router.push('/auth/login');
+      router.refresh();
     }
   };
 

@@ -449,12 +449,61 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Brand Permissions</CardTitle>
-            <CardDescription>Assign this user to specific brands and set their role for each.</CardDescription>
+            <CardTitle>Assigned Brands</CardTitle>
+            <CardDescription>
+              Select which brands this user has access to and their role. {` `}
+              <span className="text-muted-foreground">(Scroll if the list is long)</span>
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-            {brands.map((brand) => (
-              <div key={brand.id} className="flex items-center justify-between p-3 border rounded-md">
+            {isLoading && (
+              <div className="space-y-3">
+                {[1,2,3,4].map(i => (
+                  <div key={i} className="flex items-center justify-between p-3 border rounded-md">
+                    <div className="flex items-center space-x-3">
+                      <div className="h-4 w-4 rounded bg-muted animate-pulse" />
+                      <div className="h-4 w-32 rounded bg-muted animate-pulse" />
+                    </div>
+                    <div className="h-9 w-[120px] rounded bg-muted animate-pulse" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!isLoading && brands.length === 0 && (
+              <div className="rounded-md border p-3 bg-amber-50 text-amber-900 text-sm">
+                No brands available to assign. {` `}
+                <a href="/dashboard/brands/new" className="underline">Create a brand</a> then return to this page.
+              </div>
+            )}
+
+            {!isLoading && brands.length > 0 && (
+              <>
+                <div className="flex items-center gap-2 pb-2 border-b">
+                  <Checkbox
+                    id="assigned-brand-master"
+                    checked={Object.values(selectedBrands).some(b => b?.selected)}
+                    onCheckedChange={(checked) => {
+                      const v = !!checked;
+                      setSelectedBrands(prev => {
+                        const next: typeof prev = {};
+                        for (const b of brands) {
+                          const current = prev[b.id];
+                          next[b.id] = { selected: v, role: current?.role ?? 'viewer' };
+                        }
+                        return next;
+                      });
+                    }}
+                  />
+                  <label htmlFor="assigned-brand-master" className="text-sm font-medium cursor-pointer">
+                    Assigned Brand
+                  </label>
+                </div>
+                <div className="text-xs text-muted-foreground mb-2">
+                  ✓ Tick to assign this user to a brand, then choose their role
+                </div>
+                {brands.map((brand) => (
+              <div key={brand.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 transition-colors">
                 <div className="flex items-center space-x-3">
                   <Checkbox
                     id={`brand-${brand.id}`}
@@ -462,10 +511,11 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                     onCheckedChange={(checked) => 
                       handleBrandSelectionChange(brand.id, checked as boolean)
                     }
+                    aria-label={`Assign user to ${brand.name}`}
                   />
                   <label
                     htmlFor={`brand-${brand.id}`}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
                   >
                     {brand.name}
                   </label>
@@ -485,11 +535,8 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                   </SelectContent>
                 </Select>
               </div>
-            ))}
-            {brands.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No brands available to assign.
-              </p>
+                ))}
+              </>
             )}
           </CardContent>
           <CardFooter className="flex justify-end space-x-2">

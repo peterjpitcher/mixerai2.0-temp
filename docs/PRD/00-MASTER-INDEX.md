@@ -27,77 +27,77 @@ All documents are interconnected and should be read in the recommended order for
 
 ## 📚 Core Documentation
 
-### 1. [Executive Summary and Vision](./01-EXECUTIVE-SUMMARY.md)
+### 1. [Executive Summary and Vision](./01-executive-summary.md)
 **Purpose**: High-level overview of MixerAI 2.0's vision, goals, and value proposition  
 **Audience**: Executives, stakeholders, product leadership  
 **Contents**: Vision statement, business objectives, success metrics, market positioning
 
-### 2. [Functional Requirements](./02-FUNCTIONAL-REQUIREMENTS.md)
+### 2. [Functional Requirements](./02-functional-requirements.md)
 **Purpose**: Detailed specification of all system features and capabilities  
 **Audience**: Product managers, developers, QA engineers  
 **Contents**: Feature specifications, acceptance criteria, user permissions matrix
 
-### 3. [User Stories and Workflows](./03-USER-STORIES-WORKFLOWS.md)
+### 3. [User Stories and Workflows](./03-user-stories-workflows.md)
 **Purpose**: User journey mapping and detailed workflow specifications  
 **Audience**: UX designers, developers, product managers  
 **Contents**: User personas, journey maps, workflow diagrams, use cases
 
-### 4. [Technical Architecture](./04-TECHNICAL-ARCHITECTURE.md)
+### 4. [Technical Architecture](./04-technical-architecture.md)
 **Purpose**: System design and technical implementation guidelines  
 **Audience**: Architects, senior developers, DevOps engineers  
 **Contents**: Architecture patterns, technology stack, scalability design, integration points
 
-### 5. [Data Model and Schema](./05-DATA-MODEL-SCHEMA.md)
+### 5. [Data Model and Schema](./05-data-model-schema.md)
 **Purpose**: Complete database design and data relationships  
 **Audience**: Database engineers, backend developers  
 **Contents**: Entity relationships, schema definitions, data governance, migration strategy
 
-### 6. [API Specification](./06-API-SPECIFICATION.md)
+### 6. [API Specification](./06-api-specification.md)
 **Purpose**: Comprehensive API design and endpoint documentation  
 **Audience**: Backend developers, frontend developers, integration partners  
 **Contents**: RESTful endpoints, GraphQL schema, authentication, rate limiting
 
-### 7. [UI/UX Guidelines and Design System](./07-UI-UX-DESIGN-SYSTEM.md)
+### 7. [UI/UX Guidelines and Design System](./07-ui-ux-design-system.md)
 **Purpose**: User interface standards and component library  
 **Audience**: UI/UX designers, frontend developers  
 **Contents**: Design principles, component library, interaction patterns, accessibility
 
-### 8. [Security and Compliance Requirements](./08-SECURITY-COMPLIANCE.md)
+### 8. [Security and Compliance Requirements](./08-security-compliance.md)
 **Purpose**: Security architecture and regulatory compliance specifications  
 **Audience**: Security engineers, compliance officers, developers  
 **Contents**: Authentication/authorization, data protection, compliance frameworks, audit requirements
 
-### 9. [AI Integration Specifications](./09-AI-INTEGRATION.md)
+### 9. [AI Integration Specifications](./09-ai-integration.md)
 **Purpose**: Detailed AI capabilities and integration requirements  
 **Audience**: AI/ML engineers, backend developers, product managers  
 **Contents**: AI features, prompt engineering, model requirements, performance targets
 
-### 10. [Non-Functional Requirements](./10-NON-FUNCTIONAL-REQUIREMENTS.md)
+### 10. [Non-Functional Requirements](./10-non-functional-requirements.md)
 **Purpose**: Performance, reliability, and operational requirements  
 **Audience**: Architects, DevOps, QA engineers  
 **Contents**: Performance targets, availability SLAs, scalability requirements, monitoring
 
-### 11. [Testing Strategy](./11-TESTING-STRATEGY.md)
+### 11. [Testing Strategy](./11-testing-strategy.md)
 **Purpose**: Comprehensive testing approach and quality assurance  
 **Audience**: QA engineers, developers, DevOps  
 **Contents**: Test types, coverage targets, automation strategy, performance testing
 
-### 12. [Implementation Roadmap](./12-IMPLEMENTATION-ROADMAP.md)
+### 12. [Implementation Roadmap](./12-implementation-roadmap.md)
 **Purpose**: Phased delivery plan and release strategy  
 **Audience**: Product managers, engineering leadership, stakeholders  
 **Contents**: Release phases, timelines, dependencies, risk mitigation
 
-### 13. [Rebuild Delivery Guide](./13-REBUILD-DELIVERY-GUIDE.md) 🆕
+### 13. [Rebuild Delivery Guide](./13-rebuild-delivery-guide.md) 🆕
 **Purpose**: Critical path for successful architecture implementation during rebuild  
 **Audience**: Development team, architects, tech leads  
 **Contents**: Phase 0 validation, architecture checkpoints, red flags, migration strategy
 
-### 14. [Vercel/Supabase Architecture Changes](./VERCEL-SUPABASE-CHANGES.md) 🆕
+### 14. [Vercel/Supabase Architecture Changes](./vercel-supabase-changes.md) 🆕
 **Purpose**: Summary of infrastructure updates from Kubernetes to Vercel/Supabase  
 **Audience**: All stakeholders, development team  
 **Contents**: Architecture changes, cost implications, technical benefits, tradeoffs
 
-### 15. [Implementation Details](./14-IMPLEMENTATION-DETAILS.md) 🆕
+### 15. [Implementation Details](./14-implementation-details.md) 🆕
 **Purpose**: Detailed business logic and configuration specifications  
 **Audience**: Development team  
 **Contents**: Business rules, AI prompts, workflow logic, error handling, UI specifications

@@ -13,7 +13,15 @@ import {
   Edit,
   Loader2,
   UserCircle2,
-  MoreVertical
+  MoreVertical,
+  UserX,
+  UserCheck,
+  Activity,
+  FileText,
+  CheckCircle,
+  XCircle,
+  GitPullRequest,
+  LogIn
 } from 'lucide-react';
 import {
   Dialog,
@@ -34,6 +42,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { format as formatDateFns } from 'date-fns';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
@@ -63,6 +72,7 @@ interface User {
   brand_permissions?: BrandPermission[];
   job_title?: string;
   company?: string;
+  user_status?: string;
 }
 
 const formatBrandRole = (role: string): string => {
@@ -87,44 +97,47 @@ export default function UserDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
+  const [isDeactivating, setIsDeactivating] = useState(false);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [activityStats, setActivityStats] = useState<any>(null);
+  const [isLoadingActivity, setIsLoadingActivity] = useState(false);
   
   useEffect(() => {
-    async function fetchUserData() {
-      if (!params) {
-        toast.error("User ID not found in URL.");
-        setIsLoading(false);
-        return;
-      }
-      const userId = params.id;
+    if (!params?.id) return;
+
+    (async () => {
       setIsLoading(true);
-      
+      setIsLoadingActivity(true);
       try {
-        // Fetch user details
-        const response = await fetch(`/api/users/${userId}`);
-        
-        if (!response.ok) {
-          if (response.status === 404) {
+        // Fetch user, brands, and activity in parallel
+        const [userRes, brandsRes, actRes] = await Promise.all([
+          fetch(`/api/users/${params.id}`),
+          fetch('/api/brands'),
+          apiFetch(`/api/users/${params.id}/activity`)
+        ]);
+
+        // Handle user response
+        if (!userRes.ok) {
+          if (userRes.status === 404) {
             toast.error('User Not Found: The requested user could not be found.');
             router.push('/dashboard/users');
             return;
           }
-          
-          throw new Error(`Failed to fetch user: ${response.status}`);
+          throw new Error(`Failed to fetch user: ${userRes.status}`);
         }
-        
-        const data = await response.json();
-        
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to fetch user.');
+
+        const userData = await userRes.json();
+        const brandsData = await brandsRes.json();
+        const actData = await actRes.json();
+
+        if (!userData.success) {
+          throw new Error(userData.error || 'Failed to fetch user.');
         }
-        
-        // Fetch brands to get extra information
-        const brandsResponse = await fetch('/api/brands');
-        const brandsData = await brandsResponse.json();
-        
-        if (brandsData.success && Array.isArray(brandsData.data) && data.user.brand_permissions?.length > 0) {
-          // Enhance brand permissions with brand details
-          data.user.brand_permissions = data.user.brand_permissions.map((permission) => {
+
+        // Enhance brand permissions with brand details
+        if (brandsData.success && Array.isArray(brandsData.data) && userData.user.brand_permissions?.length > 0) {
+          userData.user.brand_permissions = userData.user.brand_permissions.map((permission) => {
             const brand = brandsData.data.find((b: Brand) => b.id === permission.brand_id);
             return {
               ...permission,
@@ -132,21 +145,44 @@ export default function UserDetailPage() {
             };
           });
         }
-        
-        setUser(data.user);
-      } catch (error) {
-        console.error('Error fetching user data:', error);
+
+        setUser(userData.user);
+        setActivities(actData?.success ? (actData.activities ?? []) : []);
+        setActivityStats(actData?.success ? (actData.stats ?? null) : null);
+      } catch (e) {
+        console.error('User/Activity fetch error:', e);
+        setUser(null);
+        setActivities([]);
+        setActivityStats(null);
         toast.error('Failed to load user details. Please try again.');
       } finally {
         setIsLoading(false);
+        setIsLoadingActivity(false);
       }
-    }
-    
-    if (params?.id) {
-      fetchUserData();
-    }
-  }, [params, router]);
+    })();
+  }, [params?.id, router]);
   
+  const handleDeactivate = async () => {
+    if (!user) return;
+    setIsDeactivating(true);
+    const res = await apiFetch(`/api/users/${user.id}/deactivate`, { method: 'POST' });
+    const data = await res.json();
+    setIsDeactivating(false);
+    if (!data.success) return toast.error(data.error || 'Failed to deactivate');
+    toast.success('User deactivated');
+    router.refresh();
+    setShowDeactivateDialog(false);
+  };
+
+  const handleReactivate = async () => {
+    if (!user) return;
+    const res = await apiFetch(`/api/users/${user.id}/reactivate`, { method: 'POST' });
+    const data = await res.json();
+    if (!data.success) return toast.error(data.error || 'Failed to reactivate');
+    toast.success('User reactivated');
+    router.refresh();
+  };
+
   const handleConfirmDelete = async () => {
     if (!params || !user) {
       toast.error("Cannot delete user: Invalid user or parameters.");
@@ -268,7 +304,10 @@ export default function UserDetailPage() {
             </div>
           )}
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{user.full_name || user.email}</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight">{user.full_name || user.email}</h1>
+              {user?.user_status === 'inactive' && <Badge variant="secondary">Deactivated</Badge>}
+            </div>
             <p className="text-muted-foreground mt-1">
               Details for {user.email}.
             </p>
@@ -289,6 +328,19 @@ export default function UserDetailPage() {
                       <Edit className="mr-2 h-4 w-4" /> Edit User
                     </Link>
                   </DropdownMenuItem>
+
+                  {user?.user_status !== 'inactive' ? (
+                    <DropdownMenuItem onClick={() => setShowDeactivateDialog(true)}>
+                      <UserX className="mr-2 h-4 w-4" /> Deactivate User
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem onClick={handleReactivate}>
+                      <UserCheck className="mr-2 h-4 w-4" /> Reactivate User
+                    </DropdownMenuItem>
+                  )}
+
+                  <DropdownMenuSeparator />
+
                   <DropdownMenuItem 
                     onClick={() => setShowDeleteDialog(true)} 
                     className="text-destructive"
@@ -351,7 +403,99 @@ export default function UserDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* User Activity Log Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Activity className="mr-2 h-5 w-5 text-primary" /> User Activity Log
+          </CardTitle>
+          <CardDescription>Activity from the last 30 days</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoadingActivity ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : activities.length > 0 ? (
+            <div className="space-y-4">
+              {/* Activity Stats */}
+              {activityStats && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pb-4 border-b">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold">{activityStats.totalActivities}</p>
+                    <p className="text-sm text-muted-foreground">Total Activities</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold">{activityStats.contentCreated}</p>
+                    <p className="text-sm text-muted-foreground">Content Created</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold">{activityStats.contentUpdated}</p>
+                    <p className="text-sm text-muted-foreground">Content Updated</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold">{activityStats.templatesModified}</p>
+                    <p className="text-sm text-muted-foreground">Templates Modified</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Activity Timeline */}
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {activities.slice(0, 20).map((activity, index) => (
+                  <div key={index} className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="mt-1">
+                      {activity.type === 'content' && <FileText className="h-4 w-4 text-blue-500" />}
+                      {activity.type === 'workflow' && activity.action === 'approve' && <CheckCircle className="h-4 w-4 text-green-500" />}
+                      {activity.type === 'workflow' && activity.action === 'reject' && <XCircle className="h-4 w-4 text-red-500" />}
+                      {activity.type === 'workflow' && activity.action === 'request_changes' && <GitPullRequest className="h-4 w-4 text-yellow-500" />}
+                      {activity.type === 'template' && <FileText className="h-4 w-4 text-purple-500" />}
+                      {activity.type === 'auth' && <LogIn className="h-4 w-4 text-gray-500" />}
+                      {!['content', 'workflow', 'template', 'auth'].includes(activity.type) && <Activity className="h-4 w-4 text-gray-400" />}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm">{activity.description}</p>
+                      {activity.metadata?.comments && (
+                        <p className="text-xs text-muted-foreground mt-1">Comment: {activity.metadata.comments}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatDateFns(new Date(activity.timestamp), 'MMM d, yyyy h:mm a')}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {activities.length > 20 && (
+                <p className="text-sm text-muted-foreground text-center pt-2">
+                  Showing 20 of {activities.length} activities
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-8">No activity in the last 30 days</p>
+          )}
+        </CardContent>
+      </Card>
       
+      <Dialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deactivate User</DialogTitle>
+            <DialogDescription>
+              This will immediately sign the user out and block access until reactivated.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeactivateDialog(false)}>Cancel</Button>
+            <Button onClick={handleDeactivate} disabled={isDeactivating}>
+              {isDeactivating ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Deactivating…</>) : 'Deactivate User'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>

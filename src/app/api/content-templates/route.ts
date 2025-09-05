@@ -178,8 +178,11 @@ export const GET = withAuth(async (request: NextRequest, user: unknown) => {
       .order('name');
     
     if (error) {
+      console.error('Error fetching templates:', error);
       throw error;
     }
+    
+    console.log(`Fetched ${templatesData?.length || 0} templates`);
     
     // Format data before sending
     const formattedTemplates = templatesData.map(template => ({

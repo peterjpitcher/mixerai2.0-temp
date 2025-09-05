@@ -3,6 +3,13 @@ import { Resend } from 'resend';
 // Initialize Resend client
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
+// Log configuration status on initialization
+if (!process.env.RESEND_API_KEY) {
+  console.warn('[Email Service] RESEND_API_KEY not configured - email notifications will be disabled');
+} else {
+  console.log('[Email Service] Resend client initialized successfully');
+}
+
 export interface EmailOptions {
   to: string | string[];
   subject: string;
@@ -17,7 +24,7 @@ export async function sendEmail({
   subject,
   html,
   text,
-  from = 'MixerAI <notifications@mixerai.com>',
+  from = process.env.EMAIL_FROM_ADDRESS || 'MixerAI <notifications@mixerai.com>',
   replyTo
 }: EmailOptions) {
   if (!resend) {

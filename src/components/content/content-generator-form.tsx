@@ -11,12 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { QuillEditor } from './quill-editor';
 import 'quill/dist/quill.snow.css';
+import { ValidatedTextarea } from '@/components/form/validated-textarea';
 import { useRouter } from 'next/navigation';
 import { BrandIcon } from '@/components/brand-icon';
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Sparkles, Info, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
-import type { InputField, OutputField, ContentTemplate as Template, SelectOptions, FieldType } from '@/types/template';
+import type { InputField, OutputField, ContentTemplate as Template, SelectOptions, LongTextOptions, RichTextOptions, FieldType } from '@/types/template';
 import { ProductSelect } from './product-select';
 import type { ProductContext } from '@/types/claims';
 import { apiFetch } from '@/lib/api-client';
@@ -367,9 +368,20 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
     try {
       const populatedPrompt = interpolatePrompt(field.aiPrompt);
       
+      // Ensure maxLength is passed as a number for shortText and longText fields
+      const options: Record<string, any> = { ...(field.options || {}) };
+      if ((field.type === 'shortText' || field.type === 'longText') && options.maxLength) {
+        options.maxLength = Number(options.maxLength);
+      }
+      if (field.type === 'longText' && options.maxRows) {
+        options.maxRows = Number(options.maxRows);
+      }
+      
       const requestBody = {
         brand_id: selectedBrand,
         prompt: populatedPrompt,
+        fieldType: field.type,
+        options,
       };
 
       const response = await apiFetch('/api/ai/suggest', {
@@ -381,7 +393,18 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
       const data = await response.json();
 
       if (data.success && data.suggestion) {
+        // Server has already applied constraints, just use the response
         setTemplateFieldValues(prev => ({ ...prev, [field.id]: data.suggestion }));
+        
+        // Notify if content was truncated
+        if (data.truncated) {
+          if (data.maxLength) {
+            toast.info(`Suggestion was truncated to ${data.maxLength} characters.`);
+          } else if (data.maxRows) {
+            toast.info(`Suggestion was truncated to ${data.maxRows} rows.`);
+          }
+        }
+        
         toast.success(`Suggestion generated for ${field.name}`);
       } else {
         toast.error(data.error || `Failed to generate suggestion for ${field.name}.`);
@@ -469,7 +492,8 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
           }
         }
 
-        if (contextForTitle) {
+        // Only generate title if template includes it
+        if (contextForTitle && template?.include_title === true) {
           setIsGeneratingTitle(true);
           try {
             const topicField = (template.inputFields || []).find(f => f.id === 'topic' || f.name.toLowerCase().includes('topic'));
@@ -576,7 +600,8 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
         toast.info('Auto-generating title, please wait...'); 
         return; 
     }
-    if (!title && !isGeneratingTitle) {
+    // Only require title if template includes it
+    if (template?.include_title === true && !title && !isGeneratingTitle) {
         toast.error('Content title is missing. Please set manually or wait for auto-generation.');
         return;
     }
@@ -598,7 +623,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
       const payload = {
         brand_id: selectedBrand,
         template_id: template?.id,
-        title,
+        title: template?.include_title === true ? title : 'Untitled Content',
         workflow_id: associatedWorkflowDetails.id, 
         body: primaryBodyContent,
         content_data: {
@@ -655,7 +680,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
           </div>
         </div>
         <Link 
-          href="/dashboard/help?article=03-content" 
+          href="/dashboard/help#content" 
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <HelpCircle className="h-4 w-4" />
@@ -750,9 +775,32 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
                           case 'shortText':
                             return <Input id={field.id} value={templateFieldValues[field.id] || ''} onChange={(e) => handleTemplateFieldChange(field.id, e.target.value)} placeholder={`Enter ${field.name}`} />;
                           case 'longText':
-                            return <Textarea id={field.id} value={templateFieldValues[field.id] || ''} onChange={(e) => handleTemplateFieldChange(field.id, e.target.value)} placeholder={`Enter ${field.name}`} />;
+                            const longTextOptions = field.options as LongTextOptions;
+                            return (
+                              <ValidatedTextarea
+                                value={templateFieldValues[field.id] || ''}
+                                onChange={(v) => handleTemplateFieldChange(field.id, v)}
+                                field={{
+                                  name: field.id,
+                                  label: undefined, // Label is rendered separately
+                                  placeholder: longTextOptions?.placeholder || `Enter ${field.name}`,
+                                  config: {
+                                    max_rows: longTextOptions?.maxRows,
+                                    max_length: longTextOptions?.maxLength,
+                                    required: field.required,
+                                  },
+                                }}
+                              />
+                            );
                           case 'richText':
-                            return <QuillEditor value={templateFieldValues[field.id] || ''} onChange={(content) => handleTemplateFieldChange(field.id, content)} />;
+                            const richTextOptions = field.options as RichTextOptions;
+                            return (
+                              <QuillEditor 
+                                value={templateFieldValues[field.id] || ''} 
+                                onChange={(content) => handleTemplateFieldChange(field.id, content)}
+                                allowImages={richTextOptions?.allowImages === true} // Only allow images if explicitly enabled
+                              />
+                            );
                           case 'select':
                             const options = field.options as SelectOptions;
                             return (
@@ -791,10 +839,34 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
       {Object.keys(generatedOutputs).length > 0 && selectedBrand && canGenerateContent && (
         <Card>
           <CardHeader>
-            <CardTitle>Generated Content Review {isGeneratingTitle ? "(Generating Title...)" : (title ? `- \"${title}\"` : "")}</CardTitle>
+            <CardTitle>
+              Generated Content Review 
+              {template?.include_title === true && (
+                isGeneratingTitle ? " (Generating Title...)" : (title ? ` - "${title}"` : "")
+              )}
+            </CardTitle>
             <CardDescription>Review and edit the generated content below.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Show title field if template includes it */}
+            {template?.include_title === true && (
+              <div className="pt-2 space-y-1">
+                <Label htmlFor="content_title" className="text-base font-medium">
+                  Content Title
+                </Label>
+                <Input
+                  id="content_title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Enter content title..."
+                  className="border shadow-sm focus-visible:ring-1 focus-visible:ring-ring text-sm p-2 w-full"
+                  disabled={isGeneratingTitle}
+                />
+                {isGeneratingTitle && (
+                  <p className="text-xs text-muted-foreground">Auto-generating title...</p>
+                )}
+              </div>
+            )}
             {(template?.outputFields || []).map(outputField => (
               <div key={outputField.id} className="pt-2 space-y-1">
                 <div className="flex items-center justify-between">
@@ -896,7 +968,7 @@ ${JSON.stringify(productContext.styledClaims, null, 2)}
 
             <Button 
               onClick={handleSave} 
-              disabled={!canGenerateContent || !selectedBrand || !associatedWorkflowDetails?.id || isSaving || isGeneratingTitle || !title || retryingFieldId !== null || isLoading || isFetchingAssociatedWorkflow}
+              disabled={!canGenerateContent || !selectedBrand || !associatedWorkflowDetails?.id || isSaving || isGeneratingTitle || (template?.include_title === true && !title) || retryingFieldId !== null || isLoading || isFetchingAssociatedWorkflow}
               className="flex items-center gap-2"
               title={!canGenerateContent || !associatedWorkflowDetails?.id ? "Cannot save: Workflow missing or not configured." : "Save the generated content"}
             >

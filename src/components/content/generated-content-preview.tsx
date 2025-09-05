@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { QuillEditor } from './quill-editor';
 import { RefreshCw, AlertCircle } from 'lucide-react';
-import type { OutputField } from '@/types/template';
+import type { OutputField, RichTextOptions } from '@/types/template';
 import 'quill/dist/quill.snow.css';
 
 interface GeneratedContentPreviewProps {
@@ -73,6 +73,7 @@ export function GeneratedContentPreview({
                 value={value}
                 onChange={(content) => onOutputChange(field.id, content)}
                 placeholder="Generated content will appear here"
+                allowImages={(field.options as RichTextOptions)?.allowImages === true} // Only allow images if explicitly enabled
               />
             ) : (
               <div className={`p-4 border rounded-md ${hasContent ? 'bg-muted/50' : 'bg-amber-50/50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800'}`}>

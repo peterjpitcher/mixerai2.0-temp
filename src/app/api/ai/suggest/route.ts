@@ -1,39 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError } from '@/lib/api-utils';
-
+import { z } from 'zod';
 import { generateTextCompletion } from '@/lib/azure/openai';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { Brand } from '@/types/models';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { truncateGraphemeSafe, normaliseForLength, stripAIWrappers } from '@/lib/text/enforce-limit';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
 
-interface SuggestionRequest {
-  prompt: string;
-  fieldType?: string;
-  formValues?: Record<string, unknown>;
-  brand_id?: string;
-  options?: {
-    maxLength?: number;
-    format?: string;
-  };
-  // Support for new content generator format
-  context?: {
-    templateFields?: Record<string, string>;
-  };
-}
+// Zod schema for request validation
+const SuggestionRequestSchema = z.object({
+  prompt: z.string().min(1).trim(),
+  fieldType: z.string().optional(),
+  formValues: z.record(z.unknown()).optional(),
+  brand_id: z.string().optional(),
+  options: z.object({
+    maxLength: z.preprocess(
+      v => (typeof v === 'string' ? Number(v) : v),
+      z.number().int().positive().optional()
+    ),
+    maxRows: z.preprocess(
+      v => (typeof v === 'string' ? Number(v) : v),
+      z.number().int().positive().optional()
+    ),
+    format: z.string().optional()
+  }).optional(),
+  context: z.object({
+    templateFields: z.record(z.string()).optional()
+  }).optional()
+});
 
 /**
  * POST: Generate suggestions for a field using AI
  */
 export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Response> => {
   try {
-    const body: SuggestionRequest = await request.json();
-
-    if (!body.prompt || typeof body.prompt !== 'string' || body.prompt.trim() === '') {
-      return NextResponse.json({ success: false, error: 'A valid prompt is required' }, { status: 400 });
+    const rawBody = await request.json();
+    
+    // Validate request with Zod
+    const parsed = SuggestionRequestSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      console.log('[API /ai/suggest] Validation error:', parsed.error.flatten());
+      return NextResponse.json(
+        { success: false, error: 'Invalid request payload', details: parsed.error.flatten() },
+        { status: 400 }
+      );
     }
+    
+    const body = parsed.data;
 
     let userPrompt = body.prompt;
     console.log('[API /ai/suggest] Received original prompt:', userPrompt);
@@ -94,7 +110,24 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
       return ''; // Replace with empty string instead of leaving the curly braces
     });
 
-    const systemPrompt = "You are a helpful assistant. Provide a concise suggestion based on the user's instructions. If the user asks for a title, it should be between 6 and 10 words long. If the user asks for a list, provide a comma-separated list.";
+    // Build system prompt with constraints if provided
+    let systemPrompt = "You are a helpful assistant. Return plain text only with no quotes, no markdown, no explanations.";
+    
+    // Add maxLength constraint to system prompt if provided
+    if (body.options?.maxLength && typeof body.options.maxLength === 'number') {
+      systemPrompt += ` CRITICAL REQUIREMENT: Your response MUST be no more than ${body.options.maxLength} characters long. `;
+      systemPrompt += `Do NOT exceed ${body.options.maxLength} characters under any circumstances. `;
+      systemPrompt += `If your initial response is longer, truncate it to fit within ${body.options.maxLength} characters.`;
+    } else if (body.fieldType === 'shortText') {
+      systemPrompt += " For short text fields, keep your response brief and concise (under 100 characters).";
+    }
+    
+    // Add row constraint if provided
+    if (body.options?.maxRows && typeof body.options.maxRows === 'number') {
+      systemPrompt += ` Use at most ${body.options.maxRows} lines. Do not include extra blank lines.`;
+    }
+    
+    systemPrompt += " If the user asks for a title, it should be between 6 and 10 words long. If the user asks for a list, provide a comma-separated list.";
     
     // Log the final prompt being sent to AI, ensuring it does not get truncated in the logs
     console.log('[API /ai/suggest] Final user prompt being sent to generateTextCompletion (full):', userPrompt);
@@ -106,20 +139,54 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
       return handleApiError(new Error('AI service failed to generate a suggestion or returned empty.'), 'Suggestion generation failed.', 500);
     }
 
-    let finalSuggestion = suggestion.trim();
-    // Remove leading and trailing double quotes if present
-    if (finalSuggestion.startsWith('"') && finalSuggestion.endsWith('"')) {
-      finalSuggestion = finalSuggestion.substring(1, finalSuggestion.length - 1);
+    // Clean up AI response
+    let finalSuggestion = stripAIWrappers(suggestion);
+    finalSuggestion = normaliseForLength(finalSuggestion);
+    
+    // Apply constraints and track if truncation occurred
+    let truncated = false;
+    const truncationDetails: Record<string, number> = {};
+    
+    // Apply maxLength constraint with grapheme-safe truncation
+    if (body.options?.maxLength && typeof body.options.maxLength === 'number') {
+      const result = truncateGraphemeSafe(finalSuggestion, body.options.maxLength);
+      if (result.truncated) {
+        console.log(`[API /ai/suggest] Truncated from ${result.originalLength} to ${result.finalLength} characters`);
+        truncated = true;
+        truncationDetails.maxLength = body.options.maxLength;
+        truncationDetails.originalLength = result.originalLength;
+      }
+      finalSuggestion = result.text;
     }
-    // It's possible the AI might use single quotes too, though less common for titles
-    if (finalSuggestion.startsWith("'") && finalSuggestion.endsWith("'")) {
-        finalSuggestion = finalSuggestion.substring(1, finalSuggestion.length - 1);
+    
+    // Apply maxRows constraint if provided
+    if (body.options?.maxRows && typeof body.options.maxRows === 'number') {
+      const { clampRows } = await import('@/lib/text/rows');
+      const result = clampRows(finalSuggestion, body.options.maxRows);
+      if (result.truncated) {
+        console.log(`[API /ai/suggest] Truncated from ${result.originalRows} to ${result.rows} rows`);
+        truncated = true;
+        truncationDetails.maxRows = body.options.maxRows;
+        truncationDetails.originalRows = result.originalRows;
+      }
+      finalSuggestion = result.text;
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true, 
       suggestion: finalSuggestion,
+      truncated,
+      ...(truncated && { truncationDetails }),
+      maxLength: body.options?.maxLength,
+      maxRows: body.options?.maxRows
     });
+    
+    // Add header to signal truncation
+    if (truncated) {
+      response.headers.set('x-suggestion-truncated', 'true');
+    }
+    
+    return response;
 
   } catch (error: unknown) {
     console.error('[API /ai/suggest] Error:', error);

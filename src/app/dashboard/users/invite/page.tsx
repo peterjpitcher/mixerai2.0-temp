@@ -367,25 +367,31 @@ export default function InviteUserPage() {
               
               <div>
                 <Label htmlFor="brand_id" className="text-right">
-                  Assign to Brand
+                  Assigned Brands
                 </Label>
                 {isLoading && <p className="text-sm text-muted-foreground">Loading brands...</p>}
                 {!isLoading && brands.length === 0 && <p className="text-sm text-muted-foreground">No brands available to assign.</p>}
                 {!isLoading && brands.length > 0 && (
-                  <div className="space-y-2 rounded-md border p-4 max-h-60 overflow-y-auto">
-                    {brands.map(brand => (
-                      <div key={brand.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`brand-${brand.id}`}
-                          checked={form.brand_ids.includes(brand.id)}
-                          onCheckedChange={(checked) => handleBrandCheckboxChange(brand.id, !!checked)}
-                        />
-                        <Label htmlFor={`brand-${brand.id}`} className="font-normal cursor-pointer">
-                          {brand.name}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
+                  <>
+                    <div className="text-xs text-muted-foreground mb-2">
+                      ✓ Check the box next to each brand to assign this user
+                    </div>
+                    <div className="space-y-2 rounded-md border p-4 max-h-60 overflow-y-auto">
+                      {brands.map(brand => (
+                        <div key={brand.id} className="flex items-center space-x-2 hover:bg-muted/50 p-1 rounded">
+                          <Checkbox
+                            id={`brand-${brand.id}`}
+                            checked={form.brand_ids.includes(brand.id)}
+                            onCheckedChange={(checked) => handleBrandCheckboxChange(brand.id, !!checked)}
+                            aria-label={`Assign user to ${brand.name}`}
+                          />
+                          <Label htmlFor={`brand-${brand.id}`} className="font-normal cursor-pointer flex-1">
+                            {brand.name}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 )}
                 <p className="text-xs text-muted-foreground mt-1">
                   You can assign this user to additional brands later.

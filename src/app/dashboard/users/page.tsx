@@ -11,7 +11,7 @@ import {
   ArrowUp, 
   ArrowDown, 
   Pencil, 
-  Trash2, 
+  UserX, 
   AlertCircle,
   Users2,
   Mail,
@@ -263,27 +263,54 @@ export default function UsersPage() {
     }
   };
   
-  // Delete user functionality
-  const handleDeleteUser = async () => {
+  // Deactivate user functionality
+  const handleDeactivateUser = async () => {
     if (!userToDelete) return;
     setIsDeleting(true);
     try {
-      const response = await apiFetch(`/api/users/${userToDelete.id}`, {
-        method: 'DELETE',
+      const response = await apiFetch(`/api/users/${userToDelete.id}/deactivate`, {
+        method: 'POST',
       });
       const data = await response.json();
       if (data.success) {
-        setUsers(users.filter(u => u.id !== userToDelete.id));
-        toast.success(`User ${userToDelete.full_name} deleted successfully.`);
+        setUsers(users.map(u => 
+          u.id === userToDelete.id 
+            ? { ...u, user_status: 'inactive' } 
+            : u
+        ));
+        toast.success(`User ${userToDelete.full_name} deactivated successfully.`);
       } else {
-        toast.error(data.error || 'Failed to delete user.');
+        toast.error(data.error || 'Failed to deactivate user.');
       }
     } catch (error) {
-      console.error('Error deleting user:', error);
-      toast.error('An error occurred while deleting the user.');
+      console.error('Error deactivating user:', error);
+      toast.error('An error occurred while deactivating the user.');
     } finally {
       setIsDeleting(false);
       setUserToDelete(null);
+    }
+  };
+
+  // Reactivate user functionality
+  const handleReactivateUser = async (userId: string) => {
+    try {
+      const response = await apiFetch(`/api/users/${userId}/deactivate`, {
+        method: 'DELETE', // DELETE method in our API reactivates the user
+      });
+      const data = await response.json();
+      if (data.success) {
+        setUsers(users.map(u => 
+          u.id === userId 
+            ? { ...u, user_status: 'active' } 
+            : u
+        ));
+        toast.success('User reactivated successfully.');
+      } else {
+        toast.error(data.error || 'Failed to reactivate user.');
+      }
+    } catch (error) {
+      console.error('Error reactivating user:', error);
+      toast.error('An error occurred while reactivating the user.');
     }
   };
 
@@ -315,6 +342,22 @@ export default function UsersPage() {
     if (!dateString) return 'Never';
     const date = new Date(dateString);
     return formatDateFns(date, 'MMMM d, yyyy');
+  };
+
+  const getUserStatus = (user: User) => {
+    if (user.user_status === 'inactive') {
+      return { label: 'Inactive', variant: 'outline' as const };
+    }
+    if (user.invitation_status === 'pending' || (!user.last_sign_in_at && user.invitation_status !== 'accepted')) {
+      return { label: 'Invited', variant: 'secondary' as const };
+    }
+    if (user.user_status === 'expired' || user.invitation_status === 'expired') {
+      return { label: 'Expired', variant: 'destructive' as const };
+    }
+    if (user.last_sign_in_at) {
+      return { label: 'Active', variant: 'default' as const };
+    }
+    return { label: 'Pending', variant: 'secondary' as const };
   };
 
   // Helper to render sort indicator
@@ -461,6 +504,7 @@ export default function UsersPage() {
                     <SortIndicator field="role" />
                   </div>
                 </TableHead>
+                <TableHead scope="col" className="w-[100px]">Status</TableHead>
                 <TableHead scope="col" className="w-[120px]">Brands</TableHead>
                 <TableHead scope="col" className="w-[120px] cursor-pointer hidden lg:table-cell" onClick={() => handleSort('company')}>
                   <div className="flex items-center">
@@ -480,7 +524,7 @@ export default function UsersPage() {
             </TableHeader>
             <TableBody>
               {sortedUsers.map(user => (
-                <TableRow key={user.id} className={user.role?.toLowerCase().includes('admin') ? 'bg-primary/5' : ''}>
+                <TableRow key={user.id} className={`${user.role?.toLowerCase().includes('admin') ? 'bg-primary/5' : ''} ${user.user_status === 'inactive' ? 'opacity-60' : ''}`}>
                   <TableCell>
                     <div className="relative h-8 w-8 rounded-full bg-primary/10 overflow-hidden">
                       {user.avatar_url ? (
@@ -506,6 +550,11 @@ export default function UsersPage() {
                       'outline'
                     }>
                       {user.role}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={getUserStatus(user).variant}>
+                      {getUserStatus(user).label}
                     </Badge>
                   </TableCell>
                   <TableCell>{renderBrandIcons(user)}</TableCell>
@@ -537,13 +586,22 @@ export default function UsersPage() {
                             <Pencil className="mr-2 h-4 w-4" /> Edit User
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setUserToDelete(user)}
-                          disabled={isDeleting && userToDelete?.id === user.id}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete User
-                        </DropdownMenuItem>
+                        {user.user_status === 'inactive' ? (
+                          <DropdownMenuItem
+                            onClick={() => handleReactivateUser(user.id)}
+                            className="text-green-600"
+                          >
+                            <Users2 className="mr-2 h-4 w-4" /> Reactivate User
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem
+                            onClick={() => setUserToDelete(user)}
+                            disabled={isDeleting && userToDelete?.id === user.id}
+                            className="text-destructive"
+                          >
+                            <UserX className="mr-2 h-4 w-4" /> Deactivate User
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -554,16 +612,16 @@ export default function UsersPage() {
         </div>
       )}
       
-      {/* Delete User Confirmation Dialog */}
+      {/* Deactivate User Confirmation Dialog */}
       <Dialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-destructive" />
-              Confirm User Deletion
+              Confirm User Deactivation
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete {userToDelete?.full_name}? This action cannot be undone.
+              Are you sure you want to deactivate {userToDelete?.full_name}? They will no longer be able to access the system.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -576,10 +634,10 @@ export default function UsersPage() {
             </Button>
             <Button 
               variant="destructive" 
-              onClick={handleDeleteUser}
+              onClick={handleDeactivateUser}
               disabled={isDeleting}
             >
-              {isDeleting ? 'Deleting...' : 'Delete User'}
+              {isDeleting ? 'Deactivating...' : 'Deactivate User'}
             </Button>
           </DialogFooter>
         </DialogContent>

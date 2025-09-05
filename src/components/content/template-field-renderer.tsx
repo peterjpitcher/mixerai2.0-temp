@@ -11,6 +11,7 @@ import 'quill/dist/quill.snow.css';
 import { ProductSelect } from './product-select';
 import { RecipeUrlField } from './recipe-url-field';
 import { SlugInput } from '@/components/ui/slug-input';
+import { ValidatedTextarea } from '@/components/form/validated-textarea';
 import type { InputField, FieldType, SelectOptions, ShortTextOptions, LongTextOptions, RichTextOptions, UrlOptions, RecipeUrlOptions, SlugOptions } from '@/types/template';
 
 interface TemplateFieldRendererProps {
@@ -52,23 +53,32 @@ export function TemplateFieldRenderer({
         );
         
       case 'longText':
+        const longTextOptions = field.options as LongTextOptions;
         return (
-          <Textarea
-            id={field.id}
+          <ValidatedTextarea
             value={value}
-            onChange={(e) => onChange(field.id, e.target.value)}
-            placeholder={(field.options as LongTextOptions)?.placeholder}
-            rows={(field.options as LongTextOptions)?.rows || 4}
-            required={isRequired}
+            onChange={(v) => onChange(field.id, v)}
+            field={{
+              name: field.id,
+              label: undefined, // Label is rendered separately
+              placeholder: longTextOptions?.placeholder || `Enter ${field.name}`,
+              config: {
+                max_rows: longTextOptions?.maxRows,
+                max_length: longTextOptions?.maxLength,
+                required: isRequired,
+              },
+            }}
           />
         );
         
       case 'richText':
+        const richTextOptions = field.options as RichTextOptions;
         return (
           <QuillEditor
             value={value}
             onChange={(content) => onChange(field.id, content)}
-            placeholder={(field.options as RichTextOptions)?.placeholder}
+            placeholder={richTextOptions?.placeholder}
+            allowImages={richTextOptions?.allowImages === true} // Only allow images if explicitly enabled
           />
         );
         

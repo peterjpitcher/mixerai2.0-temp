@@ -48,47 +48,69 @@ The application will be available at http://localhost:3000
 - **User Management**: Role-based access control with brand permissions
 - **Claims Management**: Product claims with market-specific overrides
 
-## Documentation Structure
+## 📚 Documentation Structure
 
-This documentation is organized into focused guides:
+This documentation is organized into focused categories for easy navigation:
 
-| Document | Description |
-|----------|-------------|
-| **[ARCHITECTURE.md](./ARCHITECTURE.md)** | Technical architecture and development patterns |
-| **[USER_GUIDE.md](./USER_GUIDE.md)** | Complete user documentation and features |
-| **[API_REFERENCE.md](./API_REFERENCE.md)** | API endpoints and integration guide |
-| **[DATABASE.md](./DATABASE.md)** | Database schema and data management |
-| **[AUTHENTICATION.md](./AUTHENTICATION.md)** | User authentication and permissions |
-| **[AZURE_OPENAI.md](./AZURE_OPENAI.md)** | AI integration and content generation |
-| **[DEPLOYMENT.md](./DEPLOYMENT.md)** | Production deployment and operations |
-| **[SECURITY.md](./SECURITY.md)** | Security policies and vulnerability reporting |
-| **[DEVELOPMENT.md](./DEVELOPMENT.md)** | Developer setup and coding guidelines |
-| **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** | Common issues and solutions |
+### Documentation Categories
+
+| Category | Path | Description |
+|----------|------|-------------|
+| **Architecture** | [/architecture](./architecture/) | System architecture, directory structure, API design |
+| **Standards** | [/standards](./standards/) | UI standards, email templates, brand guidelines |
+| **Guides** | [/guides](./guides/) | User guide, implementation guide, best practices |
+| **Infrastructure** | [/infrastructure](./infrastructure/) | Redis, database, deployment setup |
+| **Features** | [/features](./features/) | Claims, content generation, templates |
+| **Testing** | [/testing](./testing/) | Test plans, reports, manual testing |
+| **QA** | [/qa](./qa/) | QA resources, issue tracking, implementation guides |
+| **API** | [/api](./api/) | API documentation and architecture |
+| **Setup** | [/setup](./setup/) | Installation, migration, storage configuration |
+| **PRD** | [/PRD](./PRD/) | Complete product requirements documentation |
+| **Project Overview** | [/project-overview](./project-overview/) | Platform overview and executive summaries |
+| **Communications** | [/communications](./communications/) | External communications and announcements |
+
+### Key Documents
+
+- **[Documentation Index](./index.md)** - Complete navigation of all documentation
+- **[System Architecture](./architecture/system-architecture.md)** - Complete technical architecture
+- **[Implementation Guide](./guides/implementation-guide.md)** - Development standards and patterns
+- **[UI Standards](./standards/consolidated-ui-standards.md)** - UI/UX component guidelines
+- **[User Guide](./guides/user-guide.md)** - End-user documentation
 
 ## Quick Navigation
 
 ### For Users
-- [Getting Started Guide](./USER_GUIDE.md#getting-started)
-- [Brand Management](./USER_GUIDE.md#brand-management)
-- [Content Creation](./USER_GUIDE.md#content-creation)
-- [Workflow Setup](./USER_GUIDE.md#workflow-management)
+- [Getting Started Guide](./guides/user-guide.md#getting-started)
+- [Brand Management](./guides/user-guide.md#brand-management)
+- [Content Creation](./guides/user-guide.md#content-creation)
+- [Workflow Setup](./guides/user-guide.md#workflow-management)
 
 ### For Developers
-- [Project Architecture](./ARCHITECTURE.md)
-- [API Integration](./API_REFERENCE.md)
-- [Database Setup](./DATABASE.md)
-- [Development Environment](./DEVELOPMENT.md)
+- [System Architecture](./architecture/system-architecture.md)
+- [Implementation Standards](./guides/implementation-guide.md)
+- [UI Component Guidelines](./standards/consolidated-ui-standards.md)
+- [API Architecture](./api/api-architecture-review.md)
+- [API Error Reference](./architecture/api-errors-fix-guide.md)
+
+### For QA Teams
+- [QA Onboarding](./qa/qa-onboarding-checklist.md)
+- [Test Plans](./qa/comprehensive-test-plan.md)
+- [Manual Testing](./testing/manual-testing-checklist.md)
+- [Issue Guidelines](./qa/github-issue-guidelines.md)
 
 ### For Administrators
-- [Deployment Guide](./DEPLOYMENT.md)
-- [User Management](./AUTHENTICATION.md)
-- [Security Configuration](./SECURITY.md)
+- [Infrastructure Setup](./infrastructure/infrastructure-redis-setup.md)
+- [Storage Configuration](./setup/storage-setup.md)
+- [Migration Guide](./setup/migration-path-update-summary.md)
+- [Directory Organization](./architecture/directory-structure.md)
+- [Email Templates](./standards/email-template-standards.md)
 
 ## Support
 
-- **Documentation Issues**: Check [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
-- **Security Issues**: See [SECURITY.md](./SECURITY.md) for reporting procedures
-- **Development Help**: Review [DEVELOPMENT.md](./DEVELOPMENT.md) and [ARCHITECTURE.md](./ARCHITECTURE.md)
+- **Implementation Help**: Review [Implementation Guide](./guides/implementation-guide.md)
+- **Architecture Questions**: See [System Architecture](./architecture/system-architecture.md)
+- **UI/UX Standards**: Check [UI Standards](./standards/consolidated-ui-standards.md)
+- **Security Issues**: See [SECURITY.md](../SECURITY.md) in project root
 
 ## License
 

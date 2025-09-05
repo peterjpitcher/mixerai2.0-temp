@@ -222,6 +222,7 @@ export default function NewWorkflowPage() {
         if (!templatesResponse.ok) throw new Error(`Failed to fetch content templates: ${templatesResponse.status}`);
         const templatesData = await templatesResponse.json();
         if (!templatesData.success) throw new Error(templatesData.error || 'Failed to fetch content templates data');
+        console.log('Fetched templates:', templatesData.templates);
         setContentTemplates(Array.isArray(templatesData.templates) ? templatesData.templates : []);
 
       } catch (error) {
@@ -512,6 +513,15 @@ export default function NewWorkflowPage() {
       ];
       setAssigneeInputs(prevInputs => [...prevInputs, '']); // Add input state for new step
       setUserSearchResults(prevResults => ({...prevResults, [newSteps.length -1]: []})); // Init search results for new step
+      
+      // Scroll to the new step after it's added
+      setTimeout(() => {
+        const newStepElement = document.getElementById(`step-${newStepId}`);
+        if (newStepElement) {
+          newStepElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+      
       return { ...prevWorkflow, steps: newSteps };
     });
   };
@@ -583,6 +593,10 @@ export default function NewWorkflowPage() {
     }
     if (!workflow.brand_id) {
       toast.error('Please select a brand for the workflow.');
+      return false;
+    }
+    if (!workflow.template_id) {
+      toast.error('Please select a content template for the workflow.');
       return false;
     }
     if (workflow.steps.length === 0) {
@@ -770,7 +784,7 @@ export default function NewWorkflowPage() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="contentTemplate">Content Template (Optional)</Label>
+                <Label htmlFor="contentTemplate">Content Template <span className="text-destructive">*</span></Label>
                 <Select 
                   value={selectedTemplateId} 
                   onValueChange={handleUpdateTemplate}
@@ -780,12 +794,17 @@ export default function NewWorkflowPage() {
                     <SelectValue placeholder={!workflow.brand_id ? "Select a brand first" : isLoadingBrandWorkflows ? "Loading templates..." : "Select a content template"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="NO_TEMPLATE_SELECTED">No Template</SelectItem>
-                    {availableContentTemplates.map((template) => (
-                      <SelectItem key={template.id} value={template.id}>
-                        {template.name}
-                      </SelectItem>
-                    ))}
+                    {availableContentTemplates.length === 0 && contentTemplates.length === 0 ? (
+                      <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                        No templates available. Please create a content template first.
+                      </div>
+                    ) : (
+                      availableContentTemplates.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          {template.name}
+                        </SelectItem>
+                      ))
+                    )}
                     {workflow.brand_id && !isLoadingBrandWorkflows && availableContentTemplates.length === 0 && contentTemplates.length > 0 && (
                         <div className="px-2 py-3 text-sm text-muted-foreground text-center">
                             All templates are in use for this brand.
@@ -833,7 +852,7 @@ export default function NewWorkflowPage() {
             ) : (
               <div className="space-y-6">
                 {workflow.steps.map((step, index) => (
-                  <div key={step.id} className="border rounded-lg p-4 bg-background">
+                  <div key={step.id} id={`step-${step.id}`} className="border rounded-lg p-4 bg-background">
                     {/* Step Header: Number, Name Input, Action Buttons */}
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">

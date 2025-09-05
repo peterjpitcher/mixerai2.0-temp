@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 // import { Database } from '@/types/supabase';
 import { withAdminAuthAndCSRF } from '@/lib/auth/api-auth';
-import { User } from '@supabase/supabase-js';
+import { handleApiError } from '@/lib/api-utils';
 
 // Initialize Supabase client with SERVICE_ROLE_KEY for admin actions
 // Ensure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in your environment variables
@@ -20,15 +20,64 @@ export const POST = withAdminAuthAndCSRF(async function (request: NextRequest) {
     }
 
     // Determine the application URL for the redirect
-    // Ensure NEXT_PUBLIC_APP_URL is set in your environment, e.g., http://localhost:3000 or your production URL
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const redirectTo = `${appUrl}/auth/confirm`; // Or your desired confirmation/welcome page
+    // Try multiple sources for the URL
+    const protocol = request.headers.get('x-forwarded-proto') || 'https';
+    const host = request.headers.get('host') || request.headers.get('x-forwarded-host');
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                   process.env.NEXT_PUBLIC_SITE_URL ||
+                   (host ? `${protocol}://${host}` : 'http://localhost:3000');
+    const redirectTo = `${appUrl}/auth/confirm`;
 
-    // Resend the signup confirmation email. 
-    // This is suitable if the user was created (e.g., via inviteUserByEmail or direct creation)
-    // but has not confirmed their email / signed up yet.
+    console.log('Resending invite to:', email, 'with redirect to:', redirectTo);
+
+    // First, check if the user exists and get their current status
+    const { data: { users }, error: searchError } = await supabaseAdmin.auth.admin.listUsers();
+    
+    if (searchError) {
+      console.error('Error searching for user:', searchError);
+      return handleApiError(searchError, 'Failed to search for user');
+    }
+
+    const user = users?.find(u => u.email === email);
+    
+    if (!user) {
+      // User doesn't exist, need to invite them first
+      const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        redirectTo: redirectTo,
+      });
+      
+      if (inviteError) {
+        console.error('Error inviting user:', inviteError);
+        return handleApiError(inviteError, 'Failed to send invitation');
+      }
+      
+      return NextResponse.json({ 
+        success: true, 
+        message: 'New invitation sent successfully.' 
+      });
+    }
+
+    // User exists, check if they're already confirmed
+    if (user.email_confirmed_at) {
+      // User already confirmed, send a password reset instead
+      const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+        redirectTo: `${appUrl}/auth/reset-password`,
+      });
+      
+      if (resetError) {
+        console.error('Error sending password reset:', resetError);
+        return handleApiError(resetError, 'Failed to send password reset');
+      }
+      
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Password reset email sent (user already confirmed).' 
+      });
+    }
+
+    // User exists but not confirmed, resend the signup confirmation
     const { error } = await supabaseAdmin.auth.resend({
-      type: 'signup', // Use 'signup' to resend the initial confirmation for an existing invited user
+      type: 'signup',
       email: email,
       options: {
         emailRedirectTo: redirectTo,

@@ -593,11 +593,10 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   return (
     <div className="space-y-6">
       <BreadcrumbNav items={[
-        { label: "Dashboard", href: "/dashboard" },
         { label: "Content", href: "/dashboard/content" },
         { label: content.title || "Loading Content...", href: `/dashboard/content/${id}` },
         { label: "Edit" }
-      ]} />
+      ]} showHome={true} />
 
       <div className="flex items-center mb-4">
         <Button variant="outline" size="icon" onClick={() => router.push(`/dashboard/content/${id}`)} aria-label="View Content">

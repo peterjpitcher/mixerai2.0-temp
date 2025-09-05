@@ -6,6 +6,7 @@ import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import type { InputField, OutputField } from '@/types/template'; // Import field types
 import { User } from '@supabase/supabase-js';
 import { createApiErrorResponse } from '@/lib/api-error-handler';
+import { OutputFieldSchema, InputFieldSchema } from '@/lib/schemas/template';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -94,10 +95,28 @@ export const GET = withAuth(async (
     const { fields, ...restOfTemplate } = templateFromDb;
     // Cast fields to the specific type
     const typedFields = fields as TemplateFieldsColumn | null | undefined;
+    
+    // Parse fields through Zod schema to ensure proper defaults
+    const inputFields = (typedFields?.inputFields || []).map(field => {
+      try {
+        return InputFieldSchema.parse(field);
+      } catch {
+        return field; // Fallback to original if parsing fails
+      }
+    });
+    
+    const outputFields = (typedFields?.outputFields || []).map(field => {
+      try {
+        return OutputFieldSchema.parse(field);
+      } catch {
+        return field; // Fallback to original if parsing fails
+      }
+    });
+    
     const responseTemplate = {
       ...restOfTemplate,
-      inputFields: typedFields?.inputFields || [],
-      outputFields: typedFields?.outputFields || []
+      inputFields,
+      outputFields
     };
     
     // console.log('API Route - Successfully fetched template:', responseTemplate?.id);
@@ -225,10 +244,28 @@ export const PUT = withAuthAndCSRF(async (
     const { fields: updatedFieldsData, ...restOfUpdatedTemplate } = updatedTemplateFromDb;
     // Cast updatedFieldsData to the specific type
     const typedUpdatedFields = updatedFieldsData as TemplateFieldsColumn | null | undefined;
+    
+    // Parse fields through Zod schema to ensure proper defaults
+    const parsedInputFields = (typedUpdatedFields?.inputFields || []).map(field => {
+      try {
+        return InputFieldSchema.parse(field);
+      } catch {
+        return field; // Fallback to original if parsing fails
+      }
+    });
+    
+    const parsedOutputFields = (typedUpdatedFields?.outputFields || []).map(field => {
+      try {
+        return OutputFieldSchema.parse(field);
+      } catch {
+        return field; // Fallback to original if parsing fails
+      }
+    });
+    
     const responseUpdatedTemplate = {
       ...restOfUpdatedTemplate,
-      inputFields: typedUpdatedFields?.inputFields || [],
-      outputFields: typedUpdatedFields?.outputFields || []
+      inputFields: parsedInputFields,
+      outputFields: parsedOutputFields
     };
 
     return NextResponse.json({

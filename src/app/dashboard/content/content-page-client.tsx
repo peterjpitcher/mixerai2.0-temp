@@ -303,7 +303,7 @@ export default function ContentPageClient() {
         )}
         <div>
           <Link 
-            href="/dashboard/help?article=03-content" 
+            href="/dashboard/help#content" 
             className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
           >
             <HelpCircle className="h-4 w-4" />

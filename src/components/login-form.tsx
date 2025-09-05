@@ -52,6 +52,9 @@ export function LoginForm() {
       });
 
       if (signInError) {
+        // Clear password field for security
+        setPassword("");
+        
         // Record failed attempt
         await recordLoginAttempt(email, ip, false);
         
@@ -62,12 +65,16 @@ export function LoginForm() {
           setError(`Account has been locked due to too many failed attempts. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`);
         } else {
           const remainingAttempts = 5 - (newLockStatus.attempts || 0);
-          setError(`${signInError.message}${remainingAttempts < 3 ? ` (${remainingAttempts} attempt${remainingAttempts > 1 ? 's' : ''} remaining)` : ''}`);
+          // Use consistent error message wording
+          const errorMessage = signInError.message === "Invalid login credentials" 
+            ? "Invalid email or password" 
+            : signInError.message;
+          setError(`${errorMessage}${remainingAttempts < 3 ? ` (${remainingAttempts} attempt${remainingAttempts > 1 ? 's' : ''} remaining)` : ''}`);
         }
         
         // Only show toast for actual login attempts, not for session validation errors
         if (email && password) {
-          toast.error(signInError.message);
+          toast.error(signInError.message === "Invalid login credentials" ? "Invalid email or password" : signInError.message);
         }
       } else {
         // Record successful attempt
@@ -78,6 +85,8 @@ export function LoginForm() {
         router.refresh();
       }
     } catch (err) {
+      // Clear password field for security
+      setPassword("");
       setError("An unexpected error occurred. Please try again.");
       toast.error(err instanceof Error ? err.message : "An unexpected error occurred. Please try again.");
     } finally {

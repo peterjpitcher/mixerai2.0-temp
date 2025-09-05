@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import { User } from '@supabase/supabase-js';
 
 // GET /api/users/[id]/brand-removal-impact?brand_id=[brandId]
 // Check the impact of removing a user from a brand
-export const GET = withAuth(async (request: NextRequest, user: any, context?: unknown) => {
+export const GET = withAuth(async (request: NextRequest, user: User, context?: unknown) => {
   try {
     const { params } = context as { params: { id: string } };
     const url = new URL(request.url);

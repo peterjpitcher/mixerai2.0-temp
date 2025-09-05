@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronUp, Plus, Trash2, XCircle, Loader2, ArrowLeft, ShieldAlert, UserPlus, Info } from 'lucide-react'; // Added Info
-import debounce from 'lodash.debounce';
+import { debounce } from 'lodash';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { cn } from '@/lib/utils';
 import { BrandIcon } from '@/components/brand-icon';
@@ -545,6 +545,15 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
       ];
       setAssigneeInputs(prevInputs => [...prevInputs, '']);
       setUserSearchResults(prevResults => ({...prevResults, [newSteps.length -1]: []}));
+      
+      // Scroll to the new step after it's added
+      setTimeout(() => {
+        const newStepElement = document.getElementById(`step-${newStepId}`);
+        if (newStepElement) {
+          newStepElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+      
       return { ...prevWorkflow, steps: newSteps };
     });
   };
@@ -621,6 +630,10 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
     }
     if (!workflow.brand_id) {
       toast.error('Please select a brand for the workflow.');
+      return false;
+    }
+    if (!selectedTemplateId || selectedTemplateId === 'NO_TEMPLATE_SELECTED') {
+      toast.error('Please select a content template for the workflow.');
       return false;
     }
     if (workflow.steps.length === 0) {
@@ -795,11 +808,11 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
       <Button 
         variant="ghost" 
         size="sm" 
-        onClick={() => router.push(isDuplicated ? '/dashboard/workflows' : `/dashboard/workflows/${id}`)}
+        onClick={() => router.push('/dashboard/workflows')}
         className="mb-4"
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to {isDuplicated ? 'Workflows' : 'Workflow'}
+        Back to Workflows
       </Button>
 
       {currentBrandForDisplay && (
@@ -864,7 +877,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
               
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select value={workflow.status || 'draft'} onValueChange={handleUpdateWorkflowStatus} disabled={!canEditThisWorkflow}>
+                <Select value={workflow.status || ''} onValueChange={handleUpdateWorkflowStatus} disabled={!canEditThisWorkflow}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
@@ -902,7 +915,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="contentTemplate">Content Template (Optional)</Label>
+                <Label htmlFor="contentTemplate">Content Template <span className="text-destructive">*</span></Label>
                 <Select 
                   value={selectedTemplateId || 'NO_TEMPLATE_SELECTED'} 
                   onValueChange={handleUpdateTemplate} 
@@ -954,7 +967,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
             ) : (
               <div className="space-y-6">
                 {workflow.steps.map((step: WorkflowStepDefinition, index: number) => (
-                  <div key={step.id || `step-${index}`} className="border rounded-lg p-4 bg-card">
+                  <div key={step.id || `step-${index}`} id={`step-${step.id}`} className="border rounded-lg p-4 bg-card">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
                         <span className="flex items-center justify-center w-6 h-6 bg-primary text-primary-foreground rounded-full text-xs font-medium">

@@ -100,7 +100,7 @@ export default function NewTemplatePage() {
             </div>
         </div>
         <Link 
-          href="/dashboard/help?article=04-templates" 
+          href="/dashboard/help#templates" 
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <HelpCircle className="h-4 w-4" />

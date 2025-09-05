@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Loader2, Globe, ArrowLeft, AlertTriangle, ExternalLink, Languages, History } from 'lucide-react';
+import { Loader2, Globe, ArrowLeft, AlertTriangle, ExternalLink, Languages, History, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -407,6 +407,38 @@ export default function MetadataGeneratorPage() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const errorResults = results.filter(r => r.error);
 
+  const handleExportCSV = () => {
+    if (results.length === 0) {
+      toast.error('No results to export');
+      return;
+    }
+
+    const csvContent = [
+      // Headers
+      ['URL', 'Meta Title', 'Meta Description', 'Keywords', 'Status'],
+      // Data rows
+      ...results.map(result => [
+        result.url,
+        result.metaTitle || '',
+        result.metaDescription || '',
+        result.keywords?.join('; ') || '',
+        result.error ? 'Error' : 'Success'
+      ])
+    ]
+      .map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const timestamp = new Date().toISOString().split('T')[0];
+    link.href = URL.createObjectURL(blob);
+    link.download = `metadata-generator-results-${timestamp}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    
+    toast.success('Results exported successfully');
+  };
+
   // --- Loading and Access Denied States ---
   if (isLoadingUser || isCheckingPermissions) {
     return (
@@ -549,6 +581,12 @@ export default function MetadataGeneratorPage() {
                         Review the generated metadata or errors for each URL.
                     </CardDescription>
                 </div>
+                {results.length > 0 && !isLoading && (
+                    <Button onClick={handleExportCSV} variant="outline" size="sm">
+                        <Download className="h-4 w-4 mr-2" />
+                        Export CSV
+                    </Button>
+                )}
             </CardHeader>
             <CardContent>
               {results.length > 0 && !isLoading && (

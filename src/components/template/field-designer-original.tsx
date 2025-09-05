@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { v4 as uuidv4 } from 'uuid';
 import { toast as sonnerToast } from 'sonner';
 import { Info } from 'lucide-react';
+import { ensureBooleanDefaults } from '@/lib/utils/object';
 import { 
   FieldType as GlobalFieldType,
   GenericField as Field,
@@ -83,13 +84,23 @@ const LongTextOptionsComponent = ({ options, onChange }: { options: LongTextOpti
       />
     </div>
     <div>
-      <Label htmlFor="rows">Rows</Label>
+      <Label htmlFor="rows">Display Rows</Label>
       <Input
         id="rows"
         type="number"
         value={options.rows || ''}
         onChange={(e) => onChange({ rows: parseInt(e.target.value) || undefined })}
-        placeholder="Number of rows"
+        placeholder="Initial height (rows)"
+      />
+    </div>
+    <div>
+      <Label htmlFor="maxRows">Max Rows <span className="text-xs text-muted-foreground">(Line limit)</span></Label>
+      <Input
+        id="maxRows"
+        type="number"
+        value={options.maxRows || ''}
+        onChange={(e) => onChange({ maxRows: parseInt(e.target.value) || undefined })}
+        placeholder="Maximum lines allowed"
       />
     </div>
   </div>
@@ -433,7 +444,8 @@ const initializeFieldData = (fieldType: 'input' | 'output', initialData: Field |
     };
     return inputData;
   } else if (fieldType === 'output' && isOutputField(initialData)) {
-    const outputData: OutputField = {
+    // Ensure boolean fields have explicit values
+    const outputData: OutputField = ensureBooleanDefaults({
       id: initialData.id,
       name: initialData.name,
       type: initialData.type,
@@ -441,12 +453,12 @@ const initializeFieldData = (fieldType: 'input' | 'output', initialData: Field |
       options: initialData.options || {},
       aiPrompt: initialData.aiPrompt || '',
       aiAutoComplete: initialData.aiAutoComplete ?? true,
-      useBrandIdentity: initialData.useBrandIdentity || false,
-      useToneOfVoice: initialData.useToneOfVoice || false,
-      useGuardrails: initialData.useGuardrails || false,
+      useBrandIdentity: initialData.useBrandIdentity ?? false,
+      useToneOfVoice: initialData.useToneOfVoice ?? false,
+      useGuardrails: initialData.useGuardrails ?? false,
       description: initialData.description,
       helpText: initialData.helpText
-    };
+    }, ['aiAutoComplete', 'useBrandIdentity', 'useToneOfVoice', 'useGuardrails']);
     return outputData;
   }
   
@@ -469,6 +481,7 @@ export function FieldDesigner({
   
   const [activeTab, setActiveTab] = useState('basic');
   const aiPromptRef = useRef<HTMLTextAreaElement>(null);
+  const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
   
   useEffect(() => {
     setFieldData(initializeFieldData(fieldType, initialData));
@@ -557,16 +570,30 @@ export function FieldDesigner({
     });
   };
   
+  const onPromptSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+    const el = e.currentTarget;
+    setSelection({ start: el.selectionStart ?? 0, end: el.selectionEnd ?? 0 });
+  };
+  
   const insertTextIntoPrompt = (textToInsert: string) => {
     const textArea = aiPromptRef.current;
-    if (!textArea) return;
+    if (!textArea) {
+      console.warn('insertTextIntoPrompt: aiPromptRef.current is null');
+      return;
+    }
 
-    // Get the current selection position
-    const selectionStart = textArea.selectionStart ?? 0;
-    const selectionEnd = textArea.selectionEnd ?? 0;
+    // Get current value from state to ensure consistency
+    const currentPrompt = fieldData.aiPrompt || '';
     
-    // Get current value from the textarea (not state, to get the most current value)
-    const currentPrompt = textArea.value || '';
+    // Check if textarea is focused and has a selection
+    let selectionStart = textArea.selectionStart ?? currentPrompt.length;
+    let selectionEnd = textArea.selectionEnd ?? currentPrompt.length;
+    
+    // If textarea is not focused or selection is at the beginning, append at the end
+    if (document.activeElement !== textArea || (selectionStart === 0 && selectionEnd === 0 && currentPrompt.length > 0)) {
+      selectionStart = currentPrompt.length;
+      selectionEnd = currentPrompt.length;
+    }
     
     // Create the new prompt with the inserted text
     const newPrompt = 
@@ -586,14 +613,13 @@ export function FieldDesigner({
     // Calculate new cursor position
     const newCursorPosition = selectionStart + textToInsert.length;
     
-    // Set focus and cursor position immediately
-    // We need a small delay to ensure React has updated the textarea value
+    // Set focus and cursor position after React has updated the textarea value
     setTimeout(() => {
-      if (textArea) {
-        textArea.focus();
-        textArea.setSelectionRange(newCursorPosition, newCursorPosition);
+      if (aiPromptRef.current) {
+        aiPromptRef.current.focus();
+        aiPromptRef.current.setSelectionRange(newCursorPosition, newCursorPosition);
       }
-    }, 0);
+    }, 10);
   };
 
   const insertPlaceholder = (textToInsert: string) => {
@@ -601,19 +627,39 @@ export function FieldDesigner({
   };
 
   const insertBrandDataOrPlaceholder = (placeholderKey: 'name' | 'identity' | 'tone_of_voice' | 'guardrails' | 'summary' | 'brandObject') => {
-    let placeholder = '';
-    switch (placeholderKey) {
-      case 'name': placeholder = '{{brand.name}}'; break;
-      case 'identity': placeholder = '{{brand.identity}}'; break;
-      case 'tone_of_voice': placeholder = '{{brand.tone_of_voice}}'; break;
-      case 'guardrails': placeholder = '{{brand.guardrails}}'; break;
-      case 'summary': placeholder = '{{brand.summary}}'; break;
-      case 'brandObject': placeholder = '{{brand}}'; break;
-      default: 
-        console.warn(`insertBrandDataOrPlaceholder called with unknown key: ${placeholderKey}`);
-        return; // Do nothing if key is unknown
-    }
-    insertTextIntoPrompt(placeholder);
+    const map = {
+      name: '{{brand.name}}',
+      identity: '{{brand.identity}}',
+      tone_of_voice: '{{brand.tone_of_voice}}',
+      guardrails: '{{brand.guardrails}}',
+      summary: '{{brand.summary}}',
+      brandObject: '{{brand}}',
+    } as const;
+
+    const insert = map[placeholderKey];
+    if (!insert) return;
+
+    setFieldData(prev => {
+      const current = prev.aiPrompt ?? '';
+      if (selection) {
+        const { start, end } = selection;
+        const next = current.slice(0, start) + insert + current.slice(end);
+        return { ...prev, aiPrompt: next } as Field;
+      }
+      // Fallback: append
+      const sep = current && !current.endsWith(' ') ? ' ' : '';
+      return { ...prev, aiPrompt: current + sep + insert } as Field;
+    });
+
+    // Best-effort focus + caret placement next frame
+    requestAnimationFrame(() => {
+      const el = aiPromptRef.current;
+      if (el) {
+        const caret = (selection?.start ?? (el.value?.length ?? 0)) + insert.length;
+        el.focus();
+        el.setSelectionRange(caret, caret);
+      }
+    });
   };
   
   // The useEffect for aiPromptRef focusing is now handled by insertTextIntoPrompt
@@ -671,7 +717,17 @@ export function FieldDesigner({
     if (!finalFieldData.options) {
         finalFieldData.options = {};
     }
-    onSave(finalFieldData as Field, isNew);
+    
+    // Ensure boolean fields are explicitly set for output fields
+    if (fieldType === 'output' && isOutputField(finalFieldData)) {
+      const outputField = ensureBooleanDefaults(
+        finalFieldData,
+        ['aiAutoComplete', 'useBrandIdentity', 'useToneOfVoice', 'useGuardrails']
+      );
+      onSave(outputField as Field, isNew);
+    } else {
+      onSave(finalFieldData as Field, isNew);
+    }
   };
   
   const inputFieldData = fieldType === 'input' ? fieldData as InputField : null;
@@ -815,7 +871,7 @@ export function FieldDesigner({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onCancel(); }}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isNew ? 'Add' : 'Edit'} {fieldType === 'input' ? 'Input' : 'Output'} Field</DialogTitle>
           <DialogDescription>
@@ -869,6 +925,7 @@ export function FieldDesigner({
                     ref={aiPromptRef}
                     value={fieldData.aiPrompt || ''} 
                     onChange={handleAIPromptChange}
+                    onSelect={onPromptSelect}
                     placeholder={fieldType === 'input' 
                       ? "e.g., Suggest 3-5 relevant keywords for {{topic}}."
                       : "e.g., Write an article about {{topic}} using keywords: {{keywords}}."
@@ -904,7 +961,7 @@ export function FieldDesigner({
                 <p className="text-xs text-muted-foreground flex items-center">
                   <Info size={14} className="mr-1.5 text-blue-500" />
                   You can use placeholders like <code>{`{{inputFieldName}}`}</code> to reference other input fields. 
-                  <Link href="/dashboard/help?article=04-templates" className="ml-1 text-blue-600 hover:underline text-xs">Learn more.</Link>
+                  <Link href="/dashboard/help#templates" className="ml-1 text-blue-600 hover:underline text-xs">Learn more.</Link>
                 </p>
 
                 <div className="space-y-1 pt-3">

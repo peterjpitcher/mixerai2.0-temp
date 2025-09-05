@@ -967,6 +967,7 @@ export async function generateAltText(
   }
 ): Promise<{ // Return type updated to match expected JSON structure
   altText: string;
+  detectedLanguage?: string; // Add detected language to return type
 }> {
   const deploymentName = getModelName(); // Get the deployment/model name
 
@@ -981,10 +982,18 @@ export async function generateAltText(
 
   let systemPrompt = `You are an AI assistant specialized in generating concise and accurate alternative text for images.
 Analyze the provided image and generate a descriptive alt text in ${brandLanguage}.
+
+CRITICAL REQUIREMENTS:
+1. The alt text MUST be 125 characters or less for SEO and accessibility.
+2. Be concise and focus only on the most important elements.
+3. Prioritize the main subject and essential context.
+
 Focus on the main subject, context, and any relevant text visible in the image.
 Be factual and avoid subjective interpretations.
 IMPORTANT: Do NOT include color descriptions in the alt text for accessibility reasons. Focus on shape, size, position, content, and function instead of colors.
-If the image is decorative and doesn't convey information, you can indicate that, but prefer descriptive text if possible.`;
+If the image is decorative and doesn't convey information, you can indicate that, but prefer descriptive text if possible.
+
+LANGUAGE DETECTION: If you detect any text in the image, identify its language using ISO 639-1 two-letter codes (e.g., 'en' for English, 'fr' for French, 'de' for German, 'es' for Spanish, etc.). If no text is visible or the language cannot be determined, omit the detectedLanguage field.`;
 
   if (brandContext?.toneOfVoice) {
     systemPrompt += `\nAdhere to the following tone of voice: ${brandContext.toneOfVoice}.`;
@@ -996,7 +1005,18 @@ If the image is decorative and doesn't convey information, you can indicate that
     systemPrompt += `\nFollow these content guardrails: ${brandContext.guardrails}.`;
   }
   
-  systemPrompt += `\nYour response MUST be a JSON object with a single key "altText" containing the generated alt text string. For example: {"altText": "A descriptive alt text goes here."}. Do NOT include any other text, explanations, or the original URL in your response.`;
+  systemPrompt += `\nYour response MUST be a JSON object with:
+1. "altText" key containing the generated alt text string (MAXIMUM 125 CHARACTERS)
+2. "detectedLanguage" key (optional) containing the ISO 639-1 code of any text detected in the image
+
+IMPORTANT: The altText value MUST NOT exceed 125 characters. Be extremely concise.
+
+Examples:
+- If French text is detected: {"altText": "Product label with French ingredient text", "detectedLanguage": "fr"}
+- If no text is visible: {"altText": "Mountain landscape photograph"}
+- If English text is detected: {"altText": "Business hours sign display", "detectedLanguage": "en"}
+
+Do NOT include any other text, explanations, or the original URL in your response.`;
 
   const userTextMessage = "Generate alt text for the provided image based on the system instructions.";
   
@@ -1043,6 +1063,10 @@ If the image is decorative and doesn't convey information, you can indicate that
     // Start tracking the request
     const requestId = activityTracker.startRequest('generateAltText');
     
+    // Add timeout to prevent gateway timeouts
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+    
     const response = await fetch(endpointUrl, {
       method: 'POST',
       headers: {
@@ -1050,6 +1074,9 @@ If the image is decorative and doesn't convey information, you can indicate that
         'api-key': apiKey,
       },
       body: JSON.stringify(completionRequest),
+      signal: controller.signal,
+    }).finally(() => {
+      clearTimeout(timeoutId);
     });
 
     // Extract rate limit headers (Azure OpenAI format)
@@ -1080,7 +1107,26 @@ If the image is decorative and doesn't convey information, you can indicate that
       const parsedJson = JSON.parse(content.trim());
       if (typeof parsedJson.altText === 'string') {
         // console.log(`[generateAltText] Successfully parsed alt text: ${parsedJson.altText}`);
-        return { altText: parsedJson.altText.trim() };
+        
+        // Enforce 125 character limit
+        let altText = parsedJson.altText.trim();
+        if (altText.length > 125) {
+          console.warn(`[generateAltText] Alt text exceeded 125 characters (${altText.length}), truncating...`);
+          // Truncate to 122 chars and add ellipsis
+          altText = altText.substring(0, 122) + '...';
+        }
+        
+        const result: { altText: string; detectedLanguage?: string } = { 
+          altText 
+        };
+        
+        // Include detected language if provided by AI
+        if (typeof parsedJson.detectedLanguage === 'string') {
+          result.detectedLanguage = parsedJson.detectedLanguage.toLowerCase();
+          // console.log(`[generateAltText] Language detected in image: ${result.detectedLanguage}`);
+        }
+        
+        return result;
       } else {
         console.error('[generateAltText] Parsed JSON does not contain a valid "altText" string field.', { parsedJson });
         throw new Error('AI response was valid JSON but missing "altText" field or it was not a string.');
@@ -1092,8 +1138,13 @@ If the image is decorative and doesn't convey information, you can indicate that
 
   } catch (error) {
     console.error(`[generateAltText] Error generating alt text for ${imageUrl}:`, error);
+    
+    // Handle abort/timeout specifically
     if (error instanceof Error) {
-        throw error;
+      if (error.name === 'AbortError') {
+        throw new Error('Request timed out after 25 seconds. Please try again with a smaller image or check your connection.');
+      }
+      throw error;
     }
     throw new Error(`Failed to generate alt text: ${String(error)}`);
   }

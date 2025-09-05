@@ -23,7 +23,7 @@ export type FieldType =
   | 'recipeUrl';
 
 export interface ShortTextOptions { minLength?: number; maxLength?: number; placeholder?: string; }
-export interface LongTextOptions { minWords?: number; maxWords?: number; placeholder?: string; rows?: number; maxLength?: number; }
+export interface LongTextOptions { minWords?: number; maxWords?: number; placeholder?: string; rows?: number; maxRows?: number; maxLength?: number; }
 export interface RichTextOptions { placeholder?: string; allowImages?: boolean; toolbarOptions?: string[]; }
 export interface SelectOptions { choices?: Array<{ label: string; value: string }>; allowMultiple?: boolean; multiple?: boolean; }
 export interface NumberOptions { min?: number; max?: number; step?: number; placeholder?: string; }
@@ -118,4 +118,5 @@ export interface ContentTemplate {
   created_at: string | null;
   created_by: string | null;
   updated_at: string | null;
+  include_title?: boolean; // Whether to include a title field when creating content
 } 

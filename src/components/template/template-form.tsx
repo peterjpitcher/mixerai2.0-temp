@@ -25,9 +25,10 @@ type TemplateData = ContentTemplate;
 
 interface TemplateFormProps {
   initialData?: TemplateData;
+  isReadOnly?: boolean;
 }
 
-export function TemplateForm({ initialData }: TemplateFormProps) {
+export function TemplateForm({ initialData, isReadOnly = false }: TemplateFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('input');
@@ -135,6 +136,11 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent submission in read-only mode
+    if (isReadOnly) {
+      return;
+    }
     
     if (!templateData.name) {
       toast.error('Template name is required');
@@ -265,21 +271,23 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
             <TabsContent value="input" className="mt-4">
               <FieldList 
                 fields={templateData.inputFields || []} 
-                onAddField={handleAddField} 
-                onEditField={handleEditField} 
-                onDeleteField={handleFieldDelete} 
-                onDragEnd={handleDragEnd} 
+                onAddField={isReadOnly ? undefined : handleAddField} 
+                onEditField={isReadOnly ? undefined : handleEditField} 
+                onDeleteField={isReadOnly ? undefined : handleFieldDelete} 
+                onDragEnd={isReadOnly ? undefined : handleDragEnd} 
                 fieldType="input"
+                isReadOnly={isReadOnly}
               />
             </TabsContent>
             <TabsContent value="output" className="mt-4">
               <FieldList 
                 fields={templateData.outputFields || []} 
-                onAddField={handleAddField} 
-                onEditField={handleEditField} 
-                onDeleteField={handleFieldDelete} 
-                onDragEnd={handleDragEnd} 
+                onAddField={isReadOnly ? undefined : handleAddField} 
+                onEditField={isReadOnly ? undefined : handleEditField} 
+                onDeleteField={isReadOnly ? undefined : handleFieldDelete} 
+                onDragEnd={isReadOnly ? undefined : handleDragEnd} 
                 fieldType="output"
+                isReadOnly={isReadOnly}
               />
             </TabsContent>
           </Tabs>
@@ -298,11 +306,15 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
       )}
 
       <CardFooter className="flex justify-end space-x-2 pt-6">
-        <Button type="button" variant="outline" onClick={() => router.push('/dashboard/templates')}>Cancel</Button>
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? <Icons.spinner className="mr-2 h-4 w-4 animate-spin" /> : null}
-          {initialData?.id && initialData.id !== 'new' ? 'Save Changes' : 'Create Template'}
+        <Button type="button" variant="outline" onClick={() => router.push('/dashboard/templates')}>
+          {isReadOnly ? 'Back' : 'Cancel'}
         </Button>
+        {!isReadOnly && (
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? <Icons.spinner className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {initialData?.id && initialData.id !== 'new' ? 'Save Changes' : 'Create Template'}
+          </Button>
+        )}
       </CardFooter>
     </form>
   );
@@ -310,16 +322,23 @@ export function TemplateForm({ initialData }: TemplateFormProps) {
 
 interface FieldListProps {
   fields: Field[];
-  onAddField: () => void;
-  onEditField: (field: Field) => void;
-  onDeleteField: (fieldId: string) => void;
-  onDragEnd: (result: DropResult) => void;
+  onAddField?: () => void;
+  onEditField?: (field: Field) => void;
+  onDeleteField?: (fieldId: string) => void;
+  onDragEnd?: (result: DropResult) => void;
   fieldType: 'input' | 'output';
+  isReadOnly?: boolean;
 }
 
-function FieldList({ fields, onAddField, onEditField, onDeleteField, onDragEnd, fieldType }: FieldListProps) {
+function FieldList({ fields, onAddField, onEditField, onDeleteField, onDragEnd, fieldType, isReadOnly = false }: FieldListProps) {
+  const handleDragEnd = (result: DropResult) => {
+    if (onDragEnd && !isReadOnly) {
+      onDragEnd(result);
+    }
+  };
+  
   return (
-    <DragDropContext onDragEnd={onDragEnd}>
+    <DragDropContext onDragEnd={handleDragEnd}>
       <Droppable droppableId={fieldType}>
         {(provided) => (
           <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-3">
@@ -340,18 +359,22 @@ function FieldList({ fields, onAddField, onEditField, onDeleteField, onDragEnd, 
                         <p className="text-xs text-muted-foreground">Type: {field.type} {field.required ? '(Required)' : ''}</p>
                       </div>
                     </div>
-                    <div className="space-x-2">
-                      <Button type="button" variant="outline" size="sm" onClick={() => onEditField(field)}>Edit</Button>
-                      <Button type="button" variant="destructive" size="sm" onClick={() => onDeleteField(field.id)}>Delete</Button>
-                    </div>
+                    {!isReadOnly && (
+                      <div className="space-x-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => onEditField && onEditField(field)}>Edit</Button>
+                        <Button type="button" variant="destructive" size="sm" onClick={() => onDeleteField && onDeleteField(field.id)}>Delete</Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </Draggable>
             ))}
             {provided.placeholder}
-            <Button type="button" variant="outline" onClick={onAddField} className="w-full mt-4">
-              <Icons.plus className="mr-2 h-4 w-4" /> Add {fieldType === 'input' ? 'Input' : 'Output'} Field
-            </Button>
+            {!isReadOnly && onAddField && (
+              <Button type="button" variant="outline" onClick={onAddField} className="w-full mt-4">
+                <Icons.plus className="mr-2 h-4 w-4" /> Add {fieldType === 'input' ? 'Input' : 'Output'} Field
+              </Button>
+            )}
           </div>
         )}
       </Droppable>

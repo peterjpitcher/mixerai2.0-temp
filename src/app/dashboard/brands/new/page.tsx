@@ -441,7 +441,7 @@ export default function NewBrandPage() {
           </div>
         </div>
         <Link 
-          href="/dashboard/help?article=02-brands" 
+          href="/dashboard/help#brands" 
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <HelpCircle className="h-4 w-4" />
