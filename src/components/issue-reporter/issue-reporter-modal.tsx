@@ -130,6 +130,14 @@ export function IssueReporterModal({ isOpen, onClose, preloadedScreenshot }: Iss
     setError(null);
     
     try {
+      // Get CSRF token from cookies
+      const getCSRFToken = (): string | null => {
+        const csrfMatch = document.cookie.match(/(?:^|;\s*)csrf-token=([^;]+)/);
+        return csrfMatch && csrfMatch[1] ? decodeURIComponent(csrfMatch[1]) : null;
+      };
+
+      const csrfToken = getCSRFToken();
+      
       const environment = {
         url: window.location.href,
         userAgent: navigator.userAgent,
@@ -140,11 +148,17 @@ export function IssueReporterModal({ isOpen, onClose, preloadedScreenshot }: Iss
         timestamp: new Date().toISOString(),
       };
 
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+      }
+
       const response = await fetch('/api/github/issues', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           ...data,
           screenshot,
