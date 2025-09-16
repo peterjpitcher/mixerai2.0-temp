@@ -599,6 +599,11 @@ The product context is provided in the user prompt.
           const { sanitizeHTML } = require('@/lib/sanitize/html-sanitizer');
           v = sanitizeHTML(v, { allow_images: false, allow_links: true, allow_tables: true });
         } catch {}
+        // Normalize stray tags and remove empty paragraphs produced by editors
+        v = v.replace(/<\s+p\s*>/g, '<p>')
+             .replace(/<\s*\/\s*p\s*>/g, '</p>')
+             .replace(/(?:<p>\s*<\/p>\s*){2,}/g, '')
+             .replace(/<p>\s*<\/p>/g, '');
       }
       const optionMax = (field.options && (field.options as any).maxLength) || undefined;
       const maxChars = field.maxChars || optionMax;
@@ -651,6 +656,42 @@ The product context is provided in the user prompt.
         }
         if (Object.keys(fallback).length) {
           json = fallback as any;
+        }
+      } catch {}
+    }
+
+    // Section-heading fallback: if the model returned a single essay with recognizable section headings,
+    // split content by output field names and map chunks to fields.
+    if (!hasAllKeys(json) && content) {
+      try {
+        const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        type Hit = { id: string; name: string; start: number };
+        const hits: Hit[] = [];
+        for (const f of (template.outputFields || [])) {
+          const name = String(f.name || '').trim();
+          if (!name) continue;
+          const pattern = new RegExp(`(^|\n|\r)\s*(?:#{1,4}\s*)?${escapeRegExp(name)}(?:\s*\([^\)]*\))?\s*(?:\n|\r|:)`, 'i');
+          const m = content.match(pattern);
+          if (m && typeof m.index === 'number') {
+            // compute absolute index of heading start
+            const start = m.index + (m[1] ? m[1].length : 0);
+            hits.push({ id: f.id, name, start });
+          }
+        }
+        hits.sort((a, b) => a.start - b.start);
+        if (hits.length >= 1) {
+          const sectionMap: Record<string, string> = {};
+          for (let i = 0; i < hits.length; i++) {
+            const curr = hits[i];
+            const next = hits[i + 1];
+            const chunk = content.slice(curr.start, next ? next.start : content.length);
+            // Remove the first line (heading) from the chunk
+            const chunkBody = chunk.replace(/^[^\n\r]*[\n\r]+/, '').trim();
+            sectionMap[curr.id] = chunkBody;
+          }
+          if (Object.keys(sectionMap).length) {
+            json = sectionMap as any;
+          }
         }
       } catch {}
     }
