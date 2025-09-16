@@ -516,19 +516,44 @@ The product context is provided in the user prompt.
   try {
     // console.log(`Making API call to Azure OpenAI deployment: ${deploymentName}`);
     
+    // Detect a long-form single-field HTML generation case
+    const isSingleField = Array.isArray(template.outputFields) && template.outputFields.length === 1;
+    const singleField = isSingleField ? (template.outputFields as any[])[0] : null;
+    const isSingleHtml = !!(singleField && (singleField.type === 'richText' || singleField.type === 'html'));
+
     // Prepare the request body
-    const completionRequest = {
+    const completionRequest = !isSingleHtml ? {
       model: deploymentName,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
       ],
-      response_format: { type: "json_object" },
-      max_tokens: Math.min(1500, 300 + (template.outputFields?.length || 1) * 300),
+      response_format: { type: "json_object" as const },
+      // For multiple fields, keep a balanced budget
+      max_tokens: Math.min(2200, 400 + (template.outputFields?.length || 1) * 400),
       temperature: 0.3,
       top_p: 0.9,
       frequency_penalty: 1.0,
       presence_penalty: 0.3,
+    } : {
+      // Long-form single-field HTML output mode: request raw HTML fragment (no JSON)
+      model: deploymentName,
+      messages: [
+        { role: 'system', content: (
+          `You are an expert content creator for the brand "${brand.name}".\n` +
+          `Return ONLY a well-formed HTML fragment for the requested field. Do NOT return JSON, code fences, or explanatory text.\n` +
+          `Headings should use semantic tags (h2/h3) and body text should use <p>, <ul>, <li> where appropriate.\n` +
+          (brand.language && brand.country ? `All content must be in ${brand.language} for an audience in ${brand.country}.\n` : '') +
+          `Avoid repetition and unnecessary filler.`
+        )},
+        { role: 'user', content: userPrompt }
+      ],
+      // High budget to cover all sections in a single field template
+      max_tokens: 3200,
+      temperature: 0.4,
+      top_p: 0.9,
+      frequency_penalty: 0.8,
+      presence_penalty: 0.2,
     };
     
     // Specify the deployment in the URL path
@@ -613,6 +638,14 @@ The product context is provided in the user prompt.
       return v;
     };
 
+    // If we asked for raw HTML (single field mode), skip JSON parsing and return directly
+    const out: Record<string, string> = {};
+    if (isSingleHtml && singleField) {
+      const processed = validateAndPostProcess(singleField, content);
+      out[(singleField as any).id] = processed;
+      return out;
+    }
+
     let json = tryParseJson(content);
     const requiredIds = (template.outputFields || []).map(f => f.id);
     const hasAllKeys = (obj: Record<string, string> | null) => !!obj && requiredIds.every(id => Object.prototype.hasOwnProperty.call(obj, id));
@@ -696,7 +729,6 @@ The product context is provided in the user prompt.
       } catch {}
     }
 
-    const out: Record<string, string> = {};
     if (!json) {
       console.warn('Failed to parse JSON output from AI; returning empty content for fields');
       (template.outputFields || []).forEach((f: any) => { out[f.id] = ''; });
