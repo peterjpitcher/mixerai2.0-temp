@@ -17,10 +17,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  Trash2, PlusCircle, Search, AlertTriangle, PackageOpen, Loader2, 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  FileText, Building2, Package, Sprout, Globe, Tag, ShieldCheck, ShieldOff, ShieldAlert, ShieldQuestion, WorkflowIcon, MoreVertical, Eye 
+  Trash2, PlusCircle, Search, AlertTriangle, Loader2, 
+  FileText, Building2, Package, Sprout, ShieldCheck, ShieldOff, WorkflowIcon, MoreVertical, Eye 
 } from "lucide-react";
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -89,12 +87,9 @@ export default function ClaimsPage() {
   const router = useRouter();
   
   const [claims, setClaims] = useState<Claim[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [masterBrands, setMasterBrands] = useState<MasterClaimBrand[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [products, setProducts] = useState<Product[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [, setMasterBrands] = useState<MasterClaimBrand[]>([]);
+  const [, setProducts] = useState<Product[]>([]);
+  const [, setIngredients] = useState<Ingredient[]>([]);
   
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -269,7 +264,7 @@ export default function ClaimsPage() {
       },
       className: "w-[60px]",
     },
-  ], [router, openDeleteDialog]);
+  ], [router]);
 
   useEffect(() => {
     async function fetchData() {

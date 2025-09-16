@@ -1,9 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,11 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Save, Plus, Trash2, GripVertical, Loader2, Sparkles, X, ChevronDown, ChevronUp, XCircle, UserPlus } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Loader2, ChevronDown, ChevronUp, XCircle, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
-import { PageHeader } from '@/components/dashboard/page-header';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
-import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { cn } from '@/lib/utils';
 import { debounce } from 'lodash';
 import { apiFetch } from '@/lib/api-client';
@@ -87,7 +84,7 @@ export default function NewClaimsWorkflowPage() {
       assignees: [],
     },
   ]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [stepDescLoading, setStepDescLoading] = useState<Record<number, boolean>>({});
   
@@ -97,8 +94,7 @@ export default function NewClaimsWorkflowPage() {
   const [userSearchLoading, setUserSearchLoading] = useState<Record<number, boolean>>({});
 
   // Debounced user search function
-  const searchUsers = useCallback(
-    debounce(async (query: string, stepIndex: number) => {
+  const debouncedSearchFn = debounce(async (query: string, stepIndex: number) => {
       if (!query || query.length < 2) {
         setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
         return;
@@ -124,9 +120,11 @@ export default function NewClaimsWorkflowPage() {
       } finally {
         setUserSearchLoading(prev => ({ ...prev, [stepIndex]: false }));
       }
-    }, 300),
-    [steps]
-  );
+    }, 300);
+
+  const searchUsers = useCallback((query: string, stepIndex: number) => {
+    debouncedSearchFn(query, stepIndex);
+  }, [debouncedSearchFn, steps]);
 
   const handleAssigneeInputChange = (stepIndex: number, value: string) => {
     setAssigneeInputs(prev => {
@@ -249,11 +247,12 @@ export default function NewClaimsWorkflowPage() {
     }
   };
 
-  const autoGenerateStepName = (stepIndex: number, role: string) => {
+  // Function kept for future use
+  void ((stepIndex: number, role: string) => {
     const roleLabel = roles.find(r => r.id === role)?.name || role.toUpperCase();
     const stepNumber = stepIndex + 1;
     return `Step ${stepNumber}: ${roleLabel} Review`;
-  };
+  });
 
   const handleAddStep = () => {
     const newStepId = `temp_step_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
@@ -468,7 +467,7 @@ export default function NewClaimsWorkflowPage() {
             <CardContent>
               {steps.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  No steps defined for this workflow. Click "Add Step" to create your first workflow step.
+                  No steps defined for this workflow. Click &ldquo;Add Step&rdquo; to create your first workflow step.
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -607,7 +606,7 @@ export default function NewClaimsWorkflowPage() {
                           </Card>
                         )}
                         {assigneeInputs[index] && userSearchResults[index]?.length === 0 && !userSearchLoading[index] && assigneeInputs[index].length >= 2 && (
-                          <p className="text-sm text-muted-foreground py-2">No users found matching "{assigneeInputs[index]}". You can still add by full email address.</p>
+                          <p className="text-sm text-muted-foreground py-2">No users found matching &ldquo;{assigneeInputs[index]}&rdquo;. You can still add by full email address.</p>
                         )}
 
                         {/* Added Assignees Badges */}

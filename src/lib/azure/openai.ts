@@ -321,6 +321,10 @@ You must return a single JSON object with no preface or trailing text. Keys MUST
 Content Rules:
 - NEVER mention the product's size or weight (e.g., '460 ml') in the generated content.
 - NEVER mention the brand's country of origin or the target country in the generated content.
+- Generate concise, high-quality content without repetition or filler.
+- Avoid redundant phrases and synonym chains.
+- Each section should be distinct and purposeful.
+- Stop generating when you've completed the requested fields - do not continue indefinitely.
 `;
   
   // Only add global brand information if there are no field-specific settings

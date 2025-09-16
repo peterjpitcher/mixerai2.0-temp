@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MultiSelectCheckboxCombobox, ComboboxOption } from '@/components/ui/MultiSelectCheckboxCombobox';
+import { MultiSelectCheckboxCombobox } from '@/components/ui/MultiSelectCheckboxCombobox';
 import { toast } from 'sonner';
 import { Loader2, X, PlusCircle, ArrowLeft, Info, HelpCircle } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
@@ -257,9 +257,6 @@ export default function NewBrandPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleMasterClaimBrandChange = (value: string) => {
-    setFormData(prev => ({ ...prev, master_claim_brand_id: value === 'NO_SELECTION' ? null : value }));
-  };
 
   const handleMasterClaimBrandsChange = (values: string[]) => {
     setFormData(prev => ({ ...prev, master_claim_brand_ids: values }));
@@ -339,7 +336,7 @@ export default function NewBrandPage() {
       const data = await response.json();
       if (data.success && data.data) {
         const generatedAgencies = Array.isArray(data.data.suggestedAgencies) 
-                                    ? data.data.suggestedAgencies.map((a: unknown) => (a as { id?: string; name?: string }).id || (a as { id?: string; name?: string }).name)
+                                    ? data.data.suggestedAgencies.map((a: { id?: string; name?: string }) => a.id || a.name)
                                     : [];
         setFormData(prev => ({
           ...prev,
@@ -376,7 +373,7 @@ export default function NewBrandPage() {
       };
       
       Object.keys(payload).forEach(key => {
-        if (payload[key] === '' || (Array.isArray(payload[key]) && payload[key].length === 0) ) {
+        if (payload[key] === '' || (Array.isArray(payload[key]) && (payload[key] as unknown[]).length === 0) ) {
           payload[key] = null;
         }
       });

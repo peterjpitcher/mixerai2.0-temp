@@ -4,22 +4,19 @@ import React, { useEffect, useState, useCallback } from "react";
 
 // Force dynamic rendering to prevent static generation errors
 export const dynamic = 'force-dynamic';
-// import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
 import { 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  Loader2, AlertTriangle, Search, FileText, Edit3, XOctagon, CornerDownRight, Info, CheckCircle2, MinusCircle, ShieldQuestion, Settings2, Trash2, Undo2, Replace, Save, Sparkles, Maximize, Minimize, ArrowLeft, Shield
+  Loader2, AlertTriangle, Search, FileText, XOctagon, CheckCircle2, MinusCircle, ShieldQuestion, Trash2, Save, Maximize, Minimize, ArrowLeft, Shield
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 import { ALL_COUNTRIES_CODE, ALL_COUNTRIES_NAME } from "@/lib/constants/country-codes";
 import { GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
 import { Claim, ClaimTypeEnum, MasterClaimBrand as GlobalBrand, EffectiveClaim, FinalClaimTypeEnum } from "@/lib/claims-utils";
-// import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -27,8 +24,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  DialogClose,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { 
@@ -42,14 +37,7 @@ import { Input } from "@/components/ui/input";
 import { apiFetch } from '@/lib/api-client';
 import { GlobalOverrideWarning } from "@/components/ui/GlobalOverrideWarning";
 import { GlobalOverrideConfirmDialog } from "@/components/ui/GlobalOverrideConfirmDialog";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
-// Types for AI Suggestions (matching API)
-interface AISuggestion {
-  claim_text: string;
-  claim_type: ClaimTypeEnum;
-  reasoning?: string;
-}
 
 // NEW API Response Structure Types
 interface ApiProductInfo {
@@ -442,24 +430,10 @@ export default function ClaimsPreviewPage() {
   const [modalContext, setModalContext] = useState<ModalContext | null>(null);
   
   const [showGlobalConfirmDialog, setShowGlobalConfirmDialog] = useState(false);
-  const [pendingGlobalOverride, setPendingGlobalOverride] = useState<any>(null);
-  const [conflictDetails, setConflictDetails] = useState<any>(null);
+  const [pendingGlobalOverride, setPendingGlobalOverride] = useState<Record<string, unknown> | null>(null);
+  const [conflictDetails, setConflictDetails] = useState<Record<string, unknown> | null>(null);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [marketSpecificClaims, setMarketSpecificClaims] = useState<Claim[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [isLoadingMarketClaims, setIsLoadingMarketClaims] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [selectedReplacementClaimId, setSelectedReplacementClaimId] = useState<string>('');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [editIsBlocked, setEditIsBlocked] = useState(true);
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [isLoadingAISuggestions, setIsLoadingAISuggestions] = useState(false);
 
   const [isFullScreen, setIsFullScreen] = useState(false);
 
@@ -534,23 +508,28 @@ export default function ClaimsPreviewPage() {
     fetchInitialData();
   }, []);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const fetchMarketSpecificClaimsForReplacement = async (marketCountryCode: string) => {
-    if (marketCountryCode === ALL_COUNTRIES_CODE) {
-        toast.error("Cannot select replacements from __ALL COUNTRIES__ claims."); setMarketSpecificClaims([]); return;
-    }
-    setIsLoadingMarketClaims(true); setMarketSpecificClaims([]);
-    try {
-      const response = await fetch(`/api/claims?countryCode=${marketCountryCode}&level=product&level=ingredient&level=brand&excludeGlobal=true`);
-      if (!response.ok) throw new Error('Failed to fetch market-specific claims.');
-      const result = await response.json();
-      if (result.success && Array.isArray(result.data)) {
-        setMarketSpecificClaims(result.data.filter((claim: Claim) => claim.country_code === marketCountryCode));
-      } else { throw new Error(result.error || 'Could not parse market claims.'); }
-    } catch (err) {
-      toast.error('Failed to load market-specific claims.', { description: (err as Error).message });
-    } finally { setIsLoadingMarketClaims(false); }
-  };
+  // Commented out - needs refactoring if market-specific claims replacement feature is needed
+  // The state variables setMarketSpecificClaims and setIsLoadingMarketClaims no longer exist
+  // const fetchMarketSpecificClaimsForReplacement = async (marketCountryCode: string) => {
+  //   if (marketCountryCode === ALL_COUNTRIES_CODE) {
+  //       toast.error("Cannot select replacements from __ALL COUNTRIES__ claims."); 
+  //       // setMarketSpecificClaims([]); 
+  //       return;
+  //   }
+  //   // setIsLoadingMarketClaims(true); setMarketSpecificClaims([]);
+  //   try {
+  //     const response = await fetch(`/api/claims?countryCode=${marketCountryCode}&level=product&level=ingredient&level=brand&excludeGlobal=true`);
+  //     if (!response.ok) throw new Error('Failed to fetch market-specific claims.');
+  //     const result = await response.json();
+  //     if (result.success && Array.isArray(result.data)) {
+  //       // setMarketSpecificClaims(result.data.filter((claim: Claim) => claim.country_code === marketCountryCode));
+  //     } else { throw new Error(result.error || 'Could not parse market claims.'); }
+  //   } catch (err) {
+  //     toast.error('Failed to load market-specific claims.', { description: (err as Error).message });
+  //   } finally { 
+  //     // setIsLoadingMarketClaims(false); 
+  //   }
+  // };
 
   const handleOpenModal = (product: ApiProductInfo, claimTextInfo: ApiClaimTextInfo, cell: MatrixCell | null) => {
     // Let the API handle permission checks for global overrides
@@ -582,7 +561,7 @@ export default function ClaimsPreviewPage() {
       return;
         }
     }
-    if (isReplacingWithNewText && (!replacementText || !replacementText.trim())){
+    if (isReplacingWithNewText && (!replacementText || typeof replacementText !== 'string' || !replacementText.trim())){
         toast.error("New replacement claim text cannot be empty."); return;
     }
     
@@ -618,17 +597,17 @@ export default function ClaimsPreviewPage() {
     await performOverrideSubmission(dataFromModal);
   };
   
-  const performOverrideSubmission = async (dataFromModal: any) => {
+  const performOverrideSubmission = async (dataFromModal: Record<string, unknown>) => {
     const { product, cellData, isBlocked, replacementText, replacementType, isReplacingWithNewText, existingOverrideId, masterClaimIdToOverride, forceGlobal } = dataFromModal;
     
     setIsSubmitting(true); 
     let actualReplacementClaimId: string | null = null;
 
-    if (isReplacingWithNewText && replacementText && replacementText.trim()) {
+    if (isReplacingWithNewText && replacementText && typeof replacementText === 'string' && replacementText.trim()) {
         try {
-            const originalMasterClaimDetails = cellData?.originalEffectiveClaimDetails;
+            const originalMasterClaimDetails = (cellData as any)?.originalEffectiveClaimDetails;
             let inferredLevel: ClaimTypeEnum | 'product' | 'brand' | 'ingredient' = 'product';
-            let associatedIdField: Record<string, unknown> = { product_ids: [product.id] };
+            let associatedIdField: Record<string, unknown> = { product_ids: [(product as any).id] };
 
             if (originalMasterClaimDetails && originalMasterClaimDetails.source_level !== 'override' && originalMasterClaimDetails.source_level !== 'none') {
                 inferredLevel = originalMasterClaimDetails.source_level;
@@ -638,7 +617,7 @@ export default function ClaimsPreviewPage() {
                     associatedIdField = { ingredient_id: originalMasterClaimDetails.source_entity_id };
                 } else {
                     inferredLevel = 'product';
-                    associatedIdField = { product_ids: [product.id] };
+                    associatedIdField = { product_ids: [(product as any).id] };
                 }
             }
 
@@ -675,7 +654,7 @@ export default function ClaimsPreviewPage() {
     const method = isEditing ? 'PUT' : 'POST';
 
     const finalOverridePayload: Record<string, unknown> = {
-      target_product_id: product.id,
+      target_product_id: (product as any).id,
       market_country_code: selectedCountry,
       is_blocked: isBlocked, 
       replacement_claim_id: actualReplacementClaimId,
@@ -699,7 +678,7 @@ export default function ClaimsPreviewPage() {
         finalOverridePayload.is_blocked = true;
     }
     if (!finalOverridePayload.is_blocked && !actualReplacementClaimId && isEditing) { 
-        await handleDeleteExistingOverride(existingOverrideId); 
+        await handleDeleteExistingOverride(existingOverrideId as string); 
         setIsSubmitting(false);
         return;
     }
@@ -957,9 +936,9 @@ export default function ClaimsPreviewPage() {
           if (!open) handleCancelGlobalOverride();
         }}
         onConfirm={() => handleConfirmGlobalOverride()}
-        claimText={pendingGlobalOverride?.claimTextInfo?.text || ''}
+        claimText={(pendingGlobalOverride?.claimTextInfo as any)?.text || ''}
         affectedCountries={Array.isArray(availableCountries) ? availableCountries.length - 1 : 0} // All countries except __ALL_COUNTRIES__
-        conflicts={conflictDetails}
+        conflicts={conflictDetails as unknown as { country: string; countryName?: string; isBlocked: boolean; }[] | undefined}
       />
     </div>
   );

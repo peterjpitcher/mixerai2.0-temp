@@ -81,8 +81,12 @@ export function LoginForm() {
         await recordLoginAttempt(email, ip, true);
         
         toast.success('You have been logged in successfully.');
-        router.push("/dashboard");
-        router.refresh();
+        
+        // Add a small delay to ensure auth state is properly set
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Use window.location for a hard redirect to ensure cookies are properly set
+        window.location.href = "/dashboard";
       }
     } catch (err) {
       // Clear password field for security

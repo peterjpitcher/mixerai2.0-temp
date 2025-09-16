@@ -188,7 +188,7 @@ export default function MyTasksPage() {
                       <td className="p-3">
                         <DueDateIndicator 
                           dueDate={task.due_date} 
-                          status={task.content_status as any}
+                          status={task.content_status === 'rejected' ? 'in_review' : (task.content_status === 'under_review' ? 'in_review' : task.content_status) as 'draft' | 'approved' | 'published' | 'in_review' | 'completed' | undefined}
                           size="sm"
                         />
                         {!task.due_date && <span className="text-muted-foreground">N/A</span>}

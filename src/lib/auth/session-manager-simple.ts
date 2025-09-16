@@ -22,18 +22,18 @@ export interface Session {
 // In-memory session store
 const sessionStore = new Map<string, Session>();
 
-// Cleanup expired sessions every 5 minutes
-setInterval(() => {
+// Cleanup function for expired sessions (called on each operation)
+function cleanupExpiredSessions() {
   const now = new Date();
   for (const [sessionId, session] of sessionStore.entries()) {
     if (session.expiresAt < now) {
       sessionStore.delete(sessionId);
     }
   }
-}, 5 * 60 * 1000);
+}
 
 /**
- * Generate a secure session ID
+ * Generate a secure session ID using Web Crypto API (Edge Runtime compatible)
  */
 function generateSessionId(): string {
   try {
@@ -75,6 +75,9 @@ export async function createSession(
   }
 ): Promise<Session | null> {
   try {
+    // Cleanup expired sessions periodically
+    cleanupExpiredSessions();
+    
     const sessionId = generateSessionId();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + SESSION_CONFIG.absoluteTimeout);
