@@ -5,6 +5,8 @@ import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { ok, fail } from '@/lib/http/response';
+import { logClaimAudit } from '@/lib/audit';
 
 export const dynamic = "force-dynamic";
 
@@ -39,9 +41,7 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User, context
       .eq('id', claimId)
       .single();
 
-    if (claimError || !claim) {
-      return NextResponse.json({ success: false, error: 'Claim not found' }, { status: 404 });
-    }
+    if (claimError || !claim) return fail(404, 'Claim not found');
 
     // Check permissions (similar to claims POST)
     let hasPermission = user?.user_metadata?.role === 'admin' || claim.created_by === user.id;
@@ -67,9 +67,7 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User, context
       }
     }
 
-    if (!hasPermission) {
-      return NextResponse.json({ success: false, error: 'Not authorized to modify this claim' }, { status: 403 });
-    }
+    if (!hasPermission) return fail(403, 'Not authorized to modify this claim');
 
     // Assign workflow using the database function
     const { data: result, error: assignError } = await supabase.rpc('assign_workflow_to_claim', {
@@ -77,12 +75,9 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User, context
       p_workflow_id: validatedData.workflow_id
     });
 
-    if (assignError) {
-      console.error('[API Claims Workflow] Error assigning workflow:', assignError);
-      return handleApiError(assignError, 'Failed to assign workflow');
-    }
-
-    return NextResponse.json({ success: true, data: result });
+    if (assignError) return handleApiError(assignError, 'Failed to assign workflow');
+    await logClaimAudit('CLAIM_WORKFLOW_ASSIGNED', user.id, claimId, { workflow_id: validatedData.workflow_id });
+    return ok(result);
 
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -117,13 +112,9 @@ export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?
       .eq('id', claimId)
       .single();
 
-    if (claimError || !claim) {
-      return NextResponse.json({ success: false, error: 'Claim not found' }, { status: 404 });
-    }
+    if (claimError || !claim) return fail(404, 'Claim not found');
 
-    if (!claim.current_workflow_step) {
-      return NextResponse.json({ success: false, error: 'Claim has no active workflow' }, { status: 400 });
-    }
+    if (!claim.current_workflow_step) return fail(400, 'Claim has no active workflow');
 
     // Check if user is assigned to current step
     const stepData = claim.claims_workflow_steps;
@@ -131,9 +122,7 @@ export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?
                        Array.isArray((stepData as unknown as Record<string, unknown>).assigned_user_ids) &&
                        ((stepData as unknown as Record<string, unknown>).assigned_user_ids as string[]).includes(user.id);
 
-    if (!isAssigned && user?.user_metadata?.role !== 'admin') {
-      return NextResponse.json({ success: false, error: 'Not authorized to approve/reject this claim' }, { status: 403 });
-    }
+    if (!isAssigned && user?.user_metadata?.role !== 'admin') return fail(403, 'Not authorized to approve/reject this claim');
 
     // Update claim text if provided
     if (validatedData.updatedClaimText) {
@@ -142,10 +131,7 @@ export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?
         .update({ claim_text: validatedData.updatedClaimText })
         .eq('id', claimId);
       
-      if (updateError) {
-        console.error('Error updating claim text:', updateError);
-        return NextResponse.json({ success: false, error: 'Failed to update claim text' }, { status: 500 });
-      }
+      if (updateError) return fail(500, 'Failed to update claim text');
     }
 
     // Perform workflow action
@@ -165,10 +151,7 @@ export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?
       p_reviewer_id: user.id
     });
 
-    if (actionError) {
-      console.error('[API Claims Workflow] Error performing workflow action:', actionError);
-      return handleApiError(actionError, 'Failed to perform workflow action');
-    }
+    if (actionError) return handleApiError(actionError, 'Failed to perform workflow action');
     
     console.log('[API Claims Workflow] Function result:', result);
 
@@ -192,12 +175,11 @@ export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?
       }
     }
 
-    return NextResponse.json({ success: true, data: result });
+    await logClaimAudit('CLAIM_WORKFLOW_ACTION', user.id, claimId, { action: validatedData.action });
+    return ok(result);
 
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ success: false, error: 'Invalid request data', details: error.errors }, { status: 400 });
-    }
+    if (error instanceof z.ZodError) return fail(400, 'Invalid request data', JSON.stringify(error.errors));
     return handleApiError(error, 'Failed to perform workflow action');
   }
 });
@@ -233,9 +215,7 @@ export const GET = withAuth(async (_req: NextRequest, user: User, context?: unkn
       .eq('id', claimId)
       .single();
 
-    if (claimError || !claim) {
-      return NextResponse.json({ success: false, error: 'Claim not found' }, { status: 404 });
-    }
+    if (claimError || !claim) return fail(404, 'Claim not found');
 
     // Get workflow history
     const { data: history, error: historyError } = await supabase
@@ -259,13 +239,7 @@ export const GET = withAuth(async (_req: NextRequest, user: User, context?: unkn
       console.error('[API Claims Workflow] Error fetching workflow history:', historyError);
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      data: {
-        claim,
-        history: history || []
-      }
-    });
+    return ok({ claim, history: history || [] });
 
   } catch (error) {
     return handleApiError(error, 'Failed to fetch workflow details');

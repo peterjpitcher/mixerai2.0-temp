@@ -31,6 +31,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select"; // For filtering
 import { useRouter } from "next/navigation";
+import { GLOBAL_CLAIM_COUNTRY_CODE, ALL_COUNTRIES_CODE } from '@/lib/constants/claims';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -106,6 +107,12 @@ export default function ClaimsPage() {
   const [filterLevel, setFilterLevel] = useState<ClaimLevelEnum | 'all'>('all');
   const [filterType, setFilterType] = useState<ClaimTypeEnum | 'all'>('all');
   const [filterCountry, setFilterCountry] = useState<string>('all');
+
+  // Pagination
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(50);
+  const [totalPages, setTotalPages] = useState<number>(0);
+  const [totalCount, setTotalCount] = useState<number>(0);
 
   const openDeleteDialog = (claim: Claim) => {
     setItemToDelete(claim);
@@ -194,7 +201,7 @@ export default function ClaimsPage() {
         if (!countryCode) return <div className="text-muted-foreground">-</div>;
         return (
           <Badge variant="secondary">
-            {countryCode === '__GLOBAL__' ? 'Global' : countryCode}
+            {countryCode === GLOBAL_CLAIM_COUNTRY_CODE ? 'Global' : countryCode}
           </Badge>
         );
       },
@@ -269,10 +276,9 @@ export default function ClaimsPage() {
       setIsLoading(true);
       setError(null);
       try {
-        // Fetch all claims by requesting a high limit
-        // TODO: Implement proper pagination with infinite scroll or pagination controls
+        // Paginated fetch; additional lists fetched with larger limits
         const [claimsRes, brandsRes, productsRes, ingredientsRes] = await Promise.all([
-          fetch('/api/claims?limit=1000&includeProductNames=true&includeMasterBrandName=true&includeIngredientName=true'),
+          fetch(`/api/claims?limit=${pageSize}&page=${page}&includeProductNames=true&includeMasterBrandName=true&includeIngredientName=true`),
           fetch('/api/master-claim-brands'),
           fetch('/api/products?limit=1000'),
           fetch('/api/ingredients'),
@@ -336,6 +342,11 @@ export default function ClaimsPage() {
         });
 
         setClaims(enrichedClaims);
+        const pag = claimsData.pagination as { page: number; limit: number; total: number; totalPages: number } | undefined;
+        if (pag) {
+          setTotalPages(pag.totalPages || 0);
+          setTotalCount(pag.total || 0);
+        }
 
       } catch (err) {
         const errorMessage = (err as Error).message || 'An unexpected error occurred';
@@ -347,7 +358,7 @@ export default function ClaimsPage() {
       }
     }
     fetchData();
-  }, []);
+  }, [page, pageSize]);
 
   const handleDelete = async () => {
     if (!itemToDelete) return;
@@ -456,7 +467,7 @@ export default function ClaimsPage() {
                 <SelectTrigger><SelectValue placeholder="Filter by Country" /></SelectTrigger>
                 <SelectContent>
                     {uniqueCountryCodes.map(code => (
-                        <SelectItem key={code} value={code}>{code === 'all' ? 'All Countries' : (code === '__GLOBAL__' ? 'Global' : code)}</SelectItem>
+                        <SelectItem key={code} value={code}>{code === 'all' ? 'All Countries' : (code === GLOBAL_CLAIM_COUNTRY_CODE ? 'Global' : code)}</SelectItem>
                     ))}
                 </SelectContent>
             </Select>
@@ -488,6 +499,34 @@ export default function ClaimsPage() {
             </div>
           }
         />
+      )}
+
+      {/* Pagination controls */}
+      {!isLoading && totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            Showing page {page} of {totalPages} ({totalCount} total)
+          </div>
+          <div className="flex items-center gap-2">
+            <Select
+              value={String(pageSize)}
+              onValueChange={(val) => {
+                setPageSize(Number(val));
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-[130px]"><SelectValue placeholder="Page size" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="25">25 / page</SelectItem>
+                <SelectItem value="50">50 / page</SelectItem>
+                <SelectItem value="100">100 / page</SelectItem>
+                <SelectItem value="200">200 / page</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>Prev</Button>
+            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Next</Button>
+          </div>
+        </div>
       )}
 
       {itemToDelete && (

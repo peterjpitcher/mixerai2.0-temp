@@ -6,6 +6,11 @@ import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { User } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { checkProductClaimsPermission } from '@/lib/api/claims-helpers';
+import { ok, fail } from '@/lib/http/response';
+import { withCorrelation } from '@/lib/observability/with-correlation';
+import { timed } from '@/lib/observability/timer';
+import { ALL_COUNTRIES_CODE, GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
+import { logClaimAudit } from '@/lib/audit';
 
 export const dynamic = "force-dynamic";
 
@@ -55,11 +60,11 @@ const requestBodySchema = z.object({
 });
 
 // GET handler for all claims
-export const GET = withAuth(async (req: NextRequest) => {
+export const GET = withCorrelation(withAuth(async (req: NextRequest) => {
     try {
         if (isBuildPhase()) {
             console.log('[API Claims GET] Build phase: returning empty array.');
-            return NextResponse.json({ success: true, isMockData: true, data: [] });
+            return ok([]);
         }
 
         const { searchParams } = new URL(req.url);
@@ -100,9 +105,10 @@ export const GET = withAuth(async (req: NextRequest) => {
         }
 
         if (excludeGlobalFilter) {
-            // If countryCodeFilter is also __GLOBAL__, this excludeGlobal would make it return nothing.
+            const { GLOBAL_CLAIM_COUNTRY_CODE } = await import('@/lib/constants/claims');
+            // If countryCodeFilter is also GLOBAL, this excludeGlobal would make it return nothing.
             // This logic is fine: if user says exclude global, we exclude global.
-            query = query.not('country_code', 'eq', '__GLOBAL__');
+            query = query.not('country_code', 'eq', GLOBAL_CLAIM_COUNTRY_CODE);
         }
 
         if (levelFilter && ['brand', 'product', 'ingredient'].includes(levelFilter)) {
@@ -170,27 +176,22 @@ export const GET = withAuth(async (req: NextRequest) => {
         const hasNextPage = validatedPage < totalPages;
         const hasPreviousPage = validatedPage > 1;
         
-        return NextResponse.json({ 
-            success: true, 
-            data: processedData,
-            pagination: {
-                page: validatedPage,
-                limit: validatedLimit,
-                total: count || 0,
-                totalPages,
-                hasNextPage,
-                hasPreviousPage
-            }
+        return ok(processedData, {
+          page: validatedPage,
+          limit: validatedLimit,
+          total: count || 0,
+          totalPages,
         });
 
     } catch (error: unknown) {
         console.error('[API Claims GET] Catched error:', error);
-        return handleApiError(error, 'An unexpected error occurred while fetching claims.');
+        const res = handleApiError(error, 'An unexpected error occurred while fetching claims.');
+        return res;
     }
-});
+}));
 
 // POST handler for creating new claim(s)
-export const POST = withAuthAndCSRF(async (req: NextRequest, user: User) => {
+export const POST = withCorrelation(withAuthAndCSRF(async (req: NextRequest, user: User) => {
     const supabase = createSupabaseAdminClient();
     
     let rawBody;
@@ -276,9 +277,23 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User) => {
         if (level === 'ingredient' && (!ingredient_ids || ingredient_ids.length === 0) && ingredient_id) {
             finalIngredientIds = [ingredient_id];
         }
+        // Map ALL_COUNTRIES -> GLOBAL for claims
+        const mappedCountries = (country_codes || []).map(cc => cc === ALL_COUNTRIES_CODE ? GLOBAL_CLAIM_COUNTRY_CODE : cc);
+        // Validate country codes (excluding GLOBAL sentinel)
+        const realCountries = mappedCountries.filter(cc => cc !== GLOBAL_CLAIM_COUNTRY_CODE);
+        if (realCountries.length) {
+          const { data: countries, error } = await supabase
+            .from('countries')
+            .select('code')
+            .in('code', realCountries);
+          if (error) return fail(500, 'Failed to validate country codes', error.message);
+          const found = new Set((countries ?? []).map((c: any) => c.code));
+          const missing = realCountries.filter(c => !found.has(c));
+          if (missing.length) return fail(400, `Invalid country codes: ${missing.join(', ')}`);
+        }
 
         // Use the create_claim_with_associations function to create claim with junction tables
-        const { data: claimId, error } = await supabase.rpc('create_claim_with_associations', {
+        const rpcResult = await timed('claims-create', async () => await supabase.rpc('create_claim_with_associations', {
             p_claim_text: claim_text,
             p_claim_type: claim_type,
             p_level: level,
@@ -286,11 +301,12 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User) => {
             p_ingredient_id: undefined, // Deprecated parameter, passing undefined
             p_ingredient_ids: level === 'ingredient' ? finalIngredientIds : [],
             p_product_ids: level === 'product' ? product_ids : [],
-            p_country_codes: country_codes,
+            p_country_codes: mappedCountries,
             p_description: description || undefined,
             p_created_by: user.id,
             p_workflow_id: workflow_id || undefined
-        });
+        }));
+        const { data: claimId, error } = rpcResult as { data: string | null; error: any };
 
         if (error) {
             console.error('Supabase error creating claim:', error);
@@ -301,7 +317,7 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User) => {
         }
 
         if (!claimId) {
-            return NextResponse.json({ success: false, error: 'Failed to create claim - no ID returned.' }, { status: 500 });
+            return fail(500, 'Failed to create claim - no ID returned.');
         }
 
         // Fetch the created claim with all its details
@@ -314,22 +330,35 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User) => {
         if (fetchError) {
             console.error('[API Claims POST] Error fetching created claim:', fetchError);
             // Claim was created but we couldn't fetch it - still return success
-            return NextResponse.json({ 
-                success: true, 
-                message: 'Claim created successfully.',
-                claimId: claimId 
-            });
+            await logClaimAudit('CLAIM_CREATED', user.id, claimId, { ...parsedBody.data, country_codes: mappedCountries });
+            // Invalidate caches conservatively
+            try {
+              if (level === 'product' && Array.isArray(product_ids) && product_ids.length) {
+                const { invalidateClaimsCacheForProduct } = await import('@/lib/claims-service');
+                await Promise.all(product_ids.map(pid => invalidateClaimsCacheForProduct(pid)));
+              } else {
+                const { invalidateAllClaimsCache } = await import('@/lib/claims-service');
+                await invalidateAllClaimsCache();
+              }
+            } catch {}
+            return ok({ id: claimId });
         }
 
-        return NextResponse.json({ 
-            success: true, 
-            message: 'Claim created successfully with associations to multiple countries/entities.', 
-            claim: createdClaim,
-            claimId: claimId
-        });
+        await logClaimAudit('CLAIM_CREATED', user.id, claimId, { ...parsedBody.data, country_codes: mappedCountries });
+        // Invalidate caches
+        try {
+          if (level === 'product' && Array.isArray(product_ids) && product_ids.length) {
+            const { invalidateClaimsCacheForProduct } = await import('@/lib/claims-service');
+            await Promise.all(product_ids.map(pid => invalidateClaimsCacheForProduct(pid)));
+          } else {
+            const { invalidateAllClaimsCache } = await import('@/lib/claims-service');
+            await invalidateAllClaimsCache();
+          }
+        } catch {}
+        return ok({ claim: createdClaim, id: claimId });
     } catch (e: unknown) {
         console.error('Catch block error in POST /api/claims:', e);
         const errorMessage = e instanceof Error ? e.message : String(e);
-        return NextResponse.json({ success: false, error: 'An unexpected error occurred.', details: errorMessage }, { status: 500 });
+        return fail(500, 'An unexpected error occurred.', errorMessage);
     }
-}); 
+})); 

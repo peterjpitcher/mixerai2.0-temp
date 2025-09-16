@@ -182,7 +182,9 @@ export async function fetchClaimsWithRelations(
     query = query.eq('country_code', filters.countryCode);
   }
   if (filters.excludeGlobal) {
-    query = query.not('country_code', 'eq', '__GLOBAL__');
+    // Defer literal to constants to avoid regressions
+    const { GLOBAL_CLAIM_COUNTRY_CODE } = await import('@/lib/constants/claims');
+    query = query.not('country_code', 'eq', GLOBAL_CLAIM_COUNTRY_CODE);
   }
   if (filters.level) {
     query = query.eq('level', filters.level);

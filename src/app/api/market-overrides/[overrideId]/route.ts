@@ -4,6 +4,11 @@ import { handleApiError } from '@/lib/api-utils';
 
 import { User } from '@supabase/supabase-js';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { ok, fail } from '@/lib/http/response';
+import { withCorrelation } from '@/lib/observability/with-correlation';
+import { timed } from '@/lib/observability/timer';
+import { invalidateClaimsCacheForProduct } from '@/lib/claims-service';
+import { logClaimAudit } from '@/lib/audit';
 
 export const dynamic = "force-dynamic";
 
@@ -47,19 +52,15 @@ async function getClaimProperties(supabase: ReturnType<typeof createSupabaseAdmi
 }
 
 // PUT handler for updating an existing market claim override
-export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?: unknown): Promise<Response> => {
+export const PUT = withCorrelation(withAuthAndCSRF(async (req: NextRequest, user: User, context?: unknown): Promise<Response> => {
     const { params } = context as { params: RouteParams };
     const { overrideId } = params;
     try {
         const body: MarketClaimOverridePutPayload = await req.json();
         const { is_blocked, replacement_claim_id } = body;
 
-        if (Object.keys(body).length === 0) {
-            return NextResponse.json({ success: false, error: 'No update fields provided.' }, { status: 400 });
-        }
-        if (typeof is_blocked === 'undefined' && typeof replacement_claim_id === 'undefined') {
-             return NextResponse.json({ success: false, error: 'At least one of is_blocked or replacement_claim_id must be provided for update.' }, { status: 400 });
-        }
+        if (Object.keys(body).length === 0) return fail(400, 'No update fields provided.');
+        if (typeof is_blocked === 'undefined' && typeof replacement_claim_id === 'undefined') return fail(400, 'At least one of is_blocked or replacement_claim_id must be provided for update.');
 
         const supabase = createSupabaseAdminClient();
 
@@ -147,70 +148,56 @@ export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?
 
             : (await supabase.from('market_claim_overrides').select('id, market_country_code, master_claim_id').eq('id', overrideId).single<MarketClaimOverride>()).data;
 
-        if (!existingOverrideToUse) {
-            return NextResponse.json({ success: false, error: `Market override with ID ${overrideId} not found.` }, { status: 404 });
-        }
+        if (!existingOverrideToUse) return fail(404, `Market override with ID ${overrideId} not found.`);
         
 
-        if (replacement_claim_id === existingOverrideToUse.master_claim_id) {
-            return NextResponse.json({ success: false, error: 'Replacement claim cannot be the same as the master claim.'}, { status: 400 });
-        }
+        if (replacement_claim_id === existingOverrideToUse.master_claim_id) return fail(400, 'Replacement claim cannot be the same as the master claim.');
 
         // If replacement_claim_id is being set or changed, validate it's for the correct market_country_code
         if (typeof replacement_claim_id !== 'undefined' && replacement_claim_id !== null) {
             const replacementClaimProps = await getClaimProperties(supabase, replacement_claim_id);
-            if (!replacementClaimProps) {
-                return NextResponse.json({ success: false, error: `Replacement claim with ID ${replacement_claim_id} not found.` }, { status: 400 });
-            }
+            if (!replacementClaimProps) return fail(400, `Replacement claim with ID ${replacement_claim_id} not found.`);
 
-            if (replacementClaimProps.country_code !== existingOverrideToUse.market_country_code) {
-                return NextResponse.json({ success: false, error: `Replacement claim ID ${replacement_claim_id} is for country ${replacementClaimProps.country_code}, not for the market ${existingOverrideToUse.market_country_code} of this override.` }, { status: 400 });
-            }
+            if (replacementClaimProps.country_code !== existingOverrideToUse.market_country_code) return fail(400, `Replacement claim ID ${replacement_claim_id} is for country ${replacementClaimProps.country_code}, not for market ${existingOverrideToUse.market_country_code}.`);
         }
 
         const updatePayload: MarketClaimOverridePutPayload = {};
         if (typeof is_blocked !== 'undefined') updatePayload.is_blocked = is_blocked;
         if (typeof replacement_claim_id !== 'undefined') updatePayload.replacement_claim_id = replacement_claim_id; // This handles null correctly
 
-        const { data, error } = await supabase
+        const { data, error } = await timed('override-update', async () => await supabase
             .from('market_claim_overrides')
             .update(updatePayload)
             .eq('id', overrideId)
             .select()
-            .single();
+            .single());
 
         if (error) {
             console.error(`[API MarketOverrides PUT] Error updating market override ${overrideId}:`, error);
              // Foreign key violation for replacement_claim_id
-            if ((error as { code?: string }).code === '23503') { 
-                return NextResponse.json(
-                   { success: false, error: 'Invalid replacement_claim_id. Ensure it exists.' },
-                   { status: 400 }
-               );
-            }
+            if ((error as { code?: string }).code === '23503') return fail(400, 'Invalid replacement_claim_id. Ensure it exists.');
             // chk_replacement_claim_is_market (Postgres error code 23514)
-            if ((error as { code?: string }).code === '23514') {
-                 return NextResponse.json(
-                    { success: false, error: 'Database check constraint violated: Replacement claim does not match market country.' },
-                    { status: 400 }
-                );
-            }
+            if ((error as { code?: string }).code === '23514') return fail(400, 'Database check constraint violated: Replacement claim does not match market country.');
             return handleApiError(error, `Failed to update market claim override ${overrideId}.`);
         }
 
-        return NextResponse.json({ success: true, data: data as MarketClaimOverride });
+        await logClaimAudit('MARKET_OVERRIDE_UPDATED', user.id, overrideId, data);
+        // Invalidate cache for the target product
+        try {
+          const targetProductId = (existingOverrideForPermissionCheck?.target_product_id) || (data as any)?.target_product_id;
+          if (targetProductId) await invalidateClaimsCacheForProduct(targetProductId as string);
+        } catch {}
+        return ok(data as MarketClaimOverride);
 
     } catch (error: unknown) {
         console.error(`[API MarketOverrides PUT /${overrideId}] Catched error:`, error);
-        if (error instanceof Error && error.name === 'SyntaxError') { 
-            return NextResponse.json({ success: false, error: 'Invalid JSON payload.' }, { status: 400 });
-        }
+        if (error instanceof Error && error.name === 'SyntaxError') return fail(400, 'Invalid JSON payload.');
         return handleApiError(error, `An unexpected error occurred while updating market override ${overrideId}.`);
     }
-});
+}));
 
 // DELETE handler for removing a market claim override
-export const DELETE = withAuthAndCSRF(async (req: NextRequest, user: User, context?: unknown): Promise<Response> => {
+export const DELETE = withCorrelation(withAuthAndCSRF(async (req: NextRequest, user: User, context?: unknown): Promise<Response> => {
     const { params } = context as { params: RouteParams };
     const { overrideId } = params;
     try {
@@ -281,32 +268,37 @@ export const DELETE = withAuthAndCSRF(async (req: NextRequest, user: User, conte
             }
         }
 
-        if (!hasPermission) {
-            return NextResponse.json({ success: false, error: 'You do not have permission to delete this market override.' }, { status: 403 });
-        }
+        if (!hasPermission) return fail(403, 'You do not have permission to delete this market override.');
         // --- Permission Check End ---
 
-        const { error, count } = await supabase
+        const { error, count } = await timed('override-delete', async () => await supabase
             .from('market_claim_overrides')
             .delete({ count: 'exact' })
-            .eq('id', overrideId);
+            .eq('id', overrideId));
 
         if (error) {
             console.error(`[API MarketOverrides DELETE] Error deleting market override ${overrideId}:`, error);
             return handleApiError(error, `Failed to delete market claim override ${overrideId}.`);
         }
 
-        if (count === 0) {
-            return NextResponse.json(
-                { success: false, error: `Market claim override with ID ${overrideId} not found.` }, 
-                { status: 404 }
-            );
-        }
+        if (count === 0) return fail(404, `Market claim override with ID ${overrideId} not found.`);
 
-        return NextResponse.json({ success: true, message: `Market claim override ${overrideId} deleted successfully.` });
+        await logClaimAudit('MARKET_OVERRIDE_DELETED', user.id, overrideId);
+        // Attempt invalidation using prior fetched override details
+        try {
+          const supabase2 = createSupabaseAdminClient();
+          const { data: o } = await supabase2
+            .from('market_claim_overrides')
+            .select('target_product_id')
+            .eq('id', overrideId)
+            .maybeSingle();
+          const targetProductId = (o as any)?.target_product_id;
+          if (targetProductId) await invalidateClaimsCacheForProduct(targetProductId as string);
+        } catch {}
+        return ok({ message: `Market claim override ${overrideId} deleted successfully.` });
 
     } catch (error: unknown) {
         console.error(`[API MarketOverrides DELETE /${overrideId}] Catched error:`, error);
         return handleApiError(error, `An unexpected error occurred while deleting market override ${overrideId}.`);
     }
-}); 
+})); 

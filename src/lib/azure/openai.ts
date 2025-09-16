@@ -294,8 +294,10 @@ export async function generateContentFromTemplate(
     'MX': 'Mexico'
   };
 
-  // Build the system prompt with brand information
-  let systemPrompt = `You are an expert content creator for the brand "${brand.name}".`;
+  // Build the system prompt with brand information and strict output rules
+  let systemPrompt = `You are an expert content creator for the brand "${brand.name}".
+
+You must return a single JSON object with no preface or trailing text. Keys MUST be the exact output field IDs provided, and values MUST be strings containing the generated content for that field. Do not include markdown code fences. Do not include any commentary. Example: {"field_abc":"...","field_xyz":"..."}.`;
   
   // Add localization instructions if provided
   if (brand.language && brand.country) {
@@ -351,10 +353,10 @@ The product context is provided in the user prompt.
 `;
   }
   
-  systemPrompt += `\nYou are using a template called "${template.name}" to generate content. For any fields that are intended for rich text display (like a main article body), generate the content directly as well-formed HTML using common semantic tags (e.g., <p>, <h1>-<h6>, <ul>, <ol>, <li>, <strong>, <em>,<blockquote>). Do not use Markdown for these rich text fields. For other fields, follow their specific aiPrompt or generate plain text.`;
+  systemPrompt += `\nYou are using a template called "${template.name}" to generate content. For rich text fields, generate minimal well-formed HTML (no <html>/<body> wrappers). For plain text fields, output plain text only.`;
   
   // Build the user prompt using template fields and prompts
-  let userPrompt = `Create content according to this template: "${template.name}".\n\n`;
+  let userPrompt = `Create content according to this template: "${template.name}". Return only valid JSON as described.\n\n`;
   
   if (input?.product_context) {
     // The context is now expected to be an object with productName and styledClaims
@@ -472,10 +474,9 @@ The product context is provided in the user prompt.
       userPrompt += `   Apply Guardrails: ${brand.guardrails}\n`;
     }
 
-    userPrompt += `   REQUIRED FORMAT: Wrap all content for this field with these exact markers:\n`;
-    userPrompt += `   ##FIELD_ID:${field.id}##\n`;
-    userPrompt += `   [Your generated content for "${field.name}" goes here]\n`;
-    userPrompt += `   ##END_FIELD_ID##\n`;
+    const isRich = field.type === 'richText' || field.type === 'html';
+    userPrompt += `   Output Type: ${isRich ? 'HTML' : 'PLAIN_TEXT'}\n`;
+    userPrompt += `   JSON Key: ${field.id}\n`;
   });
   
   // Add additional instructions if provided
@@ -490,7 +491,7 @@ The product context is provided in the user prompt.
   }
   
   // Final reminder
-  userPrompt += `\nREMINDER: You must generate content for ALL ${template.outputFields.length} fields listed above. Each field must be wrapped with its specific ##FIELD_ID:...## markers.`;
+  userPrompt += `\nREMINDER: Generate ALL ${template.outputFields.length} fields. Output ONLY a single JSON object keyed by field IDs. No extra text.`;
   
   // DEBUG: Log the complete prompt being sent to AI
   console.log('\n========== AI GENERATION DEBUG ==========');
@@ -517,11 +518,11 @@ The product context is provided in the user prompt.
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
       ],
-      max_tokens: 2000,
-      temperature: 0.7,
-      top_p: 0.95,
-      frequency_penalty: 0.5,
-      presence_penalty: 0.5,
+      max_tokens: Math.min(1500, 300 + (template.outputFields?.length || 1) * 300),
+      temperature: 0.3,
+      top_p: 0.9,
+      frequency_penalty: 1.0,
+      presence_penalty: 0.3,
     };
     
     // Specify the deployment in the URL path
@@ -558,90 +559,83 @@ The product context is provided in the user prompt.
     // console.log("API call successful");
     
     let content = responseData.choices?.[0]?.message?.content || "";
-    // console.log(`Received response with content length: ${content.length}`);
-    
-    // Remove Markdown code block delimiters like ```html ... ``` or ``` ... ```
+    // Remove potential code fences
     content = content.replace(/```[a-zA-Z]*\n?/g, "").replace(/\n?```/g, "");
-    
-    // Save full content for debugging and fallback
-    const fullContent = content;
-    
-    // Parse the fields from the response
-    const result: Record<string, string> = {};
-    let fieldsParsed = false;
-    
-    console.log(`Parsing AI response for ${template.outputFields.length} output fields`);
-    console.log('Full AI response:', content.substring(0, 500) + '...');
-    
-    // Process each output field
-    template.outputFields.forEach((field, index) => {
-      console.log(`Processing output field ${index + 1}/${template.outputFields.length}: ${field.name} (${field.id})`);
-      
-      const fieldRegex = new RegExp(`##FIELD_ID:${field.id}##\\s*([\\s\\S]*?)\\s*##END_FIELD_ID##`, 'i');
-      let match = content.match(fieldRegex);
-      
-      if (match && match[1]) {
-        result[field.id] = match[1].trim();
-        fieldsParsed = true;
-        console.log(`✓ Successfully parsed field ${field.id} with markers, length: ${result[field.id].length}`);
+
+    const tryParseJson = (text: string): Record<string, string> | null => {
+      try {
+        const firstBrace = text.indexOf('{');
+        const lastBrace = text.lastIndexOf('}');
+        if (firstBrace === -1 || lastBrace === -1) return null;
+        const candidate = text.slice(firstBrace, lastBrace + 1);
+        const obj = JSON.parse(candidate);
+        return obj && typeof obj === 'object' ? obj : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const validateAndPostProcess = (field: any, value: string): string => {
+      if (!value) return '';
+      let v = String(value).trim();
+      const isRich = field.type === 'richText' || field.type === 'html';
+      if (!isRich) {
+        v = v.replace(/<[^>]+>/g, '');
       } else {
-        // Try multiple fallback patterns
-        const patterns = [
-          // Pattern 1: Field name with colon
-          new RegExp(`${field.name}\\s*:\\s*([\\s\\S]*?)(?=\\n\\n[A-Z]|\\n##|$)`, 'i'),
-          // Pattern 2: Field name in brackets or quotes
-          new RegExp(`\\[${field.name}\\]\\s*:?\\s*([\\s\\S]*?)(?=\\n\\n[A-Z]|\\n##|$)`, 'i'),
-          new RegExp(`"${field.name}"\\s*:?\\s*([\\s\\S]*?)(?=\\n\\n[A-Z]|\\n##|$)`, 'i'),
-          // Pattern 3: BEGIN/END markers with field name
-          new RegExp(`BEGIN\\s+${field.name}\\s*:?\\s*([\\s\\S]*?)\\s*END\\s+${field.name}`, 'i'),
-          // Pattern 4: Field ID in various formats
-          new RegExp(`##${field.id}##\\s*([\\s\\S]*?)(?=##\\w+##|$)`, 'i'),
-        ];
-        
-        for (const pattern of patterns) {
-          match = content.match(pattern);
-          if (match && match[1]) {
-            result[field.id] = match[1].trim();
-            fieldsParsed = true;
-            console.log(`✓ Parsed field ${field.id} using fallback pattern, length: ${result[field.id].length}`);
-            break;
-          }
-        }
-        
-        if (!result[field.id]) {
-          console.log(`✗ Could not parse field ${field.id} (${field.name})`);
-        }
+        v = v.replace(/```[a-zA-Z]*\n?/g, '').replace(/\n?```/g, '');
       }
+      const optionMax = (field.options && (field.options as any).maxLength) || undefined;
+      const maxChars = field.maxChars || optionMax;
+      if (maxChars && v.length > maxChars) {
+        v = v.slice(0, maxChars);
+      }
+      return v;
+    };
+
+    let json = tryParseJson(content);
+    const requiredIds = (template.outputFields || []).map(f => f.id);
+    const hasAllKeys = (obj: Record<string, string> | null) => !!obj && requiredIds.every(id => Object.prototype.hasOwnProperty.call(obj, id));
+
+    if (!hasAllKeys(json)) {
+      const retryRequest = {
+        model: deploymentName,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt + "\nCRITICAL: Output ONLY a valid JSON object keyed by field IDs. No explanation." }
+        ],
+        max_tokens: Math.min(1200, 300 + (template.outputFields?.length || 1) * 250),
+        temperature: 0.2,
+        top_p: 0.9,
+        frequency_penalty: 1.2,
+        presence_penalty: 0.2,
+      };
+      const endpoint2 = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
+      const retryResp = await fetch(endpoint2, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'api-key': process.env.AZURE_OPENAI_API_KEY || '' },
+        body: JSON.stringify(retryRequest)
+      });
+      if (retryResp.ok) {
+        const rj = await retryResp.json();
+        let retryContent = rj.choices?.[0]?.message?.content || '';
+        retryContent = retryContent.replace(/```[a-zA-Z]*\n?/g, '').replace(/\n?```/g, '');
+        json = tryParseJson(retryContent);
+      }
+    }
+
+    const out: Record<string, string> = {};
+    if (!json) {
+      console.warn('Failed to parse JSON output from AI; returning empty content for fields');
+      (template.outputFields || []).forEach((f: any) => { out[f.id] = ''; });
+      return out;
+    }
+
+    (template.outputFields || []).forEach((f: any) => {
+      const raw = (json as any)[f.id];
+      out[f.id] = validateAndPostProcess(f, typeof raw === 'string' ? raw : (raw != null ? String(raw) : ''));
     });
-    
-    // If no fields were parsed correctly but we have multiple fields, try to split content
-    if (!fieldsParsed && template.outputFields.length > 1) {
-      console.log('No fields parsed using patterns, attempting to split content for multiple fields');
-      
-      // Look for any section headers or natural breaks
-      const sections = content.split(/\n\n+/);
-      if (sections.length >= template.outputFields.length) {
-        template.outputFields.forEach((field, index) => {
-          if (sections[index]) {
-            result[field.id] = sections[index].trim();
-            console.log(`✓ Assigned section ${index + 1} to field ${field.id}`);
-          }
-        });
-        fieldsParsed = true;
-      }
-    }
-    
-    // Last resort: assign full content to first field only
-    if (!fieldsParsed && template.outputFields.length > 0) {
-      console.log('WARNING: Could not parse individual fields, assigning full content to first field only');
-      const mainField = template.outputFields[0];
-      result[mainField.id] = fullContent;
-    }
-    
-    // Log what fields we're returning
-    // console.log('Returning template-based output fields:', Object.keys(result));
-    
-    return result;
+
+    return out;
   } catch (error) {
     console.error("Error generating content with template:", error);
     throw new Error(`Failed to generate template-based content: ${error instanceof Error ? error.message : 'Unknown error'}`);

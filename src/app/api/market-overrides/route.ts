@@ -1,10 +1,16 @@
 import { NextResponse, NextRequest } from 'next/server';
+import { GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { ALL_COUNTRIES_CODE } from '@/lib/constants/country-codes';
+import { withCorrelation } from '@/lib/observability/with-correlation';
+import { timed } from '@/lib/observability/timer';
+import { invalidateClaimsCacheForProduct } from '@/lib/claims-service';
+import { ok, fail } from '@/lib/http/response';
+import { logClaimAudit } from '@/lib/audit';
 
 export const dynamic = "force-dynamic";
 
@@ -120,7 +126,7 @@ async function auditGlobalOperation(supabase: ReturnType<typeof createSupabaseAd
 
 
 // POST handler for creating a new market claim override
-export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promise<Response> => {
+export const POST = withCorrelation(withAuthAndCSRF(async (req: NextRequest, user: User): Promise<Response> => {
     try {
         const body: MarketClaimOverridePostPayload = await req.json();
         const { 
@@ -138,7 +144,7 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
         }
         
         // Allow __ALL_COUNTRIES__ but not __GLOBAL__
-        if (market_country_code === '__GLOBAL__') {
+        if (market_country_code === GLOBAL_CLAIM_COUNTRY_CODE) {
             return NextResponse.json({ success: false, error: 'market_country_code cannot be __GLOBAL__ for an override.' }, { status: 400 });
         }
         
@@ -225,7 +231,7 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
         if (!masterClaimProps) {
             return NextResponse.json({ success: false, error: `Master claim with ID ${master_claim_id} not found.` }, { status: 400 });
         }
-        if (masterClaimProps.country_code !== '__GLOBAL__') {
+        if (masterClaimProps.country_code !== GLOBAL_CLAIM_COUNTRY_CODE) {
             return NextResponse.json({ success: false, error: `Master claim ID ${master_claim_id} is not a global (__GLOBAL__) claim.` }, { status: 400 });
         }
 
@@ -237,7 +243,7 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
             }
             // For global overrides, replacement claim should be global too
             if (market_country_code === ALL_COUNTRIES_CODE) {
-                if (replacementClaimProps.country_code !== '__GLOBAL__') {
+                if (replacementClaimProps.country_code !== GLOBAL_CLAIM_COUNTRY_CODE) {
                     return NextResponse.json({ 
                         success: false, 
                         error: `For global overrides, replacement claim must be global. Claim ${replacement_claim_id} is for country ${replacementClaimProps.country_code}.` 
@@ -255,13 +261,7 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
             marketCountryCode: market_country_code
         });
         
-        if (conflicts.hasConflicts && !forceGlobal) {
-            return NextResponse.json({
-                error: 'Conflicts detected',
-                conflicts: conflicts.details,
-                requiresConfirmation: true
-            }, { status: 409 });
-        }
+        if (conflicts.hasConflicts && !forceGlobal) return fail(409, 'Conflicts detected', JSON.stringify(conflicts.details));
         
         const newRecord: Omit<MarketClaimOverride, 'id' | 'created_at' | 'updated_at' | 'created_by'> & { created_by: string } = {
             master_claim_id,
@@ -273,32 +273,17 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
         };
 
 
-        const { data, error } = await supabase.from('market_claim_overrides').insert(newRecord).select().single();
+        const { data, error } = await timed('override-create', async () => await supabase.from('market_claim_overrides').insert(newRecord).select().single());
 
         if (error) {
             console.error('[API MarketOverrides POST] Error creating market override:', error);
             // Foreign key violation for master_claim_id or target_product_id or replacement_claim_id
-            if ((error as { code?: string }).code === '23503') { 
-                return NextResponse.json(
-                   { success: false, error: 'Invalid master_claim_id, target_product_id, or replacement_claim_id. Ensure they exist.' },
-                   { status: 400 }
-               );
-            }
+            if ((error as { code?: string }).code === '23503') return fail(400, 'Invalid master_claim_id, target_product_id, or replacement_claim_id.');
             // Unique constraint chk_master_claim_is_global, chk_replacement_claim_is_market (Postgres error code for check constraint is 23514)
             // These should be caught by application logic above, but as a fallback:
-            if ((error as { code?: string }).code === '23514') {
-                 return NextResponse.json(
-                    { success: false, error: 'Database check constraint violated. This might be due to master claim not being global or replacement claim not matching market.' },
-                    { status: 400 }
-                );
-            }
+            if ((error as { code?: string }).code === '23514') return fail(400, 'Database check constraint violated (master claim must be global; replacement must match market).');
              // Unique constraint violation for (master_claim_id, market_country_code, target_product_id)
-            if ((error as { code?: string }).code === '23505') {
-                 return NextResponse.json(
-                    { success: false, error: 'An override for this master claim, market, and product already exists.' },
-                    { status: 409 } // Conflict
-                );
-            }
+            if ((error as { code?: string }).code === '23505') return fail(409, 'An override for this master claim, market, and product already exists.');
             return handleApiError(error, 'Failed to create market claim override.');
         }
         
@@ -319,17 +304,19 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
             });
         }
 
-        // Prepare response with warnings if applicable
-        const response: { success: boolean; data: MarketClaimOverride; warnings?: unknown } = { success: true, data: data as MarketClaimOverride };
-        
+        // Prepare normalized response payload
+        const payload: { override: MarketClaimOverride; warnings?: unknown } = { override: data as MarketClaimOverride };
         if (conflicts.hasConflicts && forceGlobal) {
-            response.warnings = {
+            payload.warnings = {
                 message: 'Global override created. Some country-specific overrides remain active.',
                 conflicts: conflicts.details
             };
         }
 
-        return NextResponse.json(response, { status: 201 });
+        // Invalidate product cache
+        try { await invalidateClaimsCacheForProduct(target_product_id); } catch {}
+        await logClaimAudit('MARKET_OVERRIDE_CREATED', user.id, (data as any).id, data);
+        return ok(payload);
 
     } catch (error: unknown) {
         console.error('[API MarketOverrides POST] Catched error:', error);
@@ -338,14 +325,12 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
         }
         return handleApiError(error, 'An unexpected error occurred while creating the market claim override.');
     }
-});
+}));
 
 // GET handler for market claim overrides (optional - could be filtered)
-export const GET = withAuth(async (req: NextRequest) => {
+export const GET = withCorrelation(withAuth(async (req: NextRequest) => {
     try {
-        if (isBuildPhase()) {
-            return NextResponse.json({ success: true, isMockData: true, data: [] });
-        }
+        if (isBuildPhase()) return ok([]);
         const { searchParams } = new URL(req.url);
         const target_product_id = searchParams.get('target_product_id');
         const market_country_code = searchParams.get('market_country_code');
@@ -382,7 +367,8 @@ export const GET = withAuth(async (req: NextRequest) => {
         }
         
 
-        const { data, error } = await query.order('created_at', { ascending: false });
+        const listResult = await timed('override-list', async () => await query.order('created_at', { ascending: false }));
+        const { data, error } = listResult as { data: any[]; error: any };
 
         if (error) {
             console.error('[API MarketOverrides GET] Error fetching market overrides:', error);
@@ -408,10 +394,10 @@ export const GET = withAuth(async (req: NextRequest) => {
             };
         });
 
-        return NextResponse.json({ success: true, data: enrichedData });
+        return ok(enrichedData);
 
     } catch (error: unknown) {
         console.error('[API MarketOverrides GET] Catched error:', error);
         return handleApiError(error, 'An unexpected error occurred while fetching market overrides.');
     }
-}); 
+})); 

@@ -4,16 +4,14 @@ import { handleApiError, isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { ok, fail } from '@/lib/http/response';
 
 export const dynamic = "force-dynamic";
 
 // GET handler for fetching claims workflows
 export const GET = withAuth(async (req: NextRequest) => {
     try {
-        if (isBuildPhase()) {
-            console.log('[API Claims Workflows GET] Build phase: returning empty array.');
-            return NextResponse.json({ success: true, isMockData: true, data: [] });
-        }
+        if (isBuildPhase()) return ok([]);
 
         const supabase = createSupabaseAdminClient();
         const { searchParams } = new URL(req.url);
@@ -65,10 +63,7 @@ export const GET = withAuth(async (req: NextRequest) => {
             created_by: workflow.created_by
         }));
 
-        return NextResponse.json({ 
-            success: true, 
-            data: formattedData 
-        });
+        return ok(formattedData);
 
     } catch (error: unknown) {
         console.error('[API Claims Workflows GET] Caught error:', error);
@@ -82,19 +77,9 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
         const body = await req.json();
         const { name, description, brand_id, is_active = true, steps } = body;
 
-        if (!name) {
-            return NextResponse.json(
-                { success: false, error: 'Name is required' },
-                { status: 400 }
-            );
-        }
+        if (!name) return fail(400, 'Name is required');
 
-        if (!steps || !Array.isArray(steps) || steps.length === 0) {
-            return NextResponse.json(
-                { success: false, error: 'At least one workflow step is required' },
-                { status: 400 }
-            );
-        }
+        if (!steps || !Array.isArray(steps) || steps.length === 0) return fail(400, 'At least one workflow step is required');
 
         const supabase = createSupabaseAdminClient();
 
@@ -105,21 +90,11 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
             .eq('id', user.id)
             .single();
 
-        if (!profile) {
-            return NextResponse.json(
-                { success: false, error: 'User profile not found' },
-                { status: 403 }
-            );
-        }
+        if (!profile) return fail(403, 'User profile not found');
 
         // Check if user is admin (simplified check - you may want to add more specific role checking)
         const userMetadata = user.user_metadata || {};
-        if (userMetadata.role !== 'admin') {
-            return NextResponse.json(
-                { success: false, error: 'You do not have permission to create claims workflows' },
-                { status: 403 }
-            );
-        }
+        if (userMetadata.role !== 'admin') return fail(403, 'You do not have permission to create claims workflows');
 
         // Create the workflow
         const workflowData: Record<string, unknown> = {
@@ -190,10 +165,7 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
             .eq('id', (workflow as Record<string, unknown>).id as string)
             .single();
 
-        return NextResponse.json({
-            success: true,
-            workflow: completeWorkflow
-        });
+        return ok({ workflow: completeWorkflow });
 
     } catch (error: unknown) {
         console.error('[API Claims Workflows POST] Caught error:', error);

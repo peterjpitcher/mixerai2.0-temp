@@ -103,6 +103,10 @@ export interface OutputField extends BaseField {
   useBrandIdentity?: boolean;
   useToneOfVoice?: boolean;
   useGuardrails?: boolean;
+  // Optional constraints to guide generation and validation
+  maxChars?: number;
+  maxTokens?: number;
+  allowedTags?: string[]; // For richText/html fields, overrides default allowed tags
 }
 
 export type GenericField = InputField | OutputField;

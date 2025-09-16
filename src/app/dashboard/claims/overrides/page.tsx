@@ -116,8 +116,9 @@ export default function MarketOverridesPage() {
         const response = await fetch('/api/countries');
         if (!response.ok) throw new Error('Failed to fetch countries');
         const apiResponse = await response.json();
-        if (apiResponse.success && Array.isArray(apiResponse.data)) {
-          const countryOptions = apiResponse.data.map((country: CountryOption) => ({ value: country.code, label: country.name }));
+        const list = apiResponse.countries || apiResponse.data;
+        if (apiResponse.success && Array.isArray(list)) {
+          const countryOptions = list.map((country: CountryOption) => ({ value: country.code, label: country.name }));
           setAvailableCountries(countryOptions);
         } else {
           toast.error('Could not load countries for selection.');

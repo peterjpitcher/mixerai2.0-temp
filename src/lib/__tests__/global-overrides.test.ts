@@ -1,6 +1,7 @@
 import { getStackedClaimsForProduct } from '../claims-utils';
 import { createSupabaseAdminClient } from '../supabase/client';
 import { ALL_COUNTRIES_CODE } from '../constants/country-codes';
+import { GLOBAL_CLAIM_COUNTRY_CODE } from '../constants/claims';
 
 // Mock the Supabase client
 jest.mock('../supabase/client', () => ({
@@ -115,7 +116,7 @@ describe('Global Overrides Feature', () => {
           claim_type: 'allowed',
           level: 'product',
           product_id: productId,
-          country_code: '__GLOBAL__'
+          country_code: GLOBAL_CLAIM_COUNTRY_CODE
         }],
         error: null
       });
@@ -196,7 +197,7 @@ describe('Global Overrides Feature', () => {
           claim_type: 'disallowed',
           level: 'product',
           product_id: productId,
-          country_code: '__GLOBAL__'
+          country_code: GLOBAL_CLAIM_COUNTRY_CODE
         }],
         error: null
       });
@@ -264,7 +265,7 @@ describe('Global Overrides Feature', () => {
         claim_type: 'allowed',
         level: 'product',
         product_id: productId,
-        country_code: '__GLOBAL__'
+        country_code: GLOBAL_CLAIM_COUNTRY_CODE
       };
 
       // Test for multiple countries

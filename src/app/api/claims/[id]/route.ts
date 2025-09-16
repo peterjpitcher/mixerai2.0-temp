@@ -3,13 +3,17 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { withCorrelation } from '@/lib/observability/with-correlation';
 import { User } from '@supabase/supabase-js';
 import { hasAccessToBrand, canAccessProduct, canAccessIngredient } from '@/lib/auth/permissions';
+import { ok, fail } from '@/lib/http/response';
+import { ALL_COUNTRIES_CODE, GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
+import { logClaimAudit } from '@/lib/audit';
 
 export const dynamic = "force-dynamic";
 
 // ENUM types mirroring the database
-type ClaimTypeEnum = 'allowed' | 'disallowed' | 'mandatory';
+type ClaimTypeEnum = 'allowed' | 'disallowed';
 type ClaimLevelEnum = 'brand' | 'product' | 'ingredient';
 
 interface Claim {
@@ -37,9 +41,7 @@ interface RequestContext {
 export const GET = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
     const { params } = context as RequestContext;
     const { id } = params;
-    if (!id) {
-        return NextResponse.json({ success: false, error: 'Claim ID is required.' }, { status: 400 });
-    }
+    if (!id) return fail(400, 'Claim ID is required.');
 
     try {
         const supabase = createSupabaseAdminClient();
@@ -50,16 +52,10 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
             .single();
 
         if (error) {
-            console.error(`[API Claims GET /${id}] Error fetching claim:`, error);
-            if (error.code === 'PGRST116') { 
-                return NextResponse.json({ success: false, error: 'Claim not found.' }, { status: 404 });
-            }
+            if ((error as any).code === 'PGRST116') return fail(404, 'Claim not found.');
             return handleApiError(error, 'Failed to fetch claim.');
         }
-
-        if (!data) {
-            return NextResponse.json({ success: false, error: 'Claim not found.' }, { status: 404 });
-        }
+        if (!data) return fail(404, 'Claim not found.');
         
         // Permission check based on claim level
         const isAdmin = user?.user_metadata?.role === 'admin';
@@ -109,7 +105,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
             updated_at: singleDataObject.updated_at as string
         };
 
-        return NextResponse.json({ success: true, data: validatedData });
+        return ok(validatedData);
 
     } catch (error: unknown) {
         console.error(`[API Claims GET /${id}] Catched error:`, error);
@@ -118,16 +114,14 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
 });
 
 // PUT handler for updating a claim by ID
-export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?: unknown) => {
+export const PUT = withCorrelation(withAuthAndCSRF(async (req: NextRequest, user: User, context?: unknown) => {
     const { params } = context as RequestContext;
     const { id } = params;
-    if (!id) {
-        return NextResponse.json({ success: false, error: 'Claim ID is required for update.' }, { status: 400 });
-    }
+    if (!id) return fail(400, 'Claim ID is required for update.');
 
     try {
         const body = await req.json();
-        const { claim_text, claim_type, description, country_code } = body;
+        const { claim_text, claim_type, description, country_code, product_ids, ingredient_ids, country_codes } = body as any;
 
         // Level and associated entity IDs (product_id, master_brand_id, ingredient_id) are not updatable here.
         // To change those, one would typically delete and recreate the claim if necessary.
@@ -143,8 +137,8 @@ export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?
             updatePayload.claim_text = claim_text.trim();
         }
         if (claim_type !== undefined) {
-            if (!['allowed', 'disallowed', 'mandatory'].includes(claim_type)) {
-                return NextResponse.json({ success: false, error: 'Invalid claim_type.' }, { status: 400 });
+            if (!['allowed', 'disallowed'].includes(claim_type)) {
+                return fail(400, 'Invalid claim_type.');
             }
             updatePayload.claim_type = claim_type;
         }
@@ -154,12 +148,7 @@ export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?
             }
             updatePayload.description = description === null ? null : description.trim();
         }
-        if (country_code !== undefined) {
-            if (typeof country_code !== 'string' || country_code.trim() === '') {
-                return NextResponse.json({ success: false, error: 'Country code must be a non-empty string.' }, { status: 400 });
-            }
-            updatePayload.country_code = country_code.trim();
-        }
+        // Legacy country_code is ignored in favor of junctions. Use country_codes array below.
 
         if (Object.keys(updatePayload).length === 1 && updatePayload.updated_at) {
             // Only updated_at is present, meaning no actual updatable fields were provided
@@ -249,9 +238,7 @@ export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?
             }
         }
 
-        if (!hasPermission) {
-            return NextResponse.json({ success: false, error: 'You do not have permission to update this claim.' }, { status: 403 });
-        }
+        if (!hasPermission) return fail(403, 'You do not have permission to update this claim.');
         // --- Permission Check End ---
 
 
@@ -263,18 +250,13 @@ export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?
 
         if (error) {
             console.error(`[API Claims PUT /${id}] Error updating claim:`, error);
-            if ((error as unknown as { code?: string }).code === '23505') { // Unique constraint violation
-                return NextResponse.json(
-                   { success: false, error: 'This update would result in a duplicate claim (text, type, level, entity, country combination).' },
-                   { status: 409 }
-               );
-           }
+            if ((error as any).code === '23505') return fail(409, 'This update would result in a duplicate claim.');
             // Note: CHECK constraint chk_claim_level_reference is not relevant here as level/FKs are not changed.
             return handleApiError(error, 'Failed to update claim.');
         }
 
         if (!data) {
-            return NextResponse.json({ success: false, error: 'Claim not found or update failed.' }, { status: 404 });
+            return fail(404, 'Claim not found or update failed.');
         }
 
         const singleDataObject = data as Record<string, unknown>;
@@ -293,7 +275,54 @@ export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?
             updated_at: singleDataObject.updated_at as string
         };
 
-        return NextResponse.json({ success: true, data: validatedData });
+        // Optional: update associations if arrays were provided
+        if (Array.isArray(product_ids)) {
+          // Replace product associations
+          await supabase.from('claim_products').delete().eq('claim_id', id);
+          const rows = product_ids.map((pid: string) => ({ claim_id: id, product_id: pid }));
+          if (rows.length) await supabase.from('claim_products').insert(rows);
+        }
+        if (Array.isArray(ingredient_ids)) {
+          // Replace ingredient associations if table exists
+          try {
+            await supabase.from('claim_ingredients').delete().eq('claim_id', id);
+            const rows = ingredient_ids.map((iid: string) => ({ claim_id: id, ingredient_id: iid }));
+            if (rows.length) await supabase.from('claim_ingredients').insert(rows);
+          } catch {}
+        }
+        if (Array.isArray(country_codes)) {
+          const mapped = country_codes.map((cc: string) => cc === ALL_COUNTRIES_CODE ? GLOBAL_CLAIM_COUNTRY_CODE : cc);
+          // Validate countries except GLOBAL
+          const real = mapped.filter((cc: string) => cc !== GLOBAL_CLAIM_COUNTRY_CODE);
+          if (real.length) {
+            const { data: countries, error: cErr } = await supabase.from('countries').select('code').in('code', real);
+            if (cErr) return fail(500, 'Failed to validate country codes', cErr.message);
+            const found = new Set((countries ?? []).map((c: any) => c.code));
+            const missing = real.filter((c: string) => !found.has(c));
+            if (missing.length) return fail(400, `Invalid country codes: ${missing.join(', ')}`);
+          }
+          await supabase.from('claim_countries').delete().eq('claim_id', id);
+          const rows = mapped.map((cc: string) => ({ claim_id: id, country_code: cc }));
+          if (rows.length) await supabase.from('claim_countries').insert(rows);
+        }
+
+        await logClaimAudit('CLAIM_UPDATED', user.id, id, { claim_text, claim_type });
+        // Invalidate caches for affected product(s)
+        try {
+          let pids: string[] = Array.isArray(product_ids) && product_ids.length ? product_ids : [];
+          if (!pids.length) {
+            const { data: cps } = await supabase
+              .from('claim_products')
+              .select('product_id')
+              .eq('claim_id', id);
+            pids = (cps || []).map((r: any) => r.product_id).filter(Boolean);
+          }
+          if (pids.length) {
+            const { invalidateClaimsCacheForProduct } = await import('@/lib/claims-service');
+            await Promise.all(pids.map(pid => invalidateClaimsCacheForProduct(pid)));
+          }
+        } catch {}
+        return ok(validatedData);
 
     } catch (error: unknown) {
         console.error(`[API Claims PUT /${id}] Catched error:`, error);
@@ -302,15 +331,13 @@ export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?
         }
         return handleApiError(error, 'An unexpected error occurred while updating the claim.');
     }
-});
+}));
 
 // DELETE handler for a claim by ID
-export const DELETE = withAuthAndCSRF(async (req: NextRequest, user: User, context?: unknown) => {
+export const DELETE = withCorrelation(withAuthAndCSRF(async (req: NextRequest, user: User, context?: unknown) => {
     const { params } = context as RequestContext;
     const { id } = params;
-    if (!id) {
-        return NextResponse.json({ success: false, error: 'Claim ID is required for deletion.' }, { status: 400 });
-    }
+    if (!id) return fail(400, 'Claim ID is required for deletion.');
 
     try {
         const supabase = createSupabaseAdminClient();
@@ -395,9 +422,7 @@ export const DELETE = withAuthAndCSRF(async (req: NextRequest, user: User, conte
             }
         }
 
-        if (!hasPermission) {
-            return NextResponse.json({ success: false, error: 'You do not have permission to delete this claim.' }, { status: 403 });
-        }
+        if (!hasPermission) return fail(403, 'You do not have permission to delete this claim.');
         // --- Permission Check End ---
 
 
@@ -411,6 +436,16 @@ export const DELETE = withAuthAndCSRF(async (req: NextRequest, user: User, conte
             // Continue with claim deletion even if history deletion fails
         }
 
+        // Fetch associated product ids before delete for cache invalidation
+        let pids: string[] = [];
+        try {
+          const { data: cps } = await supabase
+            .from('claim_products')
+            .select('product_id')
+            .eq('claim_id', id);
+          pids = (cps || []).map((r: any) => r.product_id).filter(Boolean);
+        } catch {}
+
         // Now delete the claim itself
         const { error, count } = await supabase.from('claims')
             .delete({ count: 'exact' })
@@ -421,14 +456,19 @@ export const DELETE = withAuthAndCSRF(async (req: NextRequest, user: User, conte
             return handleApiError(error, 'Failed to delete claim.');
         }
 
-        if (count === 0) {
-            return NextResponse.json({ success: false, error: 'Claim not found.' }, { status: 404 });
-        }
+        if (count === 0) return fail(404, 'Claim not found.');
 
-        return NextResponse.json({ success: true, message: 'Claim and any pending approvals deleted successfully.' });
+        await logClaimAudit('CLAIM_DELETED', user.id, id);
+        try {
+          if (pids.length) {
+            const { invalidateClaimsCacheForProduct } = await import('@/lib/claims-service');
+            await Promise.all(pids.map(pid => invalidateClaimsCacheForProduct(pid)));
+          }
+        } catch {}
+        return ok({ message: 'Claim and any pending approvals deleted successfully.' });
 
     } catch (error: unknown) {
         console.error(`[API Claims DELETE /${id}] Catched error:`, error);
         return handleApiError(error, 'An unexpected error occurred while deleting the claim.');
     }
-}); 
+})); 

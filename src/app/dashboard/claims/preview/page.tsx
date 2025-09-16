@@ -17,6 +17,7 @@ import {
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 import { ALL_COUNTRIES_CODE, ALL_COUNTRIES_NAME } from "@/lib/constants/country-codes";
+import { GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
 import { Claim, ClaimTypeEnum, MasterClaimBrand as GlobalBrand, EffectiveClaim, FinalClaimTypeEnum } from "@/lib/claims-utils";
 // import { Badge } from "@/components/ui/badge";
 import {
@@ -105,15 +106,15 @@ const claimTypeDisplayInfo: Record<FinalClaimTypeEnum, {
     text: "Disallowed", 
     cellBgClassName: "bg-red-200 hover:bg-red-300",
   },
-  mandatory: { 
-    icon: <ShieldQuestion className="text-blue-700" />, 
-    text: "Mandatory", 
+  mandatory: {
+    icon: <Shield className="text-blue-700" />,
+    text: "Mandatory",
     cellBgClassName: "bg-blue-200 hover:bg-blue-300",
   },
-  conditional: { // Added entry for conditional
-    icon: <AlertTriangle className="text-yellow-700" />, // Example icon
-    text: "Conditional", 
-    cellBgClassName: "bg-yellow-200 hover:bg-yellow-300", // Example style
+  conditional: {
+    icon: <ShieldQuestion className="text-amber-700" />,
+    text: "Conditional",
+    cellBgClassName: "bg-amber-200 hover:bg-amber-300",
   },
   none: { // For N/A or explicitly blocked without replacement
     icon: <XOctagon className="text-gray-600" />, 
@@ -205,9 +206,9 @@ const MatrixDisplayCell = React.memo<MatrixDisplayCellProps>(({
           <p>Status: {displayConfig?.text || 'N/A'}</p>
           <p className="text-muted-foreground text-xs mt-1">{tooltipText}</p>
           {cell?.description && <p className="text-xs italic mt-1">Note: {cell.description}</p>}
-          {cell?.originalEffectiveClaimDetails && cell.originalEffectiveClaimDetails.source_level && 
+              {cell?.originalEffectiveClaimDetails && cell.originalEffectiveClaimDetails.source_level && 
             <p className="text-xs mt-1">Source: {cell.originalEffectiveClaimDetails.source_level} 
-              {cell.originalEffectiveClaimDetails.original_claim_country_code === ALL_COUNTRIES_CODE && cell.originalEffectiveClaimDetails.source_level !== 'override' && " (Master)"}
+              {cell.originalEffectiveClaimDetails.original_claim_country_code === GLOBAL_CLAIM_COUNTRY_CODE && cell.originalEffectiveClaimDetails.source_level !== 'override' && " (Master)"}
             </p>}
         </TooltipContent>
       </Tooltip>
@@ -518,8 +519,9 @@ export default function ClaimsPreviewPage() {
 
         if (!countriesRes.ok) throw new Error("Failed to fetch countries for filter.");
         const countriesResult = await countriesRes.json();
-        if (countriesResult.success && Array.isArray(countriesResult.data)) {
-          setAvailableCountries(countriesResult.data);
+        const list = countriesResult.countries || countriesResult.data;
+        if (countriesResult.success && Array.isArray(list)) {
+          setAvailableCountries(list);
         } else { throw new Error(countriesResult.error || "Could not parse countries data."); }
 
       } catch (err) {

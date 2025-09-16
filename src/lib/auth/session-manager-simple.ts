@@ -6,7 +6,6 @@
 
 import { User } from '@supabase/supabase-js';
 import { SESSION_CONFIG } from './session-config';
-import { randomBytes } from 'crypto';
 
 export interface Session {
   sessionId: string;
@@ -37,7 +36,31 @@ setInterval(() => {
  * Generate a secure session ID
  */
 function generateSessionId(): string {
-  return randomBytes(32).toString('hex');
+  try {
+    // Prefer Web Crypto in Edge/runtime-safe environments
+    if (typeof crypto !== 'undefined') {
+      // Use randomUUID if available
+      if (typeof (crypto as any).randomUUID === 'function') {
+        return (crypto as any).randomUUID();
+      }
+      // Fallback to getRandomValues to build a hex string
+      if (typeof (crypto as any).getRandomValues === 'function') {
+        const arr = new Uint8Array(32);
+        (crypto as any).getRandomValues(arr);
+        return Array.from(arr).map((b) => b.toString(16).padStart(2, '0')).join('');
+      }
+    }
+  } catch {}
+  // Final fallback for Node environments without Web Crypto
+  try {
+    // Dynamic import to avoid bundling Node's crypto in Edge
+    const nodeCrypto = require('crypto');
+    return nodeCrypto.randomBytes(32).toString('hex');
+  } catch {}
+  // Extremely unlikely fallback (non-crypto random)
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random()
+    .toString(36)
+    .slice(2)}`;
 }
 
 /**

@@ -12,7 +12,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, ChevronRight, Info, Building2, Package, FlaskConical } from 'lucide-react';
 import { ALL_COUNTRIES_CODE, ALL_COUNTRIES_NAME } from "@/lib/constants/country-codes";
-import { COUNTRIES } from '@/lib/constants/countries';
 import { cn } from '@/lib/utils';
 
 interface Entity {
@@ -149,7 +148,7 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
     fetchData('/api/products?limit=1000', setProductOptions, 'products'); // Increase limit to get all products
     fetchData('/api/ingredients?limit=1000', setIngredientOptions, 'ingredients'); // Increase limit to get all ingredients
 
-    // Fetch claims workflows
+  // Fetch claims workflows
     async function fetchClaimsWorkflows() {
       setIsLoadingWorkflows(true);
       try {
@@ -173,9 +172,27 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
 
     fetchClaimsWorkflows();
 
-    // Set country options from constants
-    setCountryOptions([...COUNTRIES]);
-    setIsLoadingCountries(false);
+    // Fetch active countries from API
+    (async () => {
+      try {
+        const response = await fetch('/api/countries');
+        const result = await response.json();
+        if (response.ok && result.success && Array.isArray(result.countries)) {
+          const options = result.countries.map((c: { code: string; name: string }) => ({ value: c.code, label: c.name })) as ComboboxOption[];
+          setCountryOptions(options);
+        } else if (result.data && Array.isArray(result.data)) {
+          // Legacy shape fallback
+          const options = result.data.map((c: { code: string; name: string }) => ({ value: c.code, label: c.name })) as ComboboxOption[];
+          setCountryOptions(options);
+        } else {
+          setCountryOptions([]);
+        }
+      } catch (e) {
+        setCountryOptions([]);
+      } finally {
+        setIsLoadingCountries(false);
+      }
+    })();
   }, []);
 
   // Form validation

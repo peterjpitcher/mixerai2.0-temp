@@ -138,11 +138,11 @@ export default function ClaimsPendingApprovalPage() {
       const data = await response.json();
       
       if (data.success) {
-        setPendingClaims(data.data || []);
-        setCurrentUserId(data.currentUserId || null);
-        // Select first claim if available
-        if (data.data && data.data.length > 0 && !selectedClaim) {
-          setSelectedClaim(data.data[0]);
+        const items = data.data?.items || [];
+        setPendingClaims(items);
+        setCurrentUserId(data.data?.currentUserId || null);
+        if (items.length > 0 && !selectedClaim) {
+          setSelectedClaim(items[0]);
         }
       } else {
         throw new Error(data.error || 'Failed to fetch pending claims');

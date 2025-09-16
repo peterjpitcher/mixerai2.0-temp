@@ -4,6 +4,7 @@ import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { ok, fail } from '@/lib/http/response';
 
 export const dynamic = "force-dynamic";
 
@@ -30,17 +31,8 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
             .eq('id', id)
             .single();
 
-        if (error) {
-            console.error('[API Claims Workflow GET] Error fetching workflow:', error);
-            return handleApiError(error, 'Failed to fetch claims workflow');
-        }
-
-        if (!data) {
-            return NextResponse.json(
-                { success: false, error: 'Claims workflow not found' },
-                { status: 404 }
-            );
-        }
+        if (error) return handleApiError(error, 'Failed to fetch claims workflow');
+        if (!data) return fail(404, 'Claims workflow not found');
 
         // Get user details for assigned users
         const workflowData = data as unknown as Record<string, unknown>;
@@ -80,10 +72,7 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
 
         workflowData.claims_count = claimsCount || 0;
 
-        return NextResponse.json({ 
-            success: true, 
-            data: workflowData 
-        });
+        return ok(workflowData);
 
     } catch (error: unknown) {
         console.error('[API Claims Workflow GET] Caught error:', error);
@@ -99,12 +88,7 @@ export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?
         const body = await req.json();
         const { name, description, steps } = body;
 
-        if (!name) {
-            return NextResponse.json(
-                { success: false, error: 'Name is required' },
-                { status: 400 }
-            );
-        }
+        if (!name) return fail(400, 'Name is required');
 
         const supabase = createSupabaseAdminClient();
 
@@ -186,10 +170,7 @@ export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?
             .eq('id', id)
             .single();
 
-        return NextResponse.json({
-            success: true,
-            data: updatedWorkflow
-        });
+        return ok(updatedWorkflow);
 
     } catch (error: unknown) {
         console.error('[API Claims Workflow PUT] Caught error:', error);
@@ -211,12 +192,7 @@ export const DELETE = withAuthAndCSRF(async (req: NextRequest, user: User, conte
             .eq('id', id)
             .single();
 
-        if (!workflow) {
-            return NextResponse.json(
-                { success: false, error: 'Claims workflow not found' },
-                { status: 404 }
-            );
-        }
+        if (!workflow) return fail(404, 'Claims workflow not found');
 
         // For now, skip brand permission check as claims workflows might not be brand-specific
         // This can be re-enabled when brand_id is added to claims_workflows table
@@ -228,12 +204,7 @@ export const DELETE = withAuthAndCSRF(async (req: NextRequest, user: User, conte
             .eq('workflow_id', id)
             .limit(1);
 
-        if (claimsUsingWorkflow && claimsUsingWorkflow.length > 0) {
-            return NextResponse.json(
-                { success: false, error: 'Cannot delete workflow that is being used by claims' },
-                { status: 400 }
-            );
-        }
+        if (claimsUsingWorkflow && claimsUsingWorkflow.length > 0) return fail(400, 'Cannot delete workflow that is being used by claims');
 
         // Delete the workflow (steps will be cascade deleted)
         const { error: deleteError } = await supabase
@@ -246,10 +217,7 @@ export const DELETE = withAuthAndCSRF(async (req: NextRequest, user: User, conte
             return handleApiError(deleteError, 'Failed to delete claims workflow');
         }
 
-        return NextResponse.json({
-            success: true,
-            message: 'Claims workflow deleted successfully'
-        });
+        return ok({ message: 'Claims workflow deleted successfully' });
 
     } catch (error: unknown) {
         console.error('[API Claims Workflow DELETE] Caught error:', error);

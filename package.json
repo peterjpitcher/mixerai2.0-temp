@@ -15,6 +15,9 @@
     "check": "next lint && tsc --noEmit",
     "review": "node scripts/code-review.js",
     "review:fix": "next lint --fix && npm run review",
+    "db:push:dry": "supabase db push --dry-run --include-all --include-roles",
+    "db:push": "supabase db push --include-all --include-roles",
+    "db:push:force": "supabase migration repair --status reverted 20241221 && supabase db push --include-all --include-roles",
     "db:types": "./scripts/regenerate-types.sh",
     "setup:screenshots": "node scripts/setup-issue-screenshots.js"
   },

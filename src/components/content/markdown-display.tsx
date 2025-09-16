@@ -11,44 +11,41 @@ interface MarkdownDisplayProps {
 }
 
 export function MarkdownDisplay({ markdown, className = '' }: MarkdownDisplayProps) {
-  // In a real app, this would use a markdown parser library like react-markdown
-  // For this example, we'll do a very basic transformation
   const [formattedContent, setFormattedContent] = useState('');
-  
+
   useEffect(() => {
-    // Very basic markdown formatting
+    if (!markdown) {
+      setFormattedContent('');
+      return;
+    }
+
+    const looksLikeHtml = /<\s*\w+[^>]*>/.test(markdown);
+
+    if (looksLikeHtml) {
+      // Treat as HTML; sanitize and render directly
+      const sanitized = DOMPurify.sanitize(markdown, {
+        ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'strong', 'em', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'br']
+      });
+      setFormattedContent(sanitized);
+      return;
+    }
+
+    // Fallback: very basic markdown to HTML conversion, then sanitize
     let formatted = markdown;
-    
-    // Convert headers
     formatted = formatted.replace(/^# (.+)$/gm, '<h1>$1</h1>');
     formatted = formatted.replace(/^## (.+)$/gm, '<h2>$1</h2>');
     formatted = formatted.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-    
-    // Convert bold and italic
     formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     formatted = formatted.replace(/\*(.+?)\*/g, '<em>$1</em>');
-    
-    // Convert lists
     formatted = formatted.replace(/^\* (.+)$/gm, '<li>$1</li>');
-    
-    // Convert paragraphs (simple)
     formatted = formatted.replace(/^(?!<[hl]).+$/gm, (match) => {
       if (match.trim() === '') return '';
       return `<p>${match}</p>`;
     });
-    
-    // Wrap lists
-    const wrappedWithUl = formatted.replace(
-      /(<li>.+<\/li>\n?)+/g,
-      (match) => `<ul>${match}</ul>`
-    );
-    
-    // Sanitize HTML to prevent XSS attacks
+    const wrappedWithUl = formatted.replace(/(<li>.+<\/li>\n?)+/g, (match) => `<ul>${match}</ul>`);
     const sanitized = DOMPurify.sanitize(wrappedWithUl, {
-      ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'strong', 'em', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'br'],
-      ALLOWED_ATTR: []
+      ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'strong', 'em', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'br']
     });
-    
     setFormattedContent(sanitized);
   }, [markdown]);
   

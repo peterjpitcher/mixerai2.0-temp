@@ -1,4 +1,5 @@
 import type { StyledClaims } from '@/types/claims';
+import { GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
 
 interface RawClaim {
   id: string;
@@ -86,7 +87,7 @@ export function deduplicateClaims(claims: RawClaim[]): RawClaim[] {
  */
 export function filterClaimsByMarket(claims: RawClaim[], countryCode: string): RawClaim[] {
   return claims.filter(claim => 
-    claim.country_code === '__GLOBAL__' || 
+    claim.country_code === GLOBAL_CLAIM_COUNTRY_CODE || 
     claim.country_code === countryCode
   );
 }

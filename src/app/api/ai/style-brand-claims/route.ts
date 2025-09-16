@@ -3,7 +3,11 @@ import { NextRequest } from 'next/server';
 
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { formatClaimsDirectly } from '@/lib/claims-formatter';
+import { GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { getStackedClaimsForProduct } from '@/lib/claims-utils';
+import { ok, fail } from '@/lib/http/response';
+import { logDebug, logError } from '@/lib/logger';
 
 type Claim = {
   claim_text: string;
@@ -38,10 +42,9 @@ function sortClaims(a: Claim, b: Claim): number {
     return aLevel - bLevel;
   }
 
-  // 2. Market specificity: specific market > all countries
-  const allCountriesCode = '__ALL_COUNTRIES__'; 
-  const aIsGlobal = a.country_code === allCountriesCode;
-  const bIsGlobal = b.country_code === allCountriesCode;
+  // 2. Market specificity: specific market > global
+  const aIsGlobal = a.country_code === GLOBAL_CLAIM_COUNTRY_CODE;
+  const bIsGlobal = b.country_code === GLOBAL_CLAIM_COUNTRY_CODE;
   if (aIsGlobal !== bIsGlobal) {
     return aIsGlobal ? 1 : -1;
   }
@@ -55,22 +58,40 @@ async function styleBrandClaimsHandler(request: NextRequest) {
     const { masterClaimBrandId, productId, countryCode } = body;
 
     if (!masterClaimBrandId || typeof masterClaimBrandId !== 'string') {
-      return NextResponse.json({ success: false, error: 'Master Claim Brand ID must be a string.' }, { status: 400 });
+      return fail(400, 'Master Claim Brand ID must be a string.');
     }
     
     const supabase = createSupabaseAdminClient();
 
-    // 1. Fetch all claims
+    // If productId and countryCode are provided, reuse stacked claims for precedence consistency
+    if (productId && countryCode) {
+      const effective = await getStackedClaimsForProduct(productId, countryCode);
+      const { data: brandData } = await supabase
+        .from('master_claim_brands')
+        .select('name')
+        .eq('id', masterClaimBrandId)
+        .single();
+      const formatted = formatClaimsDirectly(
+        effective.map((ec, idx) => ({
+          id: `${ec.claim_text}_${idx}`,
+          claim_text: ec.claim_text,
+          claim_type: ec.final_claim_type === 'none' ? 'disallowed' : (ec.final_claim_type as 'allowed'|'disallowed'),
+          level: (ec.source_level || 'none').toString().replace(/^./, c => c.toUpperCase()),
+          country_code: ec.original_claim_country_code || countryCode,
+          priority: effective.length - idx,
+        })),
+        undefined,
+        brandData?.name
+      );
+      return ok({ brandName: brandData?.name || 'Unknown Brand', styledClaims: formatted, rawClaimsForAI: effective.map(ec => ({ text: ec.claim_text, type: ec.final_claim_type, level: ec.source_level, market: ec.original_claim_country_code })) });
+    }
+
+    // 1. Fetch all claims (brand-oriented)
     const allClaims = await fetchAllBrandClaims(supabase, masterClaimBrandId, productId, countryCode);
 
     if (allClaims.length === 0) {
       const { data: brandData } = await supabase.from('master_claim_brands').select('name').eq('id', masterClaimBrandId).single();
-      return NextResponse.json({
-        success: true,
-        brandName: brandData?.name || 'Unknown Brand',
-        styledClaims: [],
-        message: 'No claims found for the selected criteria.'
-      });
+      return ok({ brandName: brandData?.name || 'Unknown Brand', styledClaims: [], rawClaimsForAI: [] });
     }
 
     // 2. Sort claims to establish precedence
@@ -112,14 +133,13 @@ async function styleBrandClaimsHandler(request: NextRequest) {
     );
 
     // Log for debugging
-    console.log('Formatted claims without AI:', {
+    logDebug('Formatted claims without AI:', {
       brandName: brandData?.name,
       productName,
       totalClaims: allClaimsToDisplay.length
     });
 
-    return NextResponse.json({
-      success: true,
+    return ok({
       brandName: brandData?.name || 'Unknown Brand',
       styledClaims: formattedClaims,
       rawClaimsForAI: allClaimsToDisplay.map(claim => ({
@@ -131,8 +151,8 @@ async function styleBrandClaimsHandler(request: NextRequest) {
     });
 
   } catch (error: unknown) {
-    console.error('Error in /api/ai/style-brand-claims handler:', error);
-    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Unknown error occurred' }, { status: 500 });
+    logError('Error in /api/ai/style-brand-claims handler:', error);
+    return fail(500, 'Failed to style brand claims', error instanceof Error ? error.message : 'Unknown error occurred');
   }
 }
 

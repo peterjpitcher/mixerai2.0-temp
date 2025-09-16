@@ -18,6 +18,7 @@ import {
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 import { ALL_COUNTRIES_CODE, ALL_COUNTRIES_NAME } from '@/lib/constants/country-codes';
+import { GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
 import { apiFetch } from '@/lib/api-client';
 import { Claim, ClaimTypeEnum, ClaimLevelEnum } from "@/lib/claims-utils"; // Import from claims-utils
 import { Badge } from "@/components/ui/badge";
@@ -265,7 +266,7 @@ export default function EditProductPage() {
         const response = await fetch('/api/countries');
         const data = await response.json();
         if (data.success) {
-          setCountries(data.countries);
+          setCountries(data.countries ?? data.data);
         } else {
           console.error('Failed to fetch countries:', data.error);
         }
@@ -536,7 +537,7 @@ export default function EditProductPage() {
                   <SelectValue placeholder="Select Country to View Claims" />
                 </SelectTrigger>
                 <SelectContent className="max-h-72">
-                  <SelectItem value={ALL_COUNTRIES_CODE}><span className="truncate">{ALL_COUNTRIES_NAME} (Effective Total)</span></SelectItem>
+                  <SelectItem value={ALL_COUNTRIES_CODE} disabled><span className="truncate">{ALL_COUNTRIES_NAME} (Not available here)</span></SelectItem>
                   {Array.isArray(countries) ? countries.map((country: unknown) => {
                     const countryCode = typeof country === 'object' && country !== null && (country as { code?: string }).code ? (country as { code: string }).code : typeof country === 'string' ? country : 'unknown';
                     const countryName = typeof country === 'object' && country !== null && (country as { name?: string }).name ? (country as { name: string }).name : typeof country === 'string' ? country : 'Unknown Country';
@@ -576,20 +577,20 @@ export default function EditProductPage() {
 
             {!isLoadingStackedClaims && !stackedClaimsError && stackedClaims.length > 0 && (
               <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-                {stackedClaims.map((claim) => (
-                  <div key={claim.id} className="p-3 border rounded-md bg-background shadow-sm hover:shadow-md transition-shadow">
-                    <p className="font-semibold text-sm leading-snug">{claim.claim_text}</p>
-                    {claim.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{claim.description}</p>}
+                {stackedClaims.map((ec) => (
+                  <div key={`${(ec as any).source_claim_id}:${ec.claim_text}`} className="p-3 border rounded-md bg-background shadow-sm hover:shadow-md transition-shadow">
+                    <p className="font-semibold text-sm leading-snug">{ec.claim_text}</p>
+                    {ec.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{ec.description}</p>}
                     <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-2 text-xs">
                       <Badge variant="outline" className="flex items-center text-muted-foreground">
-                        {claimTypeIcons[claim.claim_type]} {claim.claim_type}
+                        {claimTypeIcons[(ec as any).final_claim_type || 'none']} {(ec as any).final_claim_type}
                       </Badge>
                       <Badge variant="outline" className="flex items-center text-muted-foreground">
-                        {claimLevelIcons[claim.level]} {claim.level}
+                        {claimLevelIcons[((ec as any).source_level as any) || 'none']} {(ec as any).source_level}
                       </Badge>
                       <Badge variant="outline" className="flex items-center text-muted-foreground">
                         <Globe className="mr-1.5 h-3.5 w-3.5" /> 
-                        {claim.country_code === ALL_COUNTRIES_CODE ? ALL_COUNTRIES_NAME : claim.country_code}
+                        {(ec as any).original_claim_country_code === GLOBAL_CLAIM_COUNTRY_CODE ? 'Global' : (ec as any).original_claim_country_code}
                       </Badge>
                     </div>
                   </div>

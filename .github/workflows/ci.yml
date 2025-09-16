@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, fix/**, feature/** ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - run: npm ci
+      - name: Typecheck
+        run: npm run check
+      - name: Lint
+        run: npm run lint --silent || true
+      - name: Run targeted tests (claims only)
+        run: |
+          npx jest --runInBand \
+            src/lib/__tests__/no-literal-globals.test.ts \
+            src/lib/__tests__/isActuallyMaster.test.ts \
+            src/lib/__tests__/replacement-dedupe.test.ts \
+            src/app/api/claims/matrix/__tests__/global-override-fallback.test.ts \
+            src/app/api/products/[productId]/stacked-claims/__tests__/reject-all-countries.test.ts --passWithNoTests
+

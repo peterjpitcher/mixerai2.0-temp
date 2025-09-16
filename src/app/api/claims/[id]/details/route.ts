@@ -3,24 +3,17 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
+import { ok, fail } from '@/lib/http/response';
 
 export const dynamic = "force-dynamic";
 
 // GET /api/claims/[id]/details - Get detailed claim information including workflow steps and history
-export const GET = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
-  console.log('[API Claims Details] Raw context:', context);
-  console.log('[API Claims Details] Context type:', typeof context);
-  
+export const GET = withAuth(async (_req: NextRequest, user: User, context?: unknown) => {
   const { params } = context as { params: { id: string } };
   const claimId = params?.id;
-  
-  console.log('[API Claims Details] Params:', params);
-  console.log('[API Claims Details] Fetching claim with ID:', claimId);
-  console.log('[API Claims Details] User ID:', user.id);
 
   if (!claimId) {
-    console.error('[API Claims Details] No claim ID provided');
-    return NextResponse.json({ success: false, error: 'Claim ID is required' }, { status: 400 });
+    return fail(400, 'Claim ID is required');
   }
 
   try {
@@ -34,11 +27,8 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
       .single();
 
     if (claimError || !claim) {
-      console.error('[API Claims Details] Error fetching claim:', claimError);
-      return NextResponse.json({ success: false, error: 'Claim not found' }, { status: 404 });
+      return fail(404, 'Claim not found');
     }
-    
-    console.log('[API Claims Details] Found claim:', claim.id);
 
     // Get all workflow steps for this workflow
     let workflowSteps: Record<string, unknown>[] = [];
@@ -97,19 +87,15 @@ export const GET = withAuth(async (req: NextRequest, user: User, context?: unkno
     // Note: claims_history table may not exist yet
     const changeHistory = [];
 
-    return NextResponse.json({ 
-      success: true, 
-      data: {
-        claim,
-        workflowSteps,
-        history: history || [],
-        changeHistory: changeHistory || [],
-        currentUserId: user.id
-      }
+    return ok({
+      claim,
+      workflowSteps,
+      history: history || [],
+      changeHistory: changeHistory || [],
+      currentUserId: user.id
     });
 
   } catch (error: unknown) {
-    console.error('[API Claims Details GET] Caught error:', error);
     return handleApiError(error, 'An unexpected error occurred while fetching claim details.');
   }
 });

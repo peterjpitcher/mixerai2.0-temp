@@ -163,8 +163,9 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
         const response = await fetch('/api/countries');
         if (!response.ok) throw new Error('Failed to fetch countries');
         const apiResponse = await response.json();
-        if (apiResponse.success && Array.isArray(apiResponse.data)) {
-          const fetchedCountryOptions = apiResponse.data.map((c: {code: string, name: string}) => ({ value: c.code, label: c.name}));
+        if (apiResponse.success && Array.isArray(apiResponse.countries || apiResponse.data)) {
+          const source = apiResponse.countries || apiResponse.data;
+          const fetchedCountryOptions = source.map((c: {code: string, name: string}) => ({ value: c.code, label: c.name}));
           setCountryOptions([
             { value: ALL_COUNTRIES_CODE, label: ALL_COUNTRIES_NAME }, 
             ...fetchedCountryOptions
@@ -383,7 +384,6 @@ export const ClaimDefinitionForm: React.FC<ClaimDefinitionFormProps> = ({
           <SelectContent>
             <SelectItem value="allowed">Allowed</SelectItem>
             <SelectItem value="disallowed">Disallowed</SelectItem>
-            <SelectItem value="mandatory">Mandatory</SelectItem>
           </SelectContent>
         </Select>
       </div>

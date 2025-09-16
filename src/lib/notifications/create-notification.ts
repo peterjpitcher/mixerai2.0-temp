@@ -97,6 +97,8 @@ export const NotificationHelpers = {
       title: 'Claim Review Completed',
       message: `Claims for ${brandName} in ${countryCode} have been reviewed: ${status}.`,
       action_label: 'View Results',
-      action_url: `/dashboard/claims/reviews`
+      action_url: CLAIMS_DEFAULT_NOTIFICATION_ROUTE
     })
 };
+
+export const CLAIMS_DEFAULT_NOTIFICATION_ROUTE = '/dashboard/claims/pending-approval';

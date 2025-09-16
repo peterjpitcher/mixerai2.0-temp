@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { Loader2, ArrowLeft, Building2, Package, Sprout, Globe, ShieldCheck, ShieldOff, ShieldAlert, ShieldQuestion, FileText, WorkflowIcon } from 'lucide-react';
+import { GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -207,7 +208,7 @@ export default function ClaimDetailPage({ params }: ClaimDetailPageProps) {
               <h4 className="text-sm font-medium text-muted-foreground mb-1">Country</h4>
               <Badge variant="secondary">
                 <Globe className="mr-1 h-3 w-3" />
-                {claim.country_code === '__GLOBAL__' ? 'Global' : claim.country_code}
+                {claim.country_code === GLOBAL_CLAIM_COUNTRY_CODE ? 'Global' : claim.country_code}
               </Badge>
             </div>
           </CardContent>

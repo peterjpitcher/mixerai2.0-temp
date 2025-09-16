@@ -3,7 +3,11 @@ import { NextRequest } from 'next/server';
 
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { formatClaimsDirectly, deduplicateClaims } from '@/lib/claims-formatter';
+import { GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
+import { logDebug, logError } from '@/lib/logger';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { getStackedClaimsForProduct } from '@/lib/claims-utils';
+import { ok, fail } from '@/lib/http/response';
 
 type Claim = {
   claim_text: string;
@@ -73,11 +77,11 @@ async function fetchAllBrandClaims(supabase: ReturnType<typeof createSupabaseAdm
   // Add country filter if provided
   if (countryCode) {
     // Use parameterized filters to prevent SQL injection
-    brandQuery = brandQuery.or(`country_code.eq.${countryCode.replace(/[^a-zA-Z0-9_-]/g, '')},country_code.eq.__GLOBAL__`);
-    if (productQuery) productQuery = productQuery.or(`country_code.eq.${countryCode.replace(/[^a-zA-Z0-9_-]/g, '')},country_code.eq.__GLOBAL__`);
+    brandQuery = brandQuery.or(`country_code.eq.${countryCode.replace(/[^a-zA-Z0-9_-]/g, '')},country_code.eq.${GLOBAL_CLAIM_COUNTRY_CODE}`);
+    if (productQuery) productQuery = productQuery.or(`country_code.eq.${countryCode.replace(/[^a-zA-Z0-9_-]/g, '')},country_code.eq.${GLOBAL_CLAIM_COUNTRY_CODE}`);
     // Filter ingredient claims by country
     ingredientClaims = ingredientClaims.filter(claim => 
-      claim.country_code === countryCode || claim.country_code === '__GLOBAL__'
+      claim.country_code === countryCode || claim.country_code === GLOBAL_CLAIM_COUNTRY_CODE
     );
   }
 
@@ -121,10 +125,9 @@ function sortClaims(a: Claim, b: Claim): number {
     return aLevel - bLevel;
   }
 
-  // Sort by market specificity: specific market > all countries
-  const allCountriesCode = '__ALL_COUNTRIES__';
-  const aIsGlobal = a.country_code === allCountriesCode;
-  const bIsGlobal = b.country_code === allCountriesCode;
+  // Sort by market specificity: specific market > global
+  const aIsGlobal = a.country_code === GLOBAL_CLAIM_COUNTRY_CODE;
+  const bIsGlobal = b.country_code === GLOBAL_CLAIM_COUNTRY_CODE;
   if (aIsGlobal !== bIsGlobal) {
     return aIsGlobal ? 1 : -1;
   }
@@ -164,10 +167,10 @@ function sortClaims(a: Claim, b: Claim): number {
  */
 async function prepareProductContextHandler(request: NextRequest) {
   try {
-    const { productId } = await request.json();
+    const { productId, countryCode } = await request.json();
 
     if (!productId || typeof productId !== 'string') {
-      return NextResponse.json({ success: false, error: 'Product ID must be provided.' }, { status: 400 });
+      return fail(400, 'Product ID must be provided.');
     }
     
     const supabase = createSupabaseAdminClient();
@@ -179,28 +182,35 @@ async function prepareProductContextHandler(request: NextRequest) {
         .single();
     
     if (productError) throw new Error('Could not find the specified product.');
-    if (!productData) return NextResponse.json({ success: false, error: 'Product not found.' }, { status: 404 });
+    if (!productData) return fail(404, 'Product not found.');
     
     const { name: productName, master_brand_id: masterClaimBrandId } = productData;
 
     if (!masterClaimBrandId) {
-        return NextResponse.json({
-            success: true,
-            productName,
-            styledClaims: null,
-            message: 'This product is not associated with a master brand and has no claims.'
-        });
+      return ok({ productName, styledClaims: null });
+    }
+
+    if (countryCode && typeof countryCode === 'string') {
+      const effective = await getStackedClaimsForProduct(productId, countryCode);
+      const formatted = formatClaimsDirectly(
+        effective.map((ec, index) => ({
+          id: `${ec.claim_text}_${index}`,
+          claim_text: ec.claim_text,
+          claim_type: ec.final_claim_type === 'none' ? 'disallowed' : (ec.final_claim_type as 'allowed'|'disallowed'),
+          level: (ec.source_level || 'none').toString().replace(/^./, c => c.toUpperCase()),
+          country_code: ec.original_claim_country_code || countryCode,
+          priority: effective.length - index,
+        })),
+        productName,
+        undefined
+      );
+      return ok({ productName, styledClaims: formatted });
     }
 
     const allClaims = await fetchAllBrandClaims(supabase, masterClaimBrandId, productId, null);
 
     if (allClaims.length === 0) {
-      return NextResponse.json({
-        success: true,
-        productName,
-        styledClaims: null,
-        message: 'No claims found for this product.'
-      });
+      return ok({ productName, styledClaims: null });
     }
 
     const sortedClaims = allClaims.sort(sortClaims);
@@ -231,22 +241,18 @@ async function prepareProductContextHandler(request: NextRequest) {
       brandData?.name
     );
 
-    console.log('[prepare-product-context] Formatted claims without AI:', {
+    logDebug('[prepare-product-context] Formatted claims without AI:', {
       productName,
       brandName: brandData?.name,
       totalUniqueClaimsCount: uniqueClaims.length,
       totalClaimsCount: allClaims.length
     });
 
-    return NextResponse.json({
-      success: true,
-      productName,
-      styledClaims: formattedClaims,
-    });
+    return ok({ productName, styledClaims: formattedClaims });
 
   } catch (error: unknown) {
-    console.error('Error in /api/content/prepare-product-context handler:', error);
-    return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
+    logError('Error in /api/content/prepare-product-context handler:', error);
+    return fail(500, 'Failed to prepare product context', (error as Error).message);
   }
 }
 

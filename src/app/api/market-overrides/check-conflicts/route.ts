@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { ALL_COUNTRIES_CODE } from '@/lib/constants/country-codes';
+import { ok, fail } from '@/lib/http/response';
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +20,7 @@ export const POST = withAuthAndCSRF(async (req: NextRequest): Promise<Response> 
         const { masterClaimId, marketCountryCode, targetProductId } = body;
 
         // Basic validation
-        if (!masterClaimId || !marketCountryCode || !targetProductId) {
-            return NextResponse.json({ 
-                success: false, 
-                error: 'Missing required fields: masterClaimId, marketCountryCode, targetProductId.' 
-            }, { status: 400 });
-        }
+        if (!masterClaimId || !marketCountryCode || !targetProductId) return fail(400, 'Missing required fields: masterClaimId, marketCountryCode, targetProductId.');
 
         const supabase = createSupabaseAdminClient();
 
@@ -83,11 +79,7 @@ export const POST = withAuthAndCSRF(async (req: NextRequest): Promise<Response> 
             }
         }
 
-        return NextResponse.json({ 
-            success: true, 
-            conflicts,
-            hasConflicts: conflicts.length > 0
-        });
+        return ok({ conflicts, hasConflicts: conflicts.length > 0 });
 
     } catch (error: unknown) {
         console.error('[API MarketOverrides Check Conflicts POST] Error:', error);
