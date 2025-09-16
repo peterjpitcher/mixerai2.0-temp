@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
