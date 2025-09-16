@@ -107,6 +107,7 @@ export default function UsersPage() {
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [resendingInviteToUserId, setResendingInviteToUserId] = useState<string | null>(null);
+  const [showInactive, setShowInactive] = useState<boolean>(false);
 
   // RBAC State
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
@@ -215,19 +216,24 @@ export default function UsersPage() {
     }
   }, [isAllowedToAccess, isLoadingUser, isCheckingPermissions]);
   
-  // Filter users based on search term
-  const filteredUsers = searchTerm.trim() === '' 
-    ? users 
-    : users.filter(user => 
+  // Search filter
+  const filteredUsers = searchTerm.trim() === ''
+    ? users
+    : users.filter(user =>
         (user.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
         (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
         (user.role?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
         (user.company?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
         (user.job_title?.toLowerCase() || '').includes(searchTerm.toLowerCase())
       );
+
+  // Hide inactive users by default unless toggled on
+  const visibleUsers = showInactive
+    ? filteredUsers
+    : filteredUsers.filter(u => u.user_status !== 'inactive');
   
   // Sort users based on sort field and direction
-  const sortedUsers = [...filteredUsers].sort((a, b) => {
+  const sortedUsers = [...visibleUsers].sort((a, b) => {
     // First, priority sort by role (Admin at top)
     if (sortField === 'role') {
       // Sort by role with admins at the top
@@ -438,11 +444,19 @@ export default function UsersPage() {
         title="Users"
         description="View, search, sort, and manage users in your workspace."
         actions={
-          <Button asChild>
-            <Link href="/dashboard/users/invite">
-              <Plus className="mr-2 h-4 w-4" /> Invite User
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowInactive(s => !s)}
+            >
+              {showInactive ? 'Hide Inactive Users' : 'Show Inactive Users'}
+            </Button>
+            <Button asChild>
+              <Link href="/dashboard/users/invite">
+                <Plus className="mr-2 h-4 w-4" /> Invite User
+              </Link>
+            </Button>
+          </div>
         }
       />
       

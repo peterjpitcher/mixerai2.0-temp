@@ -612,7 +612,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
 
       <PageHeader
         title={`Edit: ${content.title || 'Content'}`}
-        description="Modify the title, body, and other generated fields for this piece of content."
+        description="Review and edit generated fields. Title is auto-generated and read-only."
         actions={
           <div className="flex items-center gap-4">
             {hasUnsavedChanges && (
@@ -635,8 +635,9 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="title">Title</Label>
-                <Input id="title" name="title" value={content.title} onChange={handleInputChange}/>
+                <Label htmlFor="title">Title (auto-generated)</Label>
+                <Input id="title" name="title" value={content.title} readOnly disabled />
+                <p className="text-xs text-muted-foreground mt-1">Titles are generated automatically and cannot be edited.</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div><Label>Content Template</Label><Input value={content.template_name || 'N/A'} disabled /></div>
