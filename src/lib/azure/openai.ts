@@ -659,13 +659,97 @@ The product context is provided in the user prompt.
     if (!json) {
       console.warn('Failed to parse JSON output from AI; returning empty content for fields');
       (template.outputFields || []).forEach((f: any) => { out[f.id] = ''; });
-      return out;
+      // continue to per-field fallback attempts below
     }
 
-    (template.outputFields || []).forEach((f: any) => {
-      const raw = (json as any)[f.id];
-      out[f.id] = validateAndPostProcess(f, typeof raw === 'string' ? raw : (raw != null ? String(raw) : ''));
-    });
+    if (json) {
+      (template.outputFields || []).forEach((f: any) => {
+        const raw = (json as any)[f.id];
+        out[f.id] = validateAndPostProcess(f, typeof raw === 'string' ? raw : (raw != null ? String(raw) : ''));
+      });
+    }
+
+    // Per-field fallback: if any required field is still empty, try a focused generation for that field only
+    const missingFields = (template.outputFields || []).filter((f: any) => !out[f.id] || out[f.id].trim().length === 0);
+    if (missingFields.length > 0) {
+      for (const f of missingFields) {
+        try {
+          const singleFieldSystemPrompt = (() => {
+            let sp = `You are an expert content creator for the brand "${brand.name}".`;
+            sp += ` Return ONLY a JSON object where the single key is exactly "${f.id}" and the value is the generated content string for that field.`;
+            const isRich = f.type === 'richText' || f.type === 'html';
+            if (isRich) {
+              sp += ` For this field, output well-formed HTML fragments ONLY (no <!DOCTYPE>, <html>, <head>, or <body> wrappers).`;
+            } else {
+              sp += ` For this field, output plain text (no HTML tags).`;
+            }
+            if (brand.language && brand.country) {
+              sp += ` Generate ALL content in ${brand.language} for an audience in ${brand.country}.`;
+              if (brand.language !== 'en') {
+                sp += ` Do NOT generate content in English.`;
+              }
+            }
+            if (brand.brand_identity && f.useBrandIdentity) sp += ` Brand identity: ${brand.brand_identity}.`;
+            if (brand.tone_of_voice && f.useToneOfVoice) sp += ` Tone of voice: ${brand.tone_of_voice}.`;
+            if (brand.guardrails && f.useGuardrails) sp += ` Content guardrails: ${brand.guardrails}.`;
+            return sp;
+          })();
+
+          // Build a concise user prompt focusing on the single field
+          let singleFieldUserPrompt = `Generate content for field "${f.name}" (ID: ${f.id}) based on the template "${template.name}".`;
+          // Include the field-specific AI prompt if available
+          if (f.aiPrompt) {
+            singleFieldUserPrompt += `\nInstructions: ${f.aiPrompt}`;
+          }
+          // Provide input field values context
+          if (Array.isArray(template.inputFields) && template.inputFields.length > 0) {
+            singleFieldUserPrompt += `\n\nTemplate input fields:`;
+            template.inputFields.forEach((inp: any) => {
+              singleFieldUserPrompt += `\n- ${inp.name}: ${inp.value || ''}`;
+            });
+          }
+          if (input?.additionalInstructions) {
+            singleFieldUserPrompt += `\n\nAdditional instructions: ${input.additionalInstructions}`;
+          }
+          if (input?.product_context) {
+            const { productName, styledClaims } = input.product_context as { productName?: string; styledClaims?: any };
+            if (productName) singleFieldUserPrompt += `\nProduct Name: ${productName}`;
+            if (styledClaims) singleFieldUserPrompt += `\nStyled Claims: ${JSON.stringify(styledClaims).slice(0, 1500)}`; // keep concise
+          }
+
+          const singleReq = {
+            model: deploymentName,
+            messages: [
+              { role: 'system', content: singleFieldSystemPrompt },
+              { role: 'user', content: singleFieldUserPrompt }
+            ],
+            response_format: { type: 'json_object' as const },
+            max_tokens: 600,
+            temperature: 0.5,
+            top_p: 0.9,
+          };
+          const endpointSf = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
+          const sfResp = await fetch(endpointSf, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'api-key': process.env.AZURE_OPENAI_API_KEY || '' },
+            body: JSON.stringify(singleReq)
+          });
+          if (sfResp.ok) {
+            const sfJson = await sfResp.json();
+            let sfContent = sfJson.choices?.[0]?.message?.content || '';
+            sfContent = sfContent.replace(/```[a-zA-Z]*\n?/g, '').replace(/\n?```/g, '');
+            const parsed = tryParseJson(sfContent);
+            const raw = parsed ? (parsed as any)[f.id] : '';
+            const processed = validateAndPostProcess(f, typeof raw === 'string' ? raw : (raw != null ? String(raw) : ''));
+            if (processed && processed.trim().length > 0) {
+              out[f.id] = processed;
+            }
+          }
+        } catch (e) {
+          console.warn(`Single-field fallback failed for ${f.id}:`, e);
+        }
+      }
+    }
 
     return out;
   } catch (error) {
