@@ -7,6 +7,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { generateContentTitleFromContext } from '@/lib/azure/openai';
 // import { TablesInsert, Enums } from '@/types/supabase'; // TODO: Uncomment when types are regenerated
 import { User } from '@supabase/supabase-js';
 
@@ -324,7 +325,8 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User) => 
   try {
     const data = await request.json();
     
-    if (!data.brand_id || !data.title || !data.body) {
+    // brand_id and body are required inputs; title will be auto-generated if missing
+    if (!data.brand_id || !data.body) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
         { status: 400 }
@@ -387,9 +389,59 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User) => 
       }
     }
 
+    // Ensure we have a title: prefer provided title, else generate server-side, else safe fallback
+    let finalTitle: string = (typeof data.title === 'string' ? data.title.trim() : '') || '';
+
+    if (!finalTitle) {
+      try {
+        // Fetch brand context for AI title generation
+        const { data: brandData, error: brandError } = await supabase
+          .from('brands')
+          .select('id, name, brand_identity, tone_of_voice, language, country')
+          .eq('id', data.brand_id)
+          .single();
+
+        if (!brandError && brandData && brandData.language && brandData.country) {
+          try {
+            finalTitle = await generateContentTitleFromContext(String(data.body), {
+              name: brandData.name as string,
+              brand_identity: brandData.brand_identity as string | null,
+              tone_of_voice: brandData.tone_of_voice as string | null,
+              language: brandData.language as string,
+              country: brandData.country as string,
+            });
+          } catch (aiError) {
+            console.warn('[API Content POST] AI title generation failed, will use fallback:', aiError);
+          }
+        } else {
+          if (brandError) {
+            console.warn('[API Content POST] Failed to fetch brand for title generation:', brandError);
+          } else {
+            console.warn('[API Content POST] Brand missing language/country; skipping AI title generation');
+          }
+        }
+      } catch (ctxError) {
+        console.warn('[API Content POST] Error preparing brand context for title generation:', ctxError);
+      }
+    }
+
+    if (!finalTitle) {
+      // Fallback: derive a simple title from body or use a dated default
+      try {
+        const bodyText: string = String(data.body || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (bodyText.length > 0) {
+          finalTitle = bodyText.slice(0, 80);
+        }
+      } catch {}
+      if (!finalTitle) {
+        const dateStr = new Date().toISOString().slice(0, 10);
+        finalTitle = `Untitled Content - ${dateStr}`;
+      }
+    }
+
     const newContentPayload = { // TODO: Type as TablesInsert<'content'> when types are regenerated
       brand_id: data.brand_id,
-      title: data.title,
+      title: finalTitle,
       body: data.body,
       meta_title: data.meta_title || null,
       meta_description: data.meta_description || null,

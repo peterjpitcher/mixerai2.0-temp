@@ -10,7 +10,7 @@ import { Json } from '@/types/supabase';
 // In-memory rate limiting
 const rateLimit = new Map<string, { count: number, timestamp: number }>();
 const RATE_LIMIT_PERIOD = 60 * 1000; // 1 minute
-const MAX_REQUESTS_PER_MINUTE = 10; // Allow 10 requests per minute per IP
+const MAX_REQUESTS_PER_MINUTE = 60; // Allow 60 requests per minute per IP (relaxed)
 
 interface MetadataGenerationRequest {
   urls: string[];

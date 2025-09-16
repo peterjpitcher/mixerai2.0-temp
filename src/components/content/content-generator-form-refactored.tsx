@@ -4,7 +4,6 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, Sparkles, ShieldAlert, Info } from 'lucide-react';
@@ -428,76 +427,7 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
           </CardFooter>
         </Card>
         
-        {/* Content Title Section - System Field */}
-        {hasGeneratedContent && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Content Details</CardTitle>
-              <CardDescription>
-                Set the title for this content piece
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Title Field - System Required */}
-              <div className="space-y-2">
-                <Label htmlFor="content-title">
-                  Content Title <span className="text-xs text-muted-foreground">(Required for saving)</span>
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="content-title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder={isGeneratingTitle ? "Generating title..." : "Enter a title for this content"}
-                    disabled={isGeneratingTitle}
-                    className="flex-1"
-                  />
-                  {!title && Object.keys(generatedOutputs).length > 0 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
-                        // Get primary body content for title generation
-                        let contentForTitle = '';
-                        if (template?.outputFields && template.outputFields.length > 0) {
-                          const richTextOutput = template.outputFields.find(f => f.type === 'richText' && generatedOutputs[f.id]);
-                          if (richTextOutput) {
-                            contentForTitle = generatedOutputs[richTextOutput.id];
-                          } else {
-                            const firstOutputField = template.outputFields[0];
-                            if (firstOutputField && generatedOutputs[firstOutputField.id]) {
-                              contentForTitle = generatedOutputs[firstOutputField.id];
-                            }
-                          }
-                        }
-                        if (contentForTitle) {
-                          await generateTitle(contentForTitle);
-                        }
-                      }}
-                      disabled={isGeneratingTitle}
-                    >
-                      {isGeneratingTitle ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="mr-2 h-4 w-4" />
-                          Generate Title
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
-                {isGeneratingTitle && (
-                  <p className="text-sm text-muted-foreground">Using AI to create an engaging title...</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Title input hidden: titles are auto-generated on save or server-side */}
         
         {/* Generated Content Section - Template Output Fields Only */}
         {hasGeneratedContent && (

@@ -353,9 +353,10 @@ The product context is provided in the user prompt.
 `;
   }
   
-  systemPrompt += `\nYou are using a template called "${template.name}" to generate content. For rich text fields, generate minimal well-formed HTML (no <html>/<body> wrappers). For plain text fields, output plain text only.`;
+  systemPrompt += `\nYou are using a template called "${template.name}" to generate content.\n- For rich text fields: generate well-formed HTML fragments ONLY (no <!DOCTYPE>, <html>, <head>, or <body> wrappers).\n- For plain text fields: output plain text only (no HTML tags).\n- Avoid repetition and duplicate headings. Provide concise, high quality content without filler.`;
   
   // Build the user prompt using template fields and prompts
+  const requiredIds = (template.outputFields || []).map(f => f.id);
   let userPrompt = `Create content according to this template: "${template.name}". Return only valid JSON as described.\n\n`;
   
   if (input?.product_context) {
@@ -385,7 +386,7 @@ The product context is provided in the user prompt.
     }
   });
   
-  userPrompt += `\nIMPORTANT: You MUST generate content for ALL ${template.outputFields.length} output fields listed below. Each field must be clearly marked and separated.\n\n`;
+  userPrompt += `\nIMPORTANT: You MUST generate content for ALL ${template.outputFields.length} output fields listed below.\nReturn ONLY a single JSON object whose keys are EXACTLY: ${JSON.stringify(requiredIds)}. No extra keys, no commentary.\n\n`;
   userPrompt += `Generate the following ${template.outputFields.length} output fields:\n`;
   
   // Include output field requirements with their prompts
@@ -475,7 +476,7 @@ The product context is provided in the user prompt.
     }
 
     const isRich = field.type === 'richText' || field.type === 'html';
-    userPrompt += `   Output Type: ${isRich ? 'HTML' : 'PLAIN_TEXT'}\n`;
+    userPrompt += `   Output Type: ${isRich ? 'HTML_FRAGMENT' : 'PLAIN_TEXT'}\n`;
     userPrompt += `   JSON Key: ${field.id}\n`;
   });
   
@@ -491,7 +492,7 @@ The product context is provided in the user prompt.
   }
   
   // Final reminder
-  userPrompt += `\nREMINDER: Generate ALL ${template.outputFields.length} fields. Output ONLY a single JSON object keyed by field IDs. No extra text.`;
+  userPrompt += `\nREMINDER: Generate ALL ${template.outputFields.length} fields. Output ONLY a single JSON object keyed by field IDs ${JSON.stringify(requiredIds)}. No extra text.`;
   
   // DEBUG: Log the complete prompt being sent to AI
   console.log('\n========== AI GENERATION DEBUG ==========');
@@ -518,6 +519,7 @@ The product context is provided in the user prompt.
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
       ],
+      response_format: { type: "json_object" },
       max_tokens: Math.min(1500, 300 + (template.outputFields?.length || 1) * 300),
       temperature: 0.3,
       top_p: 0.9,
@@ -575,6 +577,11 @@ The product context is provided in the user prompt.
       }
     };
 
+    const stripHtmlWrappers = (html: string) =>
+      html
+        .replace(/<!DOCTYPE[^>]*>/gi, '')
+        .replace(/<\/?(?:html|head|body)[^>]*>/gi, '');
+
     const validateAndPostProcess = (field: any, value: string): string => {
       if (!value) return '';
       let v = String(value).trim();
@@ -583,6 +590,11 @@ The product context is provided in the user prompt.
         v = v.replace(/<[^>]+>/g, '');
       } else {
         v = v.replace(/```[a-zA-Z]*\n?/g, '').replace(/\n?```/g, '');
+        v = stripHtmlWrappers(v);
+        try {
+          const { sanitizeHTML } = require('@/lib/sanitize/html-sanitizer');
+          v = sanitizeHTML(v, { allow_images: false, allow_links: true, allow_tables: true });
+        } catch {}
       }
       const optionMax = (field.options && (field.options as any).maxLength) || undefined;
       const maxChars = field.maxChars || optionMax;
@@ -601,8 +613,9 @@ The product context is provided in the user prompt.
         model: deploymentName,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt + "\nCRITICAL: Output ONLY a valid JSON object keyed by field IDs. No explanation." }
+          { role: "user", content: userPrompt + "\nCRITICAL: Output ONLY a valid JSON object keyed EXACTLY by these field IDs: " + JSON.stringify(requiredIds) + ". No explanation, no extra keys." }
         ],
+        response_format: { type: "json_object" },
         max_tokens: Math.min(1200, 300 + (template.outputFields?.length || 1) * 250),
         temperature: 0.2,
         top_p: 0.9,
@@ -621,6 +634,21 @@ The product context is provided in the user prompt.
         retryContent = retryContent.replace(/```[a-zA-Z]*\n?/g, '').replace(/\n?```/g, '');
         json = tryParseJson(retryContent);
       }
+    }
+
+    // Temporary marker-based fallback if JSON still doesn't include all keys
+    if (!hasAllKeys(json) && content) {
+      try {
+        const fallback: Record<string, string> = {};
+        for (const f of (template.outputFields || [])) {
+          const re = new RegExp(`##FIELD_ID:${f.id}##([\\s\\S]*?)##END_FIELD_ID##`, 'i');
+          const m = content.match(re);
+          if (m && m[1]) fallback[f.id] = m[1].trim();
+        }
+        if (Object.keys(fallback).length) {
+          json = fallback as any;
+        }
+      } catch {}
     }
 
     const out: Record<string, string> = {};

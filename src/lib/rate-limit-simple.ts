@@ -11,27 +11,27 @@ import { NextRequest } from 'next/server';
  */
 const RATE_LIMIT_CONFIGS = {
   auth: {
-    requests: 5,
+    requests: 20,
     windowMs: 15 * 60 * 1000, // 15 minutes
     message: 'Too many authentication attempts. Please try again in 15 minutes.',
   },
   'ai-expensive': {
-    requests: 5,
+    requests: 30,
     windowMs: 5 * 60 * 1000, // 5 minutes
-    message: 'AI generation rate limit exceeded. Please wait 5 minutes.',
+    message: 'AI generation rate limit exceeded. Please wait a few minutes.',
   },
   'ai-standard': {
-    requests: 10,
+    requests: 60,
     windowMs: 60 * 1000, // 1 minute
     message: 'AI request rate limit exceeded. Please wait a minute.',
   },
   api: {
-    requests: 100,
+    requests: 600,
     windowMs: 60 * 1000, // 1 minute
     message: 'API rate limit exceeded. Please slow down.',
   },
   sensitive: {
-    requests: 10,
+    requests: 50,
     windowMs: 60 * 60 * 1000, // 1 hour
     message: 'Too many sensitive operations. Please wait an hour.',
   },

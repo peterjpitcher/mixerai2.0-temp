@@ -118,7 +118,7 @@ export const rateLimitConfigs = {
   // Strict rate limiting for authentication endpoints
   auth: {
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // 5 attempts per 15 minutes
+    max: 20, // 20 attempts per 15 minutes
     keyPrefix: 'auth',
     message: 'Too many authentication attempts. Please try again later.',
   },
@@ -126,7 +126,7 @@ export const rateLimitConfigs = {
   // Moderate rate limiting for AI endpoints
   ai: {
     windowMs: 60 * 1000, // 1 minute
-    max: 10, // 10 requests per minute
+    max: 60, // 60 requests per minute
     keyPrefix: 'ai',
     message: 'AI service rate limit exceeded. Please wait before trying again.',
   },
@@ -134,7 +134,7 @@ export const rateLimitConfigs = {
   // Strict rate limiting for expensive AI operations
   aiExpensive: {
     windowMs: 5 * 60 * 1000, // 5 minutes
-    max: 5, // 5 requests per 5 minutes
+    max: 30, // 30 requests per 5 minutes
     keyPrefix: 'ai-expensive',
     message: 'Rate limit exceeded for AI generation. Please wait a few minutes.',
   },
@@ -142,7 +142,7 @@ export const rateLimitConfigs = {
   // Standard rate limiting for general API endpoints
   api: {
     windowMs: 60 * 1000, // 1 minute
-    max: 100, // 100 requests per minute
+    max: 600, // 600 requests per minute
     keyPrefix: 'api',
     message: 'Too many requests. Please slow down.',
   },
@@ -150,7 +150,7 @@ export const rateLimitConfigs = {
   // Very strict rate limiting for sensitive operations
   sensitive: {
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 10, // 10 requests per hour
+    max: 50, // 50 requests per hour
     keyPrefix: 'sensitive',
     message: 'Rate limit exceeded for sensitive operations.',
   },
