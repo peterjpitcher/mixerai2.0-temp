@@ -107,6 +107,8 @@ export interface OutputField extends BaseField {
   maxChars?: number;
   maxTokens?: number;
   allowedTags?: string[]; // For richText/html fields, overrides default allowed tags
+  minWords?: number;
+  maxWords?: number;
 }
 
 export type GenericField = InputField | OutputField;

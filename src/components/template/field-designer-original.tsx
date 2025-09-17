@@ -569,6 +569,10 @@ export function FieldDesigner({
       }
     });
   };
+
+  const handleWordCountChange = (key: 'minWords' | 'maxWords', value: number | undefined) => {
+    setFieldData(prev => ({ ...prev, [key]: value }) as Field);
+  };
   
   const onPromptSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
     const el = e.currentTarget;
@@ -707,6 +711,24 @@ export function FieldDesigner({
       sonnerToast.error("AI prompt is required for input fields when AI Suggestions are enabled.");
       setActiveTab('ai');
       return false;
+    }
+    if (fieldType === 'output') {
+      const { minWords, maxWords } = fieldData as OutputField;
+      if (typeof minWords === 'number' && minWords <= 0) {
+        sonnerToast.error('Minimum word count must be greater than zero.');
+        setActiveTab('ai');
+        return false;
+      }
+      if (typeof maxWords === 'number' && maxWords <= 0) {
+        sonnerToast.error('Maximum word count must be greater than zero.');
+        setActiveTab('ai');
+        return false;
+      }
+      if (typeof minWords === 'number' && typeof maxWords === 'number' && minWords >= maxWords) {
+        sonnerToast.error('Minimum word count must be less than maximum word count.');
+        setActiveTab('ai');
+        return false;
+      }
     }
     return true;
   };
@@ -847,8 +869,8 @@ export function FieldDesigner({
                 />
                 <Label htmlFor="useGuardrails">Use Guardrails</Label>
               </div>
-               <div className="flex items-center space-x-2 pt-1">
-                  <Checkbox 
+              <div className="flex items-center space-x-2 pt-1">
+                 <Checkbox 
                       id="useCombinedBrandContext"
                       checked={!!(outputFieldData.useBrandIdentity && outputFieldData.useToneOfVoice && outputFieldData.useGuardrails)}
                       onCheckedChange={(checked) => {
@@ -860,6 +882,36 @@ export function FieldDesigner({
                   />
                   <Label htmlFor="useCombinedBrandContext">Enable All Brand Context</Label>
             </div>
+            </div>
+          </div>
+          <div className="pt-4">
+            <Label className="font-medium">Word Count Targeting</Label>
+            <p className="text-xs text-muted-foreground pb-2">
+              Set explicit word-count bounds to enforce during AI generation. Leave blank to rely on prompt instructions only.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="output-min-words">Min words</Label>
+                <Input
+                  id="output-min-words"
+                  type="number"
+                  inputMode="numeric"
+                  value={outputFieldData.minWords ?? ''}
+                  onChange={(e) => handleWordCountChange('minWords', e.target.value ? parseInt(e.target.value, 10) || undefined : undefined)}
+                  placeholder="e.g. 1200"
+                />
+              </div>
+              <div>
+                <Label htmlFor="output-max-words">Max words</Label>
+                <Input
+                  id="output-max-words"
+                  type="number"
+                  inputMode="numeric"
+                  value={outputFieldData.maxWords ?? ''}
+                  onChange={(e) => handleWordCountChange('maxWords', e.target.value ? parseInt(e.target.value, 10) || undefined : undefined)}
+                  placeholder="e.g. 1500"
+                />
+              </div>
             </div>
           </div>
         </>

@@ -533,8 +533,8 @@ The product context is provided in the user prompt.
       max_tokens: Math.min(2200, 400 + (template.outputFields?.length || 1) * 400),
       temperature: 0.3,
       top_p: 0.9,
-      frequency_penalty: 1.0,
-      presence_penalty: 0.3,
+      frequency_penalty: 0,
+      presence_penalty: 0,
     } : {
       // Long-form single-field HTML output mode: request raw HTML fragment (no JSON)
       model: deploymentName,
@@ -552,8 +552,8 @@ The product context is provided in the user prompt.
       max_tokens: 3200,
       temperature: 0.4,
       top_p: 0.9,
-      frequency_penalty: 0.8,
-      presence_penalty: 0.2,
+      frequency_penalty: 0,
+      presence_penalty: 0,
     };
     
     // Specify the deployment in the URL path
@@ -611,6 +611,60 @@ The product context is provided in the user prompt.
         .replace(/<!DOCTYPE[^>]*>/gi, '')
         .replace(/<\/?(?:html|head|body)[^>]*>/gi, '');
 
+    const stripWordCountSuffix = (text: string) => text.replace(/\s*\(\s*\d+\s*[–-]\s*\d+\s*words?\s*\)/gi, '').trim();
+
+    const normalizeHeadings = (html: string) =>
+      html.replace(/<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/gi, (_match, _level, inner) => {
+        const cleanedTitle = stripWordCountSuffix(inner.replace(/<[^>]+>/g, '').trim());
+        if (!cleanedTitle) return '';
+        return `<p><strong>${cleanedTitle}</strong></p>`;
+      });
+
+    const parseNumeric = (value: string) => {
+      if (!value) return null;
+      const cleaned = value.replace(/,/g, '').trim();
+      if (!cleaned) return null;
+      const num = parseInt(cleaned, 10);
+      return Number.isNaN(num) ? null : num;
+    };
+
+    const countWords = (value: string) =>
+      stripHtmlWrappers(value)
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .split(/\s+/)
+        .map(w => w.trim())
+        .filter(Boolean)
+        .length;
+
+    const extractWordRange = (field: any): { min: number; max: number } | null => {
+      if (typeof field?.minWords === 'number' && typeof field?.maxWords === 'number' && field.minWords > 0 && field.maxWords > 0 && field.minWords < field.maxWords) {
+        return { min: field.minWords, max: field.maxWords };
+      }
+      const candidates: string[] = [];
+      if (field?.aiPrompt) candidates.push(field.aiPrompt);
+      if (field?.name) candidates.push(field.name);
+      for (const text of candidates) {
+        const match = text.match(/([0-9]{1,3}(?:,[0-9]{3})*)\s*[–-]\s*([0-9]{1,3}(?:,[0-9]{3})*)\s*words?/i);
+        if (match) {
+          const min = parseNumeric(match[1]);
+          const max = parseNumeric(match[2]);
+          if (min != null && max != null && min < max) {
+            return { min, max };
+          }
+        }
+        const altMatch = text.match(/length\s*:\s*([0-9]{1,3}(?:,[0-9]{3})*)\s*[–-]\s*([0-9]{1,3}(?:,[0-9]{3})*)/i);
+        if (altMatch) {
+          const min = parseNumeric(altMatch[1]);
+          const max = parseNumeric(altMatch[2]);
+          if (min != null && max != null && min < max) {
+            return { min, max };
+          }
+        }
+      }
+      return null;
+    };
+
     const validateAndPostProcess = (field: any, value: string): string => {
       if (!value) return '';
       let v = String(value).trim();
@@ -620,6 +674,8 @@ The product context is provided in the user prompt.
       } else {
         v = v.replace(/```[a-zA-Z]*\n?/g, '').replace(/\n?```/g, '');
         v = stripHtmlWrappers(v);
+        v = normalizeHeadings(v);
+        v = stripWordCountSuffix(v);
         try {
           const { sanitizeHTML } = require('@/lib/sanitize/html-sanitizer');
           v = sanitizeHTML(v, { allow_images: false, allow_links: true, allow_tables: true });
@@ -630,6 +686,7 @@ The product context is provided in the user prompt.
              .replace(/(?:<p>\s*<\/p>\s*){2,}/g, '')
              .replace(/<p>\s*<\/p>/g, '');
       }
+      v = stripWordCountSuffix(v);
       const optionMax = (field.options && (field.options as any).maxLength) || undefined;
       const maxChars = field.maxChars || optionMax;
       if (maxChars && v.length > maxChars) {
@@ -638,19 +695,28 @@ The product context is provided in the user prompt.
       return v;
     };
 
-    // If we asked for raw HTML (single field mode), skip JSON parsing and return directly
     const out: Record<string, string> = {};
+    const wordCountViolations: Array<{ field: any; words: number; range: { min: number; max: number } }> = [];
+    let json: Record<string, string> | null = null;
+
     if (isSingleHtml && singleField) {
       const processed = validateAndPostProcess(singleField, content);
       out[(singleField as any).id] = processed;
-      return out;
+      const range = extractWordRange(singleField);
+      if (range) {
+        const words = countWords(processed);
+        if (words < range.min || words > range.max) {
+          wordCountViolations.push({ field: singleField, words, range });
+        }
+      }
+    } else {
+      json = tryParseJson(content);
     }
 
-    let json = tryParseJson(content);
     const requiredIds = (template.outputFields || []).map(f => f.id);
     const hasAllKeys = (obj: Record<string, string> | null) => !!obj && requiredIds.every(id => Object.prototype.hasOwnProperty.call(obj, id));
 
-    if (!hasAllKeys(json)) {
+    if (json && !hasAllKeys(json)) {
       const retryRequest = {
         model: deploymentName,
         messages: [
@@ -661,8 +727,8 @@ The product context is provided in the user prompt.
         max_tokens: Math.min(1200, 300 + (template.outputFields?.length || 1) * 250),
         temperature: 0.2,
         top_p: 0.9,
-        frequency_penalty: 1.2,
-        presence_penalty: 0.2,
+        frequency_penalty: 0,
+        presence_penalty: 0,
       };
       const endpoint2 = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
       const retryResp = await fetch(endpoint2, {
@@ -679,7 +745,7 @@ The product context is provided in the user prompt.
     }
 
     // Temporary marker-based fallback if JSON still doesn't include all keys
-    if (!hasAllKeys(json) && content) {
+    if (json && !hasAllKeys(json) && content) {
       try {
         const fallback: Record<string, string> = {};
         for (const f of (template.outputFields || [])) {
@@ -695,7 +761,7 @@ The product context is provided in the user prompt.
 
     // Section-heading fallback: if the model returned a single essay with recognizable section headings,
     // split content by output field names and map chunks to fields.
-    if (!hasAllKeys(json) && content) {
+    if (json && !hasAllKeys(json) && content) {
       try {
         const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         type Hit = { id: string; name: string; start: number };
@@ -729,7 +795,7 @@ The product context is provided in the user prompt.
       } catch {}
     }
 
-    if (!json) {
+    if (!json && !isSingleHtml) {
       console.warn('Failed to parse JSON output from AI; returning empty content for fields');
       (template.outputFields || []).forEach((f: any) => { out[f.id] = ''; });
       // continue to per-field fallback attempts below
@@ -738,14 +804,29 @@ The product context is provided in the user prompt.
     if (json) {
       (template.outputFields || []).forEach((f: any) => {
         const raw = (json as any)[f.id];
-        out[f.id] = validateAndPostProcess(f, typeof raw === 'string' ? raw : (raw != null ? String(raw) : ''));
+        const processed = validateAndPostProcess(f, typeof raw === 'string' ? raw : (raw != null ? String(raw) : ''));
+        out[f.id] = processed;
+        const range = extractWordRange(f);
+        if (range) {
+          const words = countWords(processed);
+          if (words < range.min || words > range.max) {
+            wordCountViolations.push({ field: f, words, range });
+          }
+        }
       });
     }
 
-    // Per-field fallback: if any required field is still empty, try a focused generation for that field only
+    // Per-field fallback: if any required field is empty or fails validation, try focused regeneration
     const missingFields = (template.outputFields || []).filter((f: any) => !out[f.id] || out[f.id].trim().length === 0);
-    if (missingFields.length > 0) {
-      for (const f of missingFields) {
+    const retryCandidates: Array<{ field: any; reason: string; range?: { min: number; max: number }; words?: number }> = [];
+    missingFields.forEach((f: any) => retryCandidates.push({ field: f, reason: 'empty' }));
+    wordCountViolations.forEach(({ field, words, range }) => {
+      retryCandidates.push({ field, reason: 'word_range', range, words });
+    });
+
+    if (retryCandidates.length > 0) {
+      for (const candidate of retryCandidates) {
+        const f = candidate.field;
         try {
           const singleFieldSystemPrompt = (() => {
             let sp = `You are an expert content creator for the brand "${brand.name}".`;
@@ -765,6 +846,10 @@ The product context is provided in the user prompt.
             if (brand.brand_identity && f.useBrandIdentity) sp += ` Brand identity: ${brand.brand_identity}.`;
             if (brand.tone_of_voice && f.useToneOfVoice) sp += ` Tone of voice: ${brand.tone_of_voice}.`;
             if (brand.guardrails && f.useGuardrails) sp += ` Content guardrails: ${brand.guardrails}.`;
+            const range = extractWordRange(f);
+            if (range) {
+              sp += ` Responses that are not between ${range.min} and ${range.max} words are invalid—revise before replying.`;
+            }
             return sp;
           })();
 
@@ -773,6 +858,10 @@ The product context is provided in the user prompt.
           // Include the field-specific AI prompt if available
           if (f.aiPrompt) {
             singleFieldUserPrompt += `\nInstructions: ${f.aiPrompt}`;
+          }
+          if (candidate.reason === 'word_range' && candidate.range) {
+            const previousCount = typeof candidate.words === 'number' ? candidate.words : 'UNKNOWN';
+            singleFieldUserPrompt += `\nThe previous draft contained ${previousCount} words. Regenerate so the response falls strictly between ${candidate.range.min} and ${candidate.range.max} words.`;
           }
           // Provide input field values context
           if (Array.isArray(template.inputFields) && template.inputFields.length > 0) {
@@ -816,6 +905,13 @@ The product context is provided in the user prompt.
             const processed = validateAndPostProcess(f, typeof raw === 'string' ? raw : (raw != null ? String(raw) : ''));
             if (processed && processed.trim().length > 0) {
               out[f.id] = processed;
+              const postRange = extractWordRange(f);
+              if (postRange) {
+                const words = countWords(processed);
+                if (words < postRange.min || words > postRange.max) {
+                  console.warn(`Field ${f.id} still violates word count after retry (${words} words, expected ${postRange.min}-${postRange.max}).`);
+                }
+              }
             }
           }
         } catch (e) {

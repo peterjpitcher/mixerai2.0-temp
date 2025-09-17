@@ -14,6 +14,16 @@ export const OutputFieldSchema = z.object({
   useGuardrails: z.boolean().default(false),
   description: z.string().optional(),
   helpText: z.string().optional(),
+  minWords: z.number().int().positive().optional(),
+  maxWords: z.number().int().positive().optional(),
+}).superRefine((data, ctx) => {
+  if (typeof data.minWords === 'number' && typeof data.maxWords === 'number' && data.minWords >= data.maxWords) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['minWords'],
+      message: 'Minimum word count must be less than maximum word count',
+    });
+  }
 });
 
 // Schema for Input Field

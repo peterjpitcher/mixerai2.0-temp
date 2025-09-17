@@ -229,16 +229,16 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
           throw new Error(workflowData.error || 'Failed to process workflow data');
         }
         
-        // If this is a duplicated workflow, clear the IDs to make it a new workflow
-        const processedWorkflow = isDuplicatedWorkflow ? {
-          ...workflowData.workflow,
-          id: null, // Clear the ID so it creates a new workflow
-          name: workflowData.workflow.name, // Keep the "Copy of" name from duplication
-          steps: workflowData.workflow.steps.map((step: WorkflowStepDefinition) => ({
-            ...step,
-            id: uuidv4() // Generate new IDs for all steps
-          }))
-        } : workflowData.workflow;
+        // If this is a duplicated workflow, work with fresh objects while retaining the duplicate's IDs
+        const processedWorkflow = isDuplicatedWorkflow
+          ? {
+              ...workflowData.workflow,
+              // Ensure we work with fresh objects but keep the IDs generated when the duplicate shell was created
+              steps: Array.isArray(workflowData.workflow.steps)
+                ? workflowData.workflow.steps.map((step: WorkflowStepDefinition) => ({ ...step }))
+                : []
+            }
+          : workflowData.workflow;
         
         setWorkflow(processedWorkflow);
         setSelectedTemplateId(processedWorkflow?.template_id || 'NO_TEMPLATE_SELECTED');
@@ -660,45 +660,77 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
   const handleSaveWorkflow = async () => {
     if (!validateWorkflow() || !workflow) return;
     setIsSaving(true);
-    const workflowToSave: Partial<WorkflowFull> = {
-      name: workflow.name,
-      description: workflow.description,
-      brand_id: workflow.brand_id,
-      status: workflow.status,
-      template_id: selectedTemplateId === 'NO_TEMPLATE_SELECTED' ? null : selectedTemplateId,
-      steps: workflow.steps.map((step, index) => ({
+    const stepsPayload = workflow.steps.map((step, index) => {
+      const assigneesForPayload = step.assignees
+        .map(assignee => {
+          if (!assignee?.email) {
+            return null;
+          }
+
+          const normalizedEmail = assignee.email.trim();
+          if (!normalizedEmail) {
+            return null;
+          }
+
+          const payload: { email: string; id?: string; name?: string } = {
+            email: normalizedEmail
+          };
+
+          if (assignee.id && typeof assignee.id === 'string' && !assignee.id.startsWith('temp_') && !assignee.id.startsWith('email_')) {
+            payload.id = assignee.id;
+          }
+
+          if (assignee.full_name) {
+            payload.name = assignee.full_name;
+          }
+
+          return payload;
+        })
+        .filter((assignee): assignee is { email: string; id?: string; name?: string } => assignee !== null);
+
+      return {
         // Ensure only necessary fields are sent, especially if step.id is temporary client-side ID
         id: step.id && typeof step.id === 'string' && !step.id.startsWith('temp_') && !step.id.startsWith('email_') ? step.id : uuidv4(), // Generate a proper UUID for new steps
         name: step.name,
         description: step.description,
         role: step.role,
         approvalRequired: step.approvalRequired,
-        step_order: index + 1, // Add step_order based on array position
-        assignees: step.assignees.map(a => ({ 
-          email: a.email, 
-          id: a.id && typeof a.id === 'string' && !a.id.startsWith('temp_') && !a.id.startsWith('email_') ? a.id : '', 
-          full_name: a.full_name || null 
-        }))
-      })),
-        updated_at: new Date().toISOString()
+        step_order: index + 1, // Maintain 1-based order for updates
+        order_index: index + 1, // Provide order_index for create API compatibility
+        assignees: assigneesForPayload
       };
+    });
+
+    if (stepsPayload.some(step => step.assignees.length === 0)) {
+      setIsSaving(false);
+      toast.error('Each step must have at least one valid assignee with an email address.');
+      return;
+    }
+
+    const workflowToSave = {
+      name: workflow.name,
+      description: workflow.description,
+      brand_id: workflow.brand_id,
+      status: workflow.status,
+      template_id: selectedTemplateId === 'NO_TEMPLATE_SELECTED' ? null : selectedTemplateId,
+      steps: stepsPayload,
+      updated_at: new Date().toISOString()
+    } satisfies Record<string, unknown>;
       
     try {
       let response;
-      let newWorkflowId;
       
       if (isDuplicated) {
-        // For duplicated workflows, create a new workflow instead of updating
-        response = await apiFetch('/api/workflows', {
-          method: 'POST',
+        // When working with a duplicated workflow we update the duplicate shell that was created on the server
+        response = await apiFetch(`/api/workflows/${id}`, {
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(workflowToSave)
         });
         const data = await response.json();
         if (!response.ok || !data.success) {
-          throw new Error(data.error || 'Failed to create workflow. Please try again.');
+          throw new Error(data.error || 'Failed to save duplicated workflow. Please try again.');
         }
-        newWorkflowId = data.workflow?.id;
         toast.success('Workflow created successfully!');
       } else {
         // For existing workflows, update as normal
@@ -711,7 +743,6 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         if (!response.ok || !data.success) {
           throw new Error(data.error || 'Failed to update workflow. Please try again.');
         }
-        newWorkflowId = id;
         toast.success('Workflow updated successfully!');
       }
       
