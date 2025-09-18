@@ -90,7 +90,10 @@ const RoleSelectionCards: React.FC<RoleSelectionCardsProps> = ({ selectedRole, o
 export default function EditClaimsWorkflowPage() {
   const params = useParams();
   const router = useRouter();
-  const workflowId = params.id as string;
+  const workflowIdParam = params?.id;
+  const workflowId = Array.isArray(workflowIdParam)
+    ? workflowIdParam[0]
+    : (workflowIdParam ?? '') as string;
   
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');

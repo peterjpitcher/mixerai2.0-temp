@@ -72,8 +72,8 @@ interface UnifiedNavigationProps {
  * This demonstrates how to migrate from direct API calls to using React Query and contexts
  */
 export function UnifiedNavigationV2({ className }: UnifiedNavigationProps) {
-  const pathname = usePathname();
-  const segments = useSelectedLayoutSegments();
+  const pathname = usePathname() ?? '';
+  const segments = useSelectedLayoutSegments() ?? [];
   const searchParams = useSearchParams();
   
   // Use auth context instead of local state

@@ -948,8 +948,10 @@ The product context is provided in the user prompt.
     });
 
     if (retryCandidates.length > 0) {
-      for (const candidate of retryCandidates) {
+      for (const candidate of retryCandidates) { 
         const f = candidate.field;
+        const fieldWordRange = getWordRange(f);
+        const fieldCharConstraints = getCharConstraints(f);
         try {
           const singleFieldSystemPrompt = (() => {
             const expectingHtml = isSingleFieldHtml && (f.type === 'richText' || f.type === 'html');
@@ -974,11 +976,11 @@ The product context is provided in the user prompt.
             if (brand.brand_identity && f.useBrandIdentity) sp += ` Brand identity: ${brand.brand_identity}.`;
             if (brand.tone_of_voice && f.useToneOfVoice) sp += ` Tone of voice: ${brand.tone_of_voice}.`;
             if (brand.guardrails && f.useGuardrails) sp += ` Content guardrails: ${brand.guardrails}.`;
-            const range = getWordRange(f);
+            const range = fieldWordRange;
             if (range) {
               sp += ` Responses that are not between ${range.min} and ${range.max} words are invalid—revise before replying.`;
             }
-            const charConstraints = getCharConstraints(f);
+            const charConstraints = fieldCharConstraints;
             if (typeof charConstraints.min === 'number' || typeof charConstraints.max === 'number') {
               const parts: string[] = [];
               if (typeof charConstraints.min === 'number') parts.push(`at least ${charConstraints.min} characters`);
@@ -1028,13 +1030,29 @@ The product context is provided in the user prompt.
 
           const expectingHtml = isSingleFieldHtml && (f.type === 'richText' || f.type === 'html');
 
+          const fallbackMaxTokens = (() => {
+            const candidateCharMax = (candidate.reason === 'char_range' && candidate.constraints?.max)
+              ? candidate.constraints.max
+              : fieldCharConstraints.max;
+            if (typeof candidateCharMax === 'number' && candidateCharMax > 0) {
+              return Math.min(4000, Math.max(800, Math.ceil(candidateCharMax / 3))); // rough tokens≈chars/3
+            }
+            const candidateWordMax = (candidate.reason === 'word_range' && candidate.range)
+              ? candidate.range.max
+              : fieldWordRange?.max;
+            if (typeof candidateWordMax === 'number' && candidateWordMax > 0) {
+              return Math.min(4000, Math.max(800, Math.ceil(candidateWordMax * 1.5)));
+            }
+            return isSingleFieldHtml ? 3200 : 1500;
+          })();
+
           const singleReq = {
             model: deploymentName,
             messages: [
               { role: 'system', content: singleFieldSystemPrompt },
               { role: 'user', content: singleFieldUserPrompt }
             ],
-            max_tokens: 600,
+            max_tokens: fallbackMaxTokens,
             temperature: 0.5,
             top_p: 0.9,
             ...(expectingHtml ? {} : { response_format: { type: 'json_object' as const } }),
