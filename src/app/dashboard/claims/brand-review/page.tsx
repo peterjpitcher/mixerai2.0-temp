@@ -57,15 +57,29 @@ const BrandClaimsOutputPage = () => {
         const loadInitialData = async () => {
             setIsLoading(true);
             try {
-                const [brandsRes, productsRes, countriesRes] = await Promise.all([
+                const [brandsRes, productsData, countriesData] = await Promise.all([
                     apiFetch('/api/master-claim-brands'),
                     fetchProducts(),
                     fetchCountries()
                 ]);
                 const brandsData = await brandsRes.json();
-                if (brandsData.success) setBrands(brandsData.data); else toast.error('Could not load brands.');
-                if (productsRes.success) setProducts(productsRes.data); else toast.error('Could not load products.');
-                if (countriesRes.success) setCountries(countriesRes.data); else toast.error('Could not load countries.');
+                if (brandsData?.success && Array.isArray(brandsData.data)) {
+                    setBrands(brandsData.data as SelectOption[]);
+                } else {
+                    toast.error('Could not load brands.');
+                }
+
+                if (Array.isArray(productsData)) {
+                    setProducts(productsData as SelectOption[]);
+                } else {
+                    toast.error('Could not load products.');
+                }
+
+                if (Array.isArray(countriesData)) {
+                    setCountries(countriesData as CountryOption[]);
+                } else {
+                    toast.error('Could not load countries.');
+                }
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             } catch (_error) {
                 toast.error('Failed to fetch initial page data.');

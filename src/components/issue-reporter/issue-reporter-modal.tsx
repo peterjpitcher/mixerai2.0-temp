@@ -37,6 +37,7 @@ import { Loader2, Bug, Image as ImageIcon, Terminal, Network, CheckCircle } from
 import { captureScreenshot, compressImage, getScreenshotSize } from '@/lib/issue-reporter/screenshot-capture';
 import { consoleCapture, ConsoleLog, NetworkLog } from '@/lib/issue-reporter/console-capture';
 import { toast } from 'sonner';
+import type { UserSessionData } from '@/hooks/use-common-data';
 
 const formSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters').max(100, 'Title must be less than 100 characters'),
@@ -50,9 +51,10 @@ interface IssueReporterModalProps {
   isOpen: boolean;
   onClose: () => void;
   preloadedScreenshot?: string | null;
+  currentUser: UserSessionData | null | undefined;
 }
 
-export function IssueReporterModal({ isOpen, onClose, preloadedScreenshot }: IssueReporterModalProps) {
+export function IssueReporterModal({ isOpen, onClose, preloadedScreenshot, currentUser }: IssueReporterModalProps) {
   const [isCapturing, setIsCapturing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [screenshot, setScreenshot] = useState<string | null>(null);
@@ -165,6 +167,10 @@ export function IssueReporterModal({ isOpen, onClose, preloadedScreenshot }: Iss
           consoleLogs,
           networkLogs,
           environment,
+          reporter: currentUser ? {
+            id: currentUser.id,
+            email: currentUser.email ?? null,
+          } : undefined,
         }),
       });
 

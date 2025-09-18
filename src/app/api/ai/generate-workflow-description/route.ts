@@ -5,6 +5,7 @@ import { generateTextCompletion } from '@/lib/azure/openai';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { BrandPermissionVerificationError, requireBrandAccess } from '@/lib/auth/brand-access';
+import { logAiUsage } from '@/lib/audit/ai';
 
 // Define the expected request body schema
 const WorkflowDetailsSchema = z.object({
@@ -18,8 +19,11 @@ const WorkflowDetailsSchema = z.object({
 });
 
 export const POST = withAuthAndCSRF(async function (request: NextRequest, user: User) {
+  let requestPayloadSize = 0;
+  let brandId: string | null = null;
   try {
     const body = await request.json();
+    requestPayloadSize = JSON.stringify(body).length;
     const validationResult = WorkflowDetailsSchema.safeParse(body);
 
     if (!validationResult.success) {
@@ -30,6 +34,7 @@ export const POST = withAuthAndCSRF(async function (request: NextRequest, user: 
     }
 
     const { brand_id, workflowName, brandName, templateName, stepNames, brandCountry, brandLanguage } = validationResult.data;
+    brandId = brand_id ?? null;
 
     if (brand_id) {
       const supabase = createSupabaseAdminClient();
@@ -82,9 +87,22 @@ export const POST = withAuthAndCSRF(async function (request: NextRequest, user: 
       );
     }
 
+    const trimmed = generatedDescription.trim();
+
+    await logAiUsage({
+      action: 'ai_generate_workflow_description',
+      userId: user.id,
+      brandId,
+      inputCharCount: requestPayloadSize,
+      metadata: {
+        responseLength: trimmed.length,
+        stepCount: stepNames?.length ?? 0,
+      },
+    });
+
     return NextResponse.json({ 
       success: true, 
-      description: generatedDescription.trim() 
+      description: trimmed 
     });
 
   } catch (error) {
@@ -95,6 +113,25 @@ export const POST = withAuthAndCSRF(async function (request: NextRequest, user: 
             { success: false, error: 'Invalid request payload.', details: error.format() },
             { status: 400 }
         );
+    }
+    try {
+      await logAiUsage({
+        action: 'ai_generate_workflow_description',
+        userId: user.id,
+        brandId,
+        inputCharCount: requestPayloadSize,
+        status: 'error',
+        errorMessage: 'Failed to generate workflow description',
+        metadata: {
+          cause: error instanceof Error ? error.message : String(error),
+        },
+      });
+    } catch (auditError) {
+      console.error('[API_GENERATE_WORKFLOW_DESCRIPTION_ERROR] Failed to log AI usage', auditError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to record AI usage event.' },
+        { status: 500 }
+      );
     }
     return NextResponse.json(
       { success: false, error: 'An unexpected error occurred while generating the workflow description.' },

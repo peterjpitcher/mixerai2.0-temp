@@ -75,13 +75,13 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user): Promise<
         user_agent: request.headers.get('user-agent') ?? null,
       });
     } catch (dbError) {
-      console.error('[ErrorReports] Failed to persist error log:', dbError);
+      console.error('[ErrorReports] Failed to persist error log:', dbError instanceof Error ? dbError.message : dbError);
     }
 
     if (process.env.NODE_ENV === 'production') {
-      console.error('[Production Error]', errorLog);
+      console.error('[ErrorReports] Production error captured:', parsed.data.message);
     } else {
-      console.error('[Development Error]', errorLog);
+      console.error('[ErrorReports] Development error captured:', parsed.data.message);
     }
 
     return NextResponse.json({ 
@@ -89,7 +89,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user): Promise<
       message: 'Error tracked successfully' 
     });
   } catch (error) {
-    console.error('Failed to track error:', error);
+    console.error('Failed to track error:', error instanceof Error ? error.message : error);
     // Don't throw - we don't want error tracking to cause more errors
     return NextResponse.json({ 
       success: false, 

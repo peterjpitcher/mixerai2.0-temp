@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '@/lib/api-client';
+import { apiFetchJson } from '@/lib/api-client';
 import { toast } from 'sonner';
 
 // Common query keys for deduplication
@@ -12,7 +12,7 @@ export const commonQueryKeys = {
   brands: ['brands'],
 } as const;
 
-interface UserSessionData {
+export interface UserSessionData {
   id: string;
   email?: string;
   user_metadata?: {
@@ -46,12 +46,13 @@ export function useCurrentUser() {
     queryKey: commonQueryKeys.currentUser,
     queryFn: async () => {
       try {
-        const response = await apiFetch('/api/me');
-        if (!response.ok) throw new Error('Failed to fetch user session');
-        const data = await response.json();
-        
+        const data = await apiFetchJson<{ success: boolean; user?: UserSessionData }>(
+          '/api/me',
+          { errorMessage: 'Failed to fetch user session' }
+        );
+
         if (data.success && data.user) {
-          return data.user as UserSessionData;
+          return data.user;
         }
         throw new Error('Invalid user data');
       } catch (error) {
@@ -76,12 +77,13 @@ export function useMasterClaimBrands() {
     queryKey: commonQueryKeys.masterClaimBrands,
     queryFn: async () => {
       try {
-        const response = await apiFetch('/api/master-claim-brands');
-        if (!response.ok) throw new Error('Failed to fetch Master Claim Brands');
-        const data = await response.json();
-        
+        const data = await apiFetchJson<{ success: boolean; data?: MasterClaimBrand[]; error?: string }>(
+          '/api/master-claim-brands',
+          { errorMessage: 'Failed to fetch Master Claim Brands' }
+        );
+
         if (data.success && Array.isArray(data.data)) {
-          return data.data as MasterClaimBrand[];
+          return data.data;
         }
         throw new Error(data.error || 'Invalid master claim brands data');
       } catch (error) {
@@ -106,10 +108,11 @@ export function useVettingAgencies() {
     queryKey: commonQueryKeys.vettingAgencies,
     queryFn: async () => {
       try {
-        const response = await apiFetch('/api/content-vetting-agencies');
-        if (!response.ok) throw new Error('Failed to fetch vetting agencies');
-        const data = await response.json();
-        
+        const data = await apiFetchJson<{ success: boolean; data?: any[]; error?: string }>(
+          '/api/content-vetting-agencies',
+          { errorMessage: 'Failed to fetch vetting agencies' }
+        );
+
         if (data.success && Array.isArray(data.data)) {
           // Transform numeric priority to string labels
           return data.data.map((agency: any) => ({

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { withAdminAuth } from '@/lib/auth/api-auth';
+import { logSecurityEvent } from '@/lib/auth/account-lockout';
 
 const diagnosticsEnabled = process.env.ENABLE_HEALTH_DIAGNOSTICS === 'true';
 
@@ -40,9 +41,15 @@ const startTime = Date.now();
  * Returns 200 if all critical services are operational
  * Returns 503 if any critical service is down
  */
-export const GET = withAdminAuth(async (): Promise<Response> => {
+export const GET = withAdminAuth(async (_req, user): Promise<Response> => {
   if (!diagnosticsEnabled) {
     return disabledResponse();
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json(
+      { success: false, error: 'Not found' },
+      { status: 404 }
+    );
   }
   const healthStatus: HealthStatus = {
     status: 'healthy',
@@ -159,15 +166,29 @@ export const GET = withAdminAuth(async (): Promise<Response> => {
 
   // Return appropriate status code based on health
   const statusCode = healthStatus.status === 'unhealthy' ? 503 : 200;
-  
-  return NextResponse.json(healthStatus, { 
-    status: statusCode,
-    headers: {
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache',
-      'Expires': '0',
+
+  await logSecurityEvent(
+    'health_check_requested',
+    {
+      status: healthStatus.status,
+      checks: Object.fromEntries(
+        Object.entries(healthStatus.checks).map(([key, value]) => [key, value.status])
+      ),
     },
-  });
+    user.id
+  );
+
+  return NextResponse.json(
+    healthStatus,
+    {
+      status: statusCode,
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    }
+  );
 });
 
 /**

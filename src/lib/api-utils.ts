@@ -3,9 +3,9 @@
  */
 
 import { NextResponse } from 'next/server';
-import axios from 'axios';
 import { ApiError, PostgresError, isPostgresError } from '@/types/api';
 import { isRLSError } from '@/lib/api/rls-helpers';
+import { apiFetchJson, ApiClientError } from '@/lib/api-client';
 
 /**
  * Get environment mode (development, production, test)
@@ -91,10 +91,18 @@ export const handleApiError = (
       errorDetails.hint = error.hint;
     }
   } else if (error && typeof error === 'object') {
-    if ('message' in error) errorDetails.message = String(error.message);
-    if ('code' in error) errorDetails.code = String(error.code);
-    if ('hint' in error) errorDetails.hint = String(error.hint);
-    if ('source' in error) errorDetails.source = String(error.source);
+    if ('message' in error && error.message) {
+      errorDetails.message = String(error.message);
+    } else if ('error' in error && error.error) {
+      errorDetails.message = String(error.error);
+    }
+    if ('code' in error) errorDetails.code = String((error as { code?: unknown }).code);
+    if ('hint' in error) errorDetails.hint = String((error as { hint?: unknown }).hint);
+    if ('source' in error) errorDetails.source = String((error as { source?: unknown }).source);
+  } else if (typeof error === 'string') {
+    errorDetails.message = error;
+  } else if (typeof error === 'number' || typeof error === 'boolean') {
+    errorDetails.message = String(error);
   }
   
   errorDetails.isDatabaseError = isDatabaseConnectionError(error);
@@ -163,8 +171,16 @@ export const handleApiError = (
 
 export const fetchCountries = async () => {
   try {
-    const response = await axios.get('/api/countries');
-    return response.data;
+    const data = await apiFetchJson<{ success: boolean; data?: unknown[] }>(
+      '/api/countries',
+      { errorMessage: 'Failed to fetch countries', retry: 1 }
+    );
+
+    if (data?.success && Array.isArray(data.data)) {
+      return data.data;
+    }
+
+    return [];
   } catch (error) {
     console.error('Error fetching countries:', error);
     return [];
@@ -173,8 +189,16 @@ export const fetchCountries = async () => {
 
 export const fetchProducts = async () => {
   try {
-    const response = await axios.get('/api/products');
-    return response.data;
+    const data = await apiFetchJson<{ success: boolean; data?: unknown[] }>(
+      '/api/products',
+      { errorMessage: 'Failed to fetch products', retry: 1 }
+    );
+
+    if (data?.success && Array.isArray(data.data)) {
+      return data.data;
+    }
+
+    return [];
   } catch (error) {
     console.error('Error fetching products:', error);
     return [];
@@ -183,13 +207,26 @@ export const fetchProducts = async () => {
 
 export const fetchClaims = async (productId: string, countryCodeValue: string) => {
   try {
-    const response = await axios.get(`/api/products/${productId}/stacked-claims`, {
-      params: { countryCode: countryCodeValue },
-    });
-    return response.data;
+    const params = new URLSearchParams();
+    if (countryCodeValue) {
+      params.set('countryCode', countryCodeValue);
+    }
+
+    const data = await apiFetchJson<{ success: boolean; data?: unknown; error?: string }>(
+      `/api/products/${productId}/stacked-claims?${params.toString()}`,
+      { errorMessage: 'Failed to fetch claims', retry: 1 }
+    );
+
+    if (data?.success) {
+      return data;
+    }
+
+    return { success: false, error: data?.error || 'Failed to fetch claims.', data: [] };
   } catch (error) {
+    if (error instanceof ApiClientError && error.status === 404) {
+      return { success: false, error: 'Claims not found.', data: [] };
+    }
     console.error('Error fetching claims for product:', productId, 'country:', countryCodeValue, error);
-    // Return a more structured error or rethrow, to be handled by the caller
     return { success: false, error: 'Failed to fetch claims.', data: [] };
   }
-}; 
+};

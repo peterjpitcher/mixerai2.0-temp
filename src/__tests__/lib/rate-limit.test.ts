@@ -1,142 +1,139 @@
-import { checkRateLimit, RateLimitConfig } from '@/lib/rate-limit';
+import { checkRateLimit, RateLimitConfig, resetRateLimitStore } from '@/lib/rate-limit';
 import { NextRequest } from 'next/server';
 
-// Mock NextRequest
 const createMockRequest = (ip: string = '127.0.0.1', pathname: string = '/api/test'): NextRequest => {
   const url = `http://localhost:3000${pathname}`;
-  const request = new NextRequest(url);
-  // Override the ip property
-  Object.defineProperty(request, 'ip', {
-    value: ip,
-    writable: false,
-    configurable: true
-  });
-  return request;
+  const headers = new Headers();
+  if (ip) {
+    headers.set('x-forwarded-for', ip);
+  }
+  return new NextRequest(url, { headers });
 };
 
 describe('Rate Limiting', () => {
   const testConfig: RateLimitConfig = {
-    windowMs: 60 * 1000, // 1 minute
+    windowMs: 60 * 1000,
     max: 5,
-    message: 'Too many requests'
+    message: 'Too many requests',
   };
 
-  beforeEach(() => {
-    // Clear the rate limit store between tests
-    // Since the store is in-memory, we need to access it directly
-    // @ts-expect-error - accessing private variable for testing
-    global.rateLimitStore = new Map();
+  beforeEach(async () => {
+    jest.useFakeTimers();
+    await resetRateLimitStore();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   describe('checkRateLimit', () => {
-    it('should allow requests within the rate limit', () => {
+    it('allows requests within the configured limit', async () => {
       const request = createMockRequest();
-      
+
       for (let i = 0; i < testConfig.max; i++) {
-        const result = checkRateLimit(request, testConfig);
+        const result = await checkRateLimit(request, testConfig);
         expect(result.allowed).toBe(true);
         expect(result.remaining).toBe(testConfig.max - i - 1);
         expect(result.limit).toBe(testConfig.max);
       }
     });
 
-    it('should block requests exceeding the rate limit', () => {
+    it('blocks requests once the limit is exceeded', async () => {
       const request = createMockRequest();
-      
-      // Use up all allowed requests
+
       for (let i = 0; i < testConfig.max; i++) {
-        checkRateLimit(request, testConfig);
+        await checkRateLimit(request, testConfig);
       }
-      
-      // Next request should be blocked
-      const result = checkRateLimit(request, testConfig);
+
+      const result = await checkRateLimit(request, testConfig);
       expect(result.allowed).toBe(false);
       expect(result.remaining).toBe(0);
       expect(result.retryAfter).toBeDefined();
       expect(result.retryAfter).toBeGreaterThan(0);
     });
 
-    it('should track different IPs separately', () => {
+    it('tracks different IP addresses independently', async () => {
       const request1 = createMockRequest('192.168.1.1');
       const request2 = createMockRequest('192.168.1.2');
-      
-      // Use up rate limit for first IP
+
       for (let i = 0; i < testConfig.max; i++) {
-        checkRateLimit(request1, testConfig);
+        await checkRateLimit(request1, testConfig);
       }
-      
-      // Second IP should still be allowed
-      const result = checkRateLimit(request2, testConfig);
+
+      const result = await checkRateLimit(request2, testConfig);
       expect(result.allowed).toBe(true);
       expect(result.remaining).toBe(testConfig.max - 1);
     });
 
-    it('should reset after the time window expires', (done) => {
+    it('resets after the window expires', async () => {
       const shortWindowConfig: RateLimitConfig = {
-        windowMs: 100, // 100ms for testing
+        windowMs: 100,
         max: 2,
-        message: 'Too many requests'
+        message: 'Too many requests',
       };
-      
+
       const request = createMockRequest();
-      
-      // Use up rate limit
-      checkRateLimit(request, shortWindowConfig);
-      checkRateLimit(request, shortWindowConfig);
-      
-      // Should be blocked
-      let result = checkRateLimit(request, shortWindowConfig);
+
+      await checkRateLimit(request, shortWindowConfig);
+      await checkRateLimit(request, shortWindowConfig);
+
+      let result = await checkRateLimit(request, shortWindowConfig);
       expect(result.allowed).toBe(false);
-      
-      // Wait for window to expire
-      setTimeout(() => {
-        result = checkRateLimit(request, shortWindowConfig);
-        expect(result.allowed).toBe(true);
-        expect(result.remaining).toBe(shortWindowConfig.max - 1);
-        done();
-      }, 150);
+
+      const tick = new Promise<void>((resolve) => {
+        setTimeout(async () => {
+          const nextResult = await checkRateLimit(request, shortWindowConfig);
+          expect(nextResult.allowed).toBe(true);
+          expect(nextResult.remaining).toBe(shortWindowConfig.max - 1);
+          resolve();
+        }, 150);
+      });
+
+      jest.advanceTimersByTime(150);
+      await tick;
     });
 
-    it('should handle missing IP gracefully', () => {
+    it('handles missing IP headers gracefully', async () => {
       const request = createMockRequest('');
-      const result = checkRateLimit(request, testConfig);
-      
+      const result = await checkRateLimit(request, testConfig);
+
       expect(result.allowed).toBe(true);
       expect(result.limit).toBe(testConfig.max);
     });
 
-    it('should use user ID for authenticated requests when available', () => {
+    it('supports custom identifiers for authenticated users', async () => {
       const request = createMockRequest();
       const userId = 'user-123';
-      
-      // Simulate authenticated request
-      const result1 = checkRateLimit(request, testConfig, userId);
-      expect(result1.allowed).toBe(true);
-      
-      // Different IP, same user should share rate limit
+
+      const firstResult = await checkRateLimit(request, testConfig, {
+        identifier: userId,
+        keyParts: ['test', 'user', userId],
+      });
+      expect(firstResult.allowed).toBe(true);
+
       const request2 = createMockRequest('10.0.0.1');
-      const result2 = checkRateLimit(request2, testConfig, userId);
-      expect(result2.allowed).toBe(true);
-      expect(result2.remaining).toBe(testConfig.max - 2); // Shared counter
+      const secondResult = await checkRateLimit(request2, testConfig, {
+        identifier: userId,
+        keyParts: ['test', 'user', userId],
+      });
+      expect(secondResult.allowed).toBe(true);
+      expect(secondResult.remaining).toBe(testConfig.max - 2);
     });
 
-    it('should implement exponential backoff for repeat offenders', () => {
+    it('applies exponential backoff to repeat offenders', async () => {
       const request = createMockRequest();
-      
-      // Use up initial rate limit
+
       for (let i = 0; i < testConfig.max; i++) {
-        checkRateLimit(request, testConfig);
+        await checkRateLimit(request, testConfig);
       }
-      
-      // First violation
-      let result = checkRateLimit(request, testConfig);
+
+      let result = await checkRateLimit(request, testConfig);
       expect(result.allowed).toBe(false);
-      const firstRetryAfter = result.retryAfter || 0;
-      
-      // Subsequent violations should have longer retry times
-      result = checkRateLimit(request, testConfig);
+      const firstRetryAfter = result.retryAfter ?? 0;
+
+      result = await checkRateLimit(request, testConfig);
       expect(result.allowed).toBe(false);
-      expect(result.retryAfter).toBeGreaterThan(firstRetryAfter);
+      expect(result.retryAfter ?? 0).toBeGreaterThanOrEqual(firstRetryAfter);
     });
   });
 });

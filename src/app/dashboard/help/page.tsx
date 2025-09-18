@@ -61,14 +61,14 @@ async function getHelpArticles(): Promise<HelpArticle[]> {
     }
     return articles;
   } catch (error) {
-    console.error("Failed to load help articles list:", error);
+    console.error('Failed to load help articles list:', error);
     return [];
   }
 }
 
 async function getHelpArticleContent(slug: string): Promise<string | null> {
   if (!slug || !/^[a-zA-Z0-9_-]+$/.test(slug)) {
-    console.error("Invalid slug provided for help article:", slug);
+    console.error('Invalid slug provided for help article:', slug);
     return null;
   }
   const filePath = path.join(process.cwd(), 'src', 'content', 'help-wiki', `${slug}.md`);
@@ -94,12 +94,9 @@ interface HelpPageProps {
 export default async function HelpPage({ searchParams }: HelpPageProps) {
   await requireAuth();
   const articles = await getHelpArticles();
-  console.log("HelpPage: Loaded articles", articles); // DEBUGGING
-  const currentArticleSlug = searchParams?.article || articles[0]?.slug || '01-overview'; // Default to first article or overview
-  console.log("HelpPage: Determined currentArticleSlug", currentArticleSlug); // DEBUGGING
-  
+  const currentArticleSlug = searchParams?.article || articles[0]?.slug || '01-overview';
+
   const currentArticleContent = await getHelpArticleContent(currentArticleSlug);
-  console.log("HelpPage: Loaded currentArticleContent (first 50 chars)", currentArticleContent?.substring(0, 50)); // DEBUGGING
   const currentArticleTitle = articles.find(a => a.slug === currentArticleSlug)?.title || 'Help Article';
 
   const breadcrumbItems: { label: string, href?: string }[] = [

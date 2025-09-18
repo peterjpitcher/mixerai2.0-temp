@@ -1,21 +1,36 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-/**
- * Catch-all error handler for API routes
- * This prevents Vercel from serving HTML error pages for API routes
- */
-export async function GET() {
+function respond(request: NextRequest) {
+  const requestId = request.headers.get('x-request-id') ?? crypto.randomUUID();
+  const method = request.method;
+  const pathname = request.nextUrl?.pathname ?? 'unknown';
+
+  console.warn('[api.catch-all] Unmatched API route', {
+    requestId,
+    method,
+    pathname,
+  });
+
   return NextResponse.json(
-    { 
-      success: false, 
+    {
+      success: false,
       error: 'Not Found',
-      statusCode: 404 
+      requestId,
     },
-    { status: 404 }
+    {
+      status: 404,
+      headers: {
+        'Cache-Control': 'no-store',
+      },
+    }
   );
 }
 
-export const POST = GET;
-export const PUT = GET;
-export const DELETE = GET;
-export const PATCH = GET;
+export function GET(request: NextRequest) {
+  return respond(request);
+}
+
+export const POST = respond;
+export const PUT = respond;
+export const DELETE = respond;
+export const PATCH = respond;

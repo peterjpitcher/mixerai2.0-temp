@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
  * Visually hides content but keeps it available to screen readers
  */
 export const srOnly = cn(
+  'sr-only',
   'absolute w-px h-px p-0 -m-px overflow-hidden whitespace-nowrap border-0',
   '[clip:rect(0,0,0,0)]'
 );
@@ -35,17 +36,21 @@ export const skipLink = cn(
  * Announce to screen readers using ARIA live regions
  */
 export function announce(message: string, priority: 'polite' | 'assertive' = 'polite') {
+  if (typeof document === 'undefined') return;
+
   const announcer = document.createElement('div');
   announcer.setAttribute('aria-live', priority);
   announcer.setAttribute('aria-atomic', 'true');
   announcer.className = srOnly;
   announcer.textContent = message;
-  
+
   document.body.appendChild(announcer);
-  
+
   // Remove after announcement
   setTimeout(() => {
-    document.body.removeChild(announcer);
+    if (announcer.parentNode) {
+      announcer.parentNode.removeChild(announcer);
+    }
   }, 1000);
 }
 
@@ -199,6 +204,48 @@ export const semanticRoles = {
   article: 'article',
   section: 'section',
 } as const;
+
+export function getAriaLabel(label?: string | null): Record<string, string> {
+  const trimmed = label?.trim();
+  return trimmed ? { 'aria-label': trimmed } : {};
+}
+
+export function getAriaDescribedBy(
+  ids?: string | string[] | null
+): Record<string, string> {
+  if (!ids) return {};
+
+  const candidateIds = Array.isArray(ids) ? ids : [ids];
+  const filtered = candidateIds
+    .map((id) => (id ?? '').trim())
+    .filter(Boolean);
+
+  return filtered.length > 0 ? { 'aria-describedby': filtered.join(' ') } : {};
+}
+
+const SCREEN_READER_UA_PATTERNS = [
+  /NVDA/i,
+  /JAWS/i,
+  /VoiceOver/i,
+  /TalkBack/i,
+  /Narrator/i,
+  /ScreenReader/i,
+];
+
+export function isScreenReaderActive(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  return SCREEN_READER_UA_PATTERNS.some((pattern) => pattern.test(ua));
+}
+
+export function announceToScreenReader(
+  message: string,
+  priority: 'polite' | 'assertive' = 'polite'
+) {
+  announce(message, priority);
+}
+
+export const keyboardNavigation = focusRing;
 
 /**
  * Create accessible table props

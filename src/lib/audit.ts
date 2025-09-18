@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { emitMetric } from '@/lib/observability/metrics';
 
 export async function logClaimAudit(action: string, userId: string, resourceId: string, details?: any) {
   try {
@@ -15,5 +16,21 @@ export async function logClaimAudit(action: string, userId: string, resourceId: 
     });
   } catch (e) {
     console.warn('[audit] Failed to log claim audit', e);
+    emitMetric({
+      name: 'audit.persist.failure',
+      tags: { category: 'claim' },
+      context: {
+        userId,
+        resourceId,
+        error: e instanceof Error ? e.message : String(e),
+      },
+    });
+    return;
   }
+
+  emitMetric({
+    name: 'audit.persist.success',
+    tags: { category: 'claim' },
+    context: { userId, resourceId },
+  });
 }

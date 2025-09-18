@@ -1,10 +1,11 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { User } from '@supabase/supabase-js';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { apiFetchJson, ApiClientError } from '@/lib/api-client';
 
 interface UserMetadata {
   role?: string;
@@ -53,33 +54,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Then fetch additional user data from our API
-      const response = await fetch('/api/me', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      });
+      try {
+        const data = await apiFetchJson<{ success: boolean; user?: AuthUser }>(
+          '/api/me',
+          { errorMessage: 'Failed to fetch user data' }
+        );
 
-      if (!response.ok) {
-        if (response.status === 401) {
+        if (data.success && data.user) {
+          return {
+            ...user,
+            ...data.user,
+            user_metadata: data.user.user_metadata || {},
+            brand_permissions: data.user.brand_permissions || [],
+          };
+        }
+
+        return user;
+      } catch (error) {
+        if (error instanceof ApiClientError && error.status === 401) {
           return null;
         }
-        throw new Error(`Failed to fetch user data: ${response.status}`);
+        throw error;
       }
-
-      const data = await response.json();
-      
-      if (data.success && data.user) {
-        return {
-          ...user,
-          ...data.user,
-          user_metadata: data.user.user_metadata || {},
-          brand_permissions: data.user.brand_permissions || [],
-        };
-      }
-
-      return user;
     } catch (error) {
       console.error('[AuthContext] Error fetching user:', error);
       throw error;
@@ -97,8 +93,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Listen for auth state changes
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         // Invalidate and refetch user data
         queryClient.invalidateQueries({ queryKey: userQueryKey });
       } else if (event === 'SIGNED_OUT') {
@@ -112,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, [supabase, queryClient]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
@@ -126,19 +122,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Error signing out:', error);
       toast.error('Failed to sign out');
     }
-  };
+  }, [supabase, queryClient]);
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: userQueryKey });
-  };
+  }, [queryClient]);
 
-  const value: AuthContextType = {
+  const value = useMemo<AuthContextType>(() => ({
     user: user || null,
     isLoading: isInitializing || isLoading,
-    error: error as Error | null,
+    error: (error as Error | null) ?? null,
     signOut,
     refreshUser,
-  };
+  }), [user, isInitializing, isLoading, error, signOut, refreshUser]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

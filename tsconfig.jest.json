@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "moduleResolution": "node",
+    "module": "commonjs",
+    "target": "ES2019",
+    "noEmit": false,
+    "outDir": "./.jest-tmp"
+  }
+}

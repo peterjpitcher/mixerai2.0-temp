@@ -4,45 +4,50 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { FORM_PATTERNS, TYPOGRAPHY } from '@/lib/utils/ui-standards';
 
-interface FormLayoutProps {
+interface FormLayoutProps extends React.FormHTMLAttributes<HTMLFormElement> {
   children: React.ReactNode;
-  className?: string;
 }
 
-interface FormSectionProps {
+interface FormSectionProps extends React.HTMLAttributes<HTMLElement> {
   title?: string;
   description?: string;
   children: React.ReactNode;
-  className?: string;
 }
 
-interface FormFieldGroupProps {
+interface FormFieldGroupProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
-  className?: string;
 }
 
 /**
  * Consistent form layout following UI standards
  */
-export function FormLayout({ children, className }: FormLayoutProps) {
-  return (
-    <form className={cn(FORM_PATTERNS.sectionSpacing, className)}>
-      {children}
-    </form>
-  );
-}
+export const FormLayout = React.forwardRef<HTMLFormElement, FormLayoutProps>(
+  ({ children, className, ...props }, ref) => {
+    return (
+      <form
+        ref={ref}
+        className={cn(FORM_PATTERNS.sectionSpacing, className)}
+        {...props}
+      >
+        {children}
+      </form>
+    );
+  }
+);
+FormLayout.displayName = 'FormLayout';
 
 /**
  * Form section with optional title and description
  */
-export function FormSection({ 
-  title, 
-  description, 
-  children, 
-  className 
+export function FormSection({
+  title,
+  description,
+  children,
+  className,
+  ...props
 }: FormSectionProps) {
   return (
-    <section className={cn('space-y-4', className)}>
+    <section className={cn('space-y-4', className)} {...props}>
       {(title || description) && (
         <div className="space-y-1">
           {title && (
@@ -65,9 +70,9 @@ export function FormSection({
 /**
  * Group related form fields together
  */
-export function FormFieldGroup({ children, className }: FormFieldGroupProps) {
+export function FormFieldGroup({ children, className, ...props }: FormFieldGroupProps) {
   return (
-    <div className={cn(FORM_PATTERNS.fieldSpacing, className)}>
+    <div className={cn(FORM_PATTERNS.fieldSpacing, className)} {...props}>
       {children}
     </div>
   );
@@ -76,11 +81,16 @@ export function FormFieldGroup({ children, className }: FormFieldGroupProps) {
 /**
  * Form actions footer with consistent spacing
  */
-export function FormActions({ 
-  children, 
+interface FormActionsProps extends React.HTMLAttributes<HTMLDivElement> {
+  align?: 'start' | 'center' | 'end';
+}
+
+export function FormActions({
+  children,
   className,
-  align = 'end' 
-}: FormLayoutProps & { align?: 'start' | 'center' | 'end' }) {
+  align = 'end',
+  ...props
+}: FormActionsProps) {
   const alignmentClasses = {
     start: 'justify-start',
     center: 'justify-center',
@@ -92,7 +102,7 @@ export function FormActions({
       'flex items-center gap-4 pt-6 border-t',
       alignmentClasses[align],
       className
-    )}>
+    )} {...props}>
       {children}
     </div>
   );

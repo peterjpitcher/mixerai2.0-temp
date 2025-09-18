@@ -8,6 +8,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth/brand-access';
 import { logContentGenerationAudit } from '@/lib/audit/content';
+import { enforceContentRateLimits } from '@/lib/rate-limit/content';
 import {
   calculateMaxTokens,
   processAIResponse,
@@ -119,6 +120,14 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
       template_field_values = {},
       existing_outputs = {},
     } = parsedBody.data;
+
+    const rateLimitResult = await enforceContentRateLimits(req, user.id, brand_id);
+    if ('type' in rateLimitResult) {
+      return NextResponse.json(rateLimitResult.body, {
+        status: rateLimitResult.status,
+        headers: rateLimitResult.headers,
+      });
+    }
 
     try {
       const hasAccess = await userHasBrandAccess(supabase, user, brand_id);

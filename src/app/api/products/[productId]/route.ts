@@ -5,6 +5,7 @@ import { withAuth } from '@/lib/auth/api-auth';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { User } from '@supabase/supabase-js';
 import { canAccessProduct } from '@/lib/auth/permissions';
+import { z } from 'zod';
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,11 @@ interface Product {
     created_at?: string;
     updated_at?: string;
 }
+
+const updateProductSchema = z.object({
+    name: z.string().min(1).max(200),
+    description: z.string().max(2000).optional().nullable(),
+});
 
 // GET handler for a single product by ID
 export const GET = withAuth(async (req: NextRequest, user: User, context?: unknown) => {
@@ -81,24 +87,15 @@ export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?
     }
 
     try {
-        const body = await req.json();
-        const { name, description } = body;
-
-        // master_brand_id is not updatable via this endpoint for simplicity.
-        // If it needs to be updatable, careful consideration of permissions and implications is needed.
-
-        if (!name || typeof name !== 'string' || name.trim() === '') {
+        const parsed = updateProductSchema.safeParse(await req.json());
+        if (!parsed.success) {
             return NextResponse.json(
-                { success: false, error: 'Product name must be a non-empty string.' },
+                { success: false, error: 'Invalid request payload', details: parsed.error.flatten() },
                 { status: 400 }
             );
         }
-        if (description !== undefined && (description !== null && typeof description !== 'string')) {
-            return NextResponse.json(
-               { success: false, error: 'Description must be a string or null if provided.' },
-               { status: 400 }
-           );
-       }
+
+        const { name, description } = parsed.data;
 
         const supabase = createSupabaseAdminClient();
 
@@ -175,11 +172,9 @@ export const PUT = withAuthAndCSRF(async (req: NextRequest, user: User, context?
         const updateData: Partial<Omit<Product, 'id' | 'created_at' | 'master_brand_id'>> & { updated_at: string } = {
             updated_at: new Date().toISOString(),
         };
-        if (name) {
-            updateData.name = name.trim();
-        }
+        updateData.name = name.trim();
         if (description !== undefined) {
-            updateData.description = description === null ? null : description?.trim();
+            updateData.description = description === null ? null : description.trim();
         }
 
 

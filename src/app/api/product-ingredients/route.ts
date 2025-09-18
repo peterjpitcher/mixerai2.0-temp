@@ -5,6 +5,7 @@ import { handleApiError } from '@/lib/api-utils';
 import { User } from '@supabase/supabase-js';
 import { canAccessProduct, canAccessIngredient, canEditInBrand } from '@/lib/auth/permissions';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { z } from 'zod';
 
 export const dynamic = "force-dynamic";
 
@@ -14,24 +15,22 @@ interface ProductIngredientAssociation {
     created_at?: string;
 }
 
-// POST handler for associating a product with an ingredient
+const associationSchema = z.object({
+    product_id: z.string().uuid(),
+    ingredient_id: z.string().uuid(),
+});
+
 export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promise<Response> => {
     try {
-        const body = await req.json();
-        const { product_id, ingredient_id } = body;
+        const parsed = associationSchema.safeParse(await req.json());
+        if (!parsed.success) {
+            return NextResponse.json(
+                { success: false, error: 'Invalid request payload', details: parsed.error.flatten() },
+                { status: 400 }
+            );
+        }
 
-        if (!product_id || typeof product_id !== 'string') {
-            return NextResponse.json(
-                { success: false, error: 'Product ID is required and must be a string.' },
-                { status: 400 }
-            );
-        }
-        if (!ingredient_id || typeof ingredient_id !== 'string') {
-            return NextResponse.json(
-                { success: false, error: 'Ingredient ID is required and must be a string.' },
-                { status: 400 }
-            );
-        }
+        const { product_id, ingredient_id } = parsed.data;
 
         const supabase = createSupabaseAdminClient();
         
@@ -102,7 +101,6 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
             .single(); // Assuming combination of product_id and ingredient_id is unique
 
         if (error) {
-            console.error('[API ProductIngredients POST] Error creating association:', error);
             if ((error as {code?: string}).code === '23505') { // Unique PK violation
                  return NextResponse.json(
                     { success: false, error: 'This product-ingredient association already exists.' },
@@ -128,7 +126,6 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
         return NextResponse.json({ success: true, data: validatedData }, { status: 201 });
 
     } catch (error: unknown) {
-        console.error('[API ProductIngredients POST] Catched error:', error);
         if (error instanceof Error && error.name === 'SyntaxError') {
             return NextResponse.json({ success: false, error: 'Invalid JSON payload.' }, { status: 400 });
         }
@@ -139,21 +136,15 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
 // DELETE handler for removing a product-ingredient association
 export const DELETE = withAuthAndCSRF(async (req: NextRequest, user: User): Promise<Response> => {
     try {
-        const body = await req.json();
-        const { product_id, ingredient_id } = body;
+        const parsed = associationSchema.safeParse(await req.json());
+        if (!parsed.success) {
+            return NextResponse.json(
+                { success: false, error: 'Invalid request payload', details: parsed.error.flatten() },
+                { status: 400 }
+            );
+        }
 
-        if (!product_id || typeof product_id !== 'string') {
-            return NextResponse.json(
-                { success: false, error: 'Product ID is required and must be a string.' },
-                { status: 400 }
-            );
-        }
-        if (!ingredient_id || typeof ingredient_id !== 'string') {
-            return NextResponse.json(
-                { success: false, error: 'Ingredient ID is required and must be a string.' },
-                { status: 400 }
-            );
-        }
+        const { product_id, ingredient_id } = parsed.data;
 
         const supabase = createSupabaseAdminClient();
         

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect, useId } from 'react';
 import { cn } from '@/lib/utils';
 
 interface FieldConfig {
@@ -34,6 +34,9 @@ export function ValidatedTextarea({
   const [lineCount, setLineCount] = useState(1);
   const [composing, setComposing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const errorId = useId();
+  const counterId = useId();
+  const helperId = useId();
 
   // Normalize line breaks and count lines
   const normalizeAndCount = useCallback((text: string) => {
@@ -152,11 +155,18 @@ export function ValidatedTextarea({
     }
   }, [value, validateText, onChange]);
 
-  // Calculate initial line count
-  useState(() => {
+  // Calculate initial line count when value is controlled externally
+  useEffect(() => {
     const { lines } = normalizeAndCount(value);
     setLineCount(lines);
-  });
+  }, [value, normalizeAndCount]);
+
+  const describedByIds = [counterId];
+  if (error) {
+    describedByIds.push(errorId);
+  } else if (field.config?.max_rows) {
+    describedByIds.push(helperId);
+  }
 
   return (
     <div className="space-y-1">
@@ -182,6 +192,9 @@ export function ValidatedTextarea({
           placeholder={field.placeholder}
           disabled={disabled}
           rows={field.config?.max_rows || 5}
+          aria-invalid={error ? 'true' : 'false'}
+          aria-required={field.config?.required ? 'true' : 'false'}
+          aria-describedby={describedByIds.join(' ')}
           className={cn(
             "w-full rounded-md border px-3 py-2",
             "focus:outline-none focus:ring-2 focus:ring-offset-2",
@@ -193,7 +206,10 @@ export function ValidatedTextarea({
         />
         
         {/* Character/row counter */}
-        <div className="absolute bottom-2 right-2 text-xs text-gray-500 pointer-events-none">
+        <div
+          className="absolute bottom-2 right-2 text-xs text-gray-500 pointer-events-none"
+          id={counterId}
+        >
           {field.config?.max_length && (
             <span className={value.length > field.config.max_length * 0.9 ? "text-orange-500" : ""}>
               {value.length}/{field.config.max_length}
@@ -210,15 +226,16 @@ export function ValidatedTextarea({
       
       {/* Error message */}
       {error && (
-        <p className="text-sm text-red-500 mt-1">{error}</p>
-      )}
-      
-      {/* Help text */}
-      {!error && field.config?.max_rows && (
-        <p className="text-xs text-gray-500">
-          Press Enter to add a new line (max {field.config.max_rows} rows)
+        <p className="text-sm text-red-500 mt-1" id={errorId} role="alert">
+          {error}
         </p>
       )}
+
+      {!error && field.config?.max_rows && (
+          <p className="text-xs text-gray-500" id={helperId}>
+            Press Enter to add a new line (max {field.config.max_rows} rows)
+          </p>
+        )}
     </div>
   );
 }

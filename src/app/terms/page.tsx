@@ -12,7 +12,7 @@ export default function TermsPage() {
           <CardTitle>MixerAI 2.0 Terms of Service</CardTitle>
         </CardHeader>
         <CardContent className="prose max-w-none">
-          <p className="text-muted-foreground">Last updated: December 2024</p>
+          <p className="text-muted-foreground">Last updated: January 2025</p>
           
           <h2 className="text-xl font-semibold mt-6 mb-3">1. Agreement to Terms</h2>
           <p className="mb-4">
@@ -134,9 +134,10 @@ export default function TermsPage() {
           
           <h2 className="text-xl font-semibold mt-6 mb-3">12. Governing Law</h2>
           <p className="mb-4">
-            These Terms shall be governed by and construed in accordance with the laws of [Jurisdiction], 
-            without regard to its conflict of law provisions. Any disputes shall be resolved in the courts 
-            of [Jurisdiction].
+            These Terms are governed by the laws of the State of Delaware, United States, without regard to its 
+            conflict of law principles. You agree that any dispute, claim, or controversy arising out of or relating 
+            to these Terms or the Service will be brought exclusively in the federal or state courts located in 
+            Wilmington, Delaware, and you consent to the personal jurisdiction of those courts.
           </p>
           
           <h2 className="text-xl font-semibold mt-6 mb-3">13. Changes to Terms</h2>
@@ -154,14 +155,14 @@ export default function TermsPage() {
           </ul>
           
           <h2 className="text-xl font-semibold mt-6 mb-3">15. Contact Information</h2>
-          <p className="mb-2">For questions about these Terms of Service:</p>
+          <p className="mb-2">For questions about these Terms of Service you can reach us at:</p>
           <ul className="list-none space-y-1">
             <li><strong>Email:</strong> legal@mixerai.com</li>
             <li><strong>Support:</strong> support@mixerai.com</li>
-            <li><strong>Address:</strong> [Company Address]</li>
+            <li><strong>Mail:</strong> MixerAI, Inc., 548 Market Street, PMB 81188, San Francisco, CA 94104, USA</li>
           </ul>
         </CardContent>
       </Card>
     </div>
   );
-} 
+}

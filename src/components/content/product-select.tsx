@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/icons';
 import { Package, AlertCircle } from 'lucide-react';
 import { useDebounce } from '@/lib/hooks/use-debounce';
-import useSWR from 'swr';
+import { useBrandProducts, type BrandProductSummary } from '@/hooks/queries/use-brand-products';
 
 interface ProductSelectProps {
   brandId: string | null;
@@ -16,28 +16,20 @@ interface ProductSelectProps {
   isMultiSelect?: false; // For now, only handling single select
 }
 
-const fetcher = (url: string) => fetch(url).then(res => res.json());
-
 export function ProductSelect({ brandId, value, onChange }: ProductSelectProps) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  const apiUrl = useMemo(() => {
-    if (!brandId) return null;
-    const params = new URLSearchParams();
-    if (debouncedSearchTerm) {
-      params.append('q', debouncedSearchTerm);
-    }
-    // Increase limit to fetch more products (default is 20)
-    params.append('limit', '200');
-    return `/api/brands/${brandId}/products?${params.toString()}`;
-  }, [brandId, debouncedSearchTerm]);
-
-  const { data, error, isLoading } = useSWR(apiUrl, fetcher, {
-    revalidateOnFocus: false, // Avoid re-fetching on window focus
-    shouldRetryOnError: false, // We'll provide a manual retry button
+  const productsQuery = useBrandProducts({
+    brandId,
+    searchTerm: debouncedSearchTerm || undefined,
+    limit: 200,
+    enabled: Boolean(brandId),
   });
+
+  const productList: BrandProductSummary[] = (productsQuery.data ?? []) as BrandProductSummary[];
+  const { isPending, isError, refetch } = productsQuery;
 
   // Reset selection when brandId changes
   useEffect(() => {
@@ -47,17 +39,13 @@ export function ProductSelect({ brandId, value, onChange }: ProductSelectProps) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brandId]); // Only reset when brandId changes, not value
   
-  const products = useMemo(() => {
-    const productList = data?.products || [];
-    return [...productList].sort((a, b) => a.name.localeCompare(b.name));
-  }, [data?.products]);
-  const selectedProduct = useMemo(() => products.find(p => p.id === value), [products, value]);
+  const selectedProduct = useMemo(() => productList.find(p => p.id === value), [productList, value]);
 
   const renderContent = () => {
     if (!brandId) {
       return <CommandEmpty icon={AlertCircle}>Please select a brand first.</CommandEmpty>;
     }
-    if (isLoading) {
+    if (isPending) {
       return (
         <div className="p-4 flex items-center justify-center">
           <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
@@ -65,20 +53,22 @@ export function ProductSelect({ brandId, value, onChange }: ProductSelectProps) 
         </div>
       );
     }
-    if (error) {
+    if (isError) {
       return (
         <div className="p-4 text-center text-destructive">
           <p>Failed to load products.</p>
-          {/* In a real app, a retry button would trigger a re-fetch */}
+          <Button variant="ghost" size="sm" className="mt-2" onClick={() => refetch()}>
+            Retry
+          </Button>
         </div>
       );
     }
-    if (products.length === 0) {
+    if (productList.length === 0) {
       return <CommandEmpty icon={Package}>No products found for this brand.</CommandEmpty>;
     }
     return (
       <CommandGroup>
-        {products.map((product) => (
+        {productList.map((product) => (
           <CommandItem
             key={product.id}
             value={product.name} // Command uses value for search, but we drive it via API

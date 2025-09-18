@@ -2,10 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import dns from 'dns';
 import ipaddr from 'ipaddr.js';
 import { z } from 'zod';
+import { User } from '@supabase/supabase-js';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { env } from '@/lib/env';
+import { enforceContentRateLimits } from '@/lib/rate-limit/content';
 
 const MAX_HTML_BYTES = 1024 * 1024; // 1MB cap
+const MAX_STRING_LENGTH = 1000;
+const MAX_ARRAY_ITEMS = 50;
+const MAX_NUTRITION_ENTRIES = 20;
+
+const ALLOWED_NUTRITION_KEYS = new Set([
+  'calories',
+  'protein',
+  'carbs',
+  'fat',
+  'fiber',
+  'sugar',
+  'sodium',
+  'cholesterol',
+  'saturatedFat',
+  'unsaturatedFat',
+]);
 
 const rawAllowlist = (env.PROXY_ALLOWED_HOSTS || '')
   .split(',')
@@ -53,16 +71,62 @@ interface RecipeData {
   cookTime?: string;
   totalTime?: string;
   servings?: string;
-  nutrition?: {
-    calories?: string;
-    protein?: string;
-    carbs?: string;
-    fat?: string;
-    [key: string]: string | undefined;
-  };
+  nutrition?: Record<string, unknown>;
   imageUrl?: string;
   author?: string;
   source?: string;
+}
+
+function sanitizeText(value: unknown, maxLength = MAX_STRING_LENGTH) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  const stripped = value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!stripped) {
+    return '';
+  }
+  return stripped.slice(0, maxLength);
+}
+
+function sanitizeUrl(value: unknown) {
+  if (typeof value !== 'string') return '';
+  try {
+    const url = new URL(value);
+    if (url.protocol === 'http:' || url.protocol === 'https:') {
+      return url.toString().slice(0, MAX_STRING_LENGTH);
+    }
+  } catch {
+    return '';
+  }
+  return '';
+}
+
+function sanitizeStringArray(values: unknown, options?: { maxItems?: number; maxLength?: number }) {
+  const { maxItems = MAX_ARRAY_ITEMS, maxLength = MAX_STRING_LENGTH } = options ?? {};
+  if (!Array.isArray(values)) return [];
+  const sanitized: string[] = [];
+  for (const value of values) {
+    if (sanitized.length >= maxItems) break;
+    const text = sanitizeText(value, maxLength);
+    if (text) {
+      sanitized.push(text);
+    }
+  }
+  return sanitized;
+}
+
+function sanitizeNutrition(nutrition: unknown) {
+  if (!nutrition || typeof nutrition !== 'object') return {};
+  const entries: Record<string, string> = {};
+  for (const [key, rawValue] of Object.entries(nutrition).slice(0, MAX_NUTRITION_ENTRIES)) {
+    const normalizedKey = key.trim();
+    if (!ALLOWED_NUTRITION_KEYS.has(normalizedKey)) continue;
+    const value = sanitizeText(rawValue);
+    if (value) {
+      entries[normalizedKey] = value;
+    }
+  }
+  return entries;
 }
 
 // Helper function to extract JSON-LD data
@@ -209,10 +273,32 @@ function parseRecipeFromHtml(html: string, url: string): RecipeData | null {
 }
 
 // POST /api/content/scrape-recipe
-export const POST = withAuthAndCSRF(async (req: NextRequest): Promise<Response> => {
+export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promise<Response> => {
   try {
     const body = await req.json();
     const validatedData = scrapeRecipeSchema.parse(body);
+
+    const rateLimitResult = await enforceContentRateLimits(req, user.id, null, {
+      userLimitConfigKey: 'sensitive',
+      brandLimitConfigKey: 'sensitive',
+    });
+    if ('type' in rateLimitResult) {
+      return NextResponse.json(rateLimitResult.body, {
+        status: rateLimitResult.status,
+        headers: rateLimitResult.headers,
+      });
+    }
+
+    const userRole = (user.user_metadata?.role || '').toString().toLowerCase();
+    if (userRole !== 'admin') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Only administrators may access recipe scraping diagnostics.',
+        },
+        { status: 403 }
+      );
+    }
     
     let parsedUrl: URL;
     try {
@@ -379,23 +465,28 @@ export const POST = withAuthAndCSRF(async (req: NextRequest): Promise<Response> 
       );
     }
 
-    // Format the response
+    const sanitizedIngredients = sanitizeStringArray(recipeData.ingredients);
+    const sanitizedInstructions = sanitizeStringArray(recipeData.instructions, { maxItems: MAX_ARRAY_ITEMS, maxLength: 2000 });
+    const nutrition = sanitizeNutrition(recipeData.nutrition);
+
+    const nutritionList = Object.entries(nutrition)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join(', ');
+
     const formattedRecipe = {
-      title: recipeData.title || '',
-      description: recipeData.description || '',
-      ingredients: recipeData.ingredients?.join('\n') || '',
-      instructions: recipeData.instructions?.map((inst, idx) => `${idx + 1}. ${inst}`).join('\n') || '',
-      prepTime: recipeData.prepTime || '',
-      cookTime: recipeData.cookTime || '',
-      totalTime: recipeData.totalTime || '',
-      servings: recipeData.servings || '',
-      nutrition: recipeData.nutrition ? Object.entries(recipeData.nutrition)
-        .filter(([, value]) => value)
-        .map(([key, value]) => `${key}: ${value}`)
-        .join(', ') : '',
-      imageUrl: recipeData.imageUrl || '',
-      author: recipeData.author || '',
-      source: recipeData.source || validatedData.url
+      title: sanitizeText(recipeData.title),
+      description: sanitizeText(recipeData.description, 2000),
+      ingredients: sanitizedIngredients.join('\n'),
+      instructions: sanitizedInstructions.map((instruction, index) => `${index + 1}. ${instruction}`).join('\n'),
+      prepTime: sanitizeText(recipeData.prepTime),
+      cookTime: sanitizeText(recipeData.cookTime),
+      totalTime: sanitizeText(recipeData.totalTime),
+      servings: sanitizeText(recipeData.servings),
+      nutrition: nutritionList,
+      nutritionDetails: nutrition,
+      imageUrl: sanitizeUrl(recipeData.imageUrl),
+      author: sanitizeText(recipeData.author),
+      source: sanitizeUrl(recipeData.source) || validatedData.url,
     };
 
     return NextResponse.json({

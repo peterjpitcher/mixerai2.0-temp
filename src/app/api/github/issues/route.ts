@@ -44,6 +44,10 @@ const CreateIssueSchema = z.object({
     }),
     timestamp: z.string(),
   }),
+  reporter: z.object({
+    id: z.string().min(1),
+    email: z.string().email().nullable().optional(),
+  }).optional(),
 });
 
 function checkRateLimit(userId: string): { allowed: boolean; remaining: number; resetTime: number } {
@@ -242,7 +246,17 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
 
     // Parse and validate request body
     const body = await request.json();
-    const validatedData = CreateIssueSchema.parse(body);
+    const parsedData = CreateIssueSchema.parse(body);
+    const { reporter, ...issuePayload } = parsedData;
+
+    if (reporter?.id && reporter.id !== user.id) {
+      return NextResponse.json(
+        {
+          error: 'Reporter mismatch. Please refresh and try again.',
+        },
+        { status: 403 }
+      );
+    }
 
     // Get GitHub configuration
     const owner = process.env.GITHUB_OWNER;
@@ -259,11 +273,11 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
 
     // Upload screenshot first if provided
     let screenshotUrl: string | null = null;
-    if (validatedData.screenshot) {
+    if (issuePayload.screenshot) {
       screenshotUrl = await uploadScreenshot(
         owner,
         repo,
-        validatedData.screenshot,
+        issuePayload.screenshot,
         githubToken
       );
       
@@ -274,10 +288,10 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
     
     // Prepare issue body with screenshot URL if available
     const issueBody = formatIssueBody({
-      ...validatedData,
+      ...issuePayload,
       user: {
         id: user.id,
-        email: user.email || 'Unknown',
+        email: reporter?.email ?? user.email ?? 'Unknown',
         name: user.user_metadata?.full_name || user.user_metadata?.name || 'Unknown User',
       },
       screenshotUrl, // Pass the URL to include in the body
@@ -285,8 +299,8 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
 
     // Prepare labels
     const labels = ['user-reported'];
-    if (validatedData.priority) {
-      labels.push(`${validatedData.priority}: ${getPriorityName(validatedData.priority)}`);
+    if (parsedData.priority) {
+      labels.push(`${parsedData.priority}: ${getPriorityName(parsedData.priority)}`);
     }
 
     // Create issue on GitHub
@@ -299,7 +313,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        title: validatedData.title,
+        title: parsedData.title,
         body: issueBody,
         labels: labels,
       }),

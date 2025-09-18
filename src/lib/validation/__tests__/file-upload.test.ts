@@ -4,8 +4,8 @@ import {
   isExecutableExtension,
   isSuspiciousFilename,
   getMimeTypeCategory,
-  FileValidationResult,
-  MultiFileValidationResult,
+  type FileValidationResult,
+  type MultiFileValidationResult,
 } from '../file-upload';
 
 describe('File Upload Validation', () => {
@@ -45,7 +45,7 @@ describe('File Upload Validation', () => {
         allowedMimeTypes: ['image/jpeg', 'image/png'] 
       });
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('File type application/javascript is not allowed');
+        expect(result.errors).toContain('File type application/javascript is not allowed');
     });
 
     it('should detect and reject executable files', () => {
@@ -72,7 +72,7 @@ describe('File Upload Validation', () => {
       suspiciousFiles.forEach(file => {
         const result = validateFile(file);
         expect(result.valid).toBe(false);
-        expect(result.errors.some(err => err.includes('potentially dangerous'))).toBe(true);
+        expect(result.errors.some(err => err.includes('Filename is potentially dangerous'))).toBe(true);
       });
     });
 
@@ -109,7 +109,7 @@ describe('File Upload Validation', () => {
       };
 
       const result = validateFile(file);
-      expect(result.sanitizedFilename).toBe('etc-passwd');
+      expect(result.sanitizedFilename).toBe('etc-passwd-unknown');
     });
   });
 

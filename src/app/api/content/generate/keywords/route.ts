@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { User } from '@supabase/supabase-js';
 
 import { handleApiError } from '@/lib/api-utils';
@@ -7,13 +8,19 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth/brand-access';
 import { logContentGenerationAudit } from '@/lib/audit/content';
+import { enforceContentRateLimits } from '@/lib/rate-limit/content';
 
 export const dynamic = 'force-dynamic';
 
-interface RequestBody {
-  content: string;
-  brand_id?: string;
-}
+const MAX_CONTENT_LENGTH = 6000;
+
+const requestSchema = z.object({
+  content: z
+    .string()
+    .min(1, 'Content is required')
+    .max(MAX_CONTENT_LENGTH, `Content must be fewer than ${MAX_CONTENT_LENGTH} characters`),
+  brand_id: z.string().uuid().optional(),
+});
 
 /**
  * POST: Generate keyword suggestions based on provided content.
@@ -21,14 +28,24 @@ interface RequestBody {
  */
 export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Promise<Response> => {
   try {
-    const body: RequestBody = await request.json();
-
-    if (!body.content) {
+    const parsed = requestSchema.safeParse(await request.json());
+    if (!parsed.success) {
       return NextResponse.json(
-        { success: false, error: 'Content is required in the request body' },
+        { success: false, error: 'Invalid request payload', details: parsed.error.flatten() },
         { status: 400 }
       );
     }
+
+    const body = parsed.data;
+
+    const rateLimitResult = await enforceContentRateLimits(request, user.id, body.brand_id);
+    if ('type' in rateLimitResult) {
+      return NextResponse.json(rateLimitResult.body, {
+        status: rateLimitResult.status,
+        headers: rateLimitResult.headers,
+      });
+    }
+    const content = body.content.trim();
 
     let brandContextForSuggestions: {
       name?: string;
@@ -66,7 +83,9 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Pr
         .single();
 
       if (brandError || !brandData) {
-        console.warn(`Keywords Gen: Brand with ID ${body.brand_id} not found or error fetching. Proceeding without brand context. Error: ${brandError?.message}`);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`keywords generation: brand ${body.brand_id} not found or error fetching (${brandError?.message})`);
+        }
       } else {
         if (!brandData.language || !brandData.country) {
           return NextResponse.json(
@@ -82,12 +101,10 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Pr
           country: brandData.country,
         };
       }
-    } else {
-        console.warn('Keywords Gen: No brand_id provided. Generating generic suggestions.');
     }
 
     const suggestions = await generateSuggestions('keywords', {
-      content: body.content,
+      content,
       brandContext: brandContextForSuggestions,
     });
 
@@ -96,7 +113,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Pr
       userId: user.id,
       brandId: body.brand_id,
       metadata: {
-        sourceLength: body.content.length,
+        sourceLength: content.length,
         suggestionCount: suggestions?.length ?? 0,
       }
     });

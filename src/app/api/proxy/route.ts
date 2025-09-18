@@ -4,6 +4,7 @@ import { handleApiError } from '@/lib/api-utils';
 import dns from 'dns';
 import ipaddr from 'ipaddr.js'; // Using ipaddr.js for robust IP checking
 import { env } from '@/lib/env';
+import { logSecurityEvent } from '@/lib/auth/account-lockout';
 
 const MAX_RESPONSE_SIZE = 1024 * 1024; // 1MB
 const allowedContentPrefixes = ['text/', 'application/json', 'application/xml'];
@@ -48,7 +49,7 @@ export const dynamic = "force-dynamic";
  * MITIGATION: Basic SSRF protection implemented by blocking requests to private/reserved IP ranges.
  * RECOMMENDATION: For enhanced security, replace this basic check with a strict allowlist of permitted target domains/protocols.
  */
-export const GET = withAuthMonitoringAndCSRF(async (request: NextRequest) => {
+export const GET = withAuthMonitoringAndCSRF(async (request: NextRequest, user) => {
   try {
     const urlToProxy = request.nextUrl.searchParams.get('url');
     
@@ -80,6 +81,11 @@ export const GET = withAuthMonitoringAndCSRF(async (request: NextRequest) => {
 
     if (!isHostAllowlisted(parsedUrl.hostname)) {
       console.warn('[proxy] Blocked request to non-allowlisted host', parsedUrl.hostname);
+      await logSecurityEvent('proxy_request_blocked', {
+        reason: 'host_not_allowlisted',
+        target: parsedUrl.hostname,
+        url: parsedUrl.href,
+      }, user.id);
       return NextResponse.json(
         {
           success: false,
@@ -105,6 +111,11 @@ export const GET = withAuthMonitoringAndCSRF(async (request: NextRequest) => {
 
         if (ipRange === 'private' || ipRange === 'loopback' || ipRange === 'reserved' || ipRange === 'linkLocal' || ipRange === 'uniqueLocal') {
           console.warn(`Blocked proxy request to internal IP: ${result.address} (${parsedUrl.hostname})`);
+          await logSecurityEvent('proxy_request_blocked', {
+            reason: 'private_ip',
+            target: parsedUrl.hostname,
+            ip: result.address,
+          }, user.id);
           return NextResponse.json(
             { success: false, error: 'Requests to internal or reserved IP addresses are not allowed' },
             { status: 403 }
@@ -113,6 +124,11 @@ export const GET = withAuthMonitoringAndCSRF(async (request: NextRequest) => {
       }
     } catch (dnsError) {
       console.error(`DNS lookup failed for ${parsedUrl.hostname}:`, dnsError);
+      await logSecurityEvent('proxy_request_blocked', {
+        reason: 'dns_lookup_failed',
+        target: parsedUrl.hostname,
+        error: dnsError instanceof Error ? dnsError.message : String(dnsError),
+      }, user.id);
       return NextResponse.json(
         { success: false, error: `Could not resolve hostname: ${parsedUrl.hostname}` },
         { status: 502 }
@@ -150,6 +166,12 @@ export const GET = withAuthMonitoringAndCSRF(async (request: NextRequest) => {
     if (contentLengthHeader) {
       const numericLength = Number(contentLengthHeader);
       if (!Number.isNaN(numericLength) && numericLength > MAX_RESPONSE_SIZE) {
+        await logSecurityEvent('proxy_request_blocked', {
+          reason: 'body_too_large',
+          target: parsedUrl.hostname,
+          url: parsedUrl.href,
+          contentLength: numericLength,
+        }, user.id);
         return NextResponse.json(
           { success: false, error: 'The requested resource is too large to proxy.' },
           { status: 413 }
@@ -175,6 +197,16 @@ export const GET = withAuthMonitoringAndCSRF(async (request: NextRequest) => {
       totalSize += value.byteLength;
       if (totalSize > MAX_RESPONSE_SIZE) {
         reader.cancel();
+        await logSecurityEvent(
+          'proxy_request_blocked',
+          {
+            reason: 'stream_body_too_large',
+            target: parsedUrl.hostname,
+            url: parsedUrl.href,
+            bytesRead: totalSize,
+          },
+          user.id
+        );
         return NextResponse.json(
           { success: false, error: 'The requested resource is too large to proxy.' },
           { status: 413 }
@@ -185,13 +217,45 @@ export const GET = withAuthMonitoringAndCSRF(async (request: NextRequest) => {
 
     const concatenated = concatenateUint8Arrays(chunks, totalSize);
     const text = new TextDecoder('utf-8').decode(concatenated);
-    
-    return new NextResponse(text, {
-      status: 200,
-      headers: {
-        'Content-Type': contentType,
+
+    let body: unknown = text;
+    if (contentType.toLowerCase().includes('application/json')) {
+      try {
+        body = JSON.parse(text);
+      } catch {
+        // Fall back to raw text when JSON parsing fails
+        body = text;
+      }
+    }
+
+    await logSecurityEvent(
+      'proxy_request_success',
+      {
+        target: parsedUrl.hostname,
+        url: parsedUrl.href,
+        contentType,
+        bytesRead: totalSize,
       },
-    });
+      user.id
+    );
+
+    return NextResponse.json(
+      {
+        success: true,
+        proxied: {
+          url: parsedUrl.href,
+          contentType,
+          bytes: totalSize,
+          body,
+        },
+      },
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store',
+        },
+      }
+    );
   } catch (error) {
      if (error instanceof Error && error.name === 'TimeoutError') {
         return NextResponse.json(
@@ -199,6 +263,10 @@ export const GET = withAuthMonitoringAndCSRF(async (request: NextRequest) => {
             { status: 504 } // Gateway Timeout
         );
     }
+    await logSecurityEvent('proxy_request_error', {
+      reason: 'unhandled_exception',
+      error: error instanceof Error ? error.message : String(error),
+    }, user.id);
     return handleApiError(error, 'Failed to proxy request');
   }
 }); 

@@ -12,7 +12,7 @@ export default function PrivacyPolicyPage() {
           <CardTitle>MixerAI 2.0 Privacy Policy</CardTitle>
         </CardHeader>
         <CardContent className="prose max-w-none">
-          <p className="text-muted-foreground">Last updated: December 2024</p>
+          <p className="text-muted-foreground">Last updated: January 2025</p>
           
           <h2 className="text-xl font-semibold mt-6 mb-3">1. Introduction</h2>
           <p className="mb-4">
@@ -113,10 +113,10 @@ export default function PrivacyPolicyPage() {
           <ul className="list-none space-y-1">
             <li><strong>Email:</strong> privacy@mixerai.com</li>
             <li><strong>Security Issues:</strong> security@mixerai.com</li>
-            <li><strong>Address:</strong> [Company Address]</li>
+            <li><strong>Mail:</strong> MixerAI, Inc., 548 Market Street, PMB 81188, San Francisco, CA 94104, USA</li>
           </ul>
         </CardContent>
       </Card>
     </div>
   );
-} 
+}

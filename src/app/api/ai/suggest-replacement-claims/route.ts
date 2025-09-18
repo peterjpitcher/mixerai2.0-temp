@@ -7,6 +7,7 @@ import { generateTextCompletion } from '@/lib/azure/openai';
 import { ClaimTypeEnum, Product, MasterClaimBrand as MasterClaimBrandSummary } from '@/lib/claims-utils';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { BrandPermissionVerificationError, requireBrandAccess } from '@/lib/auth/brand-access';
+import { logAiUsage } from '@/lib/audit/ai';
 
 export const dynamic = "force-dynamic";
 
@@ -102,8 +103,11 @@ async function getProductAndFullBrandDetails(
 }
 
 export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promise<Response> => {
+    let requestPayloadSize = 0;
+    let effectiveBrandId: string | null = null;
     try {
         const body: SuggestReplacementClaimsRequest = await req.json();
+        requestPayloadSize = JSON.stringify(body).length;
         const {
             brand_id,
             masterClaimText,
@@ -119,6 +123,15 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
 
         if (isBuildPhase()) {
             console.log('[AI Suggest] Build phase: returning empty suggestions.');
+            await logAiUsage({
+                action: 'ai_suggest_replacement_claims',
+                userId: user.id,
+                brandId: brand_id ?? null,
+                inputCharCount: requestPayloadSize,
+                metadata: {
+                    buildPhase: true,
+                },
+            });
             return NextResponse.json<SuggestReplacementClaimsResponse>({ success: true, suggestions: [] });
         }
 
@@ -151,6 +164,7 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
         }
 
         const mixeraiBrandId = masterBrandSummary?.mixerai_brand_id ?? null;
+        effectiveBrandId = mixeraiBrandId ?? brandIdToVerify ?? null;
 
         if (!mixeraiBrandId && user.user_metadata?.role !== 'admin') {
             return NextResponse.json<SuggestReplacementClaimsResponse>(
@@ -234,6 +248,19 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
             throw aiError;
         }
 
+        await logAiUsage({
+            action: 'ai_suggest_replacement_claims',
+            userId: user.id,
+            brandId: effectiveBrandId,
+            inputCharCount: requestPayloadSize,
+            metadata: {
+                suggestionCount: suggestions.length,
+                productId,
+                masterClaimType,
+                targetMarketCountryCode,
+            },
+        });
+
         return NextResponse.json<SuggestReplacementClaimsResponse>({ success: true, suggestions });
 
     } catch (error: unknown) {
@@ -245,6 +272,22 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
         // For now, assuming handleApiError returns a structure that might not perfectly match {success: false, error: string}.
         // So, it might be better to return a known shape directly for consistency if handleApiError is too generic.
         const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred while suggesting replacement claims.';
+        try {
+            await logAiUsage({
+                action: 'ai_suggest_replacement_claims',
+                userId: user.id,
+                brandId: effectiveBrandId,
+                inputCharCount: requestPayloadSize,
+                status: 'error',
+                errorMessage,
+                metadata: {
+                    cause: error instanceof Error ? error.message : String(error),
+                },
+            });
+        } catch (auditError) {
+            console.error('[AI Suggest] Failed to log AI usage', auditError);
+            return NextResponse.json<SuggestReplacementClaimsResponse>({ success: false, error: 'Failed to record AI usage event.' }, { status: 500 });
+        }
         return NextResponse.json<SuggestReplacementClaimsResponse>({ success: false, error: errorMessage }, { status: 500 });
     }
 }); 

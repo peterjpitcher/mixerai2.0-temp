@@ -56,6 +56,7 @@ const DANGEROUS_PATTERNS = [
 
 export interface FileValidationOptions {
   maxSize?: number;
+  maxSizeMB?: number;
   allowedMimeTypes?: string[];
   allowedExtensions?: string[];
   category?: keyof typeof FILE_SIZE_LIMITS;
@@ -65,7 +66,17 @@ export interface FileValidationOptions {
 export interface FileValidationResult {
   valid: boolean;
   error?: string;
+  errors: string[];
   sanitizedFileName?: string;
+  sanitizedFilename?: string;
+}
+
+export interface MultiFileValidationResult {
+  allValid: boolean;
+  validCount: number;
+  totalSize: number;
+  errors: string[];
+  results: FileValidationResult[];
 }
 
 /**
@@ -77,58 +88,68 @@ export function validateFile(
 ): FileValidationResult {
   const {
     category = 'default',
-    maxSize = FILE_SIZE_LIMITS[category],
-    allowedMimeTypes = options.allowedMimeTypes || (category in ALLOWED_MIME_TYPES 
-      ? [...ALLOWED_MIME_TYPES[category as keyof typeof ALLOWED_MIME_TYPES]] 
+    maxSize: explicitMaxSize,
+    maxSizeMB,
+    allowedMimeTypes = options.allowedMimeTypes || (category in ALLOWED_MIME_TYPES
+      ? [...ALLOWED_MIME_TYPES[category as keyof typeof ALLOWED_MIME_TYPES]]
       : undefined),
+    allowedExtensions,
     validateContent = true,
   } = options;
 
-  // Validate file size
+  const errors: string[] = [];
+  const maxSize = explicitMaxSize ?? (typeof maxSizeMB === 'number' ? maxSizeMB * 1024 * 1024 : FILE_SIZE_LIMITS[category]);
+
+  if (file.size === 0) {
+    errors.push('File is empty');
+  }
+
   if (file.size > maxSize) {
-    const sizeMB = (maxSize / 1024 / 1024).toFixed(1);
-    return {
-      valid: false,
-      error: `File size exceeds ${sizeMB}MB limit`,
-    };
+    const sizeMB = (maxSize / 1024 / 1024).toFixed(0);
+    errors.push(`File size exceeds the maximum allowed size of ${sizeMB}MB`);
   }
 
-  // Validate MIME type
   if (allowedMimeTypes && !allowedMimeTypes.includes(file.type)) {
-    return {
-      valid: false,
-      error: `File type "${file.type}" is not allowed. Allowed types: ${allowedMimeTypes.join(', ')}`,
-    };
+    errors.push(`File type ${file.type} is not allowed`);
   }
 
-  // Validate file extension matches MIME type
   const fileName = file.name.toLowerCase();
   const fileExtension = fileName.split('.').pop() || '';
-  
+
+  if (allowedExtensions && !allowedExtensions.includes(fileExtension)) {
+    errors.push(`File extension .${fileExtension} is not permitted`);
+  }
+
   if (file.type && MIME_TO_EXTENSION[file.type]) {
     const validExtensions = MIME_TO_EXTENSION[file.type];
     if (!validExtensions.includes(fileExtension)) {
-      return {
-        valid: false,
-        error: `File extension ".${fileExtension}" doesn't match file type "${file.type}"`,
-      };
+      errors.push(`File extension .${fileExtension} doesn't match file type ${file.type}`);
     }
   }
 
-  // Sanitize filename
   const sanitizedFileName = sanitizeFileName(file.name);
+  const sanitizedFilename = sanitizedFileName;
   
-  // Check for dangerous patterns in filename
   if (containsDangerousPatterns(fileName)) {
-    return {
-      valid: false,
-      error: 'Filename contains potentially dangerous patterns',
-    };
+    errors.push('Filename contains potentially dangerous patterns');
   }
 
+  if (isExecutableExtension(fileExtension)) {
+    errors.push('Executable files are not allowed');
+  }
+
+  if (isSuspiciousFilename(fileName)) {
+    errors.push('Filename is potentially dangerous');
+  }
+
+  const valid = errors.length === 0;
+
   return {
-    valid: true,
+    valid,
+    error: errors[0],
+    errors,
     sanitizedFileName,
+    sanitizedFilename,
   };
 }
 
@@ -147,6 +168,7 @@ export async function validateFileContent(
       return {
         valid: false,
         error: 'SVG files are not allowed due to security concerns',
+        errors: ['SVG files are not allowed due to security concerns'],
       };
     }
     
@@ -156,12 +178,14 @@ export async function validateFileContent(
         return {
           valid: false,
           error: 'SVG file contains potentially dangerous content',
+          errors: ['SVG file contains potentially dangerous content'],
         };
       }
     } catch (error) {
       return {
         valid: false,
         error: 'Failed to validate SVG content',
+        errors: ['Failed to validate SVG content'],
       };
     }
   }
@@ -170,37 +194,49 @@ export async function validateFileContent(
   // In production, you'd want to use a proper image validation library
   // or service that can detect malformed images
   
-  return { valid: true };
+  return { valid: true, errors: [] };
 }
 
 /**
  * Sanitizes a filename for safe storage
  */
 export function sanitizeFileName(fileName: string): string {
-  // Remove path components
-  const baseName = fileName.split(/[/\\]/).pop() || fileName;
-  
-  // Replace dangerous characters
-  let sanitized = baseName
-    .replace(/[^a-zA-Z0-9._-]/g, '_')
-    .replace(/\.{2,}/g, '_')
-    .replace(/^\./, '_');
-  
-  // Ensure it has a valid extension
-  const parts = sanitized.split('.');
-  if (parts.length === 1) {
-    sanitized += '.unknown';
+  const originalParts = fileName.split('.');
+  const originalExtension = originalParts.length > 1 ? originalParts.pop()!.toLowerCase() : '';
+
+  const segments = fileName.split(/[/\\]+/).filter(Boolean);
+  let candidate = segments.length >= 2 ? segments.slice(-2).join('-') : segments[0] || fileName;
+
+  candidate = candidate
+    .replace(/[^a-zA-Z0-9._-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/\.{2,}/g, '.')
+    .replace(/^\.+/, '')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-+(\.)/g, '$1')
+    .trim();
+
+  if (!candidate) {
+    candidate = 'file';
   }
-  
-  // Limit length
-  if (sanitized.length > 255) {
-    const extension = parts[parts.length - 1];
-    const nameWithoutExt = parts.slice(0, -1).join('.');
+
+  const parts = candidate.split('.');
+
+  if (candidate.length > 255) {
+    const extension = parts.length > 1 ? parts[parts.length - 1] : '';
+    const nameWithoutExt = parts.length > 1 ? parts.slice(0, -1).join('.') : candidate;
     const maxNameLength = 250 - extension.length;
-    sanitized = nameWithoutExt.substring(0, maxNameLength) + '.' + extension;
+    candidate = extension
+      ? `${nameWithoutExt.substring(0, maxNameLength)}.${extension}`
+      : nameWithoutExt.substring(0, 250);
   }
-  
-  return sanitized;
+
+  if (originalExtension && !candidate.toLowerCase().endsWith(`.${originalExtension}`)) {
+    candidate = candidate.replace(/\.+$/, '');
+    candidate = `${candidate}.${originalExtension}`;
+  }
+
+  return candidate;
 }
 
 /**
@@ -208,6 +244,89 @@ export function sanitizeFileName(fileName: string): string {
  */
 function containsDangerousPatterns(content: string): boolean {
   return DANGEROUS_PATTERNS.some(pattern => pattern.test(content));
+}
+
+const EXECUTABLE_EXTENSIONS = new Set([
+  'exe',
+  'bat',
+  'cmd',
+  'com',
+  'msi',
+  'scr',
+  'ps1',
+  'sh',
+  'bash',
+  'csh',
+  'ksh',
+  'zsh',
+  'reg',
+  'vb',
+  'js',
+]);
+
+const SUSPICIOUS_FILENAMES = new Set([
+  '.htaccess',
+  'web.config',
+  '.env',
+  '.gitignore',
+  '.npmrc',
+  '.yarnrc',
+]);
+
+export function isExecutableExtension(ext: string): boolean {
+  const normalized = ext.replace(/^\./, '').toLowerCase();
+  return EXECUTABLE_EXTENSIONS.has(normalized);
+}
+
+export function isSuspiciousFilename(name: string): boolean {
+  const segments = name.split(/[/\\]+/).filter(Boolean);
+  const normalized = (segments.pop() || name).trim().toLowerCase();
+  return SUSPICIOUS_FILENAMES.has(normalized);
+}
+
+export function getMimeTypeCategory(mime: string): string {
+  if (mime.startsWith('image/')) return 'image';
+  if (mime.startsWith('video/')) return 'video';
+  if (mime.startsWith('audio/')) return 'audio';
+  if (mime === 'application/pdf' || mime === 'application/msword' || mime.includes('document')) return 'document';
+  if (mime.startsWith('text/')) return 'text';
+  return 'other';
+}
+
+export function validateMultipleFiles(
+  files: Array<{ name: string; type: string; size: number }> = [],
+  options: {
+    maxFiles?: number;
+    maxTotalSizeMB?: number;
+    perFileOptions?: FileValidationOptions;
+  } = {}
+): MultiFileValidationResult {
+  const { maxFiles, maxTotalSizeMB, perFileOptions } = options;
+  const errors: string[] = [];
+
+  if (maxFiles && files.length > maxFiles) {
+    errors.push(`Too many files. Maximum allowed: ${maxFiles}`);
+  }
+
+  const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+  if (typeof maxTotalSizeMB === 'number') {
+    const maxTotalBytes = maxTotalSizeMB * 1024 * 1024;
+    if (totalSize > maxTotalBytes) {
+      const totalMB = Math.round(totalSize / 1024 / 1024);
+      errors.push(`Total file size (${totalMB}MB) exceeds maximum allowed (${maxTotalSizeMB}MB)`);
+    }
+  }
+
+  const results = files.map((file) => validateFile(file, perFileOptions));
+  const validResults = results.filter((result) => result.valid);
+
+  return {
+    allValid: errors.length === 0 && validResults.length === files.length,
+    validCount: validResults.length,
+    totalSize,
+    errors,
+    results,
+  };
 }
 
 /**
@@ -278,6 +397,7 @@ export async function validateImageDimensions(
         resolve({
           valid: false,
           error: `Image width must be between ${minWidth}px and ${maxWidth}px`,
+          errors: [`Image width must be between ${minWidth}px and ${maxWidth}px`],
         });
         return;
       }
@@ -286,6 +406,7 @@ export async function validateImageDimensions(
         resolve({
           valid: false,
           error: `Image height must be between ${minHeight}px and ${maxHeight}px`,
+          errors: [`Image height must be between ${minHeight}px and ${maxHeight}px`],
         });
         return;
       }
@@ -296,12 +417,13 @@ export async function validateImageDimensions(
           resolve({
             valid: false,
             error: `Image aspect ratio must be between ${aspectRatio.min}:1 and ${aspectRatio.max}:1`,
+            errors: [`Image aspect ratio must be between ${aspectRatio.min}:1 and ${aspectRatio.max}:1`],
           });
           return;
         }
       }
       
-      resolve({ valid: true });
+      resolve({ valid: true, errors: [] });
     };
     
     img.onerror = () => {
@@ -309,6 +431,7 @@ export async function validateImageDimensions(
       resolve({
         valid: false,
         error: 'Failed to load image for dimension validation',
+        errors: ['Failed to load image for dimension validation'],
       });
     };
     

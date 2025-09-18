@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { apiFetch } from '@/lib/api-client';
 
 /**
@@ -21,14 +21,14 @@ export function useSessionTimeout(
     // Set warning timer
     warningTimeoutRef.current = setTimeout(() => {
       const remainingMinutes = sessionMinutes - warningMinutes;
-      if (window.confirm(
-        `Your session will expire in ${remainingMinutes} minutes. ` +
-        `Would you like to continue working?`
-      )) {
-        // User wants to continue, reset timers
+      const shouldExtend = window.confirm(
+        `Your session will expire in ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}. ` +
+        `Would you like to stay signed in?`
+      );
+
+      if (shouldExtend) {
         resetTimers();
-        // Optionally refresh the session here
-        apiFetch('/api/auth/refresh', { method: 'POST' }).catch(() => {});
+        apiFetch('/api/auth/refresh', { method: 'POST', retry: 2, retryDelayMs: 500 }).catch(() => {});
       }
     }, warningMinutes * 60 * 1000);
 

@@ -15,7 +15,7 @@ export default async function Home() {
   // Redirect based on authentication status
   if (user) {
     redirect('/dashboard');
-        } else {
-    redirect('/auth/login');
   }
+
+  redirect('/auth/login');
 }

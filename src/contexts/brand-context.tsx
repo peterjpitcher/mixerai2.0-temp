@@ -1,9 +1,10 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './auth-context';
-import { apiFetch } from '@/lib/api-client';
+import { apiFetchJson, ApiClientError } from '@/lib/api-client';
+import type { ApiResponse } from '@/types/api';
 
 interface Brand {
   id: string;
@@ -55,15 +56,11 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   const fetchBrands = async (): Promise<Brand[]> => {
     if (!user) return [];
 
-    const response = await apiFetch('/api/brands');
+    const data = await apiFetchJson<ApiResponse<Brand[]>>('/api/brands', {
+      errorMessage: 'Failed to fetch brands',
+    });
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch brands: ${response.status}`);
-    }
-
-    const data = await response.json();
-    
-    if (data.success && data.data) {
+    if (data?.success && Array.isArray(data.data)) {
       return data.data;
     }
 
@@ -74,17 +71,23 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   const fetchBrand = async (brandId: string): Promise<Brand | null> => {
     if (!user || !brandId) return null;
 
-    const response = await apiFetch(`/api/brands/${brandId}`);
+    try {
+      const data = await apiFetchJson<{ success: boolean; brand?: Brand; data?: { brand?: Brand } }>(`/api/brands/${brandId}`, {
+        errorMessage: 'Failed to fetch brand',
+      });
 
-    if (!response.ok) {
-      if (response.status === 404) return null;
-      throw new Error(`Failed to fetch brand: ${response.status}`);
-    }
-
-    const data = await response.json();
-    
-    if (data.success && data.brand) {
-      return data.brand;
+      if (data?.success) {
+        if (data.brand) return data.brand;
+        if (data.data?.brand) return data.data.brand;
+      }
+    } catch (error) {
+      if (
+        (error instanceof ApiClientError && error.status === 404) ||
+        (error && typeof error === 'object' && 'status' in error && (error as { status?: number }).status === 404)
+      ) {
+        return null;
+      }
+      throw error;
     }
 
     return null;
@@ -107,48 +110,73 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   });
 
   // Set active brand and persist to localStorage
-  const setActiveBrand = (brand: Brand | null) => {
+  const setActiveBrand = useCallback((brand: Brand | null) => {
     if (brand) {
       setActiveBrandIdState(brand.id);
-      localStorage.setItem(ACTIVE_BRAND_KEY, brand.id);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(ACTIVE_BRAND_KEY, brand.id);
+      }
       // Cache the brand data
       queryClient.setQueryData(brandQueryKey(brand.id), brand);
     } else {
       setActiveBrandIdState(null);
-      localStorage.removeItem(ACTIVE_BRAND_KEY);
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(ACTIVE_BRAND_KEY);
+      }
     }
-  };
+  }, [queryClient]);
 
   // Set active brand by ID
-  const setActiveBrandId = (brandId: string) => {
+  const setActiveBrandId = useCallback((brandId: string) => {
     setActiveBrandIdState(brandId);
-    localStorage.setItem(ACTIVE_BRAND_KEY, brandId);
-  };
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(ACTIVE_BRAND_KEY, brandId);
+    }
+  }, []);
 
   // Refresh brands data
-  const refreshBrands = async () => {
+  const refreshBrands = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: brandsQueryKey });
     if (activeBrandId) {
       await queryClient.invalidateQueries({ queryKey: brandQueryKey(activeBrandId) });
     }
-  };
+  }, [queryClient, activeBrandId]);
 
   // Auto-select first brand if none selected
   useEffect(() => {
     if (!activeBrandId && brands.length > 0 && !isLoadingBrands) {
       setActiveBrand(brands[0]);
     }
-  }, [activeBrandId, brands, isLoadingBrands]);
+  }, [activeBrandId, brands, isLoadingBrands, setActiveBrand]);
 
-  const value: BrandContextType = {
+  // Clear persisted brand when user logs out
+  useEffect(() => {
+    if (!user) {
+      setActiveBrandIdState(null);
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(ACTIVE_BRAND_KEY);
+      }
+    }
+  }, [user]);
+
+  const value = useMemo<BrandContextType>(() => ({
     brands,
     activeBrand: activeBrand || null,
     isLoading: isLoadingBrands || isLoadingActiveBrand,
-    error: brandsError as Error | null,
+    error: (brandsError as Error | null) ?? null,
     setActiveBrand,
     setActiveBrandId,
     refreshBrands,
-  };
+  }), [
+    brands,
+    activeBrand,
+    isLoadingBrands,
+    isLoadingActiveBrand,
+    brandsError,
+    setActiveBrand,
+    setActiveBrandId,
+    refreshBrands,
+  ]);
 
   return <BrandContext.Provider value={value}>{children}</BrandContext.Provider>;
 }

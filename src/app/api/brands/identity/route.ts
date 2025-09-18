@@ -4,6 +4,7 @@ import axios from 'axios';
 import sanitizeHtml from 'sanitize-html';
 import dns from 'dns';
 import ipaddr from 'ipaddr.js';
+import { z } from 'zod';
 
 import { COUNTRIES } from '@/lib/constants';
 import { withAdminAuthAndCSRF } from '@/lib/auth/api-auth';
@@ -18,6 +19,19 @@ const rawAllowlist = (env.PROXY_ALLOWED_HOSTS || '')
   .filter(Boolean);
 
 const allowlistedHosts = new Set(rawAllowlist);
+
+const MAX_URLS = 3;
+const MAX_SCRAPED_CHARACTERS = 8000;
+const requestSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  urls: z
+    .union([z.string(), z.array(z.string())])
+    .transform((value) => (Array.isArray(value) ? value : [value]))
+    .refine((arr) => arr.length > 0, 'At least one URL is required')
+    .transform((arr) => arr.slice(0, MAX_URLS)),
+  country: z.string().trim().min(1).max(5).optional().default('GB'),
+  language: z.string().trim().min(1).max(10).optional().default('en-GB'),
+});
 
 function isHostAllowlisted(hostname: string): boolean {
   if (!allowlistedHosts.size) {
@@ -139,7 +153,7 @@ async function scrapeWebsiteContent(url: string): Promise<string> {
       }
     });
     
-    return textContent;
+    return textContent.slice(0, MAX_SCRAPED_CHARACTERS);
   } catch (error) {
     // Log scraping errors to a secure server-side log in production.
     // Return an empty string or a specific marker if content extraction fails, rather than error string in content.
@@ -150,35 +164,16 @@ async function scrapeWebsiteContent(url: string): Promise<string> {
 
 export const POST = withAdminAuthAndCSRF(async (req: NextRequest) => {
   try {
-    const body = await req.json();
-    const name = body.name || body.brandName;
-    let urls = body.urls || [];
-    
-    // If urls is a string, convert to array
-    if (typeof urls === 'string') {
-      urls = [urls];
-    } else if (!Array.isArray(urls)) {
-      urls = [];
-    }
-    
-    // Get country and language with defaults
-    const country = body.country || 'GB';
-    const language = body.language || 'en-GB';
-    
-    if (!name) {
+    const parsedBody = requestSchema.safeParse(await req.json());
+    if (!parsedBody.success) {
       return NextResponse.json(
-        { success: false, error: 'Brand name is required' },
+        { success: false, error: 'Invalid request payload', details: parsedBody.error.flatten() },
         { status: 400 }
       );
     }
-    
-    if (urls.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'At least one URL is required' },
-        { status: 400 }
-      );
-    }
-    
+
+    const { name, urls, country, language } = parsedBody.data;
+
     // Filter to valid URLs
     const validUrls = urls.filter((url): url is string => typeof url === 'string' && isValidUrl(url));
     if (validUrls.length === 0) {
@@ -187,7 +182,7 @@ export const POST = withAdminAuthAndCSRF(async (req: NextRequest) => {
         { status: 400 }
       );
     }
-    
+
     const openai = getOpenAIClientOrThrow(); // Throws if no client can be configured.
 
     // Get content from URLs
@@ -243,9 +238,6 @@ Format your response as a structured JSON object with these keys: brandIdentity,
 Remember that ALL text fields (except potentially within agency names) must be written in ${specificLanguageName}, and should avoid mentioning "${countryName}" or its nationality.`;
     
     try {
-      console.log("---- [Brand Identity API] System Message ----\n", systemMessage);
-      console.log("---- [Brand Identity API] User Message ----\n", userMessage);
-
       const modelToUse = process.env.AZURE_OPENAI_DEPLOYMENT || process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
       const completionResponse = await openai.chat.completions.create({
         model: modelToUse,

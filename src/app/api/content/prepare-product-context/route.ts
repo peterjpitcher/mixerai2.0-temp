@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { User } from '@supabase/supabase-js';
 
@@ -11,6 +11,7 @@ import { getStackedClaimsForProduct } from '@/lib/claims-utils';
 import { ok, fail } from '@/lib/http/response';
 import { BrandPermissionVerificationError, isPlatformAdminUser, userHasBrandAccess } from '@/lib/auth/brand-access';
 import { logContentGenerationAudit } from '@/lib/audit/content';
+import { enforceContentRateLimits } from '@/lib/rate-limit/content';
 
 type Claim = {
   claim_text: string;
@@ -238,6 +239,14 @@ async function prepareProductContextHandler(request: NextRequest, user: User) {
         }
         throw error;
       }
+    }
+
+    const rateLimitResult = await enforceContentRateLimits(request, user.id, masterBrand.mixerai_brand_id);
+    if ('type' in rateLimitResult) {
+      return NextResponse.json(rateLimitResult.body, {
+        status: rateLimitResult.status,
+        headers: rateLimitResult.headers,
+      });
     }
 
     if (countryCode) {

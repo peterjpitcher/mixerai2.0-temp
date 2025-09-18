@@ -8,6 +8,7 @@ import { extractCleanDomain } from '@/lib/utils/url-utils';
 // import { Database } from '@/types/supabase';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf'; // TODO: Uncomment when supabase types are generated
 import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth/brand-access';
+import { logAiUsage } from '@/lib/audit/ai';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,8 +31,12 @@ interface AIBrandContext {
 }
 
 export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Promise<Response> => {
+  let requestPayloadSize = 0;
+  let brandId: string | null = null;
+  let brandForContext: Record<string, unknown> | null = null; // TODO: Type as Database['public']['Tables']['brands']['Row'] when types are generated
   try {
     const body: TitleGenerationRequest = await request.json();
+    requestPayloadSize = JSON.stringify(body).length;
 
     if (!body.contentBody) {
       return NextResponse.json({ success: false, error: 'contentBody is required' }, { status: 400 });
@@ -40,7 +45,6 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Pr
       return NextResponse.json({ success: false, error: 'brand_id or websiteUrlForBrandDetection is required' }, { status: 400 });
     }
 
-    let brandForContext: Record<string, unknown> | null = null; // TODO: Type as Database['public']['Tables']['brands']['Row'] when types are generated
     const supabase = createSupabaseAdminClient();
 
     if (body.brand_id) {
@@ -71,6 +75,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Pr
         console.warn(`[GenerateTitle] Brand ID ${body.brand_id} provided but not found: ${brandError.message}`);
       } else {
         brandForContext = brandData;
+        brandId = (brandData?.id as string) ?? null;
       }
     } else if (body.websiteUrlForBrandDetection) {
       const cleanDomain = extractCleanDomain(body.websiteUrlForBrandDetection);
@@ -102,6 +107,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Pr
             throw error;
           }
           brandForContext = brandData;
+          brandId = (brandData?.id as string) ?? null;
         }
       }
     }
@@ -129,6 +135,17 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Pr
 
     const title = await generateContentTitleFromContext(body.contentBody, aiBrandContext);
 
+    await logAiUsage({
+      action: 'ai_generate_title',
+      userId: user.id,
+      brandId,
+      inputCharCount: requestPayloadSize,
+      metadata: {
+        responseLength: title?.length ?? 0,
+        detectionSource: body.brand_id ? 'brand_id' : brandForContext ? 'url_detection' : 'none',
+      },
+    });
+
     return NextResponse.json({
       success: true, 
       title: title,
@@ -146,6 +163,26 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Pr
       statusCode = 503;
     } else if (error instanceof Error) {
         errorMessage = error.message || errorMessage;
+    }
+    try {
+      await logAiUsage({
+        action: 'ai_generate_title',
+        userId: user.id,
+        brandId,
+        inputCharCount: requestPayloadSize,
+        status: 'error',
+        errorMessage,
+        metadata: {
+          cause: error instanceof Error ? error.message : String(error),
+        },
+      });
+    } catch (auditError) {
+      console.error('[generate-title] Failed to log AI usage', auditError);
+      return handleApiError(
+        auditError instanceof Error ? auditError : new Error(String(auditError)),
+        'Failed to record AI usage event.',
+        500
+      );
     }
     return handleApiError(new Error(errorMessage), 'Failed to generate content title', statusCode);
   }

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { handleApiError } from '@/lib/api-utils';
 // import { withAuth } from '@/lib/auth/api-auth'; // No longer used
 import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
+import { logSecurityEvent } from '@/lib/auth/account-lockout';
 
 const diagnosticsEnabled = process.env.ENABLE_HEALTH_DIAGNOSTICS === 'true';
 
@@ -73,27 +74,39 @@ export const GET = withAdminAuth(async (_request: NextRequest, user) => {
     // Check template availability
     const localTemplatesAvailable = true; // Should always be available as fallback
 
-    return NextResponse.json({
-      success: true,
-      diagnostics: {
-        azureOpenAIConfigured: !!(azureEndpoint && azureApiKey && azureDeployment),
-        azureOpenAIApiKeySet: !!azureApiKey,
-        azureOpenAIEndpointSet: !!azureEndpoint,
-        azureOpenAIDeploymentSet: !!azureDeployment,
-        azureApiVersionUsed: azureApiVersion,
-        useLocalGenerationEnabled: useLocalGeneration,
-        supabaseClientConnection: supabaseConnected,
-        supabaseClientTestQueryError: supabaseTestQueryError,
-        supabaseUrlConfigured: !!supabaseUrl,
-        databaseProvider: supabaseConnected ? 'Supabase (via client)' : (directDbConnected ? 'Direct PostgreSQL (env vars set)' : 'None Configured'),
-        localFallbackTemplatesMarkedAvailable: localTemplatesAvailable,
-        directDbConfigSet: directDbConnected,
-        debugModeEnabled: debugMode,
-        nodeEnv: process.env.NODE_ENV,
-        timestamp: new Date().toISOString(),
-        checkedByUserId: user.id
+    const diagnosticsPayload = {
+      azureOpenAI: {
+        status: azureEndpoint && azureApiKey && azureDeployment ? 'configured' : 'missing',
+        apiVersion: azureApiVersion,
+      },
+      supabaseClient: {
+        status: supabaseConnected ? 'connected' : 'error',
+        issueDetected: Boolean(supabaseTestQueryError),
+      },
+      directDatabaseConfig: directDbConnected ? 'configured' : 'missing',
+      localFallbackTemplatesAvailable: localTemplatesAvailable,
+      featureFlags: {
+        useLocalGeneration,
+        debugMode,
+      },
+      environment: process.env.NODE_ENV,
+      timestamp: new Date().toISOString(),
+      requestedBy: user.id,
+    } as const;
+
+    await logSecurityEvent('env_diagnostics_requested', diagnosticsPayload, user.id);
+
+    return NextResponse.json(
+      {
+        success: true,
+        diagnostics: diagnosticsPayload,
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store',
+        },
       }
-    });
+    );
   } catch (error: unknown) {
     return handleApiError(error, `Failed to check environment: ${(error as Error).message}`);
   }

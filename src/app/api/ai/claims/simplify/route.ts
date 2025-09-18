@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { BrandPermissionVerificationError, requireBrandAccess } from '@/lib/auth/brand-access';
+import { logAiUsage } from '@/lib/audit/ai';
 
 export const dynamic = "force-dynamic";
 
@@ -26,8 +27,11 @@ const simplifyClaimsSchema = z.object({
 });
 
 export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promise<Response> => {
+  let requestPayloadSize = 0;
+  let brandId: string | null = null;
   try {
     const body = await req.json();
+    requestPayloadSize = JSON.stringify(body).length;
     const validationResult = simplifyClaimsSchema.safeParse(body);
 
     if (!validationResult.success) {
@@ -38,6 +42,7 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
     }
 
     const { claims, brandName, productName, marketName, mixeraiBrandId } = validationResult.data;
+    brandId = mixeraiBrandId ?? null;
 
     // --- Permission Check Start ---
     const supabase = createSupabaseAdminClient();
@@ -105,10 +110,39 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
       );
     }
 
+    await logAiUsage({
+      action: 'ai_simplify_claims',
+      userId: user.id,
+      brandId,
+      inputCharCount: requestPayloadSize,
+      metadata: {
+        claimCount: claims.length,
+        summaryLength: simplifiedSummary.length,
+        productName,
+        marketName,
+      },
+    });
+
     return NextResponse.json({ success: true, summary: simplifiedSummary });
 
   } catch (error: unknown) {
     console.error("[API /ai/claims/simplify] Error:", error);
+    try {
+      await logAiUsage({
+        action: 'ai_simplify_claims',
+        userId: user.id,
+        brandId,
+        inputCharCount: requestPayloadSize,
+        status: 'error',
+        errorMessage: 'Failed to simplify claims.',
+        metadata: {
+          cause: error instanceof Error ? error.message : String(error),
+        },
+      });
+    } catch (auditError) {
+      console.error('[API /ai/claims/simplify] Failed to log AI usage', auditError);
+      return handleApiError(auditError, 'Failed to record AI usage event.', 500);
+    }
     return handleApiError(error, "Failed to simplify claims.");
   }
 }); 

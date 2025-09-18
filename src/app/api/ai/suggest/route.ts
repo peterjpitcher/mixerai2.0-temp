@@ -8,6 +8,7 @@ import { Brand } from '@/types/models';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { truncateGraphemeSafe, normaliseForLength, stripAIWrappers } from '@/lib/text/enforce-limit';
 import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth/brand-access';
+import { logAiUsage } from '@/lib/audit/ai';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -38,8 +39,11 @@ const SuggestionRequestSchema = z.object({
  * POST: Generate suggestions for a field using AI
  */
 export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Promise<Response> => {
+  let requestPayloadSize = 0;
+  let brandId: string | null = null;
   try {
     const rawBody = await request.json();
+    requestPayloadSize = JSON.stringify(rawBody).length;
 
     // Validate request with Zod
     const parsed = SuggestionRequestSchema.safeParse(rawBody);
@@ -54,6 +58,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Pr
     }
     
     const body = parsed.data;
+    brandId = body.brand_id ?? null;
 
     let userPrompt = body.prompt;
 
@@ -200,6 +205,17 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Pr
       finalSuggestion = result.text;
     }
 
+    await logAiUsage({
+      action: 'ai_suggest',
+      userId: user.id,
+      brandId,
+      inputCharCount: requestPayloadSize,
+      metadata: {
+        responseLength: finalSuggestion.length,
+        ...(truncated ? { truncated: true, truncationDetails } : {}),
+      },
+    });
+
     const response = NextResponse.json({
       success: true, 
       suggestion: finalSuggestion,
@@ -229,6 +245,26 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Pr
       statusCode = 400; // Bad Request
     } else if (error instanceof Error) {
       errorMessage = error.message || errorMessage;
+    }
+    try {
+      await logAiUsage({
+        action: 'ai_suggest',
+        userId: user.id,
+        brandId,
+        inputCharCount: requestPayloadSize,
+        status: 'error',
+        errorMessage,
+        metadata: {
+          cause: error instanceof Error ? error.message : String(error),
+        },
+      });
+    } catch (auditError) {
+      console.error('[api/ai/suggest] Failed to log AI usage', auditError);
+      return handleApiError(
+        auditError instanceof Error ? auditError : new Error(String(auditError)),
+        'Failed to record AI usage event.',
+        500
+      );
     }
     return handleApiError(new Error(errorMessage), 'Failed to generate suggestion.', statusCode);
   }

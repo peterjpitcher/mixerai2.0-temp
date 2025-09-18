@@ -5,6 +5,7 @@ import { getModelName } from '@/lib/azure/openai';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { BrandPermissionVerificationError, requireBrandAccess } from '@/lib/auth/brand-access';
+import { logAiUsage } from '@/lib/audit/ai';
 
 // Define the expected request body schema
 const StepContextSchema = z.object({
@@ -77,8 +78,11 @@ async function callOpenAI(prompt: string): Promise<string | null> {
 }
 
 export const POST = withAuthAndCSRF(async function (request: NextRequest, user: User) {
+  let requestPayloadSize = 0;
+  let brandId: string | null = null;
   try {
     const body = await request.json();
+    requestPayloadSize = JSON.stringify(body).length;
     const validationResult = StepContextSchema.safeParse(body);
 
     if (!validationResult.success) {
@@ -89,6 +93,7 @@ export const POST = withAuthAndCSRF(async function (request: NextRequest, user: 
     }
 
     const { brand_id, workflowName, brandName, templateName, stepName, role, brandCountry, brandLanguage } = validationResult.data;
+    brandId = brand_id ?? null;
 
     if (brand_id) {
       const supabase = createSupabaseAdminClient();
@@ -150,6 +155,16 @@ Focus on the key actions and responsibilities for the user in this step. Be spec
       );
     }
 
+    await logAiUsage({
+      action: 'ai_generate_step_description',
+      userId: user.id,
+      brandId,
+      inputCharCount: requestPayloadSize,
+      metadata: {
+        responseLength: generatedDescription.length,
+      },
+    });
+
     return NextResponse.json({ 
       success: true, 
       description: generatedDescription 
@@ -157,6 +172,25 @@ Focus on the key actions and responsibilities for the user in this step. Be spec
 
   } catch (error) {
     console.error('[AI_GENERATE_STEP_DESCRIPTION_ERROR]', error);
+    try {
+      await logAiUsage({
+        action: 'ai_generate_step_description',
+        userId: user.id,
+        brandId,
+        inputCharCount: requestPayloadSize,
+        status: 'error',
+        errorMessage: 'Failed to generate step description',
+        metadata: {
+          cause: error instanceof Error ? error.message : String(error),
+        },
+      });
+    } catch (auditError) {
+      console.error('[AI_GENERATE_STEP_DESCRIPTION_ERROR] Failed to log AI usage', auditError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to record AI usage event' },
+        { status: 500 }
+      );
+    }
     return NextResponse.json(
       { success: false, error: 'Failed to generate step description' },
       { status: 500 }

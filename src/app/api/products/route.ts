@@ -5,6 +5,7 @@ import { withAuth } from '@/lib/auth/api-auth';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { User } from '@supabase/supabase-js';
 import { getUserAccessibleBrands, isPlatformAdmin } from '@/lib/auth/permissions';
+import { z } from 'zod';
 
 export const dynamic = "force-dynamic";
 
@@ -12,24 +13,35 @@ interface Product {
     id: string;
     name: string;
     description: string | null;
-    master_brand_id: string; // Renamed from global_brand_id, FK, should be required
+    master_brand_id: string;
     created_at?: string;
     updated_at?: string;
 }
 
+const MAX_PAGE_SIZE = 100;
+
+const createProductSchema = z.object({
+    name: z.string().min(1).max(200),
+    description: z.string().max(2000).optional().nullable(),
+    master_brand_id: z.string().uuid(),
+});
+
+const updateProductSchema = z.object({
+    name: z.string().min(1).max(200),
+    description: z.string().max(2000).optional().nullable(),
+});
+
 // GET handler for all products with pagination
 export const GET = withAuth(async (req: NextRequest, user: User) => {
     try {
-        // Parse pagination parameters from query string
         const searchParams = req.nextUrl.searchParams;
-        const page = parseInt(searchParams.get('page') || '1', 10);
-        const limit = parseInt(searchParams.get('limit') || '20', 10);
+        const pageParam = Number(searchParams.get('page'));
+        const limitParam = Number(searchParams.get('limit'));
         const search = searchParams.get('search') || '';
-        
-        // Validate pagination parameters
-        const validatedPage = Math.max(1, page);
-        const validatedLimit = Math.min(Math.max(1, limit), 1000); // Max 1000 items per page
-        const offset = (validatedPage - 1) * validatedLimit;
+
+        const page = Number.isFinite(pageParam) && pageParam > 0 ? Math.floor(pageParam) : 1;
+        const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(Math.floor(limitParam), MAX_PAGE_SIZE) : 20;
+        const offset = (page - 1) * limit;
         if (isBuildPhase()) {
             console.log('[API Products GET] Build phase: returning empty array.');
             return NextResponse.json({ success: true, isMockData: true, data: [] });
@@ -45,17 +57,14 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
         if (!isPlatAdmin) {
             // Get user's MixerAI brand permissions
             const mixerAIBrandIds = await getUserAccessibleBrands(user.id, supabase);
-            
-            console.log('[API Products GET] User MixerAI brand IDs:', mixerAIBrandIds);
-            
             // If user has no brand access, return empty result
             if (mixerAIBrandIds.length === 0) {
                 return NextResponse.json({
                     success: true,
                     data: [],
                     pagination: {
-                        page: validatedPage,
-                        limit: validatedLimit,
+                        page: page,
+                        limit: limit,
                         total: 0,
                         totalPages: 0,
                         hasNextPage: false,
@@ -69,8 +78,6 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
                 .from('master_claim_brands')
                 .select('id, mixerai_brand_id')
                 .in('mixerai_brand_id', mixerAIBrandIds);
-                
-            console.log('[API Products GET] Master brands found:', masterBrands);
                 
             if (masterBrandsError) {
                 console.error('[API Products GET] Error fetching master brands:', masterBrandsError);
@@ -93,16 +100,14 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
                 accessibleMasterBrandIds.push(...additionalMasterBrandIds);
             }
             
-            console.log('[API Products GET] Accessible master brand IDs:', accessibleMasterBrandIds);
-            
             // If no master brands found for user's MixerAI brands, return empty
             if (accessibleMasterBrandIds.length === 0) {
                 return NextResponse.json({
                     success: true,
                     data: [],
                     pagination: {
-                        page: validatedPage,
-                        limit: validatedLimit,
+                        page: page,
+                        limit: limit,
                         total: 0,
                         totalPages: 0,
                         hasNextPage: false,
@@ -143,7 +148,7 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
         }
         
         // Apply pagination
-        query = query.range(offset, offset + validatedLimit - 1);
+        query = query.range(offset, offset + limit - 1);
         
         const { data, error, count } = await query;
 
@@ -162,16 +167,16 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
         })).filter(item => item.master_brand_id !== '') : []; // Filter out products without master_brand_id
 
         // Calculate pagination metadata
-        const totalPages = count ? Math.ceil(count / validatedLimit) : 0;
-        const hasNextPage = validatedPage < totalPages;
-        const hasPreviousPage = validatedPage > 1;
+        const totalPages = count ? Math.ceil(count / limit) : 0;
+        const hasNextPage = page < totalPages;
+        const hasPreviousPage = page > 1;
         
         return NextResponse.json({ 
             success: true, 
             data: validatedData as Product[],
             pagination: {
-                page: validatedPage,
-                limit: validatedLimit,
+                page,
+                limit,
                 total: count || 0,
                 totalPages,
                 hasNextPage,
@@ -188,27 +193,15 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
 // POST handler for creating a new product
 export const POST = withAuthAndCSRF(async (req: NextRequest, user: User) => {
     try {
-        const body = await req.json();
-        const { name, description, master_brand_id } = body; // Renamed global_brand_id
+        const parsed = createProductSchema.safeParse(await req.json());
+        if (!parsed.success) {
+            return NextResponse.json(
+                { success: false, error: 'Invalid request payload', details: parsed.error.flatten() },
+                { status: 400 }
+            );
+        }
 
-        if (!name || typeof name !== 'string' || name.trim() === '') {
-            return NextResponse.json(
-                { success: false, error: 'Product name is required and must be a non-empty string.' },
-                { status: 400 }
-            );
-        }
-        if (!master_brand_id || typeof master_brand_id !== 'string') { // Renamed
-            return NextResponse.json(
-                { success: false, error: 'Master Brand ID is required.' }, // Renamed
-                { status: 400 }
-            );
-        }
-        if (description && typeof description !== 'string') {
-            return NextResponse.json(
-               { success: false, error: 'Description must be a string if provided.' },
-               { status: 400 }
-           );
-       }
+        const { name, description, master_brand_id } = parsed.data;
 
         const supabase = createSupabaseAdminClient();
         
@@ -255,8 +248,8 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User) => {
         
         const newRecord: Omit<Product, 'id' | 'created_at' | 'updated_at'> = {
             name: name.trim(),
-            description: description?.trim() || null,
-            master_brand_id: master_brand_id // Renamed
+            description: description ? description.trim() : null,
+            master_brand_id,
         };
 
         const { data, error } = await supabase.from('products')

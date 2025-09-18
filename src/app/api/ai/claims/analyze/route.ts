@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
-import { withAuth } from '@/lib/auth/api-auth';
+
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 export const dynamic = 'force-dynamic';
 
-export const GET = withAuth(async (_req, user) => {
-  if (user.user_metadata?.role !== 'admin') {
-    return NextResponse.json({ success: false, error: 'Not Found' }, { status: 404 });
-  }
-
-  return NextResponse.json({ success: true, message: 'Analyze API is working' });
+export const GET = withAuthAndCSRF(async () => {
+  return NextResponse.json(
+    {
+      success: false,
+      error: 'The claims analyze endpoint has been retired. Use claims insights tooling instead.',
+    },
+    { status: 410 }
+  );
 }); 

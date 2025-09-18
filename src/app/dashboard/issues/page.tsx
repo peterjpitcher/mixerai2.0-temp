@@ -91,8 +91,6 @@ export default function IssuesPage() {
       ).sort((a, b) => a.order - b.order);
 
       setPriorityLabels(uniquePriorities);
-      console.log('Found priority labels:', uniquePriorities);
-      console.log('All labels:', allLabels.map((l: GitHubLabel) => l.name));
     } catch (err) {
       console.error('Error fetching labels:', err);
     }
@@ -114,7 +112,7 @@ export default function IssuesPage() {
       
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('GitHub API response:', errorData);
+        console.error('GitHub issues API response:', errorData);
         if (errorData.details) {
           throw new Error(`${errorData.error} (${errorData.details.owner}/${errorData.details.repo})`);
         }

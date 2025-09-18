@@ -7,6 +7,7 @@ import { handleApiError } from '@/lib/api-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth/brand-access';
 import { logContentGenerationAudit } from '@/lib/audit/content';
+import { enforceContentRateLimits } from '@/lib/rate-limit/content';
 import { TemplateFieldsSchema } from '@/lib/schemas/template';
 import type { StyledClaims } from '@/types/claims';
 
@@ -77,6 +78,14 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
     }
 
     const data = parsedBody.data;
+
+    const rateLimitResult = await enforceContentRateLimits(request, user.id, data.brand_id);
+    if ('type' in rateLimitResult) {
+      return NextResponse.json(rateLimitResult.body, {
+        status: rateLimitResult.status,
+        headers: rateLimitResult.headers,
+      });
+    }
 
     const supabase = createSupabaseAdminClient();
 

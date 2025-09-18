@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { User } from '@supabase/supabase-js';
+import type { StyledClaims } from '@/types/claims';
 
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { formatClaimsDirectly } from '@/lib/claims-formatter';
@@ -9,6 +10,7 @@ import { getStackedClaimsForProduct } from '@/lib/claims-utils';
 import { ok, fail } from '@/lib/http/response';
 import { logDebug, logError } from '@/lib/logger';
 import { BrandPermissionVerificationError, requireBrandAccess } from '@/lib/auth/brand-access';
+import { logAiUsage } from '@/lib/audit/ai';
 
 type Claim = {
   claim_text: string;
@@ -16,6 +18,13 @@ type Claim = {
   level: 'brand' | 'product' | 'ingredient';
   country_code: string;
 };
+
+function countStyledClaims(styled: StyledClaims): number {
+  return styled.grouped_claims.reduce(
+    (total, group) => total + group.allowed_claims.length + group.disallowed_claims.length,
+    0
+  );
+}
 
 // Function to fetch all claims related to a master claim brand
 async function fetchAllBrandClaims(supabase: ReturnType<typeof createSupabaseAdminClient>, masterClaimBrandId: string, productId: string | undefined, countryCode: string | undefined): Promise<Claim[]> {
@@ -54,8 +63,11 @@ function sortClaims(a: Claim, b: Claim): number {
 }
 
 async function styleBrandClaimsHandler(request: NextRequest, user: User) {
+  let requestPayloadSize = 0;
+  let effectiveBrandId: string | null = null;
   try {
     const body = await request.json();
+    requestPayloadSize = JSON.stringify(body).length;
     const { masterClaimBrandId, productId, countryCode } = body;
 
     if (!masterClaimBrandId || typeof masterClaimBrandId !== 'string') {
@@ -75,6 +87,7 @@ async function styleBrandClaimsHandler(request: NextRequest, user: User) {
     }
 
     if (masterBrand.mixerai_brand_id) {
+      effectiveBrandId = masterBrand.mixerai_brand_id;
       try {
         await requireBrandAccess(supabase, user, masterBrand.mixerai_brand_id);
       } catch (error) {
@@ -119,6 +132,19 @@ async function styleBrandClaimsHandler(request: NextRequest, user: User) {
         undefined,
         masterBrand.name
       );
+      await logAiUsage({
+        action: 'ai_style_brand_claims',
+        userId: user.id,
+        brandId: effectiveBrandId,
+        inputCharCount: requestPayloadSize,
+        metadata: {
+          branch: 'stacked',
+          styledClaimCount: countStyledClaims(formatted),
+          rawClaimCount: effective.length,
+          productId,
+          countryCode,
+        },
+      });
       return ok({ brandName: masterBrand.name || 'Unknown Brand', styledClaims: formatted, rawClaimsForAI: effective.map(ec => ({ text: ec.claim_text, type: ec.final_claim_type, level: ec.source_level, market: ec.original_claim_country_code })) });
     }
 
@@ -127,6 +153,17 @@ async function styleBrandClaimsHandler(request: NextRequest, user: User) {
 
     if (allClaims.length === 0) {
       const { data: brandData } = await supabase.from('master_claim_brands').select('name').eq('id', masterClaimBrandId).single();
+      await logAiUsage({
+        action: 'ai_style_brand_claims',
+        userId: user.id,
+        brandId: effectiveBrandId,
+        inputCharCount: requestPayloadSize,
+        metadata: {
+          branch: 'no-claims',
+          styledClaimCount: 0,
+          rawClaimCount: 0,
+        },
+      });
       return ok({ brandName: brandData?.name || 'Unknown Brand', styledClaims: [], rawClaimsForAI: [] });
     }
 
@@ -172,6 +209,20 @@ async function styleBrandClaimsHandler(request: NextRequest, user: User) {
       totalClaims: allClaimsToDisplay.length
     });
 
+    await logAiUsage({
+      action: 'ai_style_brand_claims',
+      userId: user.id,
+      brandId: effectiveBrandId,
+      inputCharCount: requestPayloadSize,
+      metadata: {
+        branch: 'brand-level',
+        styledClaimCount: countStyledClaims(formattedClaims),
+        rawClaimCount: allClaimsToDisplay.length,
+        productId,
+        countryCode,
+      },
+    });
+
     return ok({
       brandName: masterBrand.name || 'Unknown Brand',
       styledClaims: formattedClaims,
@@ -185,6 +236,22 @@ async function styleBrandClaimsHandler(request: NextRequest, user: User) {
 
   } catch (error: unknown) {
     logError('Error in /api/ai/style-brand-claims handler:', error);
+    try {
+      await logAiUsage({
+        action: 'ai_style_brand_claims',
+        userId: user.id,
+        brandId: effectiveBrandId,
+        inputCharCount: requestPayloadSize,
+        status: 'error',
+        errorMessage: 'Failed to style brand claims',
+        metadata: {
+          cause: error instanceof Error ? error.message : String(error),
+        },
+      });
+    } catch (auditError) {
+      logError('Failed to log AI usage for style-brand-claims', auditError);
+      return fail(500, 'Failed to record AI usage event');
+    }
     return fail(500, 'Failed to style brand claims', error instanceof Error ? error.message : 'Unknown error occurred');
   }
 }

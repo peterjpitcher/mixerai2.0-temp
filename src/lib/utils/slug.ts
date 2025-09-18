@@ -9,6 +9,12 @@
  * @param options - Configuration options
  * @returns A URL-friendly slug
  */
+const SPECIAL_REPLACEMENTS: Array<{ pattern: RegExp; replacement: string }> = [
+  { pattern: /&/g, replacement: ' and ' },
+  { pattern: /\+/g, replacement: ' plus ' },
+  { pattern: /['’]/g, replacement: '' },
+];
+
 export function generateSlug(
   text: string,
   options: {
@@ -27,17 +33,30 @@ export function generateSlug(
 
   let slug = text.trim();
 
-  if (!allowUnicode) {
-    // Convert to ASCII
-    slug = slug.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  SPECIAL_REPLACEMENTS.forEach(({ pattern, replacement }) => {
+    slug = slug.replace(pattern, replacement);
+  });
+
+  slug = slug.replace(/(\d+)%/g, '$1 percent ');
+
+  if (allowUnicode) {
+    slug = slug.replace(/[^\p{L}\p{N}\s_-]+/gu, ' ');
+  } else {
+    slug = slug
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9\s_-]+/g, ' ');
   }
 
-  // Replace spaces and special characters
+  const escapedSeparator = separator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const whitespaceRegex = /[\s_]+/g;
+  const duplicateSepRegex = new RegExp(`${escapedSeparator}{2,}`, 'g');
+  const edgeSepRegex = new RegExp(`^${escapedSeparator}|${escapedSeparator}$`, 'g');
+
   slug = slug
-    .replace(/[^\w\s-]/g, '') // Remove special characters
-    .replace(/[\s_]+/g, separator) // Replace spaces and underscores with separator
-    .replace(new RegExp(`${separator}{2,}`, 'g'), separator) // Replace multiple separators
-    .replace(new RegExp(`^${separator}|${separator}$`, 'g'), ''); // Trim separators
+    .replace(whitespaceRegex, separator)
+    .replace(duplicateSepRegex, separator)
+    .replace(edgeSepRegex, '');
 
   if (lowercase) {
     slug = slug.toLowerCase();
@@ -76,6 +95,32 @@ export function makeSlugUnique(baseSlug: string, existingSlugs: string[]): strin
 
   return uniqueSlug;
 }
+
+export async function ensureUniqueSlug(
+  baseSlug: string,
+  isUnique: (candidate: string) => Promise<boolean>,
+  maxAttempts = 50
+): Promise<string> {
+  const initialSlug = baseSlug || 'item';
+
+  if (await isUnique(initialSlug)) {
+    return initialSlug;
+  }
+
+  for (let index = 1; index <= maxAttempts; index++) {
+    const candidate = `${initialSlug}-${index}`;
+    if (await isUnique(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error(`Could not generate unique slug after ${maxAttempts} attempts`);
+}
+
+export const generateSlugFromTitle = (
+  title: string,
+  options?: Parameters<typeof generateSlug>[1]
+) => generateSlug(title, options);
 
 /**
  * Generate a slug with date prefix
