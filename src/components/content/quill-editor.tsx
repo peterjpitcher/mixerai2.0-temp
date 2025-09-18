@@ -1,6 +1,11 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import type QuillType from 'quill';
+
+type DeltaStatic = any;
+type ClipboardMatcherCallback = (node: Node, delta: DeltaStatic) => DeltaStatic;
+type QuillOp = any;
 
 interface QuillEditorProps {
   value: string;
@@ -20,8 +25,45 @@ export function QuillEditor({
   allowImages = false // Default closed for security
 }: QuillEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
-  const quillRef = useRef<any>(null);
+  const quillRef = useRef<QuillType | null>(null);
+  const dropHandlerRef = useRef<((event: DragEvent) => void) | null>(null);
+  const dragOverHandlerRef = useRef<((event: DragEvent) => void) | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+
+  const resolveHtmlValue = useMemo(() => {
+    const ensureHtml = (value: string) => {
+      const trimmed = value.trim();
+      if (!trimmed) return '';
+      if (/<[a-z][\s\S]*>/i.test(trimmed)) {
+        return trimmed;
+      }
+      // Wrap plain text in paragraph for Quill
+      return `<p>${trimmed.replace(/\n+/g, '<br />')}</p>`;
+    };
+
+    return (raw: string): string => {
+      if (!raw) return '';
+      const trimmed = raw.trim();
+      if (!trimmed.startsWith('{')) {
+        return ensureHtml(trimmed);
+      }
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (typeof parsed === 'string') {
+          return ensureHtml(parsed);
+        }
+        if (parsed && typeof parsed === 'object') {
+          const candidate = Object.values(parsed).find((value): value is string => typeof value === 'string');
+          if (candidate) {
+            return ensureHtml(candidate);
+          }
+        }
+      } catch {
+        return ensureHtml(trimmed);
+      }
+      return ensureHtml(trimmed);
+    };
+  }, []);
 
   useEffect(() => {
     if (!editorRef.current || quillRef.current) return;
@@ -34,76 +76,115 @@ export function QuillEditor({
       }
 
       // Dynamically import Quill to avoid SSR issues
-      const Quill = (await import('quill')).default;
-      
+      const { default: Quill } = await import('quill');
+      const DeltaConstructor = Quill.import('delta') as { new (ops?: QuillOp[]): DeltaStatic };
+
       console.log('Initializing Quill editor');
-      
+
       // Initialize Quill
+      const toolbarConfig = readOnly
+        ? false
+        : [
+            [{ header: [1, 2, 3, false] }],
+            ['bold', 'italic', 'underline', 'strike'],
+            ['blockquote', 'code-block'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            [{ color: [] }, { background: [] }],
+            [{ align: [] }],
+            allowImages ? ['link', 'image'] : ['link'],
+          ];
+
+      const formats: string[] = [
+        'header',
+        'bold',
+        'italic',
+        'underline',
+        'strike',
+        'blockquote',
+        'code-block',
+        'list',
+        'color',
+        'background',
+        'align',
+        'link',
+      ];
+      if (allowImages) {
+        formats.push('image');
+      }
+
       const quill = new Quill(editorRef.current!, {
         theme: 'snow',
         placeholder,
         readOnly,
         modules: {
-          toolbar: readOnly ? false : [
-            [{ 'header': [1, 2, 3, false] }],
-            ['bold', 'italic', 'underline', 'strike'],
-            ['blockquote', 'code-block'],
-            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-            [{ 'color': [] }, { 'background': [] }],
-            [{ 'align': [] }],
-            allowImages ? ['link', 'image'] : ['link'],
-          ]
-        }
+          toolbar: toolbarConfig,
+        },
+        formats,
       });
 
       quillRef.current = quill;
 
+      if (!readOnly) {
+        const headingMatcherFactory = (level: number): ClipboardMatcherCallback => (node, delta) => {
+          const element = node as HTMLElement;
+          const contentText = (element.textContent ?? '').replace(/\s+/g, ' ').trim();
+          if (!contentText) {
+            return delta;
+          }
+          const normalized = new DeltaConstructor();
+          normalized.insert(contentText);
+          normalized.insert('\n', { header: level });
+          return normalized;
+        };
+
+        ['h1', 'h2', 'h3'].forEach((tagName, index) => {
+          quill.clipboard.addMatcher(tagName, headingMatcherFactory(index + 1));
+        });
+      }
+
       // Add paste and drop handlers for image restriction
       if (!allowImages) {
-        const Delta = Quill.import('delta');
-        
         // Strip images from paste
-        quill.clipboard.addMatcher(Node.ELEMENT_NODE, (node: any, delta: any) => {
-          if (node.tagName === 'IMG') {
-            return new Delta(); // Return empty delta to strip image
+        quill.clipboard.addMatcher(Node.ELEMENT_NODE, (node, delta) => {
+          if ((node as HTMLElement).tagName === 'IMG') {
+            return new DeltaConstructor();
           }
-          // Also filter Delta operations
-          const filtered = new Delta();
-          delta.ops?.forEach((op: any) => {
-            if (!op.insert?.image) {
-              filtered.push(op);
+          const filteredOps = (delta.ops ?? []).filter(op => {
+            if (typeof op.insert === 'object' && op.insert) {
+              return !('image' in (op.insert as Record<string, unknown>));
             }
+            return true;
           });
-          return filtered;
+          return new DeltaConstructor(filteredOps as QuillOp[]);
         });
 
         // Prevent image drops
         const editorElement = quill.root;
-        const handleDrop = (e: DragEvent) => {
-          const items = Array.from(e.dataTransfer?.items || []);
+        const handleDrop = (event: DragEvent) => {
+          const items = Array.from(event.dataTransfer?.items || []);
           if (items.some(item => item.type.startsWith('image/'))) {
-            e.preventDefault();
-            e.stopPropagation();
+            event.preventDefault();
+            event.stopPropagation();
             console.log('Image drop prevented due to template restrictions');
           }
         };
-        
-        editorElement.addEventListener('drop', handleDrop);
-        editorElement.addEventListener('dragover', (e) => {
-          const items = Array.from(e.dataTransfer?.items || []);
+        const handleDragOver = (event: DragEvent) => {
+          const items = Array.from(event.dataTransfer?.items || []);
           if (items.some(item => item.type.startsWith('image/'))) {
-            e.preventDefault();
+            event.preventDefault();
           }
-        });
-        
-        // Store handler for cleanup
-        (quill as any)._dropHandler = handleDrop;
+        };
+        dropHandlerRef.current = handleDrop;
+        dragOverHandlerRef.current = handleDragOver;
+        editorElement.addEventListener('drop', handleDrop);
+        editorElement.addEventListener('dragover', handleDragOver);
       }
 
       // Set initial content if provided
-      if (value && value.trim() !== '') {
-        console.log('Setting initial HTML content:', value.substring(0, 100) + '...');
-        quill.clipboard.dangerouslyPasteHTML(value);
+      const initialValue = resolveHtmlValue(value);
+      if (initialValue && initialValue.trim() !== '') {
+        console.log('Setting initial HTML content:', initialValue.substring(0, 100) + '...');
+        quill.clipboard.dangerouslyPasteHTML(initialValue);
       }
 
       // Handle changes
@@ -123,16 +204,20 @@ export function QuillEditor({
       if (quillRef.current) {
         const quill = quillRef.current;
         quill.off('text-change');
-        
-        // Remove drop handler if exists
-        if ((quill as any)._dropHandler) {
-          quill.root.removeEventListener('drop', (quill as any)._dropHandler);
+
+        if (dropHandlerRef.current) {
+          quill.root.removeEventListener('drop', dropHandlerRef.current);
+          dropHandlerRef.current = null;
         }
-        
+        if (dragOverHandlerRef.current) {
+          quill.root.removeEventListener('dragover', dragOverHandlerRef.current);
+          dragOverHandlerRef.current = null;
+        }
+
         quillRef.current = null;
       }
     };
-  }, []);
+  }, [allowImages, onChange, placeholder, readOnly, resolveHtmlValue, value]);
 
   // Update content when value prop changes
   useEffect(() => {
@@ -142,15 +227,16 @@ export function QuillEditor({
     const currentHtml = quill.root.innerHTML;
 
     // Only update if content is different
-    if (currentHtml !== value) {
-      console.log('Updating editor content:', value ? value.substring(0, 100) + '...' : 'empty');
+    const normalizedValue = resolveHtmlValue(value);
+    if (currentHtml !== normalizedValue) {
+      console.log('Updating editor content:', normalizedValue ? normalizedValue.substring(0, 100) + '...' : 'empty');
       
       // Save selection
       const selection = quill.getSelection();
       
       // Update content
-      if (value && value.trim() !== '') {
-        quill.clipboard.dangerouslyPasteHTML(value);
+      if (normalizedValue && normalizedValue.trim() !== '') {
+        quill.clipboard.dangerouslyPasteHTML(normalizedValue);
       } else {
         quill.setText('');
       }
@@ -160,7 +246,7 @@ export function QuillEditor({
         quill.setSelection(selection);
       }
     }
-  }, [value, isLoaded]);
+  }, [value, isLoaded, resolveHtmlValue]);
 
   // Update read-only state
   useEffect(() => {

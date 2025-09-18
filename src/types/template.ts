@@ -22,6 +22,8 @@ export type FieldType =
   | 'product-selector'
   | 'recipeUrl';
 
+export type { NormalizedContent } from '@/lib/content/html-normalizer';
+
 export interface ShortTextOptions { minLength?: number; maxLength?: number; placeholder?: string; }
 export interface LongTextOptions { minWords?: number; maxWords?: number; placeholder?: string; rows?: number; maxRows?: number; maxLength?: number; }
 export interface RichTextOptions { placeholder?: string; allowImages?: boolean; toolbarOptions?: string[]; }
@@ -104,11 +106,10 @@ export interface OutputField extends BaseField {
   useToneOfVoice?: boolean;
   useGuardrails?: boolean;
   // Optional constraints to guide generation and validation
+  minChars?: number;
   maxChars?: number;
   maxTokens?: number;
   allowedTags?: string[]; // For richText/html fields, overrides default allowed tags
-  minWords?: number;
-  maxWords?: number;
 }
 
 export type GenericField = InputField | OutputField;

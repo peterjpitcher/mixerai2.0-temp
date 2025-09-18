@@ -12,6 +12,9 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { apiFetch } from '@/lib/api-client';
+import DOMPurify from 'isomorphic-dompurify';
+import { normalizeOutputsMap } from '@/lib/content/html-normalizer';
+import type { NormalizedContent } from '@/types/template';
 
 export interface WorkflowStep {
   id: string | number;
@@ -31,7 +34,7 @@ interface ContentVersion {
   reviewer?: { full_name?: string };
   created_at: string;
   content_json?: {
-    generatedOutputs?: Record<string, string>;
+    generatedOutputs?: Record<string, unknown>;
   } | null;
 }
 
@@ -39,7 +42,7 @@ interface ContentVersion {
 interface TemplateOutputField {
   id: string;
   name: string;
-  // type: string; // Not strictly needed by ContentApprovalWorkflow for now
+  type: string;
 }
 
 interface TemplateFields {
@@ -256,22 +259,54 @@ export function ContentApprovalWorkflow({
                   
                   {/* Display generatedOutputs */}
                   {v.content_json?.generatedOutputs && Object.keys(v.content_json.generatedOutputs).length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-border/50 space-y-2">
-                      <h5 className="text-xs font-semibold text-muted-foreground">Content at this step:</h5>
-                      {Object.entries(v.content_json.generatedOutputs).map(([fieldId, htmlContent]) => {
-                        if (fieldId === 'userId' || fieldId === 'success') return null; 
-                        const fieldDisplayName = getOutputFieldName(fieldId);
-                        return (
-                          <div key={fieldId} className="space-y-1">
-                            <p className="text-xs font-medium text-foreground">{fieldDisplayName}:</p>
-                            <div 
-                              className="prose prose-sm max-w-none p-2 border rounded-md bg-input/30 text-foreground/80"
-                              dangerouslySetInnerHTML={{ __html: htmlContent || '<p><em>No content</em></p>' }} 
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
+                    (() => {
+                      const normalized = normalizeOutputsMap(
+                        v.content_json.generatedOutputs as Record<string, unknown>,
+                        template?.fields?.outputFields
+                      );
+                      const ordered: Array<{ id: string; label: string; content: NormalizedContent }> = [];
+                      const seen = new Set<string>();
+
+                      if (template?.fields?.outputFields) {
+                        template.fields.outputFields.forEach(field => {
+                          const value = normalized[field.id];
+                          if (value) {
+                            ordered.push({ id: field.id, label: field.name, content: value });
+                            seen.add(field.id);
+                          }
+                        });
+                      }
+
+                      Object.entries(normalized).forEach(([id, value]) => {
+                        if (!seen.has(id) && id !== 'userId' && id !== 'success') {
+                          ordered.push({ id, label: getOutputFieldName(id), content: value });
+                        }
+                      });
+
+                      if (ordered.length === 0) {
+                        return null;
+                      }
+
+                      return (
+                        <div className="mt-2 pt-2 border-t border-border/50 space-y-2">
+                          <h5 className="text-xs font-semibold text-muted-foreground">Content at this step:</h5>
+                          {ordered.map(({ id, label, content }) => (
+                            <div key={id} className="space-y-1">
+                              <p className="text-xs font-medium text-foreground">{label}:</p>
+                              <div
+                                className="prose prose-sm max-w-none p-2 border rounded-md bg-input/30 text-foreground/80"
+                                dangerouslySetInnerHTML={{
+                                  __html: DOMPurify.sanitize(
+                                    content.html || '<p><em>No content</em></p>',
+                                    { USE_PROFILES: { html: true } }
+                                  ),
+                                }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()
                   )}
                 </div>
               );

@@ -4,6 +4,27 @@ import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { User } from '@supabase/supabase-js';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 
+const notificationRateLimit = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
+
+function checkNotificationRateLimit(key: string) {
+  const now = Date.now();
+  const bucket = notificationRateLimit.get(key);
+
+  if (!bucket || bucket.resetTime <= now) {
+    notificationRateLimit.set(key, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    return { allowed: true, remaining: RATE_LIMIT_MAX - 1, resetTime: now + RATE_LIMIT_WINDOW };
+  }
+
+  if (bucket.count >= RATE_LIMIT_MAX) {
+    return { allowed: false, remaining: 0, resetTime: bucket.resetTime };
+  }
+
+  bucket.count += 1;
+  return { allowed: true, remaining: RATE_LIMIT_MAX - bucket.count, resetTime: bucket.resetTime };
+}
+
 export interface Notification {
   id: string;
   user_id: string;
@@ -59,6 +80,24 @@ export const GET = withAuth(async (req: NextRequest, user: User) => {
 // POST - Create a new notification (usually called by system/other APIs)
 export const POST = withAuthAndCSRF(async (req: NextRequest, user: User) => {
   try {
+    const rateInfo = checkNotificationRateLimit(user.id);
+    if (!rateInfo.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Too many notifications created. Please try again later.',
+        },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': RATE_LIMIT_MAX.toString(),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': String(Math.floor(rateInfo.resetTime / 1000)),
+          },
+        }
+      );
+    }
+
     const body = await req.json();
     const supabase = createSupabaseAdminClient();
     
@@ -70,11 +109,53 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User) => {
       );
     }
 
+    if (!['success', 'error', 'warning', 'info'].includes(body.type)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid notification type. Must be one of success, error, warning, info.' },
+        { status: 400 }
+      );
+    }
+
+    if (typeof body.title === 'string' && body.title.length > 256) {
+      return NextResponse.json(
+        { success: false, error: 'Title is too long (max 256 characters).' },
+        { status: 400 }
+      );
+    }
+
+    if (typeof body.message === 'string' && body.message.length > 2000) {
+      return NextResponse.json(
+        { success: false, error: 'Message is too long (max 2000 characters).' },
+        { status: 400 }
+      );
+    }
+
+    const isPlatformAdmin = user.user_metadata?.role === 'admin';
+    const requestedUserId = typeof body.user_id === 'string' ? body.user_id : undefined;
+    const targetUserId = (() => {
+      if (!requestedUserId || requestedUserId === user.id) {
+        return user.id;
+      }
+
+      if (isPlatformAdmin) {
+        return requestedUserId;
+      }
+
+      console.warn(
+        '[notifications][POST] Non-admin user attempted to create notification for another user',
+        {
+          actorId: user.id,
+          requestedUserId
+        }
+      );
+      throw new Error('FORBIDDEN_TARGET_USER');
+    })();
+
     // Create notification
     const { data: notification, error } = await supabase
       .from('notifications')
       .insert({
-        user_id: body.user_id || user.id, // Allow creating notifications for other users if admin
+        user_id: targetUserId,
         type: body.type,
         title: body.title,
         message: body.message,
@@ -96,8 +177,20 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User) => {
     return NextResponse.json({
       success: true,
       data: notification
+    }, {
+      headers: {
+        'X-RateLimit-Limit': RATE_LIMIT_MAX.toString(),
+        'X-RateLimit-Remaining': String(rateInfo.remaining),
+        'X-RateLimit-Reset': String(Math.floor(rateInfo.resetTime / 1000)),
+      },
     });
   } catch (error) {
+    if (error instanceof Error && error.message === 'FORBIDDEN_TARGET_USER') {
+      return NextResponse.json(
+        { success: false, error: 'You do not have permission to notify other users.' },
+        { status: 403 }
+      );
+    }
     console.error('Error in notifications POST:', error);
     return NextResponse.json(
       { success: false, error: 'Internal server error' },

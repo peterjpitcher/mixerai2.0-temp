@@ -4,6 +4,15 @@ import { handleApiError } from '@/lib/api-utils'; // Import for consistent error
 import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
 import { User } from '@supabase/supabase-js';
 
+const testsEnabled = process.env.ENABLE_TEST_ENDPOINTS === 'true';
+
+function disabledResponse() {
+  return NextResponse.json(
+    { success: false, error: 'This test endpoint is disabled. Set ENABLE_TEST_ENDPOINTS=true to enable locally.' },
+    { status: 410 }
+  );
+}
+
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
 
@@ -85,6 +94,9 @@ const mockTemplates = [
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const GET = withAdminAuth(async (request: NextRequest, _user: User) => {
+  if (!testsEnabled) {
+    return disabledResponse();
+  }
   // Restrict to development environment only
   if (process.env.NODE_ENV === 'production') {
     return NextResponse.json(

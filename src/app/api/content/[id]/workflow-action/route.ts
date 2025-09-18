@@ -41,7 +41,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
     // 1. Fetch current content and its current_step (UUID)
     const { data: currentContent, error: contentError } = await supabase
       .from('content')
-      .select('id, status, workflow_id, current_step, content_data, assigned_to')
+      .select('id, status, workflow_id, current_step, content_data, assigned_to, brand_id, created_by')
       .eq('id', contentId)
       .single();
 
@@ -72,14 +72,53 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
       return NextResponse.json({ success: false, error: currentStepDetailsError?.message || 'Current workflow step details not found.' }, { status: 404 });
     }
 
-    // 2. Verify Ownership/Authorization (user must be in assigned_user_ids of the current step)
-    if (!currentDbStep.assigned_user_ids || !currentDbStep.assigned_user_ids.includes(user.id)) {
-      // Also check if the user is a brand admin as a fallback for actioning tasks.
-      // This might require fetching brand admin id similar to restart-workflow if not directly available.
-      // For now, strictly checking step assignment.
-      console.warn(`User ${user.id} not in assigned_user_ids ${currentDbStep.assigned_user_ids} for step ${currentDbStep.id}`);
+    const globalRole = user?.user_metadata?.role;
+    let isAuthorizedForStep = Array.isArray(currentDbStep.assigned_user_ids) && currentDbStep.assigned_user_ids.includes(user.id);
+
+    if (!isAuthorizedForStep && globalRole === 'admin') {
+      isAuthorizedForStep = true;
+    }
+
+    if (!isAuthorizedForStep && currentContent.created_by === user.id) {
+      isAuthorizedForStep = true;
+    }
+
+    if (!isAuthorizedForStep && currentContent.brand_id) {
+      const { data: brandPermission, error: brandPermissionError } = await supabase
+        .from('user_brand_permissions')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('brand_id', currentContent.brand_id)
+        .maybeSingle();
+
+      if (brandPermissionError) {
+        console.error('[Workflow Action] Error checking brand permissions:', brandPermissionError);
+        return handleApiError(brandPermissionError, 'Failed to verify user permissions for workflow action');
+      }
+
+      if (brandPermission && brandPermission.role === 'admin') {
+        isAuthorizedForStep = true;
+      }
+    }
+
+    if (!isAuthorizedForStep) {
+      console.warn(`User ${user.id} not authorized for workflow step ${currentDbStep.id}`);
       return NextResponse.json({ success: false, error: 'User is not assigned to the current step or not authorized.' }, { status: 403 });
     }
+
+    const { data: latestVersion, error: latestVersionError } = await supabase
+      .from('content_versions')
+      .select('version_number')
+      .eq('content_id', contentId)
+      .order('version_number', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestVersionError) {
+      console.error('Error fetching latest content version:', latestVersionError);
+    }
+
+    const nextVersionNumber = ((latestVersion?.version_number as number | null) ?? 0) + 1;
 
     // Get next step info if approving
     if (action === 'approve') {
@@ -173,7 +212,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
           content_id: contentId,
           workflow_step_identifier: currentDbStep.id,
           step_name: currentDbStep.name,
-          version_number: 1,
+          version_number: nextVersionNumber,
           content_json: currentContent.content_data,
           action_status: 'rejected',
           feedback: feedback || null,
@@ -329,7 +368,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
           content_id: contentId,
           workflow_step_identifier: currentDbStep.id,
           step_name: currentDbStep.name,
-          version_number: 1,
+          version_number: nextVersionNumber,
           content_json: currentContent.content_data,
           action_status: 'approved',
           feedback: feedback || null,
@@ -387,7 +426,8 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
           headers: { 
             'Content-Type': 'application/json',
             'Authorization': request.headers.get('authorization') || '',
-            'x-csrf-token': request.headers.get('x-csrf-token') || ''
+            'x-csrf-token': request.headers.get('x-csrf-token') || '',
+            'Cookie': request.headers.get('cookie') || ''
           },
           body: JSON.stringify({
             type: 'workflow_action',
@@ -430,7 +470,8 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
                 headers: { 
                   'Content-Type': 'application/json',
                   'Authorization': request.headers.get('authorization') || '',
-                  'x-csrf-token': request.headers.get('x-csrf-token') || ''
+                  'x-csrf-token': request.headers.get('x-csrf-token') || '',
+                  'Cookie': request.headers.get('cookie') || ''
                 },
                 body: JSON.stringify({
                   type: 'task_assignment',

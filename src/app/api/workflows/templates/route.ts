@@ -1,5 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { handleApiError } from '@/lib/api-utils'; // Import for consistent error handling
+import { withAuth } from '@/lib/auth/api-auth';
+
+export const dynamic = 'force-dynamic';
 
 /**
  * GET endpoint to retrieve workflow templates
@@ -7,8 +10,15 @@ import { handleApiError } from '@/lib/api-utils'; // Import for consistent error
  * different content templates.
  * This endpoint is currently unauthenticated.
  */
-export async function GET() {
+export const GET = withAuth(async (request: NextRequest, user) => {
   try {
+    const userRole = user.user_metadata?.role;
+    if (!(userRole === 'admin' || userRole === 'editor')) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: You do not have permission to access workflow templates.' },
+        { status: 403 }
+      );
+    }
     // Define standard workflow templates
     const templates = [
       {
@@ -86,12 +96,12 @@ export async function GET() {
       }
     ];
 
-    return NextResponse.json({ 
-      success: true, 
-      templates 
+    return NextResponse.json({
+      success: true,
+      templates
     });
   } catch (error) {
     // Removed console.error
     return handleApiError(error, 'Failed to fetch workflow templates');
   }
-} 
+});

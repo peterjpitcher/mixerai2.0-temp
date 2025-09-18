@@ -10,6 +10,8 @@ import { Loader2, Sparkles, ShieldAlert, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { apiFetch } from '@/lib/api-client';
+import { normalizeOutputsMap } from '@/lib/content/html-normalizer';
+import type { NormalizedContent } from '@/types/template';
 
 // Import our new components
 import { ContentHeader } from './content-header';
@@ -30,12 +32,10 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
   const {
     // State
     isLoading,
-    isGeneratingTitle,
     isSaving,
     displayableBrands,
     selectedBrand,
     generatedOutputs,
-    title,
     template,
     isLoadingTemplate,
     templateFieldValues,
@@ -51,7 +51,6 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     
     // Actions
     setSelectedBrand,
-    setTitle,
     setGeneratedOutputs,
     setTemplateFieldValues,
     setIsGeneratingSuggestionFor,
@@ -59,7 +58,6 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     setAiError,
     handleTemplateFieldChange,
     generateContent,
-    generateTitle,
     saveContent,
     setDueDate,
   } = useContentGenerator(templateId);
@@ -141,20 +139,22 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
         value: templateFieldValues[field.id] || ''
       }));
 
+      const inputPayload = productContext ? { product_context: productContext } : undefined;
+
+      const requestBody = {
+        brand_id: selectedBrand,
+        template: {
+          id: template.id,
+          name: template.name,
+          inputFields: input_fields_with_values,
+          outputFields: [field] // Only send the field we want to regenerate
+        },
+        ...(inputPayload ? { input: inputPayload } : {})
+      };
+
       const response = await apiFetch('/api/content/generate', {
         method: 'POST',
-        body: JSON.stringify({
-          brand_id: selectedBrand,
-          template: {
-            id: template.id,
-            name: template.name,
-            inputFields: input_fields_with_values,
-            outputFields: [field] // Only send the field we want to regenerate
-          },
-          input: {
-            product_context: productContext,
-          }
-        }),
+        body: JSON.stringify(requestBody),
       });
       
       const data = await response.json();
@@ -164,13 +164,16 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
       }
       
       if (data.success) {
-        // Extract the regenerated field
-        const { ...generatedFields } = data;
-        
-        if (generatedFields[fieldId]) {
-          setGeneratedOutputs(prev => ({ 
-            ...prev, 
-            [fieldId]: generatedFields[fieldId] 
+        const normalized = normalizeOutputsMap(
+          data.generatedOutputs as Record<string, unknown>,
+          [field]
+        );
+
+        const updatedField = normalized[fieldId];
+        if (updatedField) {
+          setGeneratedOutputs(prev => ({
+            ...prev,
+            [fieldId]: updatedField,
           }));
           toast.success(`${field.name} regenerated successfully!`);
         } else {
@@ -227,10 +230,14 @@ export function ContentGeneratorForm({ templateId }: ContentGeneratorFormProps) 
     if (!hasGeneratedContent || !template || hasAutoRegenerated) return;
     
     const checkAndRegenerateMissingFields = async () => {
+      const isEmptyContent = (content: NormalizedContent | undefined) => {
+        if (!content) return true;
+        return content.html.trim().length === 0 && content.plain.trim().length === 0;
+      };
+
       const missingFields = (template.outputFields || []).filter(field => {
         const value = generatedOutputs[field.id];
-        // Check ALL fields, not just aiAutoComplete ones
-        return !value || value.trim().length === 0;
+        return isEmptyContent(value);
       });
       
       if (missingFields.length > 0) {

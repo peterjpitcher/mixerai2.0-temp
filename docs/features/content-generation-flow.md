@@ -68,7 +68,7 @@ This hook manages all the state and logic for content generation:
 
 ```tsx
 export function useContentGenerator(templateId: string | null | undefined) {
-  const [generatedOutputs, setGeneratedOutputs] = useState<Record<string, string>>({});
+  const [generatedOutputs, setGeneratedOutputs] = useState<Record<string, NormalizedContent>>({});
   const [selectedBrand, setSelectedBrand] = useState<string>('');
   const [templateFieldValues, setTemplateFieldValues] = useState<Record<string, string>>({});
 
@@ -108,11 +108,13 @@ export function useContentGenerator(templateId: string | null | undefined) {
       const data = await response.json();
       
       if (data.success) {
-        // Extract generated outputs from response
-        const { success, userId, error, ...generatedFields } = data;
-        
-        if (Object.keys(generatedFields).length > 0) {
-          setGeneratedOutputs(generatedFields); // THIS IS WHERE CONTENT IS SET
+        const normalized = normalizeOutputsMap(
+          data.generatedOutputs as Record<string, unknown>,
+          template.outputFields || []
+        );
+
+        if (Object.keys(normalized).length > 0) {
+          setGeneratedOutputs(normalized); // THIS IS WHERE CONTENT IS SET
           toast.success('Content generated successfully!');
         }
       }

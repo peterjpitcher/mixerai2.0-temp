@@ -3,6 +3,41 @@ import { withAuthMonitoringAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import dns from 'dns';
 import ipaddr from 'ipaddr.js'; // Using ipaddr.js for robust IP checking
+import { env } from '@/lib/env';
+
+const MAX_RESPONSE_SIZE = 1024 * 1024; // 1MB
+const allowedContentPrefixes = ['text/', 'application/json', 'application/xml'];
+
+const rawAllowlist = (env.PROXY_ALLOWED_HOSTS || '')
+  .split(',')
+  .map((entry) => entry.trim().toLowerCase())
+  .filter(Boolean);
+
+const allowlistedHosts = new Set(rawAllowlist);
+
+function isHostAllowlisted(hostname: string): boolean {
+  if (!allowlistedHosts.size) {
+    return false;
+  }
+
+  const host = hostname.toLowerCase();
+
+  for (const entry of allowlistedHosts) {
+    if (entry.startsWith('*.')) {
+      const bare = entry.slice(2);
+      if (host === bare || host.endsWith(`.${bare}`)) {
+        return true;
+      }
+      continue;
+    }
+
+    if (host === entry) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -43,32 +78,47 @@ export const GET = withAuthMonitoringAndCSRF(async (request: NextRequest) => {
       );
     }
 
-    // Resolve hostname to IP address
-    let resolvedIp: string;
+    if (!isHostAllowlisted(parsedUrl.hostname)) {
+      console.warn('[proxy] Blocked request to non-allowlisted host', parsedUrl.hostname);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Requests to this host are not permitted. Please contact an administrator to allowlist the domain.'
+        },
+        { status: 403 }
+      );
+    }
+
+    // Resolve hostname to IP address and ensure no private ranges
     try {
-      const lookupResult = await dns.promises.lookup(parsedUrl.hostname);
-      resolvedIp = lookupResult.address;
+      const lookupResults = await dns.promises.lookup(parsedUrl.hostname, { all: true });
+      if (!lookupResults.length) {
+        return NextResponse.json(
+          { success: false, error: `Could not resolve hostname: ${parsedUrl.hostname}` },
+          { status: 502 }
+        );
+      }
+
+      for (const result of lookupResults) {
+        const addr = ipaddr.parse(result.address);
+        const ipRange = addr.range();
+
+        if (ipRange === 'private' || ipRange === 'loopback' || ipRange === 'reserved' || ipRange === 'linkLocal' || ipRange === 'uniqueLocal') {
+          console.warn(`Blocked proxy request to internal IP: ${result.address} (${parsedUrl.hostname})`);
+          return NextResponse.json(
+            { success: false, error: 'Requests to internal or reserved IP addresses are not allowed' },
+            { status: 403 }
+          );
+        }
+      }
     } catch (dnsError) {
       console.error(`DNS lookup failed for ${parsedUrl.hostname}:`, dnsError);
       return NextResponse.json(
         { success: false, error: `Could not resolve hostname: ${parsedUrl.hostname}` },
-        { status: 502 } // Bad Gateway seems appropriate here
+        { status: 502 }
       );
     }
-
-    // Check if the resolved IP is private, loopback, or reserved
-    const addr = ipaddr.parse(resolvedIp);
-    const ipRange = addr.range();
-
-    if (ipRange === 'private' || ipRange === 'loopback' || ipRange === 'reserved') {
-        console.warn(`Blocked proxy request to potentially internal IP: ${resolvedIp} (${parsedUrl.hostname})`);
-        return NextResponse.json(
-            { success: false, error: 'Requests to internal or reserved IP addresses are not allowed' },
-            { status: 403 } // Forbidden
-        );
-    }
     // --- SSRF Mitigation End ---
-    
     const response = await fetch(urlToProxy, {
       headers: {
         'User-Agent': 'MixerAI/1.0',
@@ -88,9 +138,55 @@ export const GET = withAuthMonitoringAndCSRF(async (request: NextRequest) => {
     }
     
     const contentType = response.headers.get('content-type') || 'text/plain';
-    const body = await response.text();
+    const isAllowedContent = allowedContentPrefixes.some(prefix => contentType.toLowerCase().startsWith(prefix));
+    if (!isAllowedContent) {
+      return NextResponse.json(
+        { success: false, error: `Content type ${contentType} is not allowed through this proxy.` },
+        { status: 415 }
+      );
+    }
+
+    const contentLengthHeader = response.headers.get('content-length');
+    if (contentLengthHeader) {
+      const numericLength = Number(contentLengthHeader);
+      if (!Number.isNaN(numericLength) && numericLength > MAX_RESPONSE_SIZE) {
+        return NextResponse.json(
+          { success: false, error: 'The requested resource is too large to proxy.' },
+          { status: 413 }
+        );
+      }
+    }
+
+    // Stream response with size cap
+    const reader = response.body?.getReader();
+    if (!reader) {
+      return NextResponse.json(
+        { success: false, error: 'Unable to read proxied response body.' },
+        { status: 502 }
+      );
+    }
+
+    const chunks: Uint8Array[] = [];
+    let totalSize = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      totalSize += value.byteLength;
+      if (totalSize > MAX_RESPONSE_SIZE) {
+        reader.cancel();
+        return NextResponse.json(
+          { success: false, error: 'The requested resource is too large to proxy.' },
+          { status: 413 }
+        );
+      }
+      chunks.push(value);
+    }
+
+    const concatenated = concatenateUint8Arrays(chunks, totalSize);
+    const text = new TextDecoder('utf-8').decode(concatenated);
     
-    return new NextResponse(body, {
+    return new NextResponse(text, {
       status: 200,
       headers: {
         'Content-Type': contentType,
@@ -106,3 +202,13 @@ export const GET = withAuthMonitoringAndCSRF(async (request: NextRequest) => {
     return handleApiError(error, 'Failed to proxy request');
   }
 }); 
+
+function concatenateUint8Arrays(chunks: Uint8Array[], totalLength: number): Uint8Array {
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return result;
+}

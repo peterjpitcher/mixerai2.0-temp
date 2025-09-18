@@ -6,6 +6,7 @@ import { User } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { BrandPermissionVerificationError, requireBrandAccess } from '@/lib/auth/brand-access';
 
 export const dynamic = "force-dynamic";
 
@@ -39,50 +40,33 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
     const { claims, brandName, productName, marketName, mixeraiBrandId } = validationResult.data;
 
     // --- Permission Check Start ---
+    const supabase = createSupabaseAdminClient();
+
     if (mixeraiBrandId) { // Only check if mixeraiBrandId is provided
-      const globalRole = user?.user_metadata?.role;
-      let hasPermission = globalRole === 'admin';
-
-      if (!hasPermission) {
-        const supabase = createSupabaseAdminClient(); // Create client if not admin and needs check
-        const { data: permissionsData, error: permissionsError } = await supabase
-          .from('user_brand_permissions')
-          .select('brand_id, role')
-          .eq('user_id', user.id)
-          .eq('brand_id', mixeraiBrandId);
-
-        if (permissionsError) {
-          console.error(`[API /ai/claims/simplify] Error fetching brand permissions for user ${user.id}, mixeraiBrandId ${mixeraiBrandId}:`, permissionsError);
-          // Potentially critical, but for now, let hasPermission remain false if error occurs
-        } else if (permissionsData && permissionsData.length > 0) {
-          hasPermission = true; // User has some role on the brand
+      try {
+        await requireBrandAccess(supabase, user, mixeraiBrandId);
+      } catch (error) {
+        if (error instanceof BrandPermissionVerificationError) {
+          return NextResponse.json(
+            { success: false, error: 'Unable to verify brand permissions. Please try again later.' },
+            { status: 500 }
+          );
         }
+        if (error instanceof Error && error.message === 'NO_BRAND_ACCESS') {
+          console.warn(`[API /ai/claims/simplify] User ${user.id} denied access for brand ${mixeraiBrandId}.`);
+          return NextResponse.json(
+            { success: false, error: 'You do not have permission to simplify claims for the specified brand.' },
+            { status: 403 }
+          );
+        }
+        throw error;
       }
-
-      if (!hasPermission) {
-        console.warn(`[API /ai/claims/simplify] User ${user.id} (global role: ${globalRole}) access denied to simplify claims for brand ${mixeraiBrandId}.`);
-        return NextResponse.json(
-          { success: false, error: 'You do not have permission to simplify claims for the specified brand.' },
-          { status: 403 }
-        );
-      }
-    } else {
-      // If mixeraiBrandId is not provided, how should we handle permissions?
-      // For now, if it's not provided, we can't tie it to a specific brand permission check.
-      // This might mean only global admins can use it without a brandId, or it's a less secure operation.
-      // Let's default to requiring it for non-admins, or allowing if no brand context is given (less secure).
-      // For safety, if no brandId, only admin. But this might break if client doesn't send it.
-      // A better approach might be to make mixeraiBrandId *required* if claims are present and user is not admin.
-      // For now, will proceed with: if mixeraiBrandId is present, check it. If not, current logic allows if user is admin.
-      // If user is NOT admin AND mixeraiBrandId is NOT provided, they will be blocked if the above `if (mixeraiBrandId)` isn't met AND they are not global admin.
-      // So, let's ensure non-admins are blocked if mixeraiBrandId is missing.
-      if (user?.user_metadata?.role !== 'admin') {
-        console.warn(`[API /ai/claims/simplify] Non-admin user ${user.id} attempted to simplify claims without providing a brand context (mixeraiBrandId).`);
-        return NextResponse.json(
-          { success: false, error: 'Brand context is required to simplify claims for non-admin users.' },
-          { status: 400 } // Bad request, as brand context is needed from client for non-admins
-        );
-      }
+    } else if (user?.user_metadata?.role !== 'admin') {
+      console.warn(`[API /ai/claims/simplify] Non-admin user ${user.id} attempted to simplify claims without providing a brand context (mixeraiBrandId).`);
+      return NextResponse.json(
+        { success: false, error: 'Brand context is required to simplify claims for non-admin users.' },
+        { status: 400 }
+      );
     }
     // --- Permission Check End ---
 

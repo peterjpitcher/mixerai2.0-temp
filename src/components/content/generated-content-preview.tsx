@@ -4,13 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { QuillEditor } from './quill-editor';
 import { RefreshCw, AlertCircle } from 'lucide-react';
-import type { OutputField, RichTextOptions } from '@/types/template';
+import type { OutputField, RichTextOptions, NormalizedContent } from '@/types/template';
+import { ensureNormalizedContent } from '@/lib/content/html-normalizer';
 import 'quill/dist/quill.snow.css';
 
 interface GeneratedContentPreviewProps {
-  generatedOutputs: Record<string, string>;
+  generatedOutputs: Record<string, NormalizedContent>;
   outputFields: OutputField[];
-  onOutputChange: (fieldId: string, value: string) => void;
+  onOutputChange: (fieldId: string, value: NormalizedContent) => void;
   onRetry: (fieldId: string) => void;
   retryingFieldId: string | null;
   aiError: string | null;
@@ -41,9 +42,11 @@ export function GeneratedContentPreview({
       )}
       
       {outputFields.map((field) => {
-        const value = generatedOutputs[field.id] || '';
+        const value = generatedOutputs[field.id];
         const isRetrying = retryingFieldId === field.id;
-        const hasContent = value && value.trim().length > 0;
+        const hasContent = value && (value.html.trim().length > 0 || value.plain.trim().length > 0);
+        const normalizedType = field.type.toLowerCase();
+        const isRich = normalizedType === 'richtext' || normalizedType === 'rich-text' || normalizedType === 'html';
         
         return (
           <div key={field.id} className="space-y-2">
@@ -67,18 +70,18 @@ export function GeneratedContentPreview({
               </Button>
             </div>
             
-            {field.type === 'richText' ? (
+            {isRich ? (
               <QuillEditor
-                key={`${field.id}-${value?.length || 0}`} // Force remount on content changes
-                value={value}
-                onChange={(content) => onOutputChange(field.id, content)}
+                key={`${field.id}-${value?.html?.length ?? value?.plain?.length ?? 0}`} // Force remount on content changes
+                value={value?.html ?? ''}
+                onChange={(content) => onOutputChange(field.id, ensureNormalizedContent(content, field.type))}
                 placeholder="Generated content will appear here"
                 allowImages={(field.options as RichTextOptions)?.allowImages === true} // Only allow images if explicitly enabled
               />
             ) : (
               <div className={`p-4 border rounded-md ${hasContent ? 'bg-muted/50' : 'bg-amber-50/50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800'}`}>
                 <p className="text-sm whitespace-pre-wrap">
-                  {value || (
+                  {value?.plain || (
                     <span className="text-muted-foreground italic">
                       No content generated - click Regenerate to generate this field
                     </span>

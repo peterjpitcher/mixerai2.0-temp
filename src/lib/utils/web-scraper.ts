@@ -1,7 +1,50 @@
 /**
  * Utility for fetching and extracting content from web pages
  */
+import dns from 'node:dns';
+import ipaddr from 'ipaddr.js';
 import * as cheerio from 'cheerio';
+
+function isPrivateAddress(address: string): boolean {
+  try {
+    const parsed = ipaddr.parse(address);
+    const range = parsed.range();
+    return range === 'private' || range === 'loopback' || range === 'linkLocal' || range === 'uniqueLocal' || range === 'reserved';
+  } catch {
+    return true;
+  }
+}
+
+async function assertSafeRemoteUrl(rawUrl: string): Promise<URL> {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error('Invalid URL format');
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error(`Invalid protocol: ${parsed.protocol}. Only HTTP(S) URLs are allowed.`);
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]') {
+    throw new Error('Localhost URLs are not allowed');
+  }
+
+  const lookupResults = await dns.promises.lookup(hostname, { all: true });
+  if (!lookupResults.length) {
+    throw new Error('Unable to resolve host');
+  }
+
+  for (const result of lookupResults) {
+    if (isPrivateAddress(result.address)) {
+      throw new Error('Requests to internal or reserved IP addresses are not allowed.');
+    }
+  }
+
+  return parsed;
+}
 
 /**
  * Fetches content from a web page URL
@@ -10,14 +53,15 @@ import * as cheerio from 'cheerio';
  */
 export async function fetchWebPageContent(url: string, timeout = 5000): Promise<string> {
   try {
-    console.log(`Fetching content from URL: ${url}`);
+    const parsedUrl = await assertSafeRemoteUrl(url);
+    console.log(`Fetching content from URL: ${parsedUrl.href}`);
     
     // Create an AbortController for timeout handling
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
     
     // Perform a server-side fetch of the URL
-    const response = await fetch(url, {
+    const response = await fetch(parsedUrl.href, {
       headers: {
         'User-Agent': 'MixerAI/1.0 Content Analysis Bot'
       },

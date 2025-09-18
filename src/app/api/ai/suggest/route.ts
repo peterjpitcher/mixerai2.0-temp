@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { User } from '@supabase/supabase-js';
 import { handleApiError } from '@/lib/api-utils';
 import { z } from 'zod';
 import { generateTextCompletion } from '@/lib/azure/openai';
@@ -6,6 +7,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { Brand } from '@/types/models';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { truncateGraphemeSafe, normaliseForLength, stripAIWrappers } from '@/lib/text/enforce-limit';
+import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth/brand-access';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -35,14 +37,16 @@ const SuggestionRequestSchema = z.object({
 /**
  * POST: Generate suggestions for a field using AI
  */
-export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Response> => {
+export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Promise<Response> => {
   try {
     const rawBody = await request.json();
-    
+
     // Validate request with Zod
     const parsed = SuggestionRequestSchema.safeParse(rawBody);
     if (!parsed.success) {
-      console.log('[API /ai/suggest] Validation error:', parsed.error.flatten());
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[api/ai/suggest] Validation error', parsed.error.flatten());
+      }
       return NextResponse.json(
         { success: false, error: 'Invalid request payload', details: parsed.error.flatten() },
         { status: 400 }
@@ -52,9 +56,6 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
     const body = parsed.data;
 
     let userPrompt = body.prompt;
-    console.log('[API /ai/suggest] Received original prompt:', userPrompt);
-    console.log('[API /ai/suggest] Received brand_id:', body.brand_id);
-    console.log('[API /ai/suggest] Received formValues:', body.formValues);
 
     // First, interpolate any field variables from formValues
     if (body.formValues && typeof body.formValues === 'object') {
@@ -65,12 +66,30 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
           userPrompt = userPrompt.replace(fieldNamePattern, String(value));
         }
       });
-      console.log('[API /ai/suggest] Interpolated prompt with form values:', userPrompt);
     }
 
     if (body.brand_id) {
+      const supabase = createSupabaseAdminClient();
+
       try {
-        const supabase = createSupabaseAdminClient();
+        const hasAccess = await userHasBrandAccess(supabase, user, body.brand_id);
+        if (!hasAccess) {
+          return NextResponse.json(
+            { success: false, error: 'You do not have access to this brand.' },
+            { status: 403 }
+          );
+        }
+      } catch (error) {
+        if (error instanceof BrandPermissionVerificationError) {
+          return NextResponse.json(
+            { success: false, error: 'Unable to verify brand permissions. Please try again later.' },
+            { status: 500 }
+          );
+        }
+        throw error;
+      }
+
+      try {
         const { data: brand, error: brandError } = await supabase
           .from('brands')
           .select('*')
@@ -78,11 +97,10 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
           .single<Brand>();
 
         if (brandError) {
-          console.error(`[API /ai/suggest] Error fetching brand ${body.brand_id}:`, brandError.message);
+          console.error(`[api/ai/suggest] Error fetching brand ${body.brand_id}:`, brandError.message);
           // Decide if to proceed with original prompt or error out
           // For now, proceeding with original prompt and logging the error.
         } else if (brand) {
-          console.log('[API /ai/suggest] Successfully fetched brand data:', brand.name);
           // Perform interpolation
           userPrompt = userPrompt.replace(/\{\{brand\.name\}\}/g, brand.name || '');
           userPrompt = userPrompt.replace(/\{\{brand\.identity\}\}/g, brand.brand_identity || '');
@@ -93,12 +111,13 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
           if (userPrompt.includes('{{brand}}')) {
              userPrompt = userPrompt.replace(/\{\{brand\}\}/g, JSON.stringify(brand, null, 2));
           }
-          console.log('[API /ai/suggest] Interpolated prompt with brand data:', userPrompt);
         } else {
-          console.warn(`[API /ai/suggest] Brand with ID ${body.brand_id} not found. Proceeding with original prompt.`);
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn(`[api/ai/suggest] Brand with ID ${body.brand_id} not found. Proceeding without brand context.`);
+          }
         }
       } catch (e) {
-        console.error('[API /ai/suggest] Exception during brand fetching/interpolation:', e);
+        console.error('[api/ai/suggest] Exception during brand fetching/interpolation:', e);
         // Proceed with original prompt in case of an unexpected error during brand processing
       }
     }
@@ -106,7 +125,9 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
     // Clean up any remaining unreplaced variables by removing them or replacing with empty string
     // This prevents curly braces from appearing in the AI output
     userPrompt = userPrompt.replace(/\{\{[^}]+\}\}/g, (match) => {
-      console.warn(`[API /ai/suggest] Unreplaced variable found: ${match}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`[api/ai/suggest] Unreplaced variable found: ${match}`);
+      }
       return ''; // Replace with empty string instead of leaving the curly braces
     });
 
@@ -129,9 +150,6 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
     
     systemPrompt += " If the user asks for a title, it should be between 6 and 10 words long. If the user asks for a list, provide a comma-separated list.";
     
-    // Log the final prompt being sent to AI, ensuring it does not get truncated in the logs
-    console.log('[API /ai/suggest] Final user prompt being sent to generateTextCompletion (full):', userPrompt);
-
     // Using generateTextCompletion for suggestions
     const suggestion = await generateTextCompletion(systemPrompt, userPrompt, 250, 0.7); // Increased maxTokens for potentially longer interpolated prompts
 
@@ -151,7 +169,12 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
     if (body.options?.maxLength && typeof body.options.maxLength === 'number') {
       const result = truncateGraphemeSafe(finalSuggestion, body.options.maxLength);
       if (result.truncated) {
-        console.log(`[API /ai/suggest] Truncated from ${result.originalLength} to ${result.finalLength} characters`);
+        if (process.env.NODE_ENV !== 'production') {
+          console.debug('[api/ai/suggest] Applied maxLength truncation', {
+            original: result.originalLength,
+            final: result.finalLength,
+          });
+        }
         truncated = true;
         truncationDetails.maxLength = body.options.maxLength;
         truncationDetails.originalLength = result.originalLength;
@@ -164,7 +187,12 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
       const { clampRows } = await import('@/lib/text/rows');
       const result = clampRows(finalSuggestion, body.options.maxRows);
       if (result.truncated) {
-        console.log(`[API /ai/suggest] Truncated from ${result.originalRows} to ${result.rows} rows`);
+        if (process.env.NODE_ENV !== 'production') {
+          console.debug('[api/ai/suggest] Applied maxRows truncation', {
+            original: result.originalRows,
+            final: result.rows,
+          });
+        }
         truncated = true;
         truncationDetails.maxRows = body.options.maxRows;
         truncationDetails.originalRows = result.originalRows;
@@ -189,7 +217,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
     return response;
 
   } catch (error: unknown) {
-    console.error('[API /ai/suggest] Error:', error);
+    console.error('[api/ai/suggest] Error:', error);
     let errorMessage = 'Failed to generate suggestion';
     let statusCode = 500;
 

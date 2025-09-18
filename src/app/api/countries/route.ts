@@ -38,14 +38,22 @@ async function getCountriesHandler() {
           { code: 'MX', name: 'Mexico' },
           { code: 'KR', name: 'South Korea' },
         ];
-        return NextResponse.json({ success: true, countries: defaultCountries });
+        return NextResponse.json({ success: true, countries: defaultCountries }, {
+          headers: {
+            'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+          },
+        });
       }
       
       console.error('Error fetching countries:', error);
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, countries: data || [] });
+    return NextResponse.json({ success: true, countries: data || [] }, {
+      headers: {
+        'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+      },
+    });
 
   } catch (error) {
     return handleApiError(error, 'Error fetching countries');

@@ -1,36 +1,89 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/auth/server';
-import { withCSRF } from '@/lib/api/with-csrf';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { z } from 'zod';
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
 
-export const POST = withCSRF(async (request: NextRequest): Promise<Response> => {
+const errorSchema = z.object({
+  message: z.string().min(1).max(2000),
+  stack: z.string().max(8000).optional(),
+  componentStack: z.string().max(8000).optional(),
+  info: z.record(z.any()).optional(),
+  fingerprint: z.string().max(512).optional(),
+  severity: z.enum(['info', 'warning', 'error']).optional(),
+});
+
+const RATE_LIMIT = 5;
+const WINDOW_MS = 60_000;
+const buckets = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(userId: string, ip: string): boolean {
+  const key = `${userId || 'anonymous'}:${ip || 'unknown'}`;
+  const now = Date.now();
+  let bucket = buckets.get(key);
+
+  if (!bucket || bucket.resetAt <= now) {
+    bucket = { count: 0, resetAt: now + WINDOW_MS };
+    buckets.set(key, bucket);
+  }
+
+  if (bucket.count >= RATE_LIMIT) {
+    return false;
+  }
+
+  bucket.count += 1;
+  return true;
+}
+
+export const POST = withAuthAndCSRF(async (request: NextRequest, user): Promise<Response> => {
   try {
-    const body = await request.json();
-    const supabase = createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    // Enhanced error info with session context
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.ip || 'unknown';
+
+    if (!checkRateLimit(user?.id ?? 'anonymous', ip)) {
+      return NextResponse.json(
+        { success: false, error: 'Too many error reports. Please retry shortly.' },
+        { status: 429 }
+      );
+    }
+
+    const rawBody = await request.json();
+    const parsed = errorSchema.safeParse(rawBody);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid payload.', details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+
     const errorLog = {
-      ...body,
+      ...parsed.data,
       sessionUserId: user?.id,
       sessionEmail: user?.email,
+      reporterIp: ip,
       reportedAt: new Date().toISOString(),
+      userAgent: request.headers.get('user-agent') ?? null,
     };
-    
-    // In production, send to error tracking service (Sentry, LogRocket, etc.)
+
+    try {
+      const supabase = createSupabaseAdminClient();
+      await (supabase as any).from('error_reports').insert({
+        user_id: user?.id ?? null,
+        severity: parsed.data.severity ?? 'error',
+        fingerprint: parsed.data.fingerprint ?? null,
+        payload: errorLog,
+        reporter_ip: ip,
+        user_agent: request.headers.get('user-agent') ?? null,
+      });
+    } catch (dbError) {
+      console.error('[ErrorReports] Failed to persist error log:', dbError);
+    }
+
     if (process.env.NODE_ENV === 'production') {
-      // Example: await sendToSentry(errorLog);
-      // Example: await sendToLogRocket(errorLog);
       console.error('[Production Error]', errorLog);
     } else {
       console.error('[Development Error]', errorLog);
     }
-    
-    // Optionally store critical errors in database
-    if (errorLog.digest) {
-      // Could store in a database table for internal tracking
-      // await supabase.from('error_logs').insert(errorLog);
-    }
-    
+
     return NextResponse.json({ 
       success: true, 
       message: 'Error tracked successfully' 

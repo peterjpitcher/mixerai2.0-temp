@@ -1,5 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { withAdminAuth } from '@/lib/auth/api-auth';
+
+const diagnosticsEnabled = process.env.ENABLE_HEALTH_DIAGNOSTICS === 'true';
+
+function disabledResponse() {
+  return NextResponse.json(
+    { success: false, error: 'Detailed health diagnostics are disabled. Set ENABLE_HEALTH_DIAGNOSTICS=true to enable locally.' },
+    { status: 410 }
+  );
+}
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +40,10 @@ const startTime = Date.now();
  * Returns 200 if all critical services are operational
  * Returns 503 if any critical service is down
  */
-export async function GET(): Promise<Response> {
+export const GET = withAdminAuth(async (): Promise<Response> => {
+  if (!diagnosticsEnabled) {
+    return disabledResponse();
+  }
   const healthStatus: HealthStatus = {
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -155,7 +168,7 @@ export async function GET(): Promise<Response> {
       'Expires': '0',
     },
   });
-}
+});
 
 /**
  * Simple liveness check - returns 200 if the application is running

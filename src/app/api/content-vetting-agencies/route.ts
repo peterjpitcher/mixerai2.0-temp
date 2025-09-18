@@ -70,7 +70,11 @@ export const GET = withAuth(async () => {
     });
 
 
-    return NextResponse.json({ success: true, data: processedAgencies });
+    return NextResponse.json({ success: true, data: processedAgencies }, {
+      headers: {
+        'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+      },
+    });
 
   } catch (error: unknown) {
     return handleApiError(error, 'Error fetching content vetting agencies');

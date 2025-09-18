@@ -17,6 +17,29 @@ interface TemplateFieldsColumn {
   outputFields?: OutputField[];
 }
 
+async function getAccessibleBrandIds(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  userId: string
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('user_brand_permissions')
+    .select('brand_id')
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('[content-templates][id] Failed to load brand permissions:', error);
+    throw new Error('Unable to verify brand permissions at this time.');
+  }
+
+  return (data || [])
+    .map(record => record.brand_id)
+    .filter((brandId): brandId is string => Boolean(brandId));
+}
+
+function isPlatformAdmin(user: User, accessibleBrandIds: string[]): boolean {
+  return user.user_metadata?.role === 'admin' && accessibleBrandIds.length === 0;
+}
+
 /**
  * GET: Retrieve a specific content template by ID
  */
@@ -26,32 +49,10 @@ export const GET = withAuth(async (
   context?: unknown
 ) => {
   const { params } = context as { params: { id: string } };
-  
-  // DEBUG: Log the entire request context
-  console.log('[DEBUG] Content Template GET Request:', {
-    url: request.url,
-    headers: Object.fromEntries(request.headers.entries()),
-    params,
-    user: {
-      id: user?.id,
-      email: user?.email,
-      role: user?.user_metadata?.role,
-      metadata: user?.user_metadata
-    },
-    timestamp: new Date().toISOString()
-  });
-  
   try {
     // Role check: Allow Admins (Platform/Scoped) and Editors to fetch a specific content template
     const userRole = user.user_metadata?.role;
     if (!(userRole === 'admin' || userRole === 'editor')) {
-      console.log('[DEBUG] Permission denied for user:', {
-        userId: user?.id,
-        email: user?.email,
-        actualRole: userRole,
-        allowedRoles: ['admin', 'editor']
-      });
-      
       return createApiErrorResponse(
         'You do not have permission to access this resource.',
         403 // Will be converted to 401 to avoid Vercel interception
@@ -89,6 +90,19 @@ export const GET = withAuth(async (
         { success: false, error: 'Content template not found' },
         { status: 404 }
       );
+    }
+
+    if (templateFromDb.brand_id) {
+      const accessibleBrandIds = await getAccessibleBrandIds(supabase, user.id);
+      const isGlobalAdmin = isPlatformAdmin(user, accessibleBrandIds);
+      const hasBrandAccess = accessibleBrandIds.includes(templateFromDb.brand_id);
+
+      if (!isGlobalAdmin && !hasBrandAccess) {
+        return createApiErrorResponse(
+          'You do not have permission to access this template.',
+          403
+        );
+      }
     }
     
     // Transform the template structure for the response
@@ -173,6 +187,33 @@ export const PUT = withAuthAndCSRF(async (
     }
     
     const supabase = createSupabaseAdminClient();
+
+    const { data: existingTemplate, error: fetchError } = await supabase
+      .from('content_templates')
+      .select('id, brand_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (fetchError) {
+      throw fetchError;
+    }
+
+    if (!existingTemplate) {
+      return NextResponse.json(
+        { success: false, error: 'Content template not found.' },
+        { status: 404 }
+      );
+    }
+
+    const accessibleBrandIds = await getAccessibleBrandIds(supabase, user.id);
+    const isGlobalAdmin = isPlatformAdmin(user, accessibleBrandIds);
+
+    if (existingTemplate.brand_id && !isGlobalAdmin && !accessibleBrandIds.includes(existingTemplate.brand_id)) {
+      return NextResponse.json(
+        { success: false, error: 'You do not have permission to modify this template.' },
+        { status: 403 }
+      );
+    }
     
     let generatedDescription = data.description || '';
     const shouldRegenerateDescription = data.name !== undefined || data.inputFields !== undefined || data.outputFields !== undefined;
@@ -221,6 +262,12 @@ export const PUT = withAuthAndCSRF(async (
     };
 
     if (data.brand_id !== undefined) {
+      if (data.brand_id && !isGlobalAdmin && !accessibleBrandIds.includes(data.brand_id)) {
+        return NextResponse.json(
+          { success: false, error: 'You do not have permission to assign this template to the selected brand.' },
+          { status: 403 }
+        );
+      }
       updatePayload.brand_id = data.brand_id;
     }
 
@@ -308,6 +355,33 @@ export const DELETE = withAuthAndCSRF(async (
     }
     
     const supabase = createSupabaseAdminClient();
+
+    const { data: templateRecord, error: templateError } = await supabase
+      .from('content_templates')
+      .select('id, brand_id')
+      .eq('id', templateIdToDelete)
+      .maybeSingle();
+
+    if (templateError) {
+      throw templateError;
+    }
+
+    if (!templateRecord) {
+      return NextResponse.json(
+        { success: false, error: 'Content template not found.' },
+        { status: 404 }
+      );
+    }
+
+    const accessibleBrandIds = await getAccessibleBrandIds(supabase, user.id);
+    const isGlobalAdmin = isPlatformAdmin(user, accessibleBrandIds);
+
+    if (templateRecord.brand_id && !isGlobalAdmin && !accessibleBrandIds.includes(templateRecord.brand_id)) {
+      return createApiErrorResponse(
+        'You do not have permission to delete this template.',
+        403
+      );
+    }
 
     // Call the database function to perform atomic delete and content update
     const { error: rpcError } = await supabase.rpc('delete_template_and_update_content', {

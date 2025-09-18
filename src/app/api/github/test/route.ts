@@ -1,6 +1,28 @@
 import { NextResponse } from 'next/server';
+import { withAuth } from '@/lib/auth/api-auth';
 
-export async function GET() {
+export const dynamic = 'force-dynamic';
+
+const githubDiagnosticsEnabled = process.env.ENABLE_GITHUB_TEST_ENDPOINTS === 'true';
+
+function disabledResponse() {
+  return NextResponse.json(
+    { success: false, error: 'GitHub diagnostics are disabled. Set ENABLE_GITHUB_TEST_ENDPOINTS=true to enable locally.' },
+    { status: 410 }
+  );
+}
+
+export const GET = withAuth(async (_req, user) => {
+  if (!githubDiagnosticsEnabled) {
+    return disabledResponse();
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
+  }
+  if (user.user_metadata?.role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
+  }
+
   const owner = process.env.GITHUB_OWNER;
   const repo = process.env.GITHUB_REPO;
   const token = process.env.GITHUB_TOKEN;
@@ -79,4 +101,4 @@ export async function GET() {
     status: 'not_configured',
     message: 'Please set GITHUB_OWNER, GITHUB_REPO, and GITHUB_TOKEN environment variables'
   });
-}
+});

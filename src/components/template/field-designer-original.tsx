@@ -445,6 +445,11 @@ const initializeFieldData = (fieldType: 'input' | 'output', initialData: Field |
     return inputData;
   } else if (fieldType === 'output' && isOutputField(initialData)) {
     // Ensure boolean fields have explicit values
+    const legacyOutputData = initialData as OutputField & {
+      minWords?: number;
+      maxWords?: number;
+    };
+
     const outputData: OutputField = ensureBooleanDefaults({
       id: initialData.id,
       name: initialData.name,
@@ -457,7 +462,19 @@ const initializeFieldData = (fieldType: 'input' | 'output', initialData: Field |
       useToneOfVoice: initialData.useToneOfVoice ?? false,
       useGuardrails: initialData.useGuardrails ?? false,
       description: initialData.description,
-      helpText: initialData.helpText
+      helpText: initialData.helpText,
+      minChars:
+        typeof initialData.minChars === 'number'
+          ? initialData.minChars
+          : typeof legacyOutputData.minWords === 'number'
+            ? legacyOutputData.minWords
+            : undefined,
+      maxChars:
+        typeof initialData.maxChars === 'number'
+          ? initialData.maxChars
+          : typeof legacyOutputData.maxWords === 'number'
+            ? legacyOutputData.maxWords
+            : undefined
     }, ['aiAutoComplete', 'useBrandIdentity', 'useToneOfVoice', 'useGuardrails']);
     return outputData;
   }
@@ -570,7 +587,7 @@ export function FieldDesigner({
     });
   };
 
-  const handleWordCountChange = (key: 'minWords' | 'maxWords', value: number | undefined) => {
+  const handleCharLimitChange = (key: 'minChars' | 'maxChars', value: number | undefined) => {
     setFieldData(prev => ({ ...prev, [key]: value }) as Field);
   };
   
@@ -713,19 +730,19 @@ export function FieldDesigner({
       return false;
     }
     if (fieldType === 'output') {
-      const { minWords, maxWords } = fieldData as OutputField;
-      if (typeof minWords === 'number' && minWords <= 0) {
-        sonnerToast.error('Minimum word count must be greater than zero.');
+      const { minChars, maxChars } = fieldData as OutputField;
+      if (typeof minChars === 'number' && minChars <= 0) {
+        sonnerToast.error('Minimum character count must be greater than zero.');
         setActiveTab('ai');
         return false;
       }
-      if (typeof maxWords === 'number' && maxWords <= 0) {
-        sonnerToast.error('Maximum word count must be greater than zero.');
+      if (typeof maxChars === 'number' && maxChars <= 0) {
+        sonnerToast.error('Maximum character count must be greater than zero.');
         setActiveTab('ai');
         return false;
       }
-      if (typeof minWords === 'number' && typeof maxWords === 'number' && minWords >= maxWords) {
-        sonnerToast.error('Minimum word count must be less than maximum word count.');
+      if (typeof minChars === 'number' && typeof maxChars === 'number' && minChars >= maxChars) {
+        sonnerToast.error('Minimum character count must be less than maximum character count.');
         setActiveTab('ai');
         return false;
       }
@@ -885,31 +902,31 @@ export function FieldDesigner({
             </div>
           </div>
           <div className="pt-4">
-            <Label className="font-medium">Word Count Targeting</Label>
+            <Label className="font-medium">Character Count Targeting</Label>
             <p className="text-xs text-muted-foreground pb-2">
-              Set explicit word-count bounds to enforce during AI generation. Leave blank to rely on prompt instructions only.
+              Set explicit character-length bounds to enforce during AI generation. Leave blank to rely on prompt instructions only.
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="output-min-words">Min words</Label>
+                <Label htmlFor="output-min-chars">Min characters</Label>
                 <Input
-                  id="output-min-words"
+                  id="output-min-chars"
                   type="number"
                   inputMode="numeric"
-                  value={outputFieldData.minWords ?? ''}
-                  onChange={(e) => handleWordCountChange('minWords', e.target.value ? parseInt(e.target.value, 10) || undefined : undefined)}
-                  placeholder="e.g. 1200"
+                  value={outputFieldData.minChars ?? ''}
+                  onChange={(e) => handleCharLimitChange('minChars', e.target.value ? parseInt(e.target.value, 10) || undefined : undefined)}
+                  placeholder="e.g. 800"
                 />
               </div>
               <div>
-                <Label htmlFor="output-max-words">Max words</Label>
+                <Label htmlFor="output-max-chars">Max characters</Label>
                 <Input
-                  id="output-max-words"
+                  id="output-max-chars"
                   type="number"
                   inputMode="numeric"
-                  value={outputFieldData.maxWords ?? ''}
-                  onChange={(e) => handleWordCountChange('maxWords', e.target.value ? parseInt(e.target.value, 10) || undefined : undefined)}
-                  placeholder="e.g. 1500"
+                  value={outputFieldData.maxChars ?? ''}
+                  onChange={(e) => handleCharLimitChange('maxChars', e.target.value ? parseInt(e.target.value, 10) || undefined : undefined)}
+                  placeholder="e.g. 2800"
                 />
               </div>
             </div>

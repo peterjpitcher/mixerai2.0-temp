@@ -7,6 +7,8 @@ import { withAuth } from '@/lib/auth/api-auth';
 
 export const dynamic = "force-dynamic";
 
+const MAX_TASK_RESULTS = 200;
+
 export const GET = withAuth(async (request: NextRequest, user) => {
   if (!user) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
@@ -14,7 +16,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
 
   const supabase = createSupabaseAdminClient();
   const globalRole = user?.user_metadata?.role;
-  let permittedBrandIds: string[] | null = null;
+  let permittedBrandIds: string[] = [];
 
   if (globalRole !== 'admin') {
     // Fetch brand_permissions directly for the user
@@ -29,17 +31,20 @@ export const GET = withAuth(async (request: NextRequest, user) => {
     }
 
     if (!permissionsData || permissionsData.length === 0) {
-      console.log('[API Tasks GET] Non-admin user has no brand permissions in user_brand_permissions table. Returning empty array for tasks.');
       return NextResponse.json({ success: true, data: [] });
     }
-    
-    permittedBrandIds = permissionsData.map(p => p.brand_id).filter(id => id != null);
-    
-    if (permittedBrandIds.length === 0) {
-      console.log('[API Tasks GET] Non-admin user has no valid brand IDs after fetching permissions. Returning empty array for tasks.');
+
+    const uniqueBrandIds = new Set(
+      permissionsData
+        .map((permission) => permission.brand_id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    );
+
+    if (uniqueBrandIds.size === 0) {
       return NextResponse.json({ success: true, data: [] });
     }
-    console.log(`[API Tasks GET] User ${user.id} (role: ${globalRole}) has permitted brand IDs: ${permittedBrandIds.join(', ')}`);
+
+    permittedBrandIds = Array.from(uniqueBrandIds);
   }
 
   try {
@@ -59,18 +64,20 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         workflow_step_details:workflow_steps!current_step (id, name, step_order)
       `)
       // Filter for content assigned to the current user
-      .filter('assigned_to', 'cs', `{"${user.id}"}`)
+      .contains('assigned_to', [user.id])
       // Filter for actionable content statuses (active content in review)
       .in('status', ['draft', 'pending_review']);
 
-    if (globalRole !== 'admin' && permittedBrandIds) {
+    if (globalRole !== 'admin' && permittedBrandIds.length > 0) {
       // Non-admin user - filter tasks by permitted brand IDs
       contentQuery = contentQuery.in('brand_id', permittedBrandIds);
     } else if (globalRole === 'admin') {
       // Admin user - fetch tasks from all brands
     }
 
-    const { data: contentItems, error } = await contentQuery.order('updated_at', { ascending: false });
+    const { data: contentItems, error } = await contentQuery
+      .order('updated_at', { ascending: false })
+      .limit(MAX_TASK_RESULTS);
 
     if (error) {
       console.error('Error fetching user tasks from content:', error);

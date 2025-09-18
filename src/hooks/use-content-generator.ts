@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { apiFetch } from '@/lib/api-client';
-import type { InputField, ContentTemplate as Template, FieldType } from '@/types/template';
+import { normalizeOutputsMap } from '@/lib/content/html-normalizer';
+import type { InputField, OutputField, ContentTemplate as Template, FieldType, NormalizedContent } from '@/types/template';
 import type { ProductContext } from '@/types/claims';
 
 interface Brand {
@@ -39,7 +40,7 @@ export function useContentGenerator(templateId?: string | null) {
   const [displayableBrands, setDisplayableBrands] = useState<Brand[]>([]);
   
   const [selectedBrand, setSelectedBrand] = useState('');
-  const [generatedOutputs, setGeneratedOutputs] = useState<Record<string, string>>({});
+  const [generatedOutputs, setGeneratedOutputs] = useState<Record<string, NormalizedContent>>({});
   const [title, setTitle] = useState('');
   const [template, setTemplate] = useState<Template | null>(null);
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(true);
@@ -252,20 +253,24 @@ export function useContentGenerator(templateId?: string | null) {
         value: templateFieldValues[field.id] || ''
       }));
 
+      const inputPayload = productContext
+        ? { product_context: productContext }
+        : undefined;
+
+      const requestBody = {
+        brand_id: selectedBrand,
+        template: {
+          id: template.id,
+          name: template.name,
+          inputFields: input_fields_with_values,
+          outputFields: template.outputFields || []
+        },
+        ...(inputPayload ? { input: inputPayload } : {}),
+      };
+
       const response = await apiFetch('/api/content/generate', {
         method: 'POST',
-        body: JSON.stringify({
-          brand_id: selectedBrand,
-          template: {
-            id: template.id,
-            name: template.name,
-            inputFields: input_fields_with_values,
-            outputFields: template.outputFields || []
-          },
-          input: {
-            product_context: productContext,
-          }
-        }),
+        body: JSON.stringify(requestBody),
       });
       
       const data = await response.json();
@@ -275,12 +280,13 @@ export function useContentGenerator(templateId?: string | null) {
       }
       
       if (data.success) {
-        // Extract the generated outputs from the response
-        // The API returns the fields directly in the response object
-        const { success, userId, error, ...generatedFields } = data;
-        
-        if (Object.keys(generatedFields).length > 0) {
-          setGeneratedOutputs(generatedFields);
+        const normalized = normalizeOutputsMap(
+          data.generatedOutputs as Record<string, unknown>,
+          template.outputFields || []
+        );
+
+        if (Object.keys(normalized).length > 0) {
+          setGeneratedOutputs(normalized);
           toast.success('Content generated successfully!');
         } else {
           throw new Error('No content fields were generated');
@@ -347,24 +353,29 @@ export function useContentGenerator(templateId?: string | null) {
     setIsSaving(true);
     
     try {
-      // Get primary body content from generated outputs
-      let primaryBodyContent = '';
-      if (template && (template.outputFields || []).length > 0) {
-        const richTextOutput = (template.outputFields || []).find(f => f.type === 'richText' && generatedOutputs[f.id]);
-        if (richTextOutput) {
-          primaryBodyContent = generatedOutputs[richTextOutput.id];
-        } else {
-          const firstOutputField = (template.outputFields || [])[0];
-          if (firstOutputField && generatedOutputs[firstOutputField.id]) {
-            primaryBodyContent = generatedOutputs[firstOutputField.id];
-          }
-        }
+      const outputFields = template.outputFields || [];
+      const isRichOutput = (fieldType: OutputField['type']) => {
+        const normalizedType = fieldType?.toLowerCase();
+        return normalizedType === 'richtext' || normalizedType === 'rich-text' || normalizedType === 'html';
+      };
+
+      let primaryField: OutputField | undefined;
+      if (outputFields.length > 0) {
+        primaryField = outputFields.find((field) => isRichOutput(field.type) && generatedOutputs[field.id])
+          || outputFields.find((field) => generatedOutputs[field.id]);
       }
+
+      const primaryNormalized = primaryField ? generatedOutputs[primaryField.id] : undefined;
+      const primaryBodyContentHtml = primaryNormalized?.html ?? '';
+      const primaryBodyContentPlain = primaryNormalized?.plain ?? '';
+      const bodyPayload = primaryField && isRichOutput(primaryField.type)
+        ? primaryBodyContentHtml
+        : primaryBodyContentPlain;
 
       // Generate AI title if not already set and we have content
       let finalTitle = title.trim();
-      if (!finalTitle && primaryBodyContent) {
-        const generatedTitle = await generateTitle(primaryBodyContent);
+      if (!finalTitle && primaryBodyContentPlain) {
+        const generatedTitle = await generateTitle(primaryBodyContentPlain);
         finalTitle = generatedTitle || `${template.name} - ${format(new Date(), 'MMMM d, yyyy')}`;
       } else if (!finalTitle) {
         finalTitle = `${template.name} - ${format(new Date(), 'MMMM d, yyyy')}`;
@@ -377,7 +388,7 @@ export function useContentGenerator(templateId?: string | null) {
           template_id: template.id,
           title: finalTitle,
           workflow_id: associatedWorkflowDetails?.id,
-          body: primaryBodyContent,
+          body: bodyPayload,
           due_date: dueDate?.toISOString() || null,
           content_data: {
             templateInputValues: templateFieldValues,

@@ -4,6 +4,15 @@ import { handleApiError } from '@/lib/api-utils';
 // import { withAuth } from '@/lib/auth/api-auth'; // No longer used
 import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
 
+const diagnosticsEnabled = process.env.ENABLE_HEALTH_DIAGNOSTICS === 'true';
+
+function disabledResponse() {
+  return NextResponse.json(
+    { success: false, error: 'Environment diagnostics are disabled. Set ENABLE_HEALTH_DIAGNOSTICS=true to enable locally.' },
+    { status: 410 }
+  );
+}
+
 export const dynamic = "force-dynamic"; // Ensures the route is always dynamic
 
 /**
@@ -12,6 +21,9 @@ export const dynamic = "force-dynamic"; // Ensures the route is always dynamic
  * It should be REMOVED or STRICTLY SECURED if kept in deployment.
  */
 export const GET = withAdminAuth(async (_request: NextRequest, user) => {
+  if (!diagnosticsEnabled) {
+    return disabledResponse();
+  }
   // Restrict to development environment only
   if (process.env.NODE_ENV === 'production') {
     return NextResponse.json(

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -70,7 +70,6 @@ export default function TemplatesPage() {
   const router = useRouter();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
-  // const [searchTerm, setSearchTerm] = useState('');
   const [templateToDelete, setTemplateToDelete] = useState<Template | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -103,25 +102,29 @@ export default function TemplatesPage() {
     fetchCurrentUser();
   }, []);
 
+  const userRole = currentUser?.user_metadata?.role;
+  const userBrandPermissions = currentUser?.brand_permissions || [];
+  const isAdmin = userRole === 'admin';
+  const isEditor = userRole === 'editor';
+  const canViewTemplates = isAdmin || isEditor;
+
   useEffect(() => {
-    // Fetch templates only if user is loaded and is an admin
-    const userRole = currentUser?.user_metadata?.role;
-    const userBrandPermissions = currentUser?.brand_permissions || [];
-    const isAdmin = userRole === 'admin';
-    const canViewTemplates = isAdmin; // Only admins can view templates
-    
-    if (!isLoadingUser && (!currentUser || !canViewTemplates)) {
-      setLoading(false); // Stop loading templates if user doesn't have permission
+    if (isLoadingUser) {
       return;
     }
-    
+
+    if (!currentUser || !canViewTemplates) {
+      setLoading(false);
+      return;
+    }
+
     const fetchTemplates = async () => {
       try {
         setLoading(true);
-        
+
         const response = await fetch('/api/content-templates');
         const data = await response.json();
-        
+
         if (data.success && Array.isArray(data.templates)) {
           setTemplates(data.templates);
         } else {
@@ -140,11 +143,89 @@ export default function TemplatesPage() {
       }
     };
 
-    // Only fetch if user is loaded and has permission (admin or editor)
-    if (isLoadingUser || (currentUser && canViewTemplates)) {
-        fetchTemplates();
+    fetchTemplates();
+  }, [isLoadingUser, currentUser, canViewTemplates]);
+
+  const generateFieldId = () => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
     }
-  }, [isLoadingUser, currentUser]);
+    return `field_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  };
+
+  const deepClone = <T,>(value: T): T => {
+    if (value === undefined || value === null) {
+      return value;
+    }
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch (error) {
+      console.warn('Failed to deep clone value during template duplication; returning original reference.', error);
+      return value;
+    }
+  };
+
+  const isSlugOptions = (options: unknown): options is { sourceField?: string } => {
+    return Boolean(options && typeof options === 'object' && 'sourceField' in (options as Record<string, unknown>));
+  };
+
+  const hasFieldsMapping = (
+    options: unknown
+  ): options is { fieldsMapping?: Record<string, string | undefined> } => {
+    return Boolean(options && typeof options === 'object' && 'fieldsMapping' in (options as Record<string, unknown>));
+  };
+
+  const cloneTemplateFieldSets = (template: Template) => {
+    const originalInputFields = template.fields?.inputFields || [];
+    const originalOutputFields = template.fields?.outputFields || [];
+    const idMap = new Map<string, string>();
+
+    for (const field of [...originalInputFields, ...originalOutputFields]) {
+      idMap.set(field.id, generateFieldId());
+    }
+
+    const remapId = (maybeId?: string | null) => {
+      if (!maybeId) return maybeId;
+      return idMap.get(maybeId) ?? maybeId;
+    };
+
+    const clonedInputFields = originalInputFields.map((field) => {
+      const clonedOptions = deepClone(field.options);
+
+      if (field.type === 'slug' && isSlugOptions(clonedOptions) && clonedOptions.sourceField) {
+        clonedOptions.sourceField = remapId(clonedOptions.sourceField) ?? clonedOptions.sourceField;
+      }
+
+      if (
+        field.type === 'recipeUrl' &&
+        hasFieldsMapping(clonedOptions) &&
+        clonedOptions.fieldsMapping
+      ) {
+        const remappedMapping: Record<string, string | undefined> = {};
+        Object.entries(clonedOptions.fieldsMapping).forEach(([key, targetFieldId]) => {
+          remappedMapping[key] = remapId(targetFieldId) ?? targetFieldId;
+        });
+        clonedOptions.fieldsMapping = remappedMapping;
+      }
+
+      return {
+        ...field,
+        id: idMap.get(field.id) as string,
+        options: clonedOptions,
+      };
+    });
+
+    const clonedOutputFields = originalOutputFields.map((field) => {
+      const clonedOptions = deepClone(field.options);
+      return {
+        ...field,
+        id: idMap.get(field.id) as string,
+        options: clonedOptions,
+      };
+    });
+
+    return { inputFields: clonedInputFields, outputFields: clonedOutputFields };
+  };
 
   const handleDuplicateTemplate = async (templateToDuplicate: Template) => {
     if (!currentUser || currentUser.user_metadata?.role !== 'admin') {
@@ -158,21 +239,16 @@ export default function TemplatesPage() {
         toast.error('Template structure is invalid for duplication');
         return;
       }
-      
-      // Helper function to regenerate field IDs to avoid conflicts
-      const regenerateFieldIds = (fields: any[]) => 
-        fields.map(field => ({
-          ...field,
-          id: `${field.id}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-        }));
-      
+
+      const clonedFields = cloneTemplateFieldSets(templateToDuplicate);
+
       const newTemplateData = {
         name: `Copy of ${templateToDuplicate.name}`,
         description: templateToDuplicate.description,
         icon: templateToDuplicate.icon,
-        // Extract and regenerate inputFields and outputFields with unique IDs
-        inputFields: regenerateFieldIds(templateToDuplicate.fields.inputFields),
-        outputFields: regenerateFieldIds(templateToDuplicate.fields.outputFields),
+        // Deep-cloned field sets with safe ID remapping
+        inputFields: clonedFields.inputFields,
+        outputFields: clonedFields.outputFields,
         brand_id: templateToDuplicate.brand_id,
       };
 
@@ -228,9 +304,6 @@ export default function TemplatesPage() {
     }
   };
 
-  const userRole = currentUser?.user_metadata?.role;
-  const userBrandPermissions = currentUser?.brand_permissions || [];
-  const isAdmin = userRole === 'admin';
   const isPlatformAdmin = isAdmin && userBrandPermissions.length === 0;
   const isScopedAdmin = isAdmin && userBrandPermissions.length > 0;
   const isGlobalAdmin = isPlatformAdmin || isScopedAdmin; // Admin users can see templates
@@ -385,7 +458,7 @@ export default function TemplatesPage() {
     );
   }
 
-  if (!isGlobalAdmin) {
+  if (!canViewTemplates) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
         <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
@@ -425,11 +498,13 @@ export default function TemplatesPage() {
           <p className="mt-1 text-sm text-muted-foreground mb-6">
               Create your first content template to get started.
           </p>
-          <Link href="/dashboard/templates/new">
+          {isGlobalAdmin && (
+            <Link href="/dashboard/templates/new">
               <Button>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Create Your First Template
+                <PlusCircle className="mr-2 h-4 w-4" /> Create Your First Template
               </Button>
-          </Link>
+            </Link>
+          )}
         </div>
       ) : (
         <DataTable

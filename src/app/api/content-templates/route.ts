@@ -9,6 +9,34 @@ import { validateRequest, commonSchemas } from '@/lib/api/validation';
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
 
+type AuthenticatedUser = {
+  id: string;
+  user_metadata?: {
+    role?: string;
+  };
+};
+
+async function getAccessibleBrandIds(
+  user: AuthenticatedUser,
+  supabase: ReturnType<typeof createSupabaseAdminClient>
+): Promise<string[]> {
+  if (!user?.id) return [];
+
+  const { data, error } = await supabase
+    .from('user_brand_permissions')
+    .select('brand_id')
+    .eq('user_id', user.id);
+
+  if (error) {
+    console.error('[content-templates] Failed to load brand permissions:', error);
+    return [];
+  }
+
+  return (data || [])
+    .map(record => record.brand_id)
+    .filter((brandId): brandId is string => Boolean(brandId));
+}
+
 // Field schema for template fields
 const templateFieldSchema = z.object({
   id: commonSchemas.nonEmptyString,
@@ -139,10 +167,13 @@ const _mockTemplates = [
 /**
  * GET handler for templates, now wrapped with authentication.
  */
-export const GET = withAuth(async (request: NextRequest, user: unknown) => {
+export const GET = withAuth(async (request: NextRequest, user: AuthenticatedUser) => {
   try {
+    const userRole = user.user_metadata?.role;
+    const isAdmin = userRole === 'admin';
+
     // Role check: Allow Admins (Platform/Scoped) and Editors to list/view content templates
-    if (!((user as { user_metadata?: { role?: string } }).user_metadata?.role === 'admin' || (user as { user_metadata?: { role?: string } }).user_metadata?.role === 'editor')) {
+    if (!(isAdmin || userRole === 'editor')) {
       return NextResponse.json(
         { success: false, error: 'Forbidden: You do not have permission to access this resource.' },
         { status: 403 }
@@ -160,40 +191,59 @@ export const GET = withAuth(async (request: NextRequest, user: unknown) => {
         .select('*')
         .eq('id', id)
         .single();
-      
+
       if (error) {
         throw error;
       }
-      
-      return NextResponse.json({ 
-        success: true, 
-        template: data 
+
+      if (!data) {
+        return NextResponse.json({ success: false, error: 'Content template not found' }, { status: 404 });
+      }
+
+      if (!isAdmin && data.brand_id) {
+        const accessibleBrands = await getAccessibleBrandIds(user, supabase);
+        if (!accessibleBrands.includes(data.brand_id)) {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: You do not have permission to access this template.' },
+            { status: 403 }
+          );
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        template: data
       });
     }
     
     // Otherwise, fetch all templates
-    const { data: templatesData, error } = await supabase
+    let query = supabase
       .from('content_templates')
       .select('*, content_count:content!template_id(count)')
       .order('name');
+
+    if (!isAdmin) {
+      const accessibleBrands = await getAccessibleBrandIds(user, supabase);
+      if (accessibleBrands.length === 0) {
+        query = query.is('brand_id', null);
+      } else {
+        const orFilters = ['brand_id.is.null', ...accessibleBrands.map(id => `brand_id.eq.${id}`)];
+        query = query.or(orFilters.join(','));
+      }
+    }
+
+    const { data: templatesData, error } = await query;
     
     if (error) {
       console.error('Error fetching templates:', error);
       throw error;
     }
-    
-    console.log(`Fetched ${templatesData?.length || 0} templates`);
-    
-    // Format data before sending
-    const formattedTemplates = templatesData.map(template => ({
-      ...template,
-      // Supabase returns count as an array like [{ count: N }], so extract it.
-      usageCount: template.content_count && Array.isArray(template.content_count) && template.content_count.length > 0 
-                  ? template.content_count[0].count 
-                  : 0,
-      // Remove the raw content_count array from the response if desired
-      content_count: undefined 
-    }));
+
+    const formattedTemplates = (templatesData || []).map(template => {
+      const { content_count: rawCount, ...rest } = template as Record<string, unknown> & { content_count?: Array<{ count: number }> };
+      const usageCount = Array.isArray(rawCount) && rawCount.length > 0 ? rawCount[0]?.count ?? 0 : 0;
+      return { ...rest, usageCount };
+    });
 
     return NextResponse.json({ 
       success: true, 
@@ -207,10 +257,10 @@ export const GET = withAuth(async (request: NextRequest, user: unknown) => {
 /**
  * POST: Create a new content template, withAuth applied directly.
  */
-export const POST = withAuthAndCSRF(async (request: NextRequest, user: unknown) => {
+export const POST = withAuthAndCSRF(async (request: NextRequest, user: AuthenticatedUser) => {
   try {
     // Role check: Only Global Admins can create content templates
-    if ((user as { user_metadata?: { role?: string } }).user_metadata?.role !== 'admin') {
+    if (user.user_metadata?.role !== 'admin') {
       return NextResponse.json(
         { success: false, error: 'Forbidden: You do not have permission to create this resource.' },
         { status: 403 }
@@ -267,7 +317,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: unknown) 
         icon: data.icon || null,
         fields: fieldsForDb, // Use the reconstructed fields object
         brand_id: data.brand_id || null,
-        created_by: (user as { id: string }).id,
+        created_by: user.id,
       })
       .select()
       .single();
@@ -288,10 +338,10 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: unknown) 
 /**
  * DELETE: Delete a content template, withAuth applied directly.
  */
-export const DELETE = withAuthAndCSRF(async (request: NextRequest, user: unknown) => {
+export const DELETE = withAuthAndCSRF(async (request: NextRequest, user: AuthenticatedUser) => {
   try {
     // Role check: Only Global Admins can delete content templates
-    if ((user as { user_metadata?: { role?: string } }).user_metadata?.role !== 'admin') {
+    if (user.user_metadata?.role !== 'admin') {
       return NextResponse.json(
         { success: false, error: 'Forbidden: You do not have permission to delete this resource.' },
         { status: 403 }

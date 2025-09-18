@@ -39,15 +39,14 @@ export class ErrorBoundary extends Component<Props, State> {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          error: {
-            message: error.message,
-            stack: error.stack,
+          message: error.message,
+          stack: error.stack,
+          componentStack: errorInfo.componentStack,
+          severity: 'error',
+          info: {
+            url: window.location.href,
+            timestamp: new Date().toISOString(),
           },
-          errorInfo: {
-            componentStack: errorInfo.componentStack,
-          },
-          url: window.location.href,
-          timestamp: new Date().toISOString(),
         }),
       }).catch(err => console.error('Failed to log error:', err));
     }

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { requiresReauthentication } from '@/lib/auth/session-manager';
+import { validateSession } from '@/lib/auth/session-manager-simple';
 
 export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
   try {
@@ -17,9 +20,19 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
       );
     }
     
-    // Get last authentication time from user metadata or session
-    // For now, we'll use the user's last sign in time
-    const lastAuthTime = user.last_sign_in_at ? new Date(user.last_sign_in_at).getTime() : Date.now();
+    let lastAuthTime = user.last_sign_in_at ? new Date(user.last_sign_in_at).getTime() : Date.now();
+
+    try {
+      const sessionId = cookies().get('app-session-id')?.value;
+      if (sessionId) {
+        const sessionValidation = await validateSession(sessionId);
+        if (sessionValidation.valid && sessionValidation.session) {
+          lastAuthTime = sessionValidation.session.lastActivityAt.getTime();
+        }
+      }
+    } catch (sessionError) {
+      console.warn('[auth/check-reauthentication] Failed to inspect session info', sessionError);
+    }
     
     const needsReauth = requiresReauthentication(operation, lastAuthTime);
     

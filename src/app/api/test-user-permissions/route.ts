@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
-import { withAuth } from '@/lib/auth/api-auth';
+import { withAdminAuth } from '@/lib/auth/api-auth';
+
+const testsEnabled = process.env.ENABLE_TEST_ENDPOINTS === 'true';
+
+function disabledResponse() {
+  return NextResponse.json(
+    { success: false, error: 'This test endpoint is disabled. Set ENABLE_TEST_ENDPOINTS=true to enable locally.' },
+    { status: 410 }
+  );
+}
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +18,16 @@ export const dynamic = "force-dynamic";
  * GET endpoint to directly examine user permissions in the database
  * Only for debugging purposes
  */
-export const GET = withAuth(async (request: NextRequest, user) => {
+export const GET = withAdminAuth(async (request: NextRequest, user) => {
+  if (!testsEnabled) {
+    return disabledResponse();
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json(
+      { success: false, error: 'Not found' },
+      { status: 404 }
+    );
+  }
   try {
     const supabase = createSupabaseAdminClient();
     

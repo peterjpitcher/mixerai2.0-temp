@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
+import { z } from 'zod';
+import { User } from '@supabase/supabase-js';
 
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { formatClaimsDirectly, deduplicateClaims } from '@/lib/claims-formatter';
@@ -8,6 +9,8 @@ import { logDebug, logError } from '@/lib/logger';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { getStackedClaimsForProduct } from '@/lib/claims-utils';
 import { ok, fail } from '@/lib/http/response';
+import { BrandPermissionVerificationError, isPlatformAdminUser, userHasBrandAccess } from '@/lib/auth/brand-access';
+import { logContentGenerationAudit } from '@/lib/audit/content';
 
 type Claim = {
   claim_text: string;
@@ -165,13 +168,23 @@ function sortClaims(a: Claim, b: Claim): number {
  *   }
  * }
  */
-async function prepareProductContextHandler(request: NextRequest) {
-  try {
-    const { productId, countryCode } = await request.json();
+const requestSchema = z.object({
+  productId: z.string().uuid('productId must be a valid UUID'),
+  countryCode: z
+    .string()
+    .length(2, 'countryCode must be a 2-letter ISO code')
+    .transform((code) => code.toUpperCase())
+    .optional(),
+});
 
-    if (!productId || typeof productId !== 'string') {
-      return fail(400, 'Product ID must be provided.');
+async function prepareProductContextHandler(request: NextRequest, user: User) {
+  try {
+    const parsedBody = requestSchema.safeParse(await request.json());
+    if (!parsedBody.success) {
+      return fail(400, 'Invalid request payload', JSON.stringify(parsedBody.error.flatten()));
     }
+
+    const { productId, countryCode } = parsedBody.data;
     
     const supabase = createSupabaseAdminClient();
 
@@ -179,18 +192,55 @@ async function prepareProductContextHandler(request: NextRequest) {
         .from('products')
         .select('name, master_brand_id')
         .eq('id', productId)
-        .single();
+        .maybeSingle();
     
-    if (productError) throw new Error('Could not find the specified product.');
-    if (!productData) return fail(404, 'Product not found.');
+    if (productError) {
+      logError('[prepare-product-context] Failed to load product', productError);
+      return fail(500, 'Could not load product information.');
+    }
+
+    if (!productData) {
+      return fail(404, 'Product not found.');
+    }
     
     const { name: productName, master_brand_id: masterClaimBrandId } = productData;
 
     if (!masterClaimBrandId) {
+      if (!isPlatformAdminUser(user)) {
+        return fail(403, 'This product is not linked to a brand. Only platform admins may access its context.');
+      }
       return ok({ productName, styledClaims: null });
     }
 
-    if (countryCode && typeof countryCode === 'string') {
+    const { data: masterBrand, error: masterBrandError } = await supabase
+      .from('master_claim_brands')
+      .select('id, name, mixerai_brand_id')
+      .eq('id', masterClaimBrandId)
+      .single();
+
+    if (masterBrandError || !masterBrand) {
+      return fail(404, 'Master brand not found for the specified product.');
+    }
+
+    if (!isPlatformAdminUser(user)) {
+      if (!masterBrand.mixerai_brand_id) {
+        return fail(403, 'This product is not yet linked to a MixerAI brand. Contact an administrator to complete setup.');
+      }
+
+      try {
+        const hasAccess = await userHasBrandAccess(supabase, user, masterBrand.mixerai_brand_id);
+        if (!hasAccess) {
+          return fail(403, 'You do not have permission to access this product.');
+        }
+      } catch (error) {
+        if (error instanceof BrandPermissionVerificationError) {
+          return fail(500, 'Unable to verify brand permissions at this time.', error.message);
+        }
+        throw error;
+      }
+    }
+
+    if (countryCode) {
       const effective = await getStackedClaimsForProduct(productId, countryCode);
       const formatted = formatClaimsDirectly(
         effective.map((ec, index) => ({
@@ -204,12 +254,32 @@ async function prepareProductContextHandler(request: NextRequest) {
         productName,
         undefined
       );
+      await logContentGenerationAudit({
+        action: 'content_prepare_product_context',
+        userId: user.id,
+        brandId: masterBrand.mixerai_brand_id,
+        metadata: {
+          productId,
+          countryCode,
+          claimsReturned: effective.length,
+        },
+      });
+
       return ok({ productName, styledClaims: formatted });
     }
 
     const allClaims = await fetchAllBrandClaims(supabase, masterClaimBrandId, productId, null);
 
     if (allClaims.length === 0) {
+      await logContentGenerationAudit({
+        action: 'content_prepare_product_context',
+        userId: user.id,
+        brandId: masterBrand.mixerai_brand_id,
+        metadata: {
+          productId,
+          claimsReturned: 0,
+        },
+      });
       return ok({ productName, styledClaims: null });
     }
 
@@ -228,24 +298,28 @@ async function prepareProductContextHandler(request: NextRequest) {
     );
 
     // Get master brand name for context
-    const { data: brandData } = await supabase
-      .from('master_claim_brands')
-      .select('name')
-      .eq('id', masterClaimBrandId)
-      .single();
-
     // Format claims directly without AI
     const formattedClaims = formatClaimsDirectly(
       uniqueClaims,
       productName,
-      brandData?.name
+      masterBrand.name
     );
 
     logDebug('[prepare-product-context] Formatted claims without AI:', {
       productName,
-      brandName: brandData?.name,
+      brandName: masterBrand.name,
       totalUniqueClaimsCount: uniqueClaims.length,
       totalClaimsCount: allClaims.length
+    });
+
+    await logContentGenerationAudit({
+      action: 'content_prepare_product_context',
+      userId: user.id,
+      brandId: masterBrand.mixerai_brand_id,
+      metadata: {
+        productId,
+        claimsReturned: uniqueClaims.length,
+      },
     });
 
     return ok({ productName, styledClaims: formattedClaims });

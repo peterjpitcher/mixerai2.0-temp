@@ -1,10 +1,12 @@
 import { NextResponse, NextRequest } from 'next/server';
+import { User } from '@supabase/supabase-js';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { isBuildPhase } from '@/lib/api-utils';
 
 import { generateTextCompletion } from '@/lib/azure/openai';
 import { ClaimTypeEnum, Product, MasterClaimBrand as MasterClaimBrandSummary } from '@/lib/claims-utils';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { BrandPermissionVerificationError, requireBrandAccess } from '@/lib/auth/brand-access';
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +24,7 @@ interface BrandDetails {
 }
 
 interface SuggestReplacementClaimsRequest {
+    brand_id?: string;
     masterClaimText: string;
     masterClaimType: ClaimTypeEnum;
     targetMarketCountryCode: string;
@@ -41,9 +44,13 @@ interface SuggestReplacementClaimsResponse {
     error?: string; // Optional error field
 }
 
-async function getProductAndFullBrandDetails(supabase: ReturnType<typeof createSupabaseAdminClient>, productId: string): Promise<{ product: Product | null, brandDetails: BrandDetails | null }> {
+async function getProductAndFullBrandDetails(
+    supabase: ReturnType<typeof createSupabaseAdminClient>,
+    productId: string
+): Promise<{ product: Product | null; brandDetails: BrandDetails | null; masterBrandSummary: MasterClaimBrandSummary | null }> {
     let product: Product | null = null;
     let brandDetails: BrandDetails | null = null;
+    let masterBrandSummary: MasterClaimBrandSummary | null = null;
 
     const { data: productData, error: productError } = await supabase
         .from('products')
@@ -53,36 +60,52 @@ async function getProductAndFullBrandDetails(supabase: ReturnType<typeof createS
 
     if (productError) {
         console.error(`[AI Suggest] Error fetching product ${productId}:`, productError);
-        return { product, brandDetails }; // Return nulls if product fetch fails
+        return { product, brandDetails, masterBrandSummary }; // Return nulls if product fetch fails
     }
 
     if (productData) {
-        product = productData as Product;
-        const masterClaimBrandSummary = productData.master_brand_id as MasterClaimBrandSummary; // Renamed
+        const rawMasterBrand = productData.master_brand_id as unknown;
+        if (rawMasterBrand && typeof rawMasterBrand === 'object') {
+            masterBrandSummary = rawMasterBrand as MasterClaimBrandSummary;
+        }
 
-        if (masterClaimBrandSummary && masterClaimBrandSummary.mixerai_brand_id) {
+        const normalizedMasterBrandId =
+            typeof productData.master_brand_id === 'string'
+                ? productData.master_brand_id
+                : masterBrandSummary?.id ?? '';
+
+        product = {
+            ...productData,
+            master_brand_id: normalizedMasterBrandId,
+        } as Product;
+
+        if (masterBrandSummary && masterBrandSummary.mixerai_brand_id) {
             // 2. Fetch full brand details from 'brands' table using mixerai_brand_id
             const { data: fullBrandData, error: brandError } = await supabase
                 .from('brands') // The main brands table
                 .select('id, name, website_url, country, language, brand_identity, tone_of_voice, guardrails')
-                .eq('id', masterClaimBrandSummary.mixerai_brand_id)
+                .eq('id', masterBrandSummary.mixerai_brand_id)
                 .single();
 
             if (brandError) {
-                console.warn(`[AI Suggest] Could not fetch full brand details for mixerai_brand_id ${masterClaimBrandSummary.mixerai_brand_id}:`, brandError);
+                console.warn(
+                    `[AI Suggest] Could not fetch full brand details for mixerai_brand_id ${masterBrandSummary.mixerai_brand_id}:`,
+                    brandError
+                );
                 // Proceed without full brand details if this fetch fails
             } else if (fullBrandData) {
                 brandDetails = fullBrandData as BrandDetails;
             }
         }
     }
-    return { product, brandDetails };
+    return { product, brandDetails, masterBrandSummary };
 }
 
-export const POST = withAuthAndCSRF(async (req: NextRequest): Promise<Response> => {
+export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promise<Response> => {
     try {
         const body: SuggestReplacementClaimsRequest = await req.json();
         const {
+            brand_id,
             masterClaimText,
             masterClaimType,
             targetMarketCountryCode,
@@ -100,10 +123,67 @@ export const POST = withAuthAndCSRF(async (req: NextRequest): Promise<Response> 
         }
 
         const supabase = createSupabaseAdminClient();
-        const { product, brandDetails } = await getProductAndFullBrandDetails(supabase, productId);
+
+        const brandIdToVerify = brand_id;
+        if (brandIdToVerify) {
+            try {
+                await requireBrandAccess(supabase, user, brandIdToVerify);
+            } catch (error) {
+                if (error instanceof BrandPermissionVerificationError) {
+                    return NextResponse.json<SuggestReplacementClaimsResponse>(
+                        { success: false, error: 'Unable to verify brand permissions. Please try again later.' },
+                        { status: 500 }
+                    );
+                }
+                if (error instanceof Error && error.message === 'NO_BRAND_ACCESS') {
+                    return NextResponse.json<SuggestReplacementClaimsResponse>(
+                        { success: false, error: 'You do not have access to this brand.' },
+                        { status: 403 }
+                    );
+                }
+                throw error;
+            }
+        }
+        const { product, brandDetails, masterBrandSummary } = await getProductAndFullBrandDetails(supabase, productId);
 
         if (!product) {
             return NextResponse.json<SuggestReplacementClaimsResponse>({ success: false, error: `Product with ID ${productId} not found.` }, { status: 404 });
+        }
+
+        const mixeraiBrandId = masterBrandSummary?.mixerai_brand_id ?? null;
+
+        if (!mixeraiBrandId && user.user_metadata?.role !== 'admin') {
+            return NextResponse.json<SuggestReplacementClaimsResponse>(
+                { success: false, error: 'This product is not linked to a MixerAI brand. Contact an administrator.' },
+                { status: 403 }
+            );
+        }
+
+        if (brandIdToVerify && mixeraiBrandId && brandIdToVerify !== mixeraiBrandId) {
+            return NextResponse.json<SuggestReplacementClaimsResponse>(
+                { success: false, error: 'Provided brand_id does not match the product’s brand.' },
+                { status: 400 }
+            );
+        }
+
+        if (mixeraiBrandId) {
+            try {
+                await requireBrandAccess(supabase, user, mixeraiBrandId);
+            } catch (error) {
+                if (error instanceof BrandPermissionVerificationError) {
+                    return NextResponse.json<SuggestReplacementClaimsResponse>(
+                        { success: false, error: 'Unable to verify brand permissions. Please try again later.' },
+                        { status: 500 }
+                    );
+                }
+                if (error instanceof Error && error.message === 'NO_BRAND_ACCESS') {
+                    return NextResponse.json<SuggestReplacementClaimsResponse>(
+                        { success: false, error: 'You do not have access to this brand.' },
+                        { status: 403 }
+                    );
+                }
+                throw error;
+            }
         }
 
         const systemPrompt = `You are an expert marketing compliance assistant specializing in product claims for the brand "${brandDetails?.name || 'this brand'}". Your task is to suggest suitable market-specific replacement claims. Adhere strictly to the brand's identity, tone of voice, and guardrails if provided. The suggestions must be valid for the target market. Return JSON.`;

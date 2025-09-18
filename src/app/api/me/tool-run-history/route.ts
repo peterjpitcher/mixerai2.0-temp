@@ -9,20 +9,26 @@ export const GET = withAuthMonitoringAndCSRF(async (request: NextRequest) => {
     const supabase = createSupabaseServerClient();
     const { searchParams } = new URL(request.url);
     const toolName = searchParams.get('tool_name');
+    const pageParam = Number(searchParams.get('page') || '1');
+    const limitParam = Number(searchParams.get('limit') || '20');
+
+    const page = Number.isFinite(pageParam) && pageParam > 0 ? Math.floor(pageParam) : 1;
+    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(Math.floor(limitParam), 100) : 20;
+    const offset = (page - 1) * limit;
 
     let query = supabase
       .from('tool_run_history')
-      .select('*')
+      .select('*', { count: 'exact' })
       // RLS will handle user_id filtering automatically when using createSupabaseServerClient
       // .eq('user_id', user.id) 
       .order('run_at', { ascending: false })
-      .limit(50); // Let's limit to 50 records for now
+      .range(offset, offset + limit - 1);
 
     if (toolName) {
       query = query.eq('tool_name', toolName);
     }
 
-    const { data: history, error } = await query;
+    const { data: history, error, count } = await query;
 
     if (error) {
       console.error('[ToolRunHistoryAPI] Error fetching history:', error);
@@ -41,7 +47,15 @@ export const GET = withAuthMonitoringAndCSRF(async (request: NextRequest) => {
       outputs: item.outputs || {}
     })) || [];
 
-    return NextResponse.json({ success: true, history: mappedHistory });
+    return NextResponse.json({
+      success: true,
+      history: mappedHistory,
+      pagination: {
+        page,
+        limit,
+        total: count ?? mappedHistory.length,
+      },
+    });
 
   } catch (error: unknown) {
     console.error('[ToolRunHistoryAPI] Unexpected error:', error);

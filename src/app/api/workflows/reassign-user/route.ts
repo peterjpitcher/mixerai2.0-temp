@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
 import { z } from 'zod';
+import { logSecurityEvent } from '@/lib/auth/account-lockout';
+import type { Json } from '@/types/supabase';
 
 // Schema for request validation
 const ReassignUserSchema = z.object({
@@ -50,87 +52,267 @@ export const POST = withAuth(async (request: NextRequest, user: User) => {
       );
     }
 
-    const supabase = createSupabaseServerClient();
+    const supabase = createSupabaseAdminClient();
 
-    // If specific workflow IDs provided, reassign only those
-    if (workflow_ids && workflow_ids.length > 0) {
-      let reassignedCount = 0;
-      const reassignmentLog: Array<{ workflow_id: string; workflow_name: string }> = [];
+    const { data: fromProfile, error: fromProfileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', from_user_id)
+      .maybeSingle();
 
-      for (const workflowId of workflow_ids) {
-        // Get the workflow
-        const { data: workflow, error: fetchError } = await supabase
-          .from('workflows')
-          .select('id, name, steps')
-          .eq('id', workflowId)
-          .single();
+    if (fromProfileError) {
+      throw fromProfileError;
+    }
 
-        if (fetchError || !workflow || !workflow.steps || !Array.isArray(workflow.steps)) continue;
+    if (!fromProfile) {
+      return NextResponse.json(
+        { success: false, error: 'Source user not found.' },
+        { status: 404 }
+      );
+    }
 
-        // Process steps to replace the user
-        const newSteps = (workflow.steps as Array<{assignees?: Array<{id: string; email: string; full_name: string}>}>).map((step) => {
-          if (step.assignees && Array.isArray(step.assignees)) {
-            step.assignees = step.assignees.map((assignee) => {
-              if (assignee.id === from_user_id) {
-                return {
-                  id: to_user_id,
-                  email: assignee.email, // This will be updated by the UI
-                  full_name: assignee.full_name // This will be updated by the UI
-                };
-              }
-              return assignee;
-            });
+    const { data: toProfile, error: toProfileError } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .eq('id', to_user_id)
+      .maybeSingle();
+
+    if (toProfileError) {
+      throw toProfileError;
+    }
+
+    if (!toProfile) {
+      return NextResponse.json(
+        { success: false, error: 'Destination user not found.' },
+        { status: 404 }
+      );
+    }
+
+    const reassignAcrossWorkflows = async (workflowIds: string[], scope?: { brandId?: string }) => {
+      if (workflowIds.length === 0) {
+        return { reassignedCount: 0, reassignmentLog: [] as Array<{ workflow_id: string; workflow_name: string; steps_updated: number }> };
+      }
+
+      const { data: workflows, error: workflowsError } = await supabase
+        .from('workflows')
+        .select('id, name, brand_id, steps')
+        .in('id', workflowIds);
+
+      if (workflowsError) {
+        throw workflowsError;
+      }
+
+      const workflowList = workflows || [];
+      if (workflowList.length === 0) {
+        return { reassignedCount: 0, reassignmentLog: [] };
+      }
+
+      const brandIds = new Set<string>();
+      workflowList.forEach((workflow) => {
+        if (workflow.brand_id) {
+          brandIds.add(workflow.brand_id as string);
+        }
+      });
+
+      if (brandIds.size > 0) {
+        const { data: brandPermissions, error: brandPermError } = await supabase
+          .from('user_brand_permissions')
+          .select('brand_id')
+          .eq('user_id', to_user_id)
+          .in('brand_id', Array.from(brandIds));
+
+        if (brandPermError) {
+          throw brandPermError;
+        }
+
+        const allowedBrands = new Set((brandPermissions || []).map((p) => p.brand_id));
+        for (const brandId of brandIds) {
+          if (!allowedBrands.has(brandId)) {
+            await logSecurityEvent('workflow_reassign_blocked', {
+              reason: 'destination_missing_brand_access',
+              brandId,
+              fromUserId: from_user_id,
+              toUserId: to_user_id,
+              workflowIds,
+            }, user.id);
+
+            return NextResponse.json(
+              { success: false, error: `Destination user must have access to brand ${brandId} before reassignment.` },
+              { status: 400 }
+            );
           }
-          return step;
+        }
+      }
+
+      const { data: stepRows, error: stepError } = await supabase
+        .from('workflow_steps')
+        .select('id, workflow_id, assigned_user_ids')
+        .in('workflow_id', workflowList.map((w) => w.id));
+
+      if (stepError) {
+        throw stepError;
+      }
+
+      const stepsByWorkflow = new Map<string, Array<{ id: string; assigned_user_ids: string[] | null }>>();
+      (stepRows || []).forEach((row) => {
+        if (!stepsByWorkflow.has(row.workflow_id)) {
+          stepsByWorkflow.set(row.workflow_id, []);
+        }
+        stepsByWorkflow.get(row.workflow_id)!.push({ id: row.id, assigned_user_ids: row.assigned_user_ids });
+      });
+
+      const isoNow = new Date().toISOString();
+      const reassignmentLog: Array<{ workflow_id: string; workflow_name: string; steps_updated: number }> = [];
+      const workflowsUpdated: string[] = [];
+      let reassignedCount = 0;
+
+      for (const workflow of workflowList) {
+        const stepChanges: Array<{ id: string; assigned_user_ids: string[] }> = [];
+        const stepsForWorkflow = stepsByWorkflow.get(workflow.id) || [];
+
+        stepsForWorkflow.forEach((step) => {
+          const assigned = Array.isArray(step.assigned_user_ids) ? [...step.assigned_user_ids] : [];
+          if (!assigned.includes(from_user_id)) {
+            return;
+          }
+
+          const updated = assigned.filter((id) => id !== from_user_id);
+          if (!updated.includes(to_user_id)) {
+            updated.push(to_user_id);
+          }
+
+          stepChanges.push({ id: step.id, assigned_user_ids: updated });
         });
 
-        // Update the workflow
-        const { error: updateError } = await supabase
-          .from('workflows')
-          .update({ 
-            steps: newSteps,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', workflowId);
-
-        if (!updateError) {
-          reassignedCount++;
-          reassignmentLog.push({
-            workflow_id: workflowId,
-            workflow_name: workflow.name
-          });
+        if (stepChanges.length === 0) {
+          continue;
         }
+
+        for (const change of stepChanges) {
+          const { error: updateStepError } = await supabase
+            .from('workflow_steps')
+            .update({ assigned_user_ids: change.assigned_user_ids, updated_at: isoNow })
+            .eq('id', change.id);
+
+          if (updateStepError) {
+            throw updateStepError;
+          }
+        }
+
+        let updatedStepsJson: Json = workflow.steps as Json;
+        if (Array.isArray(workflow.steps)) {
+          const mappedSteps = (workflow.steps as Array<Record<string, unknown>>).map((step) => {
+            if (!Array.isArray(step.assignees)) {
+              return step;
+            }
+
+            const assignees = step.assignees as Array<Record<string, unknown>>;
+            const includesSource = assignees.some((assignee) => assignee?.id === from_user_id);
+            if (!includesSource) {
+              return step;
+            }
+
+            const filtered = assignees.filter((assignee) => assignee?.id !== from_user_id);
+            const hasDestination = filtered.some((assignee) => assignee?.id === to_user_id);
+
+            if (!hasDestination) {
+              filtered.push({ id: to_user_id, email: toProfile.email, full_name: toProfile.full_name });
+            }
+
+            return { ...step, assignees: filtered };
+          });
+          updatedStepsJson = mappedSteps as unknown as Json;
+        }
+
+        const { error: updateWorkflowError } = await supabase
+          .from('workflows')
+          .update({ steps: updatedStepsJson, updated_at: isoNow })
+          .eq('id', workflow.id);
+
+        if (updateWorkflowError) {
+          throw updateWorkflowError;
+        }
+
+        const { error: tasksUpdateError } = await supabase
+          .from('user_tasks')
+          .update({ user_id: to_user_id, updated_at: isoNow })
+          .eq('user_id', from_user_id)
+          .eq('workflow_id', workflow.id);
+
+        if (tasksUpdateError && tasksUpdateError.code !== 'PGRST116') {
+          throw tasksUpdateError;
+        }
+
+        workflowsUpdated.push(workflow.id);
+        reassignedCount += 1;
+        reassignmentLog.push({
+          workflow_id: workflow.id,
+          workflow_name: workflow.name,
+          steps_updated: stepChanges.length,
+        });
+      }
+
+      if (scope?.brandId) {
+        await logSecurityEvent('workflow_reassign_brand', {
+          fromUserId: from_user_id,
+          toUserId: to_user_id,
+          brandId: scope.brandId,
+          workflowsExamined: workflowIds.length,
+          workflowsReassigned: reassignedCount,
+        }, user.id);
+      } else {
+        await logSecurityEvent('workflow_reassign_specific', {
+          fromUserId: from_user_id,
+          toUserId: to_user_id,
+          workflowIds,
+          reassignedCount,
+        }, user.id);
+      }
+
+      return { reassignedCount, reassignmentLog };
+    };
+
+    if (workflow_ids && workflow_ids.length > 0) {
+      const uniqueWorkflowIds = Array.from(new Set(workflow_ids));
+      const result = await reassignAcrossWorkflows(uniqueWorkflowIds);
+      if (result instanceof NextResponse) {
+        return result;
       }
 
       return NextResponse.json({
         success: true,
-        reassigned_count: reassignedCount,
-        reassignment_log: reassignmentLog
+        reassigned_count: result.reassignedCount,
+        reassignment_log: result.reassignmentLog,
       });
     }
 
-    // If brand_id provided, use the database function to handle all reassignments
     if (brand_id) {
-      // TODO: Replace with actual RPC call once the database function is deployed
-      // const { data, error } = await supabase.rpc('handle_user_brand_removal', {
-      //   p_user_id: from_user_id,
-      //   p_brand_id: brand_id,
-      //   p_reassign_to_user_id: to_user_id
-      // });
+      const { data: brandWorkflows, error: brandWorkflowsError } = await supabase
+        .from('workflows')
+        .select('id')
+        .eq('brand_id', brand_id);
 
-      // For now, return placeholder response
+      if (brandWorkflowsError) {
+        throw brandWorkflowsError;
+      }
+
+      const workflowIds = (brandWorkflows || []).map((w) => w.id);
+      const result = await reassignAcrossWorkflows(workflowIds, { brandId: brand_id });
+      if (result instanceof NextResponse) {
+        return result;
+      }
+
       return NextResponse.json({
         success: true,
-        reassigned_count: 0,
-        reassignment_log: []
+        reassigned_count: result.reassignedCount,
+        reassignment_log: result.reassignmentLog,
       });
     }
 
-    // If neither workflow_ids nor brand_id provided
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Either brand_id or workflow_ids must be provided' 
+      {
+        success: false,
+        error: 'Either brand_id or workflow_ids must be provided',
       },
       { status: 400 }
     );

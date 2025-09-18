@@ -5,8 +5,12 @@ import { handleApiError } from '@/lib/api-utils';
 import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth for global admin check
 import { User } from '@supabase/supabase-js';
 // import { withAuthAndCSRF } from '@/lib/api/with-csrf'; - not used
+import { logSecurityEvent } from '@/lib/auth/account-lockout';
 
 export const dynamic = "force-dynamic";
+
+const LAST_EXECUTION = new Map<string, number>();
+const COOLDOWN_MS = 30_000; // simple throttle to avoid rapid role churn
 
 /**
  * POST endpoint to fix user role permissions across all their associated brands.
@@ -19,6 +23,17 @@ export const dynamic = "force-dynamic";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const POST = withAdminAuth(async (request: NextRequest, _adminUser: User) => {
   try {
+    const adminId = _adminUser.id;
+    const now = Date.now();
+    const lastRun = LAST_EXECUTION.get(adminId) || 0;
+    if (now - lastRun < COOLDOWN_MS) {
+      return NextResponse.json(
+        { success: false, error: 'This operation was run recently. Please wait a moment before retrying.' },
+        { status: 429 }
+      );
+    }
+    LAST_EXECUTION.set(adminId, now);
+
     // adminUser is the authenticated global admin from withAdminAuth
     const supabase = createSupabaseAdminClient();
     
@@ -112,6 +127,13 @@ export const POST = withAdminAuth(async (request: NextRequest, _adminUser: User)
     
     if (metadataError) throw metadataError;
     operations.details.push('Updated user metadata with new role');
+
+    await logSecurityEvent('admin_fix_user_role', {
+      targetUserId: userId,
+      newRole: role,
+      updatedPermissions: operations.updated,
+      createdPermissions: operations.created
+    }, adminId);
     
     return NextResponse.json({
       success: true,

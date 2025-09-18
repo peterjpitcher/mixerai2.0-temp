@@ -9,6 +9,7 @@ import { withCorrelation } from '@/lib/observability/with-correlation';
 import { timed } from '@/lib/observability/timer';
 import { invalidateClaimsCacheForProduct } from '@/lib/claims-service';
 import { logClaimAudit } from '@/lib/audit';
+import { logSecurityEvent } from '@/lib/auth/account-lockout';
 
 export const dynamic = "force-dynamic";
 
@@ -182,6 +183,13 @@ export const PUT = withCorrelation(withAuthAndCSRF(async (req: NextRequest, user
         }
 
         await logClaimAudit('MARKET_OVERRIDE_UPDATED', user.id, overrideId, data);
+        await logSecurityEvent('market_override_updated', {
+          overrideId,
+          masterClaimId: (data as any)?.master_claim_id,
+          marketCountryCode: (data as any)?.market_country_code,
+          targetProductId: (existingOverrideForPermissionCheck?.target_product_id) || (data as any)?.target_product_id,
+          updatePayload,
+        }, user.id);
         // Invalidate cache for the target product
         try {
           const targetProductId = (existingOverrideForPermissionCheck?.target_product_id) || (data as any)?.target_product_id;

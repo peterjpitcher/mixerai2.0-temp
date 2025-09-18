@@ -4,6 +4,15 @@ import { generateBrandIdentityFromUrls } from '@/lib/azure/openai';
 import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
 import { handleApiError } from '@/lib/api-utils';
 
+const testsEnabled = process.env.ENABLE_TEST_ENDPOINTS === 'true';
+
+function disabledResponse() {
+  return NextResponse.json(
+    { success: false, error: 'This test endpoint is disabled. Set ENABLE_TEST_ENDPOINTS=true to enable locally.' },
+    { status: 410 }
+  );
+}
+
 export const dynamic = "force-dynamic";
 
 // Detect if we're in a build environment (Vercel)
@@ -29,6 +38,9 @@ const mockResponse = {
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const GET = withAdminAuth(async (_request: NextRequest, _user) => {
+  if (!testsEnabled) {
+    return disabledResponse();
+  }
   // Restrict to development environment only
   if (process.env.NODE_ENV === 'production') {
     return NextResponse.json(

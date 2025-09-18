@@ -4,11 +4,23 @@ import OpenAI from 'openai';
 import { withAdminAuthAndCSRF } from '@/lib/auth/api-auth'; // Use withAdminAuthAndCSRF
 import { handleApiError } from '@/lib/api-utils';
 
+const testsEnabled = process.env.ENABLE_TEST_ENDPOINTS === 'true';
+
+function disabledResponse() {
+  return NextResponse.json(
+    { success: false, error: 'This test endpoint is disabled. Set ENABLE_TEST_ENDPOINTS=true to enable locally.' },
+    { status: 410 }
+  );
+}
+
 /**
  * GET: Test basic Azure OpenAI connectivity (admin only).
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const GET = withAdminAuthAndCSRF(async (_req: NextRequest, _user) => {
+  if (!testsEnabled) {
+    return disabledResponse();
+  }
   try {
     const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
     const azureApiKey = process.env.AZURE_OPENAI_API_KEY;
@@ -68,6 +80,9 @@ export const GET = withAdminAuthAndCSRF(async (_req: NextRequest, _user) => {
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const POST = withAdminAuthAndCSRF(async (req: NextRequest, _user) => {
+  if (!testsEnabled) {
+    return disabledResponse();
+  }
   try {
     const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
     const azureApiKey = process.env.AZURE_OPENAI_API_KEY;

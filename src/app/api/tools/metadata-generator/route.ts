@@ -5,6 +5,8 @@ import { fetchWebPageContent } from '@/lib/utils/web-scraper';
 import { handleApiError } from '@/lib/api-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { Json } from '@/types/supabase';
+import { z } from 'zod';
+import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth/brand-access';
  // TODO: Uncomment when types are regenerated
 
 // In-memory rate limiting
@@ -12,11 +14,17 @@ const rateLimit = new Map<string, { count: number, timestamp: number }>();
 const RATE_LIMIT_PERIOD = 60 * 1000; // 1 minute
 const MAX_REQUESTS_PER_MINUTE = 60; // Allow 60 requests per minute per IP (relaxed)
 
-interface MetadataGenerationRequest {
-  urls: string[];
-  language?: string;
-  processBatch?: boolean;
-}
+const MetadataGenerationSchema = z.object({
+  urls: z
+    .array(z.string().min(1))
+    .min(1, 'At least one URL is required')
+    .max(10, 'A maximum of 10 URLs can be processed at once'),
+  language: z.string().min(2).max(10).optional(),
+  processBatch: z.boolean().optional(),
+  brand_id: z.string().uuid().optional(),
+});
+
+type MetadataGenerationRequest = z.infer<typeof MetadataGenerationSchema>;
 
 // Define the result item type matching the frontend
 interface MetadataResultItem {
@@ -86,87 +94,143 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
   }
 
   try {
-    const data: MetadataGenerationRequest = await request.json();
-    apiInputs = data; // Capture inputs for logging
-    
-    if (!data.urls || !Array.isArray(data.urls) || data.urls.length === 0) {
+    const parsedBody = MetadataGenerationSchema.safeParse(await request.json());
+    if (!parsedBody.success) {
       historyEntryStatus = 'failure';
-      historyErrorMessage = 'An array of URLs is required';
+      historyErrorMessage = 'Invalid request payload';
       return NextResponse.json(
-        { success: false, error: historyErrorMessage },
+        { success: false, error: historyErrorMessage, details: parsedBody.error.flatten() },
         { status: 400 }
       );
     }
 
-    const results: MetadataResultItem[] = [];
-    const requestedLanguage = data.language || 'en';
+    const data = parsedBody.data;
+    apiInputs = data;
 
-    // Process URLs with appropriate delays to avoid rate limiting
+    let brandLanguage: string | undefined;
+    let brandCountry: string | undefined;
+    let baseBrandContext = {
+      brandIdentity: '',
+      toneOfVoice: '',
+      guardrails: '',
+    };
+
+    if (data.brand_id) {
+      try {
+        const hasAccess = await userHasBrandAccess(supabaseAdmin, user, data.brand_id);
+        if (!hasAccess) {
+          historyEntryStatus = 'failure';
+          historyErrorMessage = 'You do not have access to this brand.';
+          return NextResponse.json(
+            { success: false, error: historyErrorMessage },
+            { status: 403 }
+          );
+        }
+      } catch (error) {
+        if (error instanceof BrandPermissionVerificationError) {
+          historyEntryStatus = 'failure';
+          historyErrorMessage = 'Unable to verify brand permissions.';
+          return NextResponse.json(
+            { success: false, error: historyErrorMessage },
+            { status: 500 }
+          );
+        }
+        throw error;
+      }
+
+      const { data: brandData, error: brandError } = await supabaseAdmin
+        .from('brands')
+        .select('language, country, brand_identity, tone_of_voice, guardrails')
+        .eq('id', data.brand_id)
+        .single();
+
+      if (brandError || !brandData) {
+        historyEntryStatus = 'failure';
+        historyErrorMessage = 'Failed to fetch brand details or brand not found.';
+        return NextResponse.json(
+          { success: false, error: historyErrorMessage },
+          { status: 404 }
+        );
+      }
+
+      if (!brandData.language || !brandData.country) {
+        historyEntryStatus = 'failure';
+        historyErrorMessage = 'Brand language and country are required for metadata generation and are missing for this brand.';
+        return NextResponse.json(
+          { success: false, error: historyErrorMessage },
+          { status: 400 }
+        );
+      }
+
+      brandLanguage = brandData.language;
+      brandCountry = brandData.country;
+      baseBrandContext = {
+        brandIdentity: brandData.brand_identity ?? '',
+        toneOfVoice: brandData.tone_of_voice ?? '',
+        guardrails: brandData.guardrails ?? '',
+      };
+    }
+
+    const targetLanguage = data.language?.trim() || brandLanguage || 'en';
+    const targetCountry = brandCountry || 'US';
+
+    const results: MetadataResultItem[] = [];
+
     for (let i = 0; i < data.urls.length; i++) {
       const url = data.urls[i];
       try {
+        // Validate that URL can be parsed (fetchWebPageContent performs additional checks)
         new URL(url);
 
-        const brandCountry = 'US';
-        const brandContext = {
-          brandIdentity: '',
-          toneOfVoice: '',
-          guardrails: '',
-        };
-        
         let pageContent = '';
         try {
           pageContent = await fetchWebPageContent(url);
         } catch (fetchError) {
           console.warn(`[MetadataGen] Failed to fetch content for URL ${url}: ${(fetchError as Error).message}`);
         }
-        
-        // Add delay between URLs to avoid rate limiting (except for the first URL)
+
         if (i > 0) {
-          console.log(`[Delay] Metadata Gen: Waiting 2 seconds before processing next URL...`);
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
 
         const generatedMetadata = await generateMetadata(
           url,
-          requestedLanguage,
-          brandCountry,
+          targetLanguage,
+          targetCountry,
           {
-            ...brandContext,
-            pageContent
+            ...baseBrandContext,
+            pageContent,
           }
         );
-        
+
         results.push({
           url,
           metaTitle: generatedMetadata.metaTitle,
           metaDescription: generatedMetadata.metaDescription,
-          keywords: [], // generateMetadata doesn't return keywords
+          keywords: [],
         });
-
       } catch (error: unknown) {
         console.error(`[MetadataGen] Error processing URL ${url}:`, error);
         results.push({
           url,
           error: error instanceof Error ? error.message : 'Failed to generate metadata for this URL.',
         });
-        historyEntryStatus = 'failure'; // Mark overall run as failure if any URL fails
+        historyEntryStatus = 'failure';
         if (!historyErrorMessage) historyErrorMessage = 'One or more URLs failed metadata generation.';
       }
     }
-    
-    apiOutputs = { results }; // Capture outputs for logging
 
-    // Determine final history status based on individual URL results
+    apiOutputs = { results };
+
     if (results.some(r => r.error)) {
-        historyEntryStatus = 'failure';
-        if (!historyErrorMessage) historyErrorMessage = 'One or more URLs failed to generate metadata.';
+      historyEntryStatus = 'failure';
+      if (!historyErrorMessage) historyErrorMessage = 'One or more URLs failed to generate metadata.';
     } else {
-        historyEntryStatus = 'success';
+      historyEntryStatus = 'success';
     }
 
     return NextResponse.json({
-      success: historyEntryStatus === 'success', // Reflect overall success
+      success: historyEntryStatus === 'success',
       userId: user.id,
       results,
       ...(historyEntryStatus === 'failure' && historyErrorMessage && { error: historyErrorMessage })
@@ -176,7 +240,9 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
     console.error('[MetadataGen] Global error in POST handler:', error);
     historyEntryStatus = 'failure';
     historyErrorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
-    if (!apiInputs) apiInputs = { urls: [], language: 'unknown' };
+    if (!apiInputs) {
+      apiInputs = { urls: [], language: 'unknown', processBatch: false } as MetadataGenerationRequest;
+    }
     apiOutputs = { results: [{ url: 'unknown', error: historyErrorMessage }] };
     // Note: handleApiError already returns a NextResponse, so we don't return it directly here.
     // The finally block will still execute.
@@ -198,7 +264,7 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
             outputs: ((apiOutputs as unknown as Json) || { error: historyErrorMessage || 'Unknown error before output generation' } as Json),
             status: historyEntryStatus,
             error_message: historyErrorMessage,
-            brand_id: null,
+            brand_id: apiInputs?.brand_id ?? null,
             batch_id: batchId,
             batch_sequence: batchId ? 1 : null
         });

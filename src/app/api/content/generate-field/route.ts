@@ -1,161 +1,312 @@
-import { NextResponse, NextRequest } from 'next/server';
-// import { createSupabaseServerClient } from '@/lib/supabase/server'; // For DB access with RLS
-import { generateTextCompletion } from '@/lib/azure/openai';
- // Use the withAuth wrapper
-import type { ContentTemplate as Template } from '@/types/template';
-import type { Brand } from '@/types/models'; // Corrected Brand type import
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { User } from '@supabase/supabase-js';
+
+import { generateTextCompletion } from '@/lib/azure/openai';
+import { normalizeFieldContent, type NormalizedContent } from '@/lib/content/html-normalizer';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
-import { 
-  calculateMaxTokens, 
+import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth/brand-access';
+import { logContentGenerationAudit } from '@/lib/audit/content';
+import {
+  calculateMaxTokens,
   processAIResponse,
   type FieldConstraints,
-  type TemplateField 
+  type TemplateField,
 } from '@/lib/ai/constrained-generation';
+import { TemplateFieldsSchema } from '@/lib/schemas/template';
+import type { Brand } from '@/types/models';
 
-// Helper function to get template details
-async function getTemplateDetails(templateId: string, supabaseClient: ReturnType<typeof createSupabaseAdminClient>): Promise<Template | null> {
-  const { data: template, error } = await supabaseClient
-    .from('content_templates')
-    .select('*, inputFields:content_template_input_fields(*), outputFields:content_template_output_fields(*)')
-    .eq('id', templateId)
-    .single();
+const MAX_TEMPLATE_VALUE_LENGTH = 8000;
+const MAX_EXISTING_OUTPUT_LENGTH = 20000;
 
-  if (error) {
-    console.error('[generate-field] Error fetching template details:', error);
-    return null;
-  }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return template as any as Template;
-}
+const normalizedContentInputSchema = z
+  .object({
+    html: z.string().optional(),
+    plain: z.string().optional(),
+    wordCount: z.number().optional(),
+    charCount: z.number().optional(),
+  })
+  .refine((value) => typeof value.html === 'string' || typeof value.plain === 'string', {
+    message: 'Normalized content must include html or plain text',
+  });
 
-// Helper function to get brand details
-async function getBrandDetails(brandId: string, supabaseClient: ReturnType<typeof createSupabaseAdminClient>): Promise<Brand | null> {
-  const { data: brand, error } = await supabaseClient
-    .from('brands')
-    .select('*')
-    .eq('id', brandId)
-    .single();
+const requestSchema = z.object({
+  brand_id: z.string().uuid('brand_id must be a valid UUID'),
+  template_id: z.string().uuid('template_id must be a valid UUID'),
+  output_field_to_generate_id: z.string().min(1, 'output_field_to_generate_id is required'),
+  template_field_values: z
+    .record(z.string().max(MAX_TEMPLATE_VALUE_LENGTH, 'template field values must be 8000 characters or fewer'))
+    .optional(),
+  existing_outputs: z
+    .record(
+      z.union([
+        z.string().max(
+          MAX_EXISTING_OUTPUT_LENGTH,
+          'existing output values must be 20000 characters or fewer'
+        ),
+        normalizedContentInputSchema,
+      ])
+    )
+    .optional(),
+});
 
-  if (error) {
-    console.error('[generate-field] Error fetching brand details:', error);
-    return null;
-  }
-  return brand as Brand;
-}
+const clampString = (value: string, limit: number) => (value.length > limit ? value.slice(0, limit) : value);
 
-// Enhanced interpolatePrompt function
-function interpolatePrompt(
+const interpolatePrompt = (
   promptText: string,
   templateFieldValues: Record<string, string>,
   existingOutputs: Record<string, string>,
-  brandDetails: Brand | null
-): string {
+  brandDetails: Pick<Brand, 'name' | 'brand_identity' | 'tone_of_voice' | 'guardrails'> | null
+): string => {
   let interpolated = promptText;
 
-  // Replace input field placeholders: {{inputFieldName}}
-  // These come from templateFieldValues, keys are field names
-  for (const key in templateFieldValues) {
-    const placeholder = new RegExp(`{{${key.replace(/[.*+?^${}()|[\]\\\\]/g, '\\\\$&')}}}`, 'g');
-    interpolated = interpolated.replace(placeholder, templateFieldValues[key] || '');
-  }
+  Object.entries(templateFieldValues).forEach(([key, value]) => {
+    const placeholder = new RegExp(`{{${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}}}`, 'g');
+    interpolated = interpolated.replace(placeholder, value);
+  });
 
-  // Replace output field placeholders: {{outputFieldName}}
-  // These come from existingOutputs, keys are field names (or IDs if that's how they are stored)
-  for (const key in existingOutputs) {
-    const placeholder = new RegExp(`{{${key.replace(/[.*+?^${}()|[\]\\\\]/g, '\\\\$&')}}}`, 'g');
-    interpolated = interpolated.replace(placeholder, existingOutputs[key] || '');
-  }
+  Object.entries(existingOutputs).forEach(([key, value]) => {
+    const placeholder = new RegExp(`{{${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}}}`, 'g');
+    interpolated = interpolated.replace(placeholder, value);
+  });
 
-  // Replace generic brand placeholders if they are used in the promptText
   if (brandDetails) {
-    // Replace the new format used by the UI
-    interpolated = interpolated.replace(/{{brand\.name}}/g, brandDetails.name || '');
-    interpolated = interpolated.replace(/{{brand\.identity}}/g, brandDetails.brand_identity || '');
-    interpolated = interpolated.replace(/{{brand\.tone_of_voice}}/g, brandDetails.tone_of_voice || '');
-    interpolated = interpolated.replace(/{{brand\.guardrails}}/g, brandDetails.guardrails || '');
-    interpolated = interpolated.replace(/{{brand\.summary}}/g, brandDetails.brand_identity || ''); // Use brand_identity as summary
-    interpolated = interpolated.replace(/{{brand}}/g, JSON.stringify({
-      name: brandDetails.name,
-      identity: brandDetails.brand_identity,
-      tone_of_voice: brandDetails.tone_of_voice,
-      guardrails: brandDetails.guardrails
-    }));
-    
-    // Also support the old format for backward compatibility
-    interpolated = interpolated.replace(/{{Brand Name}}/g, brandDetails.name || '');
-    interpolated = interpolated.replace(/{{Brand Identity}}/g, brandDetails.brand_identity || '');
-    interpolated = interpolated.replace(/{{Tone of Voice}}/g, brandDetails.tone_of_voice || '');
-    interpolated = interpolated.replace(/{{Guardrails}}/g, brandDetails.guardrails || '');
-  }
-  return interpolated;
-}
+    interpolated = interpolated.replace(/{{brand\.name}}/g, brandDetails.name ?? '');
+    interpolated = interpolated.replace(/{{brand\.identity}}/g, brandDetails.brand_identity ?? '');
+    interpolated = interpolated.replace(/{{brand\.tone_of_voice}}/g, brandDetails.tone_of_voice ?? '');
+    interpolated = interpolated.replace(/{{brand\.guardrails}}/g, brandDetails.guardrails ?? '');
+    interpolated = interpolated.replace(/{{brand\.summary}}/g, brandDetails.brand_identity ?? '');
+    interpolated = interpolated.replace(
+      /{{brand}}/g,
+      JSON.stringify({
+        name: brandDetails.name,
+        identity: brandDetails.brand_identity,
+        tone_of_voice: brandDetails.tone_of_voice,
+        guardrails: brandDetails.guardrails,
+      })
+    );
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export const POST = withAuthAndCSRF(async (req: NextRequest, _user: User): Promise<Response> => {
+    interpolated = interpolated.replace(/{{Brand Name}}/g, brandDetails.name ?? '');
+    interpolated = interpolated.replace(/{{Brand Identity}}/g, brandDetails.brand_identity ?? '');
+    interpolated = interpolated.replace(/{{Tone of Voice}}/g, brandDetails.tone_of_voice ?? '');
+    interpolated = interpolated.replace(/{{Guardrails}}/g, brandDetails.guardrails ?? '');
+  }
+
+  return interpolated;
+};
+
+export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promise<Response> => {
   const supabase = createSupabaseAdminClient();
+
   try {
-    const body = await req.json();
+    const parsedBody = requestSchema.safeParse(await req.json());
+    if (!parsedBody.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid request payload',
+          details: parsedBody.error.flatten(),
+        },
+        { status: 400 }
+      );
+    }
+
     const {
       brand_id,
       template_id,
-      template_field_values = {}, // User inputs for the template's input fields
       output_field_to_generate_id,
-      existing_outputs = {}, // Current values of other generated output fields for context
-      // title // Current main title, if needed for context
-    } = body;
+      template_field_values = {},
+      existing_outputs = {},
+    } = parsedBody.data;
 
-    if (!brand_id || !template_id || !output_field_to_generate_id) {
-      return NextResponse.json({ success: false, error: 'Missing required parameters: brand_id, template_id, or output_field_to_generate_id' }, { status: 400 });
+    try {
+      const hasAccess = await userHasBrandAccess(supabase, user, brand_id);
+      if (!hasAccess) {
+        return NextResponse.json(
+          { success: false, error: 'You do not have access to this brand.' },
+          { status: 403 }
+        );
+      }
+    } catch (error) {
+      if (error instanceof BrandPermissionVerificationError) {
+        return NextResponse.json(
+          { success: false, error: 'Unable to verify brand permissions. Please try again later.' },
+          { status: 500 }
+        );
+      }
+      throw error;
     }
 
-    const [template, brandDetails] = await Promise.all([
-      getTemplateDetails(template_id, supabase),
-      getBrandDetails(brand_id, supabase)
-    ]);
+    const [{ data: templateRecord, error: templateError }, { data: brandRecord, error: brandError }] =
+      await Promise.all([
+        supabase
+          .from('content_templates')
+          .select('id, name, brand_id, fields')
+          .eq('id', template_id)
+          .maybeSingle(),
+        supabase
+          .from('brands')
+          .select('id, name, brand_identity, tone_of_voice, guardrails, language, country')
+          .eq('id', brand_id)
+          .maybeSingle(),
+      ]);
 
-    if (!template) {
+    if (templateError) {
+      console.error('[generate-field] Error fetching template details:', templateError);
+      throw templateError;
+    }
+    if (!templateRecord) {
       return NextResponse.json({ success: false, error: 'Content template not found' }, { status: 404 });
     }
-    if (!brandDetails) {
+
+    if (templateRecord.brand_id && templateRecord.brand_id !== brand_id) {
+      return NextResponse.json(
+        { success: false, error: 'Template does not belong to the selected brand.' },
+        { status: 403 }
+      );
+    }
+
+    if (brandError) {
+      console.error('[generate-field] Error fetching brand details:', brandError);
+      throw brandError;
+    }
+    if (!brandRecord) {
       return NextResponse.json({ success: false, error: 'Brand not found' }, { status: 404 });
     }
 
-    const outputFieldToGenerate = template.outputFields?.find(f => f.id === output_field_to_generate_id);
+    let parsedTemplateFields;
+    try {
+      parsedTemplateFields = TemplateFieldsSchema.parse(templateRecord.fields ?? {});
+    } catch (error) {
+      console.error('[generate-field] Template fields failed validation:', error);
+      return NextResponse.json(
+        { success: false, error: 'Template configuration is invalid. Please contact an administrator.' },
+        { status: 422 }
+      );
+    }
+
+    const inputValuesById = new Map<string, string>();
+    Object.entries(template_field_values).forEach(([key, value]) => {
+      inputValuesById.set(key, clampString(value, MAX_TEMPLATE_VALUE_LENGTH));
+    });
+
+    const sanitizedInputFields = parsedTemplateFields.inputFields.map((field) => ({
+      ...field,
+      value: inputValuesById.get(field.id) ?? '',
+    }));
+
+    const missingRequiredInputs = sanitizedInputFields.filter(
+      (field) => field.required && !(field.value && field.value.toString().trim().length > 0)
+    );
+
+    if (missingRequiredInputs.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Required template inputs are missing.',
+          missingFields: missingRequiredInputs.map((field) => field.name || field.id),
+        },
+        { status: 400 }
+      );
+    }
+
+    const outputFieldToGenerate = parsedTemplateFields.outputFields.find(
+      (field) => field.id === output_field_to_generate_id
+    );
 
     if (!outputFieldToGenerate) {
-      return NextResponse.json({ success: false, error: `Output field with ID ${output_field_to_generate_id} not found in template.` }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: `Output field with ID ${output_field_to_generate_id} not found in template.` },
+        { status: 404 }
+      );
     }
 
     if (!outputFieldToGenerate.aiPrompt) {
-      return NextResponse.json({ success: false, error: `Output field ${outputFieldToGenerate.name} does not have an AI prompt configured.` }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: `Output field ${outputFieldToGenerate.name} does not have an AI prompt configured.` },
+        { status: 400 }
+      );
     }
-    
-    // 1. Interpolate the specific AI prompt for the output field based on its definition in the template
-    // This fills in {{inputFieldPlaceholder}}, {{outputFieldPlaceholder}}, and any {{Brand...}} placeholders
-    // *if* they were used by the template designer in this specific outputField.aiPrompt.
+
+    const templatePlaceholderValues: Record<string, string> = {};
+    sanitizedInputFields.forEach((field) => {
+      const value = field.value ?? '';
+      templatePlaceholderValues[field.id] = value;
+      if (field.name) {
+        templatePlaceholderValues[field.name] = value;
+      }
+    });
+
+    const existingOutputValues: Record<string, string> = {};
+    parsedTemplateFields.outputFields.forEach((field) => {
+      const rawValue = existing_outputs[field.id] ?? (field.name ? existing_outputs[field.name] : undefined);
+      if (!rawValue) {
+        return;
+      }
+
+      let normalized: NormalizedContent | null = null;
+      if (typeof rawValue === 'string') {
+        normalized = normalizeFieldContent(rawValue, field.type);
+      } else if (typeof rawValue === 'object') {
+        const candidate = (rawValue as { html?: string; plain?: string }).html ?? (rawValue as { html?: string; plain?: string }).plain ?? '';
+        normalized = normalizeFieldContent(candidate, field.type);
+      }
+
+      if (!normalized) {
+        return;
+      }
+
+      const primaryValue = field.type === 'richText' || field.type === 'html' ? normalized.html : normalized.plain;
+      const truncatedPrimary = clampString(primaryValue, MAX_EXISTING_OUTPUT_LENGTH);
+      existingOutputValues[field.id] = truncatedPrimary;
+      if (field.name) {
+        existingOutputValues[field.name] = truncatedPrimary;
+      }
+
+      const truncatedPlain = clampString(normalized.plain, MAX_EXISTING_OUTPUT_LENGTH);
+      const truncatedHtml = clampString(normalized.html, MAX_EXISTING_OUTPUT_LENGTH);
+      existingOutputValues[`${field.id}_plain`] = truncatedPlain;
+      existingOutputValues[`${field.id}_html`] = truncatedHtml;
+      if (field.name) {
+        existingOutputValues[`${field.name}_plain`] = truncatedPlain;
+        existingOutputValues[`${field.name}_html`] = truncatedHtml;
+      }
+    });
+
+    const brandContext = {
+      name: brandRecord.name,
+      brand_identity: brandRecord.brand_identity,
+      tone_of_voice: brandRecord.tone_of_voice,
+      guardrails: brandRecord.guardrails,
+      language: brandRecord.language ?? 'en',
+      country: brandRecord.country ?? 'US',
+    };
+
     const baseFieldSpecificInstructions = interpolatePrompt(
-      outputFieldToGenerate.aiPrompt || '', // Ensure aiPrompt is a string
-      template_field_values,
-      existing_outputs,
-      brandDetails
+      outputFieldToGenerate.aiPrompt,
+      templatePlaceholderValues,
+      existingOutputValues,
+      brandRecord
     );
 
-    // 2. Construct the final user prompt with explicit brand context + the field-specific task
-    let contextualizedUserPrompt = "";
-    const INDENT = "  "; // For formatting if desired
+    let contextualizedUserPrompt = '';
+    const INDENT = '  ';
 
     contextualizedUserPrompt += `BRAND CONTEXT:\n`;
-    contextualizedUserPrompt += `${INDENT}Brand Name: ${brandDetails.name}\n`;
-    if (brandDetails.brand_identity) {
-      contextualizedUserPrompt += `${INDENT}Brand Identity:\n${INDENT}${INDENT}${brandDetails.brand_identity.split('\\n').join(`\\n${INDENT}${INDENT}`)}\n`; // Indent multi-line identity
+    contextualizedUserPrompt += `${INDENT}Brand Name: ${brandContext.name}\n`;
+    if (brandRecord.brand_identity) {
+      contextualizedUserPrompt += `${INDENT}Brand Identity:\n${INDENT}${INDENT}${brandRecord.brand_identity
+        .split('\\n')
+        .join(`\\n${INDENT}${INDENT}`)}\n`;
     }
-    if (brandDetails.tone_of_voice) {
-      contextualizedUserPrompt += `${INDENT}Tone of Voice: ${brandDetails.tone_of_voice}\n`;
+    if (brandRecord.tone_of_voice) {
+      contextualizedUserPrompt += `${INDENT}Tone of Voice: ${brandRecord.tone_of_voice}\n`;
     }
-    if (brandDetails.guardrails) {
-      contextualizedUserPrompt += `${INDENT}Brand Guardrails:\n${INDENT}${INDENT}${brandDetails.guardrails.split('\\n').join(`\\n${INDENT}${INDENT}`)}\n`; // Indent multi-line guardrails
+    if (brandRecord.guardrails) {
+      contextualizedUserPrompt += `${INDENT}Brand Guardrails:\n${INDENT}${INDENT}${brandRecord.guardrails
+        .split('\\n')
+        .join(`\\n${INDENT}${INDENT}`)}\n`;
     }
     contextualizedUserPrompt += `\nTASK TO PERFORM:\n`;
     contextualizedUserPrompt += `${INDENT}You are generating content *only* for the field named "${outputFieldToGenerate.name}".\n`;
@@ -163,11 +314,9 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, _user: User): Promi
     contextualizedUserPrompt += `${INDENT}Use the following instructions and input data (if any) to generate the content for this field:\n\n`;
     contextualizedUserPrompt += baseFieldSpecificInstructions;
 
-    // Extract field constraints from options
     const fieldOptions = outputFieldToGenerate.options || {};
     const constraints: FieldConstraints = {};
-    
-    // Map field options to constraints based on field type
+
     if (outputFieldToGenerate.type === 'plainText' && 'maxLength' in fieldOptions) {
       constraints.max_length = fieldOptions.maxLength as number;
     } else if (outputFieldToGenerate.type === 'richText') {
@@ -178,17 +327,18 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, _user: User): Promi
         constraints.max_rows = fieldOptions.maxRows as number;
       }
     }
-    
-    // Build template field object for constrained generation
+
     const templateField: TemplateField = {
       name: outputFieldToGenerate.name,
-      type: outputFieldToGenerate.type === 'plainText' ? 'short_text' : 
-            outputFieldToGenerate.type === 'richText' ? 'long_text' : 
-            'long_text', // Default for html/image
-      config: constraints
+      type:
+        outputFieldToGenerate.type === 'plainText'
+          ? 'short_text'
+          : outputFieldToGenerate.type === 'richText'
+          ? 'long_text'
+          : 'long_text',
+      config: constraints,
     };
-    
-    // Add constraint instructions to the prompt if constraints exist
+
     let constraintInstructions = '';
     if (constraints.max_length) {
       constraintInstructions += `\n\nCRITICAL REQUIREMENT: The response MUST be ${constraints.max_length} characters or less. This is mandatory.`;
@@ -196,15 +346,12 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, _user: User): Promi
     if (constraints.max_rows) {
       constraintInstructions += `\nMAXIMUM LINES: ${constraints.max_rows} lines/rows only. Do not exceed this limit.`;
     }
-    
+
     const enhancedUserPrompt = contextualizedUserPrompt + constraintInstructions;
-    
     const systemPrompt = `You are an AI assistant specialized in generating specific pieces of marketing content based on detailed instructions and brand context. Your goal is to produce accurate, high-quality text for the requested field ONLY. Do not add conversational fluff or any introductory/concluding remarks beyond the direct content for the field.${constraintInstructions ? ' IMPORTANT: You MUST respect all character and line limits specified.' : ''}`;
-    
-    // Calculate appropriate max tokens based on constraints
+
     let singleFieldMaxTokens = calculateMaxTokens(constraints.max_length);
     if (!singleFieldMaxTokens) {
-      // Fallback to type-based defaults if no max_length constraint
       if (outputFieldToGenerate.type === 'richText') {
         singleFieldMaxTokens = 1000;
       } else if (outputFieldToGenerate.type === 'html') {
@@ -214,62 +361,83 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, _user: User): Promi
       }
     }
 
-    // Use lower temperature for constrained generation
     const temperature = constraints.max_length || constraints.max_rows ? 0.3 : 0.7;
-    
-    // Try generation with retries for constraint violations
+
     let generatedText: string | null = null;
     let attempts = 0;
     const maxAttempts = 3;
-    
+
     while (attempts < maxAttempts && !generatedText) {
-      attempts++;
-      
+      attempts += 1;
+
       const rawResponse = await generateTextCompletion(
         systemPrompt,
-        enhancedUserPrompt + (attempts > 1 ? `\n\nPREVIOUS ATTEMPT FAILED: Response exceeded constraints. Generate a shorter response that fits within ${constraints.max_length || 'the specified'} characters.` : ''),
+        enhancedUserPrompt +
+          (attempts > 1
+            ? `\n\nPREVIOUS ATTEMPT FAILED: Response exceeded constraints. Generate a shorter response that fits within ${constraints.max_length || 'the specified'} characters.`
+            : ''),
         singleFieldMaxTokens,
         temperature
       );
-      
+
       if (!rawResponse) {
-        console.error(`[generate-field] AI generation attempt ${attempts} failed for field ${outputFieldToGenerate.name}`);
+        console.error(`[generate-field] AI generation attempt ${attempts} returned no content for field ${outputFieldToGenerate.name}`);
         continue;
       }
-      
-      // Process and validate the response against constraints
+
       const processed = processAIResponse(rawResponse, templateField);
-      
+
       if (processed.warnings.length === 0 || attempts === maxAttempts) {
-        // Either no violations or last attempt - use the processed result
         generatedText = processed.value;
         if (processed.warnings.length > 0) {
-          console.warn(`[generate-field] Using truncated response after ${attempts} attempts:`, processed.warnings);
+          console.warn(`[generate-field] Using truncated response after ${attempts} attempts for field ${outputFieldToGenerate.name}:`, processed.warnings);
         }
       } else {
-        console.warn(`[generate-field] Attempt ${attempts} violated constraints:`, processed.warnings);
+        console.warn(`[generate-field] Attempt ${attempts} violated constraints for field ${outputFieldToGenerate.name}:`, processed.warnings);
       }
     }
 
     if (!generatedText) {
-      console.error(`[generate-field] AI generation failed after ${maxAttempts} attempts for field ${outputFieldToGenerate.name}`);
-      return NextResponse.json({ success: false, error: `AI failed to generate content within constraints for field: ${outputFieldToGenerate.name}` }, { status: 500 });
+      return NextResponse.json(
+        { success: false, error: `AI failed to generate content within constraints for field: ${outputFieldToGenerate.name}` },
+        { status: 500 }
+      );
+    }
+
+    await logContentGenerationAudit({
+      action: 'content_generate_field',
+      userId: user.id,
+      brandId: brand_id,
+      templateId: template_id,
+      metadata: {
+        fieldId: output_field_to_generate_id,
+        attempts,
+        constraints: templateField.config,
+      },
+    });
+
+    const generatedContent = normalizeFieldContent(generatedText, outputFieldToGenerate.type);
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[api/content/generate-field] generatedContent', generatedContent);
     }
 
     return NextResponse.json({
       success: true,
-      generated_text: generatedText,
-      field_id: outputFieldToGenerate.id,
+      generated_content: generatedContent,
+      output_field_id: output_field_to_generate_id,
       field_name: outputFieldToGenerate.name,
-      attempts_made: attempts
+      attempts_made: attempts,
     });
-
-  } catch (error: unknown) {
+  } catch (error) {
     console.error('[generate-field] Error:', error);
-    return NextResponse.json({ success: false, error: (error as Error).message || 'An unexpected error occurred' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: (error as Error).message || 'An unexpected error occurred' },
+      { status: 500 }
+    );
   }
 });
 
 export async function OPTIONS() {
   return NextResponse.json({}, { status: 200 });
-} 
+}

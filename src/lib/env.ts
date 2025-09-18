@@ -26,6 +26,7 @@ const optionalEnvVars = {
   GITHUB_REPO: process.env.GITHUB_REPO,
   NEXT_PUBLIC_GITHUB_OWNER: process.env.NEXT_PUBLIC_GITHUB_OWNER,
   NEXT_PUBLIC_GITHUB_REPO: process.env.NEXT_PUBLIC_GITHUB_REPO,
+  PROXY_ALLOWED_HOSTS: process.env.PROXY_ALLOWED_HOSTS,
 } as const;
 
 /**

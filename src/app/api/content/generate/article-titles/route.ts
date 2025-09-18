@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { User } from '@supabase/supabase-js';
 
 import { handleApiError } from '@/lib/api-utils';
 import { generateSuggestions } from '@/lib/azure/openai';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth/brand-access';
+import { logContentGenerationAudit } from '@/lib/audit/content';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +19,7 @@ interface RequestBody {
  * POST: Generate article title suggestions based on a topic.
  * Requires authentication.
  */
-export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Response> => {
+export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Promise<Response> => {
   try {
     const body: RequestBody = await request.json();
 
@@ -37,6 +40,25 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
 
     if (body.brand_id) {
       const supabase = createSupabaseAdminClient();
+
+      try {
+        const hasAccess = await userHasBrandAccess(supabase, user, body.brand_id);
+        if (!hasAccess) {
+          return NextResponse.json(
+            { success: false, error: 'You do not have access to this brand.' },
+            { status: 403 }
+          );
+        }
+      } catch (error) {
+        if (error instanceof BrandPermissionVerificationError) {
+          return NextResponse.json(
+            { success: false, error: 'Unable to verify brand permissions. Please try again later.' },
+            { status: 500 }
+          );
+        }
+        throw error;
+      }
+
       const { data: brandData, error: brandError } = await supabase
         .from('brands')
         .select('name, brand_identity, tone_of_voice, language, country')
@@ -67,6 +89,16 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
     const suggestions = await generateSuggestions('article-titles', {
       topic: body.topic,
       brandContext: brandContextForSuggestions,
+    });
+
+    await logContentGenerationAudit({
+      action: 'content_generate_article_titles',
+      userId: user.id,
+      brandId: body.brand_id,
+      metadata: {
+        topic: body.topic,
+        suggestionCount: suggestions?.length ?? 0,
+      }
     });
 
     return NextResponse.json({

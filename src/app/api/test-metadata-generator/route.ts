@@ -4,6 +4,15 @@ import { fetchWebPageContent } from '@/lib/utils/web-scraper';
 import { handleApiError } from '@/lib/api-utils'; // Import for consistent error handling
 // import { withAuth } from '@/lib/auth/api-auth'; // No longer used
 import { withAdminAuthAndCSRF } from '@/lib/auth/api-auth'; // Use withAdminAuthAndCSRF
+
+const testsEnabled = process.env.ENABLE_TEST_ENDPOINTS === 'true';
+
+function disabledResponse() {
+  return NextResponse.json(
+    { success: false, error: 'This test endpoint is disabled. Set ENABLE_TEST_ENDPOINTS=true to enable locally.' },
+    { status: 410 }
+  );
+}
 import { User } from '@supabase/supabase-js';
 
 // WARNING: This is a test endpoint that allows calls to Azure OpenAI services.
@@ -22,6 +31,9 @@ interface MetadataGenerationRequest {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const POST = withAdminAuthAndCSRF(async (request: NextRequest, _user: User) => {
+  if (!testsEnabled) {
+    return disabledResponse();
+  }
   // console.log removed
   try {
     const data: MetadataGenerationRequest = await request.json();

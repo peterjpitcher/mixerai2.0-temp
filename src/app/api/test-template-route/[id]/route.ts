@@ -4,6 +4,15 @@ import { handleApiError } from '@/lib/api-utils'; // Import for consistent error
 import { withAdminAuth } from '@/lib/auth/api-auth'; // Use withAdminAuth
 import { User } from '@supabase/supabase-js';
 
+const testsEnabled = process.env.ENABLE_TEST_ENDPOINTS === 'true';
+
+function disabledResponse() {
+  return NextResponse.json(
+    { success: false, error: 'This test endpoint is disabled. Set ENABLE_TEST_ENDPOINTS=true to enable locally.' },
+    { status: 410 }
+  );
+}
+
 export const dynamic = "force-dynamic";
 
 /**
@@ -12,6 +21,9 @@ export const dynamic = "force-dynamic";
  * or STRICTLY SECURED if kept in deployment.
  */
 export const GET = withAdminAuth(async (_request: NextRequest, _user: User, context?: unknown) => {
+  if (!testsEnabled) {
+    return disabledResponse();
+  }
   const { params } = context as { params: { id: string } };
   try {
     const id = params?.id;

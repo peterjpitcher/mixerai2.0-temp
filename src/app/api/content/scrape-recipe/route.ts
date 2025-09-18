@@ -1,7 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
-
+import dns from 'dns';
+import ipaddr from 'ipaddr.js';
 import { z } from 'zod';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { env } from '@/lib/env';
+
+const MAX_HTML_BYTES = 1024 * 1024; // 1MB cap
+
+const rawAllowlist = (env.PROXY_ALLOWED_HOSTS || '')
+  .split(',')
+  .map(entry => entry.trim().toLowerCase())
+  .filter(Boolean);
+
+const allowlistedHosts = new Set(rawAllowlist);
+
+function isHostAllowlisted(hostname: string): boolean {
+  if (!allowlistedHosts.size) {
+    return false;
+  }
+
+  const host = hostname.toLowerCase();
+
+  for (const entry of allowlistedHosts) {
+    if (entry.startsWith('*.')) {
+      const bare = entry.slice(2);
+      if (host === bare || host.endsWith(`.${bare}`)) {
+        return true;
+      }
+      continue;
+    }
+
+    if (host === entry) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 // Schema for the request
 const scrapeRecipeSchema = z.object({
@@ -179,6 +214,60 @@ export const POST = withAuthAndCSRF(async (req: NextRequest): Promise<Response> 
     const body = await req.json();
     const validatedData = scrapeRecipeSchema.parse(body);
     
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(validatedData.url);
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'Invalid URL format' },
+        { status: 400 }
+      );
+    }
+
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return NextResponse.json(
+        { success: false, error: 'Only HTTP and HTTPS URLs are permitted.' },
+        { status: 400 }
+      );
+    }
+
+    if (!isHostAllowlisted(parsedUrl.hostname)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'This host is not allowed. Ask an administrator to add it to the allowlist if needed.'
+        },
+        { status: 403 }
+      );
+    }
+
+    try {
+      const lookupResults = await dns.promises.lookup(parsedUrl.hostname, { all: true });
+      if (!lookupResults.length) {
+        return NextResponse.json(
+          { success: false, error: `Could not resolve hostname: ${parsedUrl.hostname}` },
+          { status: 502 }
+        );
+      }
+
+      for (const result of lookupResults) {
+        const addr = ipaddr.parse(result.address);
+        const range = addr.range();
+        if (range === 'private' || range === 'loopback' || range === 'reserved' || range === 'linkLocal' || range === 'uniqueLocal') {
+          return NextResponse.json(
+            { success: false, error: 'Requests to internal or reserved IP addresses are not allowed.' },
+            { status: 403 }
+          );
+        }
+      }
+    } catch (ipError) {
+      console.error('[scrape-recipe] Failed to validate DNS resolution:', ipError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to validate destination host.' },
+        { status: 400 }
+      );
+    }
+
     // Try to fetch the recipe page
     let response;
     try {
@@ -248,7 +337,32 @@ export const POST = withAuthAndCSRF(async (req: NextRequest): Promise<Response> 
       );
     }
 
-    const html = await response.text();
+    const reader = response.body?.getReader();
+    if (!reader) {
+      return NextResponse.json(
+        { success: false, error: 'Failed to read response body.' },
+        { status: 502 }
+      );
+    }
+
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > MAX_HTML_BYTES) {
+        reader.cancel();
+        return NextResponse.json(
+          { success: false, error: 'Recipe page is too large to process.' },
+          { status: 413 }
+        );
+      }
+      chunks.push(value);
+    }
+
+    const html = new TextDecoder('utf-8').decode(concatenateUint8Arrays(chunks, total));
     
     // Try to extract structured data first
     let recipeData = extractJsonLdData(html);
@@ -304,3 +418,13 @@ export const POST = withAuthAndCSRF(async (req: NextRequest): Promise<Response> 
     );
   }
 });
+
+function concatenateUint8Arrays(chunks: Uint8Array[], totalLength: number): Uint8Array {
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return result;
+}

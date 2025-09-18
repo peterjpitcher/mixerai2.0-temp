@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { User } from '@supabase/supabase-js';
 import { getModelName } from '@/lib/azure/openai';
-import { withCSRF } from '@/lib/api/with-csrf';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { BrandPermissionVerificationError, requireBrandAccess } from '@/lib/auth/brand-access';
 
 // Define the expected request body schema
 const StepContextSchema = z.object({
+  brand_id: z.string().uuid({ message: 'brand_id must be a valid UUID' }).optional(),
   workflowName: z.string().optional(),
   brandName: z.string().optional(),
   templateName: z.string().optional(),
@@ -72,7 +76,7 @@ async function callOpenAI(prompt: string): Promise<string | null> {
   }
 }
 
-export const POST = withCSRF(async function (request: NextRequest) {
+export const POST = withAuthAndCSRF(async function (request: NextRequest, user: User) {
   try {
     const body = await request.json();
     const validationResult = StepContextSchema.safeParse(body);
@@ -84,7 +88,28 @@ export const POST = withCSRF(async function (request: NextRequest) {
       );
     }
 
-    const { workflowName, brandName, templateName, stepName, role, brandCountry, brandLanguage } = validationResult.data;
+    const { brand_id, workflowName, brandName, templateName, stepName, role, brandCountry, brandLanguage } = validationResult.data;
+
+    if (brand_id) {
+      const supabase = createSupabaseAdminClient();
+      try {
+        await requireBrandAccess(supabase, user, brand_id);
+      } catch (error) {
+        if (error instanceof BrandPermissionVerificationError) {
+          return NextResponse.json(
+            { success: false, error: 'Unable to verify brand permissions. Please try again later.' },
+            { status: 500 }
+          );
+        }
+        if (error instanceof Error && error.message === 'NO_BRAND_ACCESS') {
+          return NextResponse.json(
+            { success: false, error: 'You do not have access to this brand.' },
+            { status: 403 }
+          );
+        }
+        throw error;
+      }
+    }
 
     // Refined Prompt:
     let prompt = `As an AI assistant, your task is to generate a clear and concise description for a step in a content workflow. This description will be read by a human user who is assigned to this step. The user needs to understand their specific responsibilities and expectations for this step based on their role.

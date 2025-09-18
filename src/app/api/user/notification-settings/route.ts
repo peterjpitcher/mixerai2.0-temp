@@ -2,31 +2,87 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { withAuthAndCSRF } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
+import { z } from 'zod';
+
+const NotificationSettingsSchema = z.object({
+  emailNotifications: z.boolean().optional(),
+  contentUpdates: z.boolean().optional(),
+  newComments: z.boolean().optional(),
+  taskReminders: z.boolean().optional(),
+  marketingEmails: z.boolean().optional()
+});
+
+function mapProfileToSettings(profile: {
+  email_notifications_enabled: boolean | null;
+  email_preferences: unknown;
+}) {
+  const rawPrefs = profile?.email_preferences;
+  const emailPrefs = rawPrefs && typeof rawPrefs === 'object' && !Array.isArray(rawPrefs)
+    ? (rawPrefs as Record<string, unknown>)
+    : {};
+
+  return {
+    emailNotifications: profile?.email_notifications_enabled ?? true,
+    contentUpdates: emailPrefs.content_approved !== false && emailPrefs.content_rejected !== false,
+    newComments: emailPrefs.comments_mentions !== false,
+    taskReminders: emailPrefs.deadline_reminders === true,
+    marketingEmails: emailPrefs.marketing === true,
+  };
+}
+
+function buildPreferences(settings: {
+  emailNotifications: boolean;
+  contentUpdates: boolean;
+  newComments: boolean;
+  taskReminders: boolean;
+  marketingEmails: boolean;
+}) {
+  return {
+    content_approved: settings.contentUpdates,
+    content_rejected: settings.contentUpdates,
+    workflow_assigned: settings.contentUpdates,
+    workflow_completed: settings.contentUpdates,
+    brand_invitation: true,
+    weekly_summary: settings.marketingEmails,
+    deadline_reminders: settings.taskReminders,
+    comments_mentions: settings.newComments,
+    marketing: settings.marketingEmails,
+  };
+}
+
+async function fetchProfile(supabase: ReturnType<typeof createSupabaseServerClient>, userId: string) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('email_notifications_enabled, email_preferences, updated_at')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
 
 export const GET = withAuthAndCSRF(async function (req: NextRequest, user: User) {
   try {
     const supabase = createSupabaseServerClient();
+    const profile = await fetchProfile(supabase, user.id);
 
-    // Get user's notification preferences from profile
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('email_notifications_enabled, email_preferences')
-      .eq('id', user.id)
-      .single();
-      
-    const emailPrefs = (profile?.email_preferences as Record<string, unknown>) || {};
-    const settings = {
-      emailNotifications: profile?.email_notifications_enabled ?? true,
-      contentUpdates: emailPrefs.content_approved !== false && emailPrefs.content_rejected !== false,
-      newComments: emailPrefs.comments_mentions ?? true,
-      taskReminders: emailPrefs.deadline_reminders ?? false,
-      marketingEmails: emailPrefs.marketing ?? false,
-    };
-
-    return NextResponse.json({
-      success: true,
-      data: settings
+    const settings = mapProfileToSettings(profile ?? {
+      email_notifications_enabled: true,
+      email_preferences: null,
     });
+
+    const version = profile?.updated_at ?? 'null';
+
+    const response = NextResponse.json({
+      success: true,
+      data: settings,
+      version,
+    });
+    response.headers.set('ETag', version);
+    return response;
   } catch (error) {
     console.error('Error fetching notification settings:', error);
     return NextResponse.json(
@@ -42,39 +98,86 @@ export const GET = withAuthAndCSRF(async function (req: NextRequest, user: User)
 export const POST = withAuthAndCSRF(async function (request: NextRequest, user: User) {
   try {
     const supabase = createSupabaseServerClient();
-    const body = await request.json();
+    const rawBody = await request.json();
+    const parseResult = NotificationSettingsSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      return NextResponse.json({ success: false, error: 'Invalid request body', details: parseResult.error.flatten() }, { status: 400 });
+    }
+    const body = parseResult.data;
 
-    const emailPreferences = {
-      content_approved: body.contentUpdates ?? true,
-      content_rejected: body.contentUpdates ?? true,
-      workflow_assigned: body.contentUpdates ?? true,
-      workflow_completed: body.contentUpdates ?? true,
-      brand_invitation: true,
-      weekly_summary: body.marketingEmails ?? false,
-      deadline_reminders: body.taskReminders ?? false,
-      comments_mentions: body.newComments ?? true,
-      marketing: body.marketingEmails ?? false
-    };
-
-    // Update user's notification settings in profile
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .upsert({ 
-        id: user.id,
-        email_notifications_enabled: body.emailNotifications ?? true,
-        email_preferences: emailPreferences,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', user.id);
-
-    if (updateError) {
-      throw updateError;
+    const ifMatch = request.headers.get('if-match');
+    if (!ifMatch) {
+      return NextResponse.json(
+        { success: false, error: 'Missing If-Match header for concurrency control.' },
+        { status: 428 }
+      );
     }
 
-    return NextResponse.json({
+    const profile = await fetchProfile(supabase, user.id);
+    const currentVersion = profile?.updated_at ?? 'null';
+
+    if (ifMatch !== currentVersion && ifMatch !== '*') {
+      return NextResponse.json(
+        { success: false, error: 'Notification settings have been modified by another session.' },
+        { status: 412 }
+      );
+    }
+
+    const targetSettings = {
+      emailNotifications: body.emailNotifications ?? true,
+      contentUpdates: body.contentUpdates ?? true,
+      newComments: body.newComments ?? true,
+      taskReminders: body.taskReminders ?? false,
+      marketingEmails: body.marketingEmails ?? false,
+    };
+
+    const emailPreferences = buildPreferences(targetSettings);
+
+    const updated_at = new Date().toISOString();
+
+    let updatedProfile;
+    if (profile) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({
+          email_notifications_enabled: targetSettings.emailNotifications,
+          email_preferences: emailPreferences,
+          updated_at,
+        })
+        .eq('id', user.id)
+        .select('email_notifications_enabled, email_preferences, updated_at')
+        .single();
+
+      if (error) {
+        throw error;
+      }
+      updatedProfile = data;
+    } else {
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert({
+          id: user.id,
+          email_notifications_enabled: targetSettings.emailNotifications,
+          email_preferences: emailPreferences,
+          updated_at,
+        })
+        .select('email_notifications_enabled, email_preferences, updated_at')
+        .single();
+
+      if (error) {
+        throw error;
+      }
+      updatedProfile = data;
+    }
+
+    const settings = mapProfileToSettings(updatedProfile);
+    const response = NextResponse.json({
       success: true,
-      message: 'Notification preferences updated successfully'
+      data: settings,
+      version: updatedProfile.updated_at ?? 'null',
     });
+    response.headers.set('ETag', updatedProfile.updated_at ?? 'null');
+    return response;
   } catch (error) {
     console.error('Error saving notification settings:', error);
     return NextResponse.json(
@@ -90,47 +193,90 @@ export const POST = withAuthAndCSRF(async function (request: NextRequest, user: 
 export const PATCH = withAuthAndCSRF(async function (request: NextRequest, user: User) {
   try {
     const supabase = createSupabaseServerClient();
-    const body = await request.json();
+    const rawBody = await request.json();
+    const parseResult = NotificationSettingsSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      return NextResponse.json({ success: false, error: 'Invalid request body', details: parseResult.error.flatten() }, { status: 400 });
+    }
+    const body = parseResult.data;
 
-    const updatedSettings = {
-      emailNotifications: body.emailNotifications ?? true,
-      contentUpdates: body.contentUpdates ?? true,
-      newComments: body.newComments ?? true,
-      taskReminders: body.taskReminders ?? false,
-      marketingEmails: body.marketingEmails ?? false,
-    };
-
-    const emailPreferences = {
-      content_approved: updatedSettings.contentUpdates,
-      content_rejected: updatedSettings.contentUpdates,
-      workflow_assigned: updatedSettings.contentUpdates,
-      workflow_completed: updatedSettings.contentUpdates,
-      brand_invitation: true,
-      weekly_summary: updatedSettings.marketingEmails,
-      deadline_reminders: updatedSettings.taskReminders,
-      comments_mentions: updatedSettings.newComments,
-      marketing: updatedSettings.marketingEmails
-    };
-
-    // Update user's notification settings in profile
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .upsert({ 
-        id: user.id,
-        email_notifications_enabled: updatedSettings.emailNotifications,
-        email_preferences: emailPreferences,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', user.id);
-
-    if (updateError) {
-      throw updateError;
+    const ifMatch = request.headers.get('if-match');
+    if (!ifMatch) {
+      return NextResponse.json(
+        { success: false, error: 'Missing If-Match header for concurrency control.' },
+        { status: 428 }
+      );
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Notification preference updated successfully'
+    const profile = await fetchProfile(supabase, user.id);
+    const currentVersion = profile?.updated_at ?? 'null';
+
+    if (ifMatch !== currentVersion && ifMatch !== '*') {
+      return NextResponse.json(
+        { success: false, error: 'Notification settings have been modified by another session.' },
+        { status: 412 }
+      );
+    }
+
+    const existingSettings = mapProfileToSettings(profile ?? {
+      email_notifications_enabled: true,
+      email_preferences: null,
     });
+
+    const updatedSettings = {
+      emailNotifications: body.emailNotifications ?? existingSettings.emailNotifications,
+      contentUpdates: body.contentUpdates ?? existingSettings.contentUpdates,
+      newComments: body.newComments ?? existingSettings.newComments,
+      taskReminders: body.taskReminders ?? existingSettings.taskReminders,
+      marketingEmails: body.marketingEmails ?? existingSettings.marketingEmails,
+    };
+
+    const emailPreferences = buildPreferences(updatedSettings);
+    const updated_at = new Date().toISOString();
+
+    let updatedProfile;
+    if (profile) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({
+          email_notifications_enabled: updatedSettings.emailNotifications,
+          email_preferences: emailPreferences,
+          updated_at,
+        })
+        .eq('id', user.id)
+        .select('email_notifications_enabled, email_preferences, updated_at')
+        .single();
+
+      if (error) {
+        throw error;
+      }
+      updatedProfile = data;
+    } else {
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert({
+          id: user.id,
+          email_notifications_enabled: updatedSettings.emailNotifications,
+          email_preferences: emailPreferences,
+          updated_at,
+        })
+        .select('email_notifications_enabled, email_preferences, updated_at')
+        .single();
+
+      if (error) {
+        throw error;
+      }
+      updatedProfile = data;
+    }
+
+    const settings = mapProfileToSettings(updatedProfile);
+    const response = NextResponse.json({
+      success: true,
+      data: settings,
+      version: updatedProfile.updated_at ?? 'null',
+    });
+    response.headers.set('ETag', updatedProfile.updated_at ?? 'null');
+    return response;
   } catch (error) {
     console.error('Error updating notification settings:', error);
     return NextResponse.json(

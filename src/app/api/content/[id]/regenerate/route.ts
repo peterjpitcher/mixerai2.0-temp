@@ -4,6 +4,7 @@ import { handleApiError } from '@/lib/api-utils';
 
 import { User } from '@supabase/supabase-js';
 import { generateTextCompletion } from '@/lib/azure/openai';
+import { normalizeFieldContent } from '@/lib/content/html-normalizer';
 import { Database, Json } from '@/types/supabase';
 
 type ContentVersionInsert = Database['public']['Tables']['content_versions']['Insert'];
@@ -139,19 +140,23 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
       if (!regeneratedContent) {
         throw new Error('Failed to generate content');
       }
-      
+      const normalizedContent = normalizeFieldContent(regeneratedContent, field.type);
+
       // Update specific field in content_data
       const currentContentData = (content.content_data || {}) as Record<string, unknown>;
-      const currentGeneratedOutputs = (currentContentData?.generatedOutputs && typeof currentContentData.generatedOutputs === 'object') 
-        ? currentContentData.generatedOutputs 
-        : {};
-      
+      const currentGeneratedOutputsRaw =
+        currentContentData?.generatedOutputs && typeof currentContentData.generatedOutputs === 'object'
+          ? (currentContentData.generatedOutputs as Record<string, unknown>)
+          : {};
+
+      const updatedGeneratedOutputs: Record<string, unknown> = {
+        ...currentGeneratedOutputsRaw,
+        [body.fieldId]: normalizedContent,
+      };
+
       const updatedContentData = {
         ...currentContentData,
-        generatedOutputs: {
-          ...currentGeneratedOutputs,
-          [body.fieldId]: regeneratedContent
-        }
+        generatedOutputs: updatedGeneratedOutputs,
       };
       
       // If this is the primary body field, also update main body
@@ -159,7 +164,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
         content_data: updatedContentData
       };
       if (isBodyField(field, templateFields.outputFields)) {
-        updatePayload.body = regeneratedContent;
+        updatePayload.body = normalizedContent.html;
       }
       
       const { error: updateError } = await supabase
@@ -175,7 +180,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
         success: true, 
         data: { 
           fieldId: body.fieldId, 
-          content: regeneratedContent 
+          content: normalizedContent 
         } 
       });
     }

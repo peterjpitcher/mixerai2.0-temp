@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cleanupExpiredSessions } from '@/lib/auth/session-manager';
 
+let lastCleanupRun = 0;
+const MIN_INTERVAL_MS = 60_000; // 1 minute throttle
+
 // This endpoint should be called periodically (e.g., via a cron job)
 // to clean up expired sessions
 export async function POST(req: NextRequest) {
@@ -27,7 +30,16 @@ export async function POST(req: NextRequest) {
       );
     }
     
+    const now = Date.now();
+    if (now - lastCleanupRun < MIN_INTERVAL_MS) {
+      return NextResponse.json(
+        { success: false, error: 'Cleanup already executed recently' },
+        { status: 429 }
+      );
+    }
+
     await cleanupExpiredSessions();
+    lastCleanupRun = now;
     
     return NextResponse.json({
       success: true,

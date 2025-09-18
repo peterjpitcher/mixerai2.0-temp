@@ -84,6 +84,45 @@ export const GET = withAuth(async (request: NextRequest, user: User, context?: u
       return NextResponse.json({ success: false, error: 'Content not found' }, { status: 404 });
     }
 
+    const globalRole = user?.user_metadata?.role;
+    const contentBrandId = content.brand_id as string | null;
+
+    if (globalRole !== 'admin') {
+      let isAuthorized = false;
+
+      if (contentBrandId) {
+        const { data: brandPermission, error: brandPermissionError } = await supabase
+          .from('user_brand_permissions')
+          .select('brand_id')
+          .eq('user_id', user.id)
+          .eq('brand_id', contentBrandId)
+          .maybeSingle();
+
+        if (brandPermissionError) {
+          console.error('[API Content GET] Error checking brand permissions:', brandPermissionError);
+          return handleApiError(brandPermissionError, 'Failed to verify brand permissions');
+        }
+
+        if (brandPermission) {
+          isAuthorized = true;
+        }
+      }
+
+      if (!isAuthorized) {
+        const assignedUsers = Array.isArray(content.assigned_to) ? content.assigned_to : [];
+        if (assignedUsers.includes(user.id) || content.created_by === user.id) {
+          isAuthorized = true;
+        }
+      }
+
+      if (!isAuthorized) {
+        return NextResponse.json(
+          { success: false, error: 'You do not have permission to view this content item.' },
+          { status: 403 }
+        );
+      }
+    }
+
     // Step 1.5: Fetch content versions
     let versions: ContentVersionWithReviewer[] = [];
     const { data: versionData, error: versionError } = await supabase

@@ -11,6 +11,7 @@ import { timed } from '@/lib/observability/timer';
 import { invalidateClaimsCacheForProduct } from '@/lib/claims-service';
 import { ok, fail } from '@/lib/http/response';
 import { logClaimAudit } from '@/lib/audit';
+import { logSecurityEvent } from '@/lib/auth/account-lockout';
 
 export const dynamic = "force-dynamic";
 
@@ -288,6 +289,15 @@ export const POST = withCorrelation(withAuthAndCSRF(async (req: NextRequest, use
         }
         
         // Audit global operations
+        await logSecurityEvent('market_override_created', {
+          overrideId: data.id,
+          masterClaimId: master_claim_id,
+          marketCountryCode: market_country_code,
+          targetProductId: target_product_id,
+          isBlocked: is_blocked,
+          replacementClaimId: replacement_claim_id,
+          conflicts: conflicts.details,
+        }, user.id);
         if (market_country_code === ALL_COUNTRIES_CODE) {
             // Get list of active countries
             const { data: activeCountries } = await supabase

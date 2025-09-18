@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { z } from 'zod';
+import { withAuth, withAuthAndCSRF } from '@/lib/auth/api-auth';
+
+const githubDiagnosticsEnabled = process.env.ENABLE_GITHUB_TEST_ENDPOINTS === 'true';
+
+function disabledResponse() {
+  return NextResponse.json(
+    { success: false, error: 'GitHub diagnostics are disabled. Set ENABLE_GITHUB_TEST_ENDPOINTS=true to enable locally.' },
+    { status: 410 }
+  );
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -57,20 +66,14 @@ function checkRateLimit(userId: string): { allowed: boolean; remaining: number; 
   return { allowed: true, remaining: maxRequests - userLimit.count, resetTime: userLimit.resetTime };
 }
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest, user) => {
+  if (!githubDiagnosticsEnabled) {
+    return disabledResponse();
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
+  }
   try {
-    // Check authentication
-    const supabase = createSupabaseServerClient();
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     // Check if user is admin
     const isAdmin = user.user_metadata?.role === 'admin';
     if (!isAdmin) {
@@ -184,7 +187,7 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
 
 // Helper function to parse GitHub's Link header for pagination
 function parseLinkHeader(header: string | null): Record<string, number> {
@@ -210,20 +213,14 @@ function parseLinkHeader(header: string | null): Record<string, number> {
   return links;
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
+  if (!githubDiagnosticsEnabled) {
+    return disabledResponse();
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
+  }
   try {
-    // Check authentication
-    const supabase = createSupabaseServerClient();
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     // Check rate limit
     const rateLimit = checkRateLimit(user.id);
     if (!rateLimit.allowed) {
@@ -354,7 +351,7 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
 
 function getPriorityName(priority: string): string {
   const priorityMap: Record<string, string> = {

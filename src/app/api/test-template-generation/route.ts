@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError } from '@/lib/api-utils'; // For consistent error handling
 // import { withAuth } from '@/lib/auth/api-auth'; // No longer used
 import { withAdminAuthAndCSRF } from '@/lib/auth/api-auth'; // Use withAdminAuthAndCSRF
+
+const testsEnabled = process.env.ENABLE_TEST_ENDPOINTS === 'true';
+
+function disabledResponse() {
+  return NextResponse.json(
+    { success: false, error: 'This test endpoint is disabled. Set ENABLE_TEST_ENDPOINTS=true to enable locally.' },
+    { status: 410 }
+  );
+}
 import { User } from '@supabase/supabase-js';
 
 // Template-based brand identity generation (Non-AI)
@@ -56,6 +65,9 @@ function generateContentTemplate(title: string, contentType: string, _brandIdent
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const POST = withAdminAuthAndCSRF(async (req: NextRequest, _user: User) => {
+  if (!testsEnabled) {
+    return disabledResponse();
+  }
   try {
     const payload = await req.json();
     const { type, brandName, country, language, contentType, title } = payload;

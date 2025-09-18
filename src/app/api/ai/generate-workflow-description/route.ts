@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { User } from '@supabase/supabase-js';
 import { generateTextCompletion } from '@/lib/azure/openai';
-import { withCSRF } from '@/lib/api/with-csrf';
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { BrandPermissionVerificationError, requireBrandAccess } from '@/lib/auth/brand-access';
 
 // Define the expected request body schema
 const WorkflowDetailsSchema = z.object({
+  brand_id: z.string().uuid({ message: 'brand_id must be a valid UUID' }).optional(),
   workflowName: z.string().min(1, { message: 'Workflow name is required' }),
   brandName: z.string().optional(),
   templateName: z.string().optional(),
@@ -13,7 +17,7 @@ const WorkflowDetailsSchema = z.object({
   brandLanguage: z.string().optional(),
 });
 
-export const POST = withCSRF(async function (request: NextRequest) {
+export const POST = withAuthAndCSRF(async function (request: NextRequest, user: User) {
   try {
     const body = await request.json();
     const validationResult = WorkflowDetailsSchema.safeParse(body);
@@ -25,7 +29,28 @@ export const POST = withCSRF(async function (request: NextRequest) {
       );
     }
 
-    const { workflowName, brandName, templateName, stepNames, brandCountry, brandLanguage } = validationResult.data;
+    const { brand_id, workflowName, brandName, templateName, stepNames, brandCountry, brandLanguage } = validationResult.data;
+
+    if (brand_id) {
+      const supabase = createSupabaseAdminClient();
+      try {
+        await requireBrandAccess(supabase, user, brand_id);
+      } catch (error) {
+        if (error instanceof BrandPermissionVerificationError) {
+          return NextResponse.json(
+            { success: false, error: 'Unable to verify brand permissions. Please try again later.' },
+            { status: 500 }
+          );
+        }
+        if (error instanceof Error && error.message === 'NO_BRAND_ACCESS') {
+          return NextResponse.json(
+            { success: false, error: 'You do not have access to this brand.' },
+            { status: 403 }
+          );
+        }
+        throw error;
+      }
+    }
 
     const systemPrompt = "You are an expert marketing copywriter. Your task is to generate a concise and engaging marketing description for a content workflow.";
 

@@ -1,6 +1,34 @@
 import { OpenAI } from "openai";
 import type { StyledClaims } from "@/types/claims";
+import { normalizeFieldContent, extractFirstHtmlValue, type NormalizedContent } from "@/lib/content/html-normalizer";
 import { activityTracker } from "./activity-tracker";
+
+type TemplateInputField = {
+  id: string;
+  name: string;
+  type: string;
+  value: string;
+  aiPrompt?: string;
+};
+
+type TemplateOutputField = {
+  id: string;
+  name: string;
+  type: string;
+  aiPrompt?: string;
+  aiAutoComplete?: boolean;
+  useBrandIdentity?: boolean;
+  useToneOfVoice?: boolean;
+  useGuardrails?: boolean;
+  minWords?: number;
+  maxWords?: number;
+  minChars?: number;
+  maxChars?: number;
+  options?: {
+    minLength?: number;
+    maxLength?: number;
+  } | null;
+};
 
 // Helper function to extract rate limit headers
 function extractRateLimitHeaders(response: Response): Record<string, string> {
@@ -230,30 +258,15 @@ export async function generateContentFromTemplate(
   template: {
     id: string;
     name: string;
-    inputFields: Array<{
-      id: string;
-      name: string;
-      type: string;
-      value: string;
-      aiPrompt?: string;
-    }>;
-    outputFields: Array<{
-      id: string;
-      name: string;
-      type: string;
-      aiPrompt?: string;
-      aiAutoComplete?: boolean;
-      useBrandIdentity?: boolean;
-      useToneOfVoice?: boolean;
-      useGuardrails?: boolean;
-    }>;
+    inputFields: TemplateInputField[];
+    outputFields: TemplateOutputField[];
   },
   input?: {
     additionalInstructions?: string;
     templateFields?: Record<string, string>;
-    product_context?: { productName: string; styledClaims: StyledClaims | null };
+    product_context?: { productName?: string; styledClaims: StyledClaims | null };
   }
-) {
+): Promise<Record<string, NormalizedContent>> {
   // console.log(`Generating template-based content for brand: ${brand.name} using template: ${template.name}`);
   // console.log(`Brand localization - Language: ${brand.language || 'not specified'}, Country: ${brand.country || 'not specified'}`);
   
@@ -294,10 +307,22 @@ export async function generateContentFromTemplate(
     'MX': 'Mexico'
   };
 
-  // Build the system prompt with brand information and strict output rules
-  let systemPrompt = `You are an expert content creator for the brand "${brand.name}".
+  const isSingleFieldHtml =
+    Array.isArray(template.outputFields) &&
+    template.outputFields.length === 1 &&
+    !!template.outputFields[0] &&
+    ['richtext', 'rich-text', 'html'].includes(
+      (template.outputFields[0].type || '').toLowerCase()
+    );
 
-You must return a single JSON object with no preface or trailing text. Keys MUST be the exact output field IDs provided, and values MUST be strings containing the generated content for that field. Do not include markdown code fences. Do not include any commentary. Example: {"field_abc":"...","field_xyz":"..."}.`;
+  // Build the system prompt with brand information and strict output rules
+  let systemPrompt = `You are an expert content creator for the brand "${brand.name}".`;
+
+  if (isSingleFieldHtml) {
+    systemPrompt += `\nReturn ONLY a well-formed HTML fragment for the requested field. Do NOT include JSON, code fences, or any commentary.`;
+  } else {
+    systemPrompt += `\nYou must return a single JSON object with no preface or trailing text. Keys MUST be the exact output field IDs provided, and values MUST be strings containing the generated content for that field. Do not include markdown code fences. Do not include any commentary. Example: {"field_abc":"...","field_xyz":"..."}.`;
+  }
   
   // Add localization instructions if provided
   if (brand.language && brand.country) {
@@ -361,7 +386,18 @@ The product context is provided in the user prompt.
   
   // Build the user prompt using template fields and prompts
   const requiredIds = (template.outputFields || []).map(f => f.id);
-  let userPrompt = `Create content according to this template: "${template.name}". Return only valid JSON as described.\n\n`;
+  const processedFieldInstructions = new Map<string, {
+    combinedInstruction: string;
+    processedPrompt: string;
+    fieldSpecificInstruction: string;
+  }>();
+
+  let userPrompt = `Create content according to this template: "${template.name}". `;
+  if (isSingleFieldHtml) {
+    userPrompt += 'Return only the HTML fragment requested for the field. Do not wrap the response in JSON or add commentary.\n\n';
+  } else {
+    userPrompt += 'Return only valid JSON as described.\n\n';
+  }
   
   if (input?.product_context) {
     // The context is now expected to be an object with productName and styledClaims
@@ -383,14 +419,14 @@ The product context is provided in the user prompt.
   template.inputFields.forEach(field => {
     const fieldValue = field.value || '';
     userPrompt += `- ${field.name}: ${fieldValue}\n`;
-    
-    // Log if a field is empty that might be expected to have a value
-    if (!fieldValue && field.name.toLowerCase().includes('title')) {
-      console.warn(`[Template ${template.name}] Input field "${field.name}" (ID: ${field.id}) is empty but appears to be a title field`);
-    }
   });
   
-  userPrompt += `\nIMPORTANT: You MUST generate content for ALL ${template.outputFields.length} output fields listed below.\nReturn ONLY a single JSON object whose keys are EXACTLY: ${JSON.stringify(requiredIds)}. No extra keys, no commentary.\n\n`;
+  userPrompt += `\nIMPORTANT: You MUST generate content for ALL ${template.outputFields.length} output fields listed below.\n`;
+  if (isSingleFieldHtml) {
+    userPrompt += 'Return ONLY the HTML fragment for the single requested field. Do not return JSON, code fences, or meta commentary.\n\n';
+  } else {
+    userPrompt += `Return ONLY a single JSON object whose keys are EXACTLY: ${JSON.stringify(requiredIds)}. No extra keys, no commentary.\n\n`;
+  }
   userPrompt += `Generate the following ${template.outputFields.length} output fields:\n`;
   
   // Include output field requirements with their prompts
@@ -405,69 +441,49 @@ The product context is provided in the user prompt.
 
     let fieldAIPrompt = "";
     if (field.aiPrompt) {
-      console.log(`[Field ${field.id}] Original AI prompt: ${field.aiPrompt}`);
-      console.log(`[Field ${field.id}] Available input fields:`, template.inputFields.map(f => ({ id: f.id, name: f.name, value: f.value ? f.value.substring(0, 50) + '...' : 'NO VALUE' })));
-      
-      const processedPrompt = field.aiPrompt.replace(/\{\{([^}]+)\}\}/g, (match, inputFieldIdOrName) => {
-        console.log(`[Field ${field.id}] Processing placeholder: ${match}, extracted name: "${inputFieldIdOrName}"`);
-        
-        // Handle special placeholders
-        if (inputFieldIdOrName === 'Rules') {
-          // Combine product context rules if available
-          if (input?.product_context?.styledClaims) {
-            console.log(`[Field ${field.id}] Replaced {{Rules}} with product context`);
-            return 'Follow the product claims and guidelines provided in the product context.';
-          }
-          console.log(`[Field ${field.id}] Replaced {{Rules}} with default guidelines`);
-          return 'Create engaging, accurate content following brand guidelines.';
+      const processedPrompt = field.aiPrompt.replace(/\{\{([^}]+)\}\}/g, (match, rawPlaceholder) => {
+        const placeholder = rawPlaceholder.trim();
+
+        if (placeholder === 'Rules') {
+          return input?.product_context?.styledClaims
+            ? 'Follow the product claims and guidelines provided in the product context.'
+            : 'Create engaging, accurate content following brand guidelines.';
         }
-        
-        if (inputFieldIdOrName === 'Product Name' && input?.product_context?.productName) {
-          console.log(`[Field ${field.id}] Replaced {{Product Name}} with: ${input.product_context.productName}`);
+
+        if (placeholder === 'Product Name' && input?.product_context?.productName) {
           return input.product_context.productName;
         }
-        
-        // Find by ID or name (trimmed to handle spaces)
-        const fieldName = inputFieldIdOrName.trim();
-        const inputField = template.inputFields.find(f => 
-          f.id === fieldName || f.name === fieldName
-        );
-        
+
+        const inputField = template.inputFields.find(f => f.id === placeholder || f.name === placeholder);
         if (inputField) {
-          if (inputField.value && inputField.value.trim() !== '') {
-            console.log(`[Field ${field.id}] Found matching input field for "${fieldName}": ${inputField.value.substring(0, 50)}...`);
-            return inputField.value;
-          } else {
-            console.log(`[Field ${field.id}] Found input field "${fieldName}" but it has no value, keeping placeholder for context`);
-            // Keep the field name so the AI has context about what's expected
-            return `[${inputField.name}]`;
-          }
-        } else {
-          console.log(`[Field ${field.id}] No matching input field found for "${fieldName}", keeping placeholder`);
-          return match;
+          const trimmed = inputField.value?.trim();
+          return trimmed && trimmed.length > 0 ? trimmed : `[${inputField.name}]`;
         }
+
+        return match;
       });
-      
-      console.log(`[Field ${field.id}] Processed AI prompt: ${processedPrompt}`);
-      
-      // Clean up the prompt if we removed placeholders
-      // Remove phrases that reference empty placeholders
+
       fieldAIPrompt = processedPrompt
-        .replace(/that includes these priority keywords \(\s*\)/g, '') // Remove empty priority keywords phrase
-        .replace(/\(\s*\)/g, '') // Remove any remaining empty parentheses
-        .replace(/\s+/g, ' ') // Normalize whitespace
+        .replace(/that includes these priority keywords \(\s*\)/g, '')
+        .replace(/\(\s*\)/g, '')
+        .replace(/\s+/g, ' ')
         .trim();
-      
-      // If the prompt becomes too short or incomplete after replacements, add context
-      if (fieldAIPrompt && fieldAIPrompt.split(' ').length < 3) {
-        console.warn(`[Field ${field.id}] AI prompt seems incomplete after processing: "${fieldAIPrompt}"`);
-        fieldAIPrompt = `${fieldAIPrompt} based on the provided brand context and input values`;
+
+      if (!fieldAIPrompt || fieldAIPrompt.split(' ').length < 3) {
+        fieldAIPrompt = `${fieldAIPrompt ? `${fieldAIPrompt} ` : ''}based on the provided brand context and input values`;
       }
     }
     
-    if (fieldAIPrompt || fieldSpecificInstruction) {
-        userPrompt += `   Instructions: ${fieldSpecificInstruction}${fieldAIPrompt}\n`;
+    const combinedInstruction = `${fieldSpecificInstruction}${fieldAIPrompt}`.trim();
+    if (combinedInstruction) {
+        userPrompt += `   Instructions: ${combinedInstruction}\n`;
     }
+
+    processedFieldInstructions.set(field.id, {
+      combinedInstruction,
+      processedPrompt: fieldAIPrompt,
+      fieldSpecificInstruction,
+    });
 
     if (field.useBrandIdentity && brand.brand_identity) {
       userPrompt += `   Apply Brand Identity: ${brand.brand_identity}\n`;
@@ -481,7 +497,9 @@ The product context is provided in the user prompt.
 
     const isRich = field.type === 'richText' || field.type === 'html';
     userPrompt += `   Output Type: ${isRich ? 'HTML_FRAGMENT' : 'PLAIN_TEXT'}\n`;
-    userPrompt += `   JSON Key: ${field.id}\n`;
+    if (!isSingleFieldHtml) {
+      userPrompt += `   JSON Key: ${field.id}\n`;
+    }
   });
   
   // Add additional instructions if provided
@@ -496,21 +514,11 @@ The product context is provided in the user prompt.
   }
   
   // Final reminder
-  userPrompt += `\nREMINDER: Generate ALL ${template.outputFields.length} fields. Output ONLY a single JSON object keyed by field IDs ${JSON.stringify(requiredIds)}. No extra text.`;
-  
-  // DEBUG: Log the complete prompt being sent to AI
-  console.log('\n========== AI GENERATION DEBUG ==========');
-  console.log('Template:', template.name);
-  console.log('Brand:', brand.name);
-  console.log('\n--- System Prompt ---');
-  console.log(systemPrompt);
-  console.log('\n--- User Prompt ---');
-  console.log(userPrompt);
-  console.log('\n--- Input Fields ---');
-  template.inputFields.forEach(field => {
-    console.log(`  ${field.name} (ID: ${field.id}): "${field.value || '[EMPTY]'}"`);
-  });
-  console.log('========================================\n');
+  if (isSingleFieldHtml) {
+    userPrompt += `\nREMINDER: Generate the requested field and return ONLY the HTML fragment for it. Do not include JSON, code fences, or commentary.`;
+  } else {
+    userPrompt += `\nREMINDER: Generate ALL ${template.outputFields.length} fields. Output ONLY a single JSON object keyed by field IDs ${JSON.stringify(requiredIds)}. No extra text.`;
+  }
   
   // Make the API call with error handling
   try {
@@ -518,8 +526,8 @@ The product context is provided in the user prompt.
     
     // Detect a long-form single-field HTML generation case
     const isSingleField = Array.isArray(template.outputFields) && template.outputFields.length === 1;
-    const singleField = isSingleField ? (template.outputFields as any[])[0] : null;
-    const isSingleHtml = !!(singleField && (singleField.type === 'richText' || singleField.type === 'html'));
+    const singleField: TemplateOutputField | null = isSingleField ? template.outputFields[0] : null;
+    const isSingleHtml = isSingleFieldHtml && !!singleField;
 
     // Prepare the request body
     const completionRequest = !isSingleHtml ? {
@@ -593,7 +601,7 @@ The product context is provided in the user prompt.
     // Remove potential code fences
     content = content.replace(/```[a-zA-Z]*\n?/g, "").replace(/\n?```/g, "");
 
-    const tryParseJson = (text: string): Record<string, string> | null => {
+    const tryParseJson = (text: string): Record<string, unknown> | null => {
       try {
         const firstBrace = text.indexOf('{');
         const lastBrace = text.lastIndexOf('}');
@@ -606,19 +614,11 @@ The product context is provided in the user prompt.
       }
     };
 
-    const stripHtmlWrappers = (html: string) =>
-      html
-        .replace(/<!DOCTYPE[^>]*>/gi, '')
-        .replace(/<\/?(?:html|head|body)[^>]*>/gi, '');
-
-    const stripWordCountSuffix = (text: string) => text.replace(/\s*\(\s*\d+\s*[–-]\s*\d+\s*words?\s*\)/gi, '').trim();
-
-    const normalizeHeadings = (html: string) =>
-      html.replace(/<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/gi, (_match, _level, inner) => {
-        const cleanedTitle = stripWordCountSuffix(inner.replace(/<[^>]+>/g, '').trim());
-        if (!cleanedTitle) return '';
-        return `<p><strong>${cleanedTitle}</strong></p>`;
-      });
+    const coerceToString = (value: unknown): string => {
+      if (typeof value === 'string') return value;
+      if (value == null) return '';
+      return String(value);
+    };
 
     const parseNumeric = (value: string) => {
       if (!value) return null;
@@ -628,16 +628,7 @@ The product context is provided in the user prompt.
       return Number.isNaN(num) ? null : num;
     };
 
-    const countWords = (value: string) =>
-      stripHtmlWrappers(value)
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/gi, ' ')
-        .split(/\s+/)
-        .map(w => w.trim())
-        .filter(Boolean)
-        .length;
-
-    const extractWordRange = (field: any): { min: number; max: number } | null => {
+    const getWordRange = (field: TemplateOutputField): { min: number; max: number } | null => {
       if (typeof field?.minWords === 'number' && typeof field?.maxWords === 'number' && field.minWords > 0 && field.maxWords > 0 && field.minWords < field.maxWords) {
         return { min: field.minWords, max: field.maxWords };
       }
@@ -665,56 +656,170 @@ The product context is provided in the user prompt.
       return null;
     };
 
-    const validateAndPostProcess = (field: any, value: string): string => {
-      if (!value) return '';
-      let v = String(value).trim();
-      const isRich = field.type === 'richText' || field.type === 'html';
-      if (!isRich) {
-        v = v.replace(/<[^>]+>/g, '');
-      } else {
-        v = v.replace(/```[a-zA-Z]*\n?/g, '').replace(/\n?```/g, '');
-        v = stripHtmlWrappers(v);
-        v = normalizeHeadings(v);
-        v = stripWordCountSuffix(v);
-        try {
-          const { sanitizeHTML } = require('@/lib/sanitize/html-sanitizer');
-          v = sanitizeHTML(v, { allow_images: false, allow_links: true, allow_tables: true });
-        } catch {}
-        // Normalize stray tags and remove empty paragraphs produced by editors
-        v = v.replace(/<\s+p\s*>/g, '<p>')
-             .replace(/<\s*\/\s*p\s*>/g, '</p>')
-             .replace(/(?:<p>\s*<\/p>\s*){2,}/g, '')
-             .replace(/<p>\s*<\/p>/g, '');
-      }
-      v = stripWordCountSuffix(v);
-      const optionMax = (field.options && (field.options as any).maxLength) || undefined;
-      const maxChars = field.maxChars || optionMax;
-      if (maxChars && v.length > maxChars) {
-        v = v.slice(0, maxChars);
-      }
-      return v;
+    const getCharConstraints = (field: TemplateOutputField): { min?: number; max?: number } => {
+      const min = typeof field?.minChars === 'number' ? field.minChars : typeof field?.options?.minLength === 'number' ? field.options.minLength : undefined;
+      const max = typeof field?.maxChars === 'number' ? field.maxChars : typeof field?.options?.maxLength === 'number' ? field.options.maxLength : undefined;
+      return { min, max };
     };
 
-    const out: Record<string, string> = {};
-    const wordCountViolations: Array<{ field: any; words: number; range: { min: number; max: number } }> = [];
-    let json: Record<string, string> | null = null;
+    const normalizeValueForField = (field: TemplateOutputField, rawValue: unknown): NormalizedContent => {
+      if (rawValue && typeof rawValue === 'object' && 'html' in (rawValue as Record<string, unknown>) && 'plain' in (rawValue as Record<string, unknown>)) {
+        const existing = rawValue as Partial<NormalizedContent>;
+        if (typeof existing.wordCount === 'number' && typeof existing.charCount === 'number') {
+          return existing as NormalizedContent;
+        }
+        return normalizeFieldContent(existing.html ?? '', field.type);
+      }
+      const candidate = coerceToString(rawValue);
+      const extracted = field.type === 'richText' || field.type === 'html'
+        ? extractFirstHtmlValue(candidate)
+        : candidate;
+      return normalizeFieldContent(extracted, field.type);
+    };
+
+    const runSingleFieldHtmlFallback = async (): Promise<NormalizedContent | null> => {
+      if (!isSingleFieldHtml || !singleField) {
+        return null;
+      }
+
+      const processed = processedFieldInstructions.get(singleField.id);
+      const combinedInstruction = processed?.combinedInstruction ?? '';
+
+      const convertInstructionToHtml = (instruction: string): string => {
+        if (!instruction) return '';
+        return instruction
+          .replace(/Output\s+plain\s+Markdown[^.]*\.?/gi, 'Return well-formed HTML without wrapping in <html> or <body> tags.')
+          .replace(/Markdown/gi, 'HTML')
+          .replace(/\bJSON\b/gi, 'HTML');
+      };
+
+      const htmlInstruction = convertInstructionToHtml(combinedInstruction).trim();
+      const brandInfoForGeneration = {
+        name: brand.name,
+        brand_identity: brand.brand_identity ?? null,
+        tone_of_voice: brand.tone_of_voice ?? null,
+        guardrails: brand.guardrails ?? null,
+        language: brand.language ?? null,
+        country: brand.country ?? null,
+      };
+      const systemParts: string[] = [
+        `You are an expert content creator for the brand "${brandInfoForGeneration.name}".`,
+        'Return ONLY a well-formed HTML fragment for the requested field. Do not include <html>, <head>, or <body> wrappers, and do not add any commentary before or after the fragment.',
+        'Use semantic headings (<h2>, <h3>) and paragraph tags. Keep the HTML clean and accessible.',
+        'Avoid repetition, filler, or placeholder text.'
+      ];
+
+      if (brandInfoForGeneration.brand_identity) {
+        systemParts.push(`Brand identity: ${brandInfoForGeneration.brand_identity}.`);
+      }
+      if (brandInfoForGeneration.tone_of_voice) {
+        systemParts.push(`Tone of voice: ${brandInfoForGeneration.tone_of_voice}.`);
+      }
+      if (brandInfoForGeneration.guardrails) {
+        systemParts.push(`Guardrails: ${brandInfoForGeneration.guardrails}.`);
+      }
+      if (brandInfoForGeneration.language && brandInfoForGeneration.country) {
+        systemParts.push(`All content must be written in ${brandInfoForGeneration.language} for an audience in ${brandInfoForGeneration.country}.`);
+      }
+
+      const fallbackSystemPrompt = systemParts.join('\n');
+
+      const inputFieldSummaries = (template.inputFields ?? []).map((field) => `- ${field.name}: ${field.value || ''}`).join('\n');
+      const wordRange = getWordRange(singleField);
+      const charConstraints = getCharConstraints(singleField);
+
+      const userSections: string[] = [];
+      userSections.push(`Generate the content for the field "${singleField.name}" (ID: ${singleField.id}) within the template "${template.name}".`);
+
+      if (inputFieldSummaries) {
+        userSections.push(`Template input values:\n${inputFieldSummaries}`);
+      }
+
+      if (input?.additionalInstructions) {
+        userSections.push(`Additional template instructions: ${input.additionalInstructions}`);
+      }
+
+      if (input?.product_context) {
+        const { productName, styledClaims } = input.product_context;
+        const contextParts: string[] = [];
+        if (productName) {
+          contextParts.push(`Product Name: ${productName}`);
+        }
+        if (styledClaims) {
+          contextParts.push(`Styled Claims: ${JSON.stringify(styledClaims).slice(0, 2000)}`);
+        }
+        if (contextParts.length > 0) {
+          userSections.push(contextParts.join('\n'));
+        }
+      }
+
+      const constraintParts: string[] = [];
+      if (wordRange) {
+        constraintParts.push(`Aim for ${wordRange.min}–${wordRange.max} words after sanitisation.`);
+      }
+      if (typeof charConstraints.min === 'number' || typeof charConstraints.max === 'number') {
+        const charText: string[] = [];
+        if (typeof charConstraints.min === 'number') charText.push(`at least ${charConstraints.min} characters`);
+        if (typeof charConstraints.max === 'number') charText.push(`no more than ${charConstraints.max} characters`);
+        if (charText.length) {
+          constraintParts.push(`Ensure the HTML results in ${charText.join(' and ')} of readable text.`);
+        }
+      }
+      if (constraintParts.length) {
+        userSections.push(constraintParts.join(' '));
+      }
+
+      if (htmlInstruction) {
+        userSections.push(`Field-specific instructions:\n${htmlInstruction}`);
+      }
+
+      const fallbackUserPrompt = userSections.join('\n\n');
+
+      try {
+        const fallbackResult = await generateTextCompletion(
+          fallbackSystemPrompt,
+          fallbackUserPrompt,
+          3200,
+          0.4
+        );
+
+        if (!fallbackResult || !fallbackResult.trim()) {
+          return null;
+        }
+
+        return normalizeFieldContent(fallbackResult, singleField.type);
+      } catch (fallbackError) {
+        console.error('[generateContentFromTemplate] Single-field HTML fallback failed:', fallbackError);
+        return null;
+      }
+    };
+
+    const out: Record<string, NormalizedContent> = {};
+    const wordCountViolations: Array<{ field: TemplateOutputField; words: number; range: { min: number; max: number } }> = [];
+    const charCountViolations: Array<{ field: TemplateOutputField; chars: number; constraints: { min?: number; max?: number } }> = [];
+    let json: Record<string, unknown> | null = null;
 
     if (isSingleHtml && singleField) {
-      const processed = validateAndPostProcess(singleField, content);
-      out[(singleField as any).id] = processed;
-      const range = extractWordRange(singleField);
+      const normalized = normalizeValueForField(singleField, content);
+      out[singleField.id] = normalized;
+      const range = getWordRange(singleField);
       if (range) {
-        const words = countWords(processed);
+        const words = normalized.wordCount;
         if (words < range.min || words > range.max) {
           wordCountViolations.push({ field: singleField, words, range });
         }
+      }
+      const charConstraints = getCharConstraints(singleField);
+      if ((typeof charConstraints.min === 'number' && normalized.charCount < charConstraints.min) ||
+          (typeof charConstraints.max === 'number' && normalized.charCount > charConstraints.max)) {
+        charCountViolations.push({ field: singleField, chars: normalized.charCount, constraints: charConstraints });
       }
     } else {
       json = tryParseJson(content);
     }
 
     const requiredIds = (template.outputFields || []).map(f => f.id);
-    const hasAllKeys = (obj: Record<string, string> | null) => !!obj && requiredIds.every(id => Object.prototype.hasOwnProperty.call(obj, id));
+    const hasAllKeys = (obj: Record<string, unknown> | null) => !!obj && requiredIds.every(id => Object.prototype.hasOwnProperty.call(obj, id));
 
     if (json && !hasAllKeys(json)) {
       const retryRequest = {
@@ -754,7 +859,7 @@ The product context is provided in the user prompt.
           if (m && m[1]) fallback[f.id] = m[1].trim();
         }
         if (Object.keys(fallback).length) {
-          json = fallback as any;
+          json = fallback;
         }
       } catch {}
     }
@@ -789,39 +894,57 @@ The product context is provided in the user prompt.
             sectionMap[curr.id] = chunkBody;
           }
           if (Object.keys(sectionMap).length) {
-            json = sectionMap as any;
+            json = sectionMap;
           }
         }
       } catch {}
     }
 
     if (!json && !isSingleHtml) {
-      console.warn('Failed to parse JSON output from AI; returning empty content for fields');
-      (template.outputFields || []).forEach((f: any) => { out[f.id] = ''; });
+      console.warn('Failed to parse JSON output from AI; will attempt per-field fallback');
       // continue to per-field fallback attempts below
     }
 
     if (json) {
-      (template.outputFields || []).forEach((f: any) => {
-        const raw = (json as any)[f.id];
-        const processed = validateAndPostProcess(f, typeof raw === 'string' ? raw : (raw != null ? String(raw) : ''));
-        out[f.id] = processed;
-        const range = extractWordRange(f);
+      const parsedJson = json as Record<string, unknown>;
+      (template.outputFields ?? []).forEach((f) => {
+        const raw = parsedJson[f.id];
+        const normalized = normalizeValueForField(f, raw);
+        out[f.id] = normalized;
+        const range = getWordRange(f);
         if (range) {
-          const words = countWords(processed);
+          const words = normalized.wordCount;
           if (words < range.min || words > range.max) {
             wordCountViolations.push({ field: f, words, range });
           }
+        }
+        const charConstraints = getCharConstraints(f);
+        if ((typeof charConstraints.min === 'number' && normalized.charCount < charConstraints.min) ||
+            (typeof charConstraints.max === 'number' && normalized.charCount > charConstraints.max)) {
+          charCountViolations.push({ field: f, chars: normalized.charCount, constraints: charConstraints });
         }
       });
     }
 
     // Per-field fallback: if any required field is empty or fails validation, try focused regeneration
-    const missingFields = (template.outputFields || []).filter((f: any) => !out[f.id] || out[f.id].trim().length === 0);
-    const retryCandidates: Array<{ field: any; reason: string; range?: { min: number; max: number }; words?: number }> = [];
-    missingFields.forEach((f: any) => retryCandidates.push({ field: f, reason: 'empty' }));
+    const missingFields = (template.outputFields ?? []).filter((f) => {
+      const normalized = out[f.id];
+      return !normalized || (!normalized.html && !normalized.plain);
+    });
+    const retryCandidates: Array<{
+      field: TemplateOutputField;
+      reason: 'empty' | 'word_range' | 'char_range';
+      range?: { min: number; max: number };
+      words?: number;
+      chars?: number;
+      constraints?: { min?: number; max?: number };
+    }> = [];
+    missingFields.forEach((f) => retryCandidates.push({ field: f, reason: 'empty' }));
     wordCountViolations.forEach(({ field, words, range }) => {
       retryCandidates.push({ field, reason: 'word_range', range, words });
+    });
+    charCountViolations.forEach(({ field, chars, constraints }) => {
+      retryCandidates.push({ field, reason: 'char_range', chars, constraints });
     });
 
     if (retryCandidates.length > 0) {
@@ -829,8 +952,13 @@ The product context is provided in the user prompt.
         const f = candidate.field;
         try {
           const singleFieldSystemPrompt = (() => {
+            const expectingHtml = isSingleFieldHtml && (f.type === 'richText' || f.type === 'html');
             let sp = `You are an expert content creator for the brand "${brand.name}".`;
-            sp += ` Return ONLY a JSON object where the single key is exactly "${f.id}" and the value is the generated content string for that field.`;
+            if (expectingHtml) {
+              sp += ` Return ONLY a well-formed HTML fragment for this field. Do NOT include JSON, code fences, or commentary.`;
+            } else {
+              sp += ` Return ONLY a JSON object where the single key is exactly "${f.id}" and the value is the generated content string for that field.`;
+            }
             const isRich = f.type === 'richText' || f.type === 'html';
             if (isRich) {
               sp += ` For this field, output well-formed HTML fragments ONLY (no <!DOCTYPE>, <html>, <head>, or <body> wrappers).`;
@@ -846,9 +974,18 @@ The product context is provided in the user prompt.
             if (brand.brand_identity && f.useBrandIdentity) sp += ` Brand identity: ${brand.brand_identity}.`;
             if (brand.tone_of_voice && f.useToneOfVoice) sp += ` Tone of voice: ${brand.tone_of_voice}.`;
             if (brand.guardrails && f.useGuardrails) sp += ` Content guardrails: ${brand.guardrails}.`;
-            const range = extractWordRange(f);
+            const range = getWordRange(f);
             if (range) {
               sp += ` Responses that are not between ${range.min} and ${range.max} words are invalid—revise before replying.`;
+            }
+            const charConstraints = getCharConstraints(f);
+            if (typeof charConstraints.min === 'number' || typeof charConstraints.max === 'number') {
+              const parts: string[] = [];
+              if (typeof charConstraints.min === 'number') parts.push(`at least ${charConstraints.min} characters`);
+              if (typeof charConstraints.max === 'number') parts.push(`no more than ${charConstraints.max} characters`);
+              if (parts.length) {
+                sp += ` Responses must contain ${parts.join(' and ')} once sanitised.`;
+              }
             }
             return sp;
           })();
@@ -863,10 +1000,18 @@ The product context is provided in the user prompt.
             const previousCount = typeof candidate.words === 'number' ? candidate.words : 'UNKNOWN';
             singleFieldUserPrompt += `\nThe previous draft contained ${previousCount} words. Regenerate so the response falls strictly between ${candidate.range.min} and ${candidate.range.max} words.`;
           }
+          if (candidate.reason === 'char_range' && candidate.constraints) {
+            const parts: string[] = [];
+            if (typeof candidate.constraints.min === 'number') parts.push(`minimum ${candidate.constraints.min} characters`);
+            if (typeof candidate.constraints.max === 'number') parts.push(`maximum ${candidate.constraints.max} characters`);
+            if (parts.length) {
+              singleFieldUserPrompt += `\nThe previous draft had ${candidate.chars ?? 'UNKNOWN'} characters. Please ensure the new response stays within the ${parts.join(' and ')} limit.`;
+            }
+          }
           // Provide input field values context
           if (Array.isArray(template.inputFields) && template.inputFields.length > 0) {
             singleFieldUserPrompt += `\n\nTemplate input fields:`;
-            template.inputFields.forEach((inp: any) => {
+            template.inputFields.forEach((inp: TemplateInputField) => {
               singleFieldUserPrompt += `\n- ${inp.name}: ${inp.value || ''}`;
             });
           }
@@ -874,10 +1019,14 @@ The product context is provided in the user prompt.
             singleFieldUserPrompt += `\n\nAdditional instructions: ${input.additionalInstructions}`;
           }
           if (input?.product_context) {
-            const { productName, styledClaims } = input.product_context as { productName?: string; styledClaims?: any };
+            const { productName, styledClaims } = input.product_context;
             if (productName) singleFieldUserPrompt += `\nProduct Name: ${productName}`;
-            if (styledClaims) singleFieldUserPrompt += `\nStyled Claims: ${JSON.stringify(styledClaims).slice(0, 1500)}`; // keep concise
+            if (styledClaims) {
+              singleFieldUserPrompt += `\nStyled Claims: ${JSON.stringify(styledClaims).slice(0, 1500)}`; // keep concise
+            }
           }
+
+          const expectingHtml = isSingleFieldHtml && (f.type === 'richText' || f.type === 'html');
 
           const singleReq = {
             model: deploymentName,
@@ -885,10 +1034,10 @@ The product context is provided in the user prompt.
               { role: 'system', content: singleFieldSystemPrompt },
               { role: 'user', content: singleFieldUserPrompt }
             ],
-            response_format: { type: 'json_object' as const },
             max_tokens: 600,
             temperature: 0.5,
             top_p: 0.9,
+            ...(expectingHtml ? {} : { response_format: { type: 'json_object' as const } }),
           };
           const endpointSf = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
           const sfResp = await fetch(endpointSf, {
@@ -900,22 +1049,38 @@ The product context is provided in the user prompt.
             const sfJson = await sfResp.json();
             let sfContent = sfJson.choices?.[0]?.message?.content || '';
             sfContent = sfContent.replace(/```[a-zA-Z]*\n?/g, '').replace(/\n?```/g, '');
-            const parsed = tryParseJson(sfContent);
-            const raw = parsed ? (parsed as any)[f.id] : '';
-            const processed = validateAndPostProcess(f, typeof raw === 'string' ? raw : (raw != null ? String(raw) : ''));
-            if (processed && processed.trim().length > 0) {
-              out[f.id] = processed;
-              const postRange = extractWordRange(f);
+            const parsed = expectingHtml ? null : tryParseJson(sfContent);
+            const raw = expectingHtml ? sfContent : parsed ? (parsed as Record<string, unknown>)[f.id] : '';
+            const normalized = normalizeValueForField(f, raw);
+            if (normalized.html.trim().length > 0 || normalized.plain.trim().length > 0) {
+              out[f.id] = normalized;
+              const postRange = getWordRange(f);
               if (postRange) {
-                const words = countWords(processed);
+                const words = normalized.wordCount;
                 if (words < postRange.min || words > postRange.max) {
                   console.warn(`Field ${f.id} still violates word count after retry (${words} words, expected ${postRange.min}-${postRange.max}).`);
                 }
+              }
+              const postChar = getCharConstraints(f);
+              if ((typeof postChar.min === 'number' && normalized.charCount < postChar.min) || (typeof postChar.max === 'number' && normalized.charCount > postChar.max)) {
+                console.warn(`Field ${f.id} still violates character constraints after retry (${normalized.charCount} chars, expected min ${postChar.min ?? 'n/a'} max ${postChar.max ?? 'n/a'}).`);
               }
             }
           }
         } catch (e) {
           console.warn(`Single-field fallback failed for ${f.id}:`, e);
+        }
+      }
+    }
+
+    if (isSingleFieldHtml && singleField) {
+      const current = out[singleField.id];
+      const hasContent = current && ((current.html && current.html.replace(/<[^>]+>/g, '').trim().length > 0) || (current.plain && current.plain.trim().length > 0));
+
+      if (!hasContent) {
+        const fallbackNormalized = await runSingleFieldHtmlFallback();
+        if (fallbackNormalized && (fallbackNormalized.html.replace(/<[^>]+>/g, '').trim().length > 0 || fallbackNormalized.plain.trim().length > 0)) {
+          out[singleField.id] = fallbackNormalized;
         }
       }
     }
@@ -935,7 +1100,6 @@ export async function generateBrandIdentityFromUrls(
   urls: string[],
   language: string,
   country: string,
-  context?: { userId?: string; brandId?: string }
 ): Promise<{
   brandIdentity: string;
   toneOfVoice: string;

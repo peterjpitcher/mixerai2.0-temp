@@ -158,6 +158,84 @@
   border-radius: 0 0 0.375rem 0.375rem;
 }
 
+
+.mix-generated-heading-large {
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 2rem 0 0.85rem;
+}
+
+.mix-generated-heading-large:first-child,
+.mix-generated-heading-large:where(:first-child) {
+  margin-top: 0;
+}
+
+.mix-generated-heading-small {
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 1.75rem 0 0.75rem;
+}
+
+.mix-generated-heading-small:first-child,
+.mix-generated-heading-small:where(:first-child) {
+  margin-top: 0;
+}
+
+.mix-generated-paragraph {
+  line-height: 1.7;
+  margin: 1.25rem 0;
+}
+
+.mix-generated-list {
+  line-height: 1.6;
+  margin: 1.25rem 0;
+  padding-left: 1.25rem;
+}
+
+.mix-generated-list-item {
+  margin-bottom: 0.375rem;
+}
+
+.ql-editor h1 {
+  font-size: 1.85rem;
+  line-height: 1.35;
+  margin: 2.25rem 0 1rem;
+  font-weight: 600;
+}
+
+.ql-editor h2 {
+  font-size: 1.55rem;
+  line-height: 1.35;
+  margin: 2rem 0 0.85rem;
+  font-weight: 600;
+}
+
+.ql-editor h3 {
+  font-size: 1.3rem;
+  line-height: 1.4;
+  margin: 1.75rem 0 0.75rem;
+  font-weight: 600;
+}
+
+.ql-editor h1:first-child,
+.ql-editor h2:first-child,
+.ql-editor h3:first-child {
+  margin-top: 0;
+}
+
+.ql-editor p {
+  line-height: 1.7;
+  margin: 1.1rem 0;
+}
+
+.ql-editor ul,
+.ql-editor ol {
+  line-height: 1.6;
+  margin: 1.25rem 0 1.25rem 1.25rem;
+}
+
 .ql-toolbar {
   border: 1px solid #e5e7eb;
   border-radius: 0.375rem 0.375rem 0 0;

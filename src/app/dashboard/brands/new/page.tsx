@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -133,6 +133,79 @@ export default function NewBrandPage() {
 
   const [masterClaimBrands, setMasterClaimBrands] = useState<MasterClaimBrand[]>([]);
   const [isLoadingMasterClaimBrands, setIsLoadingMasterClaimBrands] = useState(true);
+
+  const agencyLookupById = useMemo(() => {
+    const map = new Map<string, VettingAgency>();
+    allVettingAgencies.forEach(agency => {
+      map.set(agency.id, agency);
+    });
+    return map;
+  }, [allVettingAgencies]);
+
+  const agencyLookupByName = useMemo(() => {
+    const map = new Map<string, VettingAgency>();
+    allVettingAgencies.forEach(agency => {
+      if (agency.name) {
+        map.set(agency.name.toLowerCase(), agency);
+      }
+    });
+    return map;
+  }, [allVettingAgencies]);
+
+  const resolveSuggestedAgencyIds = useCallback(
+    (suggested: unknown): { matched: string[]; unmatched: string[] } => {
+      const matched = new Set<string>();
+      const unmatched: string[] = [];
+
+      if (!Array.isArray(suggested)) {
+        return { matched: [], unmatched: [] };
+      }
+
+      suggested.forEach(item => {
+        if (typeof item === 'string') {
+          const normalized = item.trim().toLowerCase();
+          if (!normalized) return;
+          const match = agencyLookupByName.get(normalized);
+          if (match) {
+            matched.add(match.id);
+          } else {
+            unmatched.push(item);
+          }
+          return;
+        }
+
+        if (item && typeof item === 'object') {
+          const maybeId = 'id' in item && typeof (item as { id?: unknown }).id === 'string'
+            ? ((item as { id: string }).id)
+            : null;
+          if (maybeId) {
+            const agency = agencyLookupById.get(maybeId);
+            if (agency) {
+              matched.add(agency.id);
+              return;
+            }
+          }
+
+          const maybeName = 'name' in item && typeof (item as { name?: unknown }).name === 'string'
+            ? ((item as { name: string }).name)
+            : null;
+          if (maybeName) {
+            const normalizedName = maybeName.trim().toLowerCase();
+            if (!normalizedName) return;
+            const agency = agencyLookupByName.get(normalizedName);
+            if (agency) {
+              matched.add(agency.id);
+            } else {
+              unmatched.push(maybeName);
+            }
+          }
+        }
+      });
+
+      return { matched: Array.from(matched), unmatched };
+    },
+    [agencyLookupById, agencyLookupByName]
+  );
 
   // Fetch Master Claim Brands
   useEffect(() => {
@@ -335,9 +408,7 @@ export default function NewBrandPage() {
       }
       const data = await response.json();
       if (data.success && data.data) {
-        const generatedAgencies = Array.isArray(data.data.suggestedAgencies) 
-                                    ? data.data.suggestedAgencies.map((a: { id?: string; name?: string }) => a.id || a.name)
-                                    : [];
+        const { matched: generatedAgencies, unmatched } = resolveSuggestedAgencyIds(data.data.suggestedAgencies);
         setFormData(prev => ({
           ...prev,
           brand_identity: data.data.brandIdentity || prev.brand_identity,
@@ -346,6 +417,11 @@ export default function NewBrandPage() {
           content_vetting_agencies: Array.from(new Set([...prev.content_vetting_agencies, ...generatedAgencies])),
           brand_color: data.data.brandColor || prev.brand_color
         }));
+        if (unmatched.length > 0) {
+          toast.info('Some suggested vetting agencies were not recognised and were skipped.', {
+            description: unmatched.join(', ')
+          });
+        }
         toast.success('Brand identity generated successfully!');
         setActiveTab('identity');
       } else {
@@ -366,9 +442,22 @@ export default function NewBrandPage() {
     }
     setIsSaving(true);
     try {
+      const validAgencyIds = formData.content_vetting_agencies.filter(id => agencyLookupById.has(id));
+      const invalidAgencyIds = formData.content_vetting_agencies.filter(id => !agencyLookupById.has(id));
+
+      if (invalidAgencyIds.length > 0) {
+        toast.info('Some agencies could not be matched to existing records and were excluded.', {
+          description: invalidAgencyIds.join(', ')
+        });
+        setFormData(prev => ({
+          ...prev,
+          content_vetting_agencies: validAgencyIds
+        }));
+      }
+
       const payload: Record<string, unknown> = { 
         ...formData,
-        selected_agency_ids: formData.content_vetting_agencies,
+        selected_agency_ids: validAgencyIds,
         master_claim_brand_ids: formData.master_claim_brand_ids, // Include the array of master claim brand IDs
       };
       

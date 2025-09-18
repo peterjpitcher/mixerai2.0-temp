@@ -26,6 +26,10 @@ export const GET = withAuth(async () => {
     return NextResponse.json({
       success: true,
       data: contentTypes,
+    }, {
+      headers: {
+        'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+      },
     });
 
   } catch (error) {

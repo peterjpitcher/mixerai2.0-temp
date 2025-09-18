@@ -4,19 +4,23 @@ import { withAuthMonitoringAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { Json } from '@/types/supabase';
+import { z } from 'zod';
+import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth/brand-access';
 
 // In-memory rate limiting
 const rateLimit = new Map<string, { count: number, timestamp: number }>();
 const RATE_LIMIT_PERIOD = 60 * 1000; // 1 minute
 const MAX_REQUESTS_PER_MINUTE = 60; // Allow 60 requests per minute per IP (relaxed)
 
-interface ContentTransCreationRequest {
-  content: string;
-  sourceLanguage?: string;
-  brand_id: string;
-  batch_id?: string; // Optional batch ID for grouping multiple runs
-  batch_sequence?: number; // Optional sequence number within a batch
-}
+const ContentTransCreationSchema = z.object({
+  content: z.string().min(1, 'Content is required'),
+  sourceLanguage: z.string().min(2).max(10).optional(),
+  brand_id: z.string().uuid(),
+  batch_id: z.string().uuid().optional(),
+  batch_sequence: z.number().int().nonnegative().optional(),
+});
+
+type ContentTransCreationRequest = z.infer<typeof ContentTransCreationSchema>;
 
 export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user) => {
   const supabaseAdmin = createSupabaseAdminClient();
@@ -24,8 +28,30 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
   let historyErrorMessage: string | undefined = undefined;
   let apiInputs: ContentTransCreationRequest | null = null;
   let apiOutputs: { transCreatedContent?: string; targetLanguage: string; targetCountry: string; error?: string } | null = null;
-  const data: ContentTransCreationRequest = await request.json();
-  apiInputs = data; // Capture inputs for logging
+  let parsedBody: unknown;
+  try {
+    parsedBody = await request.json();
+  } catch {
+    historyEntryStatus = 'failure';
+    historyErrorMessage = 'Invalid JSON payload.';
+    return NextResponse.json(
+      { success: false, error: historyErrorMessage },
+      { status: 400 }
+    );
+  }
+
+  const bodyParse = ContentTransCreationSchema.safeParse(parsedBody);
+  if (!bodyParse.success) {
+    historyEntryStatus = 'failure';
+    historyErrorMessage = 'Invalid request payload';
+    return NextResponse.json(
+      { success: false, error: historyErrorMessage, details: bodyParse.error.flatten() },
+      { status: 400 }
+    );
+  }
+
+  const data = bodyParse.data;
+  apiInputs = data;
 
   // Role check: Only Global Admins or Editors can access this tool
   const userRole = user.user_metadata?.role;
@@ -77,26 +103,29 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
   }
 
   try {
-    if (!data.content) {
-      historyEntryStatus = 'failure';
-      historyErrorMessage = 'Content is required';
-      return NextResponse.json(
-        { success: false, error: historyErrorMessage },
-        { status: 400 }
-      );
+    try {
+      const hasAccess = await userHasBrandAccess(supabaseAdmin, user, data.brand_id);
+      if (!hasAccess) {
+        historyEntryStatus = 'failure';
+        historyErrorMessage = 'You do not have access to this brand.';
+        return NextResponse.json(
+          { success: false, error: historyErrorMessage },
+          { status: 403 }
+        );
+      }
+    } catch (error) {
+      if (error instanceof BrandPermissionVerificationError) {
+        historyEntryStatus = 'failure';
+        historyErrorMessage = 'Unable to verify brand permissions.';
+        return NextResponse.json(
+          { success: false, error: historyErrorMessage },
+          { status: 500 }
+        );
+      }
+      throw error;
     }
-    
-    if (!data.brand_id) {
-      historyEntryStatus = 'failure';
-      historyErrorMessage = 'Brand ID is required for trans-creation';
-      return NextResponse.json(
-        { success: false, error: historyErrorMessage },
-        { status: 400 }
-      );
-    }
-    
-    const supabase = createSupabaseAdminClient();
-    const { data: brandData, error: brandError } = await supabase
+
+    const { data: brandData, error: brandError } = await supabaseAdmin
       .from('brands')
       .select('language, country')
       .eq('id', data.brand_id)

@@ -1,52 +1,114 @@
 import { NextRequest, NextResponse } from 'next/server';
-// OpenAI import removed as the client instance was unused and direct fetch is used.
+import { z } from 'zod';
+
 import { withAuthMonitoringAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
-// import { withAuthAndCSRF } from '@/lib/api/with-csrf'; // Import for consistent error handling - not used
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { BrandPermissionVerificationError, requireBrandAccess } from '@/lib/auth/brand-access';
 
 // const openai = new OpenAI({ ... }); // Unused OpenAI client initialization removed
 
+const GenerateDescriptionSchema = z.object({
+  type: z.enum(['generate', 'polish']),
+  stepName: z.string().min(1, 'stepName is required'),
+  existingDescription: z.string().optional(),
+  otherSteps: z.array(z.object({
+    name: z.string().min(1),
+    description: z.string().optional(),
+  })).optional(),
+  brandContext: z.object({
+    brandId: z.string().uuid('brandId must be a valid UUID').optional(),
+    name: z.string().optional(),
+    country: z.string().optional(),
+    language: z.string().optional(),
+  }).optional(),
+});
+
 export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user) => {
   try {
-    const body = await request.json();
-    const { type, stepName, existingDescription, otherSteps, brandContext } = body;
-    
-    // userId for auditing is available via the 'user' object from withAuthMonitoringAndCSRF
-    // Example: user.id
-    
-    if (!type || !stepName) {
+    const payload = await request.json();
+    const parsed = GenerateDescriptionSchema.safeParse(payload);
+
+    if (!parsed.success) {
       return NextResponse.json(
-        { success: false, error: 'Missing required parameters: type and stepName are required.' },
+        { success: false, error: 'Invalid request payload.', details: parsed.error.flatten() },
         { status: 400 }
       );
     }
-    
-    if (!process.env.AZURE_OPENAI_API_KEY || 
-        !process.env.AZURE_OPENAI_ENDPOINT || 
+
+    const { type, stepName, existingDescription, otherSteps = [], brandContext } = parsed.data;
+
+    if (type === 'polish' && (!existingDescription || existingDescription.trim().length === 0)) {
+      return NextResponse.json(
+        { success: false, error: 'existingDescription is required when type is "polish".' },
+        { status: 400 }
+      );
+    }
+
+    if (!process.env.AZURE_OPENAI_API_KEY ||
+        !process.env.AZURE_OPENAI_ENDPOINT ||
         !process.env.AZURE_OPENAI_DEPLOYMENT) {
-      // This error should ideally be caught by a health check or at startup.
-      // Returning a generic error to the client for security.
       return NextResponse.json(
         { success: false, error: 'AI service configuration error.' },
         { status: 500 }
       );
     }
-    
+
+    if (brandContext?.brandId) {
+      const supabase = createSupabaseAdminClient();
+      try {
+        await requireBrandAccess(supabase, user, brandContext.brandId);
+      } catch (error) {
+        if (error instanceof BrandPermissionVerificationError) {
+          return NextResponse.json(
+            { success: false, error: 'Unable to verify brand permissions at this time.' },
+            { status: 500 }
+          );
+        }
+        if (error instanceof Error && error.message === 'NO_BRAND_ACCESS') {
+          return NextResponse.json(
+            { success: false, error: 'You do not have access to the selected brand.' },
+            { status: 403 }
+          );
+        }
+        throw error;
+      }
+    }
+
+    const safeBrandContext = brandContext ? {
+      name: brandContext.name?.trim(),
+      country: brandContext.country?.trim(),
+      language: brandContext.language?.trim(),
+    } : undefined;
+
     let prompt = '';
     let systemMessage = '';
     const azureApiVersion = process.env.AZURE_OPENAI_API_VERSION || '2023-05-15'; // Use env var or default
 
     if (type === 'generate') {
       systemMessage = "You are a concise workflow assistant that creates brief, professional step descriptions. Keep descriptions under 30 words. Be clear and professional, focusing on the purpose of the step.";
-      if (brandContext) {
-        systemMessage += ` Use language appropriate for ${brandContext.name} brand, which operates in ${brandContext.country} and uses ${brandContext.language} as their primary language.`;
+      if (safeBrandContext?.name || safeBrandContext?.country || safeBrandContext?.language) {
+        const brandDescriptor = [
+          safeBrandContext?.name ? `${safeBrandContext.name} brand` : null,
+          safeBrandContext?.country ? `operating in ${safeBrandContext.country}` : null,
+          safeBrandContext?.language ? `using ${safeBrandContext.language} as the primary language` : null,
+        ].filter(Boolean).join(' and ');
+
+        if (brandDescriptor) {
+          systemMessage += ` Use language appropriate for ${brandDescriptor}.`;
+        }
       }
       let stepsContext = '';
-      if (otherSteps && Array.isArray(otherSteps) && otherSteps.length > 0) {
-        stepsContext = "Other steps in this workflow include: " + 
-          otherSteps.map((s: {name: string, description?: string}) => `\"${s.name}\" (${s.description || 'No description'})`).join(', ');
+      if (otherSteps.length > 0) {
+        stepsContext = 'Other steps in this workflow include: ' +
+          otherSteps.map((s) => `"${s.name}" (${s.description || 'No description'})`).join(', ');
       }
-      prompt = `Generate a concise professional description (maximum 30 words) for a workflow step named \"${stepName}\".\n${stepsContext ? stepsContext + '\\n' : ''}${brandContext ? `This is for ${brandContext.name} brand, which operates in ${brandContext.country} and uses ${brandContext.language} language.\\n` : ''}Keep the description focused on what happens during this step in the content workflow.`;
+      prompt = `Generate a concise professional description (maximum 30 words) for a workflow step named "${stepName}".\n` +
+        (stepsContext ? `${stepsContext}\n` : '') +
+        (safeBrandContext?.name || safeBrandContext?.country || safeBrandContext?.language
+          ? `This is for ${safeBrandContext?.name ?? 'the selected'} brand${safeBrandContext?.country ? ` operating in ${safeBrandContext.country}` : ''}${safeBrandContext?.language ? ` using ${safeBrandContext.language}` : ''}.\n`
+          : '') +
+        'Keep the description focused on what happens during this step in the content workflow.';
     } 
     else if (type === 'polish') {
       if (!existingDescription) {
@@ -56,10 +118,22 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
         );
       }
       systemMessage = "You are a concise professional editor that improves workflow step descriptions. Keep descriptions under 30 words. Maintain the original meaning while making the text more professional, clear, and concise.";
-      if (brandContext) {
-        systemMessage += ` Use language appropriate for ${brandContext.name} brand, which operates in ${brandContext.country} and uses ${brandContext.language} as their primary language.`;
+      if (safeBrandContext?.name || safeBrandContext?.country || safeBrandContext?.language) {
+        const brandDescriptor = [
+          safeBrandContext?.name ? `${safeBrandContext.name} brand` : null,
+          safeBrandContext?.country ? `operating in ${safeBrandContext.country}` : null,
+          safeBrandContext?.language ? `using ${safeBrandContext.language}` : null,
+        ].filter(Boolean).join(' and ');
+
+        if (brandDescriptor) {
+          systemMessage += ` Use language appropriate for ${brandDescriptor}.`;
+        }
       }
-      prompt = `Polish the following workflow step description for the step \"${stepName}\" while keeping it under 30 words:\n\"${existingDescription}\"\n${brandContext ? `This is for ${brandContext.name} brand, which operates in ${brandContext.country} and uses ${brandContext.language} language.\\n` : ''}Improve clarity, professionalism, and conciseness while preserving the original meaning.`;
+      prompt = `Polish the following workflow step description for the step "${stepName}" while keeping it under 30 words:\n"${existingDescription}"\n` +
+        (safeBrandContext?.name || safeBrandContext?.country || safeBrandContext?.language
+          ? `This is for ${safeBrandContext?.name ?? 'the selected'} brand${safeBrandContext?.country ? ` operating in ${safeBrandContext.country}` : ''}${safeBrandContext?.language ? ` using ${safeBrandContext.language}` : ''}.\n`
+          : '') +
+        'Improve clarity, professionalism, and conciseness while preserving the original meaning.';
     } 
     else {
       return NextResponse.json(

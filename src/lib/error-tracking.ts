@@ -22,18 +22,21 @@ export async function trackError(
   error: Error & { digest?: string },
   details?: Partial<ErrorDetails>
 ) {
-  const errorInfo = {
+  const payload = {
     message: error.message,
     stack: error.stack,
-    digest: error.digest,
-    ...details,
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
+    severity: 'error' as const,
+    fingerprint: error.digest,
+    info: {
+      ...details,
+      environment: process.env.NODE_ENV || 'development',
+      timestamp: new Date().toISOString(),
+    },
   };
 
   // In development, just log to console
   if (process.env.NODE_ENV === 'development') {
-    console.error('[Error Tracking]', errorInfo);
+    console.error('[Error Tracking]', payload);
     return;
   }
 
@@ -45,7 +48,7 @@ export async function trackError(
       headers: { 
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(errorInfo),
+      body: JSON.stringify(payload),
     });
   } catch (trackingError) {
     // Fail silently to not disrupt user experience

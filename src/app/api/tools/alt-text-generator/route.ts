@@ -4,23 +4,65 @@ import { withAuthMonitoringAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { Json } from '@/types/supabase';
+import { z } from 'zod';
+import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth/brand-access';
+import dns from 'node:dns';
+import ipaddr from 'ipaddr.js';
 
 // In-memory rate limiting
 const rateLimit = new Map<string, { count: number, timestamp: number }>();
 const RATE_LIMIT_PERIOD = 60 * 1000; // 1 minute
 const MAX_REQUESTS_PER_MINUTE = 60; // Allow 60 requests per minute per IP (relaxed)
 
-interface AltTextGenerationRequest {
-  imageUrls: string[];
-  language?: string; // Add language field from request
-  processBatch?: boolean; // Add batch processing flag
-}
+const AltTextGenerationSchema = z.object({
+  imageUrls: z
+    .array(z.string().min(1))
+    .min(1, 'At least one image URL is required')
+    .max(20, 'A maximum of 20 images can be processed at once'),
+  language: z.string().min(2).max(10).optional(),
+  processBatch: z.boolean().optional(),
+  brand_id: z.string().uuid().optional(),
+});
+
+type AltTextGenerationRequest = z.infer<typeof AltTextGenerationSchema>;
 
 interface AltTextResultItem {
   imageUrl: string;
   altText?: string;
   error?: string;
   detectedLanguage?: string; // Add detected language to result
+}
+
+function isPrivateAddress(address: string): boolean {
+  try {
+    const parsed = ipaddr.parse(address);
+    const range = parsed.range();
+    return range === 'private' || range === 'loopback' || range === 'linkLocal' || range === 'uniqueLocal' || range === 'reserved';
+  } catch {
+    return true;
+  }
+}
+
+async function ensureSafeHostname(hostname: string) {
+  const lowerHost = hostname.toLowerCase();
+  if (lowerHost === 'localhost' || lowerHost === '127.0.0.1' || lowerHost === '[::1]') {
+    throw new Error('Internal or localhost URLs are not allowed');
+  }
+
+  if (ipaddr.isValid(lowerHost) && isPrivateAddress(lowerHost)) {
+    throw new Error('Requests to internal or reserved IP addresses are not allowed.');
+  }
+
+  const lookupResults = await dns.promises.lookup(lowerHost, { all: true });
+  if (!lookupResults.length) {
+    throw new Error('Unable to resolve image host.');
+  }
+
+  for (const result of lookupResults) {
+    if (isPrivateAddress(result.address)) {
+      throw new Error('Requests to internal or reserved IP addresses are not allowed.');
+    }
+  }
 }
 
 const tldToLangCountry: { [key: string]: { language: string; country: string } } = {
@@ -134,24 +176,77 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
   }
 
   try {
-    const data: AltTextGenerationRequest = await request.json();
-    apiInputs = data; // Capture inputs for logging
-    
-    if (!data.imageUrls || !Array.isArray(data.imageUrls) || data.imageUrls.length === 0) {
+    const parsedBody = AltTextGenerationSchema.safeParse(await request.json());
+    if (!parsedBody.success) {
       historyEntryStatus = 'failure';
-      historyErrorMessage = 'An array of image URLs is required';
+      historyErrorMessage = 'Invalid request payload';
       return NextResponse.json(
-        { success: false, error: historyErrorMessage },
+        { success: false, error: historyErrorMessage, details: parsedBody.error.flatten() },
         { status: 400 }
       );
+    }
+
+    const data = parsedBody.data;
+    apiInputs = data;
+
+    if (data.brand_id) {
+      try {
+        const hasAccess = await userHasBrandAccess(supabaseAdmin, user, data.brand_id);
+        if (!hasAccess) {
+          historyEntryStatus = 'failure';
+          historyErrorMessage = 'You do not have access to this brand.';
+          return NextResponse.json(
+            { success: false, error: historyErrorMessage },
+            { status: 403 }
+          );
+        }
+      } catch (error) {
+        if (error instanceof BrandPermissionVerificationError) {
+          historyEntryStatus = 'failure';
+          historyErrorMessage = 'Unable to verify brand permissions.';
+          return NextResponse.json(
+            { success: false, error: historyErrorMessage },
+            { status: 500 }
+          );
+        }
+        throw error;
+      }
+    }
+
+    let brandLanguage: string | undefined;
+    let brandCountry: string | undefined;
+    let brandContext = {
+      brandIdentity: '',
+      toneOfVoice: '',
+      guardrails: '',
+    };
+
+    if (data.brand_id) {
+      const { data: brandData, error: brandError } = await supabaseAdmin
+        .from('brands')
+        .select('brand_identity, tone_of_voice, guardrails, language, country')
+        .eq('id', data.brand_id)
+        .single();
+
+      if (brandError) {
+        console.error('[AltTextGen] Failed to load brand context:', brandError);
+      } else if (brandData) {
+        brandContext = {
+          brandIdentity: brandData.brand_identity ?? '',
+          toneOfVoice: brandData.tone_of_voice ?? '',
+          guardrails: brandData.guardrails ?? '',
+        };
+        brandLanguage = brandData.language ?? undefined;
+        brandCountry = brandData.country ?? undefined;
+      }
     }
 
     const results: AltTextResultItem[] = [];
 
     for (const imageUrl of data.imageUrls) {
-      const requestedLanguage = data.language; // Get language from request if provided
-      let language = 'en';
-      let country = 'US';
+      const requestedLanguage = data.language;
+      let language = brandLanguage || 'en';
+      let country = brandCountry || 'US';
       let processingError: string | undefined = undefined;
 
       try {
@@ -189,6 +284,8 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
               hostname.startsWith('172.')) {
             throw new Error('Internal or localhost URLs are not allowed');
           }
+
+          await ensureSafeHostname(url.hostname);
           
           // Validate image file extension if present in URL
           const pathname = url.pathname.toLowerCase();
@@ -251,13 +348,6 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
       }
       
       try {
-        // Brand context is currently empty, but kept for potential future use
-        const brandContext = {
-          brandIdentity: '',
-          toneOfVoice: '',
-          guardrails: ''
-        };
-        
         // Add delay between image processing to avoid rate limiting (except for the first image)
         if (results.length > 0) {
           console.log(`[Delay] Alt-Text Gen: Waiting 2 seconds before processing next image...`);
@@ -300,10 +390,9 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
     }
 
     return NextResponse.json({
-      success: historyEntryStatus === 'success', // Reflect overall success
+      success: historyEntryStatus === 'success',
       userId: user.id,
       results,
-      // Add overall error message if the entire operation is considered a failure
       ...(historyEntryStatus === 'failure' && historyErrorMessage && { error: historyErrorMessage })
     });
 
@@ -312,7 +401,9 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
     historyEntryStatus = 'failure';
     historyErrorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
     // Ensure apiInputs is at least an empty object if error happened before parsing request body
-    if (!apiInputs) apiInputs = {imageUrls: [], language: 'unknown'}; 
+    if (!apiInputs) {
+      apiInputs = { imageUrls: [], language: 'unknown', processBatch: false } as AltTextGenerationRequest;
+    }
     apiOutputs = { results: [{ imageUrl: 'unknown', error: historyErrorMessage }] };
     return handleApiError(new Error(historyErrorMessage), 'Alt Text Generation Error', 500);
   } finally {
@@ -332,7 +423,7 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
             outputs: (apiOutputs || { error: historyErrorMessage || 'Unknown error before output generation' }) as unknown as Json,
             status: historyEntryStatus,
             error_message: historyErrorMessage,
-            brand_id: null, // Alt text generator is not brand-specific for history
+            brand_id: apiInputs?.brand_id ?? null,
             batch_id: batchId,
             batch_sequence: batchId ? 1 : null
         });

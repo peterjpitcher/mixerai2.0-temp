@@ -17,6 +17,8 @@ import { ArrowLeft, Edit3, MessageSquare, CheckCircle, XCircle, Clock, UserCircl
 import { RestartWorkflowButton } from '@/components/content/restart-workflow-button';
 import { RejectionFeedbackCard } from '@/components/content/rejection-feedback-card';
 import { format as formatDateFns } from 'date-fns';
+import { normalizeOutputsMap } from '@/lib/content/html-normalizer';
+import type { NormalizedContent } from '@/types/template';
 
 interface TemplateOutputField {
   id: string;
@@ -70,7 +72,7 @@ interface ContentVersion {
   reviewer?: { id: string; full_name?: string; avatar_url?: string };
   created_at: string;
   content_json?: {
-    generatedOutputs?: Record<string, string>;
+    generatedOutputs?: Record<string, unknown>;
     body_snapshot?: string;
   } | null;
 }
@@ -242,6 +244,16 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     }, {} as Record<string, string>);
   }, [template]);
 
+  const outputFieldDefinitions = useMemo(
+    () => (template?.fields?.outputFields as Array<{ id: string; type: string }> | undefined) ?? [],
+    [template]
+  );
+
+  const generatedOutputs: Record<string, NormalizedContent> = useMemo(() => {
+    const rawOutputs = (content?.content_data?.generatedOutputs ?? null) as Record<string, unknown> | null;
+    return normalizeOutputsMap(rawOutputs ?? undefined, outputFieldDefinitions);
+  }, [content?.content_data?.generatedOutputs, outputFieldDefinitions]);
+
   const handleWorkflowAction = () => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -336,8 +348,6 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     { label: 'Content', href: '/dashboard/content' },
     { label: content.title || 'Details' }
   ];
-  
-  const generatedOutputs = content.content_data?.generatedOutputs || {};
 
   const getHistoryItemDisplayName = (identifier: string, stepName: string) => {
     return outputFieldIdToNameMap[identifier] || stepName || identifier;
@@ -443,14 +453,19 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
             </CardHeader>
             <CardContent>
               {template && template.fields && template.fields.outputFields && template.fields.outputFields.length > 0 ? (
-                template.fields.outputFields.map(field => (
-                  <div key={field.id} className="mb-6">
-                    <h3 className="font-semibold text-lg mb-2">{field.name}</h3>
-                    <div className="prose prose-sm max-w-none p-4 border rounded-md bg-gray-50/50 dark:bg-gray-800/50">
-                      <MarkdownDisplay markdown={generatedOutputs[field.id] || 'This field has no content yet.'} />
+                template.fields.outputFields.map(field => {
+                  const normalized = generatedOutputs[field.id];
+                  const html = normalized?.html || '<p class="text-muted-foreground italic">This field has no content yet.</p>';
+                  return (
+                    <div key={field.id} className="mb-6">
+                      <h3 className="font-semibold text-lg mb-2">{field.name}</h3>
+                      <div
+                        className="prose prose-sm max-w-none p-4 border rounded-md bg-gray-50/50 dark:bg-gray-800/50"
+                        dangerouslySetInnerHTML={{ __html: html }}
+                      />
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                  <div className="prose prose-sm max-w-none p-4 border rounded-md bg-gray-50/50 dark:bg-gray-800/50">
                   <MarkdownDisplay markdown={content.body || 'No dynamic fields configured or template not loaded. Showing primary content body.'} />
@@ -527,6 +542,10 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
 
                             const generatedOutputs = version.content_json?.generatedOutputs;
                             if (generatedOutputs && typeof generatedOutputs === 'object' && template?.fields?.outputFields) {
+                              const normalizedOutputs = normalizeOutputsMap(
+                                generatedOutputs as Record<string, unknown>,
+                                template.fields.outputFields
+                              );
                               // --- Start Diagnostic Logging for generatedOutputs processing ---
                               if (process.env.NODE_ENV === 'development') {
                                 console.log('[Version Snapshot Debug] All keys in generatedOutputs:', Object.keys(generatedOutputs));
@@ -537,11 +556,11 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
                               // Iterate over template.fields.outputFields to maintain order
                               const fieldsToRender = template.fields.outputFields
                                 .map(templateField => {
-                                  if (generatedOutputs.hasOwnProperty(templateField.id)) {
+                                  if (normalizedOutputs[templateField.id]) {
                                     return {
                                       id: templateField.id,
                                       name: templateField.name, // Use name directly from template definition
-                                      value: generatedOutputs[templateField.id]
+                                      value: normalizedOutputs[templateField.id]
                                     };
                                   }
                                   return null;
@@ -565,13 +584,15 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
 
                               if (fieldsToRender.length > 0) {
                                 return fieldsToRender.map(field => {
-                                  // const fieldName = outputFieldIdToNameMap[field.id]; // No longer needed as we use field.name
+                                  const normalized = field.value as NormalizedContent;
+                                  const html = normalized?.html || '<p class="text-muted-foreground italic">No content for this field in this version.</p>';
                                   return (
                                     <div key={field.id} className="mb-4">
                                       <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-1">{field.name}</h5>
-                                      <div className="prose prose-sm max-w-none p-3 border rounded-md bg-gray-50 dark:bg-gray-700/30 text-gray-800 dark:text-gray-200">
-                                        <MarkdownDisplay markdown={String(field.value) || 'No content for this field in this version.'} />
-                                      </div>
+                                      <div
+                                        className="prose prose-sm max-w-none p-3 border rounded-md bg-gray-50 dark:bg-gray-700/30 text-gray-800 dark:text-gray-200"
+                                        dangerouslySetInnerHTML={{ __html: html }}
+                                      />
                                     </div>
                                   );
                                 });

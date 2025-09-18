@@ -1,12 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { COUNTRIES } from '@/lib/constants';
-import { withAuthMonitoringAndCSRF } from '@/lib/auth/api-auth';
-import { handleApiError } from '@/lib/api-utils';
 import axios from 'axios';
 import sanitizeHtml from 'sanitize-html';
+import dns from 'dns';
+import ipaddr from 'ipaddr.js';
+
+import { COUNTRIES } from '@/lib/constants';
+import { withAdminAuthAndCSRF } from '@/lib/auth/api-auth';
+import { handleApiError } from '@/lib/api-utils';
+import { env } from '@/lib/env';
 
 // Rate limiting is now handled globally in middleware
+
+const rawAllowlist = (env.PROXY_ALLOWED_HOSTS || '')
+  .split(',')
+  .map(entry => entry.trim().toLowerCase())
+  .filter(Boolean);
+
+const allowlistedHosts = new Set(rawAllowlist);
+
+function isHostAllowlisted(hostname: string): boolean {
+  if (!allowlistedHosts.size) {
+    return false;
+  }
+
+  const host = hostname.toLowerCase();
+
+  for (const entry of allowlistedHosts) {
+    if (entry.startsWith('*.')) {
+      const bare = entry.slice(2);
+      if (host === bare || host.endsWith(`.${bare}`)) {
+        return true;
+      }
+      continue;
+    }
+
+    if (host === entry) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 // Simplified OpenAI client initialization: Prioritizes Azure, falls back to standard OpenAI if configured, else error.
 const getOpenAIClientOrThrow = () => {
@@ -69,6 +104,26 @@ function getLanguageName(languageCode: string): string {
 // Function to extract website content from a URL
 async function scrapeWebsiteContent(url: string): Promise<string> {
   try {
+    const parsed = new URL(url);
+
+    if (!isHostAllowlisted(parsed.hostname)) {
+      throw new Error('Host not allowlisted');
+    }
+
+    let resolvedIp: string;
+    try {
+      const lookupResult = await dns.promises.lookup(parsed.hostname);
+      resolvedIp = lookupResult.address;
+    } catch (dnsError) {
+      throw new Error(`Could not resolve hostname: ${parsed.hostname}`);
+    }
+
+    const addr = ipaddr.parse(resolvedIp);
+    const range = addr.range();
+    if (range === 'private' || range === 'loopback' || range === 'reserved') {
+      throw new Error('Requests to internal or reserved IP addresses are not allowed');
+    }
+
     const response = await axios.get(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 compatible MixerAIContentScraper/1.0', 'Accept': 'text/html', 'Accept-Language': 'en-GB,en;q=0.5' },
       timeout: 8000 // 8 second timeout
@@ -85,14 +140,15 @@ async function scrapeWebsiteContent(url: string): Promise<string> {
     });
     
     return textContent;
-  } catch {
+  } catch (error) {
     // Log scraping errors to a secure server-side log in production.
     // Return an empty string or a specific marker if content extraction fails, rather than error string in content.
+    console.warn('[brands/identity] Failed to scrape URL', { url, error: error instanceof Error ? error.message : error });
     return ''; // Or throw a specific error to be handled upstream
   }
 }
 
-export const POST = withAuthMonitoringAndCSRF(async (req: NextRequest) => {
+export const POST = withAdminAuthAndCSRF(async (req: NextRequest) => {
   try {
     const body = await req.json();
     const name = body.name || body.brandName;

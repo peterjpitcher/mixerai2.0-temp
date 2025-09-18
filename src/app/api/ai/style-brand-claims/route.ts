@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
+import { User } from '@supabase/supabase-js';
 
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { formatClaimsDirectly } from '@/lib/claims-formatter';
@@ -8,6 +8,7 @@ import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { getStackedClaimsForProduct } from '@/lib/claims-utils';
 import { ok, fail } from '@/lib/http/response';
 import { logDebug, logError } from '@/lib/logger';
+import { BrandPermissionVerificationError, requireBrandAccess } from '@/lib/auth/brand-access';
 
 type Claim = {
   claim_text: string;
@@ -52,7 +53,7 @@ function sortClaims(a: Claim, b: Claim): number {
   return 0;
 }
 
-async function styleBrandClaimsHandler(request: NextRequest) {
+async function styleBrandClaimsHandler(request: NextRequest, user: User) {
   try {
     const body = await request.json();
     const { masterClaimBrandId, productId, countryCode } = body;
@@ -63,14 +64,49 @@ async function styleBrandClaimsHandler(request: NextRequest) {
     
     const supabase = createSupabaseAdminClient();
 
+    const { data: masterBrand, error: masterBrandError } = await supabase
+      .from('master_claim_brands')
+      .select('id, name, mixerai_brand_id')
+      .eq('id', masterClaimBrandId)
+      .single();
+
+    if (masterBrandError || !masterBrand) {
+      return fail(404, 'Master claim brand not found.');
+    }
+
+    if (masterBrand.mixerai_brand_id) {
+      try {
+        await requireBrandAccess(supabase, user, masterBrand.mixerai_brand_id);
+      } catch (error) {
+        if (error instanceof BrandPermissionVerificationError) {
+          return fail(500, 'Unable to verify brand permissions at this time.', error.message);
+        }
+        if (error instanceof Error && error.message === 'NO_BRAND_ACCESS') {
+          return fail(403, 'You do not have permission to view claims for this brand.');
+        }
+        throw error;
+      }
+    } else if (user.user_metadata?.role !== 'admin') {
+      return fail(403, 'This master brand is not linked to a MixerAI brand. Contact an administrator to complete setup.');
+    }
+
     // If productId and countryCode are provided, reuse stacked claims for precedence consistency
     if (productId && countryCode) {
-      const effective = await getStackedClaimsForProduct(productId, countryCode);
-      const { data: brandData } = await supabase
-        .from('master_claim_brands')
-        .select('name')
-        .eq('id', masterClaimBrandId)
+      const { data: productRecord, error: productError } = await supabase
+        .from('products')
+        .select('id, master_brand_id')
+        .eq('id', productId)
         .single();
+
+      if (productError || !productRecord) {
+        return fail(404, 'Product not found.');
+      }
+
+      if (productRecord.master_brand_id !== masterClaimBrandId) {
+        return fail(400, 'The provided product does not belong to the supplied master claim brand.');
+      }
+
+      const effective = await getStackedClaimsForProduct(productId, countryCode);
       const formatted = formatClaimsDirectly(
         effective.map((ec, idx) => ({
           id: `${ec.claim_text}_${idx}`,
@@ -81,9 +117,9 @@ async function styleBrandClaimsHandler(request: NextRequest) {
           priority: effective.length - idx,
         })),
         undefined,
-        brandData?.name
+        masterBrand.name
       );
-      return ok({ brandName: brandData?.name || 'Unknown Brand', styledClaims: formatted, rawClaimsForAI: effective.map(ec => ({ text: ec.claim_text, type: ec.final_claim_type, level: ec.source_level, market: ec.original_claim_country_code })) });
+      return ok({ brandName: masterBrand.name || 'Unknown Brand', styledClaims: formatted, rawClaimsForAI: effective.map(ec => ({ text: ec.claim_text, type: ec.final_claim_type, level: ec.source_level, market: ec.original_claim_country_code })) });
     }
 
     // 1. Fetch all claims (brand-oriented)
@@ -102,19 +138,16 @@ async function styleBrandClaimsHandler(request: NextRequest) {
     const allClaimsToDisplay = sortedClaims;
 
     // Get brand and product names for the introductory sentence
-    const { data: brandData } = await supabase
-      .from('master_claim_brands')
-      .select('name')
-      .eq('id', masterClaimBrandId)
-      .single();
-    
     let productName: string | undefined;
     if (productId) {
       const { data: productData } = await supabase
         .from('products')
-        .select('name')
+        .select('name, master_brand_id')
         .eq('id', productId)
         .single();
+      if (productData && productData.master_brand_id !== masterClaimBrandId) {
+        return fail(400, 'The provided product does not belong to the supplied master claim brand.');
+      }
       productName = productData?.name;
     }
 
@@ -129,18 +162,18 @@ async function styleBrandClaimsHandler(request: NextRequest) {
         priority: 0 // No priority info in current structure
       })),
       productName,
-      brandData?.name
+      masterBrand.name
     );
 
     // Log for debugging
     logDebug('Formatted claims without AI:', {
-      brandName: brandData?.name,
+      brandName: masterBrand.name,
       productName,
       totalClaims: allClaimsToDisplay.length
     });
 
     return ok({
-      brandName: brandData?.name || 'Unknown Brand',
+      brandName: masterBrand.name || 'Unknown Brand',
       styledClaims: formattedClaims,
       rawClaimsForAI: allClaimsToDisplay.map(claim => ({
         text: claim.claim_text,

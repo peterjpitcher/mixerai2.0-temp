@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Edit, AlertCircle, ListChecks, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { createSupabaseClient } from '@/lib/supabase/client';
 import { formatDate } from '@/lib/utils/date';
 import { BrandIcon } from '@/components/brand-icon';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
@@ -37,51 +36,81 @@ export default function MyTasksPage() {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   // currentUserId is not strictly needed anymore if API handles user-specific tasks,
   // but keeping it doesn't harm and might be useful for other client-side checks if any.
   // const [currentUserId, setCurrentUserId] = useState<string | null>(null); 
 
   useEffect(() => {
-    async function initializePage() {
+    const abortController = new AbortController();
+
+    const fetchTasks = async () => {
       setIsLoading(true);
       setError(null);
-      const supabase = createSupabaseClient();
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-      if (userError || !user) {
-        console.error('Error fetching user or user not logged in:', userError);
-        setError('You must be logged in to view your tasks.');
-        toast.error('Authentication Error', { description: 'Could not retrieve user information.' });
-        setIsLoading(false);
-        return;
-      }
-      // setCurrentUserId(user.id);
+      setAuthError(false);
 
       try {
-        // Fetch tasks directly from the /api/me/tasks endpoint
-        const response = await fetch('/api/me/tasks'); 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch tasks' }));
-          throw new Error(errorData.error || 'Failed to fetch tasks data');
+        const response = await fetch('/api/me/tasks', {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            Accept: 'application/json',
+          },
+          signal: abortController.signal,
+        });
+
+        if (abortController.signal.aborted) return;
+
+        if (response.status === 401) {
+          const message = 'Your session has expired. Please sign in again to view your tasks.';
+          setAuthError(true);
+          setError(message);
+          setTasks([]);
+          toast.error('Authentication required', { description: message });
+          return;
         }
-        const apiData = await response.json();
-        if (apiData.success && Array.isArray(apiData.data)) {
-          setTasks(apiData.data); // API now returns data in TaskItem format directly
-        } else {
-          throw new Error(apiData.error || 'Failed to process tasks data from API');
+
+        let payload: unknown;
+        try {
+          payload = await response.json();
+        } catch {
+          throw new Error('Failed to parse tasks response.');
         }
+
+        const data = payload as { success?: boolean; data?: unknown; error?: string };
+
+        if (!response.ok || !data.success || !Array.isArray(data.data)) {
+          throw new Error(data.error || 'Failed to fetch tasks data');
+        }
+
+        setTasks(data.data as TaskItem[]);
       } catch (err) {
-        console.error('Error fetching or processing tasks:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load tasks');
-        toast.error("Failed to load your tasks. Please try again.", {
-          description: err instanceof Error ? err.message : "Unknown error",
+        if (abortController.signal.aborted) return;
+
+        const message = err instanceof Error ? err.message : 'Failed to load tasks';
+        setError(message);
+        setTasks([]);
+        toast.error('Failed to load your tasks. Please try again.', {
+          description: message,
         });
       } finally {
-        setIsLoading(false);
+        if (!abortController.signal.aborted) {
+          setIsLoading(false);
+        }
       }
-    }
-    initializePage();
-  }, []); // Dependency array is empty, runs once on mount
+    };
+
+    fetchTasks();
+
+    return () => {
+      abortController.abort();
+    };
+  }, [reloadKey]);
+
+  const handleRetry = () => {
+    setReloadKey((previous) => previous + 1);
+  };
 
 
   if (isLoading) {
@@ -115,7 +144,15 @@ export default function MyTasksPage() {
         <AlertCircle className="mx-auto h-12 w-12 text-destructive mb-4" />
         <h3 className="text-xl font-semibold mb-2">Failed to load tasks</h3>
         <p className="text-muted-foreground mb-6">{error}</p>
-        <Button onClick={() => window.location.reload()} variant="outline">Retry</Button>
+        {authError ? (
+          <Button asChild>
+            <Link href="/auth/login?redirect=/dashboard/my-tasks">
+              Sign in
+            </Link>
+          </Button>
+        ) : (
+          <Button onClick={handleRetry} variant="outline">Retry</Button>
+        )}
       </div>
     );
   }

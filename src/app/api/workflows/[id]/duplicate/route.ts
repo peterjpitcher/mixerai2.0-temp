@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
-// import { withAuth } from '@/lib/auth/api-auth'; - not used
 import { User } from '@supabase/supabase-js';
-// import { v4 as uuidv4 } from 'uuid';
-// import { TablesInsert } from '@/types/supabase';
-import { withAuthAndCSRF } from '@/lib/api/with-csrf'; // TODO: Uncomment when types are regenerated
+import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { logSecurityEvent } from '@/lib/auth/account-lockout';
+import {
+  BrandPermissionVerificationError,
+  isPlatformAdminUser,
+  requireBrandAdminAccess,
+} from '@/lib/auth/brand-access';
+import type { TablesInsert } from '@/types/supabase';
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +50,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
     // 1. Fetch the original workflow
     const { data: originalWorkflow, error: fetchError } = await supabase
       .from('workflows')
-      .select('*') // Still select all to get name, template_id etc.
+      .select('*')
       .eq('id', originalWorkflowId)
       .single();
 
@@ -58,7 +62,33 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
     if (!originalWorkflow) {
       return NextResponse.json({ success: false, error: 'Original workflow not found' }, { status: 404 });
     }
-    console.log('[API Workflows Duplicate] Fetched originalWorkflow. Name:', originalWorkflow.name);
+    const isGlobalAdmin = isPlatformAdminUser(user);
+    if (!isGlobalAdmin) {
+      if (!originalWorkflow.brand_id) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden: Workflow without brand cannot be duplicated by non-admin.' },
+          { status: 403 }
+        );
+      }
+
+      try {
+        await requireBrandAdminAccess(supabase, user, originalWorkflow.brand_id);
+      } catch (error) {
+        if (error instanceof BrandPermissionVerificationError) {
+          return NextResponse.json(
+            { success: false, error: 'Unable to verify brand permissions at this time.' },
+            { status: 500 }
+          );
+        }
+        if (error instanceof Error && error.message === 'NO_BRAND_ADMIN_ACCESS') {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: You do not have permission to duplicate this workflow.' },
+            { status: 403 }
+          );
+        }
+        throw error;
+      }
+    }
 
     let sourceStepsData: unknown[] = [];
 
@@ -90,10 +120,13 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
     }
     
     // 2. Create the new workflow shell (without steps in JSONB)
-    const newWorkflowShellData: Record<string, unknown> = { // TODO: Type as TablesInsert<'workflows'> when types are regenerated
+    const duplicatedBrandId = (originalWorkflow.brand_id ?? null) as string | null;
+    const duplicatedTemplateId = (originalWorkflow.template_id ?? null) as string | null;
+
+    const newWorkflowShellData: TablesInsert<'workflows'> = {
       name: `Copy of ${originalWorkflow.name}`,
-      brand_id: null,
-      template_id: null, // originalWorkflow.template_id if you want to copy it
+      brand_id: duplicatedBrandId,
+      template_id: duplicatedTemplateId,
       status: 'draft',
       created_by: user.id,
       steps: [], // Explicitly set to empty array or null if column allows
@@ -103,14 +136,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
 
     const { data: newWorkflow, error: insertWorkflowError } = await supabase
       .from('workflows')
-      .insert({
-        name: `Copy of ${originalWorkflow.name}`,
-        brand_id: null,
-        template_id: null,
-        status: 'draft',
-        created_by: user.id,
-        steps: []
-      })
+      .insert(newWorkflowShellData)
       .select()
       .single();
 
@@ -153,6 +179,14 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
     // 4. Fetch the complete new workflow data (if needed, or just return the shell + success)
     // For consistency, it's good to return the created workflow object.
     // Since steps are not in the JSONB, newWorkflow object might be sufficient as is.
+    await logSecurityEvent('workflow_duplicated', {
+      sourceWorkflowId: originalWorkflowId,
+      newWorkflowId: newWorkflow.id,
+      sourceBrandId: originalWorkflow.brand_id,
+      sourceTemplateId: originalWorkflow.template_id,
+      stepCount: sourceStepsData.length,
+    }, user.id);
+
     return NextResponse.json({ success: true, workflow: newWorkflow });
 
   } catch (error: unknown) {

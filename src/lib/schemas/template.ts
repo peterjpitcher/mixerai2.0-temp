@@ -14,14 +14,14 @@ export const OutputFieldSchema = z.object({
   useGuardrails: z.boolean().default(false),
   description: z.string().optional(),
   helpText: z.string().optional(),
-  minWords: z.number().int().positive().optional(),
-  maxWords: z.number().int().positive().optional(),
+  minChars: z.number().int().positive().optional(),
+  maxChars: z.number().int().positive().optional(),
 }).superRefine((data, ctx) => {
-  if (typeof data.minWords === 'number' && typeof data.maxWords === 'number' && data.minWords >= data.maxWords) {
+  if (typeof data.minChars === 'number' && typeof data.maxChars === 'number' && data.minChars >= data.maxChars) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      path: ['minWords'],
-      message: 'Minimum word count must be less than maximum word count',
+      path: ['minChars'],
+      message: 'Minimum character count must be less than maximum character count',
     });
   }
 });

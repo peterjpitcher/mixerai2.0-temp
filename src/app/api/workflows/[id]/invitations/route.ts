@@ -6,6 +6,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { verifyEmailTemplates } from '@/lib/auth/email-templates';
 import { User } from '@supabase/supabase-js';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
+import { logSecurityEvent } from '@/lib/auth/account-lockout';
+import {
+  BrandPermissionVerificationError,
+  isPlatformAdminUser,
+  requireBrandAccess,
+  requireBrandAdminAccess,
+} from '@/lib/auth/brand-access';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -76,30 +83,89 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
     }
 
     const supabase = createSupabaseAdminClient();
-    
+
+    const isGlobalAdmin = isPlatformAdminUser(user);
+    let workflowBrandId: string | null = null;
+
     const { data: workflow, error: workflowError } = await supabase
       .from('workflows')
-      .select('steps') // Only select steps, not '*', if that's all that's needed
+      .select('brand_id')
       .eq('id', workflowId)
       .single();
-    
+
     if (workflowError || !workflow) {
       return NextResponse.json(
         { success: false, error: 'Workflow not found' },
         { status: 404 }
       );
     }
-    
-    let step: Record<string, unknown> | undefined = undefined;
-    if (workflow.steps && Array.isArray(workflow.steps)) {
-      step = (workflow.steps as Record<string, unknown>[]).find((s: Record<string, unknown>) => 
-        s && typeof s === 'object' && 
-        typeof s.id === 'number' && 
-        s.id === parseInt(body.stepId)
+
+    workflowBrandId = workflow.brand_id as string | null;
+
+    if (!isGlobalAdmin) {
+      if (!workflowBrandId) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden: Workflow is not associated with a brand.' },
+          { status: 403 }
+        );
+      }
+
+      try {
+        await requireBrandAdminAccess(supabase, user, workflowBrandId);
+      } catch (error) {
+        if (error instanceof BrandPermissionVerificationError) {
+          return NextResponse.json(
+            { success: false, error: 'Unable to verify brand permissions at this time.' },
+            { status: 500 }
+          );
+        }
+        if (error instanceof Error && error.message === 'NO_BRAND_ADMIN_ACCESS') {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: You do not have permission to invite users for this workflow.' },
+            { status: 403 }
+          );
+        }
+        throw error;
+      }
+    }
+
+    const rawStepId = typeof body.stepId === 'string' ? body.stepId.trim() : String(body.stepId ?? '').trim();
+    if (!rawStepId) {
+      return NextResponse.json(
+        { success: false, error: 'A valid step ID is required.' },
+        { status: 400 }
       );
     }
-    
-    if (!step) {
+
+    const { data: stepById, error: stepByIdError } = await supabase
+      .from('workflow_steps')
+      .select('id, name, role, step_id')
+      .eq('workflow_id', workflowId)
+      .eq('id', rawStepId)
+      .maybeSingle();
+
+    if (stepByIdError && stepByIdError.code !== 'PGRST116') {
+      return handleApiError(stepByIdError, 'Failed to resolve workflow step');
+    }
+
+    let stepRecord = stepById;
+
+    if (!stepRecord && /^[0-9]+$/.test(rawStepId)) {
+      const { data: legacyStep, error: legacyStepError } = await supabase
+        .from('workflow_steps')
+        .select('id, name, role, step_id')
+        .eq('workflow_id', workflowId)
+        .eq('step_id', rawStepId)
+        .maybeSingle();
+
+      if (legacyStepError && legacyStepError.code !== 'PGRST116') {
+        return handleApiError(legacyStepError, 'Failed to resolve workflow step');
+      }
+
+      stepRecord = legacyStep;
+    }
+
+    if (!stepRecord) {
       return NextResponse.json(
         { success: false, error: 'Step not found in workflow' },
         { status: 404 }
@@ -131,7 +197,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
         workflow_id: String(workflowId),
         step_id: body.stepId,
         email: body.email,
-        role: (step.role && typeof step.role === 'string') ? step.role : 'editor',
+        role: (stepRecord.role && typeof stepRecord.role === 'string') ? stepRecord.role : 'editor',
         invite_token: inviteToken,
         expires_at: expiresAt,
         status: 'pending'
@@ -149,9 +215,9 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
       try {
         await verifyEmailTemplates();
         let userRole = 'viewer';
-        if (step.role === 'admin') userRole = 'admin';
-        else if (typeof step.role === 'string' && ['editor', 'brand', 'legal'].includes(step.role)) userRole = 'editor';
-        
+        if (stepRecord.role === 'admin') userRole = 'admin';
+        else if (typeof stepRecord.role === 'string' && ['editor', 'brand', 'legal'].includes(stepRecord.role)) userRole = 'editor';
+
         await supabase.auth.admin.inviteUserByEmail(body.email, {
           data: {
             full_name: body.full_name || '',
@@ -168,10 +234,20 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
       }
     }
     
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       invitation
     });
+
+    await logSecurityEvent('workflow_invitation_created', {
+      workflowId,
+      stepId: body.stepId,
+      inviteEmail: body.email,
+      createdBy: user.id,
+      brandId: workflowBrandId,
+    }, user.id);
+
+    return response;
   } catch (error) {
     return handleApiError(error, 'Error creating invitation');
   }
@@ -181,7 +257,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
  * GET endpoint to get all invitations for a workflow
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export const GET = withAuth(async (_request: NextRequest, _user: User, context?: unknown) => {
+export const GET = withAuth(async (_request: NextRequest, user: User, context?: unknown) => {
   const { params } = context as { params: { id: string } };
   try {
     const workflowId = params?.id;
@@ -194,7 +270,41 @@ export const GET = withAuth(async (_request: NextRequest, _user: User, context?:
     }
 
     const supabase = createSupabaseAdminClient();
-    
+
+    const isGlobalAdmin = isPlatformAdminUser(user);
+    if (!isGlobalAdmin) {
+      const { data: workflowData, error: workflowError } = await supabase
+        .from('workflows')
+        .select('brand_id')
+        .eq('id', workflowId)
+        .single();
+
+      if (workflowError || !workflowData || !workflowData.brand_id) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden: Unable to verify workflow brand access.' },
+          { status: 403 }
+        );
+      }
+
+      try {
+        await requireBrandAccess(supabase, user, workflowData.brand_id);
+      } catch (error) {
+        if (error instanceof BrandPermissionVerificationError) {
+          return NextResponse.json(
+            { success: false, error: 'Unable to verify brand permissions at this time.' },
+            { status: 500 }
+          );
+        }
+        if (error instanceof Error && error.message === 'NO_BRAND_ACCESS') {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: You do not have permission to view invitations for this workflow.' },
+            { status: 403 }
+          );
+        }
+        throw error;
+      }
+    }
+
     const { data: invitations, error } = await supabase
       .from('workflow_invitations')
       .select('*')

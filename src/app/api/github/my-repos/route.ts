@@ -1,4 +1,16 @@
 import { NextResponse } from 'next/server';
+import { withAuth } from '@/lib/auth/api-auth';
+
+export const dynamic = 'force-dynamic';
+
+const githubDiagnosticsEnabled = process.env.ENABLE_GITHUB_TEST_ENDPOINTS === 'true';
+
+function disabledResponse() {
+  return NextResponse.json(
+    { success: false, error: 'GitHub diagnostics are disabled. Set ENABLE_GITHUB_TEST_ENDPOINTS=true to enable locally.' },
+    { status: 410 }
+  );
+}
 
 interface GitHubRepo {
   name: string;
@@ -8,11 +20,21 @@ interface GitHubRepo {
   has_issues: boolean;
 }
 
-export async function GET() {
+export const GET = withAuth(async (_req, user) => {
+  if (!githubDiagnosticsEnabled) {
+    return disabledResponse();
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
+  }
   const token = process.env.GITHUB_TOKEN;
 
   if (!token) {
     return NextResponse.json({ error: 'GitHub token not configured' }, { status: 500 });
+  }
+
+  if (user.user_metadata?.role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
   }
 
   try {
@@ -55,4 +77,4 @@ export async function GET() {
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
-}
+});

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { User } from '@supabase/supabase-js';
 
 import { handleApiError } from '@/lib/api-utils';
 import { generateContentTitleFromContext } from '@/lib/azure/openai';
@@ -6,6 +7,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { extractCleanDomain } from '@/lib/utils/url-utils';
 // import { Database } from '@/types/supabase';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf'; // TODO: Uncomment when supabase types are generated
+import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth/brand-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +29,7 @@ interface AIBrandContext {
     keywords?: string[] | null;
 }
 
-export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Response> => {
+export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Promise<Response> => {
   try {
     const body: TitleGenerationRequest = await request.json();
 
@@ -42,6 +44,24 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
     const supabase = createSupabaseAdminClient();
 
     if (body.brand_id) {
+      try {
+        const hasAccess = await userHasBrandAccess(supabase, user, body.brand_id);
+        if (!hasAccess) {
+          return NextResponse.json(
+            { success: false, error: 'You do not have access to this brand.' },
+            { status: 403 }
+          );
+        }
+      } catch (error) {
+        if (error instanceof BrandPermissionVerificationError) {
+          return NextResponse.json(
+            { success: false, error: 'Unable to verify brand permissions. Please try again later.' },
+            { status: 500 }
+          );
+        }
+        throw error;
+      }
+
       const { data: brandData, error: brandError } = await supabase
         .from('brands')
         .select('*')
@@ -64,6 +84,23 @@ export const POST = withAuthAndCSRF(async (request: NextRequest): Promise<Respon
         if (brandError && brandError.code !== 'PGRST116') {
           console.warn(`[GenerateTitle] Error fetching brand by domain ${cleanDomain}: ${brandError.message}`);
         } else if (brandData) {
+          try {
+            const hasAccess = await userHasBrandAccess(supabase, user, brandData.id as string);
+            if (!hasAccess) {
+              return NextResponse.json(
+                { success: false, error: 'You do not have access to this brand.' },
+                { status: 403 }
+              );
+            }
+          } catch (error) {
+            if (error instanceof BrandPermissionVerificationError) {
+              return NextResponse.json(
+                { success: false, error: 'Unable to verify brand permissions. Please try again later.' },
+                { status: 500 }
+              );
+            }
+            throw error;
+          }
           brandForContext = brandData;
         }
       }

@@ -23,6 +23,8 @@ import { format as formatDateFns } from 'date-fns';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useAutoSave } from '@/hooks/use-auto-save';
 import { apiFetch } from '@/lib/api-client';
+import { ensureNormalizedContent, normalizeOutputsMap } from '@/lib/content/html-normalizer';
+import type { NormalizedContent } from '@/types/template';
 
 
 interface ContentEditPageProps {
@@ -82,7 +84,7 @@ interface ContentVersion {
   reviewer?: { id: string; full_name?: string; avatar_url?: string };
   created_at: string;
   content_json?: { // Added for displaying content at this step
-    generatedOutputs?: Record<string, string>;
+    generatedOutputs?: Record<string, unknown>;
   } | null;
 }
 
@@ -160,6 +162,22 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       return acc;
     }, {} as Record<string, string>);
   }, [template]);
+
+  const outputFieldDefinitions = React.useMemo(() => {
+    return template?.fields?.outputFields ?? [];
+  }, [template]);
+
+  const isRichFieldType = React.useCallback((fieldType: string) => {
+    const normalized = fieldType?.toLowerCase();
+    return normalized === 'richtext' || normalized === 'rich-text' || normalized === 'html';
+  }, []);
+
+  const normalizedGeneratedOutputs = React.useMemo(() => {
+    return normalizeOutputsMap(
+      (content.content_data?.generatedOutputs as Record<string, unknown> | undefined) ?? undefined,
+      outputFieldDefinitions
+    );
+  }, [content.content_data?.generatedOutputs, outputFieldDefinitions]);
 
   const getHistoryItemDisplayName = (identifier: string, stepName: string | null) => {
     return outputFieldIdToNameMap[identifier] || stepName || identifier;
@@ -259,7 +277,6 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     const fetchAllData = async () => {
       // Prevent multiple simultaneous fetches
       if (fetchingRef.current) {
-        console.log('[ContentEditPage] Fetch already in progress, skipping...');
         return;
       }
       fetchingRef.current = true;
@@ -294,7 +311,6 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             due_date: contentResult.data.due_date || null
           };
           setContent(newContentState);
-          console.log('[ContentEditPage] Content state AFTER setContent in fetchAllData:', JSON.stringify(newContentState, null, 2));
 
           // Set brand data from the content response if available
           if (contentResult.data.brands) {
@@ -343,7 +359,6 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
                   }
                 };
                 setTemplate(correctlyShapedTemplate);
-                console.log('[ContentEditPage] Template state AFTER setTemplate (SHAPED):', JSON.stringify(correctlyShapedTemplate, null, 2));
               } else {
                 console.error('Failed to fetch template for edit page:', templateRes.error);
               }
@@ -374,33 +389,29 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       }
     };
     
-    console.log('[ContentEditPage] Effect for fetchAllData triggered. ID:', id, 'CurrentUser ID:', currentUser?.id);
     if (id && currentUser?.id) {
-      console.log('[ContentEditPage] Conditions met. Calling fetchAllData.');
       fetchAllData();
-    } else {
-      console.warn('[ContentEditPage] Conditions NOT met for fetchAllData. ID:', id, 'CurrentUser:', currentUser);
     }
   }, [id, currentUser]);
   
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setContent(prev => ({ ...prev, [name]: value }));
-    setHasUnsavedChanges(true);
-  };
-  
   // Handler for dynamic output field changes
-  const handleGeneratedOutputChange = (outputFieldId: string, value: string) => {
-    setContent(prev => ({
-      ...prev,
-      content_data: {
-        ...(prev.content_data || {}), // Ensure content_data itself exists
-        generatedOutputs: {
-          ...(prev.content_data?.generatedOutputs || {}),
-          [outputFieldId]: value,
+  const handleGeneratedOutputChange = (outputFieldId: string, value: NormalizedContent) => {
+    setContent(prev => {
+      const previousOutputs = normalizeOutputsMap(
+        (prev.content_data?.generatedOutputs as Record<string, unknown> | undefined) ?? undefined,
+        outputFieldDefinitions
+      );
+      return {
+        ...prev,
+        content_data: {
+          ...(prev.content_data || {}),
+          generatedOutputs: {
+            ...previousOutputs,
+            [outputFieldId]: value,
+          },
         },
-      },
-    }));
+      };
+    });
     setHasUnsavedChanges(true);
   };
   
@@ -408,17 +419,23 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     setIsSaving(true);
     let success = false;
     try {
-      let primaryBodyFromOutputs = content.body; 
-      if (template && template.fields && template.fields.outputFields && template.fields.outputFields.length > 0 && content.content_data?.generatedOutputs) {
-        const richTextOutputField = template.fields.outputFields.find(f => f.type === 'richText');
+      const outputsForSave = normalizeOutputsMap(
+        (content.content_data?.generatedOutputs as Record<string, unknown> | undefined) ?? undefined,
+        outputFieldDefinitions
+      );
+
+      let primaryBodyFromOutputs = content.body;
+      if (template && template.fields && template.fields.outputFields && template.fields.outputFields.length > 0) {
+        const richTextOutputField = template.fields.outputFields.find(f => isRichFieldType(f.type));
         const firstOutputField = template.fields.outputFields[0];
         const fieldToUseForBody = richTextOutputField || firstOutputField;
 
-        if (fieldToUseForBody && content.content_data.generatedOutputs[fieldToUseForBody.id]) {
-          primaryBodyFromOutputs = content.content_data.generatedOutputs[fieldToUseForBody.id];
-        } else if (firstOutputField && content.content_data.generatedOutputs[firstOutputField.id]){
-           primaryBodyFromOutputs = content.content_data.generatedOutputs[firstOutputField.id];
-        } 
+        if (fieldToUseForBody) {
+          const normalized = outputsForSave[fieldToUseForBody.id];
+          if (normalized) {
+            primaryBodyFromOutputs = isRichFieldType(fieldToUseForBody.type) ? normalized.html : normalized.plain;
+          }
+        }
       }
 
       const payloadToSave = {
@@ -428,21 +445,10 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         due_date: content.due_date,
         content_data: {
           ...(content.content_data || {}),
-          generatedOutputs: content.content_data?.generatedOutputs || {},
+          generatedOutputs: outputsForSave,
         }
       };
       
-      // Step 1: Verify Frontend State Just Before Save
-      console.log('--- In handleSave --- ContentEditPage ---');
-      console.log('Current content.title:', content.title);
-      console.log('Current content.body (before primaryBodyFromOutputs derivation):', content.body);
-      // console.log('Template output fields:', template?.fields.outputFields); // Can be verbose
-      console.log('Current content.content_data (raw object): ethnographicRecordIdentifier=AAA-001-BBB-ehl-GEN-001-v001-json ethnographicRecordIdentifier=AAA-001-BBB-ehl-GEN-001-v001-json ethnographicRecordIdentifier=AAA-001-BBB-ehl-GEN-001-v001-json', content.content_data);
-      console.log('Current content.content_data.generatedOutputs (stringified):', JSON.stringify(content.content_data?.generatedOutputs, null, 2));
-      console.log('Derived primaryBodyFromOutputs:', primaryBodyFromOutputs);
-      console.log('Payload being sent to API (stringified):', JSON.stringify(payloadToSave, null, 2));
-      console.log('--- End In handleSave --- ContentEditPage ---');
-
       const response = await apiFetch(`/api/content/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -454,13 +460,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       }
       toast.success('Content updated successfully!');
       if (result.data) {
-        // Step 4: Verify Frontend State After Successful Save
-        console.log('Data received from API after save (stringified):', JSON.stringify(result.data, null, 2));
-        setContent(prev => {
-          const newState = { ...prev, ...result.data };
-          console.log('New local content state after API success (content_data stringified):', JSON.stringify(newState.content_data, null, 2));
-          return newState;
-        });
+        setContent(prev => ({ ...prev, ...result.data }));
       }
       setHasUnsavedChanges(false);
       success = true;
@@ -481,7 +481,6 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   }, [content, template]); // Dependencies that handleSave actually uses
   
   const handleWorkflowActionCompletion = () => {
-    console.log('[ContentEditPage] handleWorkflowActionCompletion called.');
     // This function is called AFTER the workflow action in ContentApprovalWorkflow is successful.
     // Now, redirect.
     toast.info('Workflow action completed. Redirecting to My Tasks...');
@@ -489,31 +488,8 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     // Optionally, refresh data globally or for the My Tasks page if needed upon arrival.
   };
   
-  // Add a new function to handle adding a field
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleAddField = (fieldId: string, value: string) => {
-    setContent(prev => ({
-      ...prev,
-      content_data: {
-        ...(prev.content_data || {}),
-        generatedOutputs: {
-          ...(prev.content_data?.generatedOutputs || {}),
-          [fieldId]: value,
-        },
-      },
-    }));
-    setHasUnsavedChanges(true);
-    toast.success('Field added successfully!');
-  };
-  
   // Configure auto-save (DISABLED per user request - manual save only)
-  const {
-    isSaving: isAutoSaving,
-    lastSaved: _lastSaved,
-    error: _saveError,
-    save: _triggerSave,
-    hasUnsavedChanges: _autoSaveHasChanges
-  } = useAutoSave({
+  const { isSaving: isAutoSaving } = useAutoSave({
     data: content,
     onSave: async () => {
       const success = await handleSave();
@@ -527,9 +503,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       console.error('Auto-save error:', error);
       toast.error('Auto-save failed. Your changes are not being saved automatically.');
     },
-    onSuccess: () => {
-      console.log('Auto-save successful');
-    }
+    onSuccess: () => {}
   });
 
   if (isLoadingUser || isLoading || isCheckingPermissions) {
@@ -666,15 +640,15 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             UNCONDITIONAL STATIC TEST DIV - If you see this, basic rendering in this position is working.
           </div> */}
 
-          {/* Original Card for Generated Output Fields based on Template - Restoring with static content */}
           {template && template.fields && template.fields.outputFields && template.fields.outputFields.length > 0 && (
             <Card>
               <CardHeader><CardTitle>Generated Output Fields</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 {/* Now, restore the map but with simplified content */}
                 {template.fields.outputFields.map(field => {
-                  console.log(`[ContentEditPage] INSIDE MAP (reintroducing RichTextEditor) - Field: ${field.name}, ID: ${field.id}, Type: ${field.type}`);
-                  const fieldValue = content.content_data?.generatedOutputs?.[field.id] || '';
+                  const normalizedValue = normalizedGeneratedOutputs[field.id];
+                  const plainValue = normalizedValue?.plain ?? '';
+                  const htmlValue = normalizedValue?.html ?? '';
                   return (
                     <div key={field.id}>
                       <Label htmlFor={`output_field_${field.id}`} className="text-base">
@@ -683,22 +657,22 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
                       {field.type === 'plainText' ? (
                         <Textarea
                           id={`output_field_${field.id}`}
-                          value={fieldValue}
-                          onChange={(e) => handleGeneratedOutputChange(field.id, e.target.value)}
+                          value={plainValue}
+                          onChange={(e) => handleGeneratedOutputChange(field.id, ensureNormalizedContent(e.target.value, field.type))}
                           placeholder={`Enter content for ${field.name}...`}
                           className="min-h-[120px] border shadow-sm focus-visible:ring-1 focus-visible:ring-ring"
                         />
-                      ) : field.type === 'richText' ? (
+                      ) : isRichFieldType(field.type) ? (
                         <QuillEditor
-                          value={fieldValue}
-                          onChange={(value) => handleGeneratedOutputChange(field.id, value)}
+                          value={htmlValue}
+                          onChange={(value) => handleGeneratedOutputChange(field.id, ensureNormalizedContent(value, field.type))}
                           placeholder={`Enter content for ${field.name}...`}
                         />
                       ) : (
                         // Fallback for any other unknown types (shouldn't happen with current template)
                         <div style={{ border: '1px dashed red', padding: '5px', marginTop: '5px'}}>
                           <p><strong>Unknown Field Type:</strong> {field.type}</p>
-                          <pre>{fieldValue || '(empty)'}</pre>
+                          <pre>{plainValue || htmlValue || '(empty)'}</pre>
                         </div>
                       )}
                       <p className="text-xs text-muted-foreground">

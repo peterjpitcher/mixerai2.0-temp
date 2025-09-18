@@ -1,70 +1,102 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+
 import { generateContentFromTemplate } from '@/lib/azure/openai';
 import { withAuthMonitoringAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth/brand-access';
+import { logContentGenerationAudit } from '@/lib/audit/content';
+import { TemplateFieldsSchema } from '@/lib/schemas/template';
 import type { StyledClaims } from '@/types/claims';
 
 // type ContentType = "article" | "retailer_pdp" | "owned_pdp" | string; // Removed
 
-interface ContentGenerationRequest {
-  brand_id: string;
-  // Removed brand object from here
-  input?: {
-    topic?: string;
-    keywords?: string[];
-    productName?: string;
-    productDescription?: string;
-    additionalInstructions?: string;
-    templateId?: string;
-    templateFields?: Record<string, string>;
-    product_context?: { productName: string; styledClaims: StyledClaims | null };
-  };
-  template?: {
-    id: string;
-    name: string;
-    inputFields: Array<{
-      id: string;
-      name: string;
-      type: string;
-      value: string;
-      aiPrompt?: string;
-    }>;
-    outputFields: Array<{
-      id: string;
-      name: string;
-      type: string;
-      aiPrompt?: string;
-      aiAutoComplete?: boolean;
-      useBrandIdentity?: boolean;
-      useToneOfVoice?: boolean;
-      useGuardrails?: boolean;
-    }>;
-  };
-}
+const templateInputValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+]).transform((value) => value.toString());
+
+const requestSchema = z.object({
+  brand_id: z.string().min(1, 'Brand ID is required'),
+  template_id: z.string().optional(),
+  input: z
+    .object({
+      additionalInstructions: z.string().max(5000).optional(),
+      templateFields: z.record(templateInputValueSchema).optional(),
+      product_context: z
+        .union([
+          z
+            .object({
+              productName: z.string().optional(),
+              styledClaims: z.any().optional(),
+            })
+            .strip(),
+          z.string(),
+          z.null(),
+        ])
+        .optional(),
+    })
+    .optional(),
+  template: z
+    .object({
+      id: z.string(),
+      name: z.string().optional(),
+      inputFields: z
+        .array(
+          z.object({
+            id: z.string(),
+            value: templateInputValueSchema.optional(),
+          })
+        )
+        .optional(),
+      outputFields: z
+        .array(
+          z.object({
+            id: z.string(),
+          })
+        )
+        .optional(),
+    })
+    .optional(),
+});
 
 export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user) => {
   try {
-    const data: ContentGenerationRequest = await request.json();
-    
-    // DEBUG: Log incoming request
-    console.log('\n========== CONTENT GENERATION API ==========');
-    console.log('Brand ID:', data.brand_id);
-    console.log('Template:', data.template?.name);
-    console.log('Input Fields:');
-    data.template?.inputFields.forEach(field => {
-      console.log(`  ${field.name} (${field.id}): "${field.value}"`);
-    });
-    console.log('==========================================\n');
-    
-    if (!data.brand_id) {
+    const parsedBody = requestSchema.safeParse(await request.json());
+    if (!parsedBody.success) {
       return NextResponse.json(
-        { success: false, error: 'Brand ID is required' },
+        {
+          success: false,
+          error: 'Invalid request payload',
+          details: parsedBody.error.flatten(),
+        },
         { status: 400 }
       );
     }
 
+    const data = parsedBody.data;
+
     const supabase = createSupabaseAdminClient();
+
+    try {
+      const hasAccess = await userHasBrandAccess(supabase, user, data.brand_id);
+      if (!hasAccess) {
+        return NextResponse.json(
+          { success: false, error: 'You do not have access to this brand.' },
+          { status: 403 }
+        );
+      }
+    } catch (error) {
+      if (error instanceof BrandPermissionVerificationError) {
+        return NextResponse.json(
+          { success: false, error: 'Unable to verify brand permissions. Please try again later.' },
+          { status: 500 }
+        );
+      }
+      throw error;
+    }
     const { data: brandData, error: brandError } = await supabase
       .from('brands')
       .select('name, brand_identity, tone_of_voice, guardrails, language, country')
@@ -79,59 +111,181 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
       );
     }
 
-    if (!brandData.language || !brandData.country) {
-      // Use defaults if missing
-      brandData.language = brandData.language || 'en';
-      brandData.country = brandData.country || 'US';
-    }
-    
-    if (data.template && data.template.id) {
-      try {
-        const brandInfoForGeneration = {
-          name: brandData.name,
-          brand_identity: brandData.brand_identity,
-          tone_of_voice: brandData.tone_of_voice,
-          guardrails: brandData.guardrails,
-          language: brandData.language,
-          country: brandData.country,
-        };
-
-        const finalInput = { ...data.input };
-        // Product context can come as either a string or object
-        if (data.input?.product_context) {
-          if (typeof data.input.product_context === 'string') {
-            try {
-              finalInput.product_context = JSON.parse(data.input.product_context);
-            } catch (e) {
-              console.error("Failed to parse product_context string:", e);
-              delete finalInput.product_context;
-            }
-          } else {
-            // It's already an object, use it as is
-            finalInput.product_context = data.input.product_context;
-          }
-        }
-
-        const generatedContent = await generateContentFromTemplate(
-          brandInfoForGeneration,
-          data.template,
-          finalInput
-        );
-        return NextResponse.json({
-          success: true,
-          userId: user.id,
-          ...generatedContent
-        });
-      } catch (templateError) {
-        console.error('Error during generateContentFromTemplate:', templateError);
-        return handleApiError(templateError, 'Failed to generate content from template');
-      }
-    }
-    
-    return NextResponse.json(
+    const templateId = data.template?.id ?? data.template_id;
+    if (!templateId) {
+      return NextResponse.json(
         { success: false, error: 'Template ID is required for content generation.' },
         { status: 400 }
       );
+    }
+
+    const { data: templateRecord, error: templateError } = await supabase
+      .from('content_templates')
+      .select('id, name, brand_id, fields')
+      .eq('id', templateId)
+      .maybeSingle();
+
+    if (templateError) {
+      console.error('Error fetching template metadata:', templateError);
+      return handleApiError(templateError, 'Failed to verify content template.');
+    }
+
+    if (!templateRecord) {
+      return NextResponse.json(
+        { success: false, error: 'Template not found.' },
+        { status: 404 }
+      );
+    }
+
+    if (templateRecord.brand_id && templateRecord.brand_id !== data.brand_id) {
+      return NextResponse.json(
+        { success: false, error: 'Template does not belong to the selected brand.' },
+        { status: 403 }
+      );
+    }
+
+    let parsedFields;
+    try {
+      parsedFields = TemplateFieldsSchema.parse(templateRecord.fields ?? {});
+    } catch (schemaError) {
+      console.error('Template field schema validation failed:', schemaError);
+      return NextResponse.json(
+        { success: false, error: 'Template configuration is invalid. Please contact an administrator.' },
+        { status: 422 }
+      );
+    }
+
+    const providedInputValues = new Map<string, string>();
+    if (Array.isArray(data.template?.inputFields)) {
+      for (const field of data.template.inputFields) {
+        if (field && typeof field.id === 'string' && field.value !== undefined && field.value !== null) {
+          providedInputValues.set(field.id, String(field.value));
+        }
+      }
+    }
+
+    if (data.input?.templateFields) {
+      for (const [fieldId, value] of Object.entries(data.input.templateFields)) {
+        providedInputValues.set(fieldId, value);
+      }
+    }
+
+    const sanitizedInputFields = parsedFields.inputFields.map((field) => ({
+      ...field,
+      value: providedInputValues.get(field.id) ?? '',
+    }));
+
+    const missingRequiredInputs = sanitizedInputFields.filter(
+      (field) => field.required && !(field.value && field.value.toString().trim().length > 0)
+    );
+
+    if (missingRequiredInputs.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Required template inputs are missing.',
+          missingFields: missingRequiredInputs.map((field) => field.name || field.id),
+        },
+        { status: 400 }
+      );
+    }
+
+    if (parsedFields.outputFields.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Template is missing output fields and cannot be used for generation.' },
+        { status: 400 }
+      );
+    }
+
+    const templateForGeneration = {
+      id: templateRecord.id,
+      name: templateRecord.name,
+      inputFields: sanitizedInputFields,
+      outputFields: parsedFields.outputFields.map((field) => ({ ...field })),
+    };
+
+    const brandInfoForGeneration = {
+      name: brandData.name,
+      brand_identity: brandData.brand_identity,
+      tone_of_voice: brandData.tone_of_voice,
+      guardrails: brandData.guardrails,
+      language: brandData.language || 'en',
+      country: brandData.country || 'US',
+    };
+
+    const sanitizedInput: {
+      additionalInstructions?: string;
+      templateFields?: Record<string, string>;
+      product_context?: { productName?: string; styledClaims: StyledClaims | null };
+    } = {};
+
+    if (data.input?.additionalInstructions) {
+      sanitizedInput.additionalInstructions = data.input.additionalInstructions;
+    }
+
+    if (providedInputValues.size > 0) {
+      sanitizedInput.templateFields = Object.fromEntries(providedInputValues.entries());
+    }
+
+    if (data.input?.product_context) {
+      try {
+        if (typeof data.input.product_context === 'string') {
+          const parsed = JSON.parse(data.input.product_context);
+          if (parsed && typeof parsed === 'object') {
+            sanitizedInput.product_context = {
+              productName: typeof parsed.productName === 'string' ? parsed.productName : undefined,
+              styledClaims: parsed.styledClaims ?? null,
+            };
+          }
+        } else if (typeof data.input.product_context === 'object') {
+          sanitizedInput.product_context = {
+            productName:
+              data.input.product_context.productName &&
+              typeof data.input.product_context.productName === 'string'
+                ? data.input.product_context.productName
+                : undefined,
+            styledClaims: (data.input.product_context as { styledClaims?: StyledClaims | null }).styledClaims ?? null,
+          };
+        }
+      } catch (contextError) {
+        console.error('Failed to parse product_context payload:', contextError);
+      }
+    }
+
+    try {
+      const generatedOutputs = await generateContentFromTemplate(
+        brandInfoForGeneration,
+        templateForGeneration,
+        sanitizedInput
+      );
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[api/content/generate] generatedOutputs', generatedOutputs);
+      }
+
+      const responsePayload = {
+        success: true,
+        userId: user.id,
+        generatedOutputs,
+      };
+
+      await logContentGenerationAudit({
+        action: 'content_generate_template',
+        userId: user.id,
+        brandId: data.brand_id,
+        templateId: templateRecord.id,
+        metadata: {
+          templateName: templateRecord.name,
+          inputFieldCount: sanitizedInputFields.length,
+          outputFieldCount: parsedFields.outputFields.length,
+        },
+      });
+
+      return NextResponse.json(responsePayload);
+    } catch (templateError) {
+      console.error('Error during generateContentFromTemplate:', templateError);
+      return handleApiError(templateError, 'Failed to generate content from template');
+    }
 
   } catch (error) {
     console.error('Generic error in content generation POST handler:', error);

@@ -505,7 +505,8 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User) => 
                     // Forward the authorization header for the email API
                     'Authorization': request.headers.get('authorization') || '',
                     // Forward CSRF token if present
-                    'x-csrf-token': request.headers.get('x-csrf-token') || ''
+                    'x-csrf-token': request.headers.get('x-csrf-token') || '',
+                    'Cookie': request.headers.get('cookie') || ''
                   },
                   body: JSON.stringify({
                     type: 'task_assignment',

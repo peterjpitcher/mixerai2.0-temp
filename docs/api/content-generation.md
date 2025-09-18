@@ -91,14 +91,26 @@ In this simplified flow, `input.templateId` is required.
 
 ## Response Format
 
-The response will be a JSON object where keys correspond to the `id` of each `outputField` defined in the template. The values will be the AI-generated content for those fields.
+The response returns metadata plus a `generatedOutputs` object. Each key matches an `outputField.id` and the value is a normalised content object containing the sanitised HTML fragment, a plain-text fallback, and word/character counts.
 
 ```json
 {
   "success": true,
   "userId": "user-uuid-abc",
-  "articleBody": "Generated rich text content for the article body...",
-  "metaDescription": "Generated SEO meta description..."
+  "generatedOutputs": {
+    "articleBody": {
+      "html": "<p class=\"mix-generated-paragraph\">Generated rich text content…</p>",
+      "plain": "Generated rich text content…",
+      "wordCount": 128,
+      "charCount": 812
+    },
+    "metaDescription": {
+      "html": "<p class=\"mix-generated-paragraph\">Generated SEO meta description…</p>",
+      "plain": "Generated SEO meta description…",
+      "wordCount": 22,
+      "charCount": 138
+    }
+  }
 }
 ```
 
@@ -131,7 +143,7 @@ The response will be a JSON object where keys correspond to the `id` of each `ou
 This endpoint:
 1. Validates the request data (e.g., presence of brand name and template information).
 2. Calls the Azure OpenAI service through the `generateContentFromTemplate` function, passing the brand context and the detailed template structure with user inputs.
-3. Returns a structured JSON object with generated content for each output field defined in the template.
+3. Returns a structured JSON object in `generatedOutputs`, where each entry contains normalised HTML/plain text plus word and character counts for the corresponding template field.
 
 ## Usage Example
 
