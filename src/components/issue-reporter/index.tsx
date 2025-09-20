@@ -8,7 +8,7 @@ import { captureScreenshot } from '@/lib/issue-reporter/screenshot-capture';
 import { toast } from 'sonner';
 import { useCurrentUser } from '@/hooks/use-common-data';
 
-const ISSUE_REPORTER_ENABLED = process.env.NEXT_PUBLIC_ENABLE_ISSUE_REPORTER !== 'false';
+const ISSUE_REPORTER_ENABLED = process.env.NEXT_PUBLIC_ENABLE_ISSUE_REPORTER === 'true';
 
 export function IssueReporter() {
   const { data: currentUser, isLoading } = useCurrentUser();
@@ -20,14 +20,16 @@ export function IssueReporter() {
   const canReportIssues = ISSUE_REPORTER_ENABLED && userRole === 'admin';
 
   useEffect(() => {
-    // Initialize console capture when component mounts
+    if (!canReportIssues) {
+      return;
+    }
+
     consoleCapture.initialize();
 
     return () => {
-      // Cleanup on unmount (optional - you might want to keep it running)
-      // consoleCapture.destroy();
+      consoleCapture.destroy();
     };
-  }, []);
+  }, [canReportIssues]);
 
   const handleOpen = async () => {
     setIsCapturing(true);

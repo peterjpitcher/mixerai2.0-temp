@@ -9,11 +9,13 @@ import { z } from 'zod';
 import { COUNTRIES } from '@/lib/constants';
 import { withAdminAuthAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
-import { env } from '@/lib/env';
+import { getServerEnv } from '@/lib/env';
 
 // Rate limiting is now handled globally in middleware
 
-const rawAllowlist = (env.PROXY_ALLOWED_HOSTS || '')
+const { PROXY_ALLOWED_HOSTS } = getServerEnv();
+
+const rawAllowlist = (PROXY_ALLOWED_HOSTS || '')
   .split(',')
   .map(entry => entry.trim().toLowerCase())
   .filter(Boolean);

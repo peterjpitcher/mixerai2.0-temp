@@ -4,7 +4,7 @@ import ipaddr from 'ipaddr.js';
 import { z } from 'zod';
 import { User } from '@supabase/supabase-js';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
-import { env } from '@/lib/env';
+import { getServerEnv } from '@/lib/env';
 import { enforceContentRateLimits } from '@/lib/rate-limit/content';
 
 const MAX_HTML_BYTES = 1024 * 1024; // 1MB cap
@@ -25,7 +25,9 @@ const ALLOWED_NUTRITION_KEYS = new Set([
   'unsaturatedFat',
 ]);
 
-const rawAllowlist = (env.PROXY_ALLOWED_HOSTS || '')
+const { PROXY_ALLOWED_HOSTS } = getServerEnv();
+
+const rawAllowlist = (PROXY_ALLOWED_HOSTS || '')
   .split(',')
   .map(entry => entry.trim().toLowerCase())
   .filter(Boolean);

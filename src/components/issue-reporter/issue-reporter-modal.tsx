@@ -86,7 +86,7 @@ export function IssueReporterModal({ isOpen, onClose, preloadedScreenshot, curre
 
   const captureData = async () => {
     setIsCapturing(true);
-    
+
     try {
       // Capture console logs
       const logs = consoleCapture.getConsoleLogs();
@@ -124,6 +124,7 @@ export function IssueReporterModal({ isOpen, onClose, preloadedScreenshot, curre
       toast.error('Failed to capture some diagnostic data');
     } finally {
       setIsCapturing(false);
+      consoleCapture.clearLogs();
     }
   };
 

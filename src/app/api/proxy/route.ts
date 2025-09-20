@@ -3,13 +3,15 @@ import { withAuthMonitoringAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import dns from 'dns';
 import ipaddr from 'ipaddr.js'; // Using ipaddr.js for robust IP checking
-import { env } from '@/lib/env';
+import { getServerEnv } from '@/lib/env';
 import { logSecurityEvent } from '@/lib/auth/account-lockout';
 
 const MAX_RESPONSE_SIZE = 1024 * 1024; // 1MB
 const allowedContentPrefixes = ['text/', 'application/json', 'application/xml'];
 
-const rawAllowlist = (env.PROXY_ALLOWED_HOSTS || '')
+const { PROXY_ALLOWED_HOSTS } = getServerEnv();
+
+const rawAllowlist = (PROXY_ALLOWED_HOSTS || '')
   .split(',')
   .map((entry) => entry.trim().toLowerCase())
   .filter(Boolean);
