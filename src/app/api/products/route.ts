@@ -26,11 +26,6 @@ const createProductSchema = z.object({
     master_brand_id: z.string().uuid(),
 });
 
-const updateProductSchema = z.object({
-    name: z.string().min(1).max(200),
-    description: z.string().max(2000).optional().nullable(),
-});
-
 // GET handler for all products with pagination
 export const GET = withAuth(async (req: NextRequest, user: User) => {
     try {

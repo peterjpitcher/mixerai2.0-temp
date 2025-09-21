@@ -63,5 +63,62 @@ describe('dedupeByFinalText', () => {
     expect(out).toHaveLength(1);
     expect(out[0].source_level).toBe('product');
   });
-});
 
+  test('does not conflate blank claim text entries from different overrides', () => {
+    const rows: EffectiveClaim[] = [
+      {
+        claim_text: '',
+        final_claim_type: 'none',
+        source_level: 'override',
+        source_claim_id: null,
+        override_rule_id: 'override-a',
+        applies_to_product_id: 'p2',
+        applies_to_country_code: 'US',
+        original_claim_country_code: GLOBAL_CLAIM_COUNTRY_CODE,
+      } as any,
+      {
+        claim_text: '   ',
+        final_claim_type: 'none',
+        source_level: 'override',
+        source_claim_id: null,
+        override_rule_id: 'override-b',
+        applies_to_product_id: 'p2',
+        applies_to_country_code: 'US',
+        original_claim_country_code: GLOBAL_CLAIM_COUNTRY_CODE,
+      } as any,
+    ];
+
+    const out = dedupeByFinalText(rows);
+    expect(out).toHaveLength(2);
+    expect(out.map((entry) => entry.override_rule_id)).toEqual(['override-a', 'override-b']);
+  });
+
+  test('treats missing country metadata with non-master flag as market precedence', () => {
+    const rows: EffectiveClaim[] = [
+      {
+        claim_text: 'Vegan friendly',
+        final_claim_type: 'allowed',
+        source_level: 'brand',
+        source_claim_id: 'master-claim',
+        applies_to_product_id: 'p3',
+        applies_to_country_code: 'CA',
+        original_claim_country_code: GLOBAL_CLAIM_COUNTRY_CODE,
+        isActuallyMaster: true,
+      } as any,
+      {
+        claim_text: 'Vegan friendly',
+        final_claim_type: 'allowed',
+        source_level: 'brand',
+        source_claim_id: 'market-claim',
+        applies_to_product_id: 'p3',
+        applies_to_country_code: 'CA',
+        original_claim_country_code: undefined,
+        isActuallyMaster: false,
+      } as any,
+    ];
+
+    const out = dedupeByFinalText(rows);
+    expect(out).toHaveLength(1);
+    expect(out[0].source_claim_id).toBe('market-claim');
+  });
+});

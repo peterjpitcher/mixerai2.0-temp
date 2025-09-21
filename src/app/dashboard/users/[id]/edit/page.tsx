@@ -256,11 +256,6 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
       
       Object.entries(selectedBrands).forEach(([brandId, { selected, role }]) => {
         if (selected) {
-          // Find if this permission already exists in the user's data
-          const existingPermission = user.brand_permissions?.find(
-            p => p.brand_id === brandId
-          );
-          
           brandPermissions.push({
             brand_id: brandId,
             role

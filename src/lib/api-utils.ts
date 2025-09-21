@@ -3,23 +3,63 @@
  */
 
 import { NextResponse } from 'next/server';
-import { ApiError, PostgresError, isPostgresError } from '@/types/api';
+import { isPostgresError } from '@/types/api';
 import { isRLSError } from '@/lib/api/rls-helpers';
 import { apiFetchJson, ApiClientError } from '@/lib/api-client';
 
 /**
  * Get environment mode (development, production, test)
  */
-export const isProduction = () => {
-  return process.env.NEXT_PUBLIC_VERCEL_ENV === 'production';
+export const isProduction = (): boolean => {
+  const deploymentEnv = process.env.NEXT_PUBLIC_VERCEL_ENV?.toLowerCase();
+  if (deploymentEnv === 'production') {
+    return true;
+  }
+
+  const nodeEnv = process.env.NODE_ENV?.toLowerCase();
+  return nodeEnv === 'production';
 };
 
 /**
  * Check if running during build phase (for static site generation)
  */
-export const isBuildPhase = () => {
-  return process.env.NEXT_PHASE === 'phase-production-build';
+export const isBuildPhase = (): boolean => {
+  const phase = process.env.NEXT_PHASE?.toLowerCase();
+  return phase === 'phase-production-build' || phase === 'phase-export';
 };
+
+const NODE_CONNECTION_ERROR_CODES = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EPIPE',
+  'EHOSTUNREACH',
+  'EAI_AGAIN',
+  'ENOTFOUND',
+  'ETIMEDOUT',
+]);
+
+const POSTGRES_CONNECTION_ERROR_CODES = new Set([
+  '08001', // sqlclient unable to establish connection
+  '08003', // connection does not exist
+  '08004', // server rejected the connection
+  '08006', // connection failure
+  '08007', // transaction resolution unknown
+  '57P01', // admin shutdown
+  '57P02', // crash shutdown
+  '57P03', // cannot connect now
+  '53300', // too many connections
+  '57P05', // idle session timeout
+]);
+
+const CONNECTION_MESSAGE_PATTERNS: RegExp[] = [
+  /connection (?:refused|timed? out|reset)/i,
+  /connect(?:ion)? to (?:server|database) (?:refused|failed|lost)/i,
+  /could not connect to server/i,
+  /remaining connection slots are reserved/i,
+  /no pg_hba\.conf entry/i,
+  /password authentication failed/i,
+  /terminating connection due to administrator command/i,
+];
 
 /**
  * Check if an error is related to database connection
@@ -28,46 +68,35 @@ export const isBuildPhase = () => {
 export const isDatabaseConnectionError = (error: unknown): boolean => {
   if (!error) return false;
   
-  // Check for common database connection error codes
-  if (error && typeof error === 'object' && 'code' in error) {
-    const code = error.code;
-    if (
-      code === 'ECONNREFUSED' ||
-      code === 'ConnectionError' ||
-      code === 'ETIMEDOUT' ||
-      code === 'EAI_AGAIN' ||
-      code === '42P01' // Postgres undefined table error
-    ) {
+  if (typeof error === 'object' && error !== null) {
+    const code = 'code' in error ? String((error as { code?: unknown }).code) : undefined;
+    if (code && (NODE_CONNECTION_ERROR_CODES.has(code) || POSTGRES_CONNECTION_ERROR_CODES.has(code))) {
       return true;
     }
   }
-  
-  // Check for common error message patterns
-  const message = error instanceof Error ? error.message : 
-    (error && typeof error === 'object' && 'message' in error ? String(error.message) : '');
-    
-  if (message && typeof message === 'string') {
-    const errorMessage = message.toLowerCase();
-    return (
-      errorMessage.includes('connection') ||
-      errorMessage.includes('connect to database') ||
-      errorMessage.includes('connect to server') ||
-      errorMessage.includes('auth') ||
-      errorMessage.includes('timeout') ||
-      errorMessage.includes('network') ||
-      errorMessage.includes('resolve host')
-    );
+
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : typeof error === 'object' && error && 'message' in error
+          ? String((error as { message?: unknown }).message)
+          : '';
+
+  if (!message) {
+    return false;
   }
-  
-  return false;
+
+  return CONNECTION_MESSAGE_PATTERNS.some((pattern) => pattern.test(message));
 };
 
 /**
  * Safely handle database errors, with special handling for build/SSG
  */
 export const handleApiError = (
-  error: unknown, 
-  message: string = 'An error occurred', 
+  error: unknown,
+  message: string = 'An error occurred',
   status: number = 500
 ): NextResponse => {
   // Enhanced error object for logging
@@ -108,11 +137,8 @@ export const handleApiError = (
   errorDetails.isDatabaseError = isDatabaseConnectionError(error);
   
   // Log the full error in development, but a sanitized version in production
-  if (isProduction()) {
-    console.error(`API Error [${message}]:`, errorDetails);
-  } else {
-    console.error(`${message}:`, error);
-  }
+  const logPayload = isProduction() ? errorDetails : error;
+  console.error(`[API Error] ${message}`, logPayload);
   
   // During static site generation, we return an empty success
   // to prevent build errors with database connections
@@ -176,11 +202,12 @@ export const fetchCountries = async () => {
       { errorMessage: 'Failed to fetch countries', retry: 1 }
     );
 
-    if (data?.success && Array.isArray(data.data)) {
-      return data.data;
+    if (!data?.success) {
+      return [];
     }
 
-    return [];
+    const payload = Array.isArray((data as any).countries) ? (data as any).countries : data.data;
+    return Array.isArray(payload) ? payload : [];
   } catch (error) {
     console.error('Error fetching countries:', error);
     return [];
@@ -194,11 +221,11 @@ export const fetchProducts = async () => {
       { errorMessage: 'Failed to fetch products', retry: 1 }
     );
 
-    if (data?.success && Array.isArray(data.data)) {
-      return data.data;
+    if (!data?.success) {
+      return [];
     }
 
-    return [];
+    return Array.isArray(data.data) ? data.data : [];
   } catch (error) {
     console.error('Error fetching products:', error);
     return [];
@@ -207,13 +234,22 @@ export const fetchProducts = async () => {
 
 export const fetchClaims = async (productId: string, countryCodeValue: string) => {
   try {
-    const params = new URLSearchParams();
-    if (countryCodeValue) {
-      params.set('countryCode', countryCodeValue);
+    const normalizedProductId = productId?.trim();
+    if (!normalizedProductId) {
+      return { success: false, error: 'Product ID is required.', data: [] };
     }
 
+    const params = new URLSearchParams();
+    const normalizedCountryCode = countryCodeValue?.trim();
+    if (normalizedCountryCode) {
+      params.set('countryCode', normalizedCountryCode);
+    }
+
+    const query = params.toString();
+    const url = `/api/products/${encodeURIComponent(normalizedProductId)}/stacked-claims${query ? `?${query}` : ''}`;
+
     const data = await apiFetchJson<{ success: boolean; data?: unknown; error?: string }>(
-      `/api/products/${productId}/stacked-claims?${params.toString()}`,
+      url,
       { errorMessage: 'Failed to fetch claims', retry: 1 }
     );
 
@@ -221,7 +257,8 @@ export const fetchClaims = async (productId: string, countryCodeValue: string) =
       return data;
     }
 
-    return { success: false, error: data?.error || 'Failed to fetch claims.', data: [] };
+    const fallbackData = Array.isArray((data as any)?.data) ? (data as any).data : [];
+    return { success: false, error: data?.error || 'Failed to fetch claims.', data: fallbackData };
   } catch (error) {
     if (error instanceof ApiClientError && error.status === 404) {
       return { success: false, error: 'Claims not found.', data: [] };

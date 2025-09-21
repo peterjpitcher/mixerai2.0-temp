@@ -52,7 +52,7 @@ export function createOptimizedContext<State, Action>(
   }
 
   // Hook to use both state and dispatch
-  function use() {
+  function useStateAndDispatch() {
     return [useState(), useDispatch()] as const;
   }
 
@@ -87,7 +87,7 @@ export function createOptimizedContext<State, Action>(
     Provider,
     useState,
     useDispatch,
-    use,
+    use: useStateAndDispatch,
     useSelector,
   };
 }

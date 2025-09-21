@@ -4,8 +4,6 @@ import {
   isExecutableExtension,
   isSuspiciousFilename,
   getMimeTypeCategory,
-  type FileValidationResult,
-  type MultiFileValidationResult,
 } from '../file-upload';
 
 describe('File Upload Validation', () => {
@@ -109,7 +107,20 @@ describe('File Upload Validation', () => {
       };
 
       const result = validateFile(file);
-      expect(result.sanitizedFilename).toBe('etc-passwd-unknown');
+      expect(result.sanitizedFilename).toBe('etc-passwd');
+    });
+
+    it('should strip unsafe path characters from sanitized filename', () => {
+      const file = {
+        name: 'images/../avatar.png/../../evil.png/../malicious.gif',
+        type: 'image/gif',
+        size: 2048,
+      } as { name: string; type: string; size: number };
+
+      const result = validateFile(file);
+      expect(result.valid).toBe(true);
+      expect(result.sanitizedFilename?.includes('/')).toBe(false);
+      expect(result.sanitizedFilename?.includes('\\')).toBe(false);
     });
   });
 

@@ -6,24 +6,16 @@
 
 import { User } from '@supabase/supabase-js';
 import { SESSION_CONFIG } from './session-config';
+import type { SessionMetadata, SessionRecord, SessionValidationResult } from './session-types';
 
-export interface Session {
-  sessionId: string;
-  userId: string;
-  userEmail: string;
-  createdAt: Date;
-  expiresAt: Date;
-  lastActivityAt: Date;
-  userAgent?: string;
-  ipAddress?: string;
-  metadata?: Record<string, unknown>;
-}
+export type Session = SessionRecord;
 
 // In-memory session store
 const sessionStore = new Map<string, Session>();
+(globalThis as any).__sessionStore = sessionStore;
 
 // Cleanup function for expired sessions (called on each operation)
-function cleanupExpiredSessions() {
+function cleanupExpiredSessionsInternal() {
   const now = new Date();
   for (const [sessionId, session] of sessionStore.entries()) {
     if (session.expiresAt < now) {
@@ -35,7 +27,7 @@ function cleanupExpiredSessions() {
 /**
  * Generate a secure session ID using Web Crypto API (Edge Runtime compatible)
  */
-function generateSessionId(): string {
+async function generateSessionId(): Promise<string> {
   try {
     // Prefer Web Crypto in Edge/runtime-safe environments
     if (typeof crypto !== 'undefined') {
@@ -53,8 +45,7 @@ function generateSessionId(): string {
   } catch {}
   // Final fallback for Node environments without Web Crypto
   try {
-    // Dynamic import to avoid bundling Node's crypto in Edge
-    const nodeCrypto = require('crypto');
+    const nodeCrypto = await import('node:crypto');
     return nodeCrypto.randomBytes(32).toString('hex');
   } catch {}
   // Extremely unlikely fallback (non-crypto random)
@@ -68,17 +59,13 @@ function generateSessionId(): string {
  */
 export async function createSession(
   user: User,
-  metadata?: {
-    userAgent?: string;
-    ipAddress?: string;
-    [key: string]: unknown;
-  }
+  metadata?: SessionMetadata
 ): Promise<Session | null> {
   try {
     // Cleanup expired sessions periodically
-    cleanupExpiredSessions();
+    cleanupExpiredSessionsInternal();
     
-    const sessionId = generateSessionId();
+    const sessionId = await generateSessionId();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + SESSION_CONFIG.absoluteTimeout);
     
@@ -108,16 +95,12 @@ export async function createSession(
  */
 export async function validateSession(
   sessionId: string
-): Promise<{
-  valid: boolean;
-  session?: Session;
-  shouldRenew?: boolean;
-}> {
+): Promise<SessionValidationResult> {
   try {
     const session = sessionStore.get(sessionId);
-    
+
     if (!session) {
-      return { valid: false };
+      return { valid: false, reason: 'Session not found' };
     }
     
     const now = new Date();
@@ -125,19 +108,22 @@ export async function validateSession(
     // Check if session expired
     if (session.expiresAt < now) {
       sessionStore.delete(sessionId);
-      return { valid: false };
+      return { valid: false, reason: 'Session expired' };
     }
     
     // Check if session is idle too long
     const idleTime = now.getTime() - session.lastActivityAt.getTime();
     if (idleTime > SESSION_CONFIG.idleTimeout) {
       sessionStore.delete(sessionId);
-      return { valid: false };
+      return { valid: false, reason: 'Session idle timeout' };
     }
-    
+
     // Check if should renew (when close to renewal threshold)
     const shouldRenew = idleTime > SESSION_CONFIG.renewalThreshold;
-    
+
+    session.lastActivityAt = now;
+    sessionStore.set(sessionId, session);
+
     return {
       valid: true,
       session,
@@ -145,47 +131,61 @@ export async function validateSession(
     };
   } catch (error) {
     console.error('Failed to validate session:', error);
-    return { valid: false };
+    return { valid: false, reason: 'Session validation failed' };
   }
 }
 
 /**
  * Renew a session (update lastActivityAt)
  */
-export async function renewSession(sessionId: string): Promise<boolean> {
+export async function renewSession(sessionId: string): Promise<{ success: boolean; error?: string }> {
   try {
     const session = sessionStore.get(sessionId);
     
     if (!session) {
-      return false;
+      return { success: false, error: 'Session not found' };
     }
-    
-    session.lastActivityAt = new Date();
+
+    const now = new Date();
+    if (session.expiresAt.getTime() < now.getTime()) {
+      sessionStore.delete(sessionId);
+      return { success: false, error: 'Session expired' };
+    }
+
+    const idleTime = now.getTime() - session.lastActivityAt.getTime();
+    if (idleTime > SESSION_CONFIG.idleTimeout) {
+      sessionStore.delete(sessionId);
+      return { success: false, error: 'Session expired' };
+    }
+
+    session.lastActivityAt = now;
+    session.expiresAt = new Date(now.getTime() + SESSION_CONFIG.absoluteTimeout);
     sessionStore.set(sessionId, session);
     
-    return true;
+    return { success: true };
   } catch (error) {
     console.error('Failed to renew session:', error);
-    return false;
+    return { success: false, error: 'Failed to renew session' };
   }
 }
 
 /**
  * Destroy a session
  */
-export async function destroySession(sessionId: string): Promise<boolean> {
+export async function destroySession(sessionId: string): Promise<{ success: boolean }> {
   try {
-    return sessionStore.delete(sessionId);
+    const deleted = sessionStore.delete(sessionId);
+    return { success: deleted };
   } catch (error) {
     console.error('Failed to destroy session:', error);
-    return false;
+    return { success: false };
   }
 }
 
 /**
  * Destroy all sessions for a user
  */
-export async function destroyUserSessions(userId: string): Promise<number> {
+export async function destroyUserSessions(userId: string): Promise<{ success: boolean; count: number }> {
   try {
     let count = 0;
     
@@ -196,10 +196,10 @@ export async function destroyUserSessions(userId: string): Promise<number> {
       }
     }
     
-    return count;
+    return { success: true, count };
   } catch (error) {
     console.error('Failed to destroy user sessions:', error);
-    return 0;
+    return { success: false, count: 0 };
   }
 }
 
@@ -222,4 +222,22 @@ export async function getUserSessions(userId: string): Promise<Session[]> {
     console.error('Failed to get user sessions:', error);
     return [];
   }
+}
+
+export async function getSession(sessionId: string): Promise<Session | null> {
+  return sessionStore.get(sessionId) ?? null;
+}
+
+export async function cleanupExpiredSessions(): Promise<{ cleaned: number }> {
+  const before = sessionStore.size;
+  cleanupExpiredSessionsInternal();
+  return { cleaned: Math.max(0, before - sessionStore.size) };
+}
+
+export function __getSessionStoreForTests() {
+  return sessionStore;
+}
+
+export function __clearSessionsForTests() {
+  sessionStore.clear();
 }

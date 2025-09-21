@@ -13,6 +13,9 @@ export const SESSION_CONFIG = {
   
   // Maximum concurrent sessions per user
   maxConcurrentSessions: 5,
+
+  // Reauthentication timeout for sensitive operations
+  reauthTimeout: 30 * 60 * 1000, // 30 minutes
   
   // Account lockout configuration
   lockout: {
@@ -24,6 +27,33 @@ export const SESSION_CONFIG = {
 
 // Also export as sessionConfig for backward compatibility
 export const sessionConfig = SESSION_CONFIG;
+
+const SENSITIVE_OPERATIONS = new Set([
+  'change-password',
+  'delete-account',
+  'change-email',
+  'manage-api-keys',
+  'manage-billing',
+  'invite-users',
+  'change-permissions',
+]);
+
+export function checkReauthenticationRequired(operation: string, lastAuthenticatedAt?: number): boolean {
+  if (!SENSITIVE_OPERATIONS.has(operation)) {
+    return false;
+  }
+
+  if (typeof lastAuthenticatedAt !== 'number') {
+    return true;
+  }
+
+  const now = Date.now();
+  if (lastAuthenticatedAt > now) {
+    return false;
+  }
+
+  return now - lastAuthenticatedAt > SESSION_CONFIG.reauthTimeout;
+}
 
 /**
  * Password policy configuration
@@ -50,9 +80,10 @@ export const passwordPolicy = {
 /**
  * Validate password against policy
  */
-export function validatePassword(password: string): { 
-  valid: boolean; 
-  errors: string[] 
+export function validatePassword(password: string): {
+  valid: boolean;
+  isValid: boolean;
+  errors: string[];
 } {
   const errors: string[] = [];
   
@@ -73,7 +104,7 @@ export function validatePassword(password: string): {
   }
   
   if (passwordPolicy.requireSpecialChars && 
-      !new RegExp(`[${passwordPolicy.specialChars.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}]`).test(password)) {
+      !new RegExp(`[${passwordPolicy.specialChars.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&')}]`).test(password)) {
     errors.push('Password must contain at least one special character');
   }
   
@@ -83,8 +114,10 @@ export function validatePassword(password: string): {
     errors.push('Password is too common. Please choose a more unique password');
   }
   
+  const isValid = errors.length === 0;
   return {
-    valid: errors.length === 0,
-    errors
+    valid: isValid,
+    isValid,
+    errors,
   };
 }

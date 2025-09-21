@@ -1,16 +1,21 @@
 import { NextResponse } from 'next/server';
 import { ERROR_MESSAGES, getErrorMessage, formatApiError } from '@/lib/constants/error-messages';
+import { ApiClientError } from '@/lib/api-client';
 
 interface StandardErrorResponse {
   success: false;
   error: string;
+  code: string;
+  timestamp: string;
   details?: unknown;
+  [key: string]: unknown;
 }
 
 interface StandardSuccessResponse<T = unknown> {
   success: true;
   data?: T;
   message?: string;
+  timestamp: string;
 }
 
 export type StandardApiResponse<T = unknown> = StandardSuccessResponse<T> | StandardErrorResponse;
@@ -21,22 +26,46 @@ export type StandardApiResponse<T = unknown> = StandardSuccessResponse<T> | Stan
 export function createErrorResponse(
   error: unknown,
   fallbackMessage: keyof typeof ERROR_MESSAGES = 'GENERIC_ERROR',
-  status: number = 500
+  status?: number,
+  options: {
+    code?: string;
+    includeDetails?: boolean;
+    headers?: HeadersInit;
+    extra?: Record<string, unknown>;
+  } = {}
 ): NextResponse<StandardErrorResponse> {
+  const evaluatedStatus = typeof status === 'number' ? status : getErrorStatus(error);
   const errorMessage = formatApiError(error) || getErrorMessage(fallbackMessage);
-  
-  console.error(`[API Error] ${errorMessage}:`, error);
-  
-  return NextResponse.json(
-    { 
-      success: false, 
-      error: errorMessage,
-      ...(process.env.NODE_ENV === 'development' && error instanceof Error && {
-        details: error.message
-      })
-    },
-    { status }
-  );
+  const derivedCode =
+    options.code ||
+    (typeof (error as { code?: unknown })?.code === 'string' ? String((error as { code?: unknown }).code) : fallbackMessage);
+
+  const shouldIncludeDetails =
+    options.includeDetails ?? process.env.NODE_ENV === 'development';
+
+  const responseBody: StandardErrorResponse = {
+    success: false,
+    error: errorMessage,
+    code: derivedCode,
+    timestamp: new Date().toISOString(),
+  };
+
+  if (shouldIncludeDetails && error instanceof Error) {
+    responseBody.details = error.message;
+  } else if (shouldIncludeDetails && typeof error === 'string') {
+    responseBody.details = error;
+  }
+
+  if (options.extra) {
+    Object.assign(responseBody, options.extra);
+  }
+
+  console.error('[API Error]', { message: errorMessage, status: evaluatedStatus, error });
+
+  return NextResponse.json(responseBody, {
+    status: evaluatedStatus,
+    headers: options.headers,
+  });
 }
 
 /**
@@ -51,7 +80,8 @@ export function createSuccessResponse<T = unknown>(
     {
       success: true,
       ...(data !== undefined && { data }),
-      ...(message && { message })
+      ...(message && { message }),
+      timestamp: new Date().toISOString(),
     },
     { status }
   );
@@ -61,6 +91,22 @@ export function createSuccessResponse<T = unknown>(
  * Map database/API errors to appropriate HTTP status codes
  */
 export function getErrorStatus(error: unknown): number {
+  if (error instanceof ApiClientError) {
+    return error.status;
+  }
+
+  if (error instanceof Response) {
+    return error.status;
+  }
+
+  if (error && typeof error === 'object') {
+    const candidate = error as { status?: unknown; statusCode?: unknown };
+    const status = candidate.status ?? candidate.statusCode;
+    if (typeof status === 'number' && status >= 100) {
+      return status;
+    }
+  }
+
   if (error instanceof Error) {
     const message = error.message.toLowerCase();
     
@@ -94,6 +140,5 @@ export function handleStandardApiError(
   error: unknown,
   fallbackKey: keyof typeof ERROR_MESSAGES = 'GENERIC_ERROR'
 ): NextResponse<StandardErrorResponse> {
-  const status = getErrorStatus(error);
-  return createErrorResponse(error, fallbackKey, status);
+  return createErrorResponse(error, fallbackKey);
 }

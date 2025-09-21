@@ -196,9 +196,9 @@ export async function canAccessProduct(
  * Check if user can access an ingredient based on its brand
  */
 export async function canAccessIngredient(
-  userId: string,
-  ingredientId: string,
-  supabase: ReturnType<typeof createServerClient<Database>>
+  _userId: string,
+  _ingredientId: string,
+  _supabase: ReturnType<typeof createServerClient<Database>>
 ): Promise<boolean> {
   // TODO: Implement proper ingredient access control once ingredients are linked to brands
   // For now, allow access to all ingredients

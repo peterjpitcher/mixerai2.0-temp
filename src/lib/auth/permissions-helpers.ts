@@ -1,12 +1,13 @@
 import { User } from '@supabase/supabase-js';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { getUserBrandPermissions, hasAccessToBrand, hasBrandRole } from './permissions';
+import { getUserBrandPermissions, hasBrandRole } from './permissions';
+import { isGlobalAdmin as deriveGlobalAdmin } from '@/lib/auth/user-role';
 
 /**
  * Check if user is a global admin (platform admin)
  */
 export function isGlobalAdmin(user: User | null): boolean {
-  return user?.user_metadata?.role === 'admin';
+  return deriveGlobalAdmin(user ?? undefined);
 }
 
 /**

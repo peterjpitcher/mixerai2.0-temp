@@ -6,7 +6,12 @@ export interface ApiResponse<T = any> {
   error?: string;
   details?: string;
   pagination?: {
-    page: number; limit: number; total: number; totalPages: number;
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage?: boolean;
+    hasPreviousPage?: boolean;
   };
   timestamp: string;
 }
@@ -16,4 +21,3 @@ export const ok = <T>(data: T, pagination?: ApiResponse['pagination']) =>
 
 export const fail = (status: number, error: string, details?: string) =>
   NextResponse.json<ApiResponse>({ success: false, error, details, timestamp: new Date().toISOString() }, { status });
-

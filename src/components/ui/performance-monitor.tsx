@@ -23,12 +23,21 @@ export function PerformanceMonitor({
   const renderStartTime = React.useRef(performance.now());
 
   React.useEffect(() => {
-    const renderEndTime = performance.now();
-    const renderTime = renderEndTime - renderStartTime.current;
-    setLastRenderTime(renderTime);
-    setRenderCount((prev) => prev + 1);
-    renderStartTime.current = performance.now();
-  });
+    let animationFrame: number;
+
+    const updateMetrics = () => {
+      const renderEndTime = performance.now();
+      const renderTime = renderEndTime - renderStartTime.current;
+      setLastRenderTime(renderTime);
+      setRenderCount((prev) => prev + 1);
+      renderStartTime.current = performance.now();
+      animationFrame = requestAnimationFrame(updateMetrics);
+    };
+
+    animationFrame = requestAnimationFrame(updateMetrics);
+
+    return () => cancelAnimationFrame(animationFrame);
+  }, []);
 
   if (!show) return null;
 
@@ -106,6 +115,8 @@ export function withPerformanceTracking<P extends object>(
     
     return <Component {...props} />;
   });
+
+  MemoizedComponent.displayName = `WithPerformanceTracking(${Component.displayName || Component.name || 'Component'})`;
   
   return MemoizedComponent as unknown as React.ComponentType<P>;
 }

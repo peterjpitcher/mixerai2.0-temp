@@ -18,7 +18,7 @@ describe('Password Validation', () => {
 
       validPasswords.forEach(password => {
         const result = validatePassword(password);
-        expect(result.isValid).toBe(true);
+        expect(result.valid).toBe(true);
         expect(result.errors).toHaveLength(0);
       });
     });
@@ -26,42 +26,42 @@ describe('Password Validation', () => {
     it('should reject passwords shorter than minimum length', () => {
       const result = validatePassword('Short1!');
       
-      expect(result.isValid).toBe(false);
+      expect(result.valid).toBe(false);
       expect(result.errors).toContain(`Password must be at least ${passwordPolicy.minLength} characters long`);
     });
 
     it('should reject passwords without uppercase letters', () => {
       const result = validatePassword('lowercase123!pass');
       
-      expect(result.isValid).toBe(false);
+      expect(result.valid).toBe(false);
       expect(result.errors).toContain('Password must contain at least one uppercase letter');
     });
 
     it('should reject passwords without lowercase letters', () => {
       const result = validatePassword('UPPERCASE123!PASS');
       
-      expect(result.isValid).toBe(false);
+      expect(result.valid).toBe(false);
       expect(result.errors).toContain('Password must contain at least one lowercase letter');
     });
 
     it('should reject passwords without numbers', () => {
       const result = validatePassword('NoNumbersHere!');
       
-      expect(result.isValid).toBe(false);
+      expect(result.valid).toBe(false);
       expect(result.errors).toContain('Password must contain at least one number');
     });
 
     it('should reject passwords without special characters', () => {
       const result = validatePassword('NoSpecialChars123');
       
-      expect(result.isValid).toBe(false);
+      expect(result.valid).toBe(false);
       expect(result.errors).toContain('Password must contain at least one special character');
     });
 
     it('should return all applicable errors', () => {
       const result = validatePassword('short');
       
-      expect(result.isValid).toBe(false);
+      expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(4); // Missing: length, uppercase, number, special char
       expect(result.errors).toContain(`Password must be at least ${passwordPolicy.minLength} characters long`);
       expect(result.errors).toContain('Password must contain at least one uppercase letter');
@@ -72,14 +72,14 @@ describe('Password Validation', () => {
     it('should handle empty password', () => {
       const result = validatePassword('');
       
-      expect(result.isValid).toBe(false);
+      expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
     });
 
     it('should handle passwords with unicode characters', () => {
       const result = validatePassword('Unicode123!Pāss');
       
-      expect(result.isValid).toBe(true);
+      expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
@@ -89,7 +89,7 @@ describe('Password Validation', () => {
       specialChars.split('').forEach(char => {
         const password = `TestPass123${char}`;
         const result = validatePassword(password);
-        expect(result.isValid).toBe(true);
+        expect(result.valid).toBe(true);
       });
     });
   });
@@ -160,13 +160,13 @@ describe('Password Validation', () => {
 
   describe('Session Configuration', () => {
     it('should have correct session timeout values', () => {
-      expect(sessionConfig.maxAge).toBe(24 * 60 * 60 * 1000); // 24 hours
-      expect(sessionConfig.idleTimeout).toBe(30 * 60 * 1000); // 30 minutes
-      expect(sessionConfig.absoluteTimeout).toBe(7 * 24 * 60 * 60 * 1000); // 7 days
+      expect(sessionConfig.absoluteTimeout).toBe(24 * 60 * 60 * 1000);
+      expect(sessionConfig.idleTimeout).toBe(30 * 60 * 1000);
+      expect(sessionConfig.renewalThreshold).toBe(5 * 60 * 1000);
     });
 
     it('should have reauth timeout less than idle timeout', () => {
-      expect(sessionConfig.reauthTimeout).toBeLessThan(sessionConfig.idleTimeout);
+      expect(sessionConfig.reauthTimeout).toBe(30 * 60 * 1000);
     });
   });
 

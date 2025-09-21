@@ -9,5 +9,8 @@ describe('isActuallyMaster semantics', () => {
   test('market claim not flagged as master by helper', () => {
     expect(isGlobalCountryCode('GB')).toBe(false);
   });
-});
 
+  test('helper tolerates casing and surrounding whitespace', () => {
+    expect(isGlobalCountryCode('  __global__ ')).toBe(true);
+  });
+});

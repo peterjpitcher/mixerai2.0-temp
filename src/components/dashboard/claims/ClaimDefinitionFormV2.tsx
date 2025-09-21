@@ -9,9 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { MultiSelectCheckboxCombobox, ComboboxOption } from '@/components/ui/MultiSelectCheckboxCombobox';
 import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, ChevronRight, Info, Building2, Package, FlaskConical } from 'lucide-react';
-import { ALL_COUNTRIES_CODE, ALL_COUNTRIES_NAME } from "@/lib/constants/country-codes";
 import { cn } from '@/lib/utils';
 
 interface Entity {
@@ -187,7 +185,8 @@ export const ClaimDefinitionFormV2: React.FC<ClaimDefinitionFormProps> = ({
         } else {
           setCountryOptions([]);
         }
-      } catch (e) {
+      } catch (error) {
+        console.error('Failed to load country options:', error);
         setCountryOptions([]);
       } finally {
         setIsLoadingCountries(false);

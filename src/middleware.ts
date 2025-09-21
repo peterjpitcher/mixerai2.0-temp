@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { generateCSRFToken, validateCSRFToken } from '@/lib/csrf';
 import { checkRateLimit, getRateLimitType } from '@/lib/rate-limit-simple';
-import { validateSession, createSession, renewSession } from '@/lib/auth/session-manager-simple';
+import { createSession, validateSession, renewSession } from '@/lib/auth/session-manager';
 import { SESSION_CONFIG } from '@/lib/auth/session-config';
 import type { User } from '@supabase/supabase-js';
 
@@ -91,40 +91,6 @@ export async function middleware(request: NextRequest) {
     response.headers.set('x-api-route', 'true');
   }
   
-  // Skip rate limiting for public routes to reduce overhead
-  if (!isPublicRoute(pathname)) {
-    // Rate limiting (only for protected routes)
-    const rateLimitType = getRateLimitType(pathname);
-    const userId = request.headers.get('x-user-id') || undefined;
-    
-    const rateLimitResult = await checkRateLimit(request, rateLimitType, userId);
-    
-    if (rateLimitResult.headers) {
-      Object.entries(rateLimitResult.headers).forEach(([key, value]) => {
-        response.headers.set(key, value);
-      });
-    }
-    
-    if (!rateLimitResult.allowed) {
-      const errorResponse = {
-        success: false,
-        error: rateLimitResult.message || 'Too many requests. Please try again later.',
-        retryAfter: rateLimitResult.retryAfter,
-      };
-      
-      return new NextResponse(
-        isApiRoute ? JSON.stringify(errorResponse) : errorResponse.error,
-        {
-          status: 429,
-          headers: {
-            'Content-Type': isApiRoute ? 'application/json' : 'text/plain',
-            ...Object.fromEntries(response.headers.entries()),
-          },
-        }
-      );
-    }
-  }
-  
   // CSRF Protection for API routes (optimized)
   if (isApiRoute && MUTATION_METHODS.has(request.method) && !shouldSkipCSRF(pathname)) {
     if (!validateCSRFToken(request)) {
@@ -200,11 +166,37 @@ export async function middleware(request: NextRequest) {
     console.warn('Middleware: auth.getUser() error:', userError.message);
   }
   
-  // Add user ID for rate limiting
-  if (refreshedUser?.id) {
-    request.headers.set('x-user-id', refreshedUser.id);
+  // Rate limiting (only for protected routes) - run after auth to include user identifier
+  if (!isPublicRoute(pathname)) {
+    const rateLimitType = getRateLimitType(pathname);
+    const rateLimitResult = await checkRateLimit(request, rateLimitType, refreshedUser?.id);
+
+    if (rateLimitResult.headers) {
+      Object.entries(rateLimitResult.headers).forEach(([key, value]) => {
+        response.headers.set(key, value);
+      });
+    }
+
+    if (!rateLimitResult.allowed) {
+      const errorResponse = {
+        success: false,
+        error: rateLimitResult.message || 'Too many requests. Please try again later.',
+        retryAfter: rateLimitResult.retryAfter,
+      };
+
+      return new NextResponse(
+        isApiRoute ? JSON.stringify(errorResponse) : errorResponse.error,
+        {
+          status: 429,
+          headers: {
+            'Content-Type': isApiRoute ? 'application/json' : 'text/plain',
+            ...Object.fromEntries(response.headers.entries()),
+          },
+        }
+      );
+    }
   }
-  
+
   // Session management (only if user exists)
   if (refreshedUser?.id) {
     const sessionId = request.cookies.get('app-session-id')?.value;

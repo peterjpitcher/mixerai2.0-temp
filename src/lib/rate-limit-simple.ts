@@ -47,25 +47,37 @@ function toAdvancedConfig(type: RateLimitType): RateLimitConfig {
   };
 }
 
+function normalizePath(pathname: string): string {
+  if (!pathname) return '';
+  const prefixed = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  return prefixed.toLowerCase();
+}
+
 export function getRateLimitType(pathname: string): RateLimitType {
-  if (pathname.includes('/auth/') || pathname.includes('/api/auth/')) {
+  const normalized = normalizePath(pathname);
+
+  if (!normalized.startsWith('/api/')) {
+    return 'api';
+  }
+
+  if (normalized.includes('/auth/')) {
     return 'auth';
   }
 
   if (
-    pathname.includes('/api/tools/') &&
-    (pathname.includes('content-transcreator') || pathname.includes('article-generator'))
+    normalized.includes('/api/tools/') &&
+    (normalized.includes('content-transcreator') || normalized.includes('article-generator'))
   ) {
     return 'ai-expensive';
   }
 
-  if (pathname.includes('/api/tools/') || pathname.includes('/api/content/generate')) {
+  if (normalized.includes('/api/tools/') || normalized.includes('/api/content/generate')) {
     return 'ai-standard';
   }
 
   if (
-    pathname.includes('/api/users/') ||
-    (pathname.includes('/api/brands/') && (pathname.includes('delete') || pathname.includes('deactivate')))
+    normalized.includes('/api/users/') ||
+    (normalized.includes('/api/brands/') && (normalized.includes('delete') || normalized.includes('deactivate')))
   ) {
     return 'sensitive';
   }
@@ -88,22 +100,35 @@ export async function checkRateLimit(
   const preset = RATE_LIMIT_PRESETS[type];
   const config = toAdvancedConfig(type);
 
-  const result = await advancedCheckRateLimit(req, config, {
-    identifier: userId,
-    keyParts: ['middleware', type, userId ?? 'anonymous'],
-  });
+  try {
+    const result = await advancedCheckRateLimit(req, config, {
+      identifier: userId,
+      keyParts: ['middleware', type, userId ?? 'anonymous'],
+    });
 
-  return {
-    allowed: result.allowed,
-    remaining: result.remaining,
-    resetTime: result.reset.getTime(),
-    retryAfter: result.retryAfter,
-    message: preset.message,
-    headers: {
-      'X-RateLimit-Limit': preset.requests.toString(),
-      'X-RateLimit-Remaining': result.remaining.toString(),
-      'X-RateLimit-Reset': result.reset.toISOString(),
-      ...(result.retryAfter !== undefined ? { 'Retry-After': result.retryAfter.toString() } : {}),
-    },
-  };
+    return {
+      allowed: result.allowed,
+      remaining: result.remaining,
+      resetTime: result.reset.getTime(),
+      retryAfter: result.retryAfter,
+      message: preset.message,
+      headers: {
+        'X-RateLimit-Limit': preset.requests.toString(),
+        'X-RateLimit-Remaining': result.remaining.toString(),
+        'X-RateLimit-Reset': result.reset.toISOString(),
+        ...(result.retryAfter !== undefined ? { 'Retry-After': result.retryAfter.toString() } : {}),
+      },
+    };
+  } catch (error) {
+    console.error('[RateLimit] Failed to evaluate rate limit', {
+      type,
+      identifier: userId,
+      error,
+    });
+
+    return {
+      allowed: true,
+      message: 'Rate limiting unavailable',
+    };
+  }
 }

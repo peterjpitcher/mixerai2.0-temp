@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -113,14 +113,14 @@ export default function ContentTransCreatorPage() {
   const [isCheckingPermissions, setIsCheckingPermissions] = useState<boolean>(true);
 
   // History State
-  const [runHistory, setRunHistory] = useState<ToolRunHistoryItem[]>([]);
+  const [, setRunHistory] = useState<ToolRunHistoryItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [groupedHistory, setGroupedHistory] = useState<BatchGroup[]>([]);
   const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set());
 
   // Group history items by batch_id
-  const groupHistoryByBatch = (items: ToolRunHistoryItem[]): BatchGroup[] => {
+  const groupHistoryByBatch = useCallback((items: ToolRunHistoryItem[]): BatchGroup[] => {
     const batchMap = new Map<string, ToolRunHistoryItem[]>();
     const singleRuns: ToolRunHistoryItem[] = [];
     
@@ -192,7 +192,7 @@ export default function ContentTransCreatorPage() {
     
     // Sort groups by timestamp (most recent first)
     return groups.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  };
+  }, [brands]);
 
   useEffect(() => {
     const fetchCurrentUserAndBrands = async () => {
@@ -296,7 +296,7 @@ export default function ContentTransCreatorPage() {
     if (currentUser && isAllowedToAccess) { // Fetch only if user is loaded and allowed
       fetchHistory();
     }
-  }, [currentUser, isAllowedToAccess]);
+  }, [currentUser, isAllowedToAccess, groupHistoryByBatch]);
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value);

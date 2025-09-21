@@ -18,8 +18,7 @@ interface EmailNotificationRequest {
   feedback?: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export const POST = withAuthAndCSRF(async function (request: NextRequest, _user: User) {
+export const POST = withAuthAndCSRF(async function (request: NextRequest, requestUser: User) {
   try {
     const body: EmailNotificationRequest = await request.json();
     
@@ -39,64 +38,49 @@ export const POST = withAuthAndCSRF(async function (request: NextRequest, _user:
     }
     
     const supabase = createSupabaseAdminClient();
-    
-    // Get user details
-    let userEmail: string | null = null;
-    let userName: string | null = null;
-    
-    if (body.userId) {
-      const { data: userData } = await supabase.auth.admin.getUserById(body.userId);
-      if (userData?.user) {
-        userEmail = userData.user.email || null;
-        userName = userData.user.user_metadata?.full_name || userData.user.email?.split('@')[0] || 'User';
+
+    const loadRecipient = async (targetId: string | null | undefined) => {
+      if (!targetId) {
+        return null;
       }
-    }
-    
-    if (!userEmail) {
-      return NextResponse.json(
-        { success: false, error: 'User email not found' },
-        { status: 400 }
-      );
-    }
-    
-    // Check user's email preferences
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('email_notifications_enabled, email_preferences')
-      .eq('id', body.userId!)
-      .single();
-      
-    if (!profile?.email_notifications_enabled) {
-      return NextResponse.json(
-        { success: true, message: 'Email notifications disabled for user' },
-        { status: 200 }
-      );
-    }
-    
+      const { data: userData } = await supabase.auth.admin.getUserById(targetId);
+      if (!userData?.user?.email) {
+        return null;
+      }
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email_notifications_enabled, email_preferences')
+        .eq('id', targetId)
+        .maybeSingle();
+
+      return {
+        id: targetId,
+        email: userData.user.email,
+        name: userData.user.user_metadata?.full_name || userData.user.email.split('@')[0] || 'User',
+        profile,
+      } as const;
+    };
+
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mixerai.com';
+
+    let recipient: Awaited<ReturnType<typeof loadRecipient>> = null;
+    let recipientUserId: string | null = null;
+    let notificationContext: { contentId?: string; taskId?: string } = {};
     
     switch (body.type) {
       case 'task_assignment': {
-        // Check if user wants workflow assignment emails
-        const emailPrefs = (profile?.email_preferences as Record<string, unknown>) || {};
-        if (emailPrefs.workflow_assigned === false) {
-          return NextResponse.json(
-            { success: true, message: 'User has disabled workflow assignment emails' },
-            { status: 200 }
-          );
-        }
         if (!body.taskId) {
           return NextResponse.json(
             { success: false, error: 'Task ID required for task assignment' },
             { status: 400 }
           );
         }
-        
-        // Get task details
-        const { data: task } = await supabase
+
+        const { data: task, error: taskError } = await supabase
           .from('user_tasks')
           .select(`
-            *,
+            assigned_to,
+            due_date,
             content (
               title,
               brands (name),
@@ -105,54 +89,93 @@ export const POST = withAuthAndCSRF(async function (request: NextRequest, _user:
           `)
           .eq('id', body.taskId)
           .single();
-          
-        if (!task || !task.content) {
+
+        type TaskRow = {
+          assigned_to: string[] | string | null;
+          due_date: string | null;
+          content?: {
+            title?: string | null;
+            brands?: { name?: string | null } | null;
+            workflow_steps?: { name?: string | null } | null;
+            ['workflow_steps!current_step']?: { name?: string | null } | null;
+          } | null;
+        };
+
+        const taskRow = taskError ? null : (task as unknown as TaskRow | null);
+
+        if (!taskRow || !taskRow.content) {
           return NextResponse.json(
             { success: false, error: 'Task or content not found' },
             { status: 404 }
           );
         }
-        
-        const emailData = taskAssignmentTemplate({
-          userName: userName || 'User',
-          appUrl,
-          taskTitle: 'Review Content',
-          contentTitle: task.content.title,
-          brandName: task.content.brands?.name || 'Unknown Brand',
-          workflowStep: task.content.workflow_steps?.name || 'Unknown Step',
-          dueDate: task.due_date ? format(new Date(task.due_date), 'MMM dd, yyyy') : undefined
-        });
-        
-        console.log('[Email API] Sending task assignment email to:', userEmail);
-        
-        await sendEmail({
-          to: userEmail,
-          ...emailData
-        });
-        
-        console.log('[Email API] Task assignment email sent successfully to:', userEmail);
-        
-        break;
-      }
-      
-      case 'workflow_action': {
-        // Check if user wants workflow action emails
-        const emailPrefs = (profile?.email_preferences as Record<string, unknown>) || {};
-        const prefKey = body.action === 'approved' ? 'content_approved' : 'content_rejected';
-        if (emailPrefs[prefKey] === false) {
+
+        const assignedUsers = Array.isArray(taskRow.assigned_to)
+          ? (taskRow.assigned_to as string[])
+          : [];
+
+        const targetUserId = body.userId ?? assignedUsers[0] ?? null;
+
+        if (!targetUserId) {
           return NextResponse.json(
-            { success: true, message: `User has disabled ${body.action} emails` },
+            { success: false, error: 'No assignee found for task' },
+            { status: 400 }
+          );
+        }
+
+        if (assignedUsers.length && !assignedUsers.includes(targetUserId)) {
+          return NextResponse.json(
+            { success: false, error: 'Cannot notify user not assigned to this task' },
+            { status: 403 }
+          );
+        }
+
+        recipient = await loadRecipient(targetUserId);
+        if (!recipient) {
+          return NextResponse.json(
+            { success: false, error: 'Task assignee email not found' },
+            { status: 404 }
+          );
+        }
+
+        const emailPrefs = (recipient.profile?.email_preferences as Record<string, unknown>) || {};
+        if (recipient.profile?.email_notifications_enabled === false || emailPrefs.workflow_assigned === false) {
+          return NextResponse.json(
+            { success: true, message: 'User has disabled workflow assignment emails' },
             { status: 200 }
           );
         }
+
+        const emailData = taskAssignmentTemplate({
+          userName: recipient.name,
+          appUrl,
+          taskTitle: 'Review Content',
+          contentTitle: taskRow.content?.title || 'Assigned Task',
+          brandName: taskRow.content?.brands?.name || 'Unknown Brand',
+          workflowStep:
+            taskRow.content?.['workflow_steps!current_step']?.name || taskRow.content?.workflow_steps?.name || 'Unknown Step',
+          dueDate: taskRow.due_date ? format(new Date(taskRow.due_date), 'MMM dd, yyyy') : undefined,
+        });
+
+        await sendEmail({
+          to: recipient.email,
+          ...emailData
+        });
+
+        recipientUserId = targetUserId;
+        notificationContext = { taskId: body.taskId, contentId: body.contentId };
+
+        break;
+      }
+
+      case 'workflow_action': {
         if (!body.contentId || !body.action) {
           return NextResponse.json(
             { success: false, error: 'Content ID and action required for workflow action' },
             { status: 400 }
           );
         }
-        
-        // Get content and creator details
+
         const { data: content } = await supabase
           .from('content')
           .select(`
@@ -163,67 +186,94 @@ export const POST = withAuthAndCSRF(async function (request: NextRequest, _user:
           `)
           .eq('id', body.contentId)
           .single();
-          
+
         if (!content) {
           return NextResponse.json(
             { success: false, error: 'Content not found' },
             { status: 404 }
           );
         }
-        
-        // Get creator details
+
         if (!content.created_by) {
           return NextResponse.json(
             { success: false, error: 'Content creator not found' },
             { status: 404 }
           );
         }
-        const { data: creatorData } = await supabase.auth.admin.getUserById(content.created_by);
-        if (!creatorData?.user?.email) {
+
+        recipient = await loadRecipient(content.created_by);
+        if (!recipient) {
           return NextResponse.json(
             { success: false, error: 'Content creator not found' },
             { status: 404 }
           );
         }
-        
-        const creatorName = creatorData.user.user_metadata?.full_name || creatorData.user.email.split('@')[0];
-        
+
+        const emailPrefs = (recipient.profile?.email_preferences as Record<string, unknown>) || {};
+        const prefKey = body.action === 'approved' ? 'content_approved' : 'content_rejected';
+        if (recipient.profile?.email_notifications_enabled === false || emailPrefs[prefKey] === false) {
+          return NextResponse.json(
+            { success: true, message: `User has disabled ${body.action} emails` },
+            { status: 200 }
+          );
+        }
+
+        const reviewerName = requestUser.user_metadata?.full_name || requestUser.email?.split('@')[0] || 'Reviewer';
+
         const emailData = workflowActionTemplate({
-          userName: creatorName,
+          userName: recipient.name,
           appUrl,
           contentTitle: content.title,
           brandName: (content.brands as Record<string, unknown>)?.name as string || 'Unknown Brand',
           action: body.action,
           feedback: body.feedback,
-          reviewerName: userName || 'Reviewer',
+          reviewerName,
           nextStep: body.action === 'approved' ? (content.workflow_steps as Record<string, unknown>)?.name as string : undefined
         });
-        
+
         await sendEmail({
-          to: creatorData.user.email,
+          to: recipient.email,
           ...emailData
         });
-        
+
+        recipientUserId = content.created_by;
+        notificationContext = { contentId: body.contentId };
+
         break;
       }
-      
+
       case 'deadline_reminder': {
-        // Check if user wants deadline reminder emails
-        const emailPrefs = (profile?.email_preferences as Record<string, unknown>) || {};
-        if (emailPrefs.deadline_reminders === false) {
-          return NextResponse.json(
-            { success: true, message: 'User has disabled deadline reminder emails' },
-            { status: 200 }
-          );
-        }
         if (!body.contentId) {
           return NextResponse.json(
             { success: false, error: 'Content ID required for deadline reminder' },
             { status: 400 }
           );
         }
-        
-        // Get content details including due_date
+
+        const targetUserId = body.userId ?? requestUser.id;
+        if (targetUserId !== requestUser.id) {
+          return NextResponse.json(
+            { success: false, error: 'You can only request reminders for your own account' },
+            { status: 403 }
+          );
+        }
+
+        recipient = await loadRecipient(targetUserId);
+        if (!recipient) {
+          return NextResponse.json(
+            { success: false, error: 'User email not found' },
+            { status: 400 }
+          );
+        }
+
+        const emailPrefs = (recipient.profile?.email_preferences as Record<string, unknown>) || {};
+        if (recipient.profile?.email_notifications_enabled === false || emailPrefs.deadline_reminders === false) {
+          return NextResponse.json(
+            { success: true, message: 'User has disabled deadline reminder emails' },
+            { status: 200 }
+          );
+        }
+
         const { data: content } = await supabase
           .from('content')
           .select(`
@@ -234,38 +284,41 @@ export const POST = withAuthAndCSRF(async function (request: NextRequest, _user:
           `)
           .eq('id', body.contentId)
           .single();
-          
+
         if (!content) {
           return NextResponse.json(
             { success: false, error: 'Content not found' },
             { status: 404 }
           );
         }
-        
+
         if (!content.due_date) {
           return NextResponse.json(
             { success: false, error: 'Content has no due date set' },
             { status: 400 }
           );
         }
-        
+
         const emailData = deadlineReminderTemplate({
-          userName: userName || 'User',
+          userName: recipient.name,
           appUrl,
           contentTitle: content.title,
           brandName: (content.brands as Record<string, unknown>)?.name as string || 'Unknown Brand',
           workflowStep: (content.workflow_steps as Record<string, unknown>)?.name as string || 'Unknown Step',
           dueDate: format(new Date(content.due_date), 'MMM dd, yyyy')
         });
-        
+
         await sendEmail({
-          to: userEmail,
+          to: recipient.email,
           ...emailData
         });
-        
+
+        recipientUserId = targetUserId;
+        notificationContext = { contentId: body.contentId };
+
         break;
       }
-      
+
       default:
         return NextResponse.json(
           { success: false, error: 'Invalid notification type' },
@@ -273,18 +326,23 @@ export const POST = withAuthAndCSRF(async function (request: NextRequest, _user:
         );
     }
     
-    // Log notification sent
+    if (!recipient || !recipientUserId) {
+      return NextResponse.json(
+        { success: false, error: 'Unable to resolve notification recipient' },
+        { status: 500 }
+      );
+    }
+
     await supabase
       .from('notifications')
       .insert({
-        user_id: body.userId,
+        user_id: recipientUserId,
         title: `Email sent: ${body.type.replace('_', ' ')}`,
-        message: `Email notification sent to ${userEmail}`,
+        message: `Email notification sent to ${recipient.email}`,
         type: 'email',
-        metadata: { 
+        metadata: {
           notificationType: body.type,
-          contentId: body.contentId,
-          taskId: body.taskId
+          ...notificationContext,
         }
       });
     

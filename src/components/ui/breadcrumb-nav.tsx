@@ -30,7 +30,6 @@ export function BreadcrumbNav({
 
   // Truncate if needed
   let displayItems = allItems;
-  let showEllipsis = false;
   
   if (maxItems && allItems.length > maxItems) {
     displayItems = [
@@ -38,7 +37,6 @@ export function BreadcrumbNav({
       { label: '...', href: undefined },
       ...allItems.slice(-(maxItems - 2))
     ];
-    showEllipsis = true;
   }
 
   return (

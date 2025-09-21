@@ -16,7 +16,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 import { ALL_COUNTRIES_CODE, ALL_COUNTRIES_NAME } from "@/lib/constants/country-codes";
 import { GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
-import { Claim, ClaimTypeEnum, MasterClaimBrand as GlobalBrand, EffectiveClaim, FinalClaimTypeEnum } from "@/lib/claims-utils";
+import { ClaimTypeEnum, MasterClaimBrand as GlobalBrand, EffectiveClaim, FinalClaimTypeEnum } from "@/lib/claims-utils";
 import {
   Dialog,
   DialogContent,
@@ -433,7 +433,7 @@ export default function ClaimsPreviewPage() {
   const [pendingGlobalOverride, setPendingGlobalOverride] = useState<Record<string, unknown> | null>(null);
   const [conflictDetails, setConflictDetails] = useState<Record<string, unknown> | null>(null);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [, setIsSubmitting] = useState(false);
 
   const [isFullScreen, setIsFullScreen] = useState(false);
 
@@ -553,7 +553,7 @@ export default function ClaimsPreviewPage() {
     existingOverrideId?: string | null;
     masterClaimIdToOverride: string | null;
   }) => {
-    const { product, cellData, isBlocked, replacementText, replacementType, isReplacingWithNewText, existingOverrideId, masterClaimIdToOverride } = dataFromModal;
+    const { product, replacementText, isReplacingWithNewText, existingOverrideId, masterClaimIdToOverride } = dataFromModal;
     
     if (!masterClaimIdToOverride && !isReplacingWithNewText && !existingOverrideId) {
         if (!masterClaimIdToOverride){

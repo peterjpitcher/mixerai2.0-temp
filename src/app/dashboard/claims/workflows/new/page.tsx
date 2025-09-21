@@ -124,7 +124,7 @@ export default function NewClaimsWorkflowPage() {
 
   const searchUsers = useCallback((query: string, stepIndex: number) => {
     debouncedSearchFn(query, stepIndex);
-  }, [debouncedSearchFn, steps]);
+  }, [debouncedSearchFn]);
 
   const handleAssigneeInputChange = (stepIndex: number, value: string) => {
     setAssigneeInputs(prev => {

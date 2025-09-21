@@ -96,7 +96,7 @@ export function useCreateWorkflow() {
 
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       // Invalidate workflow lists
       queryClient.invalidateQueries({ queryKey: workflowQueryKeys.lists() });
       toast.success('Workflow created successfully');
@@ -129,7 +129,7 @@ export function useUpdateWorkflow(id: string) {
 
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       // Invalidate both the specific workflow and lists
       queryClient.invalidateQueries({ queryKey: workflowQueryKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: workflowQueryKeys.lists() });

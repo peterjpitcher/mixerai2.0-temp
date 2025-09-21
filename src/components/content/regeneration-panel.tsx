@@ -102,14 +102,6 @@ export function RegenerationPanel({
     );
   };
 
-  const handleFieldToggle = (fieldId: string) => {
-    setSelectedFields(prev => 
-      prev.includes(fieldId) 
-        ? prev.filter(f => f !== fieldId)
-        : [...prev, fieldId]
-    );
-  };
-
   if (!canRegenerate) {
     return null;
   }

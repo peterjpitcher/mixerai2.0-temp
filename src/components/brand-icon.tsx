@@ -3,7 +3,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
-import { generateBrandColor, getBrandLogoRetinaSize, getBrandLogoImageProps } from "@/lib/utils/brand-logo";
+import { generateBrandColor, getBrandLogoImageProps } from "@/lib/utils/brand-logo";
 import { getBestTextColor } from "@/lib/utils/color-contrast";
 
 export interface BrandIconProps {
@@ -34,9 +34,6 @@ export function BrandIcon({
     lg: "w-12 h-12 text-xl"
   };
 
-  // Use utility function for image sizes
-  const imageSize = getBrandLogoRetinaSize(size as 'sm' | 'md' | 'lg');
-  
   // If logo URL is provided, show the image
   if (logoUrl) {
     return (
@@ -49,6 +46,7 @@ export function BrandIcon({
       >
         <Image
           {...getBrandLogoImageProps(logoUrl, name || 'Brand', size as 'sm' | 'md' | 'lg')}
+          alt={name ?? 'Brand logo'}
           className="object-cover w-full h-full"
         />
       </div>

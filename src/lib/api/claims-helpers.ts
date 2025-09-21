@@ -1,5 +1,6 @@
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
-import { User } from '@supabase/supabase-js';
+import { logError } from '@/lib/logger';
+import { GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
 
 /**
  * Check if user has permission to create claims for products (optimized batch query)
@@ -35,73 +36,119 @@ export async function checkProductClaimsPermission(
 ): Promise<{ hasPermission: boolean; errors: string[] }> {
   const supabase = createSupabaseAdminClient();
   const errors: string[] = [];
-  
+
+  if (!productIds.length) {
+    return { hasPermission: false, errors: ['No products provided'] };
+  }
+
   try {
-    // Batch fetch all products with their master brands and mixer brands in one query
     const { data: productsData, error: productsError } = await supabase
       .from('products')
-      .select(`
-        id,
-        master_brand_id,
-        master_claim_brands!inner (
-          id,
-          mixerai_brand_id,
-          brands!inner (
-            id
-          )
-        )
-      `)
+      .select('id, master_brand_id')
       .in('id', productIds);
-    
+
     if (productsError) {
-      console.error('[checkProductClaimsPermission] Error fetching products:', productsError);
+      logError('[checkProductClaimsPermission] Error fetching products:', productsError);
       errors.push('Failed to fetch product information');
       return { hasPermission: false, errors };
     }
-    
-    if (!productsData || productsData.length !== productIds.length) {
-      errors.push('Some products were not found');
+
+    if (!productsData || productsData.length === 0) {
+      errors.push('Products could not be found');
       return { hasPermission: false, errors };
     }
-    
-    // Extract all unique mixerai brand IDs
-    const mixeraiBrandIds = [...new Set(
-      productsData
-        .map(p => (p.master_claim_brands as any)?.mixerai_brand_id)
-        .filter(Boolean)
-    )] as string[];
-    
-    if (mixeraiBrandIds.length === 0) {
-      errors.push('No linked MixerAI brands found for the products');
+
+    const missingProductIds = productIds.filter(
+      (id) => !productsData.some((product) => product.id === id)
+    );
+    if (missingProductIds.length > 0) {
+      errors.push(`Products not found: ${missingProductIds.join(', ')}`);
       return { hasPermission: false, errors };
     }
-    
-    // Batch check permissions for all brands
+
+    const productsMissingBrand = productsData.filter((product) => !product.master_brand_id);
+    if (productsMissingBrand.length > 0) {
+      errors.push(
+        `Products missing master brand linkage: ${productsMissingBrand
+          .map((product) => product.id)
+          .join(', ')}`
+      );
+      return { hasPermission: false, errors };
+    }
+
+    const masterBrandIds = Array.from(
+      new Set(
+        productsData
+          .map((product) => product.master_brand_id)
+          .filter((value): value is string => Boolean(value))
+      )
+    );
+
+    if (!masterBrandIds.length) {
+      errors.push('No linked master brands found for the products');
+      return { hasPermission: false, errors };
+    }
+
+    const { data: brandMappings, error: brandMappingError } = await supabase
+      .from('master_claim_brands')
+      .select('id, mixerai_brand_id')
+      .in('id', masterBrandIds);
+
+    if (brandMappingError) {
+      logError('[checkProductClaimsPermission] Error fetching master claim brands:', brandMappingError);
+      errors.push('Failed to resolve brand permissions');
+      return { hasPermission: false, errors };
+    }
+
+    const mixeraiBrandIdByMasterId = new Map<string, string>();
+    (brandMappings || []).forEach((row) => {
+      if (row?.id && row?.mixerai_brand_id) {
+        mixeraiBrandIdByMasterId.set(row.id, row.mixerai_brand_id);
+      }
+    });
+
+    const unresolvedBrands = masterBrandIds.filter(
+      (brandId) => !mixeraiBrandIdByMasterId.has(brandId)
+    );
+
+    if (unresolvedBrands.length > 0) {
+      errors.push(
+        `Brands missing MixerAI brand mapping: ${unresolvedBrands.join(', ')}`
+      );
+      return { hasPermission: false, errors };
+    }
+
+    const mixeraiBrandIds = Array.from(new Set(mixeraiBrandIdByMasterId.values()));
+
+    if (!mixeraiBrandIds.length) {
+      errors.push('No MixerAI brands available for permission check');
+      return { hasPermission: false, errors };
+    }
+
     const { data: permissionsData, error: permissionsError } = await supabase
       .from('user_brand_permissions')
       .select('brand_id')
       .eq('user_id', userId)
       .eq('role', 'admin')
       .in('brand_id', mixeraiBrandIds);
-    
+
     if (permissionsError) {
-      console.error('[checkProductClaimsPermission] Error fetching permissions:', permissionsError);
+      logError('[checkProductClaimsPermission] Error fetching permissions:', permissionsError);
       errors.push('Failed to check user permissions');
       return { hasPermission: false, errors };
     }
-    
-    // Check if user has permission for ALL brands
-    const authorizedBrandIds = new Set(permissionsData?.map(p => p.brand_id) || []);
-    const allAuthorized = mixeraiBrandIds.every(id => authorizedBrandIds.has(id));
-    
-    if (!allAuthorized) {
+
+    const authorizedBrandIds = new Set(permissionsData?.map((permission) => permission.brand_id) || []);
+    const unauthorizedBrands = mixeraiBrandIds.filter((brandId) => !authorizedBrandIds.has(brandId));
+
+    if (unauthorizedBrands.length) {
       errors.push('You do not have permission for all brands associated with these products');
       return { hasPermission: false, errors };
     }
-    
+
     return { hasPermission: true, errors: [] };
   } catch (error) {
-    console.error('[checkProductClaimsPermission] Unexpected error:', error);
+    logError('[checkProductClaimsPermission] Unexpected error:', error);
     errors.push('An unexpected error occurred');
     return { hasPermission: false, errors };
   }
@@ -182,8 +229,6 @@ export async function fetchClaimsWithRelations(
     query = query.eq('country_code', filters.countryCode);
   }
   if (filters.excludeGlobal) {
-    // Defer literal to constants to avoid regressions
-    const { GLOBAL_CLAIM_COUNTRY_CODE } = await import('@/lib/constants/claims');
     query = query.not('country_code', 'eq', GLOBAL_CLAIM_COUNTRY_CODE);
   }
   if (filters.level) {

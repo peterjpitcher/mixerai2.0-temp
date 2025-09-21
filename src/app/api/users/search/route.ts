@@ -4,6 +4,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { BrandPermissionVerificationError, requireBrandAccess } from '@/lib/auth/brand-access';
+import { isGlobalAdmin } from '@/lib/auth/user-role';
 import { z } from 'zod';
 
 // Force dynamic rendering for this route
@@ -59,77 +60,33 @@ export const GET = withAuth(async (request: NextRequest, sessionUser) => {
     
     const supabase = createSupabaseServerClient();
     const adminSupabase = createSupabaseAdminClient();
-    
-    const isAdmin = sessionUser.user_metadata?.role === 'admin';
 
-    // Check brand access if brandId provided and caller is not platform admin
-    if (brandId && !isAdmin) {
-      try {
-        await requireBrandAccess(supabase, sessionUser, brandId);
-      } catch (error) {
-        if (error instanceof BrandPermissionVerificationError) {
-          return NextResponse.json(
-            { success: false, error: 'Unable to verify brand permissions. Please try again later.' },
-            { status: 500 }
-          );
-        }
-        if (error instanceof Error && error.message === 'NO_BRAND_ACCESS') {
-          return NextResponse.json(
-            { success: false, error: 'You do not have permission to view users for this brand.' },
-            { status: 403 }
-          );
-        }
-        throw error;
-      }
-    }
+    const isAdmin = isGlobalAdmin(sessionUser);
+    const authUsersMap = new Map<string, any>();
 
-    // TODO: Use active_brand_users_v view after migration is applied
-    // For now, use profiles table with manual filtering
-    
-    // First get active user IDs
-    const { data: { users: authUsers } } = await adminSupabase.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000,
-    });
-    const activeUserIds = authUsers
-      ?.filter(u => !u.user_metadata?.deleted_at && u.user_metadata?.status !== 'inactive')
-      ?.map(u => u.id) || [];
-
-    if (activeUserIds.length === 0) {
-      return NextResponse.json({ 
-        success: true, 
-        users: [],
-        count: 0,
-        metadata: { brandId, searchQuery, limit }
-      });
-    }
-
-    let dbQuery = supabase
-      .from('profiles')
-      .select('id, email, full_name, avatar_url, job_title')
-      .in('id', activeUserIds); // Only active users
-
-    // Filter by brand if provided
+    let permittedBrandIds: string[] = [];
     if (brandId) {
-      // For brand filtering, we need to join with user_brand_permissions
-      const { data: brandUsers, error: brandUsersError } = await supabase
-        .from('user_brand_permissions')
-        .select('user_id')
-        .eq('brand_id', brandId)
-        .in('user_id', activeUserIds);
-
-      if (brandUsersError) {
-        console.error('[users/search] Failed to load brand user permissions', brandUsersError);
-        return NextResponse.json(
-          { success: false, error: 'Unable to load brand users.' },
-          { status: 500 }
-        );
+      if (!isAdmin) {
+        try {
+          await requireBrandAccess(supabase, sessionUser, brandId);
+        } catch (error) {
+          if (error instanceof BrandPermissionVerificationError) {
+            return NextResponse.json(
+              { success: false, error: 'Unable to verify brand permissions. Please try again later.' },
+              { status: 500 }
+            );
+          }
+          if (error instanceof Error && error.message === 'NO_BRAND_ACCESS') {
+            return NextResponse.json(
+              { success: false, error: 'You do not have permission to view users for this brand.' },
+              { status: 403 }
+            );
+          }
+          throw error;
+        }
       }
-
-      const brandUserIds = brandUsers?.map(bu => bu.user_id).filter((id): id is string => id !== null) || [];
-      dbQuery = dbQuery.in('id', brandUserIds);
-    } else {
-      // If no brand specified, get brands the current user has access to
+      permittedBrandIds = [brandId];
+    } else if (!isAdmin) {
       const { data: userBrands, error: userBrandsError } = await supabase
         .from('user_brand_permissions')
         .select('brand_id')
@@ -143,27 +100,122 @@ export const GET = withAuth(async (request: NextRequest, sessionUser) => {
         );
       }
 
-      if (userBrands && userBrands.length > 0 && !isAdmin) {
-        const brandIds = userBrands.map(ub => ub.brand_id).filter((id): id is string => !!id);
-        if (brandIds.length > 0) {
-          const { data: brandUsers, error: brandUsersError } = await supabase
-            .from('user_brand_permissions')
-            .select('user_id')
-            .in('brand_id', brandIds)
-            .in('user_id', activeUserIds);
+      permittedBrandIds = (userBrands || [])
+        .map(record => record.brand_id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0);
 
-          if (brandUsersError) {
-            console.error('[users/search] Failed to load brand users for accessible brands', brandUsersError);
-            return NextResponse.json(
-              { success: false, error: 'Unable to load users for accessible brands.' },
-              { status: 500 }
-            );
-          }
-
-          const brandUserIds = brandUsers?.map(bu => bu.user_id).filter((id): id is string => id !== null) || [];
-          dbQuery = dbQuery.in('id', brandUserIds);
-        }
+      if (permittedBrandIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          users: [],
+          count: 0,
+          metadata: { brandId, searchQuery, limit }
+        });
       }
+    }
+
+    if (isAdmin) {
+      const { data: authUsersData } = await adminSupabase.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000,
+      });
+
+      authUsersData?.users?.forEach((authUser) => {
+        if (authUser.user_metadata?.deleted_at || authUser.user_metadata?.status === 'inactive') {
+          return;
+        }
+        authUsersMap.set(authUser.id, authUser);
+      });
+    } else {
+      const candidateIds = new Set<string>();
+
+      const { data: brandUsers, error: brandUsersError } = await supabase
+        .from('user_brand_permissions')
+        .select('user_id')
+        .in('brand_id', permittedBrandIds);
+
+      if (brandUsersError) {
+        console.error('[users/search] Failed to load brand user permissions', brandUsersError);
+        return NextResponse.json(
+          { success: false, error: 'Unable to load brand users.' },
+          { status: 500 }
+        );
+      }
+
+      brandUsers?.forEach(record => {
+        if (record.user_id) {
+          candidateIds.add(record.user_id);
+        }
+      });
+
+      candidateIds.add(sessionUser.id);
+
+      if (candidateIds.size === 0) {
+        return NextResponse.json({
+          success: true,
+          users: [],
+          count: 0,
+          metadata: { brandId, searchQuery, limit }
+        });
+      }
+
+      const candidateResults = await Promise.all(
+        Array.from(candidateIds).map(async (userId) => {
+          try {
+            const { data } = await adminSupabase.auth.admin.getUserById(userId);
+            const user = data?.user;
+            if (!user) return null;
+            if (user.user_metadata?.deleted_at || user.user_metadata?.status === 'inactive') {
+              return null;
+            }
+            return user;
+          } catch (error) {
+            console.error('[users/search] Failed to load auth user by id', userId, error);
+            return null;
+          }
+        })
+      );
+
+      candidateResults.forEach((user) => {
+        if (user) {
+          authUsersMap.set(user.id, user);
+        }
+      });
+    }
+
+    const activeUserIds = Array.from(authUsersMap.keys());
+
+    if (activeUserIds.length === 0) {
+      return NextResponse.json({
+        success: true,
+        users: [],
+        count: 0,
+        metadata: { brandId, searchQuery, limit }
+      });
+    }
+
+    let dbQuery = supabase
+      .from('profiles')
+      .select('id, email, full_name, avatar_url, job_title')
+      .in('id', activeUserIds);
+
+    if (brandId) {
+      const { data: brandScopedUsers, error: brandUsersError } = await supabase
+        .from('user_brand_permissions')
+        .select('user_id')
+        .eq('brand_id', brandId)
+        .in('user_id', activeUserIds);
+
+      if (brandUsersError) {
+        console.error('[users/search] Failed to load brand user permissions', brandUsersError);
+        return NextResponse.json(
+          { success: false, error: 'Unable to load brand users.' },
+          { status: 500 }
+        );
+      }
+
+      const brandUserIds = brandScopedUsers?.map(record => record.user_id).filter((id): id is string => !!id) || [];
+      dbQuery = dbQuery.in('id', brandUserIds);
     }
 
     // Apply search filter if query provided
@@ -179,28 +231,38 @@ export const GET = withAuth(async (request: NextRequest, sessionUser) => {
       .order('id', { ascending: true })
       .limit(limit);
 
-    const { data: users, error } = await dbQuery;
+    const { data: profileRows, error } = await dbQuery;
 
     if (error) {
       console.error('Error searching users:', error);
       throw error;
     }
 
-    // Add default avatars for users without one
-    const enrichedUsers: UserSearchResult[] = (users || []).map(user => ({
-      ...user,
-      avatar_url: user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
-    }));
-    
-    return NextResponse.json({ 
-      success: true, 
-      users: enrichedUsers,
-      count: enrichedUsers.length,
+    const results: UserSearchResult[] = (profileRows || []).map((profile) => {
+      const authUser = authUsersMap.get(profile.id);
+      const email = authUser?.email || (profile as Record<string, unknown>).email || '';
+      const fullName = profile.full_name || authUser?.user_metadata?.full_name || 'Unnamed User';
+      const avatarUrl = profile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.id}`;
+      const jobTitle = profile.job_title || authUser?.user_metadata?.job_title || '';
+
+      return {
+        id: profile.id,
+        email,
+        full_name: fullName,
+        avatar_url: avatarUrl,
+        job_title: jobTitle,
+      } satisfies UserSearchResult;
+    });
+
+    return NextResponse.json({
+      success: true,
+      users: results,
+      count: results.length,
       metadata: {
         brandId,
         searchQuery,
-        limit
-      }
+        limit,
+      },
     });
 
   } catch (error) {

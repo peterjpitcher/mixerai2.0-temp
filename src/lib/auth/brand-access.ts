@@ -1,6 +1,7 @@
 import { SupabaseClient, User } from '@supabase/supabase-js';
 
 import { Database } from '@/types/supabase';
+import { isGlobalAdmin } from '@/lib/auth/user-role';
 
 export class BrandPermissionVerificationError extends Error {
   constructor(message: string, public readonly cause?: unknown) {
@@ -10,7 +11,7 @@ export class BrandPermissionVerificationError extends Error {
 }
 
 export function isPlatformAdminUser(user: User | null | undefined): boolean {
-  return user?.user_metadata?.role === 'admin';
+  return isGlobalAdmin(user ?? undefined);
 }
 
 export async function userHasBrandAccess(

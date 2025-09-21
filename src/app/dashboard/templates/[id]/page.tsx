@@ -258,7 +258,6 @@ export default function TemplateEditPage() {
   }, [id, isLoadingUser, currentUser, router]); // Added router to dependencies due to potential use
 
   const userRole = currentUser?.user_metadata?.role;
-  const isAdmin = userRole === 'admin';
   const canEditTemplate = userRole === 'admin'; // Only admins can edit/delete templates
   const canViewTemplate = userRole === 'admin' || userRole === 'editor' || userRole === 'viewer';
   const isSystemTemplate = defaultTemplates[id as keyof typeof defaultTemplates];

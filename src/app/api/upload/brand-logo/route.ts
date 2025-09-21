@@ -9,10 +9,9 @@ import { sanitizeFileName } from '@/lib/validation/file-upload';
  */
 export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
   const uploadHandler = withFileUploadValidation(
-    async (req: NextRequest, file: File) => {
+    async (_req: NextRequest, file: File, formData: FormData) => {
       try {
         // Get brand ID from form data
-        const formData = await req.formData();
         const brandId = formData.get('brandId') as string;
         
         if (!brandId) {

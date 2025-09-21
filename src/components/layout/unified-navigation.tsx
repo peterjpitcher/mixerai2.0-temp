@@ -20,7 +20,6 @@ import {
   ListChecks,
   Loader2,
   MessageSquareWarning,
-  Info,
   ClipboardList,
   Package,
   FlaskConical,
@@ -206,7 +205,7 @@ export function UnifiedNavigation() {
           templatesFetched.current = false; // Reset on failure
         }
       } catch (error) {
-        // Error fetching templates
+        console.error('Error fetching templates:', error);
         setUserTemplates([]);
         templatesFetched.current = false; // Reset on error
       } finally {
@@ -215,7 +214,7 @@ export function UnifiedNavigation() {
     };
     
     fetchTemplates();
-  }, [isLoadingUser, currentUser, userRole, isPlatformAdmin, isScopedAdmin, userTemplates.length]); // Added userTemplates.length to re-run if templates are cleared
+  }, [isLoadingUser, currentUser, userRole, isPlatformAdmin, isScopedAdmin, isLoadingTemplates, userTemplates.length]);
 
   useEffect(() => {
     const fetchUserWorkflows = async () => {
@@ -238,7 +237,7 @@ export function UnifiedNavigation() {
             setUserWorkflows([]);
           }
         } catch (error) {
-          // Error fetching user workflows
+          console.error('Error fetching user workflows:', error);
           toast.error('Error loading workflows for navigation.');
           setUserWorkflows([]);
         } finally {

@@ -13,6 +13,20 @@ import { NextRequest } from 'next/server';
 const CSRF_HEADER = 'x-csrf-token';
 const CSRF_COOKIE = 'csrf-token';
 const TOKEN_LENGTH = 32;
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+const PUBLIC_API_PATTERNS = [
+  /^\/?api\/auth\//,
+  /^\/?api\/env-check$/,
+  /^\/?api\/test-connection$/,
+  /^\/?api\/test-metadata-generator$/,
+  /^\/?api\/brands\/identity$/,
+  /^\/?api\/webhooks\//,
+  /^\/?api\/health$/,
+  /^\/?api\/test-/,
+];
+
+const STATIC_ASSET_PATTERN = /\.(?:js|css|png|jpg|jpeg|gif|webp|ico|svg|woff2?|ttf|map)$/i;
 
 /**
  * Generates a cryptographically secure CSRF token using Web Crypto API
@@ -53,20 +67,20 @@ function timingSafeEqual(a: string, b: string): boolean {
  */
 export function validateCSRFToken(request: NextRequest): boolean {
   // Skip CSRF validation for safe methods
-  const method = request.method.toUpperCase();
-  if (['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+  const method = request.method?.toUpperCase?.() ?? 'GET';
+  if (SAFE_METHODS.has(method)) {
     return true;
   }
 
   // Get token from header
-  const headerToken = request.headers.get(CSRF_HEADER);
+  const headerToken = request.headers.get(CSRF_HEADER)?.trim();
   if (!headerToken) {
     console.warn('CSRF validation failed: No token in header');
     return false;
   }
 
   // Get token from cookie
-  const cookieToken = request.cookies.get(CSRF_COOKIE)?.value;
+  const cookieToken = request.cookies.get(CSRF_COOKIE)?.value?.trim();
   if (!cookieToken) {
     console.warn('CSRF validation failed: No token in cookie');
     return false;
@@ -89,20 +103,18 @@ export function validateCSRFToken(request: NextRequest): boolean {
  * @returns true if route should be protected
  */
 export function shouldProtectRoute(pathname: string): boolean {
-  // Public API routes that don't need CSRF protection
-  const publicApiPatterns = [
-    '/api/auth/', // Auth routes handle their own security
-    '/api/env-check',
-    '/api/test-connection',
-    '/api/test-metadata-generator',
-    '/api/brands/identity', // Public endpoint
-    '/api/webhooks/', // Webhooks need different validation
-    '/api/health', // Health check endpoint
-    '/api/test-', // Test endpoints during development
-  ];
+  const normalizedPath = pathname.startsWith('/') ? pathname : `/${pathname}`;
 
-  // Skip CSRF for GET, HEAD, OPTIONS requests
-  return !publicApiPatterns.some(pattern => pathname.includes(pattern));
+  if (STATIC_ASSET_PATTERN.test(normalizedPath)) {
+    return false;
+  }
+
+  if (PUBLIC_API_PATTERNS.some((pattern) => pattern.test(normalizedPath))) {
+    return false;
+  }
+
+  // Public API routes that don't need CSRF protection
+  return normalizedPath.startsWith('/api/');
 }
 
 /**

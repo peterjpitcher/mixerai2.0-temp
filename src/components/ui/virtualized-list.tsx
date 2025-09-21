@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import { useIntersectionObserver } from '@/lib/utils/performance';
 
 interface VirtualizedListProps<T> {
   items: T[];
@@ -154,13 +153,16 @@ interface InfiniteVirtualizedListProps<T> extends Omit<VirtualizedListProps<T>, 
   loadingIndicator?: React.ReactNode;
 }
 
-export function InfiniteVirtualizedList<T>({
-  loadMore,
-  hasMore,
-  isLoading,
-  loadingIndicator,
-  ...props
-}: InfiniteVirtualizedListProps<T>) {
+export function InfiniteVirtualizedList<T>(props: InfiniteVirtualizedListProps<T>) {
+  const {
+    loadMore,
+    hasMore,
+    isLoading,
+    loadingIndicator,
+    items,
+    renderItem,
+    ...rest
+  } = props;
   const loadingRef = React.useRef(false);
 
   const handleEndReached = React.useCallback(async () => {
@@ -177,10 +179,10 @@ export function InfiniteVirtualizedList<T>({
   // Add loading indicator to items if loading
   const itemsWithLoader = React.useMemo(() => {
     if (isLoading && loadingIndicator) {
-      return [...props.items, Symbol('loader') as any];
+      return [...items, Symbol('loader') as any];
     }
-    return props.items;
-  }, [props.items, isLoading, loadingIndicator]);
+    return items;
+  }, [items, isLoading, loadingIndicator]);
 
   // Wrap render function to handle loader
   const renderItemWithLoader = React.useCallback(
@@ -188,14 +190,14 @@ export function InfiniteVirtualizedList<T>({
       if (index === itemsWithLoader.length - 1 && isLoading && loadingIndicator) {
         return loadingIndicator;
       }
-      return props.renderItem(item, index);
+      return renderItem(item, index);
     },
-    [props.renderItem, itemsWithLoader.length, isLoading, loadingIndicator]
+    [renderItem, itemsWithLoader.length, isLoading, loadingIndicator]
   );
 
   return (
     <VirtualizedList
-      {...props}
+      {...rest}
       items={itemsWithLoader}
       renderItem={renderItemWithLoader}
       onEndReached={handleEndReached}
@@ -214,7 +216,7 @@ export function useWindowVirtualization<T>(
     rootMargin?: string;
   }
 ) {
-  const { overscan = 3, rootMargin = '100px' } = options || {};
+  const { overscan = 3 } = options || {};
   const [visibleRange, setVisibleRange] = React.useState({ start: 0, end: 10 });
 
   React.useEffect(() => {

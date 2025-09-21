@@ -5,7 +5,7 @@ import { validateFile, validateFileContent, FileValidationOptions } from '@/lib/
  * Middleware for validating file uploads in API routes
  */
 export function withFileUploadValidation(
-  handler: (req: NextRequest, file: File) => Promise<NextResponse>,
+  handler: (req: NextRequest, file: File, formData: FormData) => Promise<NextResponse>,
   options: FileValidationOptions = {}
 ) {
   return async (req: NextRequest) => {
@@ -16,7 +16,12 @@ export function withFileUploadValidation(
       
       if (!file) {
         return NextResponse.json(
-          { error: 'No file provided' },
+          {
+            success: false,
+            error: 'No file provided',
+            code: 'FILE_MISSING',
+            timestamp: new Date().toISOString(),
+          },
           { status: 400 }
         );
       }
@@ -25,7 +30,13 @@ export function withFileUploadValidation(
       const validationResult = validateFile(file, options);
       if (!validationResult.valid) {
         return NextResponse.json(
-          { error: validationResult.error },
+          {
+            success: false,
+            error: validationResult.error || 'Invalid file',
+            code: 'FILE_INVALID',
+            details: validationResult.errors,
+            timestamp: new Date().toISOString(),
+          },
           { status: 400 }
         );
       }
@@ -37,18 +48,29 @@ export function withFileUploadValidation(
         });
         if (!contentValidation.valid) {
           return NextResponse.json(
-            { error: contentValidation.error },
+            {
+              success: false,
+              error: contentValidation.error || 'Invalid file content',
+              code: 'FILE_CONTENT_INVALID',
+              details: contentValidation.errors,
+              timestamp: new Date().toISOString(),
+            },
             { status: 400 }
           );
         }
       }
       
-      // Call the handler with the validated file
-      return handler(req, file);
+      // Call the handler with the validated file and parsed form data
+      return handler(req, file, formData);
     } catch (error) {
       console.error('File upload validation error:', error);
       return NextResponse.json(
-        { error: 'Failed to process file upload' },
+        {
+          success: false,
+          error: 'Failed to process file upload',
+          code: 'FILE_UPLOAD_ERROR',
+          timestamp: new Date().toISOString(),
+        },
         { status: 500 }
       );
     }

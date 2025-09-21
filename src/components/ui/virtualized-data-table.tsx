@@ -8,7 +8,6 @@ import { Search } from 'lucide-react';
 import { useDebounce } from '@/lib/utils/performance';
 import {
   Table,
-  TableBody,
   TableCell,
   TableHead,
   TableHeader,

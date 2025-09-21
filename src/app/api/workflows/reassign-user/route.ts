@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
-import { withAuth } from '@/lib/auth/api-auth';
+import { withAuthAndCSRF } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { logSecurityEvent } from '@/lib/auth/account-lockout';
@@ -17,7 +17,7 @@ const ReassignUserSchema = z.object({
 
 // POST /api/workflows/reassign-user
 // Reassign workflows from one user to another
-export const POST = withAuth(async (request: NextRequest, user: User) => {
+export const POST = withAuthAndCSRF(async (request: NextRequest, user: User) => {
   try {
     // Check if user is admin
     const isGlobalAdmin = user.user_metadata?.role === 'admin';

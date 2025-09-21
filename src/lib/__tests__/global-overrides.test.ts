@@ -245,6 +245,87 @@ describe('Global Overrides Feature', () => {
       expect(result[0].is_blocked_override).toBe(true);
       expect(result[0].description).toContain('blocked globally');
     });
+
+    it('allows presets to bypass Supabase queries while still applying overrides', async () => {
+      const productId = 'preset-product-id';
+      const countryCode = 'ES';
+      const masterClaimId = 'claim-master';
+      const replacementClaimId = 'claim-replacement';
+
+      (createSupabaseAdminClient as jest.Mock).mockClear();
+
+      const fakeClient = {
+        from: jest.fn(() => {
+          throw new Error('Supabase should not be queried when preset data is supplied');
+        }),
+      };
+
+      const preset = {
+        product: {
+          id: productId,
+          name: 'Preset Product',
+          description: null,
+          master_brand_id: 'brand-123',
+        },
+        productClaims: [
+          {
+            id: masterClaimId,
+            claim_text: 'Suitable for everyone',
+            claim_type: 'allowed',
+            level: 'product',
+            product_id: productId,
+            ingredient_id: null,
+            master_brand_id: null,
+            country_code: GLOBAL_CLAIM_COUNTRY_CODE,
+            description: null,
+            created_by: null,
+            created_at: null,
+            updated_at: null,
+          },
+        ],
+        ingredientClaims: [],
+        brandClaims: [],
+        ingredientIds: [],
+        marketOverrides: [
+          {
+            id: 'override-local',
+            master_claim_id: masterClaimId,
+            market_country_code: countryCode,
+            target_product_id: productId,
+            is_blocked: false,
+            replacement_claim_id: replacementClaimId,
+            replacement_claim: {
+              id: replacementClaimId,
+              claim_text: 'Solo para España',
+              claim_type: 'allowed',
+              level: 'product',
+              product_id: productId,
+              ingredient_id: null,
+              master_brand_id: null,
+              country_code: countryCode,
+              description: null,
+              created_by: null,
+              created_at: null,
+              updated_at: null,
+            },
+            created_at: null,
+            updated_at: null,
+          },
+        ],
+      };
+
+      const result = await getStackedClaimsForProduct(productId, countryCode, {
+        preset,
+        client: fakeClient as any,
+      });
+
+      expect(createSupabaseAdminClient).not.toHaveBeenCalled();
+      expect(fakeClient.from).not.toHaveBeenCalled();
+      expect(result).toHaveLength(1);
+      expect(result[0].claim_text).toBe('Solo para España');
+      expect(result[0].is_replacement_override).toBe(true);
+      expect(result[0].source_level).toBe('override');
+    });
   });
 
   describe('Precedence Rules', () => {

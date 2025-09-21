@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -72,19 +72,7 @@ export function IssueReporterModal({ isOpen, onClose, preloadedScreenshot, curre
     },
   });
 
-  useEffect(() => {
-    if (isOpen) {
-      captureData();
-    } else {
-      // Reset form when closed
-      form.reset();
-      setScreenshot(null);
-      setSuccess(null);
-      setError(null);
-    }
-  }, [isOpen, form]);
-
-  const captureData = async () => {
+  const captureData = useCallback(async () => {
     setIsCapturing(true);
 
     try {
@@ -126,7 +114,19 @@ export function IssueReporterModal({ isOpen, onClose, preloadedScreenshot, curre
       setIsCapturing(false);
       consoleCapture.clearLogs();
     }
-  };
+  }, [preloadedScreenshot]);
+
+  useEffect(() => {
+    if (isOpen) {
+      captureData();
+    } else {
+      // Reset form when closed
+      form.reset();
+      setScreenshot(null);
+      setSuccess(null);
+      setError(null);
+    }
+  }, [isOpen, form, captureData]);
 
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);

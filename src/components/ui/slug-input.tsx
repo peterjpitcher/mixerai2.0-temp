@@ -82,7 +82,8 @@ export function SlugInput({
           if (!isUnique) {
             setError('This slug is already in use');
           }
-        } catch (err) {
+        } catch (error) {
+          console.error('Failed to validate slug uniqueness:', error);
           setValidationStatus('invalid');
           setError('Failed to validate slug uniqueness');
         }

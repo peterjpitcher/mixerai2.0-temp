@@ -1,13 +1,43 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 import { createSupabaseAdminClient } from './supabase/client';
 import { ALL_COUNTRIES_CODE, GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
-import { logError, logDebug } from '@/lib/logger';
+import { logDebug, logError } from '@/lib/logger';
+import type { Database } from '@/types/supabase';
+
+function normalizeSingleRow<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) {
+    return value.length > 0 ? value[0] : null;
+  }
+  return value ?? null;
+}
+
+async function fetchSingleRow<T>(builder: any): Promise<{ data: T | null; error: any }> {
+  if (!builder) {
+    return { data: null, error: new Error('Invalid query builder') };
+  }
+
+  if (typeof builder.single === 'function') {
+    const result = await builder.single();
+    return {
+      data: normalizeSingleRow<T>(result?.data as T | T[] | null | undefined),
+      error: result?.error ?? null,
+    };
+  }
+
+  const result = await builder;
+  return {
+    data: normalizeSingleRow<T>(result?.data as T | T[] | null | undefined),
+    error: result?.error ?? null,
+  };
+}
+
+type AdminClient = SupabaseClient<Database>;
 
 // Types mirroring database schema and API responses
-// These might be better placed in a central types file (e.g., src/types/claims.ts) if used widely
-
 export type ClaimTypeEnum = 'allowed' | 'disallowed' | 'mandatory' | 'conditional';
 export type ClaimLevelEnum = 'brand' | 'product' | 'ingredient';
-export type FinalClaimTypeEnum = ClaimTypeEnum | 'none'; // 'none' if no claim applies or it's blocked without replacement
+export type FinalClaimTypeEnum = ClaimTypeEnum | 'none';
 
 export interface Claim {
   id: string;
@@ -17,18 +47,18 @@ export interface Claim {
   master_brand_id?: string | null;
   product_id?: string | null;
   ingredient_id?: string | null;
-  country_code: string | null; // Changed to string | null
+  country_code: string | null;
   description?: string | null;
   created_by?: string | null;
-  created_at?: string | null; // Changed to string | null
-  updated_at?: string | null; // Changed to string | null
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 export interface Product {
   id: string;
   name: string;
   description: string | null;
-  master_brand_id: string; 
+  master_brand_id: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -55,24 +85,24 @@ export interface ProductIngredientAssociation {
   created_at?: string;
 }
 
-// New interface for the resolved effective claim
 export interface EffectiveClaim {
   claim_text: string;
   final_claim_type: FinalClaimTypeEnum;
-  source_level: ClaimLevelEnum | 'override' | 'none'; // 'none' if no claim applies
-  source_claim_id?: string | null; // ID of the claim that determined the final_claim_type
-  original_master_claim_id_if_overridden?: string | null; // If overridden, the ID of the master claim
-  is_blocked_override?: boolean; // True if a master claim was blocked by an override
-  is_replacement_override?: boolean; // True if a master claim was replaced by an override
-  isActuallyMaster?: boolean; // ADDED: True if this effective claim originates from a non-overridden master claim
-  description?: string | null; // Description from the source claim
+  source_level: ClaimLevelEnum | 'override' | 'none';
+  source_claim_id?: string | null;
+  original_master_claim_id_if_overridden?: string | null;
+  is_blocked_override?: boolean;
+  is_replacement_override?: boolean;
+  isActuallyMaster?: boolean;
+  description?: string | null;
   applies_to_product_id: string;
   applies_to_country_code: string;
-  original_claim_country_code?: string | null | undefined; // Changed to allow null
-  source_entity_id?: string | null; // ID of the product, ingredient, or brand from the source claim
+  original_claim_country_code?: string | null | undefined;
+  source_entity_id?: string | null;
+  original_claim_text?: string | null;
+  override_rule_id?: string | null;
 }
 
-// Interface for market_claim_overrides table rows
 export interface MarketClaimOverride {
   id: string;
   master_claim_id: string;
@@ -82,361 +112,600 @@ export interface MarketClaimOverride {
   replacement_claim_id: string | null;
   created_at?: string | null;
   updated_at?: string | null;
-  replacement_claim?: Claim | null; // For when replacement claim is joined
+  replacement_claim?: Claim | null;
+  master_claim?: Claim | null;
 }
 
-// Intermediate type for processing claims with priority
-interface ClaimWithPriority extends Claim {
-  _priority?: number; // Higher is better
-  _isMarketSpecific?: boolean;
+export interface ClaimsDataPreset {
+  product?: Product | null;
+  productClaims?: Claim[];
+  ingredientClaims?: Claim[];
+  brandClaims?: Claim[];
+  ingredientIds?: string[];
+  marketOverrides?: MarketClaimOverride[];
+}
+
+export interface GetStackedClaimsForProductOptions {
+  preset?: ClaimsDataPreset;
+  client?: AdminClient;
+}
+
+export interface GetStackedClaimsForProductRPCOptions {
+  client?: AdminClient;
+}
+
+interface EffectiveClaimRpcRow {
+  claim_text: string | null;
+  final_claim_type: FinalClaimTypeEnum | null;
+  source_level: SourceLevel | null;
+  source_claim_id: string | null;
+  original_claim_country_code: string | null;
+  applies_to_product_id: string | null;
+  applies_to_country_code: string | null;
+  description: string | null;
+  original_claim_text: string | null;
+  original_master_claim_id_if_overridden: string | null;
+  master_claim_id?: string | null;
+  is_master?: boolean | null;
+  is_replacement_override?: boolean | null;
+  is_blocked_override?: boolean | null;
+  override_rule_id?: string | null;
+  source_entity_id?: string | null;
+}
+
+type EffectiveClaimsRpcParams = {
+  p_product_id: string;
+  p_country_code: string;
+};
+
+const CLAIM_SELECT = 'id, claim_text, claim_type, level, master_brand_id, product_id, ingredient_id, country_code, description, created_by, created_at, updated_at';
+
+const resolveLevel = (claim: Claim): ClaimLevelEnum => {
+  if (claim.level === 'product') return 'product';
+  if (claim.level === 'ingredient') return 'ingredient';
+  return 'brand';
+};
+
+const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
+
+async function fetchProductRecord(client: AdminClient, productId: string): Promise<Product | null> {
+  const { data, error } = await fetchSingleRow<Product>(
+    client.from('products').select('id, name, master_brand_id').eq('id', productId)
+  );
+
+  if (error) {
+    logError(`[getStackedClaimsForProduct] Error fetching product ${productId}:`, error);
+    return null;
+  }
+
+  return data;
+}
+
+async function fetchIngredientIds(client: AdminClient, productId: string): Promise<string[]> {
+  const { data, error } = await client
+    .from('product_ingredients')
+    .select('ingredient_id')
+    .eq('product_id', productId);
+
+  if (error) {
+    logError(`[getStackedClaimsForProduct] Error fetching ingredients for product ${productId}:`, error);
+    return [];
+  }
+
+  return unique(((data as { ingredient_id: string }[] | null) ?? []).map(row => row.ingredient_id));
+}
+
+async function fetchClaimCountries(
+  client: AdminClient,
+  claimIds: string[],
+  countryCode: string,
+  context: string
+): Promise<Map<string, string>> {
+  if (!claimIds.length) {
+    return new Map();
+  }
+
+  const { data, error } = await client
+    .from('claim_countries')
+    .select('claim_id, country_code')
+    .in('claim_id', claimIds)
+    .in('country_code', [countryCode, GLOBAL_CLAIM_COUNTRY_CODE]);
+
+  if (error) {
+    logError(`[getStackedClaimsForProduct] claim_countries fetch failed for ${context}:`, error);
+    return new Map();
+  }
+
+  const map = new Map<string, string>();
+  for (const row of (data as { claim_id: string; country_code: string }[] | null) ?? []) {
+    const prev = map.get(row.claim_id);
+    if (!prev || prev === GLOBAL_CLAIM_COUNTRY_CODE || row.country_code === countryCode) {
+      map.set(row.claim_id, row.country_code);
+    }
+  }
+
+  return map;
+}
+
+async function fetchProductClaims(
+  client: AdminClient,
+  productId: string,
+  countryCode: string
+): Promise<Claim[]> {
+  const { data, error } = await client
+    .from('claim_products')
+    .select('claim_id')
+    .eq('product_id', productId);
+
+  if (error) {
+    logError(`[getStackedClaimsForProduct] claim_products fetch failed for ${productId}:`, error);
+    return [];
+  }
+
+  const claimIds = unique(((data as { claim_id: string }[] | null) ?? []).map(row => row.claim_id));
+  if (!claimIds.length) {
+    return [];
+  }
+
+  const chosenCountries = await fetchClaimCountries(client, claimIds, countryCode, 'product claims');
+  if (!chosenCountries.size) {
+    return [];
+  }
+
+  const { data: claims, error: claimErr } = await client
+    .from('claims')
+    .select(CLAIM_SELECT)
+    .in('id', Array.from(chosenCountries.keys()))
+    .eq('level', 'product');
+
+  if (claimErr) {
+    logError('[getStackedClaimsForProduct] claims fetch failed for product-level claims:', claimErr);
+    return [];
+  }
+
+  return ((claims as Claim[] | null) ?? []).map(claim => ({
+    ...claim,
+    country_code: chosenCountries.get(claim.id) ?? claim.country_code,
+  }));
+}
+
+async function fetchIngredientClaims(
+  client: AdminClient,
+  ingredientIds: string[],
+  countryCode: string
+): Promise<Claim[]> {
+  if (!ingredientIds.length) {
+    return [];
+  }
+
+  const { data, error } = await client
+    .from('claim_ingredients')
+    .select('claim_id')
+    .in('ingredient_id', ingredientIds);
+
+  if (error) {
+    logError('[getStackedClaimsForProduct] claim_ingredients fetch failed:', error);
+    return [];
+  }
+
+  const claimIds = unique(((data as { claim_id: string }[] | null) ?? []).map(row => row.claim_id));
+  if (!claimIds.length) {
+    return [];
+  }
+
+  const chosenCountries = await fetchClaimCountries(client, claimIds, countryCode, 'ingredient claims');
+  if (!chosenCountries.size) {
+    return [];
+  }
+
+  const { data: claims, error: claimErr } = await client
+    .from('claims')
+    .select(CLAIM_SELECT)
+    .in('id', Array.from(chosenCountries.keys()))
+    .eq('level', 'ingredient');
+
+  if (claimErr) {
+    logError('[getStackedClaimsForProduct] claims fetch failed for ingredient-level claims:', claimErr);
+    return [];
+  }
+
+  return ((claims as Claim[] | null) ?? []).map(claim => ({
+    ...claim,
+    country_code: chosenCountries.get(claim.id) ?? claim.country_code,
+  }));
+}
+
+async function fetchBrandClaims(
+  client: AdminClient,
+  brandId: string,
+  countryCode: string
+): Promise<Claim[]> {
+  const { data, error } = await client
+    .from('claims')
+    .select(CLAIM_SELECT)
+    .eq('master_brand_id', brandId)
+    .eq('level', 'brand');
+
+  if (error) {
+    logError('[getStackedClaimsForProduct] claims fetch failed for brand-level claims:', error);
+    return [];
+  }
+
+  const claims = (data as Claim[] | null) ?? [];
+  if (!claims.length) {
+    return [];
+  }
+
+  const ids = claims.map(claim => claim.id);
+  const { data: countries, error: countryErr } = await client
+    .from('claim_countries')
+    .select('claim_id, country_code')
+    .in('claim_id', ids);
+
+  if (countryErr) {
+    logError('[getStackedClaimsForProduct] claim_countries fetch failed for brand claims:', countryErr);
+    return [];
+  }
+
+  const map = new Map<string, string[]>();
+  for (const row of (countries as { claim_id: string; country_code: string }[] | null) ?? []) {
+    const next = map.get(row.claim_id) ?? [];
+    next.push(row.country_code);
+    map.set(row.claim_id, next);
+  }
+
+  return claims
+    .filter(claim => {
+      const list = map.get(claim.id) ?? (claim.country_code ? [claim.country_code] : []);
+      return list.includes(countryCode) || list.includes(GLOBAL_CLAIM_COUNTRY_CODE);
+    })
+    .map(claim => {
+      const list = map.get(claim.id) ?? (claim.country_code ? [claim.country_code] : []);
+      const chosen = list.includes(countryCode)
+        ? countryCode
+        : list.includes(GLOBAL_CLAIM_COUNTRY_CODE)
+          ? GLOBAL_CLAIM_COUNTRY_CODE
+          : claim.country_code;
+      return {
+        ...claim,
+        country_code: chosen ?? claim.country_code,
+      };
+    });
+}
+
+async function fetchMarketOverrides(
+  client: AdminClient,
+  productId: string,
+  countryCode: string
+): Promise<MarketClaimOverride[]> {
+  const { data, error } = await client
+    .from('market_claim_overrides')
+    .select(`
+      *,
+      replacement_claim:claims!market_claim_overrides_replacement_claim_id_fkey(${CLAIM_SELECT}),
+      master_claim:claims!market_claim_overrides_master_claim_id_fkey(${CLAIM_SELECT})
+    `)
+    .eq('target_product_id', productId)
+    .in('market_country_code', [countryCode, ALL_COUNTRIES_CODE]);
+
+  if (error) {
+    logError(`[getStackedClaimsForProduct] Error fetching market overrides for product ${productId}, country ${countryCode}:`, error);
+    return [];
+  }
+
+  return (data as MarketClaimOverride[] | null) ?? [];
+}
+
+function buildBaseEffectiveClaim(
+  claim: Claim,
+  productId: string,
+  countryCode: string
+): EffectiveClaim {
+  const level = resolveLevel(claim);
+  const sourceEntityId =
+    level === 'product'
+      ? claim.product_id ?? null
+      : level === 'ingredient'
+        ? claim.ingredient_id ?? null
+        : claim.master_brand_id ?? null;
+
+  return {
+    claim_text: claim.claim_text,
+    final_claim_type: claim.claim_type,
+    source_level: level,
+    source_claim_id: claim.id,
+    description: claim.description ?? null,
+    applies_to_product_id: productId,
+    applies_to_country_code: countryCode,
+    original_claim_country_code: claim.country_code,
+    source_entity_id: sourceEntityId,
+    isActuallyMaster: claim.country_code === GLOBAL_CLAIM_COUNTRY_CODE,
+    original_claim_text: claim.claim_text,
+    override_rule_id: null,
+  };
+}
+
+function buildBlockedOverrideClaim(
+  claim: Claim | null,
+  override: MarketClaimOverride,
+  productId: string,
+  countryCode: string
+): EffectiveClaim {
+  const text = claim?.claim_text ?? override.master_claim?.claim_text ?? override.master_claim_id ?? 'Master claim override';
+  return {
+    claim_text: text,
+    final_claim_type: 'none',
+    source_level: 'override',
+    source_claim_id: override.id,
+    original_master_claim_id_if_overridden: claim?.id ?? override.master_claim_id ?? null,
+    is_blocked_override: true,
+    isActuallyMaster: false,
+    description:
+      override.market_country_code === ALL_COUNTRIES_CODE
+        ? `Master claim "${text}" blocked globally for product ${productId}.`
+        : `Master claim "${text}" blocked in ${countryCode} for product ${productId}.`,
+    applies_to_product_id: productId,
+    applies_to_country_code: countryCode,
+    original_claim_country_code: GLOBAL_CLAIM_COUNTRY_CODE,
+    original_claim_text: claim?.claim_text ?? override.master_claim?.claim_text ?? text,
+    override_rule_id: override.id,
+  };
+}
+
+function buildReplacementOverrideClaim(
+  claim: Claim | null,
+  replacement: Claim,
+  override: MarketClaimOverride,
+  productId: string,
+  countryCode: string
+): EffectiveClaim {
+  return {
+    claim_text: replacement.claim_text,
+    final_claim_type: replacement.claim_type,
+    source_level: 'override',
+    source_claim_id: replacement.id,
+    original_master_claim_id_if_overridden: claim?.id ?? override.master_claim_id ?? null,
+    is_replacement_override: true,
+    isActuallyMaster: false,
+    description:
+      replacement.description ??
+      (override.market_country_code === ALL_COUNTRIES_CODE
+        ? `Master claim "${claim?.claim_text ?? override.master_claim?.claim_text ?? ''}" replaced globally by "${replacement.claim_text}".`
+        : `Master claim "${claim?.claim_text ?? override.master_claim?.claim_text ?? ''}" replaced by "${replacement.claim_text}" in ${countryCode}.`),
+    applies_to_product_id: productId,
+    applies_to_country_code: countryCode,
+    original_claim_country_code: replacement.country_code,
+    source_entity_id: replacement.product_id || replacement.ingredient_id || replacement.master_brand_id || null,
+    original_claim_text: claim?.claim_text ?? override.master_claim?.claim_text ?? replacement.claim_text,
+    override_rule_id: override.id,
+  };
+}
+
+function buildMissingReplacementClaim(
+  claim: Claim | null,
+  override: MarketClaimOverride,
+  productId: string,
+  countryCode: string
+): EffectiveClaim {
+  const text = claim?.claim_text ?? override.master_claim?.claim_text ?? override.master_claim_id ?? 'Master claim override';
+  return {
+    claim_text: text,
+    final_claim_type: 'none',
+    source_level: 'override',
+    source_claim_id: override.id,
+    original_master_claim_id_if_overridden: claim?.id ?? override.master_claim_id ?? null,
+    is_blocked_override: true,
+    isActuallyMaster: false,
+    description: `Master claim "${text}" intended for replacement in ${countryCode} but replacement claim missing. Considered blocked.`,
+    applies_to_product_id: productId,
+    applies_to_country_code: countryCode,
+    original_claim_country_code: GLOBAL_CLAIM_COUNTRY_CODE,
+    original_claim_text: claim?.claim_text ?? override.master_claim?.claim_text ?? text,
+    override_rule_id: override.id,
+  };
+}
+
+function rankClaim(claim: Claim, countryCode: string): number {
+  const levelScore = claim.level === 'product' ? 30 : claim.level === 'ingredient' ? 20 : 10;
+  const marketBoost = claim.country_code === countryCode ? 100 : 0;
+  return marketBoost + levelScore;
+}
+
+function sortClaimsForProcessing(claims: Claim[], countryCode: string): Claim[] {
+  return [...claims].sort((a, b) => {
+    const priorityDiff = rankClaim(b, countryCode) - rankClaim(a, countryCode);
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+    return a.claim_text.localeCompare(b.claim_text);
+  });
+}
+
+function buildOverrideLookup(
+  overrides: MarketClaimOverride[],
+  countryCode: string
+): { selected: Map<string, MarketClaimOverride>; shadowed: Set<string> } {
+  const selected = new Map<string, MarketClaimOverride>();
+  const shadowed = new Set<string>();
+
+  for (const override of overrides) {
+    if (!override.master_claim_id) {
+      continue;
+    }
+
+    const current = selected.get(override.master_claim_id);
+    if (!current) {
+      selected.set(override.master_claim_id, override);
+      continue;
+    }
+
+    const currentIsGlobal = current.market_country_code === ALL_COUNTRIES_CODE;
+    const incomingIsMarket = override.market_country_code === countryCode;
+
+    if (incomingIsMarket && currentIsGlobal) {
+      shadowed.add(current.id);
+      selected.set(override.master_claim_id, override);
+      continue;
+    }
+
+    shadowed.add(override.id);
+  }
+
+  return { selected, shadowed };
+}
+
+function composeEffectiveClaims(
+  productId: string,
+  countryCode: string,
+  claims: Claim[],
+  overrides: MarketClaimOverride[]
+): EffectiveClaim[] {
+  const processedOverrideIds = new Set<string>();
+  const { selected: overrideByMasterId, shadowed: shadowedOverrideIds } = buildOverrideLookup(overrides, countryCode);
+  const candidates: EffectiveClaim[] = [];
+
+  const orderedClaims = sortClaimsForProcessing(claims, countryCode);
+
+  for (const claim of orderedClaims) {
+    const isMaster = isGlobalCountryCode(claim.country_code);
+    const override = isMaster ? overrideByMasterId.get(claim.id) : undefined;
+
+    if (override) {
+      processedOverrideIds.add(override.id);
+      if (override.is_blocked && !override.replacement_claim_id) {
+        candidates.push(buildBlockedOverrideClaim(claim, override, productId, countryCode));
+        continue;
+      }
+
+      if (override.replacement_claim_id) {
+        if (override.replacement_claim) {
+          candidates.push(
+            buildReplacementOverrideClaim(claim, override.replacement_claim, override, productId, countryCode)
+          );
+          continue;
+        }
+
+        logError(
+          `[getStackedClaimsForProduct] Override ${override.id} specified replacement_claim_id ${override.replacement_claim_id} but no replacement claim was returned.`
+        );
+        candidates.push(buildMissingReplacementClaim(claim, override, productId, countryCode));
+        continue;
+      }
+    }
+
+    candidates.push(buildBaseEffectiveClaim(claim, productId, countryCode));
+  }
+
+  for (const override of overrides) {
+    if (processedOverrideIds.has(override.id) || shadowedOverrideIds.has(override.id)) {
+      continue;
+    }
+
+    if (override.replacement_claim_id) {
+      if (override.replacement_claim) {
+        candidates.push(
+          buildReplacementOverrideClaim(null, override.replacement_claim, override, productId, countryCode)
+        );
+        continue;
+      }
+
+      logError(
+        `[getStackedClaimsForProduct] Override ${override.id} specified replacement_claim_id ${override.replacement_claim_id} but replacement claim data was not available.`
+      );
+      candidates.push(buildMissingReplacementClaim(null, override, productId, countryCode));
+      continue;
+    }
+
+    if (override.is_blocked && !override.replacement_claim_id) {
+      candidates.push(buildBlockedOverrideClaim(null, override, productId, countryCode));
+    }
+  }
+
+  return candidates;
 }
 
 /**
  * Fetches and stacks claims for a given product, considering its ingredients, brand,
  * and market-specific overrides. It applies precedence rules to determine the
  * final effective claim for each unique claim text.
- *
- * Precedence for a given claim_text:
- * 1. Market-specific Override (block or replacement for the product in the target market)
- * 2. Market-specific Product Claim (for the product in the target market)
- * 3. Market-specific Ingredient Claim (for product's ingredients in the target market)
- * 4. Market-specific Brand Claim (for product's brand in the target market)
- * 5. Master (__GLOBAL__) Product Claim (unless overridden)
- * 6. Master (__GLOBAL__) Ingredient Claim (unless overridden)
- * 7. Master (__GLOBAL__) Brand Claim (unless overridden)
- *
- * A claim is considered unique by its `claim_text`.
  */
 export async function getStackedClaimsForProduct(
   productId: string,
-  countryCode: string // The specific country code to prioritize, e.g., "US"
+  countryCode: string,
+  options: GetStackedClaimsForProductOptions = {}
 ): Promise<EffectiveClaim[]> {
-  const supabase = createSupabaseAdminClient();
+  const { preset } = options;
+  const client = options.client ?? createSupabaseAdminClient();
+
+  const presetHas = <K extends keyof ClaimsDataPreset>(key: K) =>
+    preset !== undefined && Object.prototype.hasOwnProperty.call(preset, key);
 
   if (!productId) {
     logError('[getStackedClaimsForProduct] Product ID is required.');
     return [];
   }
   if (!countryCode) {
-    // It's crucial to have a country code, as overrides are market-specific.
-    // And master claims need to be distinguishable from market claims.
     logError('[getStackedClaimsForProduct] Country code is required.');
     return [];
   }
 
   try {
-    // 1. Fetch the product details to get its master_brand_id
-    const { data: product, error: productError } = await supabase
-      .from('products')
-      .select('id, name, master_brand_id')
-      .eq('id', productId)
-      .single();
-
-    if (productError || !product) {
-      logError(`[getStackedClaimsForProduct] Error fetching product ${productId}:`, productError);
-      return [];
-    }
-
-    const masterBrandId = product.master_brand_id;
-
-    // Product-level claims via claim_products + claim_countries
-    const fetchProductLevelClaims = async (pid: string): Promise<Claim[]> => {
-      const { data: cps, error: cpErr } = await supabase
-        .from('claim_products')
-        .select('claim_id')
-        .eq('product_id', pid);
-      if (cpErr) { logError(`[getStackedClaimsForProduct] claim_products for ${pid}:`, cpErr); return []; }
-      const claimIds = Array.from(new Set((cps || []).map((r: any) => r.claim_id)));
-      if (!claimIds.length) return [];
-      const { data: ccs, error: ccErr } = await supabase
-        .from('claim_countries')
-        .select('claim_id, country_code')
-        .in('claim_id', claimIds)
-        .in('country_code', [countryCode, GLOBAL_CLAIM_COUNTRY_CODE]);
-      if (ccErr) { logError('[getStackedClaimsForProduct] claim_countries for product claims:', ccErr); return []; }
-      const chosen = new Map<string, string>();
-      (ccs || []).forEach((r: any) => {
-        const prev = chosen.get(r.claim_id);
-        if (!prev || prev === GLOBAL_CLAIM_COUNTRY_CODE || r.country_code === countryCode) chosen.set(r.claim_id, r.country_code);
-      });
-      const allowedIds = Array.from(chosen.keys());
-      if (!allowedIds.length) return [];
-      const { data: rows, error } = await supabase.from('claims').select('*').in('id', allowedIds).eq('level', 'product');
-      if (error) { logError('[getStackedClaimsForProduct] claims fetch product-level:', error); return []; }
-      return ((rows as Claim[]) || []).map(c => ({ ...c, country_code: chosen.get(c.id) || c.country_code }));
-    };
-
-    // Ingredient-level claims via claim_ingredients + claim_countries
-    const fetchIngredientLevelClaims = async (ingredientIds: string[]): Promise<Claim[]> => {
-      if (!ingredientIds.length) return [];
-      const { data: cis, error: ciErr } = await supabase
-        .from('claim_ingredients')
-        .select('claim_id')
-        .in('ingredient_id', ingredientIds);
-      if (ciErr) { logError('[getStackedClaimsForProduct] claim_ingredients:', ciErr); return []; }
-      const claimIds = Array.from(new Set((cis || []).map((r: any) => r.claim_id)));
-      if (!claimIds.length) return [];
-      const { data: ccs, error: ccErr } = await supabase
-        .from('claim_countries')
-        .select('claim_id, country_code')
-        .in('claim_id', claimIds)
-        .in('country_code', [countryCode, GLOBAL_CLAIM_COUNTRY_CODE]);
-      if (ccErr) { logError('[getStackedClaimsForProduct] claim_countries for ingredient claims:', ccErr); return []; }
-      const chosen = new Map<string, string>();
-      (ccs || []).forEach((r: any) => {
-        const prev = chosen.get(r.claim_id);
-        if (!prev || prev === GLOBAL_CLAIM_COUNTRY_CODE || r.country_code === countryCode) chosen.set(r.claim_id, r.country_code);
-      });
-      const allowedIds = Array.from(chosen.keys());
-      if (!allowedIds.length) return [];
-      const { data: rows, error } = await supabase.from('claims').select('*').in('id', allowedIds).eq('level', 'ingredient');
-      if (error) { logError('[getStackedClaimsForProduct] claims fetch ingredient-level:', error); return []; }
-      return ((rows as Claim[]) || []).map(c => ({ ...c, country_code: chosen.get(c.id) || c.country_code }));
-    };
-
-    // Brand-level claims filtered by claim_countries
-    const fetchBrandLevelClaims = async (brandId: string): Promise<Claim[]> => {
-      const { data: rows, error } = await supabase
-        .from('claims')
-        .select('id, claim_text, claim_type, level, master_brand_id, product_id, ingredient_id, country_code, description, created_by, created_at, updated_at')
-        .eq('master_brand_id', brandId)
-        .eq('level', 'brand');
-      if (error) { logError('[getStackedClaimsForProduct] claims fetch brand-level:', error); return []; }
-      const claims = (rows as Claim[]) || [];
-      if (!claims.length) return [];
-      const ids = claims.map(c => c.id);
-      const { data: ccs, error: ccErr } = await supabase
-        .from('claim_countries')
-        .select('claim_id, country_code')
-        .in('claim_id', ids);
-      if (ccErr) { logError('[getStackedClaimsForProduct] claim_countries for brand claims:', ccErr); return []; }
-      const countryMap = new Map<string, string[]>();
-      (ccs || []).forEach((r: any) => {
-        const list = countryMap.get(r.claim_id) || [];
-        list.push(r.country_code);
-        countryMap.set(r.claim_id, list);
-      });
-      return claims.filter(c => {
-        const list = countryMap.get(c.id) || (c.country_code ? [c.country_code] : []);
-        return list.includes(countryCode) || list.includes(GLOBAL_CLAIM_COUNTRY_CODE);
-      }).map(c => {
-        const list = countryMap.get(c.id) || (c.country_code ? [c.country_code] : []);
-        const chosen = list.includes(countryCode) ? countryCode : (list.includes(GLOBAL_CLAIM_COUNTRY_CODE) ? GLOBAL_CLAIM_COUNTRY_CODE : c.country_code);
-        return { ...c, country_code: chosen || c.country_code };
-      });
-    };
-
-    // 2. Fetch Product-specific claims via junctions
-    const productClaims = await fetchProductLevelClaims(productId);
-
-    // 3. Fetch Ingredients for the product
-    const { data: productIngredientLinks, error: ingredientsError } = await supabase
-      .from('product_ingredients')
-      .select('ingredient_id')
-      .eq('product_id', productId);
-
-    let ingredientClaims: Claim[] = [];
-    if (ingredientsError) {
-      logError(`[getStackedClaimsForProduct] Error fetching ingredients for product ${productId}:`, ingredientsError);
-    } else if (productIngredientLinks && productIngredientLinks.length > 0) {
-      const ingredientIds = productIngredientLinks.map((link: { ingredient_id: string }) => link.ingredient_id);
-      // 4. Fetch Ingredient-specific claims via junctions
-      ingredientClaims = await fetchIngredientLevelClaims(ingredientIds);
-    }
-
-    // 5. Fetch Brand-specific claims filtered by country
-    let brandClaims: Claim[] = [];
-    if (masterBrandId) {
-      brandClaims = await fetchBrandLevelClaims(masterBrandId);
-    }
-
-    // 6. Fetch Market Claim Overrides for this product and country (including global overrides)
-    const { data: marketOverridesData, error: overridesError } = await supabase
-        .from('market_claim_overrides')
-        .select('*, replacement_claim:claims!replacement_claim_id(*)') // Eager load replacement claim details
-        .eq('target_product_id', productId)
-        .in('market_country_code', [countryCode, ALL_COUNTRIES_CODE]); // Include global overrides
-
-    if (overridesError) {
-        logError(`[getStackedClaimsForProduct] Error fetching market overrides for product ${productId}, country ${countryCode}:`, overridesError);
-        // Continue, but overrides won't apply
-    }
-    const marketOverrides: MarketClaimOverride[] = (marketOverridesData as MarketClaimOverride[]) || [];
-    
-    // Build a fast override map per master_claim_id, prefer market-specific over global
-    const overrideByMasterId = new Map<string, MarketClaimOverride>();
-    for (const o of marketOverrides) {
-      const existing = overrideByMasterId.get(o.master_claim_id);
-      if (!existing) {
-        overrideByMasterId.set(o.master_claim_id, o);
-      } else if (existing.market_country_code === ALL_COUNTRIES_CODE && o.market_country_code === countryCode) {
-        overrideByMasterId.set(o.master_claim_id, o);
+    let product = presetHas('product') ? preset?.product ?? null : null;
+    if (!product) {
+      product = await fetchProductRecord(client, productId);
+      if (!product) {
+        return [];
       }
     }
 
+    const ingredientIds = presetHas('ingredientIds')
+      ? preset?.ingredientIds ?? []
+      : await fetchIngredientIds(client, productId);
 
-    // 7. Consolidate and determine effective claims
-    const allFetchedClaims: Claim[] = [...productClaims, ...ingredientClaims, ...brandClaims];
-    const effectiveClaimsMap = new Map<string, EffectiveClaim>();
+    const [productClaims, ingredientClaims, brandClaims, marketOverrides] = await Promise.all([
+      presetHas('productClaims')
+        ? Promise.resolve(preset?.productClaims ?? [])
+        : fetchProductClaims(client, productId, countryCode),
+      presetHas('ingredientClaims')
+        ? Promise.resolve(preset?.ingredientClaims ?? [])
+        : fetchIngredientClaims(client, ingredientIds, countryCode),
+      presetHas('brandClaims')
+        ? Promise.resolve(preset?.brandClaims ?? [])
+        : product?.master_brand_id
+          ? fetchBrandClaims(client, product.master_brand_id, countryCode)
+          : Promise.resolve([]),
+      presetHas('marketOverrides')
+        ? Promise.resolve(preset?.marketOverrides ?? [])
+        : fetchMarketOverrides(client, productId, countryCode),
+    ]);
 
-    // Assign priorities: Market > Global, Product > Ingredient > Brand
-    // Market Override has highest priority.
-    const getPriority = (claim: Claim, claimLevel: ClaimLevelEnum): number => {
-        let priority = 0;
-        if (claim.country_code === countryCode) priority += 100; // Market-specific is higher
+    const allClaims = [...productClaims, ...ingredientClaims, ...brandClaims];
+    if (!allClaims.length && !marketOverrides.length) {
+      logDebug('[stacked-claims:compose]', { productId, countryCode, inCount: 0, outCount: 0 });
+      return [];
+    }
 
-        if (claimLevel === 'product') priority += 30;
-        else if (claimLevel === 'ingredient') priority += 20;
-        else if (claimLevel === 'brand') priority += 10;
-        
-        return priority;
-    };
-    
-    // Sort all claims by text, then by priority (desc) to process higher priority ones first for a given text
-    const sortedClaims: ClaimWithPriority[] = allFetchedClaims.map(c => {
-        let level: ClaimLevelEnum = 'brand'; // Default, will be overridden
-        if (c.product_id) level = 'product';
-        else if (c.ingredient_id) level = 'ingredient';
-        else if (c.master_brand_id) level = 'brand';
-        
-        return {
-            ...c,
-            _priority: getPriority(c, level),
-            _isMarketSpecific: c.country_code === countryCode,
-        };
-    }).sort((a, b) => {
-        if (a.claim_text < b.claim_text) return -1;
-        if (a.claim_text > b.claim_text) return 1;
-        return (b._priority || 0) - (a._priority || 0); // Higher priority first
+    const candidates = composeEffectiveClaims(productId, countryCode, allClaims, marketOverrides);
+    const result = dedupeByFinalText(candidates);
+
+    logDebug('[stacked-claims:compose]', {
+      productId,
+      countryCode,
+      inCount: candidates.length,
+      outCount: result.length,
     });
 
-
-    for (const claim of sortedClaims) {
-        if (effectiveClaimsMap.has(claim.claim_text)) {
-            // Already processed a higher or equally high priority claim for this text
-            continue;
-        }
-
-        const masterClaimIdForOverrideCheck = claim.country_code === GLOBAL_CLAIM_COUNTRY_CODE ? claim.id : null;
-        let isOverridden = false;
-        let overrideApplied: MarketClaimOverride | undefined = undefined;
-
-        if (masterClaimIdForOverrideCheck) {
-            overrideApplied = overrideByMasterId.get(masterClaimIdForOverrideCheck);
-            
-            if (overrideApplied) {
-                isOverridden = true;
-                if (overrideApplied.is_blocked && !overrideApplied.replacement_claim_id) {
-                    effectiveClaimsMap.set(claim.claim_text, {
-                        claim_text: claim.claim_text,
-                        final_claim_type: 'none', // Blocked means no claim
-                        source_level: 'override',
-                        source_claim_id: overrideApplied.id, // ID of the override rule
-                        original_master_claim_id_if_overridden: masterClaimIdForOverrideCheck,
-                        is_blocked_override: true,
-                        isActuallyMaster: false,
-                        description: overrideApplied.market_country_code === ALL_COUNTRIES_CODE 
-                            ? `Master claim "${claim.claim_text}" blocked globally for product ${productId}.`
-                            : `Master claim "${claim.claim_text}" blocked in ${countryCode} for product ${productId}.`,
-                        applies_to_product_id: productId,
-                        applies_to_country_code: countryCode,
-                        original_claim_country_code: GLOBAL_CLAIM_COUNTRY_CODE, // Master claims are global
-                    });
-                } else if (overrideApplied.replacement_claim_id) {
-                    const replacementClaim = (overrideApplied as any).replacement_claim as Claim | null;
-                    if (replacementClaim) {
-                        effectiveClaimsMap.set(claim.claim_text, {
-                            claim_text: replacementClaim.claim_text, // Could be different text if replacement changes it, though unusual for override
-                            final_claim_type: replacementClaim.claim_type,
-                            source_level: 'override',
-                            source_claim_id: replacementClaim.id, // ID of the replacement claim
-                            original_master_claim_id_if_overridden: masterClaimIdForOverrideCheck,
-                            is_replacement_override: true,
-                            isActuallyMaster: false,
-                            description: replacementClaim.description || (overrideApplied.market_country_code === ALL_COUNTRIES_CODE 
-                                ? `Master claim "${claim.claim_text}" replaced globally by "${replacementClaim.claim_text}".`
-                                : `Master claim "${claim.claim_text}" replaced by "${replacementClaim.claim_text}" in ${countryCode}.`),
-                            applies_to_product_id: productId,
-                            applies_to_country_code: countryCode,
-                            original_claim_country_code: replacementClaim.country_code, // Country of the replacement claim
-                            source_entity_id: replacementClaim.product_id || replacementClaim.ingredient_id || replacementClaim.master_brand_id,
-                        });
-                    } else {
-                         // This case should be rare if DB constraints are good (replacement_claim_id FK)
-                        logError(`[getStackedClaimsForProduct] Override ${overrideApplied.id} specified a replacement_claim_id ${overrideApplied.replacement_claim_id} but it was not found.`);
-                         effectiveClaimsMap.set(claim.claim_text, {
-                            claim_text: claim.claim_text,
-                            final_claim_type: 'none', 
-                            source_level: 'override',
-                            source_claim_id: overrideApplied.id,
-                            original_master_claim_id_if_overridden: masterClaimIdForOverrideCheck,
-                            is_blocked_override: true, // Treat as blocked if replacement is missing
-                            isActuallyMaster: false,
-                            description: `Master claim "${claim.claim_text}" intended for replacement in ${countryCode} but replacement claim missing. Considered blocked.`,
-                            applies_to_product_id: productId,
-                            applies_to_country_code: countryCode,
-                            original_claim_country_code: GLOBAL_CLAIM_COUNTRY_CODE,
-                        });
-                    }
-                }
-                // If overridden, we don't process the original master claim further for this claim_text
-                continue; 
-            }
-        }
-
-        // If not overridden (or if it's a market-specific claim which cannot be overridden by this table's logic)
-        // or if it is a master claim that had no override rule.
-        if (!isOverridden) {
-             let sourceLevel: ClaimLevelEnum = 'brand'; // Default
-             if (claim.product_id) sourceLevel = 'product';
-             else if (claim.ingredient_id) sourceLevel = 'ingredient';
-            
-             let entityIdForSource: string | null = null;
-             if (sourceLevel === 'product' && claim.product_id) {
-                entityIdForSource = claim.product_id;
-             } else if (sourceLevel === 'ingredient' && claim.ingredient_id) {
-                entityIdForSource = claim.ingredient_id;
-             } else if (sourceLevel === 'brand' && claim.master_brand_id) {
-                entityIdForSource = claim.master_brand_id;
-             }
-
-            effectiveClaimsMap.set(claim.claim_text, {
-                claim_text: claim.claim_text,
-                final_claim_type: claim.claim_type,
-                source_level: sourceLevel,
-                source_claim_id: claim.id,
-                description: claim.description,
-                applies_to_product_id: productId,
-                applies_to_country_code: countryCode,
-                original_claim_country_code: claim.country_code,
-                source_entity_id: entityIdForSource,
-                isActuallyMaster: claim.country_code === GLOBAL_CLAIM_COUNTRY_CODE,
-            });
-        }
-    }
-    
-    // Also consider market overrides that might introduce completely NEW claim texts
-    // via a replacement_claim_id, where the master_claim_id's text was not among existing claims.
-    // This is less common (override usually targets an existing master claim text) but possible if master_claim_id was deleted.
-    // For now, this is implicitly handled if replacement_claim_id's claim_text is unique.
-    // If replacement_claim_id has a text that *matches* another, existing claim text, the logic above needs to be robust.
-    // The current sort and `effectiveClaimsMap.has` check should handle this:
-    // If a replacement override introduces a claim, its `claim_text` will be added to the map.
-    // If another, lower-priority claim has the same text, it will be skipped.
-    
-    const preliminary = Array.from(effectiveClaimsMap.values());
-    const result = dedupeByFinalText(preliminary);
-    logDebug('[stacked-claims:compose]', { productId, countryCode, inCount: preliminary.length, outCount: result.length });
     return result;
-
   } catch (error) {
     logError(`[getStackedClaimsForProduct] Unexpected error for product ${productId}, country ${countryCode}:`, error);
-    return []; // Return empty on unexpected failure
+    return [];
   }
 }
 
-// Helper: check if a given country code is global
-export const isGlobalCountryCode = (code?: string | null) => code === GLOBAL_CLAIM_COUNTRY_CODE;
+export const isGlobalCountryCode = (
+  code?: string | null
+): code is typeof GLOBAL_CLAIM_COUNTRY_CODE =>
+  typeof code === 'string' && code.trim().toUpperCase() === GLOBAL_CLAIM_COUNTRY_CODE;
 
 type SourceLevel = 'product' | 'ingredient' | 'brand' | 'override' | 'none';
 type Precedence = 1 | 2 | 3;
@@ -444,76 +713,111 @@ type Precedence = 1 | 2 | 3;
 const levelScore = (lvl: SourceLevel) => ({ product: 3, ingredient: 2, brand: 1, override: 4, none: 0 }[lvl] || 0);
 
 const precedenceOf = (ec: EffectiveClaim): Precedence => {
-  const overridden = (ec as any).is_blocked_override || (ec as any).is_replacement_override;
-  if (overridden) return 1; // Override highest
-  if (ec.original_claim_country_code && ec.original_claim_country_code !== GLOBAL_CLAIM_COUNTRY_CODE) return 2; // Market
-  return 3; // Master
+  const overridden = Boolean(ec.is_blocked_override) || Boolean(ec.is_replacement_override);
+  if (overridden) return 1;
+  if (ec.original_claim_country_code && ec.original_claim_country_code !== GLOBAL_CLAIM_COUNTRY_CODE) return 2;
+  if (ec.isActuallyMaster === false) return 2;
+  return 3;
 };
 
 export function dedupeByFinalText(rows: EffectiveClaim[]): EffectiveClaim[] {
-  const keep = new Map<string, EffectiveClaim>();
+  let fallbackCounter = 0;
+  const keep = new Map<
+    string,
+    {
+      claim: EffectiveClaim;
+      priority: { p: Precedence; s: number };
+      normalizedText: string;
+      mapKey: string;
+    }
+  >();
+
   for (const ec of rows) {
-    const key = (ec.claim_text || '').trim().toLowerCase();
-    const existing = keep.get(key);
+    const normalizedText = (ec.claim_text ?? '').trim().toLowerCase();
+    const fallbackKey = ec.override_rule_id || ec.source_claim_id || `__fallback-${fallbackCounter++}`;
+    const mapKey = normalizedText || String(fallbackKey);
+
+    const incomingPriority = {
+      p: precedenceOf(ec),
+      s: levelScore((ec.source_level as SourceLevel) || 'none'),
+    };
+
+    const existing = keep.get(mapKey);
     if (!existing) {
-      keep.set(key, ec);
+      keep.set(mapKey, { claim: ec, priority: incomingPriority, normalizedText, mapKey });
       continue;
     }
-    const a = { p: precedenceOf(existing), s: levelScore((existing.source_level as SourceLevel) || 'none') };
-    const b = { p: precedenceOf(ec),       s: levelScore((ec.source_level as SourceLevel) || 'none') };
-    // Lower precedence number wins. Break ties by higher level score.
-    if (b.p < a.p || (b.p === a.p && b.s > a.s)) keep.set(key, ec);
+
+    const a = existing.priority;
+    const b = incomingPriority;
+    if (b.p < a.p || (b.p === a.p && b.s > a.s)) {
+      keep.set(mapKey, { claim: ec, priority: b, normalizedText, mapKey });
+    }
   }
-  return Array.from(keep.values());
+
+  return Array.from(keep.values())
+    .sort((left, right) => {
+      if (left.priority.p !== right.priority.p) return left.priority.p - right.priority.p;
+      if (left.priority.s !== right.priority.s) return right.priority.s - left.priority.s;
+      if (left.normalizedText !== right.normalizedText) return left.normalizedText.localeCompare(right.normalizedText);
+      return left.mapKey.localeCompare(right.mapKey);
+    })
+    .map(entry => entry.claim);
 }
 
-// Optional: RPC-based stacking (one-shot DB call)
-export async function getStackedClaimsForProductRPC(productId: string, countryCode: string): Promise<EffectiveClaim[]> {
-  const supabase = createSupabaseAdminClient();
-  const { data, error } = await (supabase as any).rpc('get_effective_claims', {
-    p_product_id: productId,
-    p_country_code: countryCode,
-  });
+export async function getStackedClaimsForProductRPC(
+  productId: string,
+  countryCode: string,
+  options: GetStackedClaimsForProductRPCOptions = {}
+): Promise<EffectiveClaim[]> {
+  if (!productId) {
+    logError('[getStackedClaimsForProductRPC] Product ID is required.');
+    return [];
+  }
+
+  if (!countryCode) {
+    logError('[getStackedClaimsForProductRPC] Country code is required.');
+    return [];
+  }
+
+  const client = options.client ?? createSupabaseAdminClient();
+
+  const { data, error } = await client.rpc<any, Record<string, unknown>>(
+    'get_effective_claims' as never,
+    {
+      p_product_id: productId,
+      p_country_code: countryCode,
+    }
+  );
+
   if (error) {
     logError('[getStackedClaimsForProductRPC] RPC error', error);
     return [];
   }
-  // data may not include overrides flags; perform dedupe if needed
-  const rows = (data as any[] | null) ?? [];
-  const mapped: EffectiveClaim[] = rows.map((r) => ({
-    source_claim_id: r.source_claim_id ?? null,
-    source_level: r.source_level ?? 'none',
-    original_claim_country_code: r.original_claim_country_code ?? null,
-    final_claim_type: r.final_claim_type ?? 'none',
-    claim_text: r.claim_text ?? '',
-    isActuallyMaster: !!r.is_master,
-    applies_to_product_id: productId,
-    applies_to_country_code: countryCode,
-  }));
+
+  const rows = (data as EffectiveClaimRpcRow[] | null) ?? [];
+  const mapped: EffectiveClaim[] = rows.map(row => {
+    const sourceLevel = (row.source_level ?? 'none') as SourceLevel;
+    return {
+      source_claim_id: row.source_claim_id ?? null,
+      source_level: sourceLevel,
+      original_claim_country_code: row.original_claim_country_code ?? null,
+      final_claim_type: (row.final_claim_type ?? 'none') as FinalClaimTypeEnum,
+      claim_text: row.claim_text ?? '',
+      isActuallyMaster: Boolean(row.is_master ?? (row.original_claim_country_code === GLOBAL_CLAIM_COUNTRY_CODE)),
+      applies_to_product_id: row.applies_to_product_id ?? productId,
+      applies_to_country_code: row.applies_to_country_code ?? countryCode,
+      description: row.description ?? null,
+      original_claim_text: row.original_claim_text ?? null,
+      original_master_claim_id_if_overridden: row.original_master_claim_id_if_overridden ?? row.master_claim_id ?? null,
+      is_replacement_override: Boolean(row.is_replacement_override),
+      is_blocked_override: Boolean(row.is_blocked_override),
+      override_rule_id: row.override_rule_id ?? null,
+      source_entity_id: row.source_entity_id ?? null,
+    };
+  });
+
   return dedupeByFinalText(mapped);
 }
 
-// Example usage (for testing, not part of the actual file usually)
-/*
-async function testStacking() {
-  // Ensure you have a Supabase client instance or initialize one for testing
-  // const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  
-  const productId = "your-product-id"; // replace with actual PRODUCT ID that exists
-  const countryCode = "US"; // replace with actual country or use GLOBAL_CLAIM_COUNTRY_CODE to test global context
-  
-  if (productId === "your-product-id") {
-    console.warn("Please replace 'your-product-id' with an actual product ID for testing.");
-    return;
-  }
-
-  console.log(`Fetching stacked claims for product ${productId} in ${countryCode}...`);
-  try {
-    const stackedClaims = await getStackedClaimsForProduct(productId, countryCode);
-    console.log("Stacked Claims:", JSON.stringify(stackedClaims, null, 2));
-  } catch (e) {
-    console.error("Error during testStacking:", e);
-  }
-}
-// testStacking(); // Uncomment and run with `node -r esm src/lib/claims-utils.js` (approx) or via a test runner
-*/ 
+export { normalizeSingleRow, fetchSingleRow };

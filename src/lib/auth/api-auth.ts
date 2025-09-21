@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 import { Database } from '@/types/supabase';
 import { User } from '@supabase/supabase-js';
 import { withCSRF } from '@/lib/api/with-csrf';
+import { applyDerivedGlobalRole, isGlobalAdmin } from '@/lib/auth/user-role';
 
 /**
  * Higher-order function to wrap API handlers with authentication
@@ -56,6 +57,9 @@ export function withAuth(
         );
       }
       
+      // Normalize role metadata to prevent client-side elevation attempts
+      applyDerivedGlobalRole(user);
+
       // Authentication successful, call the handler with the authenticated user
       return handler(req, user, context);
     } catch (error) {
@@ -136,6 +140,9 @@ export function withAuthAndMonitoring(
         );
       }
       
+      // Normalize role metadata to prevent client-side manipulation
+      applyDerivedGlobalRole(user);
+
       // Authentication successful, call the handler
       const response = await handler(req, user, context);
       
@@ -217,9 +224,11 @@ export function withAdminAuth(
         );
       }
 
-      // Check if the user is an admin
-      // Assumes role is stored in user_metadata
-      if (user.user_metadata?.role !== 'admin') {
+      // Normalize role metadata
+      applyDerivedGlobalRole(user);
+
+      // Check if the user is an admin (using immutable app metadata)
+      if (!isGlobalAdmin(user)) {
         // If not an admin, return 403 Forbidden
         return new Response(
           JSON.stringify({

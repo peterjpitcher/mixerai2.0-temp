@@ -16,8 +16,8 @@ export default function TermsPage() {
           
           <h2 className="text-xl font-semibold mt-6 mb-3">1. Agreement to Terms</h2>
           <p className="mb-4">
-            These Terms of Service ("Terms") govern your use of MixerAI's AI-powered content creation and 
-            workflow management platform ("Service"). By accessing or using our Service, you agree to be 
+            These Terms of Service (&quot;Terms&quot;) govern your use of MixerAI&apos;s AI-powered content creation and 
+            workflow management platform (&quot;Service&quot;). By accessing or using our Service, you agree to be 
             bound by these Terms. If you disagree with any part of these terms, you may not access our Service.
           </p>
           
@@ -80,9 +80,9 @@ export default function TermsPage() {
           <ul className="list-disc pl-6 mb-4 space-y-1">
             <li>You agree to pay all fees according to your selected plan</li>
             <li>Fees are non-refundable except as required by law</li>
-            <li>We may change fees with 30 days' notice</li>
+            <li>We may change fees with 30 days&rsquo; notice</li>
             <li>You authorize us to charge your payment method automatically</li>
-            <li>You're responsible for all taxes except where we're required to collect them</li>
+            <li>You&apos;re responsible for all taxes except where we&apos;re required to collect them</li>
           </ul>
           
           <h2 className="text-xl font-semibold mt-6 mb-3">7. Privacy and Data Protection</h2>
@@ -102,7 +102,7 @@ export default function TermsPage() {
           <h2 className="text-xl font-semibold mt-6 mb-3">9. Disclaimers and Limitations</h2>
           <h3 className="text-lg font-medium mt-4 mb-2">9.1 Service Availability</h3>
           <p className="mb-4">
-            The Service is provided "as is" and "as available." We do not guarantee uninterrupted or 
+            The Service is provided &quot;as is&quot; and &quot;as available.&quot; We do not guarantee uninterrupted or 
             error-free operation. We may modify or discontinue features at any time.
           </p>
           

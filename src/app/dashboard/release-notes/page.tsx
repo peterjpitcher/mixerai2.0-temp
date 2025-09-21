@@ -1,5 +1,4 @@
 import { Separator } from "@/components/ui/separator";
-import Link from "next/link";
 import { formatDate } from '@/lib/utils/date';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 

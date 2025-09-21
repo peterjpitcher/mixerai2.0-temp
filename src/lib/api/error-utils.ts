@@ -10,12 +10,15 @@ import { PostgrestError } from '@supabase/supabase-js';
  * Type guard for PostgrestError
  */
 export function isPostgrestError(error: unknown): error is PostgrestError {
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+
+  const candidate = error as { code?: unknown; message?: unknown; details?: unknown };
   return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    'message' in error &&
-    'details' in error
+    typeof candidate.code === 'string' &&
+    typeof candidate.message === 'string' &&
+    typeof candidate.details === 'string'
   );
 }
 
@@ -35,7 +38,8 @@ export function getPostgrestErrorStatus(code: string): number {
     'PGRST302': 401, // JWT invalid
   };
   
-  return statusMap[code] || 500;
+  const normalizedCode = code?.toUpperCase?.() ?? '';
+  return statusMap[normalizedCode] || 500;
 }
 
 /**
@@ -54,7 +58,13 @@ export function getPostgrestErrorMessage(error: PostgrestError): string {
     'PGRST302': 'Invalid authentication token',
   };
   
-  return messageMap[error.code] || error.message || 'Database operation failed';
+  const normalizedCode = error.code?.toUpperCase?.() ?? '';
+  const mappedMessage = messageMap[normalizedCode];
+  if (mappedMessage) {
+    return mappedMessage;
+  }
+
+  return error.message || error.details || error.hint || 'Database operation failed';
 }
 
 /**
@@ -64,15 +74,16 @@ export function formatZodError(error: ZodError): {
   message: string;
   details: Array<{ field: string; message: string }>;
 } {
-  const details = error.errors.map(err => ({
-    field: err.path.join('.'),
-    message: err.message
+  const details = error.errors.map((err) => ({
+    field: err.path.length ? err.path.join('.') : 'root',
+    message: err.message,
   }));
-  
-  const message = details.length === 1 
-    ? details[0].message 
-    : `Validation failed: ${details.length} errors found`;
-  
+
+  const uniqueMessages = Array.from(new Set(details.map((item) => item.message)));
+  const message = details.length === 1
+    ? details[0].message
+    : `Validation failed (${details.length} issues): ${uniqueMessages.join('; ')}`;
+
   return { message, details };
 }
 
@@ -80,142 +91,157 @@ export function formatZodError(error: ZodError): {
  * Check if error is a rate limit error
  */
 export function isRateLimitError(error: unknown): boolean {
-  if (error instanceof Error) {
-    const message = error.message.toLowerCase();
-    return message.includes('rate limit') || message.includes('too many requests');
+  if (!error) return false;
+
+  if (typeof (error as { status?: unknown }).status === 'number') {
+    const status = Number((error as { status?: unknown }).status);
+    if (status === 429) {
+      return true;
+    }
   }
-  return false;
+
+  const messageSource =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : typeof error === 'object' && error && 'message' in error
+          ? String((error as { message?: unknown }).message)
+          : '';
+
+  if (!messageSource) {
+    return false;
+  }
+
+  const message = messageSource.toLowerCase();
+  return message.includes('rate limit') || message.includes('too many requests') || message.includes('429');
 }
 
 /**
  * Check if error is an authentication error
  */
 export function isAuthError(error: unknown): boolean {
-  if (error instanceof Error) {
-    const message = error.message.toLowerCase();
-    return message.includes('unauthorized') || 
-           message.includes('authentication') ||
-           message.includes('jwt expired');
+  if (!error) return false;
+
+  if (typeof (error as { status?: unknown }).status === 'number') {
+    const status = Number((error as { status?: unknown }).status);
+    if (status === 401 || status === 419) {
+      return true;
+    }
   }
+
   if (isPostgrestError(error)) {
-    return error.code === 'PGRST301' || error.code === 'PGRST302';
+    const code = error.code?.toUpperCase?.();
+    return code === 'PGRST301' || code === 'PGRST302';
   }
-  return false;
+
+  const messageSource =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : typeof error === 'object' && error && 'message' in error
+          ? String((error as { message?: unknown }).message)
+          : '';
+
+  if (!messageSource) {
+    return false;
+  }
+
+  const message = messageSource.toLowerCase();
+  return (
+    message.includes('unauthorized') ||
+    message.includes('authentication') ||
+    message.includes('jwt expired') ||
+    message.includes('invalid token')
+  );
 }
 
 /**
  * Create standardized API error responses
  */
+type ErrorResponseBody = {
+  success: false;
+  error: string;
+  code: string;
+  timestamp: string;
+  details?: unknown;
+};
+
+function buildErrorResponse(
+  error: string,
+  code: string,
+  status: number,
+  options: { details?: unknown; headers?: HeadersInit } = {}
+) {
+  const body: ErrorResponseBody = {
+    success: false,
+    error,
+    code,
+    timestamp: new Date().toISOString(),
+  };
+
+  if (typeof options.details !== 'undefined') {
+    body.details = options.details;
+  }
+
+  return NextResponse.json(body, {
+    status,
+    headers: options.headers,
+  });
+}
+
 export const apiErrorResponses = {
-  unauthorized: (message: string = 'Unauthorized access') => 
-    NextResponse.json(
-      { 
-        success: false, 
-        error: message,
-        code: 'UNAUTHORIZED',
-        timestamp: new Date().toISOString()
-      },
-      { status: 401 }
-    ),
+  unauthorized: (message: string = 'Unauthorized access') =>
+    buildErrorResponse(message, 'UNAUTHORIZED', 401),
   
   forbidden: (message: string = 'Access forbidden') =>
-    NextResponse.json(
-      { 
-        success: false, 
-        error: message,
-        code: 'FORBIDDEN',
-        timestamp: new Date().toISOString()
-      },
-      { status: 403 }
-    ),
+    buildErrorResponse(message, 'FORBIDDEN', 403),
   
-  notFound: (resource: string = 'Resource') =>
-    NextResponse.json(
-      { 
-        success: false, 
-        error: `${resource} not found`,
-        code: 'NOT_FOUND',
-        timestamp: new Date().toISOString()
-      },
-      { status: 404 }
-    ),
+  notFound: (message: string = 'Resource not found') =>
+    buildErrorResponse(message, 'NOT_FOUND', 404),
   
   badRequest: (message: string = 'Bad request', details?: any) =>
-    NextResponse.json(
-      { 
-        success: false, 
-        error: message,
-        code: 'BAD_REQUEST',
-        ...(details && { details }),
-        timestamp: new Date().toISOString()
-      },
-      { status: 400 }
-    ),
+    buildErrorResponse(message, 'BAD_REQUEST', 400, { details }),
   
   conflict: (message: string = 'Resource conflict') =>
-    NextResponse.json(
-      { 
-        success: false, 
-        error: message,
-        code: 'CONFLICT',
-        timestamp: new Date().toISOString()
-      },
-      { status: 409 }
-    ),
+    buildErrorResponse(message, 'CONFLICT', 409),
   
   serverError: (message: string = 'Internal server error') =>
-    NextResponse.json(
-      { 
-        success: false, 
-        error: message,
-        code: 'SERVER_ERROR',
-        timestamp: new Date().toISOString()
-      },
-      { status: 500 }
-    ),
+    buildErrorResponse(message, 'SERVER_ERROR', 500),
   
   validationError: (errors: Array<{ field: string; message: string }>) =>
-    NextResponse.json(
-      { 
-        success: false, 
-        error: 'Validation failed',
-        code: 'VALIDATION_ERROR',
-        details: errors,
-        timestamp: new Date().toISOString()
-      },
-      { status: 400 }
-    ),
+    buildErrorResponse('Validation failed', 'VALIDATION_ERROR', 400, { details: errors }),
   
   rateLimitExceeded: (retryAfter?: number) => {
-    const response = NextResponse.json(
-      { 
-        success: false, 
-        error: 'Too many requests. Please try again later.',
-        code: 'RATE_LIMIT_EXCEEDED',
-        timestamp: new Date().toISOString()
-      },
-      { status: 429 }
-    );
+    const response = buildErrorResponse('Too many requests. Please try again later.', 'RATE_LIMIT_EXCEEDED', 429);
     
-    if (retryAfter) {
-      response.headers.set('Retry-After', retryAfter.toString());
+    if (typeof retryAfter === 'number' && Number.isFinite(retryAfter) && retryAfter > 0) {
+      response.headers.set('Retry-After', Math.ceil(retryAfter).toString());
     }
     
     return response;
   },
   
   methodNotAllowed: (allowed: string[]) => {
-    const response = NextResponse.json(
-      { 
-        success: false, 
-        error: `Method not allowed. Allowed methods: ${allowed.join(', ')}`,
-        code: 'METHOD_NOT_ALLOWED',
-        timestamp: new Date().toISOString()
-      },
-      { status: 405 }
+    const normalizedMethods = Array.from(
+      new Set(
+        allowed
+          .map((method) => method?.trim().toUpperCase())
+          .filter((method): method is string => Boolean(method))
+      )
     );
-    
-    response.headers.set('Allow', allowed.join(', '));
+
+    const message = normalizedMethods.length
+      ? `Method not allowed. Allowed methods: ${normalizedMethods.join(', ')}`
+      : 'Method not allowed.';
+
+    const response = buildErrorResponse(message, 'METHOD_NOT_ALLOWED', 405);
+
+    if (normalizedMethods.length) {
+      response.headers.set('Allow', normalizedMethods.join(', '));
+    }
+
     return response;
   }
 };
@@ -226,7 +252,7 @@ export const apiErrorResponses = {
 export function handleEnhancedApiError(error: unknown): NextResponse {
   // Handle Zod validation errors
   if (error instanceof ZodError) {
-    const { message, details } = formatZodError(error);
+    const { details } = formatZodError(error);
     return apiErrorResponses.validationError(details);
   }
   
@@ -242,13 +268,17 @@ export function handleEnhancedApiError(error: unknown): NextResponse {
       return apiErrorResponses.forbidden(message);
     }
     if (status === 404) {
-      return apiErrorResponses.notFound();
+      return apiErrorResponses.notFound(message);
     }
     if (status === 409) {
       return apiErrorResponses.conflict(message);
     }
     
-    return apiErrorResponses.badRequest(message, { code: error.code });
+    return apiErrorResponses.badRequest(message, {
+      code: error.code,
+      details: error.details || undefined,
+      hint: error.hint || undefined,
+    });
   }
   
   // Handle rate limit errors
@@ -263,19 +293,20 @@ export function handleEnhancedApiError(error: unknown): NextResponse {
   
   // Handle standard errors
   if (error instanceof Error) {
-    const message = error.message.toLowerCase();
+    const rawMessage = error.message;
+    const lowerCased = rawMessage.toLowerCase();
     
-    if (message.includes('not found')) {
+    if (lowerCased.includes('not found')) {
       return apiErrorResponses.notFound();
     }
-    if (message.includes('forbidden') || message.includes('permission')) {
+    if (lowerCased.includes('forbidden') || lowerCased.includes('permission')) {
       return apiErrorResponses.forbidden();
     }
-    if (message.includes('conflict') || message.includes('already exists')) {
-      return apiErrorResponses.conflict(error.message);
+    if (lowerCased.includes('conflict') || lowerCased.includes('already exists')) {
+      return apiErrorResponses.conflict(rawMessage);
     }
-    if (message.includes('validation') || message.includes('invalid')) {
-      return apiErrorResponses.badRequest(error.message);
+    if (lowerCased.includes('validation') || lowerCased.includes('invalid')) {
+      return apiErrorResponses.badRequest(rawMessage);
     }
     
     // Log unexpected errors

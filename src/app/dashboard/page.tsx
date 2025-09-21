@@ -174,7 +174,6 @@ export default async function DashboardPage() {
   const [
     teamActivity,
     mostAgedContent,
-    metrics
   ] = await Promise.all([
     getTeamActivity(supabase, profile),
     getMostAgedContent(supabase, profile),

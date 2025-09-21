@@ -11,6 +11,7 @@ import { withCorrelation } from '@/lib/observability/with-correlation';
 import { timed } from '@/lib/observability/timer';
 import { ALL_COUNTRIES_CODE, GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
 import { logClaimAudit } from '@/lib/audit';
+import { logDebug, logError } from '@/lib/logger';
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +64,7 @@ const requestBodySchema = z.object({
 export const GET = withCorrelation(withAuth(async (req: NextRequest) => {
     try {
         if (isBuildPhase()) {
-            console.log('[API Claims GET] Build phase: returning empty array.');
+            logDebug('[API Claims GET] build phase returning empty array');
             return ok([]);
         }
 
@@ -105,9 +106,6 @@ export const GET = withCorrelation(withAuth(async (req: NextRequest) => {
         }
 
         if (excludeGlobalFilter) {
-            const { GLOBAL_CLAIM_COUNTRY_CODE } = await import('@/lib/constants/claims');
-            // If countryCodeFilter is also GLOBAL, this excludeGlobal would make it return nothing.
-            // This logic is fine: if user says exclude global, we exclude global.
             query = query.not('country_code', 'eq', GLOBAL_CLAIM_COUNTRY_CODE);
         }
 
@@ -120,7 +118,7 @@ export const GET = withCorrelation(withAuth(async (req: NextRequest) => {
             .range(offset, offset + validatedLimit - 1);
 
         if (error) {
-            console.error('[API Claims GET] Error fetching claims:', error);
+            logError('[API Claims GET] Error fetching claims:', error);
             return handleApiError(error, 'Failed to fetch claims');
         }
 
@@ -181,10 +179,12 @@ export const GET = withCorrelation(withAuth(async (req: NextRequest) => {
           limit: validatedLimit,
           total: count || 0,
           totalPages,
+          hasNextPage,
+          hasPreviousPage,
         });
 
     } catch (error: unknown) {
-        console.error('[API Claims GET] Catched error:', error);
+        logError('[API Claims GET] Unexpected error:', error);
         const res = handleApiError(error, 'An unexpected error occurred while fetching claims.');
         return res;
     }
@@ -202,13 +202,13 @@ export const POST = withCorrelation(withAuthAndCSRF(async (req: NextRequest, use
     }
     
     // Log the raw body received by the API endpoint
-    console.log("[API Claims POST] Received raw body:", JSON.stringify(rawBody, null, 2));
+    logDebug('[API Claims POST] received raw body', JSON.stringify(rawBody, null, 2));
 
     const parsedBody = requestBodySchema.safeParse(rawBody);
 
     if (!parsedBody.success) {
         // Log the detailed Zod error
-        console.error("[API Claims POST] Zod validation failed:", JSON.stringify(parsedBody.error.flatten(), null, 2));
+        logError('[API Claims POST] Zod validation failed:', JSON.stringify(parsedBody.error.flatten(), null, 2));
         return NextResponse.json({ success: false, error: 'Invalid request data', details: parsedBody.error.flatten() }, { status: 400 });
     }
 
@@ -236,7 +236,7 @@ export const POST = withCorrelation(withAuthAndCSRF(async (req: NextRequest, use
                 .eq('id', master_brand_id)
                 .single();
             if (mcbError || !mcbData || !mcbData.mixerai_brand_id) {
-                console.error(`[API Claims POST] Error fetching MCB or MCB not linked for brand-level claim creation permissions (MCB ID: ${master_brand_id}):`, mcbError);
+                logError(`[API Claims POST] Error fetching MCB or MCB not linked for brand-level claim creation permissions (MCB ID: ${master_brand_id}):`, mcbError);
                 // Deny permission if MCB not found or not linked
             } else {
                 const { data: permissionsData, error: permissionsError } = await supabase
@@ -247,7 +247,7 @@ export const POST = withCorrelation(withAuthAndCSRF(async (req: NextRequest, use
                     .eq('role', 'admin') // User must be admin of the linked MixerAI brand
                     .limit(1);
                 if (permissionsError) {
-                    console.error(`[API Claims POST] Error fetching user_brand_permissions for brand-level claim:`, permissionsError);
+                    logError('[API Claims POST] Error fetching user_brand_permissions for brand-level claim:', permissionsError);
                 } else if (permissionsData && permissionsData.length > 0) {
                     hasPermission = true;
                 }
@@ -258,7 +258,7 @@ export const POST = withCorrelation(withAuthAndCSRF(async (req: NextRequest, use
             if (permissionCheck.hasPermission) {
                 hasPermission = true;
             } else {
-                console.error('[API Claims POST] Permission check failed:', permissionCheck.errors.join(', '));
+                logError('[API Claims POST] Permission check failed:', permissionCheck.errors.join(', '));
             }
         } else if (level === 'ingredient') {
             // For ingredient-level claims, only global admin can create (already covered by initial hasPermission check).
@@ -309,7 +309,7 @@ export const POST = withCorrelation(withAuthAndCSRF(async (req: NextRequest, use
         const { data: claimId, error } = rpcResult as { data: string | null; error: any };
 
         if (error) {
-            console.error('Supabase error creating claim:', error);
+            logError('Supabase error creating claim:', error);
             if (error.code === '23505') {
                 return NextResponse.json({ success: false, error: 'A claim already exists with the same text, level, and entity.', details: error.message }, { status: 409 });
             }
@@ -328,7 +328,7 @@ export const POST = withCorrelation(withAuthAndCSRF(async (req: NextRequest, use
             .single();
 
         if (fetchError) {
-            console.error('[API Claims POST] Error fetching created claim:', fetchError);
+            logError('[API Claims POST] Error fetching created claim:', fetchError);
             // Claim was created but we couldn't fetch it - still return success
             await logClaimAudit('CLAIM_CREATED', user.id, claimId, { ...parsedBody.data, country_codes: mappedCountries });
             // Invalidate caches conservatively
@@ -357,7 +357,7 @@ export const POST = withCorrelation(withAuthAndCSRF(async (req: NextRequest, use
         } catch {}
         return ok({ claim: createdClaim, id: claimId });
     } catch (e: unknown) {
-        console.error('Catch block error in POST /api/claims:', e);
+        logError('Catch block error in POST /api/claims:', e);
         const errorMessage = e instanceof Error ? e.message : String(e);
         return fail(500, 'An unexpected error occurred.', errorMessage);
     }

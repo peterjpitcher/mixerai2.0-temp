@@ -18,7 +18,7 @@ export default function PrivacyPolicyPage() {
           <p className="mb-4">
             At MixerAI, we take your privacy seriously. This Privacy Policy explains how we collect, use, share, 
             and protect your personal information when you use our AI-powered content creation and workflow 
-            management platform ("Service"). By using MixerAI, you agree to the collection and use of 
+            management platform (&quot;Service&quot;). By using MixerAI, you agree to the collection and use of 
             information in accordance with this policy.
           </p>
           
@@ -105,7 +105,7 @@ export default function PrivacyPolicyPage() {
           <h2 className="text-xl font-semibold mt-6 mb-3">10. Changes to This Policy</h2>
           <p className="mb-4">
             We may update this Privacy Policy from time to time. We will notify you of material changes by 
-            posting the new policy on this page and updating the "Last updated" date.
+            posting the new policy on this page and updating the &quot;Last updated&quot; date.
           </p>
           
           <h2 className="text-xl font-semibold mt-6 mb-3">11. Contact Us</h2>

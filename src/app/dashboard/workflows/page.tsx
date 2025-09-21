@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Plus, AlertTriangle, WorkflowIcon, ShieldAlert, Loader2, Copy, Eye, Edit, Trash2, MoreVertical, Pencil } from 'lucide-react';
+import { Plus, AlertTriangle, WorkflowIcon, ShieldAlert, Loader2, Copy, Eye, Trash2, MoreVertical, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandIcon } from '@/components/brand-icon';
@@ -66,15 +66,6 @@ interface WorkflowFromAPI {
   description?: string;
 }
 
-interface GroupedWorkflows {
-  [key: string]: {
-    brand_name: string;
-    brand_color?: string;
-    brand_logo_url?: string | null;
-    workflows: WorkflowFromAPI[];
-  }
-}
-
 /**
  * WorkflowsPage displays a list of all content approval workflows, grouped by brand.
  * It allows users to search for workflows and provides navigation to create new ones,
@@ -86,8 +77,6 @@ export default function WorkflowsPage() {
   const [allWorkflows, setAllWorkflows] = useState<WorkflowFromAPI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
 

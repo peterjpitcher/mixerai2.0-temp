@@ -90,13 +90,13 @@ export function RestartWorkflowButton({
           <AlertDialogHeader>
             <AlertDialogTitle>Restart Workflow?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to restart the workflow for "{contentTitle}"?
+              Are you sure you want to restart the workflow for &quot;{contentTitle}&quot;?
               <br /><br />
               This will:
               <ul className="list-disc list-inside space-y-1 mt-2">
                 <li>Move the content back to the first workflow step</li>
-                <li>Reset the approval status to "pending review"</li>
-                <li>Reassign the content to the first step's reviewers</li>
+                <li>Reset the approval status to &quot;pending review&quot;</li>
+                <li>Reassign the content to the first step&rsquo;s reviewers</li>
                 <li>Preserve all feedback and version history</li>
               </ul>
               <br />

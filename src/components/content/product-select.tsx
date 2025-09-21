@@ -28,7 +28,10 @@ export function ProductSelect({ brandId, value, onChange }: ProductSelectProps) 
     enabled: Boolean(brandId),
   });
 
-  const productList: BrandProductSummary[] = (productsQuery.data ?? []) as BrandProductSummary[];
+  const productList = useMemo(
+    () => (productsQuery.data ?? []) as BrandProductSummary[],
+    [productsQuery.data]
+  );
   const { isPending, isError, refetch } = productsQuery;
 
   // Reset selection when brandId changes

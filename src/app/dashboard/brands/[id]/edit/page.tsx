@@ -547,7 +547,6 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     lastSaved,
     error: autoSaveError,
     save: triggerSave,
-    hasUnsavedChanges
   } = useAutoSave({
     data: formData,
     onSave: () => handleSave(false), // Explicitly pass false for auto-save

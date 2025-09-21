@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -70,13 +70,36 @@ export default function AccountPage() {
   });
 
   // Mock notification settings - this should be fetched and saved via an API
-  const [notificationSettings, setNotificationSettings] = useState({
-    emailNotifications: true,
-    contentUpdates: true,
-    newComments: true,
-    taskReminders: false,
-    marketingEmails: false,
-  });
+const [notificationSettings, setNotificationSettings] = useState({
+  emailNotifications: true,
+  contentUpdates: true,
+  newComments: true,
+  taskReminders: false,
+  marketingEmails: false,
+});
+const [notificationVersion, setNotificationVersion] = useState<string | null>(null);
+  const syncNotificationVersion = useCallback((response: Response, payload?: { version?: string | null }) => {
+    const etag = response.headers.get('etag');
+    const nextVersion = etag ?? (payload?.version ?? null);
+    setNotificationVersion(nextVersion);
+  }, []);
+
+  const refreshNotificationSettings = useCallback(async () => {
+    try {
+      const response = await fetch('/api/user/notification-settings', { cache: 'no-store' });
+      if (!response.ok) {
+        setNotificationVersion(null);
+        return;
+      }
+      const payload = await response.json();
+      if (payload?.success) {
+        setNotificationSettings(payload.data);
+        syncNotificationVersion(response, payload);
+      }
+    } catch (error) {
+      console.error('Failed to refresh notification settings', error);
+    }
+  }, [syncNotificationVersion]);
 
   useEffect(() => {
     async function fetchUserData() {
@@ -147,7 +170,12 @@ export default function AccountPage() {
           const notificationData = await notificationResponse.json();
           if (notificationData.success) {
             setNotificationSettings(notificationData.data);
+            syncNotificationVersion(notificationResponse, notificationData);
+          } else {
+            setNotificationVersion(null);
           }
+        } else {
+          setNotificationVersion(null);
         }
         
       } catch (error: unknown) {
@@ -162,7 +190,7 @@ export default function AccountPage() {
       }
     }
     fetchUserData();
-  }, [supabase]); // supabase.auth might be too broad, consider specific dependencies if issues arise
+  }, [supabase, syncNotificationVersion]); // supabase.auth might be too broad, consider specific dependencies if issues arise
 
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -170,24 +198,38 @@ export default function AccountPage() {
   };
 
   const handleNotificationChange = async (id: keyof typeof notificationSettings, checked: boolean) => {
-    // Update local state immediately for responsiveness
     setNotificationSettings(prev => ({ ...prev, [id]: checked }));
     
+    const headers: HeadersInit = { 'Content-Type': 'application/json' };
+    if (notificationVersion) {
+      headers['If-Match'] = notificationVersion;
+    }
+    
     try {
-      // Persist individual setting change
       const response = await apiFetch('/api/user/notification-settings', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ [id]: checked })
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to update notification setting');
+
+      const payload = await response.json().catch(() => ({ success: response.ok }));
+
+      if (!response.ok || !payload?.success) {
+        if (response.status === 412 || response.status === 428) {
+          setNotificationVersion(null);
+          await refreshNotificationSettings();
+        }
+        throw new Error(payload?.error || 'Failed to update notification setting');
       }
-    } catch {
-      // Revert on error
+
+      if (payload?.data) {
+        setNotificationSettings(payload.data);
+      }
+      syncNotificationVersion(response, payload);
+    } catch (error) {
       setNotificationSettings(prev => ({ ...prev, [id]: !checked }));
-      toast.error('Failed to update notification preference', { description: 'Please try again' });
+      const message = error instanceof Error ? error.message : 'Failed to update notification preference';
+      toast.error('Failed to update notification preference', { description: message });
     }
   };
 
@@ -222,7 +264,12 @@ export default function AccountPage() {
         job_title: profileData.jobTitle.trim()
       };
       // Only update metadata if there are actual changes to avoid unnecessary calls
-      if (Object.values(userMetadataUpdates).some(val => val !== (user.user_metadata?.[Object.keys(userMetadataUpdates)[Object.values(userMetadataUpdates).indexOf(val)]] || ''))) {
+      const metadataChanged = Object.entries(userMetadataUpdates).some(([key, value]) => {
+        const currentValue = (user.user_metadata?.[key as keyof typeof userMetadataUpdates] as string | undefined) || '';
+        return value !== currentValue;
+      });
+
+      if (metadataChanged) {
         const { error: metadataError } = await supabase.auth.updateUser({ data: userMetadataUpdates });
         if (metadataError) throw metadataError;
       }
@@ -304,16 +351,31 @@ export default function AccountPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      // Save all notification settings
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (notificationVersion) {
+        headers['If-Match'] = notificationVersion;
+      }
+
       const response = await apiFetch('/api/user/notification-settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(notificationSettings)
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to save notification settings');
+
+      const payload = await response.json().catch(() => ({ success: response.ok }));
+
+      if (!response.ok || !payload?.success) {
+        if (response.status === 412 || response.status === 428) {
+          setNotificationVersion(null);
+          await refreshNotificationSettings();
+        }
+        throw new Error(payload?.error || 'Failed to save notification settings');
       }
+
+      if (payload?.data) {
+        setNotificationSettings(payload.data);
+      }
+      syncNotificationVersion(response, payload);
       toast('Your notification preferences have been updated.', { description: 'Preferences Saved' });
     } catch (error: unknown) {
       // console.error removed

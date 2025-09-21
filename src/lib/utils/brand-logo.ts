@@ -100,7 +100,7 @@ export async function validateLogoUrl(url: string | null | undefined): Promise<b
 export function getBrandLogoUrl(
   logoUrl: string | null | undefined,
   brandName: string,
-  options: BrandLogoOptions = {}
+  _options: BrandLogoOptions = {}
 ): { url: string | null; isFallback: boolean } {
   if (logoUrl) {
     return { url: logoUrl, isFallback: false };

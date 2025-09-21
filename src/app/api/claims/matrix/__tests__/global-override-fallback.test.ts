@@ -26,10 +26,19 @@ function createMockSupabase(datasets: Record<string, any[]>) {
           if (table === 'market_claim_overrides' && field === 'market_country_code') {
             // Filter overrides by product and market values
             const prodFilter = ctx.filters.find((f: any) => f.field === 'target_product_id');
+            const targetValues = prodFilter
+              ? (Array.isArray(prodFilter.values) ? prodFilter.values : [prodFilter.value])
+              : undefined;
             const result = (datasets.market_claim_overrides || []).filter((o: any) =>
-              (!prodFilter || prodFilter.values.includes(o.target_product_id)) &&
+              (!targetValues || targetValues.includes(o.target_product_id)) &&
               values.includes(o.market_country_code)
-            );
+            ).map((override: any) => {
+              if (override.replacement_claim_id) {
+                const replacement = (datasets.replacement_claims || []).find((c: any) => c.id === override.replacement_claim_id);
+                return { ...override, replacement_claim: replacement || null };
+              }
+              return override;
+            });
             return { data: result, error: null };
           }
           if (table === 'claims' && field === 'id') {
@@ -44,16 +53,26 @@ function createMockSupabase(datasets: Record<string, any[]>) {
             return { data: datasets.products || [], error: null };
           }
           if (table === 'claims' && field === 'level') {
-            const masterBrandIds = (ctx.filters.find((f: any) => f.field === 'master_brand_id')?.values) || [];
-            const productIds = (ctx.filters.find((f: any) => f.field === 'product_id')?.values) || [];
-            const ingredientIds = (ctx.filters.find((f: any) => f.field === 'ingredient_id')?.values) || [];
-            const countryCodes = (ctx.filters.find((f: any) => f.field === 'country_code')?.values) || [];
+            const toArray = (entry: any) => {
+              if (!entry) return [];
+              if (Array.isArray(entry.values)) return entry.values;
+              if (Array.isArray(entry.value)) return entry.value;
+              return typeof entry.value !== 'undefined' ? [entry.value] : [];
+            };
+            const masterBrandIds = toArray(ctx.filters.find((f: any) => f.field === 'master_brand_id'));
+            const productIds = toArray(ctx.filters.find((f: any) => f.field === 'product_id'));
+            const ingredientIds = toArray(ctx.filters.find((f: any) => f.field === 'ingredient_id'));
+            const countryCodes = toArray(ctx.filters.find((f: any) => f.field === 'country_code'));
+            const allowedIds = toArray(ctx.filters.find((f: any) => f.field === 'id'));
             const claimsDataset = datasets.claims || [];
             const filtered = claimsDataset.filter((c: any) => {
               const levelOk = c.level === value;
-              const idOk = value === 'brand' ? masterBrandIds.includes(c.master_brand_id) :
-                           value === 'product' ? productIds.includes(c.product_id) :
-                           ingredientIds.includes(c.ingredient_id);
+              const idMatch = allowedIds.length ? allowedIds.includes(c.id) : true;
+              const idOk = value === 'brand'
+                ? (masterBrandIds.length ? masterBrandIds.includes(c.master_brand_id) : idMatch)
+                : value === 'product'
+                  ? (productIds.length ? productIds.includes(c.product_id) : idMatch)
+                  : (ingredientIds.length ? ingredientIds.includes(c.ingredient_id) : idMatch);
               const countryOk = countryCodes.length === 0 || countryCodes.includes(c.country_code);
               return levelOk && idOk && countryOk;
             });
@@ -133,4 +152,3 @@ describe('GET /api/claims/matrix', () => {
     expect(cell.activeOverride.replacementClaimText).toBe('Replacement FR');
   });
 });
-

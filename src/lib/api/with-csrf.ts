@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { User } from '@supabase/supabase-js';
 import { validateCSRFToken, CSRF_ERROR_RESPONSE } from '@/lib/csrf';
+
+let authModulePromise: Promise<typeof import('@/lib/auth/api-auth')> | null = null;
+
+async function getAuthModule() {
+  if (!authModulePromise) {
+    authModulePromise = import('@/lib/auth/api-auth');
+  }
+  return authModulePromise;
+}
 
 /**
  * Wrapper function that adds CSRF protection to API route handlers
@@ -21,7 +31,13 @@ export function withCSRF<T extends any[]>(
   return async (req: NextRequest, ...args: T): Promise<Response> => {
     // Validate CSRF token
     if (!validateCSRFToken(req)) {
-      return NextResponse.json(CSRF_ERROR_RESPONSE, { status: 403 });
+      return NextResponse.json(
+        {
+          ...CSRF_ERROR_RESPONSE,
+          timestamp: new Date().toISOString(),
+        },
+        { status: 403 }
+      );
     }
     
     // Call the original handler
@@ -41,10 +57,11 @@ export function withCSRF<T extends any[]>(
  * });
  */
 export function withAuthAndCSRF(
-  handler: (req: NextRequest, user: any, context?: unknown) => Promise<Response>
+  handler: (req: NextRequest, user: User, context?: unknown) => Promise<Response>
 ) {
-  // Import withAuth dynamically to avoid circular dependencies
-  const { withAuth } = require('@/lib/auth/api-auth');
-  
-  return withCSRF(withAuth(handler));
+  return async (req: NextRequest, context?: unknown) => {
+    const { withAuth } = await getAuthModule();
+    const protectedHandler = withAuth(handler);
+    return withCSRF(protectedHandler)(req, context);
+  };
 }

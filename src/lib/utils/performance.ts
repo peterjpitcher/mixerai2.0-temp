@@ -67,8 +67,8 @@ export function useStableCallback<T extends (...args: unknown[]) => unknown>(
     callbackRef.current = callback;
   }, [callback]);
 
-  return useCallback(
-    ((...args) => callbackRef.current(...args)) as T,
+  return useMemo(
+    () => ((...args: Parameters<T>) => callbackRef.current(...args)) as T,
     []
   );
 }
@@ -81,21 +81,25 @@ export function useIntersectionObserver(
   options?: IntersectionObserverInit
 ): boolean {
   const [isIntersecting, setIsIntersecting] = useState(false);
+  const element = ref.current;
 
   useEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-
     const observer = new IntersectionObserver(([entry]) => {
       setIsIntersecting(entry.isIntersecting);
     }, options);
-
-    observer.observe(element);
+    if (element) {
+      observer.observe(element);
+    }
 
     return () => {
-      observer.unobserve(element);
+      if (element) {
+        observer.unobserve(element);
+      }
+      if (typeof observer.disconnect === 'function') {
+        observer.disconnect();
+      }
     };
-  }, [ref, options]);
+  }, [element, options]);
 
   return isIntersecting;
 }
@@ -181,7 +185,17 @@ export function useMemoizedHandler<T extends (...args: unknown[]) => unknown>(
   handler: T,
   deps: React.DependencyList
 ): T {
-  return useCallback(handler, deps);
+  const handlerRef = useRef<T>(handler);
+
+  useEffect(() => {
+    handlerRef.current = handler;
+  }, [handler]);
+
+  return useMemo(
+    () => ((...args: Parameters<T>) => handlerRef.current(...args)) as T,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    deps
+  );
 }
 
 /**
@@ -199,7 +213,7 @@ export function useDeepCompareEffect(
     signalRef.current += 1;
   }
 
-  useEffect(effect, [signalRef.current]);
+  useEffect(effect, [signalRef.current, effect]);
 }
 
 /**

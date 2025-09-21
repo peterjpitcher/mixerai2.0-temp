@@ -2,9 +2,8 @@ import { NextResponse } from 'next/server';
 import { getOrCreateCorrelationId } from './correlation';
 import { logError } from '@/lib/logger';
 
-export function withCorrelation<T extends (...args: any[]) => Promise<Response | NextResponse>>(handler: T): T {
-  // @ts-ignore
-  return (async (...args: any[]) => {
+export function withCorrelation<T extends (...args: any[]) => Promise<Response>>(handler: T): T {
+  const wrapped = async (...args: Parameters<T>): Promise<Response> => {
     const cid = getOrCreateCorrelationId();
     try {
       const res = await handler(...args);
@@ -14,5 +13,7 @@ export function withCorrelation<T extends (...args: any[]) => Promise<Response |
       logError('[withCorrelation] api-error', { cid, e: String(e) });
       throw e;
     }
-  }) as T;
+  };
+
+  return wrapped as T;
 }

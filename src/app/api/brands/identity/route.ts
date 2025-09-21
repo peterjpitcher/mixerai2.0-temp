@@ -131,7 +131,8 @@ async function scrapeWebsiteContent(url: string): Promise<string> {
       const lookupResult = await dns.promises.lookup(parsed.hostname);
       resolvedIp = lookupResult.address;
     } catch (dnsError) {
-      throw new Error(`Could not resolve hostname: ${parsed.hostname}`);
+      const details = dnsError instanceof Error ? ` ${dnsError.message}` : '';
+      throw new Error(`Could not resolve hostname: ${parsed.hostname}.${details}`);
     }
 
     const addr = ipaddr.parse(resolvedIp);

@@ -9,7 +9,7 @@ import { generateUniqueFileName } from '@/lib/validation/file-upload';
  */
 export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
   const uploadHandler = withFileUploadValidation(
-    async (req: NextRequest, file: File) => {
+    async (req: NextRequest, file: File, _formData: FormData) => {
       try {
         const supabase = createSupabaseServerClient();
         

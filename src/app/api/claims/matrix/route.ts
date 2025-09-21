@@ -2,7 +2,6 @@ import { NextResponse, NextRequest } from 'next/server';
 import { withCorrelation } from '@/lib/observability/with-correlation';
 import { timed } from '@/lib/observability/timer';
 import { Product, EffectiveClaim, FinalClaimTypeEnum, getStackedClaimsForProduct } from '@/lib/claims-utils';
-import { GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError, isBuildPhase } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
@@ -96,7 +95,12 @@ export const GET = withCorrelation(withAuth(async (req: NextRequest) => {
     for (const p of products) {
       const eff = await getStackedClaimsForProduct(p.id, targetCountryCode);
       effectiveByProduct.set(p.id, eff);
-      eff.forEach(ec => allClaimTextsSet.add((ec.claim_text || '').trim()));
+      eff.forEach(ec => {
+        const canonicalText = (ec.original_claim_text || ec.claim_text || '').trim();
+        if (canonicalText) {
+          allClaimTextsSet.add(canonicalText);
+        }
+      });
     }
     let claimTextsAsRows: ApiClaimTextInfo[] = Array.from(allClaimTextsSet).sort().map(text => ({ text }));
     if (claimTextsAsRows.length > limitRows) claimTextsAsRows = claimTextsAsRows.slice(0, limitRows);
@@ -107,16 +111,25 @@ export const GET = withCorrelation(withAuth(async (req: NextRequest) => {
       cellData[text] = {};
       for (const product of products) {
         const eff = effectiveByProduct.get(product.id) || [];
-        const base = eff.find(ec => (ec.claim_text || '').trim() === text.trim()) || null;
+        const base = eff.find(ec => ((ec.original_claim_text || ec.claim_text || '').trim() === text.trim())) || null;
+        const overrideInfo: MarketClaimOverrideInfo | null = base && base.source_level === 'override' ? {
+          overrideId: base.override_rule_id || undefined,
+          isBlocked: Boolean((base as any).is_blocked_override),
+          masterClaimIdItOverrides: base.original_master_claim_id_if_overridden || undefined,
+          replacementClaimId: (base as any).is_replacement_override ? base.source_claim_id || null : null,
+          replacementClaimText: (base as any).is_replacement_override ? base.claim_text : null,
+          replacementClaimType: (base as any).is_replacement_override ? (base.final_claim_type as 'allowed' | 'disallowed' | null) : null,
+        } : null;
+
         const cell: MatrixCell = base ? {
           effectiveStatus: base.final_claim_type,
           effectiveClaimSourceLevel: base.source_level,
           sourceMasterClaimId: base.original_master_claim_id_if_overridden || base.source_claim_id || null,
           isActuallyMaster: !!base.isActuallyMaster,
-          activeOverride: base.source_level === 'override' ? {} : null,
+          activeOverride: overrideInfo,
           description: base.description || null,
-          isBlockedOverride: (base as any).is_blocked_override || false,
-          isReplacementOverride: (base as any).is_replacement_override || false,
+          isBlockedOverride: Boolean((base as any).is_blocked_override),
+          isReplacementOverride: Boolean((base as any).is_replacement_override),
           originalMasterClaimIdIfOverridden: base.original_master_claim_id_if_overridden || null,
           originalEffectiveClaimDetails: base,
         } : { effectiveStatus: 'none', isActuallyMaster: false, activeOverride: null, sourceMasterClaimId: null, originalEffectiveClaimDetails: null };

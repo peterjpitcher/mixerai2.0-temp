@@ -18,7 +18,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -119,6 +118,41 @@ interface EnhancedHistoryItem extends ToolRunHistoryItem {
   domain?: string;
 }
 
+const getDomainFromUrl = (url: string): string => {
+  try {
+    if (url.startsWith('data:')) return 'data:image';
+    const urlObj = new URL(url);
+    return urlObj.hostname;
+  } catch {
+    return 'invalid';
+  }
+};
+
+const enhanceHistory = (items: ToolRunHistoryItem[]): EnhancedHistoryItem[] => {
+  return items.map(item => {
+    const enhanced: EnhancedHistoryItem = { ...item };
+
+    if (item.inputs && typeof item.inputs === 'object' && 'imageUrls' in item.inputs) {
+      const imageUrls = item.inputs.imageUrls as string[];
+      enhanced.imageCount = Array.isArray(imageUrls) ? imageUrls.length : 0;
+
+      if (Array.isArray(imageUrls) && imageUrls.length > 0) {
+        enhanced.domain = getDomainFromUrl(imageUrls[0]);
+      }
+    }
+
+    if (item.outputs && typeof item.outputs === 'object' && 'results' in item.outputs) {
+      const results = item.outputs.results as AltTextResultItem[];
+      if (Array.isArray(results)) {
+        enhanced.successCount = results.filter(r => r.altText && !r.error).length;
+        enhanced.failureCount = results.filter(r => r.error).length;
+      }
+    }
+
+    return enhanced;
+  });
+};
+
 /**
  * AltTextGeneratorPage provides a tool for generating accessible alt text for images.
  * Users can provide a list of image URLs, and the tool will generate alt text
@@ -129,7 +163,7 @@ export default function AltTextGeneratorPage() {
   const [imageUrlsInput, setImageUrlsInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<AltTextResultItem[]>([]);
-  const [processedCount, setProcessedCount] = useState(0);
+  const [, setProcessedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
   const router = useRouter();
@@ -142,49 +176,10 @@ export default function AltTextGeneratorPage() {
   const [isCheckingPermissions, setIsCheckingPermissions] = useState<boolean>(true);
 
   // History State
-  const [runHistory, setRunHistory] = useState<ToolRunHistoryItem[]>([]);
+  const [, setRunHistory] = useState<ToolRunHistoryItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [enhancedHistory, setEnhancedHistory] = useState<EnhancedHistoryItem[]>([]);
-
-  // Extract domain from URL
-  const getDomainFromUrl = (url: string): string => {
-    try {
-      if (url.startsWith('data:')) return 'data:image';
-      const urlObj = new URL(url);
-      return urlObj.hostname;
-    } catch {
-      return 'invalid';
-    }
-  };
-
-  // Enhance history items with additional metadata
-  const enhanceHistory = (items: ToolRunHistoryItem[]): EnhancedHistoryItem[] => {
-    return items.map(item => {
-      const enhanced: EnhancedHistoryItem = { ...item };
-      
-      // Extract image count and success/failure counts from inputs/outputs
-      if (item.inputs && typeof item.inputs === 'object' && 'imageUrls' in item.inputs) {
-        const imageUrls = item.inputs.imageUrls as string[];
-        enhanced.imageCount = Array.isArray(imageUrls) ? imageUrls.length : 0;
-        
-        // Extract domain from first valid URL
-        if (Array.isArray(imageUrls) && imageUrls.length > 0) {
-          enhanced.domain = getDomainFromUrl(imageUrls[0]);
-        }
-      }
-      
-      if (item.outputs && typeof item.outputs === 'object' && 'results' in item.outputs) {
-        const results = item.outputs.results as AltTextResultItem[];
-        if (Array.isArray(results)) {
-          enhanced.successCount = results.filter(r => r.altText && !r.error).length;
-          enhanced.failureCount = results.filter(r => r.error).length;
-        }
-      }
-      
-      return enhanced;
-    });
-  };
 
   // Fetch current user
   useEffect(() => {

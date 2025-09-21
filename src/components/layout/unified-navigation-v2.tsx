@@ -5,7 +5,6 @@ import { usePathname, useSelectedLayoutSegments, useSearchParams } from 'next/na
 import {
   Home,
   GitBranch,
-  BookOpen,
   Building2,
   Users,
   Settings,
@@ -20,7 +19,6 @@ import {
   ListChecks,
   Loader2,
   MessageSquareWarning,
-  Info,
   ClipboardList,
   Package,
   FlaskConical,
@@ -30,7 +28,7 @@ import {
   LayoutGrid
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { useAuth, usePermissions } from '@/contexts/auth-context';
 import { useBrands } from '@/contexts/brand-context';
@@ -125,7 +123,7 @@ export function UnifiedNavigationV2({ className }: UnifiedNavigationProps) {
   }, [isAuthenticatedUser]);
 
   // Same navigation structure but using permission helpers
-  const navItemsDefinition: NavigationItem[] = [
+  const navItemsDefinition: NavigationItem[] = useMemo(() => [
     {
       href: '/dashboard',
       label: 'Dashboard',
@@ -229,15 +227,25 @@ export function UnifiedNavigationV2({ className }: UnifiedNavigationProps) {
       segment: 'help',
       show: () => isAuthenticatedUser
     },
-  ];
+  ], [
+    isAuthenticatedUser,
+    pendingTasksCount,
+    workflowBadge,
+    isViewer,
+    isPlatformAdmin,
+    isScopedAdmin,
+  ]);
+
+  const topSegment = segments[0] || '';
+  const secondSegment = segments[1] || '';
 
   // Rest of the component remains the same...
-  const isActive = (item: NavItem | NavGroupItem) => {
+  const isActive = useCallback((item: NavItem | NavGroupItem) => {
     if ('href' in item && item.href && item.href.startsWith('/dashboard/content/new?template=')) {
       if (pathname === '/dashboard/content/new') {
         if (searchParams) {
           const templateIdFromQuery = searchParams.get('template');
-          if (templateIdFromQuery && item.segment === templateIdFromQuery && segments[0] === 'content') {
+          if (templateIdFromQuery && item.segment === templateIdFromQuery && topSegment === 'content') {
             return true;
           }
         }
@@ -249,23 +257,20 @@ export function UnifiedNavigationV2({ className }: UnifiedNavigationProps) {
     }
 
     if (item.segment) {
-      const currentTopSegment = segments[0] || '';
-      const currentSecondSegment = segments[1] || '';
-
       if ('items' in item) {
-        return item.segment === currentTopSegment;
+        return item.segment === topSegment;
       } else if ('href' in item) {
         const parentGroup = navItemsDefinition.find(def => 
           'items' in def && def.items.some(subItem => 'href' in subItem && subItem.href === item.href)
         ) as NavGroupItem | undefined;
 
         if (parentGroup && parentGroup.segment) {
-          return item.segment === currentSecondSegment && parentGroup.segment === currentTopSegment;
+          return item.segment === secondSegment && parentGroup.segment === topSegment;
         } else {
           if (item.href === '/dashboard/content') {
-            return item.segment === currentTopSegment && pathname !== '/dashboard/content/new';
+            return item.segment === topSegment && pathname !== '/dashboard/content/new';
           } else {
-            return item.segment === currentTopSegment;
+            return item.segment === topSegment;
           }
         }
       }
@@ -276,7 +281,7 @@ export function UnifiedNavigationV2({ className }: UnifiedNavigationProps) {
     }
 
     return false;
-  };
+  }, [pathname, searchParams, topSegment, secondSegment, navItemsDefinition]);
 
   const toggleGroup = (label: string) => {
     setOpenGroups(prev => ({ ...prev, [label]: !prev[label] }));
@@ -294,7 +299,7 @@ export function UnifiedNavigationV2({ className }: UnifiedNavigationProps) {
       }
     });
     setOpenGroups(prev => ({ ...initialOpenGroups, ...prev }));
-  }, []);
+  }, [isActive, navItemsDefinition]);
 
   const filteredNavItems = navItemsDefinition.filter(item => !item.show || item.show());
 

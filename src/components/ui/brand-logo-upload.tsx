@@ -10,7 +10,6 @@ import { Spinner } from '@/components/spinner';
 import { 
   validateFile, 
   validateFileContent, 
-  generateUniqueFileName, 
   validateImageDimensions,
   sanitizeFileName
 } from '@/lib/validation/file-upload';

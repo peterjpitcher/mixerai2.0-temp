@@ -75,6 +75,27 @@ interface EnhancedHistoryItem extends ToolRunHistoryItem {
   failureCount?: number;
 }
 
+const enhanceHistory = (items: ToolRunHistoryItem[]): EnhancedHistoryItem[] => {
+  return items.map(item => {
+    const enhanced: EnhancedHistoryItem = { ...item };
+
+    if (item.inputs && typeof item.inputs === 'object' && 'urls' in item.inputs) {
+      const urls = item.inputs.urls as string[];
+      enhanced.urlCount = Array.isArray(urls) ? urls.length : 0;
+    }
+
+    if (item.outputs && typeof item.outputs === 'object' && 'results' in item.outputs) {
+      const results = item.outputs.results as MetadataResultItem[];
+      if (Array.isArray(results)) {
+        enhanced.successCount = results.filter(r => r.metaTitle && !r.error).length;
+        enhanced.failureCount = results.filter(r => r.error).length;
+      }
+    }
+
+    return enhanced;
+  });
+};
+
 const supportedLanguages = [
   { code: 'en', name: 'English' },
   { code: 'fr', name: 'French (Français)' },
@@ -130,7 +151,7 @@ export default function MetadataGeneratorPage() {
   const [urlsInput, setUrlsInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<MetadataResultItem[]>([]);
-  const [processedCount, setProcessedCount] = useState(0);
+  const [, setProcessedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
   const router = useRouter();
@@ -143,33 +164,10 @@ export default function MetadataGeneratorPage() {
   const [isCheckingPermissions, setIsCheckingPermissions] = useState<boolean>(true);
 
   // History State
-  const [runHistory, setRunHistory] = useState<ToolRunHistoryItem[]>([]);
+  const [, setRunHistory] = useState<ToolRunHistoryItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [enhancedHistory, setEnhancedHistory] = useState<EnhancedHistoryItem[]>([]);
-
-  // Enhance history items with additional metadata
-  const enhanceHistory = (items: ToolRunHistoryItem[]): EnhancedHistoryItem[] => {
-    return items.map(item => {
-      const enhanced: EnhancedHistoryItem = { ...item };
-      
-      // Extract URL count and success/failure counts from inputs/outputs
-      if (item.inputs && typeof item.inputs === 'object' && 'urls' in item.inputs) {
-        const urls = item.inputs.urls as string[];
-        enhanced.urlCount = Array.isArray(urls) ? urls.length : 0;
-      }
-      
-      if (item.outputs && typeof item.outputs === 'object' && 'results' in item.outputs) {
-        const results = item.outputs.results as MetadataResultItem[];
-        if (Array.isArray(results)) {
-          enhanced.successCount = results.filter(r => r.metaTitle && !r.error).length;
-          enhanced.failureCount = results.filter(r => r.error).length;
-        }
-      }
-      
-      return enhanced;
-    });
-  };
 
   // Fetch current user
   useEffect(() => {

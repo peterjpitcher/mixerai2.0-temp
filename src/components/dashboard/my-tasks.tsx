@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { TasksSkeleton } from './dashboard-skeleton';
 import { Task } from '@/types/task';
 import { formatDistanceToNow } from 'date-fns';
-import { CheckSquare } from 'lucide-react';
 import { BrandDisplay } from '@/components/ui/brand-display';
 
 async function fetchTasks(): Promise<Task[]> {

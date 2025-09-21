@@ -8,24 +8,38 @@ import { PostgrestError } from '@supabase/supabase-js';
 /**
  * Check if an error is an RLS policy violation
  */
-export function isRLSError(error: unknown): boolean {
+export function isRLSError(error: unknown): error is PostgrestError {
   if (!error || typeof error !== 'object') return false;
-  
-  const pgError = error as PostgrestError;
+
+  const candidate = error as { code?: unknown };
+  const code = typeof candidate.code === 'string' ? candidate.code.toUpperCase() : undefined;
+
   // 42501 is the PostgreSQL error code for insufficient_privilege
   // PGRST116 is PostgREST's code for RLS violations
-  return pgError.code === '42501' || pgError.code === 'PGRST116';
+  return code === '42501' || code === 'PGRST116';
 }
 
 /**
  * Extract table name from RLS error message
  */
-export function extractTableFromRLSError(error: PostgrestError): string | null {
-  if (!error.message) return null;
-  
-  // Match patterns like "new row violates row-level security policy for table "users""
-  const match = error.message.match(/for table "([^"]+)"/);
-  return match ? match[1] : null;
+export function extractTableFromRLSError(error: PostgrestError | { message?: string }): string | null {
+  const message = typeof error.message === 'string' ? error.message : '';
+  if (!message) return null;
+
+  const patterns = [
+    /for table "([^"]+)"/i,
+    /for relation "([^"]+)"/i,
+    /policy for "([^"]+)"/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -47,8 +61,7 @@ export function handleRLSError(
 
   const pgError = error as PostgrestError;
   const table = context.table || extractTableFromRLSError(pgError) || 'unknown';
-  
-  console.error('[RLS Policy Violation]', {
+  const logPayload = {
     table,
     operation: context.operation,
     userId: context.userId,
@@ -56,15 +69,19 @@ export function handleRLSError(
     errorMessage: pgError.message,
     hint: pgError.hint,
     details: pgError.details,
-    ...context.additionalContext
-  });
+    ...context.additionalContext,
+  };
+
+  console.error('[RLS Policy Violation]', logPayload);
 
   // Return user-friendly error message
   return NextResponse.json(
     {
       success: false,
       error: 'You do not have permission to perform this action.',
-      code: 'PERMISSION_DENIED'
+      code: 'PERMISSION_DENIED',
+      details: { table, operation: context.operation },
+      timestamp: new Date().toISOString(),
     },
     { status: 403 }
   );
@@ -90,7 +107,13 @@ export function validateRLSFields(
   };
 
   const required = requiredFields[table] || [];
-  const missingFields = required.filter(field => !data[field]);
+  const missingFields = required.filter((field) => {
+    if (!Object.prototype.hasOwnProperty.call(data, field)) {
+      return true;
+    }
+    const value = data[field];
+    return value === undefined || value === null || value === '';
+  });
 
   return {
     valid: missingFields.length === 0,
@@ -119,6 +142,10 @@ export async function preValidateRLSPermission(
     return { allowed: true };
   }
 
+  if (!userId) {
+    return { allowed: false, reason: 'User context is required for permission checks' };
+  }
+
   // Table-specific permission logic
   switch (table) {
     case 'brands':
@@ -129,10 +156,10 @@ export async function preValidateRLSPermission(
         };
       }
       if (operation === 'update' || operation === 'delete') {
-        return {
-          allowed: role === 'admin' && brandId !== undefined,
-          reason: 'Only brand admins can modify brands'
-        };
+        const isBrandAdmin = role === 'admin' && Boolean(brandId);
+        return isBrandAdmin
+          ? { allowed: true }
+          : { allowed: false, reason: 'Only brand admins can modify brands' };
       }
       return { allowed: true }; // SELECT is public
 
@@ -141,16 +168,15 @@ export async function preValidateRLSPermission(
         return { allowed: true }; // Public read
       }
       if (operation === 'insert' || operation === 'update') {
-        return {
-          allowed: role === 'admin' || role === 'editor',
-          reason: 'Only admins and editors can modify content'
-        };
+        const hasPermission = role === 'admin' || role === 'editor';
+        return hasPermission
+          ? { allowed: true }
+          : { allowed: false, reason: 'Only admins and editors can modify content' };
       }
       if (operation === 'delete') {
-        return {
-          allowed: role === 'admin',
-          reason: 'Only admins can delete content'
-        };
+        return role === 'admin'
+          ? { allowed: true }
+          : { allowed: false, reason: 'Only admins can delete content' };
       }
       break;
 
@@ -165,7 +191,11 @@ export async function preValidateRLSPermission(
       return { allowed: true };
 
     default:
-      // For unknown tables, be conservative
+      if (operation === 'select') {
+        // Allow reads for unhandled tables – rely on RLS as the ultimate guard
+        return { allowed: true };
+      }
+
       return {
         allowed: false,
         reason: `Permission check not implemented for table: ${table}`
@@ -186,10 +216,13 @@ export const RLS_SAFE_OPTIONS = {
   updateMinimal: { returning: 'minimal' as const },
   
   // Use for operations that might fail due to RLS
-  withErrorHandling: { 
+  withErrorHandling: {
     onError: (error: unknown) => {
       if (isRLSError(error)) {
-        console.warn('RLS policy prevented operation:', error);
+        console.warn('RLS policy prevented operation:', {
+          code: (error as PostgrestError).code,
+          message: (error as PostgrestError).message,
+        });
         return null;
       }
       throw error;

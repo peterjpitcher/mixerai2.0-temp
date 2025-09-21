@@ -77,7 +77,7 @@ describe('Rate Limiting', () => {
       await checkRateLimit(request, shortWindowConfig);
       await checkRateLimit(request, shortWindowConfig);
 
-      let result = await checkRateLimit(request, shortWindowConfig);
+      const result = await checkRateLimit(request, shortWindowConfig);
       expect(result.allowed).toBe(false);
 
       const tick = new Promise<void>((resolve) => {
@@ -127,13 +127,13 @@ describe('Rate Limiting', () => {
         await checkRateLimit(request, testConfig);
       }
 
-      let result = await checkRateLimit(request, testConfig);
-      expect(result.allowed).toBe(false);
-      const firstRetryAfter = result.retryAfter ?? 0;
+      const firstResult = await checkRateLimit(request, testConfig);
+      expect(firstResult.allowed).toBe(false);
+      const firstRetryAfter = firstResult.retryAfter ?? 0;
 
-      result = await checkRateLimit(request, testConfig);
-      expect(result.allowed).toBe(false);
-      expect(result.retryAfter ?? 0).toBeGreaterThanOrEqual(firstRetryAfter);
+      const secondResult = await checkRateLimit(request, testConfig);
+      expect(secondResult.allowed).toBe(false);
+      expect(secondResult.retryAfter ?? 0).toBeGreaterThanOrEqual(firstRetryAfter);
     });
   });
 });

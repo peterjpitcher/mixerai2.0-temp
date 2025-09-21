@@ -121,7 +121,7 @@ export const PUT = withCorrelation(withAuthAndCSRF(async (req: NextRequest, user
 
     try {
         const body = await req.json();
-        const { claim_text, claim_type, description, country_code, product_ids, ingredient_ids, country_codes } = body as any;
+        const { claim_text, claim_type, description, product_ids, ingredient_ids, country_codes } = body as any;
 
         // Level and associated entity IDs (product_id, master_brand_id, ingredient_id) are not updatable here.
         // To change those, one would typically delete and recreate the claim if necessary.

@@ -94,7 +94,7 @@ export function validateFile(
       ? [...ALLOWED_MIME_TYPES[category as keyof typeof ALLOWED_MIME_TYPES]]
       : undefined),
     allowedExtensions,
-    validateContent = true,
+    validateContent: _validateContent = true,
   } = options;
 
   const errors: string[] = [];
@@ -182,6 +182,7 @@ export async function validateFileContent(
         };
       }
     } catch (error) {
+      console.error('Failed to validate SVG content:', error);
       return {
         valid: false,
         error: 'Failed to validate SVG content',
@@ -201,42 +202,58 @@ export async function validateFileContent(
  * Sanitizes a filename for safe storage
  */
 export function sanitizeFileName(fileName: string): string {
-  const originalParts = fileName.split('.');
-  const originalExtension = originalParts.length > 1 ? originalParts.pop()!.toLowerCase() : '';
+  const SAFE_FALLBACK = 'file';
+  const normalizedInput = (fileName ?? '').replace(/\0/g, '').trim();
 
-  const segments = fileName.split(/[/\\]+/).filter(Boolean);
-  let candidate = segments.length >= 2 ? segments.slice(-2).join('-') : segments[0] || fileName;
+  const segments = normalizedInput.split(/[\\/]+/).filter(Boolean);
+  const lastSegment = segments.length ? segments[segments.length - 1] : normalizedInput;
+  const penultimateSegment = segments.length >= 2 ? segments[segments.length - 2] : '';
 
-  candidate = candidate
-    .replace(/[^a-zA-Z0-9._-]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/\.{2,}/g, '.')
-    .replace(/^\.+/, '')
-    .replace(/^-+|-+$/g, '')
-    .replace(/-+(\.)/g, '$1')
-    .trim();
+  const trimmedLastSegment = lastSegment.replace(/^\.+/, '') || lastSegment;
+  const lastSegmentParts = trimmedLastSegment.split('.');
+  const rawExtension = lastSegmentParts.length > 1 ? lastSegmentParts.pop()! : '';
+  const sanitizedExtension = rawExtension.replace(/[^a-z0-9]/gi, '').toLowerCase();
 
-  if (!candidate) {
-    candidate = 'file';
+  const baseCandidateSegments = [penultimateSegment, lastSegmentParts.join('.') || trimmedLastSegment]
+    .filter(Boolean)
+    .slice(-2);
+
+  let baseCandidate = baseCandidateSegments.length
+    ? baseCandidateSegments.join('-')
+    : trimmedLastSegment || SAFE_FALLBACK;
+
+  const sanitizeToken = (value: string) => {
+    let token = value
+      .replace(/\0/g, '')
+      .replace(/[^a-zA-Z0-9._-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/\.{2,}/g, '.')
+      .replace(/^\.+/, '')
+      .replace(/^-+|-+$/g, '')
+      .replace(/-+(\.)/g, '$1')
+      .trim();
+
+    if (!token) {
+      token = SAFE_FALLBACK;
+    }
+
+    return token;
+  };
+
+  baseCandidate = sanitizeToken(baseCandidate);
+
+  const maxBaseLength = sanitizedExtension ? Math.max(1, 255 - sanitizedExtension.length - 1) : 255;
+  if (baseCandidate.length > maxBaseLength) {
+    baseCandidate = baseCandidate.substring(0, maxBaseLength);
+    baseCandidate = baseCandidate.replace(/[-.]+$/, '');
+    baseCandidate = baseCandidate || SAFE_FALLBACK;
   }
 
-  const parts = candidate.split('.');
-
-  if (candidate.length > 255) {
-    const extension = parts.length > 1 ? parts[parts.length - 1] : '';
-    const nameWithoutExt = parts.length > 1 ? parts.slice(0, -1).join('.') : candidate;
-    const maxNameLength = 250 - extension.length;
-    candidate = extension
-      ? `${nameWithoutExt.substring(0, maxNameLength)}.${extension}`
-      : nameWithoutExt.substring(0, 250);
+  if (!sanitizedExtension) {
+    return baseCandidate.replace(/\.+$/, '') || SAFE_FALLBACK;
   }
 
-  if (originalExtension && !candidate.toLowerCase().endsWith(`.${originalExtension}`)) {
-    candidate = candidate.replace(/\.+$/, '');
-    candidate = `${candidate}.${originalExtension}`;
-  }
-
-  return candidate;
+  return `${baseCandidate}.${sanitizedExtension}`;
 }
 
 /**

@@ -78,6 +78,7 @@ export function BrandLogoWithFallback({
       )}
       <Image
         {...getBrandLogoImageProps(logoUrl, brandName, size)}
+        alt={brandName}
         className={cn(
           'object-contain w-full h-full',
           isLoading && 'opacity-0'

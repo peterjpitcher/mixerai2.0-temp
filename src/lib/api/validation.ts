@@ -1,67 +1,85 @@
-import { z, ZodError, ZodSchema } from 'zod';
+import { z, ZodSchema } from 'zod';
 import { NextResponse } from 'next/server';
+import { createErrorResponse } from '@/lib/api/error-handler';
+import { formatZodError } from '@/lib/api/error-utils';
+import type { ErrorMessageKey } from '@/lib/constants/error-messages';
 
 /**
  * Standard API validation utility
  * Validates request body against a Zod schema and returns appropriate error responses
  */
+export interface ValidateRequestOptions {
+  parser?: (request: Request) => Promise<unknown>;
+  includeErrorDetails?: boolean;
+  fallbackKey?: ErrorMessageKey;
+}
+
 export async function validateRequest<T>(
   request: Request,
-  schema: ZodSchema<T>
+  schema: ZodSchema<T>,
+  options: ValidateRequestOptions = {}
 ): Promise<{ success: true; data: T } | { success: false; response: NextResponse }> {
+  const {
+    parser = (req: Request) => req.json(),
+    includeErrorDetails = false,
+    fallbackKey = 'INVALID_INPUT',
+  } = options;
+
   try {
     // Parse JSON body
     let body: unknown;
     try {
-      body = await request.json();
+      body = await parser(request);
     } catch (error) {
+      const details = error instanceof Error ? error.message : 'Failed to parse request payload';
       return {
         success: false,
-        response: NextResponse.json(
-          { 
-            success: false, 
-            error: 'Invalid JSON in request body',
-            details: error instanceof Error ? error.message : 'Failed to parse JSON'
-          },
-          { status: 400 }
-        )
+        response: createErrorResponse(
+          new Error('Invalid JSON in request body'),
+          fallbackKey,
+          400,
+          {
+            code: 'INVALID_JSON',
+            includeDetails: includeErrorDetails,
+            extra: includeErrorDetails ? { details } : undefined,
+          }
+        ),
       };
     }
 
     // Validate against schema
-    const validatedData = schema.parse(body);
-    return { success: true, data: validatedData };
-  } catch (error) {
-    if (error instanceof ZodError) {
-      // Format Zod validation errors
-      const formattedErrors = error.errors.map(err => ({
-        field: err.path.join('.'),
-        message: err.message
-      }));
-
+    const result = schema.safeParse(body);
+    if (!result.success) {
+      const { message, details } = formatZodError(result.error);
       return {
         success: false,
-        response: NextResponse.json(
-          { 
-            success: false, 
-            error: 'Validation failed',
-            details: formattedErrors
-          },
-          { status: 400 }
-        )
+        response: createErrorResponse(
+          new Error(message),
+          fallbackKey,
+          400,
+          {
+            code: 'VALIDATION_ERROR',
+            includeDetails: includeErrorDetails,
+            extra: { details },
+          }
+        ),
       };
     }
 
+    return { success: true, data: result.data };
+  } catch (error) {
     // Unknown error
     return {
       success: false,
-      response: NextResponse.json(
-        { 
-          success: false, 
-          error: 'An unexpected error occurred during validation'
-        },
-        { status: 500 }
-      )
+      response: createErrorResponse(
+        error instanceof Error ? error : new Error('Validation failed'),
+        fallbackKey,
+        500,
+        {
+          code: 'VALIDATION_EXCEPTION',
+          includeDetails: includeErrorDetails,
+        }
+      ),
     };
   }
 }

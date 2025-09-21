@@ -53,31 +53,41 @@ export class ApiClientError extends Error {
   }
 }
 
-/**
- * Get CSRF token from cookies
- */
-function getCSRFToken(): string | null {
+const CSRF_COOKIE_NAME = 'csrf-token';
+
+function readCookieValue(name: string): string | null {
   if (typeof document === 'undefined') return null;
 
-  // Use regex to extract csrf-token from cookie string
-  const csrfMatch = document.cookie.match(/(?:^|;\s*)csrf-token=([^;]+)/);
-  if (csrfMatch && csrfMatch[1]) {
-    return csrfMatch[1];
+  const cookieSource = document.cookie;
+  if (!cookieSource) {
+    return null;
   }
 
-  // Fallback: split and parse cookies manually
-  const cookies = document.cookie.split(';');
+  const segments = cookieSource.split(';');
+  for (const segment of segments) {
+    const [rawName, ...rawValueParts] = segment.split('=');
+    if (!rawName) continue;
 
-  for (const cookie of cookies) {
-    const trimmedCookie = cookie.trim();
-    const [name, value] = trimmedCookie.split('=');
+    if (rawName.trim() === name) {
+      const rawValue = rawValueParts.join('=').trim();
+      if (!rawValue) return null;
 
-    if (name === 'csrf-token' && value) {
-      return value;
+      try {
+        return decodeURIComponent(rawValue);
+      } catch {
+        return rawValue;
+      }
     }
   }
 
   return null;
+}
+
+/**
+ * Get CSRF token from cookies
+ */
+function getCSRFToken(): string | null {
+  return readCookieValue(CSRF_COOKIE_NAME);
 }
 
 export interface ApiFetchInit extends RequestInit {
@@ -127,6 +137,44 @@ async function createClientError(
     body: parsedBody,
     response,
   });
+}
+
+function isAbortError(error: unknown): boolean {
+  if (!error) return false;
+  if (typeof DOMException !== 'undefined' && error instanceof DOMException) {
+    return error.name === 'AbortError';
+  }
+
+  return typeof error === 'object' && 'name' in (error as Record<string, unknown>) && (error as { name?: unknown }).name === 'AbortError';
+}
+
+function normalizeRequestBody(body: unknown): { body?: BodyInit; contentType?: string } {
+  if (body === undefined) {
+    return {};
+  }
+
+  if (body === null) {
+    return { body: 'null', contentType: 'application/json' };
+  }
+
+  const isBlob = typeof Blob !== 'undefined' && body instanceof Blob;
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+  const isUrlSearchParams = typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams;
+  const isReadableStream = typeof ReadableStream !== 'undefined' && body instanceof ReadableStream;
+
+  if (
+    typeof body === 'string' ||
+    body instanceof ArrayBuffer ||
+    ArrayBuffer.isView(body) ||
+    isBlob ||
+    isFormData ||
+    isUrlSearchParams ||
+    isReadableStream
+  ) {
+    return { body: body as BodyInit };
+  }
+
+  return { body: JSON.stringify(body), contentType: 'application/json' };
 }
 
 /**
@@ -190,6 +238,14 @@ export async function apiFetch(
 
       return response;
     } catch (error) {
+      if (error instanceof ApiClientError) {
+        throw error;
+      }
+
+      if (isAbortError(error)) {
+        throw error;
+      }
+
       if (attemptsRemaining > 0) {
         await new Promise((resolve) => setTimeout(resolve, delay));
         return execute(attemptsRemaining - 1);
@@ -215,8 +271,13 @@ export async function parseJsonResponse<T = unknown>(response: Response): Promis
     return undefined;
   }
 
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
   try {
-    return JSON.parse(text) as T;
+    return JSON.parse(trimmed) as T;
   } catch (error) {
     throw new ApiClientError('Failed to parse JSON response', {
       status: response.status,
@@ -251,26 +312,50 @@ export const apiClient = {
   get: (url: string, options?: ApiFetchInit) =>
     apiFetch(url, { ...options, method: 'GET' }),
 
-  post: (url: string, body?: unknown, options?: ApiFetchInit) =>
-    apiFetch(url, {
+  post: (url: string, body?: unknown, options?: ApiFetchInit) => {
+    const { body: normalizedBody, contentType } = normalizeRequestBody(body);
+    const headers = new Headers(options?.headers);
+    if (contentType && !headers.has('content-type')) {
+      headers.set('content-type', contentType);
+    }
+
+    return apiFetch(url, {
       ...options,
       method: 'POST',
-      body: typeof body === 'string' ? body : JSON.stringify(body),
-    }),
+      body: normalizedBody,
+      headers,
+    });
+  },
 
-  put: (url: string, body?: unknown, options?: ApiFetchInit) =>
-    apiFetch(url, {
+  put: (url: string, body?: unknown, options?: ApiFetchInit) => {
+    const { body: normalizedBody, contentType } = normalizeRequestBody(body);
+    const headers = new Headers(options?.headers);
+    if (contentType && !headers.has('content-type')) {
+      headers.set('content-type', contentType);
+    }
+
+    return apiFetch(url, {
       ...options,
       method: 'PUT',
-      body: typeof body === 'string' ? body : JSON.stringify(body),
-    }),
+      body: normalizedBody,
+      headers,
+    });
+  },
 
-  patch: (url: string, body?: unknown, options?: ApiFetchInit) =>
-    apiFetch(url, {
+  patch: (url: string, body?: unknown, options?: ApiFetchInit) => {
+    const { body: normalizedBody, contentType } = normalizeRequestBody(body);
+    const headers = new Headers(options?.headers);
+    if (contentType && !headers.has('content-type')) {
+      headers.set('content-type', contentType);
+    }
+
+    return apiFetch(url, {
       ...options,
       method: 'PATCH',
-      body: typeof body === 'string' ? body : JSON.stringify(body),
-    }),
+      body: normalizedBody,
+      headers,
+    });
+  },
 
   delete: (url: string, options?: ApiFetchInit) =>
     apiFetch(url, { ...options, method: 'DELETE' }),

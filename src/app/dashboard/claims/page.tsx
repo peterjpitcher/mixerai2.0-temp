@@ -29,7 +29,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select"; // For filtering
 import { useRouter } from "next/navigation";
-import { GLOBAL_CLAIM_COUNTRY_CODE, ALL_COUNTRIES_CODE } from '@/lib/constants/claims';
+import { GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
 import {
   DropdownMenu,
   DropdownMenuContent,

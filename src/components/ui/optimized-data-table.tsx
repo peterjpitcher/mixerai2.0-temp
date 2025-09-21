@@ -29,9 +29,9 @@ import {
 } from "@/components/ui/select"
 import { useDebounce } from "@/lib/utils/performance"
 
-export interface DataTableColumn<TData, TValue = unknown> {
+export interface DataTableColumn<TData> {
   id: string
-  header: string | ((props: { column: Column<TData, TValue> }) => React.ReactNode)
+  header: string | ((props: { column: Column }) => React.ReactNode)
   cell: (props: { row: TData }) => React.ReactNode
   enableSorting?: boolean
   enableFiltering?: boolean
@@ -41,7 +41,7 @@ export interface DataTableColumn<TData, TValue = unknown> {
   hideOnMobile?: boolean
 }
 
-interface Column<TData, TValue> {
+interface Column {
   id: string
   toggleSorting: (desc?: boolean) => void
   getIsSorted: () => "asc" | "desc" | false
@@ -77,7 +77,7 @@ const TableHeaderRow = React.memo(function TableHeaderRow({
       <TableRow>
         {columns.map((column) => {
           const sortState = getSortState(column.id)
-          const columnProps: Column<unknown, unknown> = {
+          const columnProps: Column = {
             id: column.id,
             toggleSorting: (desc) => onSort(column.id, desc),
             getIsSorted: () => sortState,
@@ -122,12 +122,10 @@ const TableHeaderRow = React.memo(function TableHeaderRow({
 // Memoized table row component
 const TableDataRow = React.memo(function TableDataRow({
   item,
-  index,
   columns,
   onRowClick,
 }: {
   item: unknown
-  index: number
   columns: DataTableColumn<unknown>[]
   onRowClick?: (row: unknown) => void
 }) {
@@ -345,7 +343,6 @@ export function OptimizedDataTable<TData>({
                 <TableDataRow
                   key={index}
                   item={item}
-                  index={index}
                   columns={columns as DataTableColumn<unknown>[]}
                   onRowClick={onRowClick as ((row: unknown) => void) | undefined}
                 />

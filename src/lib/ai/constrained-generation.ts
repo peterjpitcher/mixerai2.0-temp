@@ -163,8 +163,9 @@ export function processAIResponse(
       if (!regex.test(processed)) {
         warnings.push(`AI response doesn't match required pattern: ${field.config.pattern}`);
       }
-    } catch (e) {
+    } catch (error) {
       warnings.push(`Invalid regex pattern: ${field.config.pattern}`);
+      console.error('Invalid regex pattern provided to constrained generation:', error);
     }
   }
 

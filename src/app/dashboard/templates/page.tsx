@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { PlusCircle, LayoutTemplate, ShieldAlert, Copy, Eye, Edit, Trash2, MoreVertical, Pencil, Loader2 } from 'lucide-react';
+import { PlusCircle, LayoutTemplate, ShieldAlert, Copy, Eye, Trash2, MoreVertical, Pencil, Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { touchFriendly } from '@/lib/utils/touch-target';
 import type { InputField, OutputField } from '@/types/template';

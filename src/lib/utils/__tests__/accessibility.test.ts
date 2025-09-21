@@ -1,4 +1,3 @@
-import * as React from 'react';
 import {
   srOnly,
   focusRing,
@@ -9,13 +8,6 @@ import {
   skipLink,
   keyboardNavigation,
 } from '../accessibility';
-
-// Mock document for testing
-const mockElement = () => {
-  const elem = document.createElement('div');
-  document.body.appendChild(elem);
-  return elem;
-};
 
 describe('Accessibility Utilities', () => {
   afterEach(() => {

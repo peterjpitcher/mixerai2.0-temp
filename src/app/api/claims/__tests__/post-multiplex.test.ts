@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from '@jest/globals';
+import { describe, it, expect } from '@jest/globals';
 
 const RUN_DB = process.env.RUN_DB_TESTS === 'true';
 
@@ -12,4 +12,3 @@ describe('POST /api/claims multiplex associations', () => {
     expect(true).toBe(true);
   });
 });
-

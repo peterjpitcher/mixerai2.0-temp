@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
-import { requiresReauthentication } from '@/lib/auth/session-manager';
-import { validateSession } from '@/lib/auth/session-manager-simple';
+import { requiresReauthentication, validateSession } from '@/lib/auth/session-manager';
 
 export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
   try {

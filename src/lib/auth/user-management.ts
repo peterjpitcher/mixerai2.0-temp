@@ -107,10 +107,15 @@ export async function inviteNewUserWithAppMetadata(
 
     // Step 2: Update the newly invited user with secure app_metadata
     // Only proceed if user was successfully created/invited from step 1.
+    const mergedAppMetadata = {
+      ...(invitedUser.app_metadata ?? {}),
+      ...appMetadata,
+    };
+
     const { data: updatedUserData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       invitedUser.id,
       {
-        app_metadata: { ...appMetadata } // Spread to ensure a new object if appMetadata might be reused
+        app_metadata: mergedAppMetadata,
       }
     );
 

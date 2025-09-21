@@ -27,9 +27,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-export interface DataTableColumn<TData, TValue = unknown> {
+export interface DataTableColumn<TData> {
   id: string
-  header: string | ((props: { column: Column<TData, TValue> }) => React.ReactNode)
+  header: string | ((props: { column: Column }) => React.ReactNode)
   cell: (props: { row: TData }) => React.ReactNode
   enableSorting?: boolean
   enableFiltering?: boolean
@@ -39,7 +39,7 @@ export interface DataTableColumn<TData, TValue = unknown> {
   hideOnMobile?: boolean
 }
 
-interface Column<TData, TValue> {
+interface Column {
   id: string
   toggleSorting: (desc?: boolean) => void
   getIsSorted: () => "asc" | "desc" | false
@@ -204,7 +204,7 @@ export function DataTable<TData>({
           <TableHeader>
             <TableRow>
               {columns.map((column) => {
-                const columnForHeader: Column<TData, unknown> = {
+                const columnForHeader: Column = {
                   id: column.id,
                   toggleSorting: (desc) => toggleSorting(column.id, desc),
                   getIsSorted: () => getIsSorted(column.id),

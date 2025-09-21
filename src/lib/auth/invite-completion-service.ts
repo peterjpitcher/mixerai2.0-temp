@@ -143,9 +143,19 @@ export async function processInviteCompletion(
                 ...existingUserMetadata, 
                 role: parsedMeta.intendedRole 
             };
+            const updatedAppMetadata = {
+                ...appMetadata,
+                global_role: parsedMeta.intendedRole,
+                roles: Array.isArray(appMetadata.roles)
+                  ? Array.from(new Set([...(appMetadata.roles as string[]), parsedMeta.intendedRole]))
+                  : [parsedMeta.intendedRole],
+            };
             const { error: roleSetError } = await supabase.auth.admin.updateUserById(
                 userId,
-                { user_metadata: updatedUserMetadata }
+                { 
+                    user_metadata: updatedUserMetadata,
+                    app_metadata: updatedAppMetadata,
+                }
             );
             if (roleSetError) {
                 console.error(`[InviteService] Failed to set global role '${parsedMeta.intendedRole}' in user_metadata for user ${userId}:`, roleSetError.message);
