@@ -557,7 +557,7 @@ The product context is provided in the user prompt.
         { role: 'user', content: userPrompt }
       ],
       // High budget to cover all sections in a single field template
-      max_tokens: 8000,
+      max_tokens: 6000,
       temperature: 0.4,
       top_p: 0.9,
       frequency_penalty: 0,
