@@ -407,6 +407,7 @@ export type Database = {
           created_at: string
           feedback: string | null
           id: string
+          published_url: string | null
           reviewer_id: string | null
           step_name: string | null
           updated_claim_text: string | null
@@ -419,6 +420,7 @@ export type Database = {
           created_at?: string
           feedback?: string | null
           id?: string
+          published_url?: string | null
           reviewer_id?: string | null
           step_name?: string | null
           updated_claim_text?: string | null
@@ -431,6 +433,7 @@ export type Database = {
           created_at?: string
           feedback?: string | null
           id?: string
+          published_url?: string | null
           reviewer_id?: string | null
           step_name?: string | null
           updated_claim_text?: string | null
@@ -498,6 +501,7 @@ export type Database = {
           created_by: string | null
           current_workflow_step: string | null
           description: string | null
+          form_requirements: Json
           id: string
           ingredient_id: string | null
           level: Database["public"]["Enums"]["claim_level_enum"]
@@ -517,6 +521,7 @@ export type Database = {
           created_by?: string | null
           current_workflow_step?: string | null
           description?: string | null
+          form_requirements?: Json
           id?: string
           ingredient_id?: string | null
           level: Database["public"]["Enums"]["claim_level_enum"]
@@ -536,6 +541,7 @@ export type Database = {
           created_by?: string | null
           current_workflow_step?: string | null
           description?: string | null
+          form_requirements?: Json
           id?: string
           ingredient_id?: string | null
           level?: Database["public"]["Enums"]["claim_level_enum"]
@@ -611,6 +617,7 @@ export type Database = {
           assigned_user_ids: string[] | null
           created_at: string
           description: string | null
+          form_requirements: Json
           id: string
           name: string
           role: string
@@ -623,6 +630,7 @@ export type Database = {
           assigned_user_ids?: string[] | null
           created_at?: string
           description?: string | null
+          form_requirements?: Json
           id?: string
           name: string
           role: string
@@ -635,6 +643,7 @@ export type Database = {
           assigned_user_ids?: string[] | null
           created_at?: string
           description?: string | null
+          form_requirements?: Json
           id?: string
           name?: string
           role?: string
@@ -729,6 +738,7 @@ export type Database = {
           id: string
           meta_description: string | null
           meta_title: string | null
+          published_url: string | null
           published_version: number | null
           status: Database["public"]["Enums"]["content_status"]
           template_id: string | null
@@ -751,6 +761,7 @@ export type Database = {
           id?: string
           meta_description?: string | null
           meta_title?: string | null
+          published_url?: string | null
           published_version?: number | null
           status?: Database["public"]["Enums"]["content_status"]
           template_id?: string | null
@@ -773,6 +784,7 @@ export type Database = {
           id?: string
           meta_description?: string | null
           meta_title?: string | null
+          published_url?: string | null
           published_version?: number | null
           status?: Database["public"]["Enums"]["content_status"]
           template_id?: string | null
@@ -2117,6 +2129,7 @@ export type Database = {
           assigned_user_ids: string[] | null
           created_at: string | null
           description: string | null
+          form_requirements: Json
           id: string
           is_optional: boolean
           name: string
@@ -2131,6 +2144,7 @@ export type Database = {
           assigned_user_ids?: string[] | null
           created_at?: string | null
           description?: string | null
+          form_requirements?: Json
           id?: string
           is_optional?: boolean
           name: string
@@ -2145,6 +2159,7 @@ export type Database = {
           assigned_user_ids?: string[] | null
           created_at?: string | null
           description?: string | null
+          form_requirements?: Json
           id?: string
           is_optional?: boolean
           name?: string

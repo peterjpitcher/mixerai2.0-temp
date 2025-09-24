@@ -72,6 +72,8 @@ interface WorkflowStepDefinition {
   role: string;
   approvalRequired: boolean;
   assignees: UserOption[];
+  formRequirements?: Record<string, unknown>;
+  requiresPublishedUrl?: boolean;
 }
 
 interface WorkflowFull {
@@ -230,15 +232,34 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         }
         
         // If this is a duplicated workflow, work with fresh objects while retaining the duplicate's IDs
+        const mapStepsWithRequirements = (steps: WorkflowStepDefinition[] | undefined) => {
+          if (!Array.isArray(steps)) return [];
+          return steps.map((step) => {
+            const rawFormRequirements = step.formRequirements && typeof step.formRequirements === 'object'
+              ? { ...step.formRequirements }
+              : {};
+            const requiresPublishedUrl = Boolean(step.requiresPublishedUrl ?? rawFormRequirements.requiresPublishedUrl);
+            if (!requiresPublishedUrl && 'requiresPublishedUrl' in rawFormRequirements) {
+              delete (rawFormRequirements as { requiresPublishedUrl?: unknown }).requiresPublishedUrl;
+            }
+            return {
+              ...step,
+              formRequirements: rawFormRequirements,
+              requiresPublishedUrl,
+            };
+          });
+        };
+
         const processedWorkflow = isDuplicatedWorkflow
           ? {
               ...workflowData.workflow,
               // Ensure we work with fresh objects but keep the IDs generated when the duplicate shell was created
-              steps: Array.isArray(workflowData.workflow.steps)
-                ? workflowData.workflow.steps.map((step: WorkflowStepDefinition) => ({ ...step }))
-                : []
+              steps: mapStepsWithRequirements(workflowData.workflow.steps)
             }
-          : workflowData.workflow;
+          : {
+              ...workflowData.workflow,
+              steps: mapStepsWithRequirements(workflowData.workflow.steps),
+            };
         
         setWorkflow(processedWorkflow);
         setSelectedTemplateId(processedWorkflow?.template_id || 'NO_TEMPLATE_SELECTED');
@@ -483,6 +504,28 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
     });
   };
 
+  const handleUpdateStepRequiresPublishedUrl = (index: number, value: boolean) => {
+    setWorkflow((prev: WorkflowFull | null) => {
+      if (!prev) return null;
+      const newSteps = [...prev.steps];
+      const currentStep = newSteps[index];
+      const existingRequirements = currentStep.formRequirements && typeof currentStep.formRequirements === 'object'
+        ? { ...currentStep.formRequirements }
+        : {};
+      if (value) {
+        existingRequirements.requiresPublishedUrl = true;
+      } else {
+        delete (existingRequirements as { requiresPublishedUrl?: unknown }).requiresPublishedUrl;
+      }
+      newSteps[index] = {
+        ...currentStep,
+        requiresPublishedUrl: value,
+        formRequirements: existingRequirements,
+      };
+      return { ...prev, steps: newSteps };
+    });
+  };
+
   const handleGenerateStepDescription = async (index: number) => {
     if (!workflow || !workflow.steps || !workflow.steps[index]) {
       toast.error('Step data not available.');
@@ -540,7 +583,9 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
           description: '',
           role: 'editor',
           approvalRequired: true,
-          assignees: []
+          assignees: [],
+          formRequirements: {},
+          requiresPublishedUrl: false,
         }
       ];
       setAssigneeInputs(prevInputs => [...prevInputs, '']);
@@ -688,6 +733,15 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         })
         .filter((assignee): assignee is { email: string; id?: string; name?: string } => assignee !== null);
 
+      const normalizedFormRequirements = step.formRequirements && typeof step.formRequirements === 'object'
+        ? { ...step.formRequirements }
+        : {};
+      if (step.requiresPublishedUrl) {
+        normalizedFormRequirements.requiresPublishedUrl = true;
+      } else if ('requiresPublishedUrl' in normalizedFormRequirements) {
+        delete (normalizedFormRequirements as { requiresPublishedUrl?: unknown }).requiresPublishedUrl;
+      }
+
       return {
         // Ensure only necessary fields are sent, especially if step.id is temporary client-side ID
         id: step.id && typeof step.id === 'string' && !step.id.startsWith('temp_') && !step.id.startsWith('email_') ? step.id : uuidv4(), // Generate a proper UUID for new steps
@@ -697,7 +751,9 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         approvalRequired: step.approvalRequired,
         step_order: index + 1, // Maintain 1-based order for updates
         order_index: index + 1, // Provide order_index for create API compatibility
-        assignees: assigneesForPayload
+        assignees: assigneesForPayload,
+        form_requirements: normalizedFormRequirements,
+        requiresPublishedUrl: Boolean(step.requiresPublishedUrl)
       };
     });
 
@@ -1084,16 +1140,33 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
                       </div>
                       
                     <div className="flex items-center space-x-2 mb-4">
-                        <Switch
+                      <Switch
                         id={`approval-required-${index}`}
-                          checked={!step.approvalRequired}
+                        checked={!step.approvalRequired}
                         onCheckedChange={(checked) => handleUpdateStepApprovalRequired(index, !checked)}
-                          disabled={!canEditThisWorkflow}
-                        />
+                        disabled={!canEditThisWorkflow}
+                      />
                       <Label htmlFor={`approval-required-${index}`} className="text-sm font-medium cursor-pointer">
                         This step is optional (approval not strictly required)
                       </Label>
+                    </div>
+
+                    <div className="flex items-start space-x-3 mb-4">
+                      <Switch
+                        id={`requires-published-url-${index}`}
+                        checked={Boolean(step.requiresPublishedUrl)}
+                        onCheckedChange={(checked) => handleUpdateStepRequiresPublishedUrl(index, checked)}
+                        disabled={!canEditThisWorkflow}
+                      />
+                      <div>
+                        <Label htmlFor={`requires-published-url-${index}`} className="text-sm font-medium cursor-pointer">
+                          Require final published URL before completing this step
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Enable when this step represents publishing so reviewers must record the live URL before approving.
+                        </p>
                       </div>
+                    </div>
                       
                     <div className="space-y-3">
                         <Label htmlFor={`assignee-input-${index}`} className="text-sm font-medium">Assign Users <span className="text-destructive">*</span></Label>

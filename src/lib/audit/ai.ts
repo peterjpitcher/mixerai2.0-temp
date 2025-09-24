@@ -44,16 +44,19 @@ export async function logAiUsage(event: AiUsageEvent): Promise<void> {
   } as never);
 
   if (error) {
+    const message = error.message ?? 'unknown_error';
+    console.warn('[audit][ai_helper] Failed to persist audit entry:', message);
     emitMetric({
       name: 'audit.persist.failure',
       tags: { category: 'ai_helper' },
       context: {
         userId: event.userId,
         brandId: event.brandId ?? undefined,
-        error: error.message,
+        error: message,
       },
     });
-    throw new Error(`Failed to persist AI usage audit entry: ${error.message}`);
+    // Audit persistence failures should not block primary AI responses
+    return;
   }
 
   emitMetric({

@@ -439,6 +439,23 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User) => 
       }
     }
 
+    let dueDateIso: string | null = null;
+    if (data.due_date) {
+      try {
+        const provided = new Date(data.due_date);
+        if (Number.isNaN(provided.getTime())) {
+          return NextResponse.json({ success: false, error: 'Invalid due date provided.' }, { status: 400 });
+        }
+        dueDateIso = provided.toISOString();
+      } catch {
+        return NextResponse.json({ success: false, error: 'Invalid due date format.' }, { status: 400 });
+      }
+    } else {
+      const autoDueDate = new Date();
+      autoDueDate.setDate(autoDueDate.getDate() + 21);
+      dueDateIso = autoDueDate.toISOString();
+    }
+
     const newContentPayload = { // TODO: Type as TablesInsert<'content'> when types are regenerated
       brand_id: data.brand_id,
       title: finalTitle,
@@ -453,6 +470,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User) => 
       assigned_to: assignedToUsersForContent,
       status: data.status || 'draft',
       content_data: data.content_data || {},
+      due_date: dueDateIso,
     };
 
     const { data: newContentData, error: newContentError } = await supabase

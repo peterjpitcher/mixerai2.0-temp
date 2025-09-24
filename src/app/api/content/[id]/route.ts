@@ -25,6 +25,7 @@ interface ProcessedWorkflowStep {
   approval_required: boolean | null;
   assigned_user_ids: string[] | null; // Keep original for reference if needed
   assignees: AssigneeProfile[];
+  formRequirements: Record<string, unknown> | null;
 }
 
 interface WorkflowWithSteps {
@@ -172,7 +173,8 @@ export const GET = withAuth(async (request: NextRequest, user: User, context?: u
             step_order,
             role,
             approval_required,
-            assigned_user_ids
+            assigned_user_ids,
+            form_requirements
           `)
           .eq('workflow_id', content.workflow_id)
           .order('step_order', { ascending: true });
@@ -207,11 +209,13 @@ export const GET = withAuth(async (request: NextRequest, user: User, context?: u
           }
           
           processedSteps = steps.map(step => {
+            const { form_requirements, ...stepWithoutRequirements } = step as typeof step & { form_requirements?: Record<string, unknown> | null };
             const assigneesDetails = (step.assigned_user_ids && Array.isArray(step.assigned_user_ids))
               ? step.assigned_user_ids.map(userId => assigneeProfilesMap.get(userId)).filter(Boolean) as AssigneeProfile[]
               : [];
             return { 
-              ...step, 
+              ...stepWithoutRequirements,
+              formRequirements: form_requirements && typeof form_requirements === 'object' ? form_requirements : null,
               assignees: assigneesDetails 
             };
           });
@@ -332,7 +336,7 @@ export const PUT = withAuthAndCSRF(async (request: NextRequest, user: User, cont
     console.log('[API PUT /api/content/[id]] Received body (stringified):', JSON.stringify(body, null, 2));
 
     // Define allowed fields for update
-    const allowedFields = ['title', 'body', 'meta_title', 'meta_description', 'status', 'content_data', 'due_date'];
+    const allowedFields = ['title', 'body', 'meta_title', 'meta_description', 'status', 'content_data', 'due_date', 'published_url'];
     const updateData: Record<string, unknown> = {};
 
     // Filter request body to include only allowed fields

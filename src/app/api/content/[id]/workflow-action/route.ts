@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 interface WorkflowActionRequest {
   action: 'approve' | 'reject';
   feedback?: string;
+  publishedUrl?: string;
 }
 
 
@@ -41,7 +42,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
     // 1. Fetch current content and its current_step (UUID)
     const { data: currentContent, error: contentError } = await supabase
       .from('content')
-      .select('id, status, workflow_id, current_step, content_data, assigned_to, brand_id, created_by')
+      .select('id, status, workflow_id, current_step, content_data, assigned_to, brand_id, created_by, published_url')
       .eq('id', contentId)
       .single();
 
@@ -63,7 +64,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
     // Fetch current workflow step details from workflow_steps table
     const { data: currentDbStep, error: currentStepDetailsError } = await supabase
       .from('workflow_steps')
-      .select('id, name, step_order, approval_required, assigned_user_ids')
+      .select('id, name, step_order, approval_required, assigned_user_ids, form_requirements')
       .eq('id', currentContent.current_step) // current_step is UUID
       .single();
 
@@ -104,6 +105,42 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
     if (!isAuthorizedForStep) {
       console.warn(`User ${user.id} not authorized for workflow step ${currentDbStep.id}`);
       return NextResponse.json({ success: false, error: 'User is not assigned to the current step or not authorized.' }, { status: 403 });
+    }
+
+    const rawFormRequirements =
+      currentDbStep.form_requirements && typeof currentDbStep.form_requirements === 'object'
+        ? (currentDbStep.form_requirements as Record<string, unknown>)
+        : {};
+
+    const requiresPublishedUrl = Boolean(rawFormRequirements.requiresPublishedUrl);
+    let normalizedPublishedUrl: string | null = null;
+
+    if (action === 'approve') {
+      const submittedUrl = requestData.publishedUrl?.trim();
+
+      if (requiresPublishedUrl) {
+        if (!submittedUrl) {
+          return NextResponse.json(
+            { success: false, error: 'Published URL is required to complete this step.' },
+            { status: 400 }
+          );
+        }
+      }
+
+      if (submittedUrl) {
+        try {
+          const parsed = new URL(submittedUrl);
+          if (!['http:', 'https:'].includes(parsed.protocol)) {
+            throw new Error('Invalid protocol');
+          }
+          normalizedPublishedUrl = parsed.toString();
+        } catch {
+          return NextResponse.json(
+            { success: false, error: 'Please provide a valid http(s) URL.' },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     const { data: latestVersion, error: latestVersionError } = await supabase
@@ -216,7 +253,8 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
           content_json: currentContent.content_data,
           action_status: 'rejected',
           feedback: feedback || null,
-          reviewer_id: user.id
+          reviewer_id: user.id,
+          published_url: currentContent.published_url ?? null
         });
         
       if (versionError) {
@@ -308,13 +346,14 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
       } else {
         // No more steps - mark as fully approved
         new_status = 'approved';
-        
+
         const { error: updateError } = await supabase
           .from('content')
           .update({
             status: 'approved',
             current_step: null,
             assigned_to: [],
+            published_url: normalizedPublishedUrl ?? currentContent.published_url ?? null,
             updated_at: new Date().toISOString()
           })
           .eq('id', contentId);
@@ -372,7 +411,8 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
           content_json: currentContent.content_data,
           action_status: 'approved',
           feedback: feedback || null,
-          reviewer_id: user.id
+          reviewer_id: user.id,
+          published_url: normalizedPublishedUrl ?? currentContent.published_url ?? null
         });
         
       if (versionError) {
@@ -499,4 +539,4 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
   } catch (error: unknown) {
     return handleApiError(error, 'Error processing workflow action');
   }
-}); 
+});

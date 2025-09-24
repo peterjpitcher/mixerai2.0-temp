@@ -44,6 +44,7 @@ interface WorkflowStep {
   role: string;
   approvalRequired?: boolean;
   assignees: WorkflowAssignee[];
+  formRequirements?: Record<string, unknown> | null;
 }
 
 /**
@@ -111,7 +112,7 @@ export const GET = withAuth(async (
     // Fetch actual steps from workflow_steps table
     const { data: dbSteps, error: stepsError } = await supabase
       .from('workflow_steps')
-      .select('id, name, description, role, approval_required, assigned_user_ids, step_order')
+      .select('id, name, description, role, approval_required, assigned_user_ids, step_order, form_requirements')
       .eq('workflow_id', workflowId)
       .order('step_order', { ascending: true });
 
@@ -147,6 +148,7 @@ export const GET = withAuth(async (
       }
 
       processedSteps = dbSteps.map(step => {
+        const { form_requirements, ...restStep } = step as typeof step & { form_requirements?: Record<string, unknown> | null };
         let currentStepAssignees: WorkflowAssignee[] = [];
         if (step.assigned_user_ids && Array.isArray(step.assigned_user_ids)) {
           currentStepAssignees = step.assigned_user_ids.map((userId: string | null) => { // Iterate over string | null
@@ -160,12 +162,13 @@ export const GET = withAuth(async (
           }).filter(assignee => assignee !== null) as WorkflowAssignee[]; // Filter out any nulls from skipped user IDs
         }
         return {
-          id: step.id, // Keep ID as string (UUID)
-          name: step.name,
-          description: step.description || '', // Provide empty string if null
-          role: step.role || '', // Provide empty string if null
-          approvalRequired: step.approval_required ?? undefined, // Convert null to undefined
-          assignees: currentStepAssignees
+          id: restStep.id, // Keep ID as string (UUID)
+          name: restStep.name,
+          description: restStep.description || '', // Provide empty string if null
+          role: restStep.role || '', // Provide empty string if null
+          approvalRequired: restStep.approval_required ?? undefined, // Convert null to undefined
+          assignees: currentStepAssignees,
+          formRequirements: form_requirements && typeof form_requirements === 'object' ? form_requirements : null
         };
       });
     }
@@ -385,6 +388,7 @@ export const PUT = withAuthAndCSRF(async (
       body.brand_id === undefined ? (currentBrandId ?? null) : body.brand_id;
 
     const processedStepsForRpc: Record<string, unknown>[] = [];
+    const formRequirementsByOrder = new Map<number, Record<string, unknown>>();
     
     // Ensure step_order is present, using array index as a fallback
     for (let i = 0; i < stepsFromClient.length; i++) {
@@ -425,6 +429,21 @@ export const PUT = withAuthAndCSRF(async (
         }
       }
       
+      const rawFormRequirements = step.form_requirements && typeof step.form_requirements === 'object'
+        ? { ...step.form_requirements }
+        : step.formRequirements && typeof step.formRequirements === 'object'
+          ? { ...step.formRequirements }
+          : {};
+      const shouldRequirePublishedUrl = Boolean(step.requiresPublishedUrl ?? rawFormRequirements.requiresPublishedUrl);
+      if (shouldRequirePublishedUrl) {
+        rawFormRequirements.requiresPublishedUrl = true;
+      } else if ('requiresPublishedUrl' in rawFormRequirements) {
+        delete (rawFormRequirements as { requiresPublishedUrl?: unknown }).requiresPublishedUrl;
+      }
+
+      const stepOrder = (typeof step.step_order === 'number' && Number.isInteger(step.step_order)) ? step.step_order : i + 1;
+      formRequirementsByOrder.set(stepOrder, rawFormRequirements);
+
       processedStepsForRpc.push({
         id: step.id,
         name: step.name,
@@ -433,7 +452,7 @@ export const PUT = withAuthAndCSRF(async (
         approvalRequired: step.approvalRequired,
         assignees: validAssigneesForStep.map(a => a.id),
         // Ensure step_order is an integer; use index + 1 as fallback if not provided or invalid
-        step_order: (typeof step.step_order === 'number' && Number.isInteger(step.step_order)) ? step.step_order : i + 1
+        step_order: stepOrder
       });
     }
 
@@ -481,6 +500,40 @@ export const PUT = withAuthAndCSRF(async (
         },
         { status: 500 } 
       );
+    }
+
+    // Update form requirements for each step after successful RPC execution
+    if (formRequirementsByOrder.size > 0) {
+      const { data: updatedWorkflowSteps, error: fetchUpdatedStepsError } = await supabase
+        .from('workflow_steps')
+        .select('id, step_order')
+        .eq('workflow_id', workflowId);
+
+      if (fetchUpdatedStepsError) {
+        console.error(`[API Workflows PUT /${workflowId}] Failed to fetch workflow steps for form requirement updates:`, fetchUpdatedStepsError);
+      } else if (updatedWorkflowSteps && updatedWorkflowSteps.length > 0) {
+        const updatePromises = updatedWorkflowSteps
+          .filter((stepRow) => formRequirementsByOrder.has(stepRow.step_order))
+          .map(async (stepRow, idx) => {
+            const requirements = formRequirementsByOrder.get(stepRow.step_order)!;
+            const normalizedRequirements = (Object.keys(requirements).length > 0 ? requirements : {}) as Json;
+            const { error: updateError } = await supabase
+              .from('workflow_steps')
+              .update({ form_requirements: normalizedRequirements })
+              .eq('id', stepRow.id);
+
+            if (updateError) {
+              console.error(
+                `[API Workflows PUT /${workflowId}] Failed to update form requirements for step (index ${idx}):`,
+                updateError
+              );
+            }
+          });
+
+        if (updatePromises.length > 0) {
+          await Promise.all(updatePromises);
+        }
+      }
     }
 
     const { data: finalWorkflowData, error: finalFetchError } = await supabase

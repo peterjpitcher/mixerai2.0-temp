@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { checkRateLimit, getRateLimitType } from '../rate-limit-simple';
+import { checkRateLimit as advancedCheckRateLimit } from '../rate-limit';
 
 jest.mock('../rate-limit', () => {
   const actual = jest.requireActual('../rate-limit');
@@ -18,7 +19,7 @@ jest.mock('../rate-limit', () => {
   };
 });
 
-const mockedAdvanced = require('../rate-limit').checkRateLimit as jest.Mock;
+const mockedAdvanced = jest.mocked(advancedCheckRateLimit);
 
 const buildRequest = (pathname: string) =>
   new NextRequest(`https://example.com${pathname}`, {

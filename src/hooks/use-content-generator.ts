@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { apiFetch } from '@/lib/api-client';
+import { ApiClientError, apiFetch, apiFetchJson } from '@/lib/api-client';
 import { normalizeOutputsMap } from '@/lib/content/html-normalizer';
 import type { InputField, OutputField, ContentTemplate as Template, FieldType, NormalizedContent } from '@/types/template';
 import type { ProductContext } from '@/types/claims';
@@ -268,18 +268,20 @@ export function useContentGenerator(templateId?: string | null) {
         ...(inputPayload ? { input: inputPayload } : {}),
       };
 
-      const response = await apiFetch('/api/content/generate', {
-        method: 'POST',
-        body: JSON.stringify(requestBody),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate content');
-      }
-      
-      if (data.success) {
+      const data = await apiFetchJson<{
+        success?: boolean;
+        error?: string;
+        generatedOutputs?: Record<string, unknown>;
+        code?: string;
+      }>(
+        '/api/content/generate',
+        {
+          method: 'POST',
+          body: JSON.stringify(requestBody),
+        },
+      );
+
+      if (data?.success) {
         const normalized = normalizeOutputsMap(
           data.generatedOutputs as Record<string, unknown>,
           template.outputFields || []
@@ -296,7 +298,21 @@ export function useContentGenerator(templateId?: string | null) {
       }
     } catch (error: unknown) {
       console.error('Generation error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to generate content';
+      let errorMessage = 'Failed to generate content';
+
+      if (error instanceof ApiClientError) {
+        const errorBody = error.body;
+        if (errorBody && typeof errorBody === 'object' && 'error' in errorBody) {
+          errorMessage = String((errorBody as { error?: unknown }).error ?? error.message);
+        } else if (typeof errorBody === 'string' && errorBody.trim()) {
+          errorMessage = errorBody;
+        } else {
+          errorMessage = error.message;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
       setAiError(errorMessage);
       toast.error(errorMessage);
     } finally {

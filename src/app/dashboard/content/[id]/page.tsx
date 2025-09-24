@@ -56,9 +56,10 @@ interface ContentData {
   content_data?: Record<string, unknown>;
   created_at: string;
   workflow_id?: string;
-  workflow?: { id: string; name: string; steps: unknown[] };
+  workflow?: { id: string; name: string; steps: WorkflowStep[] };
   current_step: number;
   versions?: ContentVersion[];
+  published_url?: string | null;
 }
 
 interface ContentVersion {
@@ -75,6 +76,7 @@ interface ContentVersion {
     generatedOutputs?: Record<string, unknown>;
     body_snapshot?: string;
   } | null;
+  published_url?: string | null;
 }
 
 interface ContentDetailPageProps {
@@ -624,7 +626,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
 
         <div className="lg:col-span-1 space-y-6">
            {content.workflow_id && content.workflow && currentUserId && (
-            <ContentApprovalWorkflow
+          <ContentApprovalWorkflow
               contentId={content.id}
               contentTitle={content.title}
               currentStepObject={currentStepObject}
@@ -632,6 +634,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
               versions={versions}
               template={template}
               onActionComplete={handleWorkflowAction}
+              initialPublishedUrl={content.published_url ?? null}
             />
           )}
         </div>

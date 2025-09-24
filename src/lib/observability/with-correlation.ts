@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server';
 import { getOrCreateCorrelationId } from './correlation';
 import { logError } from '@/lib/logger';
 

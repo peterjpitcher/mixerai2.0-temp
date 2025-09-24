@@ -153,11 +153,6 @@ interface EffectiveClaimRpcRow {
   source_entity_id?: string | null;
 }
 
-type EffectiveClaimsRpcParams = {
-  p_product_id: string;
-  p_country_code: string;
-};
-
 const CLAIM_SELECT = 'id, claim_text, claim_type, level, master_brand_id, product_id, ingredient_id, country_code, description, created_by, created_at, updated_at';
 
 const resolveLevel = (claim: Claim): ClaimLevelEnum => {

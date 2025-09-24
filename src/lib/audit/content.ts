@@ -32,16 +32,19 @@ export async function logContentGenerationAudit(event: ContentAuditEvent): Promi
   } as never);
 
   if (error) {
+    const message = error.message ?? 'unknown_error';
+    console.warn('[audit][content_generation] Failed to persist audit entry:', message);
     emitMetric({
       name: 'audit.persist.failure',
       tags: { category: 'content_generation' },
       context: {
         userId: event.userId,
         brandId: event.brandId ?? undefined,
-        error: error.message,
+        error: message,
       },
     });
-    throw new Error(`Failed to persist content generation audit entry: ${error.message}`);
+    // Do not block core flow if audit persistence fails (e.g., function missing, privilege issues)
+    return;
   }
 
   emitMetric({

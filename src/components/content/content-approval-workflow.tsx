@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -23,6 +24,7 @@ export interface WorkflowStep {
   role?: string;
   approvalRequired?: boolean;
   assignees?: Array<{ id?: string; email?: string; name?: string; avatar_url?: string }>;
+  formRequirements?: { requiresPublishedUrl?: boolean } | null;
 }
 
 interface ContentVersion {
@@ -66,6 +68,7 @@ interface ContentApprovalWorkflowProps {
   template?: TemplateForHistory | null; // Added template prop
   onActionComplete: () => void;
   performContentSave?: () => Promise<boolean>;
+  initialPublishedUrl?: string | null;
 }
 
 export function ContentApprovalWorkflow({
@@ -76,10 +79,18 @@ export function ContentApprovalWorkflow({
   versions,
   template, // Added template prop
   onActionComplete,
-  performContentSave
+  performContentSave,
+  initialPublishedUrl
 }: ContentApprovalWorkflowProps) {
   const [feedback, setFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [publishedUrl, setPublishedUrl] = useState(initialPublishedUrl ?? '');
+
+  React.useEffect(() => {
+    setPublishedUrl(initialPublishedUrl ?? '');
+  }, [initialPublishedUrl]);
+
+  const requiresPublishedUrl = Boolean(currentStepObject?.formRequirements?.requiresPublishedUrl);
 
   const handleSubmitAction = async (action: 'approve' | 'reject') => {
     console.log('[ContentApprovalWorkflow] handleSubmitAction called with action:', action);
@@ -92,6 +103,21 @@ export function ContentApprovalWorkflow({
       toast.error('Feedback is required for rejection.');
       console.warn('[ContentApprovalWorkflow] Feedback required for rejection.');
       return;
+    }
+    if (action === 'approve' && requiresPublishedUrl) {
+      if (!publishedUrl.trim()) {
+        toast.error('Please provide the final published URL before completing this step.');
+        return;
+      }
+      try {
+        const parsed = new URL(publishedUrl.trim());
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          throw new Error('Invalid protocol');
+        }
+      } catch {
+        toast.error('Please enter a valid http(s) URL.');
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -122,7 +148,7 @@ export function ContentApprovalWorkflow({
       const response = await apiFetch(`/api/content/${contentId}/workflow-action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, feedback }),
+        body: JSON.stringify({ action, feedback, publishedUrl: requiresPublishedUrl ? publishedUrl.trim() : undefined }),
       });
       console.log('[ContentApprovalWorkflow] API response status:', response.status);
       const result = await response.json();
@@ -311,6 +337,22 @@ export function ContentApprovalWorkflow({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {requiresPublishedUrl && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium" htmlFor="published-url">Final Published URL</label>
+            <Input
+              id="published-url"
+              value={publishedUrl}
+              onChange={(event) => setPublishedUrl(event.target.value)}
+              placeholder="https://example.com/published-article"
+              disabled={isSubmitting}
+            />
+            <p className="text-xs text-muted-foreground">
+              Provide the public link where this content will live once published.
+            </p>
           </div>
         )}
 

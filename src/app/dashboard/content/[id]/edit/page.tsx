@@ -48,8 +48,9 @@ interface ContentState {
   content_data?: Record<string, unknown>;
   workflow_id?: string | null;
   current_step?: number | null;
-  workflow?: { id: string; name: string; steps: unknown[] };
+  workflow?: { id: string; name: string; steps: WorkflowStep[] };
   due_date?: string | null;
+  published_url?: string | null;
   // Add other fields from your actual content structure as needed
   // Add fields for actual template output fields if they need to be directly editable
   // For example, if an outputField from template is 'summary', you might add: summary?: string;
@@ -86,6 +87,7 @@ interface ContentVersion {
   content_json?: { // Added for displaying content at this step
     generatedOutputs?: Record<string, unknown>;
   } | null;
+  published_url?: string | null;
 }
 
 // Define Template related interfaces if not imported
@@ -143,6 +145,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     content_data: {},
     workflow_id: null,
     current_step: null,
+    published_url: null,
   });
 
   const [versions, setVersions] = useState<ContentVersion[]>([]);
@@ -564,6 +567,14 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     );
   }
 
+  const currentWorkflowStep = content.workflow?.steps?.find(
+    (step) => String(step.id) === String(content.current_step ?? '')
+  ) as WorkflowStep | undefined;
+
+  const isCurrentUserStepOwner = Boolean(
+    currentWorkflowStep?.assignees?.some((assignee) => assignee.id === currentUser?.id)
+  );
+
   return (
     <div className="space-y-6">
       <BreadcrumbNav items={[
@@ -698,14 +709,13 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             <ContentApprovalWorkflow
               contentId={content.id}
               contentTitle={content.title}
-              currentStepObject={content.workflow.steps.find(
-                (step: unknown) => (step as { id?: unknown }).id === content.current_step
-              ) as WorkflowStep | undefined}
-              isCurrentUserStepOwner={content.workflow.steps.some((step: unknown) => (step as Record<string, unknown>).id === content.current_step && ((step as Record<string, unknown>).assignees as Record<string, unknown>[])?.some((assignee: Record<string, unknown>) => assignee.id === currentUser?.id))}
+              currentStepObject={currentWorkflowStep}
+              isCurrentUserStepOwner={isCurrentUserStepOwner}
               versions={versions}
               template={template}
               onActionComplete={handleWorkflowActionCompletion}
               performContentSave={handleSave}
+              initialPublishedUrl={content.published_url ?? null}
             />
           )}
           {!content.workflow && <Card><CardContent><p className="text-muted-foreground py-4">No workflow associated with this content.</p></CardContent></Card>}

@@ -9,7 +9,7 @@ import {
   isPlatformAdminUser,
   requireBrandAdminAccess,
 } from '@/lib/auth/brand-access';
-import type { TablesInsert } from '@/types/supabase';
+import type { Json, TablesInsert } from '@/types/supabase';
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +29,10 @@ const prepareStepForTableInsertion = (sourceStep: unknown, newWorkflowId: string
     description: String(step.description || ''),
     is_optional: typeof step.is_optional === 'boolean' ? step.is_optional : false,
     approval_required: typeof step.approval_required === 'boolean' ? step.approval_required : true,
+    form_requirements:
+      step.form_requirements && typeof step.form_requirements === 'object'
+        ? (step.form_requirements as Json)
+        : ({} as Json),
     // assigned_user_ids: '{}', // Default to empty array of user IDs if your table uses this
     // step_id: step.step_id || uuidv4(), // If your table has a separate step_id that needs to be unique
                                             // and is different from the primary key id.
