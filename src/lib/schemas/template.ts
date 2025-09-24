@@ -16,12 +16,21 @@ export const OutputFieldSchema = z.object({
   helpText: z.string().optional(),
   minChars: z.number().int().positive().optional(),
   maxChars: z.number().int().positive().optional(),
+  minWords: z.number().int().positive().optional(),
+  maxWords: z.number().int().positive().optional(),
 }).superRefine((data, ctx) => {
   if (typeof data.minChars === 'number' && typeof data.maxChars === 'number' && data.minChars >= data.maxChars) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['minChars'],
       message: 'Minimum character count must be less than maximum character count',
+    });
+  }
+  if (typeof data.minWords === 'number' && typeof data.maxWords === 'number' && data.minWords >= data.maxWords) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['minWords'],
+      message: 'Minimum word count must be less than maximum word count',
     });
   }
 });

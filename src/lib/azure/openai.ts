@@ -495,6 +495,30 @@ The product context is provided in the user prompt.
       userPrompt += `   Apply Guardrails: ${brand.guardrails}\n`;
     }
 
+    const wordDirectives: string[] = [];
+    if (typeof field.minWords === 'number' && typeof field.maxWords === 'number') {
+      wordDirectives.push(`between ${field.minWords} and ${field.maxWords} words`);
+    } else if (typeof field.minWords === 'number') {
+      wordDirectives.push(`at least ${field.minWords} words`);
+    } else if (typeof field.maxWords === 'number') {
+      wordDirectives.push(`no more than ${field.maxWords} words`);
+    }
+    if (wordDirectives.length) {
+      userPrompt += `   Word Count: ${wordDirectives.join(' and ')}.\n`;
+    }
+
+    const charDirectives: string[] = [];
+    if (typeof field.minChars === 'number' && typeof field.maxChars === 'number') {
+      charDirectives.push(`between ${field.minChars} and ${field.maxChars} characters`);
+    } else if (typeof field.minChars === 'number') {
+      charDirectives.push(`at least ${field.minChars} characters`);
+    } else if (typeof field.maxChars === 'number') {
+      charDirectives.push(`no more than ${field.maxChars} characters`);
+    }
+    if (charDirectives.length) {
+      userPrompt += `   Character Count: ${charDirectives.join(' and ')}.\n`;
+    }
+
     const isRich = field.type === 'richText' || field.type === 'html';
     userPrompt += `   Output Type: ${isRich ? 'HTML_FRAGMENT' : 'PLAIN_TEXT'}\n`;
     if (!isSingleFieldHtml) {
@@ -537,8 +561,8 @@ The product context is provided in the user prompt.
         { role: "user", content: userPrompt }
       ],
       response_format: { type: "json_object" as const },
-      // For multiple fields, keep a balanced budget
-      max_tokens: Math.min(2200, 400 + (template.outputFields?.length || 1) * 400),
+      // For multiple fields, keep a balanced budget but cap to stay within runtime limits
+      max_tokens: Math.min(4000, 400 + (template.outputFields?.length || 1) * 400),
       temperature: 0.3,
       top_p: 0.9,
       frequency_penalty: 0,
@@ -556,8 +580,8 @@ The product context is provided in the user prompt.
         )},
         { role: 'user', content: userPrompt }
       ],
-      // High budget to cover all sections in a single field template
-      max_tokens: 6000,
+      // High budget to cover all sections in a single field template while respecting runtime limits
+      max_tokens: 4000,
       temperature: 0.4,
       top_p: 0.9,
       frequency_penalty: 0,
@@ -662,6 +686,22 @@ The product context is provided in the user prompt.
       return { min, max };
     };
 
+    const getWordConstraints = (field: TemplateOutputField): { min?: number; max?: number } | null => {
+      const derived = getWordRange(field);
+      const constraints: { min?: number; max?: number } = {};
+      if (derived) {
+        constraints.min = derived.min;
+        constraints.max = derived.max;
+      }
+      if (typeof field?.minWords === 'number') {
+        constraints.min = field.minWords;
+      }
+      if (typeof field?.maxWords === 'number') {
+        constraints.max = field.maxWords;
+      }
+      return typeof constraints.min === 'number' || typeof constraints.max === 'number' ? constraints : null;
+    };
+
     const normalizeValueForField = (field: TemplateOutputField, rawValue: unknown): NormalizedContent => {
       if (rawValue && typeof rawValue === 'object' && 'html' in (rawValue as Record<string, unknown>) && 'plain' in (rawValue as Record<string, unknown>)) {
         const existing = rawValue as Partial<NormalizedContent>;
@@ -725,7 +765,7 @@ The product context is provided in the user prompt.
       const fallbackSystemPrompt = systemParts.join('\n');
 
       const inputFieldSummaries = (template.inputFields ?? []).map((field) => `- ${field.name}: ${field.value || ''}`).join('\n');
-      const wordRange = getWordRange(singleField);
+      const wordRange = getWordConstraints(singleField);
       const charConstraints = getCharConstraints(singleField);
 
       const userSections: string[] = [];
@@ -755,7 +795,16 @@ The product context is provided in the user prompt.
 
       const constraintParts: string[] = [];
       if (wordRange) {
-        constraintParts.push(`Aim for ${wordRange.min}–${wordRange.max} words after sanitisation.`);
+        if (typeof wordRange.min === 'number' && typeof wordRange.max === 'number') {
+          constraintParts.push(`Aim for ${wordRange.min}–${wordRange.max} words after sanitisation.`);
+        } else {
+          if (typeof wordRange.min === 'number') {
+            constraintParts.push(`Ensure the response has at least ${wordRange.min} words after sanitisation.`);
+          }
+          if (typeof wordRange.max === 'number') {
+            constraintParts.push(`Ensure the response has no more than ${wordRange.max} words after sanitisation.`);
+          }
+        }
       }
       if (typeof charConstraints.min === 'number' || typeof charConstraints.max === 'number') {
         const charText: string[] = [];
@@ -779,7 +828,7 @@ The product context is provided in the user prompt.
         const fallbackResult = await generateTextCompletion(
           fallbackSystemPrompt,
           fallbackUserPrompt,
-          8000,
+          4000,
           0.4
         );
 
@@ -795,17 +844,19 @@ The product context is provided in the user prompt.
     };
 
     const out: Record<string, NormalizedContent> = {};
-    const wordCountViolations: Array<{ field: TemplateOutputField; words: number; range: { min: number; max: number } }> = [];
+    const wordCountViolations: Array<{ field: TemplateOutputField; words: number; range: { min?: number; max?: number } }> = [];
     const charCountViolations: Array<{ field: TemplateOutputField; chars: number; constraints: { min?: number; max?: number } }> = [];
     let json: Record<string, unknown> | null = null;
 
     if (isSingleHtml && singleField) {
       const normalized = normalizeValueForField(singleField, content);
       out[singleField.id] = normalized;
-      const range = getWordRange(singleField);
+      const range = getWordConstraints(singleField);
       if (range) {
         const words = normalized.wordCount;
-        if (words < range.min || words > range.max) {
+        const belowMin = typeof range.min === 'number' ? words < range.min : false;
+        const aboveMax = typeof range.max === 'number' ? words > range.max : false;
+        if (belowMin || aboveMax) {
           wordCountViolations.push({ field: singleField, words, range });
         }
       }
@@ -911,10 +962,12 @@ The product context is provided in the user prompt.
         const raw = parsedJson[f.id];
         const normalized = normalizeValueForField(f, raw);
         out[f.id] = normalized;
-        const range = getWordRange(f);
+        const range = getWordConstraints(f);
         if (range) {
           const words = normalized.wordCount;
-          if (words < range.min || words > range.max) {
+          const belowMin = typeof range.min === 'number' ? words < range.min : false;
+          const aboveMax = typeof range.max === 'number' ? words > range.max : false;
+          if (belowMin || aboveMax) {
             wordCountViolations.push({ field: f, words, range });
           }
         }
@@ -934,7 +987,7 @@ The product context is provided in the user prompt.
     const retryCandidates: Array<{
       field: TemplateOutputField;
       reason: 'empty' | 'word_range' | 'char_range';
-      range?: { min: number; max: number };
+      range?: { min?: number; max?: number };
       words?: number;
       chars?: number;
       constraints?: { min?: number; max?: number };
@@ -950,7 +1003,7 @@ The product context is provided in the user prompt.
     if (retryCandidates.length > 0) {
       for (const candidate of retryCandidates) { 
         const f = candidate.field;
-        const fieldWordRange = getWordRange(f);
+        const fieldWordRange = getWordConstraints(f);
         const fieldCharConstraints = getCharConstraints(f);
         try {
           const singleFieldSystemPrompt = (() => {
@@ -978,7 +1031,16 @@ The product context is provided in the user prompt.
             if (brand.guardrails && f.useGuardrails) sp += ` Content guardrails: ${brand.guardrails}.`;
             const range = fieldWordRange;
             if (range) {
-              sp += ` Responses that are not between ${range.min} and ${range.max} words are invalid—revise before replying.`;
+              const bounds: string[] = [];
+              if (typeof range.min === 'number' && typeof range.max === 'number') {
+                bounds.push(`between ${range.min} and ${range.max} words`);
+              } else {
+                if (typeof range.min === 'number') bounds.push(`at least ${range.min} words`);
+                if (typeof range.max === 'number') bounds.push(`no more than ${range.max} words`);
+              }
+              if (bounds.length > 0) {
+                sp += ` Responses that are not ${bounds.join(' and ')} are invalid—revise before replying.`;
+              }
             }
             const charConstraints = fieldCharConstraints;
             if (typeof charConstraints.min === 'number' || typeof charConstraints.max === 'number') {
@@ -1000,7 +1062,16 @@ The product context is provided in the user prompt.
           }
           if (candidate.reason === 'word_range' && candidate.range) {
             const previousCount = typeof candidate.words === 'number' ? candidate.words : 'UNKNOWN';
-            singleFieldUserPrompt += `\nThe previous draft contained ${previousCount} words. Regenerate so the response falls strictly between ${candidate.range.min} and ${candidate.range.max} words.`;
+            const wordLimits: string[] = [];
+            if (typeof candidate.range.min === 'number') {
+              wordLimits.push(`at least ${candidate.range.min} words`);
+            }
+            if (typeof candidate.range.max === 'number') {
+              wordLimits.push(`no more than ${candidate.range.max} words`);
+            }
+            if (wordLimits.length > 0) {
+              singleFieldUserPrompt += `\nThe previous draft contained ${previousCount} words. Regenerate so the response stays ${wordLimits.join(' and ')}.`;
+            }
           }
           if (candidate.reason === 'char_range' && candidate.constraints) {
             const parts: string[] = [];
@@ -1035,15 +1106,15 @@ The product context is provided in the user prompt.
               ? candidate.constraints.max
               : fieldCharConstraints.max;
             if (typeof candidateCharMax === 'number' && candidateCharMax > 0) {
-              return Math.min(8000, Math.max(800, Math.ceil(candidateCharMax / 3))); // rough tokens≈chars/3
+              return Math.min(4000, Math.max(800, Math.ceil(candidateCharMax / 3))); // rough tokens≈chars/3
             }
             const candidateWordMax = (candidate.reason === 'word_range' && candidate.range)
               ? candidate.range.max
               : fieldWordRange?.max;
             if (typeof candidateWordMax === 'number' && candidateWordMax > 0) {
-              return Math.min(8000, Math.max(800, Math.ceil(candidateWordMax * 1.5)));
+              return Math.min(4000, Math.max(800, Math.ceil(candidateWordMax * 1.5)));
             }
-            return isSingleFieldHtml ? 8000 : 1500;
+            return isSingleFieldHtml ? 4000 : 1500;
           })();
 
           const singleReq = {
@@ -1072,11 +1143,16 @@ The product context is provided in the user prompt.
             const normalized = normalizeValueForField(f, raw);
             if (normalized.html.trim().length > 0 || normalized.plain.trim().length > 0) {
               out[f.id] = normalized;
-              const postRange = getWordRange(f);
+              const postRange = getWordConstraints(f);
               if (postRange) {
                 const words = normalized.wordCount;
-                if (words < postRange.min || words > postRange.max) {
-                  console.warn(`Field ${f.id} still violates word count after retry (${words} words, expected ${postRange.min}-${postRange.max}).`);
+                const belowMin = typeof postRange.min === 'number' ? words < postRange.min : false;
+                const aboveMax = typeof postRange.max === 'number' ? words > postRange.max : false;
+                if (belowMin || aboveMax) {
+                  const limits: string[] = [];
+                  if (typeof postRange.min === 'number') limits.push(`min ${postRange.min}`);
+                  if (typeof postRange.max === 'number') limits.push(`max ${postRange.max}`);
+                  console.warn(`Field ${f.id} still violates word count after retry (${words} words, expected ${limits.join(', ')}).`);
                 }
               }
               const postChar = getCharConstraints(f);

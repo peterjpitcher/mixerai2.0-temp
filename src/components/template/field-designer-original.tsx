@@ -466,15 +466,19 @@ const initializeFieldData = (fieldType: 'input' | 'output', initialData: Field |
       minChars:
         typeof initialData.minChars === 'number'
           ? initialData.minChars
-          : typeof legacyOutputData.minWords === 'number'
-            ? legacyOutputData.minWords
-            : undefined,
+          : undefined,
       maxChars:
         typeof initialData.maxChars === 'number'
           ? initialData.maxChars
-          : typeof legacyOutputData.maxWords === 'number'
-            ? legacyOutputData.maxWords
-            : undefined
+          : undefined,
+      minWords:
+        typeof legacyOutputData.minWords === 'number'
+          ? legacyOutputData.minWords
+          : undefined,
+      maxWords:
+        typeof legacyOutputData.maxWords === 'number'
+          ? legacyOutputData.maxWords
+          : undefined
     }, ['aiAutoComplete', 'useBrandIdentity', 'useToneOfVoice', 'useGuardrails']);
     return outputData;
   }
@@ -587,8 +591,24 @@ export function FieldDesigner({
     });
   };
 
-  const handleCharLimitChange = (key: 'minChars' | 'maxChars', value: number | undefined) => {
-    setFieldData(prev => ({ ...prev, [key]: value }) as Field);
+  const handleLimitChange = (
+    key: 'minChars' | 'maxChars' | 'minWords' | 'maxWords',
+    value: number | undefined
+  ) => {
+    setFieldData(prev => {
+      if (isOutputField(prev)) {
+        return { ...prev, [key]: value } as OutputField;
+      }
+      return prev;
+    });
+  };
+
+  const parseNumericValue = (value: string): number | undefined => {
+    if (value === '') {
+      return undefined;
+    }
+    const parsed = Number.parseInt(value, 10);
+    return Number.isNaN(parsed) ? undefined : parsed;
   };
   
   const onPromptSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
@@ -730,7 +750,7 @@ export function FieldDesigner({
       return false;
     }
     if (fieldType === 'output') {
-      const { minChars, maxChars } = fieldData as OutputField;
+      const { minChars, maxChars, minWords, maxWords } = fieldData as OutputField;
       if (typeof minChars === 'number' && minChars <= 0) {
         sonnerToast.error('Minimum character count must be greater than zero.');
         setActiveTab('ai');
@@ -743,6 +763,21 @@ export function FieldDesigner({
       }
       if (typeof minChars === 'number' && typeof maxChars === 'number' && minChars >= maxChars) {
         sonnerToast.error('Minimum character count must be less than maximum character count.');
+        setActiveTab('ai');
+        return false;
+      }
+      if (typeof minWords === 'number' && minWords <= 0) {
+        sonnerToast.error('Minimum word count must be greater than zero.');
+        setActiveTab('ai');
+        return false;
+      }
+      if (typeof maxWords === 'number' && maxWords <= 0) {
+        sonnerToast.error('Maximum word count must be greater than zero.');
+        setActiveTab('ai');
+        return false;
+      }
+      if (typeof minWords === 'number' && typeof maxWords === 'number' && minWords >= maxWords) {
+        sonnerToast.error('Minimum word count must be less than maximum word count.');
         setActiveTab('ai');
         return false;
       }
@@ -901,33 +936,66 @@ export function FieldDesigner({
             </div>
             </div>
           </div>
-          <div className="pt-4">
-            <Label className="font-medium">Character Count Targeting</Label>
-            <p className="text-xs text-muted-foreground pb-2">
-              Set explicit character-length bounds to enforce during AI generation. Leave blank to rely on prompt instructions only.
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="output-min-chars">Min characters</Label>
-                <Input
-                  id="output-min-chars"
-                  type="number"
-                  inputMode="numeric"
-                  value={outputFieldData.minChars ?? ''}
-                  onChange={(e) => handleCharLimitChange('minChars', e.target.value ? parseInt(e.target.value, 10) || undefined : undefined)}
-                  placeholder="e.g. 800"
-                />
+          <div className="pt-4 space-y-4">
+            <div>
+              <Label className="font-medium">Word Count Targeting</Label>
+              <p className="text-xs text-muted-foreground pb-2">
+                Ideal for long-form copy. Leave blank if you prefer to steer length through the prompt instead.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="output-min-words">Min words</Label>
+                  <Input
+                    id="output-min-words"
+                    type="number"
+                    inputMode="numeric"
+                    value={outputFieldData.minWords ?? ''}
+                    onChange={(e) => handleLimitChange('minWords', parseNumericValue(e.target.value))}
+                    placeholder="e.g. 600"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="output-max-words">Max words</Label>
+                  <Input
+                    id="output-max-words"
+                    type="number"
+                    inputMode="numeric"
+                    value={outputFieldData.maxWords ?? ''}
+                    onChange={(e) => handleLimitChange('maxWords', parseNumericValue(e.target.value))}
+                    placeholder="e.g. 900"
+                  />
+                </div>
               </div>
-              <div>
-                <Label htmlFor="output-max-chars">Max characters</Label>
-                <Input
-                  id="output-max-chars"
-                  type="number"
-                  inputMode="numeric"
-                  value={outputFieldData.maxChars ?? ''}
-                  onChange={(e) => handleCharLimitChange('maxChars', e.target.value ? parseInt(e.target.value, 10) || undefined : undefined)}
-                  placeholder="e.g. 2800"
-                />
+            </div>
+
+            <div>
+              <Label className="font-medium">Character Count Targeting</Label>
+              <p className="text-xs text-muted-foreground pb-2">
+                Useful for channels with strict limits such as SEO metadata or paid media placements.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="output-min-chars">Min characters</Label>
+                  <Input
+                    id="output-min-chars"
+                    type="number"
+                    inputMode="numeric"
+                    value={outputFieldData.minChars ?? ''}
+                    onChange={(e) => handleLimitChange('minChars', parseNumericValue(e.target.value))}
+                    placeholder="e.g. 800"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="output-max-chars">Max characters</Label>
+                  <Input
+                    id="output-max-chars"
+                    type="number"
+                    inputMode="numeric"
+                    value={outputFieldData.maxChars ?? ''}
+                    onChange={(e) => handleLimitChange('maxChars', parseNumericValue(e.target.value))}
+                    placeholder="e.g. 2800"
+                  />
+                </div>
               </div>
             </div>
           </div>

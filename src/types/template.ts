@@ -108,6 +108,8 @@ export interface OutputField extends BaseField {
   // Optional constraints to guide generation and validation
   minChars?: number;
   maxChars?: number;
+  minWords?: number;
+  maxWords?: number;
   maxTokens?: number;
   allowedTags?: string[]; // For richText/html fields, overrides default allowed tags
 }

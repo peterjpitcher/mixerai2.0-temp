@@ -281,18 +281,22 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
         // Move to next step
         new_status = 'pending_review';
         new_step = nextDbStep.id;
-        
+
         // Update content with next step and assignees
+        const nextStepUpdate: Record<string, unknown> = {
+          status: 'pending_review',
+          current_step: nextDbStep.id,
+          assigned_to: nextDbStep.assigned_user_ids || [],
+          updated_at: new Date().toISOString(),
+        };
+        if (normalizedPublishedUrl) {
+          nextStepUpdate.published_url = normalizedPublishedUrl;
+        }
         const { error: updateError } = await supabase
           .from('content')
-          .update({
-            status: 'pending_review',
-            current_step: nextDbStep.id,
-            assigned_to: nextDbStep.assigned_user_ids || [],
-            updated_at: new Date().toISOString()
-          })
+          .update(nextStepUpdate)
           .eq('id', contentId);
-          
+
         if (updateError) {
           console.error('Error updating content for approval:', updateError);
           throw updateError;
