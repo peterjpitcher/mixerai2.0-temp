@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { logError } from '@/lib/logger';
 import { createSupabaseClient } from '@/lib/supabase/client';
+import { apiClient } from '@/lib/api-client-csrf';
 
 export function ConfirmLogic() {
   const router = useRouter();
@@ -54,6 +55,26 @@ export function ConfirmLogic() {
 
           setStatus('error');
           setErrorMessage(friendlyMessage);
+          return;
+        }
+
+        try {
+          const response = await apiClient.post('/api/auth/complete-invite');
+          const payload = await response.json().catch(() => ({ success: false, message: 'Unable to complete invite.' }));
+
+          if (!response.ok || !payload?.success) {
+            const message = payload?.message || 'We could not finalise your invite. Please try again or contact your administrator.';
+            setStatus('error');
+            setErrorMessage(message);
+            return;
+          }
+        } catch (inviteError) {
+          if (cancelled) {
+            return;
+          }
+          logError('[auth/confirm] Failed to complete invite', inviteError);
+          setStatus('error');
+          setErrorMessage('Your invite was confirmed, but we could not finish account setup. Please try signing in again or contact support.');
           return;
         }
 

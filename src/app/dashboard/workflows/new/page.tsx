@@ -68,7 +68,8 @@ interface WorkflowStep {
   description: string;
   role: string;
   approvalRequired: boolean;
-  assignees: UserOption[]; // Changed from string[] to UserOption[]
+  requiresPublishedUrl: boolean;
+  assignees: UserOption[];
 }
 
 interface WorkflowData {
@@ -155,6 +156,7 @@ export default function NewWorkflowPage() {
         description: 'Initial review of the content.',
         role: 'editor',
         approvalRequired: true,
+        requiresPublishedUrl: false,
         assignees: []
       }
     ]
@@ -463,6 +465,14 @@ export default function NewWorkflowPage() {
     });
   };
 
+  const handleUpdateStepRequiresPublishedUrl = (index: number, value: boolean) => {
+    setWorkflow(prevWorkflow => {
+      const newSteps = [...prevWorkflow.steps];
+      newSteps[index].requiresPublishedUrl = value;
+      return { ...prevWorkflow, steps: newSteps };
+    });
+  };
+
   const handleGenerateStepDescription = async (stepIndex: number) => {
     setStepDescLoading(prev => ({ ...prev, [stepIndex]: true }));
     try {
@@ -508,6 +518,7 @@ export default function NewWorkflowPage() {
           description: '',
           role: 'editor',
           approvalRequired: true,
+          requiresPublishedUrl: false,
           assignees: []
         }
       ];
@@ -626,17 +637,24 @@ export default function NewWorkflowPage() {
 
     const workflowToSave = {
       ...workflow,
-      steps: workflow.steps.map((step, index) => ({
-        name: step.name,
-        description: step.description || '',
-        order_index: index,
-        assignees: step.assignees.map(a => ({
-          id: a.id,
-          email: a.email || '',
-          name: a.full_name || ''
-        })),
-        deadline_days: 0 // Add default deadline_days if needed
-      }))
+      steps: workflow.steps.map((step, index) => {
+        const formRequirements = step.requiresPublishedUrl ? { requiresPublishedUrl: true } : {};
+        return {
+          name: step.name,
+          description: step.description || '',
+          order_index: index + 1,
+          assignees: step.assignees.map(a => ({
+            id: a.id,
+            email: a.email || '',
+            name: a.full_name || ''
+          })),
+          deadline_days: 0,
+          role: step.role,
+          approvalRequired: step.approvalRequired,
+          requiresPublishedUrl: step.requiresPublishedUrl,
+          form_requirements: formRequirements
+        };
+      })
     };
 
     try {
@@ -947,6 +965,22 @@ export default function NewWorkflowPage() {
                       <Label htmlFor={`approval-required-${index}`} className="text-sm font-medium cursor-pointer">
                         This step is optional (approval not strictly required)
                       </Label>
+                    </div>
+
+                    <div className="flex items-start space-x-3 mb-4">
+                      <Switch
+                        id={`requires-published-url-${index}`}
+                        checked={Boolean(step.requiresPublishedUrl)}
+                        onCheckedChange={(checked) => handleUpdateStepRequiresPublishedUrl(index, !!checked)}
+                      />
+                      <div>
+                        <Label htmlFor={`requires-published-url-${index}`} className="text-sm font-medium cursor-pointer">
+                          Require final published URL before completing this step
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Enable when this step represents publishing so reviewers must record the live URL before approving.
+                        </p>
+                      </div>
                     </div>
                     
                     {/* Assignees Section */}

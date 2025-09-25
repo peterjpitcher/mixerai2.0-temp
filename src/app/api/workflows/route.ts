@@ -22,13 +22,19 @@ const workflowAssigneeSchema = z.object({
 });
 
 // Validation schema for workflow steps
-const workflowStepSchema = z.object({
-  name: commonSchemas.nonEmptyString,
-  order_index: z.number().int().min(0),
-  assignees: z.array(workflowAssigneeSchema).min(1, 'Each step must have at least one assignee'),
-  description: z.string().optional(),
-  deadline_days: z.number().int().min(0).optional()
-});
+const workflowStepSchema = z
+  .object({
+    name: commonSchemas.nonEmptyString,
+    order_index: z.number().int().min(0).optional(),
+    assignees: z.array(workflowAssigneeSchema).min(1, 'Each step must have at least one assignee'),
+    description: z.string().optional(),
+    deadline_days: z.number().int().min(0).optional(),
+    role: commonSchemas.nonEmptyString.optional(),
+    approvalRequired: z.boolean().optional(),
+    requiresPublishedUrl: z.boolean().optional(),
+    form_requirements: z.record(z.any()).optional(),
+  })
+  .passthrough();
 
 // Validation schema for creating a workflow
 const createWorkflowSchema = z.object({
@@ -265,12 +271,58 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
     const rawSteps = body.steps; // Already validated by Zod schema
     
     const pendingInvites: string[] = [];
+    const stepPostProcessUpdates: Array<{ approval_required: boolean; role?: string; form_requirements: Json }>
+      = [];
 
     // Transform steps for the new RPC function format
     const stepsForRPC = await Promise.all(rawSteps.map(async (rawStep, index) => {
         const assignedUserIds: string[] = [];
         const assignedRoles: string[] = [];
         const roleMapping: Record<string, string> = {};
+
+        const normalizedOrder = ((): number => {
+          if (typeof rawStep.order_index === 'number' && Number.isFinite(rawStep.order_index)) {
+            const coerced = Math.trunc(rawStep.order_index);
+            return coerced <= 0 ? index + 1 : coerced;
+          }
+          return index + 1;
+        })();
+
+        const fallbackRole = rawStep.name?.toLowerCase().includes('approv')
+          ? 'approver'
+          : rawStep.name?.toLowerCase().includes('edit')
+            ? 'editor'
+            : 'reviewer';
+
+        const normalizedRole = typeof rawStep.role === 'string' && rawStep.role.trim().length > 0
+          ? rawStep.role.trim()
+          : fallbackRole;
+
+        const approvalRequired = rawStep.approvalRequired !== false;
+
+        const requiresPublishedUrlFromPayload = (() => {
+          if (typeof rawStep.requiresPublishedUrl === 'boolean') {
+            return rawStep.requiresPublishedUrl;
+          }
+          if (rawStep.form_requirements && typeof rawStep.form_requirements === 'object') {
+            try {
+              return Boolean((rawStep.form_requirements as Record<string, unknown>).requiresPublishedUrl);
+            } catch {
+              return false;
+            }
+          }
+          return false;
+        })();
+
+        const formRequirements: Record<string, unknown> = requiresPublishedUrlFromPayload
+          ? { requiresPublishedUrl: true }
+          : {};
+
+        stepPostProcessUpdates.push({
+          approval_required: approvalRequired,
+          role: normalizedRole,
+          form_requirements: formRequirements as Json,
+        });
 
         if (rawStep.assignees && Array.isArray(rawStep.assignees)) {
             for (const assignee of rawStep.assignees) {
@@ -292,11 +344,8 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
                 
                 if (existingUser) {
                     assignedUserIds.push(existingUser.id);
-                    // Determine role based on step type or default to reviewer
-                    const role = rawStep.name?.toLowerCase().includes('approv') ? 'approver' : 
-                                 rawStep.name?.toLowerCase().includes('edit') ? 'editor' : 'reviewer';
-                    assignedRoles.push(role);
-                    roleMapping[existingUser.id] = role;
+                    assignedRoles.push(normalizedRole);
+                    roleMapping[existingUser.id] = normalizedRole;
                 } else {
                     // Store email for later invitation
                     if (!pendingInvites.includes(assignee.email)) {
@@ -309,8 +358,8 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
         return {
             name: rawStep.name,
             type: rawStep.name?.toLowerCase().includes('approv') ? 'approval' : 'review',
-            order_index: rawStep.order_index ?? index,
-            order: rawStep.order_index ?? index, // Fallback for compatibility
+            order_index: normalizedOrder,
+            order: normalizedOrder,
             assigned_user_ids: assignedUserIds,
             assigned_roles: assignedRoles,
             role_mapping: roleMapping,
@@ -355,6 +404,50 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
 
       if (updateError) {
         console.error('Error updating workflow with description, template_id, and status:', updateError);
+      }
+    }
+
+    if (stepPostProcessUpdates.length > 0) {
+      const { data: createdSteps, error: fetchStepsError } = await supabase
+        .from('workflow_steps')
+        .select('id, step_order')
+        .eq('workflow_id', newWorkflowId)
+        .order('step_order', { ascending: true });
+
+      if (fetchStepsError) {
+        console.error('[API Workflows POST] Failed to fetch workflow steps for post-processing:', fetchStepsError);
+      } else if (createdSteps && createdSteps.length > 0) {
+        for (let i = 0; i < createdSteps.length; i++) {
+          const stepRow = createdSteps[i];
+          const updateConfig = stepPostProcessUpdates[i];
+          if (!updateConfig) {
+            continue;
+          }
+
+          const updatePayload: Record<string, unknown> = {};
+          if (typeof updateConfig.approval_required === 'boolean') {
+            updatePayload.approval_required = updateConfig.approval_required;
+          }
+          if (updateConfig.role) {
+            updatePayload.role = updateConfig.role;
+          }
+          if (updateConfig.form_requirements) {
+            updatePayload.form_requirements = updateConfig.form_requirements;
+          }
+
+          if (Object.keys(updatePayload).length === 0) {
+            continue;
+          }
+
+          const { error: stepUpdateError } = await supabase
+            .from('workflow_steps')
+            .update(updatePayload)
+            .eq('id', stepRow.id);
+
+          if (stepUpdateError) {
+            console.error(`[API Workflows POST] Failed to update workflow step ${stepRow.id}:`, stepUpdateError);
+          }
+        }
       }
     }
 

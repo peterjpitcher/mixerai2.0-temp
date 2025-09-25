@@ -9,7 +9,7 @@ import { checkProductClaimsPermission } from '@/lib/api/claims-helpers';
 import { ok, fail } from '@/lib/http/response';
 import { withCorrelation } from '@/lib/observability/with-correlation';
 import { timed } from '@/lib/observability/timer';
-import { ALL_COUNTRIES_CODE, GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
+import { ALL_COUNTRIES_CODE, GLOBAL_CLAIM_COUNTRY_CODE, PRODUCT_CLAIMS_DEPRECATION_MESSAGE } from '@/lib/constants/claims';
 import { logClaimAudit } from '@/lib/audit';
 import { logDebug, logError } from '@/lib/logger';
 
@@ -192,6 +192,13 @@ export const GET = withCorrelation(withAuth(async (req: NextRequest) => {
 
 // POST handler for creating new claim(s)
 export const POST = withCorrelation(withAuthAndCSRF(async (req: NextRequest, user: User) => {
+    if (process.env.NEXT_PUBLIC_ENABLE_PRODUCT_CLAIMS_CREATION !== 'true') {
+        return NextResponse.json(
+            { success: false, error: PRODUCT_CLAIMS_DEPRECATION_MESSAGE },
+            { status: 410 }
+        );
+    }
+
     const supabase = createSupabaseAdminClient();
     
     let rawBody;

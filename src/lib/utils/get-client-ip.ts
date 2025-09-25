@@ -2,24 +2,18 @@
  * Get client IP address from various sources
  * Works in both client and server environments
  */
+declare global {
+  interface Window {
+    __CLIENT_IP__?: string;
+  }
+}
+
 export async function getClientIP(): Promise<string> {
-  // Client-side: Try to get IP from a public API
   if (typeof window !== 'undefined') {
-    try {
-      // Use a simple IP API service
-      const response = await fetch('https://api.ipify.org?format=json');
-      if (response.ok) {
-        const data = await response.json();
-        return data.ip || 'unknown';
-      }
-    } catch (error) {
-      console.error('Failed to fetch client IP:', error);
-    }
-    return 'unknown';
+    const hintedIp = typeof window.__CLIENT_IP__ === 'string' ? window.__CLIENT_IP__.trim() : '';
+    return hintedIp || 'unknown';
   }
 
-  // Server-side: This would typically be handled by middleware
-  // Since this is client-side component, we'll return unknown
   return 'unknown';
 }
 

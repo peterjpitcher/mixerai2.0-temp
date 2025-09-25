@@ -30,6 +30,8 @@ type TemplateOutputField = {
   } | null;
 };
 
+const MAX_COMPLETION_TOKENS = 4000;
+
 // Helper function to extract rate limit headers
 function extractRateLimitHeaders(response: Response): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -562,7 +564,7 @@ The product context is provided in the user prompt.
       ],
       response_format: { type: "json_object" as const },
       // For multiple fields, keep a balanced budget but cap to stay within runtime limits
-      max_tokens: Math.min(4000, 400 + (template.outputFields?.length || 1) * 400),
+      max_tokens: Math.min(MAX_COMPLETION_TOKENS, 400 + (template.outputFields?.length || 1) * 400),
       temperature: 0.3,
       top_p: 0.9,
       frequency_penalty: 0,
@@ -581,7 +583,7 @@ The product context is provided in the user prompt.
         { role: 'user', content: userPrompt }
       ],
       // High budget to cover all sections in a single field template while respecting runtime limits
-      max_tokens: 4000,
+      max_tokens: MAX_COMPLETION_TOKENS,
       temperature: 0.4,
       top_p: 0.9,
       frequency_penalty: 0,
@@ -828,7 +830,7 @@ The product context is provided in the user prompt.
         const fallbackResult = await generateTextCompletion(
           fallbackSystemPrompt,
           fallbackUserPrompt,
-          4000,
+          MAX_COMPLETION_TOKENS,
           0.4
         );
 
@@ -1106,15 +1108,15 @@ The product context is provided in the user prompt.
               ? candidate.constraints.max
               : fieldCharConstraints.max;
             if (typeof candidateCharMax === 'number' && candidateCharMax > 0) {
-              return Math.min(4000, Math.max(800, Math.ceil(candidateCharMax / 3))); // rough tokens≈chars/3
+              return Math.min(MAX_COMPLETION_TOKENS, Math.max(800, Math.ceil(candidateCharMax / 3))); // rough tokens≈chars/3
             }
             const candidateWordMax = (candidate.reason === 'word_range' && candidate.range)
               ? candidate.range.max
               : fieldWordRange?.max;
             if (typeof candidateWordMax === 'number' && candidateWordMax > 0) {
-              return Math.min(4000, Math.max(800, Math.ceil(candidateWordMax * 1.5)));
+              return Math.min(MAX_COMPLETION_TOKENS, Math.max(800, Math.ceil(candidateWordMax * 1.5)));
             }
-            return isSingleFieldHtml ? 4000 : 1500;
+            return isSingleFieldHtml ? MAX_COMPLETION_TOKENS : 1500;
           })();
 
           const singleReq = {

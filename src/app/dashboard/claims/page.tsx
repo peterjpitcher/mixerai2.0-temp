@@ -17,8 +17,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { 
-  Trash2, PlusCircle, Search, AlertTriangle, Loader2, 
-  FileText, Building2, Package, Sprout, ShieldCheck, ShieldOff, WorkflowIcon, MoreVertical, Eye 
+  Trash2, Search, AlertTriangle, Loader2, 
+  FileText, Building2, Package, Sprout, ShieldCheck, ShieldOff, WorkflowIcon, MoreVertical, Eye, AlertOctagon 
 } from "lucide-react";
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -36,6 +36,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { PRODUCT_CLAIMS_DEPRECATION_MESSAGE } from '@/lib/constants/claims';
 
 // Types from API definitions
 type ClaimTypeEnum = 'allowed' | 'disallowed';
@@ -400,7 +402,13 @@ export default function ClaimsPage() {
 
   // Render states (Error, Empty, NoResults)
   const ErrorState = () => ( <div className="flex flex-col items-center justify-center min-h-[300px] py-10 text-center"><AlertTriangle className="w-16 h-16 text-red-500 mb-4" /><h3 className="text-xl font-bold mb-2">Failed to Load Claims</h3><p className="text-muted-foreground mb-4 max-w-md">{error}</p><Button onClick={() => window.location.reload()}>Try Again</Button></div> );
-  const EmptyState = () => ( <div className="flex flex-col items-center justify-center min-h-[300px] py-10 text-center"><FileText className="w-16 h-16 text-muted-foreground mb-4" /><h3 className="text-xl font-bold mb-2">No Claims Found</h3><p className="text-muted-foreground mb-4">Get started by adding a new claim.</p><Button asChild><Link href="/dashboard/claims/new"><PlusCircle className="mr-2 h-4 w-4" /> Add New Claim</Link></Button></div> );
+  const EmptyState = () => (
+    <div className="flex flex-col items-center justify-center min-h-[300px] py-10 text-center">
+      <FileText className="w-16 h-16 text-muted-foreground mb-4" />
+      <h3 className="text-xl font-bold mb-2">Product Claims Deprecated</h3>
+      <p className="text-muted-foreground mb-4 max-w-lg">{PRODUCT_CLAIMS_DEPRECATION_MESSAGE}</p>
+    </div>
+  );
   const NoResultsState = () => ( <div className="flex flex-col items-center justify-center min-h-[200px] py-8 text-center"><Search className="w-16 h-16 text-muted-foreground mb-4" /><h3 className="text-xl font-bold mb-2">No Claims Match Filters</h3><p className="text-muted-foreground mb-4">Try adjusting your search or filter criteria.</p><Button variant="outline" onClick={() => { setSearchTerm(""); setFilterLevel('all'); setFilterType('all'); setFilterCountry('all');}}>Clear Filters</Button></div> );
 
   return (
@@ -411,8 +419,8 @@ export default function ClaimsPage() {
       ]} />
       
       <PageHeader 
-        title="Claims Management"
-        description="Manage all claims across brands, products, and ingredients."
+        title="Claims Management (Deprecated)"
+        description="Product Claims tools are retained for reference only. New claims cannot be created."
         actions={
           <div className="flex gap-2">
             <Button variant="outline" asChild>
@@ -420,14 +428,15 @@ export default function ClaimsPage() {
                 <WorkflowIcon className="mr-2 h-4 w-4" /> Manage Workflows
               </Link>
             </Button>
-            <Button asChild>
-              <Link href="/dashboard/claims/new">
-                <PlusCircle className="mr-2 h-4 w-4" /> Add New Claim
-              </Link>
-            </Button>
           </div>
         }
       />
+
+      <Alert variant="destructive">
+        <AlertOctagon className="h-4 w-4" />
+        <AlertTitle>Product Claims Deprecated</AlertTitle>
+        <AlertDescription>{PRODUCT_CLAIMS_DEPRECATION_MESSAGE}</AlertDescription>
+      </Alert>
 
       {/* Filters and Search Bar */}
       <div className="flex flex-col md:flex-row gap-4 items-center">

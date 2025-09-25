@@ -12,6 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Spinner } from '@/components/spinner';
 import { CheckCheck, AlertTriangle } from 'lucide-react';
 import { createSupabaseClient } from '@/lib/supabase/client';
+import { validatePassword, passwordPolicy } from '@/lib/auth/session-config';
 
 function UpdatePasswordForm() {
   const router = useRouter();
@@ -20,17 +21,24 @@ function UpdatePasswordForm() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword.length < 6) {
-      setErrorMsg("Password must be at least 6 characters.");
-      return;
-    }
     if (newPassword !== confirmPassword) {
       setErrorMsg("Passwords do not match.");
       return;
     }
+
+    const validation = validatePassword(newPassword);
+    if (!validation.valid) {
+      setValidationErrors(validation.errors);
+      setErrorMsg('Please address the password requirements below.');
+      setStatus('ready');
+      return;
+    }
+    
+    setValidationErrors([]);
     
     setErrorMsg(null);
     setStatus('submitting');
@@ -42,9 +50,11 @@ function UpdatePasswordForm() {
         throw new Error(error.message || 'Failed to update password.');
       }
       
+      setValidationErrors([]);
       setStatus('complete');
     } catch (error) {
       setErrorMsg((error as Error).message);
+      setValidationErrors([]);
       setStatus('error');
     }
   };
@@ -58,8 +68,51 @@ function UpdatePasswordForm() {
       case 'ready': return (
           <form onSubmit={handlePasswordUpdate} className="space-y-6">
             <p className="text-sm text-muted-foreground text-center">A secure session has been established. Please set your new password.</p>
-            <div className="space-y-1.5"><Label htmlFor="newPassword">New Password</Label><Input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Minimum 6 characters" required minLength={6} /></div>
-            <div className="space-y-1.5"><Label htmlFor="confirmPassword">Confirm New Password</Label><Input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter your password" required minLength={6} /></div>
+            <div className="space-y-1.5">
+              <Label htmlFor="newPassword">New Password</Label>
+              <Input
+                id="newPassword"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder={`At least ${passwordPolicy.minLength} characters with upper, lower, number & special`}
+                required
+                minLength={passwordPolicy.minLength}
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="confirmPassword">Confirm New Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter your password"
+                required
+                minLength={passwordPolicy.minLength}
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+              <p className="font-medium text-foreground">Your password must include:</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                <li>At least {passwordPolicy.minLength} characters</li>
+                <li>One uppercase and one lowercase letter</li>
+                <li>At least one number</li>
+                <li>At least one special character ({passwordPolicy.specialChars})</li>
+              </ul>
+            </div>
+            {validationErrors.length > 0 && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                <p className="font-medium">Password requirements not met:</p>
+                <ul className="mt-1 list-disc space-y-1 pl-5">
+                  {validationErrors.map((err) => (
+                    <li key={err}>{err}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {errorMsg && <p className="text-sm text-destructive">{errorMsg}</p>}
             <Button type="submit" className="w-full">Set New Password</Button>
           </form>

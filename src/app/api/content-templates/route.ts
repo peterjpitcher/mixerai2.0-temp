@@ -5,6 +5,8 @@ import { withAuth } from '@/lib/auth/api-auth';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { z } from 'zod';
 import { validateRequest, commonSchemas } from '@/lib/api/validation';
+import { InputFieldSchema, OutputFieldSchema } from '@/lib/schemas/template';
+import type { Json } from '@/types/supabase';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -37,26 +39,14 @@ async function getAccessibleBrandIds(
     .filter((brandId): brandId is string => Boolean(brandId));
 }
 
-// Field schema for template fields
-const templateFieldSchema = z.object({
-  id: commonSchemas.nonEmptyString,
-  name: commonSchemas.nonEmptyString,
-  type: z.enum(['shortText', 'longText', 'richText', 'plainText', 'tags', 'email', 'url', 'number', 'date']),
-  options: z.record(z.any()).optional(),
-  required: z.boolean().optional(),
-  aiSuggester: z.boolean().optional(),
-  aiPrompt: z.string().optional(),
-  aiAutoComplete: z.boolean().optional()
-});
-
 // Validation schema for creating a template
 const createTemplateSchema = z.object({
   name: commonSchemas.nonEmptyString,
   description: z.string().optional(),
   icon: z.string().optional().nullable(),
   brand_id: commonSchemas.uuid.optional().nullable(),
-  inputFields: z.array(templateFieldSchema).min(1, 'At least one input field is required'),
-  outputFields: z.array(templateFieldSchema).min(1, 'At least one output field is required')
+  inputFields: z.array(InputFieldSchema).min(1, 'At least one input field is required'),
+  outputFields: z.array(OutputFieldSchema).min(1, 'At least one output field is required')
 });
 
 // Mock templates for fallback in development
@@ -303,11 +293,10 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: Authentic
       // console.warn('Error calling AI template description generation service:', aiError);
     }
 
-    // Reconstruct the 'fields' object for the database
-    const fieldsForDb = {
+    const fieldsForDb = JSON.parse(JSON.stringify({
       inputFields: data.inputFields || [],
       outputFields: data.outputFields || []
-    };
+    })) as Json;
 
     const { data: newTemplate, error } = await supabase
       .from('content_templates')
@@ -315,7 +304,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: Authentic
         name: data.name,
         description: generatedDescription,
         icon: data.icon || null,
-        fields: fieldsForDb, // Use the reconstructed fields object
+        fields: fieldsForDb,
         brand_id: data.brand_id || null,
         created_by: user.id,
       })
