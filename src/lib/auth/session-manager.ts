@@ -20,14 +20,19 @@ function getSessionStore(): SessionStore {
 
   const runningInProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
   const allowInMemoryFallback = process.env.ALLOW_IN_MEMORY_SESSION_FALLBACK === 'true';
+  const buildPhase = ['phase-production-build', 'phase-development-build', 'phase-export']
+    .includes(process.env.NEXT_PHASE || '');
 
-  if (runningInProduction && !allowInMemoryFallback) {
+  if (runningInProduction && !allowInMemoryFallback && !buildPhase) {
     throw new Error(
       '[session-manager] Redis session store is not configured. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN (or provide compatible redis credentials) before deploying to production, or explicitly acknowledge the risk by setting ALLOW_IN_MEMORY_SESSION_FALLBACK=true.'
     );
   }
 
   if (!globalSymbols[SESSION_WARNING_PRINTED] && process.env.SKIP_REDIS_WARNING !== 'true') {
+    if (buildPhase) {
+      console.warn('[session-manager] Redis configuration missing during build. Falling back to in-memory sessions for build-time rendering only.');
+    }
     console.warn('[session-manager] Redis configuration missing. Falling back to in-memory sessions. This is unsafe for production.');
     globalSymbols[SESSION_WARNING_PRINTED] = true;
   }
