@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
@@ -16,12 +16,67 @@ import { validatePassword, passwordPolicy } from '@/lib/auth/session-config';
 
 function UpdatePasswordForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createSupabaseClient();
   const [status, setStatus] = useState<'ready' | 'submitting' | 'complete' | 'error'>('ready');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [isInitialising, setIsInitialising] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const initialise = async () => {
+      const code = searchParams?.get('code');
+      const type = searchParams?.get('type');
+
+      if (!code) {
+        setIsInitialising(false);
+        return;
+      }
+
+      try {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (cancelled) {
+          return;
+        }
+        if (error) {
+          const normalised = error.message?.toLowerCase() ?? '';
+          let message = 'This password link is invalid or has expired. Please request a new password reset email.';
+          if (normalised.includes('expired')) {
+            message = 'This password reset link has expired. Please request a new one to continue.';
+          } else if (normalised.includes('link is invalid')) {
+            message = 'This password reset link is invalid. Double-check that you copied the entire URL.';
+          } else if (type === 'invite') {
+            message = 'We could not confirm your invite. Ask your administrator to send a fresh invitation.';
+          }
+          setStatus('error');
+          setErrorMsg(message);
+        } else {
+          setStatus('ready');
+        }
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        console.error('[update-password] Failed to exchange code for session', error);
+        setStatus('error');
+        setErrorMsg('We were unable to validate this link. Please request a new password reset email.');
+      } finally {
+        if (!cancelled) {
+          setIsInitialising(false);
+        }
+      }
+    };
+
+    initialise();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, supabase]);
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +116,15 @@ function UpdatePasswordForm() {
 
   // UI Rendering Logic based on status
   const renderContent = () => {
+    if (isInitialising) {
+      return (
+        <div className="flex justify-center items-center py-8">
+          <Spinner className="h-6 w-6" />
+          <p className="ml-2 text-muted-foreground">Preparing secure session...</p>
+        </div>
+      );
+    }
+
     switch (status) {
       case 'error': return <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{errorMsg}</AlertDescription></Alert>;
       case 'submitting': return <div className="flex justify-center items-center py-8"><Spinner className="h-6 w-6" /><p className="ml-2 text-muted-foreground">Updating password...</p></div>;

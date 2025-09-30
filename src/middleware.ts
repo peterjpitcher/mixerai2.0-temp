@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { generateCSRFToken, validateCSRFToken } from '@/lib/csrf';
 import { checkRateLimit, getRateLimitType } from '@/lib/rate-limit-simple';
-import { createSession, validateSession, renewSession } from '@/lib/auth/session-manager';
+import { createSession, validateSession, renewSession, type SessionRecord } from '@/lib/auth/session-manager';
 import { SESSION_CONFIG } from '@/lib/auth/session-config';
 import type { User } from '@supabase/supabase-js';
 
@@ -67,6 +67,26 @@ const shouldSkipCSRF = (pathname: string): boolean => {
  */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (pathname.startsWith('/private-bookings')) {
+    console.warn('[middleware] Blocking legacy private-bookings request', {
+      url: request.url,
+      method: request.method,
+      hasServerAction: request.headers.has('next-action'),
+    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'The /private-bookings endpoint has been retired. Please update any integrations to use current MixerAI APIs.',
+      },
+      {
+        status: 410,
+        headers: {
+          'Cache-Control': 'no-store',
+          Allow: 'GET,POST,PUT,DELETE,OPTIONS',
+        },
+      },
+    );
+  }
   
   // Fast path: Skip middleware for static assets (double-check in case matcher misses)
   if (pathname.includes('/_next/') || pathname.includes('/static/')) {
@@ -203,15 +223,27 @@ export async function middleware(request: NextRequest) {
     let isSessionValid = false;
     
     if (sessionId) {
-      const sessionValidation = await validateSession(sessionId);
+      let sessionValidation;
+      try {
+        sessionValidation = await validateSession(sessionId);
+      } catch (error) {
+        console.error('[middleware] Failed to validate session', error);
+        sessionValidation = { valid: false };
+      }
+
       isSessionValid = sessionValidation.valid && sessionValidation.session?.userId === refreshedUser.id;
       
       if (!isSessionValid) {
         // Create new session if invalid
-        const newSession = await createSession(refreshedUser as User, {
-          userAgent: request.headers.get('user-agent') || undefined,
-          ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || undefined,
-        });
+        let newSession: SessionRecord | null = null;
+        try {
+          newSession = await createSession(refreshedUser as User, {
+            userAgent: request.headers.get('user-agent') || undefined,
+            ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || undefined,
+          });
+        } catch (error) {
+          console.error('[middleware] Failed to create session', error);
+        }
         if (newSession) {
           response.cookies.set('app-session-id', newSession.sessionId, {
             httpOnly: true,
@@ -230,10 +262,15 @@ export async function middleware(request: NextRequest) {
       }
     } else {
       // Create new session
-      const newSession = await createSession(refreshedUser as User, {
-        userAgent: request.headers.get('user-agent') || undefined,
-        ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || undefined,
-      });
+      let newSession: SessionRecord | null = null;
+      try {
+        newSession = await createSession(refreshedUser as User, {
+          userAgent: request.headers.get('user-agent') || undefined,
+          ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || undefined,
+        });
+      } catch (error) {
+        console.error('[middleware] Failed to create initial session', error);
+      }
       if (newSession) {
         response.cookies.set('app-session-id', newSession.sessionId, {
           httpOnly: true,
@@ -317,6 +354,7 @@ export const config = {
     // Match dashboard routes
     '/dashboard/:path*',
     '/account/:path*',
+    '/private-bookings',
     
     // Match API routes
     '/api/:path*',

@@ -3,37 +3,20 @@
 import Link from "next/link";
 import { Button } from '@/components/ui/button';
 // import { NotificationCenter } from "@/components/dashboard/notification-center";
-import { UnifiedNavigation } from "@/components/layout/unified-navigation";
+import { UnifiedNavigationV2 } from "@/components/layout/unified-navigation-v2";
 import { BottomMobileNavigation } from "@/components/layout/BottomMobileNavigation";
-import { useRouter } from "next/navigation";
-import { createSupabaseClient } from "@/lib/supabase/client";
+import { usePathname, useRouter } from "next/navigation";
 import { toast as sonnerToast } from "sonner";
 import { LogOut, UserCircle2, Loader2 } from "lucide-react";
-import React, { useState, useEffect, Suspense } from "react";
+import React, { Suspense } from "react";
 import Image from 'next/image';
 import { DevelopmentOnly } from "@/components/development-only";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { SessionTimeoutProvider } from "@/components/providers/session-timeout-provider";
-import { apiFetch } from '@/lib/api-client';
 import { IssueReporter } from '@/components/issue-reporter';
+import { useAuth } from '@/contexts/auth-context';
 
 // Define UserSessionData interface (can be shared if defined elsewhere)
-interface UserSessionData {
-  id: string;
-  email?: string;
-  user_metadata?: {
-    role?: string;
-    full_name?: string;
-    avatar_url?: string; // Expecting avatar_url here from user_metadata or profile
-  };
-  brand_permissions?: Array<{
-    brand_id: string;
-    role: string; 
-  }>;
-  avatar_url?: string; // Or directly on the user object from /api/me if profile is merged
-  full_name?: string; // Fallback if not in user_metadata
-}
-
 /**
  * DashboardLayout component.
  * Provides the main layout structure for all authenticated dashboard pages.
@@ -45,73 +28,21 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }>) {
   const router = useRouter();
-  const supabase = createSupabaseClient();
-
-  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
-
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      setIsLoadingUser(true);
-      try {
-        const response = await fetch('/api/me'); 
-        if (!response.ok) {
-          throw new Error('Failed to fetch user session for layout');
-        }
-        const data = await response.json();
-        if (data.success && data.user) {
-          setCurrentUser(data.user);
-        } else {
-          setCurrentUser(null);
-          // console.error("[DashboardLayout] Failed to get user data from /api/me:", data.error);
-          // Potentially redirect to login if user is null and not on a public part of dashboard
-        }
-      } catch {
-        // console.error('[DashboardLayout] Error fetching current user:', error);
-        setCurrentUser(null);
-      } finally {
-        setIsLoadingUser(false);
-      }
-    };
-    fetchCurrentUser();
-  }, []);
+  const pathname = usePathname();
+  const { user: currentUser, isLoading: isLoadingUser, signOut } = useAuth();
   
   const handleSignOut = async () => {
     try {
-      // Get current user before signing out
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      // Invalidate all sessions for this user
-      if (user) {
-        try {
-          await apiFetch('/api/auth/logout', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          });
-        } catch (apiError) {
-          // Log the API error but continue with client-side logout
-          console.error('Server logout error:', apiError);
-        }
-      }
-      
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        // Log the error but still redirect to login
-        console.error('Supabase signOut error:', error);
-      }
-      
-      // Always redirect to login page regardless of errors
-      sonnerToast.success("You have been successfully signed out.");
-      router.push('/auth/login');
-      router.refresh(); // Ensures the layout re-evaluates auth state
+      sonnerToast.success('You have been successfully signed out.');
+      await signOut();
     } catch (error) {
       console.error('Logout error:', error);
-      // Even on error, try to redirect to login page
-      sonnerToast.warning("There was an issue during logout, but you have been redirected to the login page.");
+      sonnerToast.warning('There was an issue during logout, but you have been redirected to the login page.');
       router.push('/auth/login');
       router.refresh();
+      return;
+    } finally {
+      // signOut already navigates to the login page via window.location.
     }
   };
 
@@ -182,16 +113,25 @@ export default function DashboardLayout({
 
       <div className="flex flex-1">
         <Suspense fallback={<div className="w-64 p-4 border-r"><Loader2 className="h-6 w-6 animate-spin mx-auto mt-8" /></div>}>
-          <UnifiedNavigation />
+          <UnifiedNavigationV2 className="w-64 border-r bg-muted/40 hidden sm:flex flex-col" />
         </Suspense>
-        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 overflow-auto lg:pb-6 pb-20">
+        <main key={pathname} className="flex-1 px-4 sm:px-6 lg:px-8 py-6 overflow-auto lg:pb-6 pb-20">
           <DevelopmentOnly>
             <div id="domain-verification-container" className="mb-4">
               {/* This will be populated client-side */}
             </div>
           </DevelopmentOnly>
-          <ErrorBoundary>
-            {children}
+          <ErrorBoundary key={`${pathname}-boundary`}>
+            <Suspense
+              key={`${pathname}-suspense`}
+              fallback={(
+                <div className="flex h-full min-h-[320px] w-full items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              )}
+            >
+              {children}
+            </Suspense>
           </ErrorBoundary>
         </main>
       </div>

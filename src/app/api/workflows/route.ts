@@ -462,9 +462,10 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
           const appMetadataPayload = {
             full_name: '',
             role: inviteRole,
+            intended_role: inviteRole,
             invited_by: user.id,
             invited_from_workflow: newWorkflowId,
-            brand_id: body.brand_id
+            invited_to_brand_id: body.brand_id,
           };
           
           const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {

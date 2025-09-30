@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
-import { createBrowserClient } from '@supabase/ssr';
 import { Spinner } from '@/components/spinner';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -16,6 +15,7 @@ import { AvatarUpload } from '@/components/ui/avatar-upload';
 import { validatePassword } from '@/lib/auth/session-config';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api-client';
+import { createSupabaseClient } from '@/lib/supabase/client';
 
 // Page metadata should ideally be exported from a server component or the page file if it's RSC.
 // For client components, this is more of a placeholder for what should be set.
@@ -56,10 +56,7 @@ export default function AccountPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [session, setSession] = useState<Record<string, unknown> | null>(null);
   
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-  );
+  const supabase = useMemo(() => createSupabaseClient(), []);
 
   const [profileData, setProfileData] = useState({
     fullName: '',
@@ -118,7 +115,7 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
 
         const { data: userData, error: userError } = await supabase
           .from('profiles')
-          .select('full_name, company, job_title, avatar_url') // Include avatar_url
+          .select('full_name, company, job_title, avatar_url, updated_at')
           .eq('id', userId)
           .single();
         
@@ -132,22 +129,26 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
             full_name: currentUser.user_metadata?.full_name || userEmail,
             email: userEmail,
             company: currentUser.user_metadata?.company || '',
-            job_title: currentUser.user_metadata?.job_title || ''
+            job_title: currentUser.user_metadata?.job_title || '',
+            updated_at: new Date().toISOString(),
           };
           
-          const { error: createError } = await supabase
+          const { data: createdProfile, error: createError } = await supabase
             .from('profiles')
-            .insert(newProfileData);
+            .insert(newProfileData)
+            .select('full_name, company, job_title, avatar_url, updated_at')
+            .single();
           
           if (createError) {
             console.error('Error creating profile:', createError);
           } else {
             // Use the newly created profile data
             profileData = {
-              full_name: newProfileData.full_name,
-              company: newProfileData.company,
-              job_title: newProfileData.job_title,
-              avatar_url: null
+              full_name: createdProfile?.full_name ?? newProfileData.full_name,
+              company: createdProfile?.company ?? newProfileData.company,
+              job_title: createdProfile?.job_title ?? newProfileData.job_title,
+              avatar_url: createdProfile?.avatar_url ?? null,
+              updated_at: createdProfile?.updated_at ?? newProfileData.updated_at,
             };
           }
         }
@@ -163,6 +164,7 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
           jobTitle: profileData?.job_title || authUser?.user_metadata?.job_title || '',
           avatarUrl: profileData?.avatar_url || '',
         });
+        setNotificationVersion(profileData?.updated_at || null);
         
         // Fetch notification settings
         const notificationResponse = await fetch('/api/user/notification-settings');
@@ -255,8 +257,22 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
         job_title: profileData.jobTitle.trim(),
         updated_at: new Date().toISOString()
       };
-      const { error: profileError } = await supabase.from('profiles').upsert(profileUpdates).eq('id', userId);
+      const { data: updatedProfile, error: profileError } = await supabase
+        .from('profiles')
+        .upsert(profileUpdates, { onConflict: 'id' })
+        .select('full_name, company, job_title, avatar_url, updated_at')
+        .single();
       if (profileError) throw profileError;
+      if (updatedProfile) {
+        setProfileData(prev => ({
+          ...prev,
+          fullName: updatedProfile.full_name ?? prev.fullName,
+          company: updatedProfile.company ?? prev.company,
+          jobTitle: updatedProfile.job_title ?? prev.jobTitle,
+          avatarUrl: updatedProfile.avatar_url ?? prev.avatarUrl,
+        }));
+        setNotificationVersion(updatedProfile.updated_at ?? null);
+      }
       
       const userMetadataUpdates = {
         full_name: profileData.fullName.trim(),
@@ -275,6 +291,7 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
       }
       
       toast('Your profile information has been successfully updated.', { description: 'Profile Updated' });
+      await refreshNotificationSettings();
     } catch (error: unknown) {
       // console.error removed
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
@@ -312,6 +329,11 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
     
     setIsSubmitting(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !user.email) {
+        throw new Error('Unable to verify your account. Please try logging in again.');
+      }
+
       // Check if re-authentication is required
       const reauthResponse = await apiFetch('/api/auth/check-reauthentication', {
         method: 'POST',
@@ -320,6 +342,9 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
       });
       
       const reauthData = await reauthResponse.json();
+      if (!reauthResponse.ok || !reauthData?.success) {
+        throw new Error(reauthData?.error || 'Unable to verify session state for password change.');
+      }
       
       if (reauthData.requiresReauthentication) {
         toast.error('For security reasons, please log in again before changing your password.', {
@@ -329,7 +354,16 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
         router.push(`/auth/login?from=${encodeURIComponent('/dashboard/account?tab=password')}`);
         return;
       }
-      
+
+      const { error: passwordCheckError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+
+      if (passwordCheckError) {
+        throw new Error('Current password is incorrect.');
+      }
+
       // Supabase updateUser for password doesn't require currentPassword if user is already authenticated.
       // However, asking for it is a good security practice to prevent session hijacking leading to password change.
       // For true verification of currentPassword, a custom server-side check would be needed.
@@ -440,6 +474,7 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
                     userId={((session as Record<string, unknown>)?.user as Record<string, unknown>)?.id as string || ''}
                     fullName={profileData.fullName}
                     email={profileData.email}
+                    onProfileVersionChange={setNotificationVersion}
                   />
                 </div>
                 
@@ -471,7 +506,7 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="border-t pt-6">
+              <CardFooter className="pt-6 flex justify-start">
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting && <Spinner className="mr-2 h-4 w-4 animate-spin" />}Update Profile
                 </Button>
@@ -518,7 +553,7 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="border-t pt-6">
+              <CardFooter className="pt-6 flex justify-start">
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting && <Spinner className="mr-2 h-4 w-4 animate-spin" />}Set New Password
                 </Button>
@@ -612,7 +647,7 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
                   />
                 </div>
               </CardContent>
-              <CardFooter className="border-t pt-6">
+              <CardFooter className="pt-6 flex justify-start">
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting && <Spinner className="mr-2 h-4 w-4 animate-spin" />}Save Preferences
                 </Button>

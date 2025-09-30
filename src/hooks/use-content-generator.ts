@@ -210,18 +210,27 @@ export function useContentGenerator(templateId?: string | null) {
         
         if (!response.ok) throw new Error('Failed to fetch product context');
         
-        const data = await response.json();
-        if (data.success && (data.productName || data.styledClaims)) {
+      const payload = await response.json();
+      if (payload?.success) {
+        // Handle both the current `{ data: {...} }` API shape and the legacy direct props.
+        const context = payload.data ?? payload;
+        const productName = context?.productName ?? '';
+        const styledClaims = context?.styledClaims ?? null;
+
+        if (productName || styledClaims !== null) {
+          const safeProductName = productName || 'Selected product';
           setProductContext({
-            productName: data.productName,
-            styledClaims: data.styledClaims
+            productName: safeProductName,
+            styledClaims,
           });
-          if (data.styledClaims) {
-            toast.success(`Loaded claims for: ${data.productName}`);
+
+          if (styledClaims) {
+            toast.success(`Loaded claims for: ${safeProductName}`);
           } else {
-            toast.info(`No claims found for: ${data.productName}`);
+            toast.info(`No claims found for: ${safeProductName}`);
           }
         }
+      }
       } catch (error: unknown) {
         if (error instanceof Error && error.name !== 'AbortError') {
           console.error('Error fetching product context:', error);

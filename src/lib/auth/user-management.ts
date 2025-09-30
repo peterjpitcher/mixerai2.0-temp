@@ -71,7 +71,11 @@ export async function inviteNewUserWithAppMetadata(
   try {
     // Step 1: Invite the user via email
     // The redirectTo URL should be a global constant or configurable, pointing to your frontend invite completion page.
-    const inviteRedirectTo = process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/auth/confirm` : '/auth/confirm';
+    const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || '').trim();
+    if (!appBaseUrl) {
+      throw new Error('Invite links require NEXT_PUBLIC_APP_URL or NEXT_PUBLIC_SITE_URL to be configured.');
+    }
+    const inviteRedirectTo = `${appBaseUrl.replace(/\/$/, '')}/auth/confirm`;
     
     const { data: inviteResponseData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       email.toLowerCase(),

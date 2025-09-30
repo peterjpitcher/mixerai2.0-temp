@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { User } from '@supabase/supabase-js';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import { apiFetchJson, ApiClientError } from '@/lib/api-client';
+import { apiFetchJson, ApiClientError, apiFetch } from '@/lib/api-client';
 
 interface UserMetadata {
   role?: string;
@@ -16,11 +16,20 @@ interface UserMetadata {
 interface BrandPermission {
   brand_id: string;
   role: string;
+  brand?: {
+    id: string;
+    name: string;
+    master_claim_brand_id?: string | null;
+  } | null;
 }
 
 interface AuthUser extends Omit<User, 'user_metadata'> {
   user_metadata?: UserMetadata;
   brand_permissions?: BrandPermission[];
+  full_name?: string | null;
+  job_title?: string | null;
+  company?: string | null;
+  avatar_url?: string | null;
 }
 
 interface AuthContextType {
@@ -110,12 +119,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     try {
+      try {
+        await apiFetch('/api/auth/logout', { method: 'POST' });
+      } catch (error) {
+        console.warn('[AuthContext] Failed to hit logout endpoint', error);
+      }
+
       const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
+      if (error) {
+        throw error;
+      }
+
       // Clear all cached data
       queryClient.clear();
       
+      // Clear CSRF cookie on the client
+      if (typeof document !== 'undefined') {
+        document.cookie = 'csrf-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict';
+      }
+
       // Redirect to login
       window.location.href = '/auth/login';
     } catch (error) {

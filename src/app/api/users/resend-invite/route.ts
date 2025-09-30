@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-// import { Database } from '@/types/supabase';
 import { withAdminAuthAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
-
-// Initialize Supabase client with SERVICE_ROLE_KEY for admin actions
-// Ensure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in your environment variables
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { getUserAuthByEmail } from '@/lib/auth/user-management';
 
 export const POST = withAdminAuthAndCSRF(async function (request: NextRequest) {
   try {
@@ -19,6 +12,8 @@ export const POST = withAdminAuthAndCSRF(async function (request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Email is required.' }, { status: 400 });
     }
 
+    const supabaseAdmin = createSupabaseAdminClient();
+
     // Determine the application URL for the redirect
     // Try multiple sources for the URL
     const protocol = request.headers.get('x-forwarded-proto') || 'https';
@@ -26,24 +21,17 @@ export const POST = withAdminAuthAndCSRF(async function (request: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 
                    process.env.NEXT_PUBLIC_SITE_URL ||
                    (host ? `${protocol}://${host}` : 'http://localhost:3000');
-    const redirectTo = `${appUrl}/auth/confirm`;
+    const confirmRedirect = `${appUrl}/auth/confirm`;
+    const updatePasswordRedirect = `${appUrl}/auth/update-password`;
 
-    console.log('Resending invite to:', email, 'with redirect to:', redirectTo);
+    console.log('Resending invite to:', email);
 
-    // First, check if the user exists and get their current status
-    const { data: { users }, error: searchError } = await supabaseAdmin.auth.admin.listUsers();
-    
-    if (searchError) {
-      console.error('Error searching for user:', searchError);
-      return handleApiError(searchError, 'Failed to search for user');
-    }
-
-    const user = users?.find(u => u.email === email);
+    const user = await getUserAuthByEmail(email.toLowerCase(), supabaseAdmin);
     
     if (!user) {
       // User doesn't exist, need to invite them first
       const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-        redirectTo: redirectTo,
+        redirectTo: confirmRedirect,
       });
       
       if (inviteError) {
@@ -61,7 +49,7 @@ export const POST = withAdminAuthAndCSRF(async function (request: NextRequest) {
     if (user.email_confirmed_at) {
       // User already confirmed, send a password reset instead
       const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-        redirectTo: `${appUrl}/auth/reset-password`,
+        redirectTo: updatePasswordRedirect,
       });
       
       if (resetError) {
@@ -80,7 +68,7 @@ export const POST = withAdminAuthAndCSRF(async function (request: NextRequest) {
       type: 'signup',
       email: email,
       options: {
-        emailRedirectTo: redirectTo,
+        emailRedirectTo: confirmRedirect,
       },
     });
 

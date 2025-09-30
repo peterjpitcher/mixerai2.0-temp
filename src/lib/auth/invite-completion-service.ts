@@ -9,38 +9,74 @@ interface InviteMetadata {
   intendedRole: UserRoles | null;
   brandIdForPermission: string | null;
   workflowIdForContext: string | null;
-  stepIdForAssignment: number | string | null;
+  stepIdForAssignment: string | null;
+}
+
+function coerceString(value: unknown): string | null {
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim();
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+  return null;
 }
 
 function parseInviteMetadata(appMetadata: Record<string, unknown>): InviteMetadata {
   const metadata = appMetadata || {};
-  // Logic to determine source, role, brandId, workflowId, stepId
-  if (metadata.invite_type === 'direct_user_invite' && metadata.intended_role) {
+
+  const intendedRole = (metadata.intended_role || metadata.role) as UserRoles | undefined;
+  const invitedToBrand = coerceString(
+    metadata.invited_to_brand_id ?? metadata.assigned_as_brand_admin_for_brand_id ?? metadata.brand_id
+  );
+  const workflowId = coerceString(metadata.invited_from_workflow);
+  const stepId = coerceString(metadata.step_id_for_assignment ?? metadata.workflow_step_id);
+
+  const inviteType = typeof metadata.invite_type === 'string'
+    ? metadata.invite_type.toLowerCase()
+    : undefined;
+
+  if (inviteType === 'direct_user_invite' && intendedRole) {
     return {
       source: 'direct_admin',
-      intendedRole: metadata.intended_role as UserRoles,
-      brandIdForPermission: (metadata.invited_to_brand_id as string) || null,
+      intendedRole,
+      brandIdForPermission: invitedToBrand,
       workflowIdForContext: null,
       stepIdForAssignment: null,
-    };
-  } else if (metadata.invite_type === 'brand_admin_invite_on_update' && metadata.intended_role && metadata.assigned_as_brand_admin_for_brand_id) {
-    return {
-      source: 'brand_assignment',
-      intendedRole: metadata.intended_role as UserRoles,
-      brandIdForPermission: metadata.assigned_as_brand_admin_for_brand_id as string,
-      workflowIdForContext: null,
-      stepIdForAssignment: null,
-    };
-  } else if (metadata.invited_from_workflow && metadata.role) { // Assuming 'role' is set for workflow invites
-    return {
-      source: 'workflow_assignment',
-      intendedRole: metadata.role as UserRoles,
-      brandIdForPermission: (metadata.invited_to_brand_id as string) || null, // Assuming brand context is available
-      workflowIdForContext: metadata.invited_from_workflow as string,
-      stepIdForAssignment: (metadata.step_id_for_assignment as string | number) || null,
     };
   }
-  return { source: 'unknown', intendedRole: null, brandIdForPermission: null, workflowIdForContext: null, stepIdForAssignment: null };
+
+  if (
+    (inviteType === 'brand_admin_invite' || inviteType === 'brand_admin_invite_on_update' || inviteType === 'brand_assignment_invite') &&
+    intendedRole &&
+    invitedToBrand
+  ) {
+    return {
+      source: 'brand_assignment',
+      intendedRole,
+      brandIdForPermission: invitedToBrand,
+      workflowIdForContext: null,
+      stepIdForAssignment: null,
+    };
+  }
+
+  if (workflowId && intendedRole) {
+    return {
+      source: 'workflow_assignment',
+      intendedRole,
+      brandIdForPermission: invitedToBrand,
+      workflowIdForContext: workflowId,
+      stepIdForAssignment: stepId,
+    };
+  }
+
+  return {
+    source: 'unknown',
+    intendedRole: intendedRole ?? null,
+    brandIdForPermission: invitedToBrand,
+    workflowIdForContext: workflowId,
+    stepIdForAssignment: stepId,
+  };
 }
 
 
@@ -121,13 +157,16 @@ export async function processInviteCompletion(
 
     const parsedMeta = parseInviteMetadata(appMetadata);
 
-    if (parsedMeta.source === 'unknown' || !parsedMeta.intendedRole) {
-        console.warn(`[InviteService] Unknown invite source or missing role for user ${userId}. AppMetadata:`, appMetadata);
-        // Attempt to cleanup metadata even if source is unknown to prevent stale data
-        await cleanupAppMetadata(userId, appMetadata, supabase);
-        return { success: true, message: 'Invite confirmed, but specific permissions could not be assigned due to missing or unclear context. Invite data cleaned.', httpStatus: 200 };
+    if (!parsedMeta.intendedRole) {
+        console.warn(`[InviteService] Missing intended role for invite completion. user=${userId}`, appMetadata);
+        return { success: false, message: 'Invite metadata is missing the intended role. Please request a new invite.', httpStatus: 400 };
     }
-    
+
+    if (parsedMeta.source === 'unknown') {
+        console.warn(`[InviteService] Unrecognised invite metadata. user=${userId}`, appMetadata);
+        return { success: false, message: 'Invite metadata is incomplete. Please request a new invite.', httpStatus: 400 };
+    }
+
     // Role validation using the defined UserRoles type and values from the generated types
     const validRoles: ReadonlyArray<UserRoles> = ['admin', 'editor', 'viewer']; // These are the literal types of UserRoles
     if (!validRoles.includes(parsedMeta.intendedRole)) {
@@ -135,7 +174,7 @@ export async function processInviteCompletion(
         await cleanupAppMetadata(userId, appMetadata, supabase); // Cleanup before returning error
         return { success: false, message: `Invalid role specified: ${parsedMeta.intendedRole}`, httpStatus: 400 };
     }
-    
+
     try {
         // Ensure the global role is set in user_metadata based on the invite
         if (parsedMeta.intendedRole) {
@@ -180,14 +219,25 @@ export async function processInviteCompletion(
             
             if (parsedMeta.source === 'workflow_assignment' && parsedMeta.workflowIdForContext && parsedMeta.brandIdForPermission) {
                 // Ensure role for workflow context is correctly derived if it can differ from brand permission role
+                if (!parsedMeta.stepIdForAssignment) {
+                    console.warn(`[InviteService] Workflow invite missing step assignment. user=${userId}, workflow=${parsedMeta.workflowIdForContext}`);
+                }
                 const workflowContextRole = parsedMeta.intendedRole; // Assuming it's the same for now
-                await finalizeWorkflowUser(userId, userEmail!, parsedMeta.workflowIdForContext, parsedMeta.stepIdForAssignment, parsedMeta.brandIdForPermission, workflowContextRole, supabase);
+                await finalizeWorkflowUser(
+                    userId,
+                    userEmail!,
+                    parsedMeta.workflowIdForContext,
+                    parsedMeta.stepIdForAssignment,
+                    parsedMeta.brandIdForPermission,
+                    workflowContextRole,
+                    supabase
+                );
             }
         } else {
              console.warn(`[InviteService] Unhandled permission assignment case for user ${userId}. ParsedMeta:`, parsedMeta);
              // Cleanup metadata even for unhandled cases
              await cleanupAppMetadata(userId, appMetadata, supabase);
-             return { success: true, message: 'Invite confirmed, but no specific permission assignment path was met. Invite data cleaned.', httpStatus: 200 };
+             return { success: false, message: 'Invite metadata did not include a target brand. Please request a new invite.', httpStatus: 400 };
         }
         
         await cleanupAppMetadata(userId, appMetadata, supabase);

@@ -102,14 +102,14 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
 
     workflowBrandId = workflow.brand_id as string | null;
 
-    if (!isGlobalAdmin) {
-      if (!workflowBrandId) {
-        return NextResponse.json(
-          { success: false, error: 'Forbidden: Workflow is not associated with a brand.' },
-          { status: 403 }
-        );
-      }
+    if (!workflowBrandId) {
+      return NextResponse.json(
+        { success: false, error: 'Workflow must be linked to a brand before inviting users.' },
+        { status: 400 }
+      );
+    }
 
+    if (!isGlobalAdmin) {
       try {
         await requireBrandAdminAccess(supabase, user, workflowBrandId);
       } catch (error) {
@@ -218,14 +218,19 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
         if (stepRecord.role === 'admin') userRole = 'admin';
         else if (typeof stepRecord.role === 'string' && ['editor', 'brand', 'legal'].includes(stepRecord.role)) userRole = 'editor';
 
+        const metadataStepId = stepRecord?.step_id ?? stepRecord?.id ?? rawStepId;
+
         await supabase.auth.admin.inviteUserByEmail(body.email, {
           data: {
             full_name: body.full_name || '',
             job_title: body.job_title || '',
             company: body.company || extractCompanyFromEmail(body.email) || '',
             role: userRole,
+            intended_role: userRole,
             invited_by: user.id,
-            invited_from_workflow: workflowId
+            invited_from_workflow: workflowId,
+            invited_to_brand_id: workflowBrandId,
+            step_id_for_assignment: metadataStepId,
           }
         });
       // eslint-disable-next-line @typescript-eslint/no-unused-vars

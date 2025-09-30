@@ -408,7 +408,8 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
             intended_role: 'admin', 
             assigned_as_brand_admin_for_brand_id: newBrandId,
             inviter_id: user.id, 
-            invite_type: 'brand_admin_invite' 
+            invite_type: 'brand_admin_invite',
+            invited_to_brand_id: newBrandId,
           };
           const userMetadata = { email_for_invite: identifier }; // Minimal user metadata
 

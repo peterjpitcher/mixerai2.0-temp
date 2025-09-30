@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Camera, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { createBrowserClient } from '@supabase/ssr';
 import Image from 'next/image';
 import { Spinner } from '@/components/spinner';
 import { 
@@ -13,6 +12,7 @@ import {
   generateUniqueFileName, 
   validateImageDimensions 
 } from '@/lib/validation/file-upload';
+import { createSupabaseClient } from '@/lib/supabase/client';
 
 interface AvatarUploadProps {
   currentAvatarUrl?: string | null;
@@ -20,6 +20,7 @@ interface AvatarUploadProps {
   userId: string;
   fullName?: string;
   email?: string;
+  onProfileVersionChange?: (version: string | null) => void;
 }
 
 export function AvatarUpload({ 
@@ -27,16 +28,18 @@ export function AvatarUpload({
   onAvatarChange, 
   userId,
   fullName,
-  email 
+  email,
+  onProfileVersionChange,
 }: AvatarUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentAvatarUrl || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-  );
+  const supabase = useMemo(() => createSupabaseClient(), []);
+
+  useEffect(() => {
+    setPreviewUrl(currentAvatarUrl || null);
+  }, [currentAvatarUrl]);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -96,10 +99,12 @@ export function AvatarUpload({
       setPreviewUrl(publicUrl);
       
       // Update the profile
-      const { error: updateError } = await supabase
+      const { data: updatedProfile, error: updateError } = await supabase
         .from('profiles')
         .update({ avatar_url: publicUrl })
-        .eq('id', userId);
+        .eq('id', userId)
+        .select('updated_at')
+        .single();
 
       if (updateError) {
         throw updateError;
@@ -107,6 +112,7 @@ export function AvatarUpload({
 
       // Call the parent callback
       onAvatarChange(publicUrl);
+      onProfileVersionChange?.(updatedProfile?.updated_at ?? null);
       
       toast.success('Profile photo updated successfully');
     } catch (error) {
@@ -127,10 +133,12 @@ export function AvatarUpload({
     setIsUploading(true);
     try {
       // Update profile to remove avatar
-      const { error: updateError } = await supabase
+      const { data: updatedProfile, error: updateError } = await supabase
         .from('profiles')
         .update({ avatar_url: null })
-        .eq('id', userId);
+        .eq('id', userId)
+        .select('updated_at')
+        .single();
 
       if (updateError) {
         throw updateError;
@@ -138,6 +146,7 @@ export function AvatarUpload({
 
       setPreviewUrl(null);
       onAvatarChange('');
+      onProfileVersionChange?.(updatedProfile?.updated_at ?? null);
       toast.success('Profile photo removed');
     } catch (error) {
       console.error('Error removing avatar:', error);
@@ -155,15 +164,15 @@ export function AvatarUpload({
   };
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex flex-wrap items-center gap-4 rounded-lg border border-muted bg-muted/40 p-4 sm:gap-6">
       <div className="relative">
-        <div className="w-20 h-20 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center">
+        <div className="w-24 h-24 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center">
           {previewUrl ? (
             <Image
               src={previewUrl}
               alt="Profile"
-              width={80}
-              height={80}
+              width={96}
+              height={96}
               className="w-full h-full object-cover"
             />
           ) : (

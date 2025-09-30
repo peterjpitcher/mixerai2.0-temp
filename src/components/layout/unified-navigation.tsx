@@ -565,20 +565,25 @@ export function UnifiedNavigation() {
             if ('items' in navElement) {
               const group = navElement as NavGroupItem;
               const isOpen = expandedSections[group.label] ?? group.defaultOpen ?? isActive(group);
+              const isProductClaimsGroup = group.label === 'Product Claims (Deprecated)';
 
               return (
                 <li key={group.label}>
                   <button
                     onClick={() => toggleSection(group.label)}
                     className={cn(
-                      "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium",
+                      "flex w-full justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium",
+                      isProductClaimsGroup ? "items-start" : "items-center",
                       "hover:bg-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                       isActive(group) ? "bg-muted text-primary" : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "flex gap-3",
+                      isProductClaimsGroup ? "items-start" : "items-center"
+                    )}>
                       {group.icon}
-                      <span>{group.label}</span>
+                      <span className={cn(isProductClaimsGroup && "block text-left leading-tight")}>{group.label}</span>
                     </div>
                     {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   </button>
