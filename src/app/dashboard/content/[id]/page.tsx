@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound, usePathname, useRouter } from 'next/navigation';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MarkdownDisplay } from '@/components/content/markdown-display';
 import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
+import { VettingAgencyFeedbackCard } from '@/components/content/vetting-agency-feedback-card';
 import { toast } from 'sonner';
 import { createBrowserClient } from '@supabase/ssr';
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -19,6 +20,7 @@ import { RejectionFeedbackCard } from '@/components/content/rejection-feedback-c
 import { format as formatDateFns } from 'date-fns';
 import { normalizeOutputsMap } from '@/lib/content/html-normalizer';
 import type { NormalizedContent } from '@/types/template';
+import type { VettingFeedbackStageResult } from '@/types/vetting-feedback';
 
 interface TemplateOutputField {
   id: string;
@@ -36,6 +38,27 @@ interface Template {
   name: string;
   description?: string;
   fields: TemplateFields;
+}
+
+interface VettingAgency {
+  id: string;
+  name: string;
+  description?: string | null;
+  country_code?: string | null;
+  priority: number; // 1 = High, 2 = Medium, 3 = Low
+}
+
+interface BrandData {
+  id: string;
+  name: string;
+  brand_color?: string | null;
+  logo_url?: string | null;
+  icon_url?: string | null;
+  avatar_url?: string | null;
+  brand_identity?: string | null;
+  tone_of_voice?: string | null;
+  guardrails?: string | null;
+  selected_vetting_agencies?: VettingAgency[];
 }
 
 interface ContentData {
@@ -110,7 +133,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   const [versions, setVersions] = useState<ContentVersion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [activeBrandData, setActiveBrandData] = useState<{ name: string; brand_color?: string; logo_url?: string; icon_url?: string; avatar_url?: string } | null>(null);
+  const [activeBrandData, setActiveBrandData] = useState<BrandData | null>(null);
   const [template, setTemplate] = useState<Template | null>(null);
   const [expandedVersions, setExpandedVersions] = useState<Record<string, boolean>>({});
   const router = useRouter();
@@ -256,7 +279,17 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     return normalizeOutputsMap(rawOutputs ?? undefined, outputFieldDefinitions);
   }, [content?.content_data?.generatedOutputs, outputFieldDefinitions]);
 
-  const handleWorkflowAction = () => {
+  const vettingFeedbackByStage = useMemo(() => {
+    const rawData = content?.content_data as Record<string, unknown> | undefined;
+    if (!rawData) return {} as Record<string, VettingFeedbackStageResult>;
+    const feedback = rawData.vettingFeedback as Record<string, VettingFeedbackStageResult> | undefined;
+    if (!feedback || typeof feedback !== 'object') {
+      return {} as Record<string, VettingFeedbackStageResult>;
+    }
+    return feedback;
+  }, [content?.content_data]);
+
+  const refreshContentData = useCallback(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
@@ -285,8 +318,8 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
       }
     };
     fetchData();
-    router.refresh(); 
-  };
+    router.refresh();
+  }, [id, router]);
 
   if (isLoading || !currentUserId) {
     return (
@@ -307,10 +340,12 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     );
   }
 
+  const currentStageId = content.current_step ? String(content.current_step) : null;
+
   let currentStepObject: WorkflowStep | undefined = undefined;
-  if (content.workflow && content.workflow.steps && content.current_step) {
+  if (content.workflow && content.workflow.steps && currentStageId) {
     currentStepObject = content.workflow.steps.find(
-      (step: unknown) => (step as { id?: unknown }).id === content.current_step
+      (step: unknown) => (step as { id?: unknown }).id === currentStageId
     ) as WorkflowStep | undefined;
   }
 
@@ -340,10 +375,13 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     }
   };
 
-  const brandForHeader = activeBrandData || (content.brands as { name?: string; brand_color?: string; logo_url?: string; icon_url?: string; avatar_url?: string } | undefined);
+  const brandForHeader = (activeBrandData ?? (content.brands as Partial<BrandData> | undefined)) || undefined;
   const brandName = brandForHeader?.name || 'Brand';
   const brandColor = brandForHeader?.brand_color || '#cccccc';
   const brandIcon = brandForHeader?.logo_url || brandForHeader?.icon_url || brandForHeader?.avatar_url;
+
+  const selectedVettingAgencies = activeBrandData?.selected_vetting_agencies ?? [];
+  const currentStageFeedback = currentStageId ? vettingFeedbackByStage[currentStageId] : undefined;
 
   const breadcrumbItems = [
     { label: 'Dashboard', href: '/dashboard' },
@@ -409,7 +447,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
               <RestartWorkflowButton
                 contentId={content.id}
                 contentTitle={content.title}
-                onRestart={handleWorkflowAction}
+                onRestart={refreshContentData}
                 variant="outline"
               />
             </div>
@@ -625,17 +663,37 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
         </div>
 
         <div className="lg:col-span-1 space-y-6">
-           {content.workflow_id && content.workflow && currentUserId && (
-          <ContentApprovalWorkflow
-              contentId={content.id}
-              contentTitle={content.title}
-              currentStepObject={currentStepObject}
-              isCurrentUserStepOwner={isCurrentUserStepOwner}
-              versions={versions}
-              template={template}
-              onActionComplete={handleWorkflowAction}
-              initialPublishedUrl={content.published_url ?? null}
-            />
+          {content.workflow_id && content.workflow && currentUserId && (
+            <>
+              <VettingAgencyFeedbackCard
+                contentId={content.id}
+                brandName={brandName}
+                agencies={selectedVettingAgencies}
+                generatedOutputs={generatedOutputs}
+                outputFieldLabels={outputFieldIdToNameMap}
+                stageId={currentStageId}
+                stageName={currentStepObject?.name || null}
+                existingFeedback={currentStageFeedback}
+                onFeedbackUpdated={refreshContentData}
+                autoRun
+                brandGuidelines={{
+                  guardrails: activeBrandData?.guardrails ?? null,
+                  toneOfVoice: activeBrandData?.tone_of_voice ?? null,
+                  brandIdentity: activeBrandData?.brand_identity ?? null,
+                }}
+              />
+
+              <ContentApprovalWorkflow
+                contentId={content.id}
+                contentTitle={content.title}
+                currentStepObject={currentStepObject}
+                isCurrentUserStepOwner={isCurrentUserStepOwner}
+                versions={versions}
+                template={template}
+                onActionComplete={refreshContentData}
+                initialPublishedUrl={content.published_url ?? null}
+              />
+            </>
           )}
         </div>
       </div>

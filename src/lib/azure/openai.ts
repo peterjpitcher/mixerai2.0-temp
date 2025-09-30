@@ -1,7 +1,9 @@
 import { OpenAI } from "openai";
+import { randomUUID } from 'crypto';
 import type { StyledClaims } from "@/types/claims";
 import { normalizeFieldContent, extractFirstHtmlValue, type NormalizedContent } from "@/lib/content/html-normalizer";
 import { activityTracker } from "./activity-tracker";
+import type { VettingFeedbackItem, VettingFeedbackPriority } from '@/types/vetting-feedback';
 
 type TemplateInputField = {
   id: string;
@@ -1949,6 +1951,191 @@ export async function generateSuggestions(
 /**
  * Generates a compelling content title based on provided context.
  */
+interface VettingAgencyFeedbackGenerationOptions {
+  brandName: string;
+  workflowStage: string;
+  agencies: Array<{
+    agencyId: string;
+    agencyName: string;
+    description: string;
+    countryCode: string;
+    priority: string;
+  }>;
+  outputs: Array<{
+    fieldId: string;
+    fieldName: string;
+    plainText: string;
+  }>;
+  guardrails?: string;
+  toneOfVoice?: string;
+  brandIdentity?: string;
+}
+
+export async function generateVettingAgencyFeedback(
+  options: VettingAgencyFeedbackGenerationOptions
+): Promise<VettingFeedbackItem[]> {
+  const deploymentName = getModelName();
+
+  const agenciesSection = options.agencies
+    .map((agency, index) => {
+      const parts = [`${index + 1}. ${agency.agencyName}`];
+      const detailParts: string[] = [];
+      if (agency.priority) detailParts.push(`Priority: ${agency.priority}`);
+      if (agency.countryCode) detailParts.push(`Country: ${agency.countryCode}`);
+      if (agency.description) detailParts.push(agency.description);
+      if (detailParts.length > 0) {
+        parts.push(`(${detailParts.join(' | ')})`);
+      }
+      return parts.join(' ');
+    })
+    .join('\n');
+
+  const outputsSection = options.outputs
+    .map((output, index) => {
+      const preview = output.plainText.length > 1500 ? `${output.plainText.slice(0, 1500)}…` : output.plainText;
+      return `${index + 1}. ${output.fieldName} [${output.fieldId}]\n${preview}`;
+    })
+    .join('\n\n');
+
+  const contextualNotes: string[] = [];
+  if (options.brandIdentity) {
+    contextualNotes.push(`Brand Identity Summary:\n${options.brandIdentity}`);
+  }
+  if (options.toneOfVoice) {
+    contextualNotes.push(`Preferred Tone of Voice:\n${options.toneOfVoice}`);
+  }
+  if (options.guardrails) {
+    contextualNotes.push(`Content Guardrails:\n${options.guardrails}`);
+  }
+
+  const systemPrompt = `You are a senior regulatory compliance analyst specialising in marketing content reviews.`;
+
+  const instructions = `Review the marketing content for the brand "${options.brandName}" at the workflow stage "${options.workflowStage}".
+
+Evaluate the content for each of the listed vetting agencies. Highlight potential compliance risks, misleading claims, missing disclosures, or legal guidance relevant to that agency. Reference the specific content from the generated outputs in your reasoning.
+
+Prioritise findings with the following severity levels:
+- critical: Clear legal, regulatory, or safety risk that must be resolved before progression.
+- high: Significant risk or likely compliance issue requiring prompt attention.
+- medium: Moderate risk, ambiguity, or best-practice gap that should be addressed soon.
+- low: Minor refinement or optional improvement with low risk.
+
+Return only JSON in the following structure:
+{
+  "feedback": [
+    {
+      "agencyId": "<agency id from list>",
+      "agencyName": "<agency name>",
+      "priority": "critical" | "high" | "medium" | "low",
+      "summary": "One or two sentences explaining the issue and referencing the specific content",
+      "recommendedAction": "Recommended next step to resolve the issue",
+      "relatedFields": ["fieldId", ...]
+    }
+  ]
+}
+
+Only include agencies that have actionable feedback. The relatedFields array must contain the identifiers of the content fields that triggered the feedback.`;
+
+  const userPromptParts = [instructions];
+  if (contextualNotes.length > 0) {
+    userPromptParts.push(`Additional brand guidance:\n${contextualNotes.join('\n\n')}`);
+  }
+  userPromptParts.push(`Selected vetting agencies:\n${agenciesSection}`);
+  userPromptParts.push(`Generated content outputs (ID in brackets):\n${outputsSection}`);
+
+  const completionRequest = {
+    model: deploymentName,
+    messages: [
+      { role: 'system' as const, content: systemPrompt },
+      { role: 'user' as const, content: userPromptParts.join('\n\n') },
+    ],
+    temperature: 0.2,
+    max_tokens: 900,
+    response_format: { type: 'json_object' as const },
+  };
+
+  const endpoint = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
+
+  const requestId = activityTracker.startRequest('generateVettingAgencyFeedback');
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'api-key': process.env.AZURE_OPENAI_API_KEY || '',
+    },
+    body: JSON.stringify(completionRequest),
+  });
+
+  const rateLimitHeaders = extractRateLimitHeaders(response);
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    const status = response.status === 429 ? 'rate_limited' : 'error';
+    activityTracker.completeRequest(requestId, status, rateLimitHeaders);
+    throw new Error(`Azure OpenAI vetting feedback request failed with status ${response.status}: ${errorText}`);
+  }
+
+  activityTracker.completeRequest(requestId, 'success', rateLimitHeaders);
+
+  const responseData = await response.json();
+  const responseContent = responseData.choices?.[0]?.message?.content || '{}';
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(responseContent);
+  } catch (error) {
+    console.error('[generateVettingAgencyFeedback] Failed to parse JSON response:', error, responseContent);
+    throw new Error('AI response could not be parsed into JSON.');
+  }
+
+  const feedbackItems: VettingFeedbackItem[] = [];
+  const feedbackArray = (parsed as { feedback?: unknown }).feedback;
+
+  if (Array.isArray(feedbackArray)) {
+    for (const item of feedbackArray) {
+      if (!item || typeof item !== 'object') continue;
+      const agencyId = String((item as Record<string, unknown>).agencyId ?? '').trim();
+      const agencyName = String((item as Record<string, unknown>).agencyName ?? '').trim();
+      const summary = String((item as Record<string, unknown>).summary ?? '').trim();
+      const recommendedAction = String((item as Record<string, unknown>).recommendedAction ?? '').trim();
+      const priorityRaw = String((item as Record<string, unknown>).priority ?? '').toLowerCase();
+
+      if (!agencyId || !agencyName || !summary || !recommendedAction) {
+        continue;
+      }
+
+      const priority: VettingFeedbackPriority = priorityRaw === 'critical'
+        ? 'critical'
+        : priorityRaw === 'high'
+        ? 'high'
+        : priorityRaw === 'medium'
+        ? 'medium'
+        : 'low';
+
+      let relatedFields: string[] = [];
+      const relatedRaw = (item as Record<string, unknown>).relatedFields;
+      if (Array.isArray(relatedRaw)) {
+        relatedFields = relatedRaw
+          .map(value => String(value).trim())
+          .filter(value => value && options.outputs.some(output => output.fieldId === value));
+      }
+
+      feedbackItems.push({
+        id: randomUUID(),
+        agencyId,
+        agencyName,
+        priority,
+        summary,
+        recommendedAction,
+        relatedFields,
+      });
+    }
+  }
+
+  return feedbackItems;
+}
+
 export async function generateContentTitleFromContext(
   contentBody: string,
   brandContext: {
