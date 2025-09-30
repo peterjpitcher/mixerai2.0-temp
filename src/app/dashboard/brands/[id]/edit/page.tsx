@@ -82,6 +82,14 @@ const normalizeCountryValue = (value: string | null | undefined): string => {
     return matchByLabel.value;
   }
 
+  if (trimmed.length === 2) {
+    const upper = trimmed.toUpperCase();
+    const exists = COUNTRIES.some(country => country.value === upper);
+    if (exists) {
+      return upper;
+    }
+  }
+
   return '';
 };
 
@@ -825,8 +833,14 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                           const matchByValue = COUNTRIES.find(country => country.value === formData.country);
                           if (matchByValue) return matchByValue.value;
                           const matchByLabel = COUNTRIES.find(country => country.label.toLowerCase() === formData.country.toLowerCase());
-                          return matchByLabel ? matchByLabel.value : formData.country;
+                          if (matchByLabel) return matchByLabel.value;
+                          const normalized = normalizeCountryValue(formData.country);
+                          return normalized;
                         })();
+
+                        const effectiveCountryLabel = effectiveCountryCode
+                          ? COUNTRIES.find(country => country.value === effectiveCountryCode)?.label || ''
+                          : '';
 
                         const filteredAgenciesByIdentityTab = allVettingAgencies.filter(agency => {
                           if (!effectiveCountryCode) return true;
@@ -845,7 +859,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                         if (!isLoadingAgencies && formData.country && filteredAgenciesByIdentityTab.length === 0) {
                           return (
                             <p className="text-sm text-muted-foreground">
-                              No specific vetting agencies found for {COUNTRIES.find(c => c.value === formData.country)?.label || formData.country}.
+                              No specific vetting agencies found for {effectiveCountryLabel || formData.country}.
                             </p>
                           );
                         }
