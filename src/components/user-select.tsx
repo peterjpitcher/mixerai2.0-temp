@@ -3,7 +3,7 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { PlusIcon, UserIcon, Users } from 'lucide-react';
 import { useDebounce } from '@/lib/hooks';
-import Image from 'next/image';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getAvatarUrl, getNameInitials } from '@/lib/utils/avatar';
 
 interface User {
@@ -137,22 +137,19 @@ export function UserSelect({ onSelect, placeholder = "Search users or enter emai
                     className="w-full px-4 py-2 text-left hover:bg-accent flex items-center gap-3"
                     onClick={() => handleUserSelect(user)}
                   >
-                    <div className="h-8 w-8 rounded-full overflow-hidden bg-muted flex items-center justify-center relative">
+                    <Avatar className="h-8 w-8">
                       {resolvedAvatar ? (
-                        <Image
-                          src={resolvedAvatar}
-                          alt={user.full_name}
-                          fill
-                          className="object-cover"
-                        />
+                        <AvatarImage src={resolvedAvatar} alt={user.full_name} />
                       ) : initials ? (
-                        <span className="text-xs font-semibold uppercase text-muted-foreground">
+                        <AvatarFallback className="text-xs font-semibold uppercase text-muted-foreground">
                           {initials}
-                        </span>
+                        </AvatarFallback>
                       ) : (
-                        <UserIcon className="h-4 w-4 text-muted-foreground" />
+                        <AvatarFallback>
+                          <UserIcon className="h-4 w-4 text-muted-foreground" />
+                        </AvatarFallback>
                       )}
-                    </div>
+                    </Avatar>
                     <div>
                       <div className="font-medium">{user.full_name}</div>
                       <div className="text-sm text-muted-foreground">{user.email}</div>

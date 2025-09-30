@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
@@ -48,6 +47,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { BrandIcon } from '@/components/brand-icon';
 import { apiFetch } from '@/lib/api-client';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getAvatarUrl, getNameInitials } from '@/lib/utils/avatar';
 
 // export const metadata: Metadata = {
 //   title: 'Manage Users | MixerAI 2.0',
@@ -540,20 +541,15 @@ export default function UsersPage() {
               {sortedUsers.map(user => (
                 <TableRow key={user.id} className={`${user.role?.toLowerCase().includes('admin') ? 'bg-primary/5' : ''} ${user.user_status === 'inactive' ? 'opacity-60' : ''}`}>
                   <TableCell>
-                    <div className="relative h-8 w-8 rounded-full bg-primary/10 overflow-hidden">
-                      {user.avatar_url ? (
-                        <Image
-                          src={user.avatar_url}
-                          alt={user.full_name || 'User'}
-                          fill
-                          className="object-cover"
-                        />
+                    <Avatar className="h-8 w-8">
+                      {getAvatarUrl(user.id, user.avatar_url) ? (
+                        <AvatarImage src={getAvatarUrl(user.id, user.avatar_url)} alt={user.full_name || 'User'} />
                       ) : (
-                        <div className="flex items-center justify-center h-full w-full text-sm font-semibold text-primary">
-                          {(user.full_name || 'U').charAt(0)}
-                        </div>
+                        <AvatarFallback className="text-xs font-semibold">
+                          {getNameInitials(user.full_name) || (user.full_name || 'U').charAt(0).toUpperCase()}
+                        </AvatarFallback>
                       )}
-                    </div>
+                    </Avatar>
                   </TableCell>
                   <TableCell className="font-medium">{user.full_name}</TableCell>
                   <TableCell>{user.email}</TableCell>
