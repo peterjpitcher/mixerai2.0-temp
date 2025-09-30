@@ -30,7 +30,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { user: currentUser, isLoading: isLoadingUser, signOut } = useAuth();
-  
+
   const handleSignOut = async () => {
     try {
       sonnerToast.success('You have been successfully signed out.');
@@ -122,16 +122,7 @@ export default function DashboardLayout({
             </div>
           </DevelopmentOnly>
           <ErrorBoundary key={`${pathname}-boundary`}>
-            <Suspense
-              key={`${pathname}-suspense`}
-              fallback={(
-                <div className="flex h-full min-h-[240px] w-full items-center justify-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              )}
-            >
-              {children}
-            </Suspense>
+            {children}
           </ErrorBoundary>
         </main>
       </div>
