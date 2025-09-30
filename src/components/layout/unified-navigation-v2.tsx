@@ -364,6 +364,10 @@ export function UnifiedNavigationV2({ className }: UnifiedNavigationProps) {
     [navItemsDefinition]
   );
 
+  useEffect(() => {
+    console.debug('[UnifiedNavigationV2] pathname', pathname, 'segments', segments);
+  }, [pathname, segmentsKey]);
+
   const handleToggle = useCallback((id: string) => {
     setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);

@@ -8,7 +8,7 @@ import { BottomMobileNavigation } from "@/components/layout/BottomMobileNavigati
 import { usePathname, useRouter } from "next/navigation";
 import { toast as sonnerToast } from "sonner";
 import { LogOut, UserCircle2, Loader2 } from "lucide-react";
-import React, { Suspense } from "react";
+import React, { Suspense, useEffect } from "react";
 import Image from 'next/image';
 import { DevelopmentOnly } from "@/components/development-only";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -30,6 +30,10 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { user: currentUser, isLoading: isLoadingUser, signOut } = useAuth();
+
+  useEffect(() => {
+    console.debug('[DashboardLayout] render path', pathname);
+  }, [pathname]);
 
   const handleSignOut = async () => {
     try {
