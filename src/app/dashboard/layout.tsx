@@ -15,6 +15,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { SessionTimeoutProvider } from "@/components/providers/session-timeout-provider";
 import { IssueReporter } from '@/components/issue-reporter';
 import { useAuth } from '@/contexts/auth-context';
+import { getAvatarUrl, getNameInitials } from '@/lib/utils/avatar';
 
 // Define UserSessionData interface (can be shared if defined elsewhere)
 /**
@@ -51,7 +52,8 @@ export default function DashboardLayout({
   };
 
   const displayName = currentUser?.user_metadata?.full_name || currentUser?.full_name || 'User';
-  const avatarUrl = currentUser?.avatar_url || currentUser?.user_metadata?.avatar_url;
+  const avatarUrl = getAvatarUrl(currentUser?.id, currentUser?.avatar_url || currentUser?.user_metadata?.avatar_url);
+  const avatarInitials = getNameInitials(displayName);
 
   return (
     <SessionTimeoutProvider warningMinutes={25} sessionMinutes={30}>
@@ -93,7 +95,9 @@ export default function DashboardLayout({
                       className="rounded-full" 
                     />
                   ) : (
-                    <UserCircle2 className="h-8 w-8" />
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold uppercase text-primary">
+                      {avatarInitials || <UserCircle2 className="h-5 w-5" />}
+                    </div>
                   )}
                   <span className="hidden sm:inline text-sm font-medium">
                     {displayName}

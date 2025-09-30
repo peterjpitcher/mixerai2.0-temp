@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Image from 'next/image';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { PlusIcon, UserIcon, Users } from 'lucide-react';
 import { useDebounce } from '@/lib/hooks';
+import Image from 'next/image';
+import { getAvatarUrl, getNameInitials } from '@/lib/utils/avatar';
 
 interface User {
   id: string;
@@ -125,31 +126,40 @@ export function UserSelect({ onSelect, placeholder = "Search users or enter emai
             </div>
           ) : users.length > 0 ? (
             <div>
-              {users.map((user) => (
-                <button
-                  key={user.id}
-                  type="button"
-                  className="w-full px-4 py-2 text-left hover:bg-accent flex items-center gap-3"
-                  onClick={() => handleUserSelect(user)}
-                >
-                  <div className="h-8 w-8 rounded-full overflow-hidden bg-muted flex items-center justify-center relative">
-                    {user.avatar_url ? (
-                      <Image
-                        src={user.avatar_url}
-                        alt={user.full_name}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <UserIcon className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-medium">{user.full_name}</div>
-                    <div className="text-sm text-muted-foreground">{user.email}</div>
-                  </div>
-                </button>
-              ))}
+              {users.map((user) => {
+                const resolvedAvatar = getAvatarUrl(user.id, user.avatar_url);
+                const initials = getNameInitials(user.full_name);
+
+                return (
+                  <button
+                    key={user.id}
+                    type="button"
+                    className="w-full px-4 py-2 text-left hover:bg-accent flex items-center gap-3"
+                    onClick={() => handleUserSelect(user)}
+                  >
+                    <div className="h-8 w-8 rounded-full overflow-hidden bg-muted flex items-center justify-center relative">
+                      {resolvedAvatar ? (
+                        <Image
+                          src={resolvedAvatar}
+                          alt={user.full_name}
+                          fill
+                          className="object-cover"
+                        />
+                      ) : initials ? (
+                        <span className="text-xs font-semibold uppercase text-muted-foreground">
+                          {initials}
+                        </span>
+                      ) : (
+                        <UserIcon className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="font-medium">{user.full_name}</div>
+                      <div className="text-sm text-muted-foreground">{user.email}</div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           ) : (
             isValidEmail(inputValue) ? (

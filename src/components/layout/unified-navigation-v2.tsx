@@ -347,26 +347,28 @@ export function UnifiedNavigationV2({ className }: UnifiedNavigationProps) {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    const initialOpen: Record<string, boolean> = {};
-    navItemsDefinition.forEach((item) => {
-      if ('items' in item) {
-        const shouldOpen = item.defaultOpen || item.items.some((child) => isItemActive(child, pathname, segments, searchParams, navItemsDefinition));
-        if (shouldOpen) {
-          initialOpen[item.id] = true;
+    setOpenGroups((previous) => {
+      let changed = false;
+      const next = { ...previous };
+
+      navItemsDefinition.forEach((item) => {
+        if ('items' in item) {
+          const shouldOpen = item.defaultOpen || item.items.some((child) => isItemActive(child, pathname, segments, searchParams, navItemsDefinition));
+          if (shouldOpen && !next[item.id]) {
+            next[item.id] = true;
+            changed = true;
+          }
         }
-      }
+      });
+
+      return changed ? next : previous;
     });
-    setOpenGroups((prev) => ({ ...initialOpen, ...prev }));
-  }, [navItemsDefinition, pathname, segmentsKey, segments, searchParams]);
+  }, [navItemsDefinition, pathname, segmentsKey, searchParams]);
 
   const filteredItems = useMemo(
     () => navItemsDefinition.filter((item) => !item.show || item.show()),
     [navItemsDefinition]
   );
-
-  useEffect(() => {
-    console.debug('[UnifiedNavigationV2] pathname', pathname, 'segments', segments);
-  }, [pathname, segmentsKey]);
 
   const handleToggle = useCallback((id: string) => {
     setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));

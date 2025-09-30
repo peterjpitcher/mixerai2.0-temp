@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
+import { getAvatarUrl, getNameInitials } from '@/lib/utils/avatar';
 
 interface UserData {
   id: string;
@@ -34,7 +35,13 @@ export function TopNavigation() {
         const response = await fetch('/api/me');
         if (response.ok) {
           const data = await response.json();
-          setCurrentUser(data);
+          if (data?.success && data.user) {
+            setCurrentUser(data.user);
+          } else {
+            setCurrentUser(null);
+          }
+        } else {
+          setCurrentUser(null);
         }
       } catch (error) {
         console.error('Error fetching user data:', error);
@@ -47,7 +54,8 @@ export function TopNavigation() {
   }, []);
 
   const displayName = currentUser?.user_metadata?.full_name || currentUser?.full_name || currentUser?.email || 'User';
-  const avatarUrl = currentUser?.avatar_url || currentUser?.user_metadata?.avatar_url;
+  const avatarUrl = getAvatarUrl(currentUser?.id, currentUser?.avatar_url || currentUser?.user_metadata?.avatar_url);
+  const avatarFallback = getNameInitials(displayName) || displayName.substring(0, 2).toUpperCase();
   
   return (
     <header className="text-white h-16 flex items-center px-6 sticky top-0 z-50 shadow-md" style={{ backgroundColor: '#13599f' }}>
@@ -102,7 +110,7 @@ export function TopNavigation() {
             <Avatar className="h-8 w-8">
               {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
               <AvatarFallback>
-                {displayName.substring(0, 2).toUpperCase()}
+                {avatarFallback}
               </AvatarFallback>
             </Avatar>
             <span className="text-sm font-medium hidden md:inline-block">

@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { UserCircle } from 'lucide-react';
 import { format as formatDateFns } from 'date-fns';
 import { apiFetch } from '@/lib/api-client';
+import { getAvatarUrl, getNameInitials } from '@/lib/utils/avatar';
 
 interface User {
   id: string;
@@ -146,11 +147,11 @@ export function UserProfile({ user, isCurrentUser = false, canEdit = false, onUs
         <CardContent className="space-y-6">
           <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
             <Avatar className="h-24 w-24">
-              {user.avatar_url ? (
-                <AvatarImage src={user.avatar_url} alt={user.full_name} />
+              {getAvatarUrl(user.id, user.avatar_url) ? (
+                <AvatarImage src={getAvatarUrl(user.id, user.avatar_url)} alt={user.full_name} />
               ) : (
                 <AvatarFallback className="text-3xl">
-                  <UserCircle className="h-12 w-12" />
+                  {getNameInitials(user.full_name) || <UserCircle className="h-12 w-12" />}
                 </AvatarFallback>
               )}
             </Avatar>
