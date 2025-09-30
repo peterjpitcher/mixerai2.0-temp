@@ -266,7 +266,7 @@ export function UnifiedNavigationV2({ className }: UnifiedNavigationProps) {
     { id: 'divider-2', type: 'divider', show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin) },
     {
       id: 'group-claims',
-      label: 'Claims',
+      label: 'Claims (deprecated)',
       icon: <ShieldCheck className="h-5 w-5" />,
       segment: 'claims',
       defaultOpen: false,
@@ -298,14 +298,15 @@ export function UnifiedNavigationV2({ className }: UnifiedNavigationProps) {
       ],
     },
     { id: 'divider-4', type: 'divider', show: () => isAuthenticatedUser && (isPlatformAdmin || isScopedAdmin) },
-    {
-      id: 'nav-issues',
-      href: '/dashboard/issues',
-      label: 'Issues',
-      icon: <MessageSquareWarning className="h-5 w-5" />,
-      segment: 'issues',
-      show: () => isPlatformAdmin,
-    },
+    // Hidden until issues module is re-enabled
+    // {
+    //   id: 'nav-issues',
+    //   href: '/dashboard/issues',
+    //   label: 'Issues',
+    //   icon: <MessageSquareWarning className="h-5 w-5" />,
+    //   segment: 'issues',
+    //   show: () => isPlatformAdmin,
+    // },
     {
       id: 'nav-users',
       href: '/dashboard/users',
