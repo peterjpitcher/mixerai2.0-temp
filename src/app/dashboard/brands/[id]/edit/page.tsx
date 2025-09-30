@@ -67,6 +67,24 @@ const mapNumericPriorityToLabel = (priority: number | string | null | undefined)
   return null;
 };
 
+const normalizeCountryValue = (value: string | null | undefined): string => {
+  if (!value) return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+
+  const matchByValue = COUNTRIES.find((country) => country.value.toLowerCase() === trimmed.toLowerCase());
+  if (matchByValue) {
+    return matchByValue.value;
+  }
+
+  const matchByLabel = COUNTRIES.find((country) => country.label.toLowerCase() === trimmed.toLowerCase());
+  if (matchByLabel) {
+    return matchByLabel.value;
+  }
+
+  return '';
+};
+
 const getPriorityAgencyStyles = (priority: 'High' | 'Medium' | 'Low' | null | undefined): string => {
   if (priority === 'High') return 'text-red-600 font-bold';
   if (priority === 'Medium') return 'text-orange-500 font-semibold';
@@ -254,6 +272,8 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         console.log('Edit page - Logo URL:', data.brand.logo_url);
         setBrand(data.brand);
         
+        const normalizedCountry = normalizeCountryValue(data.brand.country);
+
         setFormData({
           name: data.brand.name || '',
           website_url: data.brand.website_url || '',
@@ -264,7 +284,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                                               : { id: urlItem.id || uuidv4(), value: urlItem.value }
                                         )
                                       : [],
-          country: data.brand.country || '',
+          country: normalizedCountry,
           language: data.brand.language || '',
           brand_color: data.brand.brand_color || '#1982C4',
           brand_identity: data.brand.brand_identity || '',
@@ -800,7 +820,19 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                       {isLoadingAgencies && <p className="text-sm text-muted-foreground">Loading agencies...</p>}
                       
                       {(() => { 
-                        const filteredAgenciesByIdentityTab = allVettingAgencies.filter(agency => !formData.country || !agency.country_code || agency.country_code === formData.country);
+                        const effectiveCountryCode = (() => {
+                          if (!formData.country) return '';
+                          const matchByValue = COUNTRIES.find(country => country.value === formData.country);
+                          if (matchByValue) return matchByValue.value;
+                          const matchByLabel = COUNTRIES.find(country => country.label.toLowerCase() === formData.country.toLowerCase());
+                          return matchByLabel ? matchByLabel.value : formData.country;
+                        })();
+
+                        const filteredAgenciesByIdentityTab = allVettingAgencies.filter(agency => {
+                          if (!effectiveCountryCode) return true;
+                          if (!agency.country_code) return true;
+                          return agency.country_code.toLowerCase() === effectiveCountryCode.toLowerCase();
+                        });
 
                         if (!isLoadingAgencies && !formData.country && allVettingAgencies.length > 0) {
                           return (

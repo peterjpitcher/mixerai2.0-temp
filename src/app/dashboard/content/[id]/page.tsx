@@ -663,7 +663,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
         </div>
 
         <div className="lg:col-span-1 space-y-6">
-          {content.workflow_id && content.workflow && currentUserId && (
+          {content.workflow_id && currentUserId && (
             <>
               <VettingAgencyFeedbackCard
                 contentId={content.id}
