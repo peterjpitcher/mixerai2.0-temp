@@ -113,8 +113,11 @@ export default function ForgotPasswordPage() {
               Remembered your password? Log in
             </Link>
           </div>
+          <p className="mt-6 text-xs text-muted-foreground text-center leading-5">
+            Password reset emails can take up to five minutes to appear. If nothing lands after fifteen minutes, message Peter Pitcher on Teams and we&apos;ll make sure you get access.
+          </p>
         </div>
       </div>
     </div>
   );
-} 
+}

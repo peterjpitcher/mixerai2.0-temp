@@ -63,13 +63,16 @@ function buildHtml(): string {
   return `<!doctype html>
 <meta name="robots" content="noindex">
 <title>Confirm Password Reset</title>
-<body style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f1f5f9; color: #0f172a; margin: 0;">
-  <form method="post" style="background: white; padding: 32px; border-radius: 12px; box-shadow: 0 10px 30px rgba(15,23,42,0.08); text-align: center; max-width: 360px; width: 100%;">
-    <h1 style="font-size: 1.5rem; margin-bottom: 0.75rem;">Finish password reset</h1>
-    <p style="margin-bottom: 1.5rem; color: #475569;">Click continue to securely confirm your identity and choose a new password.</p>
-    <button type="submit" style="background: #13599f; color: white; border: none; border-radius: 8px; padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer;">Continue</button>
-    <p style="margin-top: 1rem; font-size: 0.75rem; color: #64748b;">If you didn’t request this, you can safely close this page.</p>
-  </form>
+<body style="margin:0; background:#f4f7fb; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:#0f172a;">
+  <div style="display:flex; align-items:center; justify-content:center; min-height:100vh; padding:32px 16px;">
+    <form method="post" style="background:#ffffff; padding:36px 32px; border-radius:16px; box-shadow:0 20px 40px rgba(15,23,42,0.12); max-width:420px; width:100%; text-align:center;">
+      <h1 style="font-size:24px; margin:0 0 12px 0;">Finish password reset</h1>
+      <p style="margin:0 0 20px 0; color:#475569; font-size:15px; line-height:1.55;">Click continue to securely confirm your identity and choose a new password for MixerAI.</p>
+      <button type="submit" style="display:inline-block; background:#13599f; color:#ffffff; border:none; border-radius:10px; padding:12px 24px; font-weight:600; cursor:pointer; font-size:15px;">Continue</button>
+      <p style="margin:20px 0 0 0; font-size:13px; color:#64748b; line-height:1.6;">Emails can take up to five minutes to arrive. If nothing shows up after fifteen minutes, message Peter Pitcher on Teams and we&apos;ll help you finish the reset.</p>
+      <p style="margin:16px 0 0 0; font-size:12px; color:#94a3b8;">Didn’t request this? You can safely close this window.</p>
+    </form>
+  </div>
 </body>`;
 }
 

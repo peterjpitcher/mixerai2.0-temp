@@ -224,6 +224,9 @@ export function LoginForm() {
             {isLoading ? "Logging in..." : "Log in"}
           </Button>
         </form>
+        <p className="mt-6 text-xs text-muted-foreground text-center leading-5">
+          Waiting for a password reset email? Delivery can take up to five minutes. If it still hasn&apos;t arrived after fifteen minutes, message Peter Pitcher on Teams and we&apos;ll help you out.
+        </p>
       </CardContent>
       <CardFooter>
         <div className="text-center w-full text-sm">

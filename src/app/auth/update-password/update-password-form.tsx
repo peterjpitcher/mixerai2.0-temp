@@ -80,6 +80,9 @@ export function UpdatePasswordForm() {
         <Button onClick={() => router.replace('/auth/login?reset=success')} className="mt-4">
           Go to Login
         </Button>
+        <p className="mt-6 text-xs text-muted-foreground leading-5">
+          If you requested a password email, keep in mind it can take up to five minutes to arrive. Still nothing after fifteen minutes? Message Peter Pitcher on Teams and we&apos;ll help you finish up.
+        </p>
       </div>
     );
   }
@@ -151,6 +154,9 @@ export function UpdatePasswordForm() {
           'Set New Password'
         )}
       </Button>
+      <p className="text-xs text-muted-foreground text-center leading-5">
+        Emails can take up to five minutes to arrive. If nothing shows up after fifteen minutes, message Peter Pitcher on Teams and we&apos;ll make sure the reset goes through.
+      </p>
     </form>
   );
 }
