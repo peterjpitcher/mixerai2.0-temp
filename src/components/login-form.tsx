@@ -197,12 +197,7 @@ export function LoginForm() {
             />
           </div>
           <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <Link href="/auth/forgot-password" className="text-sm font-medium text-primary hover:underline" tabIndex={-1}>
-                Forgot password?
-              </Link>
-            </div>
+            <Label htmlFor="password">Password</Label>
             <Input 
               id="password" 
               value={password}
@@ -211,8 +206,12 @@ export function LoginForm() {
               autoComplete="current-password"
               disabled={isLoading}
               required
-              tabIndex={0}
             />
+          </div>
+          <div className="text-right text-sm">
+            <Link href="/auth/forgot-password" className="font-medium text-primary hover:underline">
+              Forgot password?
+            </Link>
           </div>
           {error && (
             <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
@@ -224,6 +223,9 @@ export function LoginForm() {
             {isLoading ? "Logging in..." : "Log in"}
           </Button>
         </form>
+        <p className="mt-6 text-xs text-muted-foreground text-center leading-5">
+          Waiting for a password reset email? Delivery can take up to five minutes. If it still hasn&apos;t arrived after fifteen minutes, message Peter Pitcher on Teams and we&apos;ll help you out.
+        </p>
       </CardContent>
       <CardFooter>
         <div className="text-center w-full text-sm">
