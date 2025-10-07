@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { AlertCircle } from 'lucide-react';
 import { apiFetchJson } from '@/lib/api-client';
 import type { AccountLockStatus } from '@/lib/auth/account-lockout';
 import { sessionConfig } from '@/lib/auth/session-config';
+import { useSearchParams } from 'next/navigation';
 
 /**
  * LoginForm component.
@@ -24,6 +25,61 @@ export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (!searchParams) {
+      return;
+    }
+
+    const resetStatus = searchParams.get('reset');
+    const errorCode = searchParams.get('error');
+    let shouldCleanup = false;
+
+    if (resetStatus === 'success') {
+      toast.success('Password updated. Please sign in with your new password.');
+      shouldCleanup = true;
+    }
+
+    if (errorCode) {
+      switch (errorCode) {
+        case 'reset_missing_token':
+          toast.error('This password reset link was missing its security code. Please request a new email.');
+          shouldCleanup = true;
+          break;
+        case 'reset_missing_state':
+        case 'reset_session':
+          toast.error('Your password reset session has expired. Please request a fresh link.');
+          shouldCleanup = true;
+          break;
+        case 'reset_expired':
+          toast.error('This password reset link has expired. Request a new one to continue.');
+          shouldCleanup = true;
+          break;
+        case 'reset_invalid':
+          toast.error('We could not verify that password reset link. Please request a new reset email.');
+          shouldCleanup = true;
+          break;
+        case 'invite_completion_failed':
+          toast.error('Invite confirmed, but we could not finish account setup. Please sign in and try again or contact support.');
+          shouldCleanup = true;
+          break;
+        case 'callback':
+          toast.error('We could not complete the sign-in flow. Please try again.');
+          shouldCleanup = true;
+          break;
+        default:
+          break;
+      }
+    }
+
+    if (shouldCleanup) {
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('reset');
+      cleanUrl.searchParams.delete('error');
+      window.history.replaceState({}, '', cleanUrl.toString());
+    }
+  }, [searchParams]);
 
   const fetchLockoutStatus = async (payload: { email: string; action: 'status' | 'record'; success?: boolean }): Promise<AccountLockStatus> => {
     try {
