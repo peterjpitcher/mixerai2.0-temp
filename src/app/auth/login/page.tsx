@@ -1,7 +1,10 @@
 import Link from "next/link";
 import Image from 'next/image';
-import { LoginForm } from "@/components/login-form";
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
+
+import { LoginForm } from "@/components/login-form";
+import { Spinner } from '@/components/spinner';
 
 export const metadata: Metadata = {
   title: 'Login | MixerAI 2.0',
@@ -27,9 +30,16 @@ export default function LoginPage() {
             />
           </Link>
         </div>
-        
-        <LoginForm />
+        <Suspense
+          fallback={(
+            <div className="flex justify-center py-12">
+              <Spinner className="h-6 w-6" />
+            </div>
+          )}
+        >
+          <LoginForm />
+        </Suspense>
       </div>
     </div>
   );
-} 
+}
