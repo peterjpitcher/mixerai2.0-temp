@@ -124,6 +124,26 @@ export function QuillEditor({
 
       quillRef.current = quill;
 
+      const editorContentClasses = 'prose prose-sm max-w-none dark:prose-invert focus:outline-none';
+      const containerClasses = 'bg-transparent border-none';
+      const rootPaddingClasses = 'px-0 py-0';
+      editorContentClasses.split(' ').forEach(cls => {
+        if (cls) {
+          quill.root.classList.add(cls);
+        }
+      });
+      containerClasses.split(' ').forEach(cls => {
+        if (cls) {
+          quill.container.classList.add(cls);
+        }
+      });
+      rootPaddingClasses.split(' ').forEach(cls => {
+        if (cls) {
+          quill.root.classList.add(cls);
+        }
+      });
+      quill.root.style.backgroundColor = 'transparent';
+
       if (!readOnly) {
         const headingMatcherFactory = (level: number): ClipboardMatcherCallback => (node, delta) => {
           const element = node as HTMLElement;
@@ -257,11 +277,7 @@ export function QuillEditor({
 
   return (
     <div className={`quill-wrapper relative ${className}`}>
-      <div 
-        ref={editorRef}
-        className="min-h-[150px]"
-        style={{ backgroundColor: 'white' }}
-      />
+      <div ref={editorRef} className="min-h-[200px]" />
       {!isLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-muted/50 rounded-md">
           <div className="text-sm text-muted-foreground">Loading editor...</div>

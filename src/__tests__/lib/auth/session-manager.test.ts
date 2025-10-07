@@ -78,7 +78,7 @@ describe('Session Manager', () => {
       const result = await validateSession('non-existent-session');
       
       expect(result.valid).toBe(false);
-      expect(result.userId).toBeUndefined();
+      expect(result.session?.userId).toBeUndefined();
       expect(result.reason).toBe('Session not found');
     });
 

@@ -41,11 +41,15 @@ async function getTeamActivity(supabase: SupabaseClient, profile: { role?: strin
     id: item.id,
     type: item.status === 'draft' ? 'content_created' as const : 'content_updated' as const,
     created_at: item.created_at || new Date().toISOString(),
-    user: {
-      id: (item.profiles as any)?.[0]?.id || '',
-      full_name: (item.profiles as any)?.[0]?.full_name || null,
-      avatar_url: (item.profiles as any)?.[0]?.avatar_url || null,
-    },
+    user: (() => {
+      const rawProfile = (item as any).profiles;
+      const profileRecord = Array.isArray(rawProfile) ? rawProfile?.[0] : rawProfile;
+      return {
+        id: profileRecord?.id ?? '',
+        full_name: profileRecord?.full_name ?? null,
+        avatar_url: profileRecord?.avatar_url ?? null,
+      };
+    })(),
     target: {
       id: item.id,
       name: item.title,
@@ -57,9 +61,13 @@ async function getTeamActivity(supabase: SupabaseClient, profile: { role?: strin
 async function getMostAgedContent(supabase: SupabaseClient<any>, profile: { role?: string; assigned_brands?: string[] } | null) { // TODO: Type as SupabaseClient<Database> when types are regenerated
   if (!profile) return [];
 
+  const now = new Date();
+  const staleThreshold = new Date(now);
+  staleThreshold.setDate(staleThreshold.getDate() - 7);
+
   let query = supabase
     .from('content')
-    .select('id, title, updated_at, status, brand_id, brands ( name, brand_color, logo_url )')
+    .select('id, title, updated_at, created_at, due_date, status, brand_id, brands ( name, brand_color, logo_url )')
     .in('status', ['draft', 'pending_review']);
 
   if (profile.role !== 'admin') {
@@ -67,27 +75,70 @@ async function getMostAgedContent(supabase: SupabaseClient<any>, profile: { role
     query = query.in('brand_id', profile.assigned_brands);
   }
 
+  query = query.or(
+    `updated_at.lte.${staleThreshold.toISOString()},updated_at.is.null,due_date.lt.${now.toISOString()}`
+  );
+
   const { data, error } = await query
-    .order('updated_at', { ascending: true })
-    .limit(5);
+    .order('updated_at', { ascending: true, nullsFirst: true })
+    .limit(50);
 
   if (error) {
     console.error('Error fetching most aged content:', error);
     return [];
   }
 
-  return (data || [])
-    .filter((item) => item.updated_at !== null)
-    .map((item) => {
+  const processed = (data || [])
+    .reduce<Array<{
+      id: string;
+      title: string;
+      updated_at: string | null;
+      created_at: string | null;
+      due_date: string | null;
+      status: string;
+      brand_id: string | null;
+      brands: any;
+      isOverdue: boolean;
+      isStale: boolean;
+      stalledSince: string;
+    }>>((acc, item) => {
+      const updatedAt = item.updated_at ? new Date(item.updated_at) : null;
+      const createdAt = item.created_at ? new Date(item.created_at) : null;
+      const dueDate = item.due_date ? new Date(item.due_date) : null;
+
+      const isOverdue = Boolean(dueDate && dueDate < now);
+      const referenceForStale = updatedAt ?? createdAt;
+      const isStale = referenceForStale ? referenceForStale <= staleThreshold : true;
+
+      if (!isOverdue && !isStale) {
+        return acc;
+      }
+
+      const anchors: number[] = [];
+      if (isOverdue && dueDate) anchors.push(dueDate.getTime());
+      if (isStale && updatedAt) anchors.push(updatedAt.getTime());
+      if (isStale && !updatedAt && createdAt) anchors.push(createdAt.getTime());
+      if (anchors.length === 0) {
+        anchors.push(referenceForStale ? referenceForStale.getTime() : now.getTime());
+      }
+
+      const stalledSince = new Date(Math.min(...anchors)).toISOString();
       const { brands, ...rest } = item;
-      return {
+
+      acc.push({
         ...rest,
-        updated_at: item.updated_at!,
         brands: brands as any, // TODO: Remove type assertion when types are regenerated
-        brandName: (brands as any)?.name || 'N/A',
-        brandColor: (brands as any)?.brand_color || '#888'
-      };
-    });
+        isOverdue,
+        isStale,
+        stalledSince,
+      });
+
+      return acc;
+    }, [])
+    .sort((a, b) => new Date(a.stalledSince).getTime() - new Date(b.stalledSince).getTime())
+    .slice(0, 5);
+
+  return processed;
 }
 
 async function getDashboardMetrics(supabase: SupabaseClient<any>, profile: { role?: string; assigned_brands?: string[] } | null) { // TODO: Type as SupabaseClient<Database> when types are regenerated
@@ -171,13 +222,9 @@ export default async function DashboardPage() {
   }
   
   // Fetch data in parallel
-  const [
-    teamActivity,
-    mostAgedContent,
-  ] = await Promise.all([
+  const [teamActivity, mostAgedContent] = await Promise.all([
     getTeamActivity(supabase, profile),
     getMostAgedContent(supabase, profile),
-    getDashboardMetrics(supabase, profile)
   ]);
 
   return (

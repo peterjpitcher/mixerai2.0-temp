@@ -27,6 +27,10 @@ const mockIsRLSError = isRLSError as jest.MockedFunction<typeof isRLSError>;
 
 const originalEnv = { ...process.env };
 
+const setNodeEnv = (value: string | undefined) => {
+  (process.env as Record<string, string | undefined>).NODE_ENV = value;
+};
+
 beforeEach(() => {
   jest.clearAllMocks();
   process.env = { ...originalEnv };
@@ -39,21 +43,21 @@ afterAll(() => {
 describe('environment helpers', () => {
   it('detects production via NEXT_PUBLIC_VERCEL_ENV', () => {
     process.env.NEXT_PUBLIC_VERCEL_ENV = 'production';
-    process.env.NODE_ENV = 'development';
+    setNodeEnv('development');
 
     expect(isProduction()).toBe(true);
   });
 
   it('falls back to NODE_ENV for production detection', () => {
     delete process.env.NEXT_PUBLIC_VERCEL_ENV;
-    process.env.NODE_ENV = 'production';
+    setNodeEnv('production');
 
     expect(isProduction()).toBe(true);
   });
 
   it('returns false when not in production', () => {
     delete process.env.NEXT_PUBLIC_VERCEL_ENV;
-    process.env.NODE_ENV = 'test';
+    setNodeEnv('test');
 
     expect(isProduction()).toBe(false);
   });

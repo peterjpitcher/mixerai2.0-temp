@@ -370,6 +370,12 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
       // Here we rely on the fact that this action is performed by an authenticated user.
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
+
+      try {
+        await apiFetch('/api/auth/clear-lockout', { method: 'POST' });
+      } catch (lockoutError) {
+        console.warn('[account/password] Failed to clear login attempts after password change', lockoutError);
+      }
       toast('Your password has been changed successfully.', { description: 'Password Updated' });
       form.reset();
     } catch (error: unknown) {

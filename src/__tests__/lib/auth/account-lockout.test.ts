@@ -227,13 +227,13 @@ describe('Account Lockout', () => {
 
     it('should handle concurrent attempts gracefully', async () => {
       // Simulate concurrent failed attempts
-      const promises = [];
+      const promises: Array<ReturnType<typeof recordFailedAttempt>> = [];
       for (let i = 0; i < 10; i++) {
         promises.push(recordFailedAttempt(testEmail));
       }
       
       const results = await Promise.all(promises);
-      
+
       // Should handle race conditions properly
       const finalResult = results[results.length - 1];
       expect(finalResult.locked).toBe(true);

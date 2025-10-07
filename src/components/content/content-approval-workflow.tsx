@@ -23,7 +23,10 @@ export interface WorkflowStep {
   description?: string;
   role?: string;
   approvalRequired?: boolean;
-  assignees?: Array<{ id?: string; email?: string; name?: string; avatar_url?: string }>;
+  step_order?: number;
+  stepOrder?: number;
+  position?: number;
+  assignees?: Array<{ id?: string; email?: string; name?: string; full_name?: string; avatar_url?: string }>;
   formRequirements?: { requiresPublishedUrl?: boolean } | null;
 }
 
@@ -69,6 +72,7 @@ interface ContentApprovalWorkflowProps {
   onActionComplete: () => void;
   performContentSave?: () => Promise<boolean>;
   initialPublishedUrl?: string | null;
+  workflowSteps?: WorkflowStep[];
 }
 
 export function ContentApprovalWorkflow({
@@ -80,15 +84,21 @@ export function ContentApprovalWorkflow({
   template, // Added template prop
   onActionComplete,
   performContentSave,
-  initialPublishedUrl
+  initialPublishedUrl,
+  workflowSteps = [],
 }: ContentApprovalWorkflowProps) {
   const [feedback, setFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState(initialPublishedUrl ?? '');
+  const [expandedHistoryIds, setExpandedHistoryIds] = useState<Record<string, boolean>>({});
 
   React.useEffect(() => {
     setPublishedUrl(initialPublishedUrl ?? '');
   }, [initialPublishedUrl]);
+
+  const toggleHistoryVisibility = (versionId: string) => {
+    setExpandedHistoryIds(prev => ({ ...prev, [versionId]: !prev[versionId] }));
+  };
 
   const requiresPublishedUrl = Boolean(currentStepObject?.formRequirements?.requiresPublishedUrl);
 
@@ -170,7 +180,37 @@ export function ContentApprovalWorkflow({
       setIsSubmitting(false);
     }
   };
-  
+  const sortedWorkflowSteps = React.useMemo(() => {
+    if (!workflowSteps || workflowSteps.length === 0) return [] as WorkflowStep[];
+    const getOrder = (step: WorkflowStep) => {
+      const explicitOrder = typeof step.step_order === 'number' ? step.step_order
+        : typeof step.stepOrder === 'number' ? step.stepOrder
+        : typeof step.position === 'number' ? step.position
+        : Number.MAX_SAFE_INTEGER;
+      return explicitOrder;
+    };
+    return workflowSteps.slice().sort((a, b) => getOrder(a) - getOrder(b));
+  }, [workflowSteps]);
+
+  const currentStepIndex = React.useMemo(() => {
+    if (!currentStepObject) return -1;
+    return sortedWorkflowSteps.findIndex(step => String(step.id) === String(currentStepObject.id));
+  }, [currentStepObject, sortedWorkflowSteps]);
+
+  const upcomingSteps = React.useMemo(() => {
+    if (currentStepIndex < 0) return [] as WorkflowStep[];
+    return sortedWorkflowSteps.slice(currentStepIndex + 1);
+  }, [currentStepIndex, sortedWorkflowSteps]);
+
+  const renderAssigneeNames = (step: WorkflowStep) => {
+    if (!step.assignees || step.assignees.length === 0) {
+      return 'Unassigned';
+    }
+    return step.assignees
+      .map(assignee => assignee.full_name || assignee.name || assignee.email || 'Unnamed reviewer')
+      .join(', ');
+  };
+
   if (!currentStepObject) {
     return (
       <Card>
@@ -189,7 +229,7 @@ export function ContentApprovalWorkflow({
   ).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   return (
-    <Card>
+    <Card aria-label={`Approval workflow for ${contentTitle}`}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -204,141 +244,217 @@ export function ContentApprovalWorkflow({
           <div className="mt-3">
             <h5 className="text-xs font-medium text-muted-foreground mb-1.5">Assigned To:</h5>
             <div className="flex flex-wrap gap-2">
-              {currentStepObject.assignees.map((assignee, index) => (
-                <div key={assignee.id || assignee.email || index} className="flex items-center p-1.5 bg-muted/50 rounded-md text-xs">
+              {currentStepObject.assignees.map((assignee, index) => {
+                const displayName = assignee.full_name || assignee.name || assignee.email || 'Unknown Assignee';
+                return (
+                  <div key={assignee.id || assignee.email || index} className="flex items-center p-1.5 bg-muted/50 rounded-md text-xs">
                   <div className="relative h-5 w-5 rounded-full bg-muted overflow-hidden flex-shrink-0 mr-1.5">
                     {assignee.avatar_url ? (
                       <Image
                         src={assignee.avatar_url}
-                        alt={assignee.name || assignee.email || 'Assignee'}
+                        alt={displayName}
                         fill
                         className="object-cover"
                       />
                     ) : null}
                     {(!assignee.avatar_url) && (
                       <div className="flex items-center justify-center h-full w-full text-xxs font-semibold text-primary bg-muted-foreground/20">
-                        {(assignee.name || assignee.email || 'A').charAt(0).toUpperCase()}
+                        {(displayName || 'A').charAt(0).toUpperCase()}
                       </div>
                     )}
                   </div>
                   <span className="text-muted-foreground font-medium">
-                    {assignee.name || assignee.email || 'Unknown Assignee'}
+                    {displayName}
                   </span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="space-y-2">
-          <div className="text-sm font-medium">Content Title</div>
-          <div className="text-lg">{contentTitle}</div>
-        </div>
-        
         {relevantVersions && relevantVersions.length > 0 && (
           <div className="space-y-3">
             <h4 className="text-sm font-medium">Recent Feedback/History:</h4>
             {relevantVersions.slice(0,3).map(v => {
-              // Determine if template name can be found for an output field
-              const getOutputFieldName = (outputFieldId: string): string => {
-                if (template && template.fields && template.fields.outputFields) {
-                  const field = template.fields.outputFields.find(f => f.id === outputFieldId);
-                  return field?.name || outputFieldId; // Return name or ID if not found
+              const getOutputFieldMeta = (outputFieldId: string): { label: string; type: string } => {
+                const fieldDef = template?.fields?.outputFields?.find(f => f.id === outputFieldId);
+                if (fieldDef) {
+                  return { label: fieldDef.name || outputFieldId, type: fieldDef.type };
                 }
-                return outputFieldId; // Fallback to ID if no template or fields
+                return { label: outputFieldId, type: 'plainText' };
               };
 
+              const isExpanded = expandedHistoryIds[v.id] ?? false;
+
               return (
-                <div key={v.id} className="p-3 border rounded-md bg-background text-sm space-y-2">
-                  <div className="flex justify-between items-center">
-                    <p className="font-semibold">{v.step_name || 'N/A'} - <span className={cn(
-                      v.action_status === 'approved' && 'text-green-600',
-                      v.action_status === 'rejected' && 'text-red-600',
-                      v.action_status === 'pending_review' && 'text-yellow-600',
-                      !['approved', 'rejected', 'pending_review'].includes(v.action_status) && 'text-gray-600'
-                    )}>{v.action_status || 'N/A'}</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">{format(new Date(v.created_at), 'MMMM d, yyyy')}</p>
-                  </div>
-                  {v.reviewer?.full_name && (
-                    <div className="flex items-center mt-1">
-                      <div className="relative h-5 w-5 rounded-full bg-muted overflow-hidden flex-shrink-0 mr-1.5">
-                        {'avatar_url' in v.reviewer && v.reviewer.avatar_url ? (
-                          <Image
-                            src={v.reviewer.avatar_url as string}
-                            alt={v.reviewer.full_name || 'Reviewer avatar'}
-                            fill
-                            className="object-cover"
-                          />
-                        ) : null}
-                        {!('avatar_url' in v.reviewer && v.reviewer.avatar_url) && (
-                          <div className="flex items-center justify-center h-full w-full text-xxs font-semibold text-primary bg-muted-foreground/20">
-                            {(v.reviewer.full_name || 'R').charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">By: {v.reviewer.full_name}</p>
+                <div key={v.id} className="border rounded-md bg-background text-sm shadow-xs">
+                  <div className="flex items-start justify-between gap-3 p-3">
+                    <div className="space-y-1">
+                      <p className="font-semibold">
+                        {v.step_name || 'N/A'} -
+                        {' '}
+                        <span
+                          className={cn(
+                            v.action_status === 'approved' && 'text-green-600',
+                            v.action_status === 'rejected' && 'text-red-600',
+                            v.action_status === 'pending_review' && 'text-yellow-600',
+                            !['approved', 'rejected', 'pending_review'].includes(v.action_status) && 'text-gray-600'
+                          )}
+                        >
+                          {v.action_status || 'N/A'}
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">{format(new Date(v.created_at), 'MMMM d, yyyy')}</p>
                     </div>
-                  )}
-                  {v.feedback && <p className="italic text-muted-foreground bg-muted p-2 rounded-sm">{v.feedback}</p>}
-                  
-                  {/* Display generatedOutputs */}
-                  {v.content_json?.generatedOutputs && Object.keys(v.content_json.generatedOutputs).length > 0 && (
-                    (() => {
-                      const normalized = normalizeOutputsMap(
-                        v.content_json.generatedOutputs as Record<string, unknown>,
-                        template?.fields?.outputFields
-                      );
-                      const ordered: Array<{ id: string; label: string; content: NormalizedContent }> = [];
-                      const seen = new Set<string>();
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() => toggleHistoryVisibility(v.id)}
+                    >
+                      {isExpanded ? 'Hide details' : 'Show details'}
+                    </Button>
+                  </div>
 
-                      if (template?.fields?.outputFields) {
-                        template.fields.outputFields.forEach(field => {
-                          const value = normalized[field.id];
-                          if (value) {
-                            ordered.push({ id: field.id, label: field.name, content: value });
-                            seen.add(field.id);
-                          }
-                        });
-                      }
-
-                      Object.entries(normalized).forEach(([id, value]) => {
-                        if (!seen.has(id) && id !== 'userId' && id !== 'success') {
-                          ordered.push({ id, label: getOutputFieldName(id), content: value });
-                        }
-                      });
-
-                      if (ordered.length === 0) {
-                        return null;
-                      }
-
-                      return (
-                        <div className="mt-2 pt-2 border-t border-border/50 space-y-2">
-                          <h5 className="text-xs font-semibold text-muted-foreground">Content at this step:</h5>
-                          {ordered.map(({ id, label, content }) => (
-                            <div key={id} className="space-y-1">
-                              <p className="text-xs font-medium text-foreground">{label}:</p>
-                              <div
-                                className="prose prose-sm max-w-none p-2 border rounded-md bg-input/30 text-foreground/80"
-                                dangerouslySetInnerHTML={{
-                                  __html: DOMPurify.sanitize(
-                                    content.html || '<p><em>No content</em></p>',
-                                    { USE_PROFILES: { html: true } }
-                                  ),
-                                }}
+                  {isExpanded && (
+                    <div className="space-y-3 border-t border-border/40 px-3 pb-3 pt-3">
+                      {v.reviewer?.full_name && (
+                        <div className="flex items-center">
+                          <div className="relative h-5 w-5 rounded-full bg-muted overflow-hidden flex-shrink-0 mr-1.5">
+                            {'avatar_url' in v.reviewer && v.reviewer.avatar_url ? (
+                              <Image
+                                src={v.reviewer.avatar_url as string}
+                                alt={v.reviewer.full_name || 'Reviewer avatar'}
+                                fill
+                                className="object-cover"
                               />
-                            </div>
-                          ))}
+                            ) : null}
+                            {!('avatar_url' in v.reviewer && v.reviewer.avatar_url) && (
+                              <div className="flex items-center justify-center h-full w-full text-xxs font-semibold text-primary bg-muted-foreground/20">
+                                {(v.reviewer.full_name || 'R').charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">By: {v.reviewer.full_name}</p>
                         </div>
-                      );
-                    })()
+                      )}
+
+                      {v.feedback && (
+                        <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-foreground whitespace-pre-wrap shadow-xs">
+                          {v.feedback}
+                        </div>
+                      )}
+
+                      {v.content_json?.generatedOutputs && Object.keys(v.content_json.generatedOutputs).length > 0 && (
+                        (() => {
+                          const normalized = normalizeOutputsMap(
+                            v.content_json.generatedOutputs as Record<string, unknown>,
+                            template?.fields?.outputFields
+                          );
+                          const ordered: Array<{ id: string; label: string; type: string; content: NormalizedContent }> = [];
+                          const seen = new Set<string>();
+
+                          if (template?.fields?.outputFields) {
+                            template.fields.outputFields.forEach(field => {
+                              const value = normalized[field.id];
+                              if (value) {
+                                ordered.push({ id: field.id, label: field.name, type: field.type, content: value });
+                                seen.add(field.id);
+                              }
+                            });
+                          }
+
+                          Object.entries(normalized).forEach(([id, value]) => {
+                            if (!seen.has(id) && id !== 'userId' && id !== 'success') {
+                              const meta = getOutputFieldMeta(id);
+                              ordered.push({ id, label: meta.label, type: meta.type, content: value });
+                            }
+                          });
+
+                          if (ordered.length === 0) {
+                            return null;
+                          }
+
+                          return (
+                            <div className="space-y-3">
+                              <h5 className="text-xs font-semibold text-muted-foreground">Content at this step:</h5>
+                              {ordered.map(({ id, label, type, content }) => {
+                                const isPlainTextField = type?.toLowerCase() === 'plaintext';
+                                const plainTextContent = content.plain?.trim() ?? '';
+                                const htmlContent = content.html?.trim();
+                                const emptyPlainText = (
+                                  <span className="text-muted-foreground italic">No content provided.</span>
+                                );
+
+                                return (
+                                  <div key={id} className="space-y-1" data-field-container-id={id}>
+                                    <p className="text-xs font-medium text-foreground">{label}:</p>
+                                    {isPlainTextField ? (
+                                      <div
+                                        data-field-id={id}
+                                        className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-foreground whitespace-pre-wrap shadow-xs"
+                                      >
+                                        {plainTextContent ? plainTextContent : emptyPlainText}
+                                      </div>
+                                    ) : (
+                                      <div
+                                        data-field-id={id}
+                                        className="prose prose-sm max-w-none p-3 border rounded-md bg-gray-50 dark:bg-gray-700/30 text-gray-800 dark:text-gray-200"
+                                        dangerouslySetInnerHTML={{
+                                          __html: DOMPurify.sanitize(
+                                            htmlContent && htmlContent.length > 0
+                                              ? htmlContent
+                                              : '<p><em>No content</em></p>',
+                                            { USE_PROFILES: { html: true } }
+                                          ),
+                                        }}
+                                      />
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()
+                      )}
+                    </div>
                   )}
                 </div>
               );
             })}
           </div>
         )}
+
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium">Upcoming steps</h4>
+          {upcomingSteps.length > 0 ? (
+            <div className="space-y-2">
+              {upcomingSteps.map((step, index) => {
+                const stepNumber = currentStepIndex >= 0 ? currentStepIndex + index + 2 : index + 1;
+                const assigneeNames = renderAssigneeNames(step);
+                return (
+                  <div key={step.id || `${step.name}-${index}`} className="rounded-md border bg-muted/20 p-3">
+                    <div className="flex flex-col gap-1">
+                      <div className="text-xs uppercase tracking-wide text-muted-foreground">Step {stepNumber}</div>
+                      <div className="text-sm font-semibold text-foreground">{step.name}</div>
+                      {step.role && <div className="text-xs text-muted-foreground">Role: {step.role}</div>}
+                    </div>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">Assigned to:</span> {assigneeNames}
+                    </div>
+                    {step.description && (
+                      <p className="mt-2 text-xs text-muted-foreground/90">{step.description}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">No further steps are scheduled after this approval.</p>
+          )}
+        </div>
 
         {requiresPublishedUrl && (
           <div className="space-y-2">

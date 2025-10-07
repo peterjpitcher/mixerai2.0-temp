@@ -869,44 +869,45 @@ export default function ToolRunHistoryDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <Breadcrumbs 
-        items={[
-          { label: 'Dashboard', href: '/dashboard' },
-          { label: 'Tools', href: '/dashboard/tools' },
-          { label: formatToolName(historyItem.tool_name), href: getToolPageLink(historyItem.tool_name) },
-          { label: 'Run Details' }
-        ]}
-      />
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col space-y-6 overflow-y-auto pb-10">
+        <Breadcrumbs 
+          items={[
+            { label: 'Dashboard', href: '/dashboard' },
+            { label: 'Tools', href: '/dashboard/tools' },
+            { label: formatToolName(historyItem.tool_name), href: getToolPageLink(historyItem.tool_name) },
+            { label: 'Run Details' }
+          ]}
+        />
 
-      <header className="mb-8">
-        <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center">
-            <PlayCircle className="mr-3 h-8 w-8 text-primary" /> 
-            Tool Run Details
-            </h1>
-            <Button onClick={() => router.back()} variant="outline" size="sm">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Previous Page
-            </Button>
-        </div>
-        <p className="mt-2 text-muted-foreground">
-          Detailed information for a single tool run instance.
-        </p>
-      </header>
+        <header className="mb-8">
+          <div className="flex items-center justify-between gap-3">
+              <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center">
+              <PlayCircle className="mr-3 h-8 w-8 text-primary" /> 
+              Tool Run Details
+              </h1>
+              <Button onClick={() => router.back()} variant="outline" size="sm">
+                  <ArrowLeft className="mr-2 h-4 w-4" /> Back to Previous Page
+              </Button>
+          </div>
+          <p className="mt-2 text-muted-foreground">
+            Detailed information for a single tool run instance.
+          </p>
+        </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            {historyItem.status === 'success' ? 
-                <CheckCircle2 className="mr-2 h-6 w-6 text-green-500" /> : 
-                <XCircle className="mr-2 h-6 w-6 text-red-500" />}
-            {formatToolName(historyItem.tool_name)} - Run Overview
-          </CardTitle>
-          <CardDescription>
-            Run executed on {formatDateTime(historyItem.run_at)}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              {historyItem.status === 'success' ? 
+                  <CheckCircle2 className="mr-2 h-6 w-6 text-green-500" /> : 
+                  <XCircle className="mr-2 h-6 w-6 text-red-500" />}
+              {formatToolName(historyItem.tool_name)} - Run Overview
+            </CardTitle>
+            <CardDescription>
+              Run executed on {formatDateTime(historyItem.run_at)}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
             <div>
               <strong className="text-muted-foreground block mb-1">Status:</strong> 
@@ -954,8 +955,9 @@ export default function ToolRunHistoryDetailPage() {
             </>
           )}
 
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
-} 
+}

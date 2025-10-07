@@ -20,16 +20,14 @@ export function useSessionTimeout(
 
     // Set warning timer
     warningTimeoutRef.current = setTimeout(() => {
-      const remainingMinutes = sessionMinutes - warningMinutes;
-      const shouldExtend = window.confirm(
-        `Your session will expire in ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}. ` +
-        `Would you like to stay signed in?`
-      );
-
-      if (shouldExtend) {
-        resetTimers();
-        apiFetch('/api/auth/refresh', { method: 'POST', retry: 2, retryDelayMs: 500 }).catch(() => {});
-      }
+      // Automatically refresh the session instead of prompting the user.
+      apiFetch('/api/auth/refresh', { method: 'POST', retry: 2, retryDelayMs: 500 })
+        .catch(() => {
+          // Intentionally swallow errors — we'll let the main timeout handle logout.
+        })
+        .finally(() => {
+          resetTimers();
+        });
     }, warningMinutes * 60 * 1000);
 
     // Set session timeout

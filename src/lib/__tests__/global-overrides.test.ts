@@ -1,4 +1,10 @@
-import { getStackedClaimsForProduct } from '../claims-utils';
+import {
+  getStackedClaimsForProduct,
+  type ClaimsDataPreset,
+  type ClaimTypeEnum,
+  type ClaimLevelEnum,
+  type MarketClaimOverride,
+} from '../claims-utils';
 import { createSupabaseAdminClient } from '../supabase/client';
 import { ALL_COUNTRIES_CODE } from '../constants/country-codes';
 import { GLOBAL_CLAIM_COUNTRY_CODE } from '../constants/claims';
@@ -260,7 +266,7 @@ describe('Global Overrides Feature', () => {
         }),
       };
 
-      const preset = {
+      const preset: ClaimsDataPreset = {
         product: {
           id: productId,
           name: 'Preset Product',
@@ -271,8 +277,8 @@ describe('Global Overrides Feature', () => {
           {
             id: masterClaimId,
             claim_text: 'Suitable for everyone',
-            claim_type: 'allowed',
-            level: 'product',
+            claim_type: 'allowed' as ClaimTypeEnum,
+            level: 'product' as ClaimLevelEnum,
             product_id: productId,
             ingredient_id: null,
             master_brand_id: null,
@@ -297,8 +303,8 @@ describe('Global Overrides Feature', () => {
             replacement_claim: {
               id: replacementClaimId,
               claim_text: 'Solo para España',
-              claim_type: 'allowed',
-              level: 'product',
+              claim_type: 'allowed' as ClaimTypeEnum,
+              level: 'product' as ClaimLevelEnum,
               product_id: productId,
               ingredient_id: null,
               master_brand_id: null,
@@ -380,15 +386,19 @@ describe('Global Overrides Feature', () => {
         });
 
         // Build overrides based on test case
-        const overrides = [
+        const overrides: MarketClaimOverride[] = [
           {
             id: 'global-override',
             master_claim_id: masterClaimId,
             market_country_code: ALL_COUNTRIES_CODE,
             target_product_id: productId,
             is_blocked: true,
-            replacement_claim_id: null
-          }
+            replacement_claim_id: null,
+            replacement_claim: null,
+            created_at: null,
+            updated_at: null,
+            master_claim: null,
+          },
         ];
 
         if (testCase.hasCountryOverride) {
@@ -399,12 +409,25 @@ describe('Global Overrides Feature', () => {
             target_product_id: productId,
             is_blocked: testCase.expectBlocked,
             replacement_claim_id: testCase.expectBlocked ? null : 'replacement-id',
-            replacement_claim: testCase.expectBlocked ? undefined : {
-              id: 'replacement-id',
-              claim_text: `${testCase.country} specific claim`,
-              claim_type: 'allowed',
-              country_code: testCase.country
-            }
+            replacement_claim: testCase.expectBlocked
+              ? null
+              : {
+                  id: 'replacement-id',
+                  claim_text: `${testCase.country} specific claim`,
+                  claim_type: 'allowed' as ClaimTypeEnum,
+                  level: 'product' as ClaimLevelEnum,
+                  product_id: productId,
+                  ingredient_id: null,
+                  master_brand_id: null,
+                  country_code: testCase.country,
+                  description: null,
+                  created_by: null,
+                  created_at: null,
+                  updated_at: null,
+                },
+            created_at: null,
+            updated_at: null,
+            master_claim: null,
           });
         }
 

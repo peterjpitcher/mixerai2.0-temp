@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { createBrowserClient } from '@supabase/ssr';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandIcon,  } from '@/components/brand-icon';
-import { ArrowLeft, Edit3, MessageSquare, CheckCircle, XCircle, Clock, UserCircle } from 'lucide-react';
+import { ArrowLeft, Edit3, CheckCircle } from 'lucide-react';
 import { RestartWorkflowButton } from '@/components/content/restart-workflow-button';
 import { RejectionFeedbackCard } from '@/components/content/rejection-feedback-card';
 import { format as formatDateFns } from 'date-fns';
@@ -135,7 +135,6 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [activeBrandData, setActiveBrandData] = useState<BrandData | null>(null);
   const [template, setTemplate] = useState<Template | null>(null);
-  const [expandedVersions, setExpandedVersions] = useState<Record<string, boolean>>({});
   const router = useRouter();
   const pathname = usePathname();
 
@@ -143,6 +142,15 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
+
+  useEffect(() => {
+    const mainEl = document.querySelector<HTMLElement>('[data-dashboard-main]');
+    if (!mainEl) return;
+    mainEl.classList.add('lg:overflow-hidden');
+    return () => {
+      mainEl.classList.remove('lg:overflow-hidden');
+    };
+  }, []);
 
   useEffect(() => {
     const getCurrentUser = async () => {
@@ -365,15 +373,6 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
       return "Invalid Date";
     }
   };
-  const getFormattedDateTime = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    try {
-      return formatDateFns(new Date(dateString), 'MMMM d, yyyy, HH:mm');
-    } catch (e) {
-      console.error("Error formatting date/time:", dateString, e);
-      return "Invalid Date/Time";
-    }
-  };
 
   const brandForHeader = (activeBrandData ?? (content.brands as Partial<BrandData> | undefined)) || undefined;
   const brandName = brandForHeader?.name || 'Brand';
@@ -389,314 +388,167 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     { label: content.title || 'Details' }
   ];
 
-  const getHistoryItemDisplayName = (identifier: string, stepName: string) => {
-    return outputFieldIdToNameMap[identifier] || stepName || identifier;
-  };
-
-  const getActionIcon = (actionStatus: string) => {
-    switch (actionStatus?.toLowerCase()) {
-      case 'approved':
-      case 'completed':
-        return <CheckCircle className="h-4 w-4 text-green-500 mr-2" />;
-      case 'rejected':
-      case 'sent_back':
-        return <XCircle className="h-4 w-4 text-red-500 mr-2" />;
-      case 'submitted':
-      case 'pending_review':
-        return <Clock className="h-4 w-4 text-yellow-500 mr-2" />;
-      case 'commented':
-        return <MessageSquare className="h-4 w-4 text-blue-500 mr-2" />;
-      default:
-        return <UserCircle className="h-4 w-4 text-gray-400 mr-2" />;
-    }
-  };
-
-  const toggleVersionExpansion = (versionId: string) => {
-    setExpandedVersions(prev => ({ ...prev, [versionId]: !prev[versionId] }));
-  };
-
   return (
-    <div className="space-y-6">
-      <Breadcrumbs items={breadcrumbItems} />
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-6 gap-4">
-        <div className="flex items-center gap-3">
-          {brandIcon ? (
-            <Image src={brandIcon} alt={`${brandName} logo`} width={40} height={40} className="h-10 w-10 rounded-full object-cover" />
-          ) : (
-            <BrandIcon name={brandName} color={brandColor} size="md" />
-          )}
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">{content.title || 'Content Details'}</h1>
-            <p className="text-muted-foreground mt-1">
-              View details, content body, SEO metadata, and manage the approval workflow.
-              <br />
-              Template: {template?.name || content.template_name || 'N/A'} | 
-              Brand: {brandName} | 
-              Created: {getFormattedDate(content.created_at)}
-            </p>
+    <div className="flex min-h-0 flex-1 flex-col gap-6">
+      <div className="shrink-0 space-y-6">
+        <Breadcrumbs items={breadcrumbItems} />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-center gap-3">
+            {brandIcon ? (
+              <Image src={brandIcon} alt={`${brandName} logo`} width={40} height={40} className="h-10 w-10 rounded-full object-cover" />
+            ) : (
+              <BrandIcon name={brandName} color={brandColor} size="md" />
+            )}
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">{content.title || 'Content Details'}</h1>
+              <p className="mt-1 text-muted-foreground">
+                View details, content body, SEO metadata, and manage the approval workflow.
+                <br />
+                Template: {template?.name || content.template_name || 'N/A'} | Brand: {brandName} | Created: {getFormattedDate(content.created_at)}
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex-shrink-0">
-          {content.status === 'rejected' ? (
-            <div className="flex gap-2">
+          <div className="flex-shrink-0">
+            {content.status === 'rejected' ? (
+              <div className="flex gap-2">
+                <Button asChild variant="default">
+                  <Link href={`${pathname}/edit`}>
+                    <Edit3 className="mr-2 h-4 w-4" /> Edit Content
+                  </Link>
+                </Button>
+                <RestartWorkflowButton
+                  contentId={content.id}
+                  contentTitle={content.title}
+                  onRestart={refreshContentData}
+                  variant="outline"
+                />
+              </div>
+            ) : content.status !== 'approved' && content.status !== 'published' ? (
               <Button asChild variant="default">
                 <Link href={`${pathname}/edit`}>
                   <Edit3 className="mr-2 h-4 w-4" /> Edit Content
                 </Link>
               </Button>
-              <RestartWorkflowButton
-                contentId={content.id}
-                contentTitle={content.title}
-                onRestart={refreshContentData}
-                variant="outline"
-              />
-            </div>
-          ) : content.status !== 'approved' && content.status !== 'published' ? (
-            <Button asChild variant="default">
-              <Link href={`${pathname}/edit`}>
-                <Edit3 className="mr-2 h-4 w-4" /> Edit Content
-              </Link>
-            </Button>
-          ) : (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <span>Content is {content.status}</span>
-            </div>
-          )}
+            ) : (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span>Content is {content.status}</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-        <div className="lg:col-span-2 space-y-6">
-          {content.status === 'rejected' && (() => {
-            // Find the most recent rejection feedback
-            const rejectionVersion = versions
-              .slice()
-              .reverse()
-              .find(v => v.action_status === 'rejected' && v.feedback);
-            
-            return rejectionVersion ? (
-              <RejectionFeedbackCard
-                feedback={rejectionVersion.feedback}
-                reviewerName={rejectionVersion.reviewer?.full_name}
-                rejectedAt={rejectionVersion.created_at}
-              />
-            ) : null;
-          })()}
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Current Topic: {currentStepObject?.name || `Review Step ${content.current_step || 1}`}</CardTitle>
-              <CardDescription>
-                {currentStepObject?.description || 'Review the content below and take appropriate action.'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {template && template.fields && template.fields.outputFields && template.fields.outputFields.length > 0 ? (
-                template.fields.outputFields.map(field => {
-                  const normalized = generatedOutputs[field.id];
-                  const html = normalized?.html || '<p class="text-muted-foreground italic">This field has no content yet.</p>';
-                  return (
-                    <div key={field.id} className="mb-6">
-                      <h3 className="font-semibold text-lg mb-2">{field.name}</h3>
-                      <div
-                        className="prose prose-sm max-w-none p-4 border rounded-md bg-gray-50/50 dark:bg-gray-800/50"
-                        dangerouslySetInnerHTML={{ __html: html }}
-                      />
-                    </div>
-                  );
-                })
-              ) : (
-                 <div className="prose prose-sm max-w-none p-4 border rounded-md bg-gray-50/50 dark:bg-gray-800/50">
-                  <MarkdownDisplay markdown={content.body || 'No dynamic fields configured or template not loaded. Showing primary content body.'} />
-                </div>
-              )}
-            </CardContent>
-          </Card>
+      <div className="flex min-h-0 flex-1 flex-col gap-6 lg:flex-row lg:gap-6">
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden lg:pr-3">
+          <div className="flex min-h-0 flex-1 flex-col space-y-6 overflow-y-auto overscroll-contain">
+            {content.status === 'rejected' && (() => {
+              const rejectionVersion = versions
+                .slice()
+                .reverse()
+                .find(v => v.action_status === 'rejected' && v.feedback);
 
-          {versions && versions.length > 0 && (
+              return rejectionVersion ? (
+                <RejectionFeedbackCard
+                  feedback={rejectionVersion.feedback}
+                  reviewerName={rejectionVersion.reviewer?.full_name}
+                  rejectedAt={rejectionVersion.created_at}
+                />
+              ) : null;
+            })()}
+
             <Card>
               <CardHeader>
-                <CardTitle>Content History & Feedback</CardTitle>
-                <CardDescription>Review previous versions and feedback for this content.</CardDescription>
+                <CardTitle>Current Topic: {currentStepObject?.name || `Review Step ${content.current_step || 1}`}</CardTitle>
+                <CardDescription>
+                  {currentStepObject?.description || 'Review the content below and take appropriate action.'}
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-4">
-                  {versions.slice().reverse().map(version => (
-                    <li key={version.id} className="p-4 border rounded-md shadow-sm bg-white dark:bg-gray-800">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center">
-                          {getActionIcon(version.action_status)}
-                          <span className="font-semibold">
-                             {getHistoryItemDisplayName(version.workflow_step_identifier, version.step_name)}
-                          </span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">(v{version.version_number}) - {version.action_status}</span>
-                        </div>
-                        <div className="flex items-center">
-                          <span className="text-xs text-gray-500 dark:text-gray-400 mr-3">
-                            {getFormattedDateTime(version.created_at)}
-                          </span>
-                          <Button variant="outline" size="sm" onClick={() => toggleVersionExpansion(version.id)}>
-                            {expandedVersions[version.id] ? 'Hide' : 'Show'} Details
-                          </Button>
-                        </div>
-                      </div>
-                      {version.reviewer && (
-                        <div className="flex items-center mt-1 mb-1">
-                          <div className="relative h-6 w-6 rounded-full bg-muted overflow-hidden flex-shrink-0 mr-2">
-                            {version.reviewer.avatar_url ? (
-                              <Image
-                                src={version.reviewer.avatar_url}
-                                alt={version.reviewer.full_name || 'Reviewer avatar'}
-                                fill
-                                className="object-cover"
-                              />
-                            ) : null}
-                            {(!version.reviewer.avatar_url) && (
-                              <div className="flex items-center justify-center h-full w-full text-xs font-semibold text-primary bg-muted-foreground/20">
-                                {(version.reviewer.full_name || 'R').charAt(0).toUpperCase()}
-                              </div>
-                            )}
+                {template && template.fields && template.fields.outputFields && template.fields.outputFields.length > 0 ? (
+                  template.fields.outputFields.map(field => {
+                    const normalized = generatedOutputs[field.id];
+                    const isPlainTextField = field.type?.toLowerCase() === 'plaintext';
+                    const plainTextContent = normalized?.plain?.trim() ?? '';
+                    const htmlContent = normalized?.html?.trim();
+                    const emptyPlainText = (
+                      <span className="text-muted-foreground italic">No content provided for this field.</span>
+                    );
+
+                    return (
+                      <div key={field.id} className="mb-6" data-field-container-id={field.id}>
+                        <h3 className="mb-2 text-lg font-semibold">{field.name}</h3>
+                        {isPlainTextField ? (
+                          <div
+                            data-field-id={field.id}
+                            className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-foreground shadow-xs whitespace-pre-wrap"
+                          >
+                            {plainTextContent ? plainTextContent : emptyPlainText}
                           </div>
-                          <p className="text-sm text-gray-600 dark:text-gray-300">
-                            By: {version.reviewer.full_name || 'Unknown User'}
-                          </p>
-                        </div>
-                      )}
-                      {version.feedback && (
-                        <div className="mt-1 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md">
-                          <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{version.feedback}</p>
-                        </div>
-                      )}
-
-                      {expandedVersions[version.id] && (
-                        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                          <h4 className="text-md font-semibold mb-2 text-gray-800 dark:text-gray-100">Content Snapshot (Version {version.version_number})</h4>
-                          
-                          {(() => {
-                            if (process.env.NODE_ENV === 'development') {
-                              console.log(`[Version Snapshot Debug] Version ID: ${version.id}, Number: ${version.version_number}`);
-                              console.log('[Version Snapshot Debug] outputFieldIdToNameMap:', JSON.stringify(outputFieldIdToNameMap, null, 2));
-                              console.log('[Version Snapshot Debug] version.content_json:', JSON.stringify(version.content_json, null, 2));
-                            }
-
-                            const generatedOutputs = version.content_json?.generatedOutputs;
-                            if (generatedOutputs && typeof generatedOutputs === 'object' && template?.fields?.outputFields) {
-                              const normalizedOutputs = normalizeOutputsMap(
-                                generatedOutputs as Record<string, unknown>,
-                                template.fields.outputFields
-                              );
-                              // --- Start Diagnostic Logging for generatedOutputs processing ---
-                              if (process.env.NODE_ENV === 'development') {
-                                console.log('[Version Snapshot Debug] All keys in generatedOutputs:', Object.keys(generatedOutputs));
-                                console.log('[Version Snapshot Debug] Template outputFields order:', template.fields.outputFields.map(f => ({id: f.id, name: f.name})));
-                              }
-                              // --- End Diagnostic Logging ---
-
-                              // Iterate over template.fields.outputFields to maintain order
-                              const fieldsToRender = template.fields.outputFields
-                                .map(templateField => {
-                                  if (normalizedOutputs[templateField.id]) {
-                                    return {
-                                      id: templateField.id,
-                                      name: templateField.name, // Use name directly from template definition
-                                      value: normalizedOutputs[templateField.id]
-                                    };
-                                  }
-                                  return null;
-                                })
-                                .filter(field => field !== null) as { id: string; name: string; value: unknown }[];
-
-                              // --- Start Diagnostic Logging for displayableFields (now fieldsToRender) ---
-                              if (process.env.NODE_ENV === 'development') {
-                                console.log('[Version Snapshot Debug] Fields to render (ordered by template) count:', fieldsToRender.length);
-                                if (fieldsToRender.length > 0) {
-                                  console.log('[Version Snapshot Debug] Fields to render details (ID, Name, Value Preview):', 
-                                    fieldsToRender.map(field => ({ 
-                                      id: field.id, 
-                                      name: field.name, 
-                                      valuePreview: String(field.value).substring(0, 50) + (String(field.value).length > 50 ? '...' : '') 
-                                    }))
-                                  );
-                                }
-                              }
-                              // --- End Diagnostic Logging ---
-
-                              if (fieldsToRender.length > 0) {
-                                return fieldsToRender.map(field => {
-                                  const normalized = field.value as NormalizedContent;
-                                  const html = normalized?.html || '<p class="text-muted-foreground italic">No content for this field in this version.</p>';
-                                  return (
-                                    <div key={field.id} className="mb-4">
-                                      <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-1">{field.name}</h5>
-                                      <div
-                                        className="prose prose-sm max-w-none p-3 border rounded-md bg-gray-50 dark:bg-gray-700/30 text-gray-800 dark:text-gray-200"
-                                        dangerouslySetInnerHTML={{ __html: html }}
-                                      />
-                                    </div>
-                                  );
-                                });
-                              } 
-                            }
-                            // Fallback if no displayable generatedOutputs or if generatedOutputs is not in the expected format
-                            if (version.content_json?.body_snapshot) {
-                              return (
-                                <div className="mb-4">
-                                  <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-1">Body</h5>
-                                  <div className="prose prose-sm max-w-none p-3 border rounded-md bg-gray-50 dark:bg-gray-700/30 text-gray-800 dark:text-gray-200">
-                                    <MarkdownDisplay markdown={version.content_json.body_snapshot} />
-                                  </div>
-                                </div>
-                              );
-                            }
-                            return <p className="text-sm text-gray-500 dark:text-gray-400">No displayable content snapshot available for this version.</p>;
-                          })()}
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                        ) : (
+                          <div
+                            data-field-id={field.id}
+                            className="prose prose-sm max-w-none rounded-md border bg-gray-50/50 p-4 dark:bg-gray-800/50"
+                            dangerouslySetInnerHTML={{
+                              __html:
+                                htmlContent && htmlContent.length > 0
+                                  ? htmlContent
+                                  : '<p class="text-muted-foreground italic">This field has no content yet.</p>',
+                            }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="prose prose-sm max-w-none rounded-md border bg-gray-50/50 p-4 dark:bg-gray-800/50">
+                    <MarkdownDisplay markdown={content.body || 'No dynamic fields configured or template not loaded. Showing primary content body.'} />
+                  </div>
+                )}
               </CardContent>
             </Card>
-          )}
 
-        </div>
+          </div>
+        </section>
 
-        <div className="lg:col-span-1 space-y-6">
-          {content.workflow_id && currentUserId && (
-            <>
-              <VettingAgencyFeedbackCard
-                contentId={content.id}
-                brandName={brandName}
-                agencies={selectedVettingAgencies}
-                generatedOutputs={generatedOutputs}
-                outputFieldLabels={outputFieldIdToNameMap}
-                stageId={currentStageId}
-                stageName={currentStepObject?.name || null}
-                existingFeedback={currentStageFeedback}
-                onFeedbackUpdated={refreshContentData}
-                autoRun
-                brandGuidelines={{
-                  guardrails: activeBrandData?.guardrails ?? null,
-                  toneOfVoice: activeBrandData?.tone_of_voice ?? null,
-                  brandIdentity: activeBrandData?.brand_identity ?? null,
-                }}
-              />
+        <aside className="flex min-h-0 flex-col overflow-hidden lg:w-[360px] lg:shrink-0 lg:pl-1">
+          <div className="flex min-h-0 flex-1 flex-col space-y-6 overflow-y-auto overscroll-contain">
+            {content.workflow_id && currentUserId ? (
+              <>
+                <VettingAgencyFeedbackCard
+                  contentId={content.id}
+                  brandName={brandName}
+                  agencies={selectedVettingAgencies}
+                  outputFieldLabels={outputFieldIdToNameMap}
+                  stageId={currentStageId}
+                  stageName={currentStepObject?.name || null}
+                  existingFeedback={currentStageFeedback}
+                  onFeedbackUpdated={(_result) => refreshContentData()}
+                  autoRun
+                />
 
-              <ContentApprovalWorkflow
-                contentId={content.id}
-                contentTitle={content.title}
-                currentStepObject={currentStepObject}
-                isCurrentUserStepOwner={isCurrentUserStepOwner}
-                versions={versions}
-                template={template}
-                onActionComplete={refreshContentData}
-                initialPublishedUrl={content.published_url ?? null}
-              />
-            </>
-          )}
-        </div>
+                <ContentApprovalWorkflow
+                  contentId={content.id}
+                  contentTitle={content.title}
+                  currentStepObject={currentStepObject}
+                  isCurrentUserStepOwner={isCurrentUserStepOwner}
+                  versions={versions}
+                  template={template}
+                  onActionComplete={refreshContentData}
+                  initialPublishedUrl={content.published_url ?? null}
+                  workflowSteps={content.workflow?.steps}
+                />
+              </>
+            ) : (
+              <Card>
+                <CardContent>
+                  <p className="py-4 text-sm text-muted-foreground">No workflow is associated with this content.</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </aside>
       </div>
     </div>
   );
-} 
+}

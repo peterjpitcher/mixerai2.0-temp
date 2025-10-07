@@ -13,6 +13,7 @@ import { Spinner } from '@/components/spinner';
 import { CheckCheck, AlertTriangle } from 'lucide-react';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { validatePassword, passwordPolicy } from '@/lib/auth/session-config';
+import { apiFetch } from '@/lib/api-client';
 
 function UpdatePasswordForm() {
   const router = useRouter();
@@ -33,7 +34,11 @@ function UpdatePasswordForm() {
       const type = searchParams?.get('type');
 
       if (!code) {
-        setIsInitialising(false);
+        if (!cancelled) {
+          setStatus('error');
+          setErrorMsg('This password reset link is missing its security code. Please request a new password reset email.');
+          setIsInitialising(false);
+        }
         return;
       }
 
@@ -104,7 +109,13 @@ function UpdatePasswordForm() {
       if (error) {
         throw new Error(error.message || 'Failed to update password.');
       }
-      
+
+      try {
+        await apiFetch('/api/auth/clear-lockout', { method: 'POST' });
+      } catch (lockoutError) {
+        console.warn('[update-password] Failed to clear login attempts after password reset', lockoutError);
+      }
+
       setValidationErrors([]);
       setStatus('complete');
     } catch (error) {

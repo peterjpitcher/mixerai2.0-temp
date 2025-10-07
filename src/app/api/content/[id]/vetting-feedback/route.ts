@@ -4,7 +4,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { normalizeOutputsMap } from '@/lib/content/html-normalizer';
 import { generateVettingAgencyFeedback } from '@/lib/azure/openai';
-import type { VettingFeedbackStageResult, VettingFeedbackItem, VettingFeedbackPriority } from '@/types/vetting-feedback';
+import type { VettingFeedbackStageResult } from '@/types/vetting-feedback';
 import type { Json } from '@/types/supabase';
 
 export const dynamic = 'force-dynamic';

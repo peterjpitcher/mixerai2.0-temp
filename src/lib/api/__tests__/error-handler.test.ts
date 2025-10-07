@@ -10,13 +10,16 @@ import {
 
 describe('api/error-handler', () => {
   const originalEnv = { ...process.env };
+  const setNodeEnv = (value: string | undefined) => {
+    (process.env as Record<string, string | undefined>).NODE_ENV = value;
+  };
 
   afterEach(() => {
     process.env = { ...originalEnv };
   });
 
   it('creates structured error responses with code and timestamp', async () => {
-    process.env.NODE_ENV = 'test';
+    setNodeEnv('test');
     const error = new Error('Invalid email');
     const response = createErrorResponse(error, 'INVALID_INPUT', 422, { includeDetails: true });
 

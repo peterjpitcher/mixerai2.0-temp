@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { Loader2, RefreshCcw, ShieldAlert } from 'lucide-react';
+import { apiFetch } from '@/lib/api-client';
 import { formatDistanceToNow } from 'date-fns';
-import type { NormalizedContent } from '@/types/template';
 import type { VettingFeedbackStageResult, VettingFeedbackPriority } from '@/types/vetting-feedback';
+import { getCSRFToken as readCSRFToken } from '@/lib/csrf-setup';
 
 interface VettingAgency {
   id: string;
@@ -19,24 +20,16 @@ interface VettingAgency {
   priority: number;
 }
 
-interface BrandGuidelines {
-  guardrails: string | null;
-  toneOfVoice: string | null;
-  brandIdentity: string | null;
-}
-
 interface VettingAgencyFeedbackCardProps {
   contentId: string;
   brandName: string;
   agencies: VettingAgency[];
-  generatedOutputs: Record<string, NormalizedContent>;
-  outputFieldLabels: Record<string, string>;
   stageId: string | null;
   stageName: string | null;
   existingFeedback?: VettingFeedbackStageResult;
-  onFeedbackUpdated: () => void;
+  onFeedbackUpdated: (result: VettingFeedbackStageResult) => void;
   autoRun?: boolean;
-  brandGuidelines?: BrandGuidelines;
+  outputFieldLabels?: Record<string, string>;
 }
 
 const priorityOrder: VettingFeedbackPriority[] = ['critical', 'high', 'medium', 'low'];
@@ -59,47 +52,35 @@ export function VettingAgencyFeedbackCard({
   contentId,
   brandName,
   agencies,
-  generatedOutputs,
-  outputFieldLabels,
   stageId,
   stageName,
   existingFeedback,
   onFeedbackUpdated,
   autoRun = false,
-  brandGuidelines,
+  outputFieldLabels = {},
 }: VettingAgencyFeedbackCardProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const autoRunStagesRef = useRef<Set<string>>(new Set());
+  const [csrfReady, setCsrfReady] = useState(() => {
+    if (typeof document === 'undefined') return false;
+    return Boolean(readCSRFToken());
+  });
 
-  const groupedFeedback = useMemo(() => {
+  const feedbackItems = useMemo(() => {
     const items = existingFeedback?.items ?? [];
-    if (items.length === 0) {
-      return [] as Array<{ priority: VettingFeedbackPriority; items: typeof items }>;
-    }
-
-    return priorityOrder
-      .map(priority => ({
-        priority,
-        items: items.filter(item => item.priority === priority),
-      }))
-      .filter(group => group.items.length > 0);
+    const priorityRanking = Object.fromEntries(priorityOrder.map((priority, index) => [priority, index]));
+    return items.slice().sort((a, b) => {
+      const rankA = priorityRanking[a.priority] ?? Number.MAX_SAFE_INTEGER;
+      const rankB = priorityRanking[b.priority] ?? Number.MAX_SAFE_INTEGER;
+      return rankA - rankB;
+    });
   }, [existingFeedback]);
 
-  const fieldsSummary = useMemo(() => {
-    const entries = Object.entries(generatedOutputs);
-    return entries.map(([fieldId, content]) => {
-      const label = outputFieldLabels[fieldId] || fieldId;
-      const plain = content?.plain ?? '';
-      return {
-        id: fieldId,
-        label,
-        preview: plain.length > 600 ? `${plain.slice(0, 600)}…` : plain,
-      };
-    });
-  }, [generatedOutputs, outputFieldLabels]);
-
-  const handleGenerate = async (force: boolean, { silentAutoRun = false }: { silentAutoRun?: boolean } = {}) => {
+  const handleGenerate = useCallback(async (
+    force: boolean,
+    { silentAutoRun = false }: { silentAutoRun?: boolean } = {}
+  ) => {
     if (!stageId) {
       toast.error('Unable to determine the current workflow stage.');
       return;
@@ -109,7 +90,7 @@ export function VettingAgencyFeedbackCard({
       setIsGenerating(true);
       setErrorMessage(null);
 
-      const response = await fetch(`/api/content/${contentId}/vetting-feedback`, {
+      const response = await apiFetch(`/api/content/${contentId}/vetting-feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -131,7 +112,9 @@ export function VettingAgencyFeedbackCard({
         toast.success('Vetting agency feedback generated successfully.');
       }
 
-      onFeedbackUpdated();
+      if (payload.data) {
+        onFeedbackUpdated(payload.data as VettingFeedbackStageResult);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to generate vetting feedback.';
       setErrorMessage(message);
@@ -141,10 +124,31 @@ export function VettingAgencyFeedbackCard({
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [stageId, stageName, contentId, onFeedbackUpdated]);
 
   useEffect(() => {
-    if (!autoRun || !stageId) {
+    if (csrfReady) {
+      return;
+    }
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      if (readCSRFToken()) {
+        setCsrfReady(true);
+        window.clearInterval(intervalId);
+      }
+    }, 100);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [csrfReady]);
+
+  useEffect(() => {
+    if (!autoRun || !stageId || !csrfReady) {
       return;
     }
 
@@ -156,7 +160,7 @@ export function VettingAgencyFeedbackCard({
       autoRunStagesRef.current.add(stageId);
       void handleGenerate(false, { silentAutoRun: true });
     }
-  }, [autoRun, stageId, existingFeedback, agencies.length, isGenerating]);
+  }, [autoRun, stageId, existingFeedback, agencies.length, isGenerating, handleGenerate, csrfReady]);
 
   const isDisabled = agencies.length === 0;
 
@@ -187,72 +191,37 @@ export function VettingAgencyFeedbackCard({
                 Generated {formatDistanceToNow(new Date(existingFeedback.generatedAt), { addSuffix: true })}
               </span>
               <span className="text-xs uppercase tracking-wide">Stage: {stageName || stageId}</span>
-              {existingFeedback.items.length === 0 && <Badge variant="secondary">No issues found</Badge>}
+              {feedbackItems.length === 0 && <Badge variant="secondary">No issues found</Badge>}
             </div>
 
-            {groupedFeedback.map(group => (
-              <div key={group.priority} className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Badge variant={priorityBadgeVariants[group.priority]}>
-                    {priorityLabels[group.priority]}
-                  </Badge>
-                  <span className="text-sm text-muted-foreground">{group.items.length} item{group.items.length === 1 ? '' : 's'}</span>
-                </div>
-                <div className="space-y-3">
-                  {group.items.map(item => (
-                    <div key={item.id} className="rounded-lg border bg-muted/30 p-3">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="space-y-1">
-                          <div className="text-sm font-semibold">{item.agencyName}</div>
-                          <p className="text-sm text-muted-foreground">{item.summary}</p>
-                        </div>
-                      </div>
-                      <Separator className="my-2" />
-                      <div className="text-sm">
-                        <span className="font-medium">Action:</span> {item.recommendedAction}
-                      </div>
-                      {item.relatedFields && item.relatedFields.length > 0 && (
-                        <div className="mt-2 text-xs text-muted-foreground">
-                          <span className="font-medium">Related fields:</span> {item.relatedFields.map(fieldId => outputFieldLabels[fieldId] || fieldId).join(', ')}
-                        </div>
-                      )}
+            <div className="space-y-3">
+              {feedbackItems.map(item => (
+                <div key={item.id} className="rounded-lg border bg-muted/30 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <Badge variant={priorityBadgeVariants[item.priority]}>{priorityLabels[item.priority]}</Badge>
+                      <div className="text-sm font-semibold text-foreground">{item.agencyName}</div>
                     </div>
-                  ))}
+                  </div>
+                  <Separator className="my-2" />
+                  <p className="text-sm text-muted-foreground">{item.summary}</p>
+                  <div className="mt-2 text-sm">
+                    <span className="font-medium">Recommended action:</span> {item.recommendedAction}
+                  </div>
+                  {item.relatedFields && item.relatedFields.length > 0 && (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">Related fields:</span> {item.relatedFields.map(fieldId => outputFieldLabels[fieldId] || fieldId).join(', ')}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
 
         {!existingFeedback && !isDisabled && !isGenerating && (
           <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
             No vetting feedback has been generated for this stage yet. Run the analysis to surface agency-specific risks.
-          </div>
-        )}
-
-        {fieldsSummary.length > 0 && (
-          <div className="space-y-2 text-xs text-muted-foreground">
-            <div className="font-semibold text-sm text-foreground">Generated output summary</div>
-            {fieldsSummary.map(field => (
-              <div key={field.id}>
-                <span className="font-medium text-foreground">{field.label}:</span> {field.preview || '—'}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {brandGuidelines && (brandGuidelines.guardrails || brandGuidelines.toneOfVoice) && (
-          <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
-            {brandGuidelines.guardrails && (
-              <div className="mb-2">
-                <span className="font-medium text-foreground">Guardrails:</span> {brandGuidelines.guardrails}
-              </div>
-            )}
-            {brandGuidelines.toneOfVoice && (
-              <div>
-                <span className="font-medium text-foreground">Tone of voice:</span> {brandGuidelines.toneOfVoice}
-              </div>
-            )}
           </div>
         )}
       </CardContent>
@@ -268,7 +237,7 @@ export function VettingAgencyFeedbackCard({
             variant="outline"
             size="sm"
             onClick={() => handleGenerate(true)}
-            disabled={isGenerating || isDisabled}
+            disabled={isGenerating || isDisabled || !csrfReady}
           >
             {isGenerating ? (
               <>
