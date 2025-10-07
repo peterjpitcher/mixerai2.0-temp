@@ -40,7 +40,7 @@ describe('api/error-utils', () => {
         message: '',
         details: 'Cannot delete, in use',
         hint: 'Remove dependency',
-      } as PostgrestError;
+      } as unknown as PostgrestError;
       expect(getPostgrestErrorMessage(error)).toBe('Cannot complete operation due to related records');
 
       const fallbackError = {
@@ -48,7 +48,7 @@ describe('api/error-utils', () => {
         message: '',
         details: 'Row missing',
         hint: 'Check permissions',
-      } as PostgrestError;
+      } as unknown as PostgrestError;
       expect(getPostgrestErrorMessage(fallbackError)).toBe('Row missing');
     });
   });
@@ -83,7 +83,12 @@ describe('api/error-utils', () => {
     it('detects authentication failures across variants', () => {
       expect(isAuthError({ status: 401 })).toBe(true);
       expect(isAuthError(new Error('JWT expired'))).toBe(true);
-      const postgrestAuth = { code: 'PGRST302', details: '', message: 'invalid jwt', hint: null } as PostgrestError;
+      const postgrestAuth = {
+        code: 'PGRST302',
+        details: '',
+        message: 'invalid jwt',
+        hint: null,
+      } as unknown as PostgrestError;
       expect(isAuthError(postgrestAuth)).toBe(true);
       expect(isAuthError('permission denied')).toBe(false);
     });
@@ -134,7 +139,7 @@ describe('api/error-utils', () => {
         message: '',
         details: 'duplicate',
         hint: null,
-      } as PostgrestError;
+      } as unknown as PostgrestError;
 
       const response = handleEnhancedApiError(conflictError);
       expect(response.status).toBe(409);

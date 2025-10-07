@@ -142,7 +142,7 @@ export function requiresReauthentication(operation: string, lastAuthTime: number
   }
 
   const timeSinceAuth = Date.now() - lastAuthTime;
-  const reauthThreshold = 15 * 60 * 1000; // 15 minutes
+  const reauthThreshold = sessionConfig.reauthTimeout;
 
   return timeSinceAuth > reauthThreshold;
 }

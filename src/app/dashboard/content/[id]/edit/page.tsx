@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,17 +14,17 @@ import 'quill/dist/quill.snow.css';
 import { toast } from 'sonner';
 import { createBrowserClient } from '@supabase/ssr';
 import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
-import { PageHeader } from "@/components/dashboard/page-header";
+import { VettingAgencyFeedbackCard } from '@/components/content/vetting-agency-feedback-card';
 import { BrandIcon,  } from '@/components/brand-icon';
 import { BreadcrumbNav } from '@/components/ui/breadcrumb-nav';
-import { ArrowLeft, Loader2, ShieldAlert, XCircle, CheckCircle, Clock, MessageSquare, UserCircle,  } from 'lucide-react';
+import { ArrowLeft, Loader2, ShieldAlert, XCircle, CheckCircle,  } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format as formatDateFns } from 'date-fns';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useAutoSave } from '@/hooks/use-auto-save';
 import { apiFetch } from '@/lib/api-client';
 import { ensureNormalizedContent, normalizeOutputsMap } from '@/lib/content/html-normalizer';
 import type { NormalizedContent } from '@/types/template';
+import type { VettingFeedbackStageResult } from '@/types/vetting-feedback';
 
 
 interface ContentEditPageProps {
@@ -109,6 +109,25 @@ interface Template {
   fields: TemplateFields;
 }
 
+interface VettingAgency {
+  id: string;
+  name: string;
+  description?: string | null;
+  country_code?: string | null;
+  priority: number;
+}
+
+interface BrandData {
+  id: string;
+  name: string;
+  brand_color?: string | null;
+  logo_url?: string | null;
+  icon_url?: string | null;
+  avatar_url?: string | null;
+  guardrails?: string | null;
+  selected_vetting_agencies?: VettingAgency[];
+}
+
 
 /**
  * ContentEditPage allows users to modify an existing piece of content.
@@ -149,7 +168,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   });
 
   const [versions, setVersions] = useState<ContentVersion[]>([]);
-  const [activeBrandData, setActiveBrandData] = useState<{ id: string; name: string; brand_color?: string; logo_url?: string | null } | null>(null);
+  const [activeBrandData, setActiveBrandData] = useState<BrandData | null>(null);
   const [template, setTemplate] = useState<Template | null>(null);
 
   // For ContentApprovalWorkflow to trigger save
@@ -182,36 +201,15 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     );
   }, [content.content_data?.generatedOutputs, outputFieldDefinitions]);
 
-  const getHistoryItemDisplayName = (identifier: string, stepName: string | null) => {
-    return outputFieldIdToNameMap[identifier] || stepName || identifier;
-  };
+  React.useEffect(() => {
+    const mainEl = document.querySelector<HTMLElement>('[data-dashboard-main]');
+    if (!mainEl) return;
+    mainEl.classList.add('lg:overflow-hidden');
+    return () => {
+      mainEl.classList.remove('lg:overflow-hidden');
+    };
+  }, []);
 
-  const getActionIcon = (actionStatus: string) => {
-    switch (actionStatus?.toLowerCase()) {
-      case 'approved':
-      case 'completed':
-        return <CheckCircle className="h-4 w-4 text-green-500 mr-2" />;
-      case 'rejected':
-      case 'sent_back':
-        return <XCircle className="h-4 w-4 text-red-500 mr-2" />;
-      case 'submitted':
-      case 'pending_review':
-        return <Clock className="h-4 w-4 text-yellow-500 mr-2" />;
-      case 'commented':
-        return <MessageSquare className="h-4 w-4 text-blue-500 mr-2" />;
-      default:
-        return <UserCircle className="h-4 w-4 text-gray-400 mr-2" />;
-    }
-  };
-  const getFormattedDateTime = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    try {
-      return formatDateFns(new Date(dateString), 'MMMM d, yyyy, HH:mm');
-    } catch (e) {
-      console.error("Error formatting date/time:", dateString, e);
-      return "Invalid Date/Time";
-    }
-  };
   // End added from view page
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -317,20 +315,29 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
 
           // Set brand data from the content response if available
           if (contentResult.data.brands) {
-            setActiveBrandData({
-              id: contentResult.data.brands.id,
-              name: contentResult.data.brands.name,
-              brand_color: contentResult.data.brands.brand_color,
-              logo_url: contentResult.data.brands.logo_url
-            });
+            setActiveBrandData(contentResult.data.brands as BrandData);
           } else if (contentResult.data.brand_id && contentResult.data.brand_name) {
             // Use brand data from content if brands relation is not populated
             setActiveBrandData({
               id: contentResult.data.brand_id,
               name: contentResult.data.brand_name,
               brand_color: contentResult.data.brand_color,
-              logo_url: contentResult.data.brand_logo_url
+              logo_url: (contentResult.data.brand_logo_url as string | null | undefined) ?? null,
             });
+          }
+
+          if (contentResult.data.brand_id) {
+            try {
+              const brandResponse = await fetch(`/api/brands/${contentResult.data.brand_id}`);
+              if (brandResponse.ok) {
+                const brandJson = await brandResponse.json();
+                if (brandJson.success && brandJson.brand) {
+                  setActiveBrandData(brandJson.brand as BrandData);
+                }
+              }
+            } catch (brandError) {
+              console.error('[ContentEditPage] Error fetching brand details:', brandError);
+            }
           }
 
           if (contentResult.data.workflow_id && !contentResult.data.workflow?.steps) {
@@ -567,58 +574,86 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     );
   }
 
+  const currentStageId = content.current_step ? String(content.current_step) : null;
+
   const currentWorkflowStep = content.workflow?.steps?.find(
-    (step) => String(step.id) === String(content.current_step ?? '')
+    (step) => (currentStageId ? String(step.id) === currentStageId : false)
   ) as WorkflowStep | undefined;
 
   const isCurrentUserStepOwner = Boolean(
     currentWorkflowStep?.assignees?.some((assignee) => assignee.id === currentUser?.id)
   );
 
-  return (
-    <div className="space-y-6">
-      <BreadcrumbNav items={[
-        { label: "Content", href: "/dashboard/content" },
-        { label: content.title || "Loading Content...", href: `/dashboard/content/${id}` },
-        { label: "Edit" }
-      ]} showHome={true} />
+  const rawVettingFeedback = content.content_data?.vettingFeedback;
+  const vettingFeedbackByStage = (rawVettingFeedback && typeof rawVettingFeedback === 'object'
+    ? (rawVettingFeedback as Record<string, VettingFeedbackStageResult>)
+    : {}) as Record<string, VettingFeedbackStageResult>;
 
-      <div className="flex items-center mb-4">
-        <Button variant="outline" size="icon" onClick={() => router.push(`/dashboard/content/${id}`)} aria-label="View Content">
-            <ArrowLeft className="h-4 w-4" />
-        </Button>
-        {activeBrandData && (
-          <div className="ml-4 flex items-center">
-            <BrandIcon name={activeBrandData.name} color={activeBrandData.brand_color} logoUrl={activeBrandData.logo_url} size="sm" />
-            <span className="ml-2 text-sm font-medium text-muted-foreground">Brand: {activeBrandData.name}</span>
+  const currentStageFeedback = currentStageId ? vettingFeedbackByStage[currentStageId] : undefined;
+
+  const selectedVettingAgencies: VettingAgency[] = activeBrandData?.selected_vetting_agencies ?? [];
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-6">
+      <div className="shrink-0 space-y-6">
+        <BreadcrumbNav
+          items={[
+            { label: "Content", href: "/dashboard/content" },
+            { label: content.title || "Loading Content...", href: `/dashboard/content/${id}` },
+            { label: "Edit" }
+          ]}
+          showHome
+        />
+
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => router.push(`/dashboard/content/${id}`)}
+              aria-label="View content (read only)"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-3">
+              <BrandIcon
+                name={activeBrandData?.name || content.brand_name || 'Brand'}
+                color={(activeBrandData?.brand_color ?? content.brand_color) || undefined}
+                logoUrl={activeBrandData?.logo_url ?? null}
+                size="md"
+              />
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">Edit: {content.title || 'Content'}</h1>
+                <p className="mt-1 text-muted-foreground">
+                  Update generated outputs and workflow details for this item.
+                  <br />
+                  Template: {content.template_name || 'N/A'} | Brand: {activeBrandData?.name || content.brand_name || 'N/A'} | Status: {content.status}
+                </p>
+              </div>
+            </div>
           </div>
-        )}
+
+          <div className="flex flex-col items-start gap-3 sm:items-end">
+            {hasUnsavedChanges && (
+              <span className="text-sm text-muted-foreground">You have unsaved changes</span>
+            )}
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => router.push(`/dashboard/content/${id}`)}>
+                View Content (Read-only)
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <PageHeader
-        title={`Edit: ${content.title || 'Content'}`}
-        description="Review and edit generated fields. Title is auto-generated and read-only."
-        actions={
-          <div className="flex items-center gap-4">
-            {hasUnsavedChanges && (
-              <span className="text-sm text-muted-foreground">
-                You have unsaved changes
-              </span>
-            )}
-            <Button variant="outline" onClick={() => router.push(`/dashboard/content/${id}`)}>
-              View Content (Read-only)
-            </Button>
-          </div>
-        }
-      />
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Content Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-6 lg:flex-row lg:gap-6">
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden lg:pr-3">
+          <div className="flex min-h-0 flex-1 flex-col space-y-6 overflow-y-auto overscroll-contain">
+            <Card>
+              <CardHeader>
+                <CardTitle>Content Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
               <div>
                 <Label htmlFor="title">Title (auto-generated)</Label>
                 <Input id="title" name="title" value={content.title} readOnly disabled />
@@ -646,65 +681,107 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             </CardContent>
           </Card>
           
-          {/* Test: Unconditionally render a simple div here -- REMOVING THIS NOW */}
-          {/* <div style={{ border: '2px solid red', padding: '10px', marginTop: '20px' }}>
-            UNCONDITIONAL STATIC TEST DIV - If you see this, basic rendering in this position is working.
-          </div> */}
+            {template && template.fields && template.fields.outputFields && template.fields.outputFields.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Generated Output Fields</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {template.fields.outputFields.map(field => {
+                    const normalizedValue = normalizedGeneratedOutputs[field.id];
+                    const plainValue = normalizedValue?.plain ?? '';
+                    const htmlValue = normalizedValue?.html ?? '';
+                    return (
+                      <div key={field.id}>
+                        <Label htmlFor={`output_field_${field.id}`} className="text-base">
+                          {field.name || `Output Field (ID: ${field.id})`}
+                        </Label>
+                        {field.type === 'plainText' ? (
+                          <Textarea
+                            id={`output_field_${field.id}`}
+                            value={plainValue}
+                            onChange={(e) => handleGeneratedOutputChange(field.id, ensureNormalizedContent(e.target.value, field.type))}
+                            placeholder={`Enter content for ${field.name}...`}
+                            rows={5}
+                            className="rounded-md border bg-muted/40 px-3 py-2 text-sm shadow-xs focus-visible:ring-1 focus-visible:ring-ring"
+                          />
+                        ) : isRichFieldType(field.type) ? (
+                          <div className="rounded-md border bg-gray-50/50 p-4 shadow-xs dark:bg-gray-800/50">
+                            <QuillEditor
+                              value={htmlValue}
+                              onChange={(value) => handleGeneratedOutputChange(field.id, ensureNormalizedContent(value, field.type))}
+                              placeholder={`Enter content for ${field.name}...`}
+                              className="rounded-md"
+                            />
+                          </div>
+                        ) : (
+                          <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+                            <p className="font-semibold text-foreground">Unknown Field Type: {field.type}</p>
+                            <pre className="mt-1 whitespace-pre-wrap text-xs">{plainValue || htmlValue || '(empty)'}</pre>
+                          </div>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Field Type: <span className="font-semibold">{field.type}</span>
+                        </p>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
+            {!template && content.template_id && (
+              <Card>
+                <CardContent>
+                  <p className="py-4 text-muted-foreground">Loading template structure for output fields...</p>
+                </CardContent>
+              </Card>
+            )}
+            {template && template.fields && template.fields.outputFields && template.fields.outputFields.length === 0 && (
+              <Card>
+                <CardContent>
+                  <p className="py-4 text-muted-foreground">No output fields defined in the template.</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </section>
 
-          {template && template.fields && template.fields.outputFields && template.fields.outputFields.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle>Generated Output Fields</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                {/* Now, restore the map but with simplified content */}
-                {template.fields.outputFields.map(field => {
-                  const normalizedValue = normalizedGeneratedOutputs[field.id];
-                  const plainValue = normalizedValue?.plain ?? '';
-                  const htmlValue = normalizedValue?.html ?? '';
-                  return (
-                    <div key={field.id}>
-                      <Label htmlFor={`output_field_${field.id}`} className="text-base">
-                        {field.name || `Output Field (ID: ${field.id})`}
-                      </Label>
-                      {field.type === 'plainText' ? (
-                        <Textarea
-                          id={`output_field_${field.id}`}
-                          value={plainValue}
-                          onChange={(e) => handleGeneratedOutputChange(field.id, ensureNormalizedContent(e.target.value, field.type))}
-                          placeholder={`Enter content for ${field.name}...`}
-                          className="min-h-[120px] border shadow-sm focus-visible:ring-1 focus-visible:ring-ring"
-                        />
-                      ) : isRichFieldType(field.type) ? (
-                        <QuillEditor
-                          value={htmlValue}
-                          onChange={(value) => handleGeneratedOutputChange(field.id, ensureNormalizedContent(value, field.type))}
-                          placeholder={`Enter content for ${field.name}...`}
-                        />
-                      ) : (
-                        // Fallback for any other unknown types (shouldn't happen with current template)
-                        <div style={{ border: '1px dashed red', padding: '5px', marginTop: '5px'}}>
-                          <p><strong>Unknown Field Type:</strong> {field.type}</p>
-                          <pre>{plainValue || htmlValue || '(empty)'}</pre>
-                        </div>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        Field Type: <span className='font-semibold'>{field.type}</span>
-                      </p>
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
+        <aside className="flex min-h-0 flex-col overflow-hidden lg:w-[360px] lg:shrink-0 lg:pl-1">
+          <div className="flex min-h-0 flex-1 flex-col space-y-6 overflow-y-auto overscroll-contain">
+          {content.workflow_id && (
+            <VettingAgencyFeedbackCard
+              contentId={content.id}
+              brandName={content.brand_name || activeBrandData?.name || 'Brand'}
+              agencies={selectedVettingAgencies}
+              outputFieldLabels={outputFieldIdToNameMap}
+              stageId={currentStageId}
+              stageName={currentWorkflowStep?.name || null}
+              existingFeedback={currentStageFeedback}
+              onFeedbackUpdated={(result) => {
+                if (!result) return;
+                const stageKey = result.stageId || currentStageId;
+                if (!stageKey) {
+                  return;
+                }
+                setContent(prev => {
+                  const existingData = (prev.content_data || {}) as Record<string, unknown>;
+                  const previousFeedback = (existingData.vettingFeedback as Record<string, VettingFeedbackStageResult> | undefined) ?? {};
+                  return {
+                    ...prev,
+                    content_data: {
+                      ...existingData,
+                      vettingFeedback: {
+                        ...previousFeedback,
+                        [stageKey]: result,
+                      },
+                    },
+                  };
+                });
+              }}
+              autoRun
+            />
           )}
-          {/* Fallback if template is loading or has no output fields */}
-          {!template && content.template_id && (
-             <Card><CardContent><p className="text-muted-foreground py-4">Loading template structure for output fields...</p></CardContent></Card>
-          )}
-          {(template && template.fields && template.fields.outputFields && template.fields.outputFields.length === 0) && (
-             <Card><CardContent><p className="text-muted-foreground py-4">No output fields defined in the template.</p></CardContent></Card>
-          )}
-        </div>
 
-        <div className="lg:col-span-1 space-y-6">
           {content.workflow && content.workflow.steps && content.current_step && (
             <ContentApprovalWorkflow
               contentId={content.id}
@@ -718,63 +795,28 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
               initialPublishedUrl={content.published_url ?? null}
             />
           )}
-          {!content.workflow && <Card><CardContent><p className="text-muted-foreground py-4">No workflow associated with this content.</p></CardContent></Card>}
-
-
-          {/* New Card for Version History on Edit Page */}
-          {versions && versions.length > 0 && (
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>Version History</CardTitle>
-                <CardDescription>Review previous versions and feedback.</CardDescription>
-              </CardHeader>
+          {!content.workflow && (
+            <Card>
               <CardContent>
-                <ul className="space-y-4 max-h-96 overflow-y-auto">
-                  {versions.slice().reverse().map(version => (
-                    <li key={version.id} className="p-3 border rounded-md bg-background">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center">
-                          {getActionIcon(version.action_status)}
-                          <span className="font-semibold">
-                             {getHistoryItemDisplayName(version.workflow_step_identifier, version.step_name)}
-                          </span>
-                          <span className="text-xs text-muted-foreground ml-2">(v{version.version_number}) - {version.action_status}</span>
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {getFormattedDateTime(version.created_at)}
-                        </span>
-                      </div>
-                      {version.reviewer && (
-                        <p className="text-xs text-muted-foreground mb-1">
-                          By: {version.reviewer.full_name || 'Unknown User'}
-                        </p>
-                      )}
-                      {version.feedback && (
-                        <div className="mt-1 p-2 bg-muted/50 rounded-sm">
-                          <p className="text-xs text-foreground whitespace-pre-wrap">{version.feedback}</p>
-                        </div>
-                      )}
-                       {/* Optional: Display snapshot of content_json if needed */}
-                       {/* {version.content_json?.generatedOutputs && Object.keys(version.content_json.generatedOutputs).length > 0 && ( <details className="mt-2 text-xs"> <summary>View Content Snapshot</summary> <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-900 rounded text-xs overflow-auto max-h-40">{JSON.stringify(version.content_json.generatedOutputs, null, 2)}</pre> </details> )} */}
-                    </li>
-                  ))}
-                </ul>
+                <p className="py-4 text-muted-foreground">No workflow associated with this content.</p>
               </CardContent>
             </Card>
           )}
-          {/* End New Card for Version History */}
 
-        </div>
+          </div>
+        </aside>
       </div>
-      
-      <div className="flex justify-end space-x-2 pt-4 mt-4 border-t">
-        <Button variant="outline" onClick={() => router.push(`/dashboard/content/${id}`)} disabled={isSaving}>
+
+      <div className="shrink-0 border-t pt-4">
+        <div className="flex justify-end space-x-2">
+          <Button variant="outline" onClick={() => router.push(`/dashboard/content/${id}`)} disabled={isSaving}>
             Cancel
-        </Button>
-        <Button onClick={handleSave} disabled={isSaving || isAutoSaving}>
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving || isAutoSaving}>
             {(isSaving || isAutoSaving) ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
-        </Button>
+          </Button>
+        </div>
       </div>
     </div>
   );
-} 
+}

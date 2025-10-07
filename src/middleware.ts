@@ -23,6 +23,7 @@ const PUBLIC_ROUTES = new Set([
   '/api/auth/signup',
   '/api/auth/forgot-password',
   '/api/auth/reset-password',
+  '/api/auth/login-lockout',
   '/api/health'
 ]);
 

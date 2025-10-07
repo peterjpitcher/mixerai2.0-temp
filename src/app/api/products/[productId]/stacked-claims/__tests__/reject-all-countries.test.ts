@@ -17,7 +17,7 @@ describe('GET /api/products/[productId]/stacked-claims', () => {
     const { GET } = await import('../route');
     const req = { url: 'http://localhost/api/products/p1/stacked-claims?countryCode=__ALL_COUNTRIES__' } as any;
     const ctx = { params: { productId: 'p1' } } as any;
-    const res = (await GET(req, undefined as any, ctx)) as NextResponse;
+    const res = (await GET(req, ctx)) as NextResponse;
 
     expect(res.status).toBe(400);
     const body = await (res as any).json();
@@ -25,4 +25,3 @@ describe('GET /api/products/[productId]/stacked-claims', () => {
     expect(String(body.error)).toMatch(/All Countries/i);
   });
 });
-

@@ -29,11 +29,13 @@ describe('validateRequest', () => {
 
     const result = await validateRequest(request, schema, { includeErrorDetails: true });
     expect(result.success).toBe(false);
-    const body = await result.response.json();
-    expect(result.response.status).toBe(400);
-    expect(body.code).toBe('INVALID_JSON');
-    expect(body).toHaveProperty('timestamp');
-    expect(body).toHaveProperty('details');
+    if (!result.success) {
+      const body = await result.response.json();
+      expect(result.response.status).toBe(400);
+      expect(body.code).toBe('INVALID_JSON');
+      expect(body).toHaveProperty('timestamp');
+      expect(body).toHaveProperty('details');
+    }
   });
 
   it('returns validation error details when schema fails', async () => {
@@ -46,12 +48,14 @@ describe('validateRequest', () => {
 
     const result = await validateRequest(request, schema);
     expect(result.success).toBe(false);
-    const body = await result.response.json();
-    expect(result.response.status).toBe(400);
-    expect(body.code).toBe('VALIDATION_ERROR');
-    expect(body.details).toEqual(
-      expect.arrayContaining([expect.objectContaining({ field: 'email' })])
-    );
+    if (!result.success) {
+      const body = await result.response.json();
+      expect(result.response.status).toBe(400);
+      expect(body.code).toBe('VALIDATION_ERROR');
+      expect(body.details).toEqual(
+        expect.arrayContaining([expect.objectContaining({ field: 'email' })])
+      );
+    }
   });
 
   it('supports custom parsers', async () => {

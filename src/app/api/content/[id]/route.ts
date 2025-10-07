@@ -59,6 +59,14 @@ export const GET = withAuth(async (request: NextRequest, user: User, context?: u
     return NextResponse.json({ success: false, error: 'Content ID is required' }, { status: 400 });
   }
 
+  if (process.env.NEXT_PUBLIC_ENABLE_TEST_MOCKS === '1') {
+    const { testContentApiMock, testContentDetailMock } = await import('@/mocks/content-detail');
+    if (testContentDetailMock.id === id) {
+      return NextResponse.json(testContentApiMock);
+    }
+    return NextResponse.json({ success: false, error: 'Content not found' }, { status: 404 });
+  }
+
   try {
     const supabase = createSupabaseAdminClient();
     

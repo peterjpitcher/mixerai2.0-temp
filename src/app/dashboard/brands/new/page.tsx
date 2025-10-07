@@ -396,10 +396,10 @@ export default function NewBrandPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          brandName: formData.name,
-          urls: urls,
-          country: formData.country,
-          language: formData.language
+          name: formData.name.trim(),
+          urls,
+          country: (formData.country && formData.country.trim()) || 'GB',
+          language: (formData.language && formData.language.trim()) || 'en-GB'
         })
       });
       if (!response.ok) {

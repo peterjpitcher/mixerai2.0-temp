@@ -57,7 +57,7 @@ export default function DashboardLayout({
 
   return (
     <SessionTimeoutProvider warningMinutes={25} sessionMinutes={30}>
-      <div className="flex min-h-screen flex-col bg-background">
+      <div className="flex h-dvh min-h-0 flex-col bg-background">
         <header className="border-b bg-secondary text-secondary-foreground sticky top-0 z-40 h-16">
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between h-full">
           <div className="flex items-center gap-2 font-semibold">
@@ -119,11 +119,23 @@ export default function DashboardLayout({
         </div>
       </header>
 
-      <div className="flex flex-1">
-        <Suspense fallback={<div className="w-64 p-4 border-r"><Loader2 className="h-6 w-6 animate-spin mx-auto mt-8" /></div>}>
-          <UnifiedNavigationV2 className="w-64 border-r bg-muted/40 hidden sm:flex flex-col" />
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <Suspense
+          fallback={
+            <div className="hidden h-full w-64 shrink-0 border-r bg-muted/40 sm:flex sm:flex-col sm:min-h-0 sm:overflow-hidden">
+              <div className="flex flex-1 items-center justify-center p-4">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            </div>
+          }
+        >
+          <UnifiedNavigationV2 className="hidden h-full w-64 shrink-0 border-r bg-muted/40 sm:flex sm:flex-col sm:min-h-0 sm:overflow-hidden" />
         </Suspense>
-        <main key={pathname} className="flex-1 px-4 sm:px-6 lg:px-8 py-6 overflow-auto lg:pb-6 pb-20">
+        <main
+          key={pathname}
+          data-dashboard-main
+          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto px-4 py-6 pb-20 sm:px-6 lg:px-8 lg:pb-6"
+        >
           <DevelopmentOnly>
             <div id="domain-verification-container" className="mb-4">
               {/* This will be populated client-side */}

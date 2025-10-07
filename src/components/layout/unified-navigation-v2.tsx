@@ -18,7 +18,6 @@ import {
   Folder,
   ListChecks,
   Loader2,
-  MessageSquareWarning,
   ClipboardList,
   Package,
   FlaskConical,
@@ -364,7 +363,7 @@ export function UnifiedNavigationV2({ className }: UnifiedNavigationProps) {
 
       return changed ? next : previous;
     });
-  }, [navItemsDefinition, pathname, segmentsKey, searchParams]);
+  }, [navItemsDefinition, pathname, segments, segmentsKey, searchParams]);
 
   const filteredItems = useMemo(
     () => navItemsDefinition.filter((item) => !item.show || item.show()),
@@ -377,18 +376,21 @@ export function UnifiedNavigationV2({ className }: UnifiedNavigationProps) {
 
   if (isLoadingUser) {
     return (
-      <div className={cn('flex h-full w-full items-center justify-center', className)}>
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className={cn('flex h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] min-h-0 w-full flex-col overflow-hidden', className)}>
+        <div className="flex flex-1 items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
       </div>
     );
   }
 
   return (
-    <nav className={cn('flex h-full flex-col gap-2 overflow-y-auto px-4 py-4', className)}>
-      {filteredItems.map((item) => {
-        if ('type' in item) {
-          return <Separator key={item.id} className="my-2" />;
-        }
+    <div className={cn('flex h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] min-h-0 w-full flex-col overflow-hidden', className)}>
+      <nav className="flex flex-1 min-h-0 flex-col gap-2 overflow-y-auto px-4 py-4">
+        {filteredItems.map((item) => {
+          if ('type' in item) {
+            return <Separator key={item.id} className="my-2" />;
+          }
 
         if ('items' in item) {
           const isActiveGroup = isItemActive(item, pathname, segments, searchParams, navItemsDefinition) || item.items.some((child) => isItemActive(child, pathname, segments, searchParams, navItemsDefinition));
@@ -486,7 +488,8 @@ export function UnifiedNavigationV2({ className }: UnifiedNavigationProps) {
           </Link>
         );
       })}
-    </nav>
+      </nav>
+    </div>
   );
 }
 

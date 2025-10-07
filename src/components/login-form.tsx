@@ -8,9 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createSupabaseClient } from "@/lib/supabase/client";
 import { toast } from 'sonner';
-import { isAccountLocked, recordLoginAttempt } from '@/lib/auth/account-lockout';
 import { AlertCircle } from 'lucide-react';
-import { getClientIP } from '@/lib/utils/get-client-ip';
+import { apiFetchJson } from '@/lib/api-client';
+import type { AccountLockStatus } from '@/lib/auth/account-lockout';
+import { sessionConfig } from '@/lib/auth/session-config';
 
 /**
  * LoginForm component.
@@ -24,14 +25,36 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
+  const fetchLockoutStatus = async (payload: { email: string; action: 'status' | 'record'; success?: boolean }): Promise<AccountLockStatus> => {
+    try {
+      const response = await apiFetchJson<{ success: boolean; status: AccountLockStatus }>(
+        '/api/auth/login-lockout',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          errorMessage: 'Failed to evaluate account lockout state',
+        }
+      );
+
+      return response.status;
+    } catch (error) {
+      console.warn('[login] Unable to evaluate lockout status', error);
+      return {
+        locked: false,
+        attempts: 0,
+        remainingAttempts: sessionConfig.lockout.maxAttempts,
+      };
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
 
     try {
-      // Check if account is locked
-      const lockStatus = await isAccountLocked(email);
+      const lockStatus = await fetchLockoutStatus({ email, action: 'status' });
       if (lockStatus.locked) {
         const minutes = Math.ceil((lockStatus.remainingTime || 0) / 60);
         setError(`Account temporarily locked due to too many failed attempts. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`);
@@ -40,10 +63,7 @@ export function LoginForm() {
       }
 
       const supabase = createSupabaseClient();
-      
-      // Get IP address
-      const ip = await getClientIP();
-      
+
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -54,15 +74,12 @@ export function LoginForm() {
         setPassword("");
         
         // Record failed attempt
-        await recordLoginAttempt(email, ip, false);
-        
-        // Check if this attempt triggered a lockout
-        const newLockStatus = await isAccountLocked(email);
+        const newLockStatus = await fetchLockoutStatus({ email, action: 'record', success: false });
         if (newLockStatus.locked) {
           const minutes = Math.ceil((newLockStatus.remainingTime || 0) / 60);
           setError(`Account has been locked due to too many failed attempts. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`);
         } else {
-          const remainingAttempts = 5 - (newLockStatus.attempts || 0);
+          const remainingAttempts = newLockStatus.remainingAttempts ?? Math.max(0, sessionConfig.lockout.maxAttempts - (newLockStatus.attempts || 0));
           // Use consistent error message wording
           const errorMessage = signInError.message === "Invalid login credentials" 
             ? "Invalid email or password" 
@@ -76,7 +93,9 @@ export function LoginForm() {
         }
       } else {
         // Record successful attempt
-        await recordLoginAttempt(email, ip, true);
+        fetchLockoutStatus({ email, action: 'record', success: true }).catch(error => {
+          console.warn('[login] Failed to clear lockout state after successful login', error);
+        });
         
         toast.success('You have been logged in successfully.');
         
