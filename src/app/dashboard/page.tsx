@@ -141,69 +141,6 @@ async function getMostAgedContent(supabase: SupabaseClient<any>, profile: { role
   return processed;
 }
 
-async function getDashboardMetrics(supabase: SupabaseClient<any>, profile: { role?: string; assigned_brands?: string[] } | null) { // TODO: Type as SupabaseClient<Database> when types are regenerated
-  if (!profile) return { totalContent: 0, totalBrands: 0, totalWorkflows: 0, pendingTasks: 0, completedThisWeek: 0, pendingReviews: 0 };
-
-  // Get the current user
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { totalContent: 0, totalBrands: 0, totalWorkflows: 0, pendingTasks: 0, completedThisWeek: 0, pendingReviews: 0 };
-
-  try {
-    // Base queries
-    let contentQuery = supabase.from('content').select('id, status', { count: 'exact' });
-    let brandsQuery = supabase.from('brands').select('id', { count: 'exact' });
-    let workflowsQuery = supabase.from('workflows').select('id', { count: 'exact' });
-
-    // Apply brand filtering for non-admins
-    if (profile.role !== 'admin') {
-      if (!profile.assigned_brands || profile.assigned_brands.length === 0) {
-        return { totalContent: 0, totalBrands: 0, totalWorkflows: 0, pendingTasks: 0, completedThisWeek: 0, pendingReviews: 0 };
-      }
-        contentQuery = contentQuery.in('brand_id', profile.assigned_brands);
-        brandsQuery = brandsQuery.in('id', profile.assigned_brands);
-        workflowsQuery = workflowsQuery.in('brand_id', profile.assigned_brands);
-    }
-
-    const [contentResult, brandsResult, workflowsResult] = await Promise.all([
-      contentQuery,
-      brandsQuery,
-      workflowsQuery
-    ]);
-
-    // Count pending reviews
-    const pendingReviews = contentResult.data?.filter((c) => c.status === 'pending_review').length || 0;
-
-    // Get pending tasks count
-    const { count: pendingTasksCount } = await supabase
-      .from('user_tasks')
-      .select('*', { count: 'exact', head: true })
-      .eq('assigned_to', user.id)
-      .eq('status', 'pending');
-
-    // Get completed tasks this week
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    const { count: completedThisWeekCount } = await supabase
-      .from('user_tasks')
-      .select('*', { count: 'exact', head: true })
-      .eq('assigned_to', user.id)
-      .eq('status', 'completed')
-      .gte('updated_at', weekAgo.toISOString());
-
-    return {
-      totalContent: contentResult.count || 0,
-      totalBrands: brandsResult.count || 0,
-      totalWorkflows: workflowsResult.count || 0,
-      pendingTasks: pendingTasksCount || 0,
-      completedThisWeek: completedThisWeekCount || 0,
-      pendingReviews
-    };
-  } catch (error) {
-    console.error('Error fetching dashboard metrics:', error);
-    return { totalContent: 0, totalBrands: 0, totalWorkflows: 0, pendingTasks: 0, completedThisWeek: 0, pendingReviews: 0 };
-  }
-}
-
 export default async function DashboardPage() {
   const supabase = createSupabaseServerClient();
   const profile = await getProfileWithAssignedBrands(supabase as any);
