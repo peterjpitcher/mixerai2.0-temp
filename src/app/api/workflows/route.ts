@@ -360,11 +360,14 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user) => {
             type: rawStep.name?.toLowerCase().includes('approv') ? 'approval' : 'review',
             order_index: normalizedOrder,
             order: normalizedOrder,
+            assignees: assignedUserIds.map((userId) => ({ id: userId })),
             assigned_user_ids: assignedUserIds,
             assigned_roles: assignedRoles,
             role_mapping: roleMapping,
             description: rawStep.description,
-            deadline_days: rawStep.deadline_days
+            deadline_days: rawStep.deadline_days,
+            approvalRequired,
+            requiresPublishedUrl: requiresPublishedUrlFromPayload
         };
     }));
     
