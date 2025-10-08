@@ -19,7 +19,9 @@ function getSessionStore(): SessionStore {
   }
 
   const runningInProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
-  const allowInMemoryFallback = process.env.ALLOW_IN_MEMORY_SESSION_FALLBACK === 'true';
+  const allowInMemoryFallback = process.env.ALLOW_IN_MEMORY_SESSION_FALLBACK
+    ? process.env.ALLOW_IN_MEMORY_SESSION_FALLBACK === 'true'
+    : true;
   const buildPhase = ['phase-production-build', 'phase-development-build', 'phase-export']
     .includes(process.env.NEXT_PHASE || '');
 
