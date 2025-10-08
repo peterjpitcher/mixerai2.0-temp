@@ -45,7 +45,7 @@ async function generateSessionId(): Promise<string> {
   } catch {}
   // Final fallback for Node environments without Web Crypto
   try {
-    const nodeCrypto = await import('node:crypto');
+    const nodeCrypto = await import('crypto');
     return nodeCrypto.randomBytes(32).toString('hex');
   } catch {}
   // Extremely unlikely fallback (non-crypto random)

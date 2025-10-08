@@ -1,5 +1,5 @@
 import { headers } from 'next/headers';
-import crypto from 'node:crypto';
+import crypto from 'crypto';
 
 export function getOrCreateCorrelationId() {
   try {
@@ -10,4 +10,3 @@ export function getOrCreateCorrelationId() {
     return crypto.randomUUID();
   }
 }
-
