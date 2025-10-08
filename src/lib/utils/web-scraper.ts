@@ -1,7 +1,7 @@
 /**
  * Utility for fetching and extracting content from web pages
  */
-import dns from 'node:dns';
+import dns from 'dns';
 import ipaddr from 'ipaddr.js';
 import * as cheerio from 'cheerio';
 

@@ -6,7 +6,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { Json } from '@/types/supabase';
 import { z } from 'zod';
 import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth/brand-access';
-import dns from 'node:dns';
+import dns from 'dns';
 import ipaddr from 'ipaddr.js';
 
 // In-memory rate limiting

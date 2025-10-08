@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import crypto from 'node:crypto';
+import crypto from 'crypto';
 
 const CSRF_COOKIE = 'csrf_token';
 
@@ -18,4 +18,3 @@ export function requireCsrf(req: Request) {
     throw err;
   }
 }
-
