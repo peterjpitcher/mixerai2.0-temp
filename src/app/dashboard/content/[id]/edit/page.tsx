@@ -9,8 +9,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { QuillEditor } from '@/components/content/quill-editor';
-import 'quill/dist/quill.snow.css';
+import { RichTextEditor } from '@/components/content/rich-text-editor';
 import { toast } from 'sonner';
 import { createBrowserClient } from '@supabase/ssr';
 import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
@@ -707,11 +706,11 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
                           />
                         ) : isRichFieldType(field.type) ? (
                           <div className="rounded-md border bg-gray-50/50 p-4 shadow-xs dark:bg-gray-800/50">
-                            <QuillEditor
+                            <RichTextEditor
                               value={htmlValue}
                               onChange={(value) => handleGeneratedOutputChange(field.id, ensureNormalizedContent(value, field.type))}
                               placeholder={`Enter content for ${field.name}...`}
-                              className="rounded-md"
+                              minHeight={260}
                             />
                           </div>
                         ) : (

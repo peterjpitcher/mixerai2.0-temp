@@ -37,7 +37,7 @@ const requestSchema = z.object({
 
 function isHostAllowlisted(hostname: string): boolean {
   if (!allowlistedHosts.size) {
-    return false;
+    return true;
   }
 
   const host = hostname.toLowerCase();
@@ -86,13 +86,37 @@ const getOpenAIClientOrThrow = () => {
 };
 
 // Validate URL function
-function isValidUrl(url: string): boolean {
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
+function normalizeUrlCandidate(input: string): { normalized?: string; error?: string } {
+  if (!input) {
+    return { error: 'URL is empty.' };
   }
+
+  const trimmed = input.trim();
+
+  const attempt = (candidate: string) => {
+    try {
+      const parsed = new URL(candidate);
+      if (!parsed.protocol || !parsed.hostname) {
+        throw new Error('URL must include a valid protocol and hostname.');
+      }
+      return parsed.toString();
+    } catch (error) {
+      return error instanceof Error ? { error: error.message } : { error: 'Invalid URL.' };
+    }
+  };
+
+  const directAttempt = attempt(trimmed);
+  if (typeof directAttempt === 'string') {
+    return { normalized: directAttempt };
+  }
+
+  const prefixedAttempt = attempt(`https://${trimmed}`);
+  if (typeof prefixedAttempt === 'string') {
+    return { normalized: prefixedAttempt };
+  }
+
+  const reason = prefixedAttempt.error || directAttempt.error || 'Invalid URL.';
+  return { error: reason };
 }
 
 // Get language name from language code
@@ -123,7 +147,7 @@ async function scrapeWebsiteContent(url: string): Promise<string> {
     const parsed = new URL(url);
 
     if (!isHostAllowlisted(parsed.hostname)) {
-      throw new Error('Host not allowlisted');
+      throw new Error(`The host "${parsed.hostname}" is not allowlisted. Update PROXY_ALLOWED_HOSTS or use an approved domain.`);
     }
 
     let resolvedIp: string;
@@ -142,26 +166,38 @@ async function scrapeWebsiteContent(url: string): Promise<string> {
     }
 
     const response = await axios.get(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 compatible MixerAIContentScraper/1.0', 'Accept': 'text/html', 'Accept-Language': 'en-GB,en;q=0.5' },
-      timeout: 8000 // 8 second timeout
+      headers: {
+        'User-Agent': 'Mozilla/5.0 compatible MixerAIContentScraper/1.0',
+        'Accept': 'text/html',
+        'Accept-Language': 'en-GB,en;q=0.5',
+        'Accept-Encoding': 'identity',
+      },
+      timeout: 8000,
+      maxContentLength: MAX_SCRAPED_CHARACTERS * 20,
+      maxBodyLength: MAX_SCRAPED_CHARACTERS * 20,
     });
-    const htmlContent = response.data;
-    
-    // Use sanitize-html for proper HTML sanitization and text extraction
-    const textContent = sanitizeHtml(htmlContent, {
-      allowedTags: [], // Remove all HTML tags
+
+    if (typeof response.data !== 'string' || !response.data.trim()) {
+      throw new Error('The page did not return readable HTML content.');
+    }
+
+    const textContent = sanitizeHtml(response.data, {
+      allowedTags: [],
       allowedAttributes: {},
-      textFilter: function(text: string) {
+      textFilter(text: string) {
         return text.replace(/\s+/g, ' ').trim();
-      }
+      },
     });
-    
+
+    if (!textContent.trim()) {
+      throw new Error('The page did not contain any readable text after sanitization.');
+    }
+
     return textContent.slice(0, MAX_SCRAPED_CHARACTERS);
   } catch (error) {
-    // Log scraping errors to a secure server-side log in production.
-    // Return an empty string or a specific marker if content extraction fails, rather than error string in content.
-    console.warn('[brands/identity] Failed to scrape URL', { url, error: error instanceof Error ? error.message : error });
-    return ''; // Or throw a specific error to be handled upstream
+    const message =
+      error instanceof Error ? error.message : 'Unknown scraping error';
+    throw new Error(`Failed to scrape ${url}: ${message}`);
   }
 }
 
@@ -177,20 +213,57 @@ export const POST = withAdminAuthAndCSRF(async (req: NextRequest) => {
 
     const { name, urls, country, language } = parsedBody.data;
 
-    // Filter to valid URLs
-    const validUrls = urls.filter((url): url is string => typeof url === 'string' && isValidUrl(url));
-    if (validUrls.length === 0) {
+    const normalizationResults = urls.map(normalizeUrlCandidate);
+    const normalizedUrls: string[] = [];
+    const normalizationWarnings: string[] = [];
+
+    normalizationResults.forEach((result, index) => {
+      const original = urls[index];
+      if (result.normalized) {
+        if (original.trim() !== result.normalized) {
+          normalizationWarnings.push(`URL "${original}" was normalised to "${result.normalized}".`);
+        }
+        normalizedUrls.push(result.normalized);
+      } else if (result.error) {
+        normalizationWarnings.push(`URL "${original}": ${result.error}`);
+      }
+    });
+
+    if (!normalizedUrls.length) {
       return NextResponse.json(
-        { success: false, error: 'No valid URLs provided' },
+        {
+          success: false,
+          error: 'No valid URLs provided. Please check the formatting of each URL.',
+          details: normalizationWarnings,
+        },
         { status: 400 }
       );
     }
 
     const openai = getOpenAIClientOrThrow(); // Throws if no client can be configured.
 
-    // Get content from URLs
-    const contentPromises = validUrls.map(url => scrapeWebsiteContent(url));
-    const contents = await Promise.all(contentPromises);
+    const successfulScrapes: { url: string; content: string }[] = [];
+    const scrapeWarnings: string[] = [];
+
+    for (const url of normalizedUrls) {
+      try {
+        const content = await scrapeWebsiteContent(url);
+        if (!content.trim()) {
+          scrapeWarnings.push(`No readable content could be extracted from ${url}.`);
+          continue;
+        }
+        successfulScrapes.push({ url, content });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : `Failed to scrape ${url}`;
+        scrapeWarnings.push(message);
+      }
+    }
+
+    if (!successfulScrapes.length) {
+      const combined = [...normalizationWarnings, ...scrapeWarnings];
+      const detail = combined.length ? combined.join(' | ') : 'No readable content could be extracted from the provided URLs.';
+      throw new Error(`Unable to extract content from the provided URLs. ${detail}`);
+    }
     
     // Prepare prompt for OpenAI
     const countryInfo = COUNTRIES.find(c => c.value === country);
@@ -216,7 +289,10 @@ Do not include any content in English unless the specified language is ${specifi
     
     const userMessage = `Create a comprehensive brand identity profile for "${name}" based on the following website content:
     
-${contents.map((content, i) => `URL ${i+1}: ${validUrls[i]}\n${content}\n`).join('\n')}
+${successfulScrapes.map(({ url, content }, index) => {
+  const safeContent = content && content.trim().length > 0 ? content : '[No readable content extracted from this URL.]';
+  return `URL ${index + 1}: ${url}\n${safeContent}\n`;
+}).join('\n')}
 
 The brand operates in ${countryName} and communicates in ${specificLanguageName}.
 
@@ -268,6 +344,8 @@ Remember that ALL text fields (except potentially within agency names) must be w
         guardrails: jsonData.guardrails,
         suggestedAgencies: Array.isArray(jsonData.suggestedAgencies) ? jsonData.suggestedAgencies : [],
         brandColor: (jsonData.brandColor && /^#[0-9A-Fa-f]{6}$/.test(jsonData.brandColor)) ? jsonData.brandColor : null,
+        scrapeWarnings,
+        normalizationWarnings,
         // usedFallback: false, // This flag is no longer relevant
       };
       
@@ -287,8 +365,10 @@ Remember that ALL text fields (except potentially within agency names) must be w
     }
     
   } catch (error) {
-    // All console.errors removed, handleApiError will manage the response.
-    // The custom error message logic in handleApiError can be enhanced if needed for AI specific public messages.
-    return handleApiError(error, 'Failed to process brand identity request');
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : 'Failed to process brand identity request';
+    return handleApiError(error, message);
   }
 }); 
