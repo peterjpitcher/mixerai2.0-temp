@@ -36,7 +36,8 @@ const allowlistedHosts = new Set(rawAllowlist);
 
 function isHostAllowlisted(hostname: string): boolean {
   if (!allowlistedHosts.size) {
-    return false;
+    console.warn('[scrape-recipe] PROXY_ALLOWED_HOSTS not set; allowing all outbound recipe requests. Configure this env var to enforce an allowlist.');
+    return true;
   }
 
   const host = hostname.toLowerCase();
