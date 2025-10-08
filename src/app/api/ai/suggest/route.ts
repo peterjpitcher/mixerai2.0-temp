@@ -9,6 +9,7 @@ import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { truncateGraphemeSafe, normaliseForLength, stripAIWrappers } from '@/lib/text/enforce-limit';
 import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth/brand-access';
 import { logAiUsage } from '@/lib/audit/ai';
+import { createLocaleDirectives } from '@/lib/utils/locale';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -73,6 +74,9 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Pr
       });
     }
 
+    let localeSystemDirectives: string[] = [];
+    let localeUserDirectives: string[] = [];
+
     if (body.brand_id) {
       const supabase = createSupabaseAdminClient();
 
@@ -112,9 +116,18 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Pr
           userPrompt = userPrompt.replace(/\{\{brand\.tone_of_voice\}\}/g, brand.tone_of_voice || '');
           userPrompt = userPrompt.replace(/\{\{brand\.guardrails\}\}/g, brand.guardrails || '');
           userPrompt = userPrompt.replace(/\{\{brand\.summary\}\}/g, brand.brand_summary || '');
+          userPrompt = userPrompt.replace(/\{\{brand\.language\}\}/g, brand.language || '');
+          userPrompt = userPrompt.replace(/\{\{brand\.country\}\}/g, brand.country || '');
           // For the {{brand}} placeholder, replace with the whole stringified brand object
           if (userPrompt.includes('{{brand}}')) {
              userPrompt = userPrompt.replace(/\{\{brand\}\}/g, JSON.stringify(brand, null, 2));
+          }
+          const locale = createLocaleDirectives(brand.language, brand.country);
+          localeSystemDirectives = locale.systemDirectives;
+          localeUserDirectives = locale.userInstructions;
+
+          if (localeUserDirectives.length > 0) {
+            userPrompt = `${localeUserDirectives.join(' ')}\n\n${userPrompt}`;
           }
         } else {
           if (process.env.NODE_ENV !== 'production') {
@@ -138,6 +151,10 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User): Pr
 
     // Build system prompt with constraints if provided
     let systemPrompt = "You are a helpful assistant. Return plain text only with no quotes, no markdown, no explanations.";
+
+    if (localeSystemDirectives.length > 0) {
+      systemPrompt += ` ${localeSystemDirectives.join(' ')}`;
+    }
     
     // Add maxLength constraint to system prompt if provided
     if (body.options?.maxLength && typeof body.options.maxLength === 'number') {

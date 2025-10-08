@@ -17,6 +17,7 @@ import {
 } from '@/lib/ai/constrained-generation';
 import { TemplateFieldsSchema } from '@/lib/schemas/template';
 import type { Brand } from '@/types/models';
+import { createLocaleDirectives } from '@/lib/utils/locale';
 
 const MAX_TEMPLATE_VALUE_LENGTH = 8000;
 const MAX_EXISTING_OUTPUT_LENGTH = 20000;
@@ -54,11 +55,11 @@ const requestSchema = z.object({
 
 const clampString = (value: string, limit: number) => (value.length > limit ? value.slice(0, limit) : value);
 
-const interpolatePrompt = (
+export const interpolatePrompt = (
   promptText: string,
   templateFieldValues: Record<string, string>,
   existingOutputs: Record<string, string>,
-  brandDetails: Pick<Brand, 'name' | 'brand_identity' | 'tone_of_voice' | 'guardrails'> | null
+  brandDetails: Pick<Brand, 'name' | 'brand_identity' | 'tone_of_voice' | 'guardrails' | 'language' | 'country'> | null
 ): string => {
   let interpolated = promptText;
 
@@ -78,6 +79,8 @@ const interpolatePrompt = (
     interpolated = interpolated.replace(/{{brand\.tone_of_voice}}/g, brandDetails.tone_of_voice ?? '');
     interpolated = interpolated.replace(/{{brand\.guardrails}}/g, brandDetails.guardrails ?? '');
     interpolated = interpolated.replace(/{{brand\.summary}}/g, brandDetails.brand_identity ?? '');
+    interpolated = interpolated.replace(/{{brand\.language}}/g, brandDetails.language ?? '');
+    interpolated = interpolated.replace(/{{brand\.country}}/g, brandDetails.country ?? '');
     interpolated = interpolated.replace(
       /{{brand}}/g,
       JSON.stringify({
@@ -85,6 +88,8 @@ const interpolatePrompt = (
         identity: brandDetails.brand_identity,
         tone_of_voice: brandDetails.tone_of_voice,
         guardrails: brandDetails.guardrails,
+        language: brandDetails.language,
+        country: brandDetails.country,
       })
     );
 
@@ -92,6 +97,8 @@ const interpolatePrompt = (
     interpolated = interpolated.replace(/{{Brand Identity}}/g, brandDetails.brand_identity ?? '');
     interpolated = interpolated.replace(/{{Tone of Voice}}/g, brandDetails.tone_of_voice ?? '');
     interpolated = interpolated.replace(/{{Guardrails}}/g, brandDetails.guardrails ?? '');
+    interpolated = interpolated.replace(/{{Brand Language}}/g, brandDetails.language ?? '');
+    interpolated = interpolated.replace(/{{Brand Country}}/g, brandDetails.country ?? '');
   }
 
   return interpolated;
@@ -292,6 +299,8 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
       country: brandRecord.country ?? 'US',
     };
 
+    const locale = createLocaleDirectives(brandContext.language, brandContext.country);
+
     const baseFieldSpecificInstructions = interpolatePrompt(
       outputFieldToGenerate.aiPrompt,
       templatePlaceholderValues,
@@ -322,6 +331,13 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
     contextualizedUserPrompt += `${INDENT}Adhere to the brand context provided above.\n`;
     contextualizedUserPrompt += `${INDENT}Use the following instructions and input data (if any) to generate the content for this field:\n\n`;
     contextualizedUserPrompt += baseFieldSpecificInstructions;
+
+    if (locale.userInstructions.length > 0) {
+      contextualizedUserPrompt += `\n\nLOCALE REQUIREMENTS:\n`;
+      locale.userInstructions.forEach((instruction) => {
+        contextualizedUserPrompt += `${INDENT}${instruction}\n`;
+      });
+    }
 
     const fieldOptions = outputFieldToGenerate.options || {};
     const constraints: FieldConstraints = {};
@@ -357,7 +373,7 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promis
     }
 
     const enhancedUserPrompt = contextualizedUserPrompt + constraintInstructions;
-    const systemPrompt = `You are an AI assistant specialized in generating specific pieces of marketing content based on detailed instructions and brand context. Your goal is to produce accurate, high-quality text for the requested field ONLY. Do not add conversational fluff or any introductory/concluding remarks beyond the direct content for the field.${constraintInstructions ? ' IMPORTANT: You MUST respect all character and line limits specified.' : ''}`;
+    const systemPrompt = `You are an AI assistant specialized in generating specific pieces of marketing content based on detailed instructions and brand context. Your goal is to produce accurate, high-quality text for the requested field ONLY. Do not add conversational fluff or any introductory/concluding remarks beyond the direct content for the field.${constraintInstructions ? ' IMPORTANT: You MUST respect all character and line limits specified.' : ''}${locale.systemDirectives.length ? ` ${locale.systemDirectives.join(' ')}` : ''}`;
 
     let singleFieldMaxTokens = calculateMaxTokens(constraints.max_length);
     if (!singleFieldMaxTokens) {
