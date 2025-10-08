@@ -16,8 +16,8 @@ import {
   type TemplateField,
 } from '@/lib/ai/constrained-generation';
 import { TemplateFieldsSchema } from '@/lib/schemas/template';
-import type { Brand } from '@/types/models';
 import { createLocaleDirectives } from '@/lib/utils/locale';
+import { interpolatePrompt } from './interpolate-prompt';
 
 const MAX_TEMPLATE_VALUE_LENGTH = 8000;
 const MAX_EXISTING_OUTPUT_LENGTH = 20000;
@@ -54,55 +54,6 @@ const requestSchema = z.object({
 });
 
 const clampString = (value: string, limit: number) => (value.length > limit ? value.slice(0, limit) : value);
-
-export const interpolatePrompt = (
-  promptText: string,
-  templateFieldValues: Record<string, string>,
-  existingOutputs: Record<string, string>,
-  brandDetails: Pick<Brand, 'name' | 'brand_identity' | 'tone_of_voice' | 'guardrails' | 'language' | 'country'> | null
-): string => {
-  let interpolated = promptText;
-
-  Object.entries(templateFieldValues).forEach(([key, value]) => {
-    const placeholder = new RegExp(`{{${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}}}`, 'g');
-    interpolated = interpolated.replace(placeholder, value);
-  });
-
-  Object.entries(existingOutputs).forEach(([key, value]) => {
-    const placeholder = new RegExp(`{{${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}}}`, 'g');
-    interpolated = interpolated.replace(placeholder, value);
-  });
-
-  if (brandDetails) {
-    interpolated = interpolated.replace(/{{brand\.name}}/g, brandDetails.name ?? '');
-    interpolated = interpolated.replace(/{{brand\.identity}}/g, brandDetails.brand_identity ?? '');
-    interpolated = interpolated.replace(/{{brand\.tone_of_voice}}/g, brandDetails.tone_of_voice ?? '');
-    interpolated = interpolated.replace(/{{brand\.guardrails}}/g, brandDetails.guardrails ?? '');
-    interpolated = interpolated.replace(/{{brand\.summary}}/g, brandDetails.brand_identity ?? '');
-    interpolated = interpolated.replace(/{{brand\.language}}/g, brandDetails.language ?? '');
-    interpolated = interpolated.replace(/{{brand\.country}}/g, brandDetails.country ?? '');
-    interpolated = interpolated.replace(
-      /{{brand}}/g,
-      JSON.stringify({
-        name: brandDetails.name,
-        identity: brandDetails.brand_identity,
-        tone_of_voice: brandDetails.tone_of_voice,
-        guardrails: brandDetails.guardrails,
-        language: brandDetails.language,
-        country: brandDetails.country,
-      })
-    );
-
-    interpolated = interpolated.replace(/{{Brand Name}}/g, brandDetails.name ?? '');
-    interpolated = interpolated.replace(/{{Brand Identity}}/g, brandDetails.brand_identity ?? '');
-    interpolated = interpolated.replace(/{{Tone of Voice}}/g, brandDetails.tone_of_voice ?? '');
-    interpolated = interpolated.replace(/{{Guardrails}}/g, brandDetails.guardrails ?? '');
-    interpolated = interpolated.replace(/{{Brand Language}}/g, brandDetails.language ?? '');
-    interpolated = interpolated.replace(/{{Brand Country}}/g, brandDetails.country ?? '');
-  }
-
-  return interpolated;
-};
 
 export const POST = withAuthAndCSRF(async (req: NextRequest, user: User): Promise<Response> => {
   const supabase = createSupabaseAdminClient();

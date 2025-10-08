@@ -476,7 +476,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          brandName: formData.name,
+          name: formData.name.trim(),
           urls: urls,
           country: formData.country,
           language: formData.language
@@ -484,7 +484,13 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: `HTTP error ${response.status}` }));
-        throw new Error(errorData.error || 'Failed to generate brand identity');
+        let detailMsg = '';
+        if (Array.isArray(errorData.details) && errorData.details.length) {
+          detailMsg = ` (${errorData.details.join(' | ')})`;
+        } else if (typeof errorData.details === 'string' && errorData.details.trim()) {
+          detailMsg = ` (${errorData.details})`;
+        }
+        throw new Error((errorData.error || 'Failed to generate brand identity') + detailMsg);
       }
       const data = await response.json();
       if (data.success && data.data) {
@@ -493,10 +499,19 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
           ...prev,
           brand_identity: data.data.brandIdentity || prev.brand_identity,
           tone_of_voice: data.data.toneOfVoice || prev.tone_of_voice,
-          guardrails: data.data.guardrails || prev.guardrails,
           content_vetting_agencies: Array.from(new Set([...prev.content_vetting_agencies, ...generatedAgencies])),
           brand_color: data.data.brandColor || prev.brand_color
         }));
+        if (Array.isArray(data.data.scrapeWarnings) && data.data.scrapeWarnings.length) {
+          toast.warning('Some URLs could not be processed completely.', {
+            description: data.data.scrapeWarnings.join('\n').slice(0, 400),
+          });
+        }
+        if (Array.isArray(data.data.normalizationWarnings) && data.data.normalizationWarnings.length) {
+          toast.warning('Some URLs were reformatted automatically.', {
+            description: data.data.normalizationWarnings.join('\n').slice(0, 400),
+          });
+        }
         if (unmatched.length > 0) {
           toast.info('Some suggested vetting agencies were not recognised and were skipped.', {
             description: unmatched.join(', ')

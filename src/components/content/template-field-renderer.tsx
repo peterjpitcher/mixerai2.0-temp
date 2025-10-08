@@ -6,8 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Sparkles, Loader2 } from 'lucide-react';
-import { QuillEditor } from './quill-editor';
-import 'quill/dist/quill.snow.css';
+import { RichTextEditor } from './rich-text-editor';
 import { ProductSelect } from './product-select';
 import { RecipeUrlField } from './recipe-url-field';
 import { SlugInput } from '@/components/ui/slug-input';
@@ -80,7 +79,7 @@ export function TemplateFieldRenderer({
       case 'richText':
         const richTextOptions = field.options as RichTextOptions;
         return (
-          <QuillEditor
+          <RichTextEditor
             value={value}
             onChange={(content) => onChange(field.id, content)}
             placeholder={richTextOptions?.placeholder}

@@ -2,11 +2,10 @@
 
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { QuillEditor } from './quill-editor';
+import { RichTextEditor } from './rich-text-editor';
 import { RefreshCw, AlertCircle } from 'lucide-react';
 import type { OutputField, RichTextOptions, NormalizedContent } from '@/types/template';
 import { ensureNormalizedContent } from '@/lib/content/html-normalizer';
-import 'quill/dist/quill.snow.css';
 
 interface GeneratedContentPreviewProps {
   generatedOutputs: Record<string, NormalizedContent>;
@@ -71,12 +70,13 @@ export function GeneratedContentPreview({
             </div>
             
             {isRich ? (
-              <QuillEditor
+              <RichTextEditor
                 key={`${field.id}-${value?.html?.length ?? value?.plain?.length ?? 0}`} // Force remount on content changes
                 value={value?.html ?? ''}
                 onChange={(content) => onOutputChange(field.id, ensureNormalizedContent(content, field.type))}
                 placeholder="Generated content will appear here"
-                allowImages={(field.options as RichTextOptions)?.allowImages === true} // Only allow images if explicitly enabled
+                allowImages={(field.options as RichTextOptions)?.allowImages === true}
+                minHeight={180}
               />
             ) : (
               <div className={`p-4 border rounded-md ${hasContent ? 'bg-muted/50' : 'bg-amber-50/50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800'}`}>
