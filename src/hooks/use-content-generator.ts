@@ -136,8 +136,16 @@ export function useContentGenerator(templateId?: string | null) {
   
   // Update displayable brands when data changes
   useEffect(() => {
-    if (!initialDataLoaded || !templateId || workflowsForCurrentTemplate.length === 0) {
+    if (!initialDataLoaded || !templateId) {
       setDisplayableBrands(allBrands);
+      return;
+    }
+
+    if (workflowsForCurrentTemplate.length === 0) {
+      setDisplayableBrands([]);
+      if (selectedBrand) {
+        setSelectedBrand('');
+      }
       return;
     }
     

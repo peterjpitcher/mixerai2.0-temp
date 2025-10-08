@@ -20,7 +20,8 @@ const allowlistedHosts = new Set(rawAllowlist);
 
 function isHostAllowlisted(hostname: string): boolean {
   if (!allowlistedHosts.size) {
-    return false;
+    console.warn('[proxy] PROXY_ALLOWED_HOSTS not set; allowing all outbound proxy requests. Set this env var to enforce an allowlist.');
+    return true;
   }
 
   const host = hostname.toLowerCase();
