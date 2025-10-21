@@ -12,6 +12,12 @@ function getSupabaseBrowserClient() {
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      'Supabase client could not be initialised because NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY is missing.'
+    );
+  }
   
   supabaseBrowserClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
@@ -56,7 +62,13 @@ export const createSupabaseClient = () => {
 export const createSupabaseAdminClient = () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  
+
+  if (!supabaseUrl || !supabaseServiceRole) {
+    throw new Error(
+      'Supabase admin client could not be initialised because NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing.'
+    );
+  }
+
   // Ensure we're in a server context when using service role
   if (typeof window !== 'undefined') {
     console.error('Attempted to use service role in client context! This is a security risk.');

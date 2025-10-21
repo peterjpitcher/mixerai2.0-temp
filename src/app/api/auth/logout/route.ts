@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { signOut } from '@/lib/auth/session-manager';
 
+export const runtime = 'nodejs';
+
 export const POST = withAuthAndCSRF(async (_req: NextRequest, user) => {
   try {
     // Sign out and invalidate all sessions

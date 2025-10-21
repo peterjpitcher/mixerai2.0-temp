@@ -8,58 +8,107 @@ import { MostAgedContent } from '@/components/dashboard/most-aged-content';
 import { TasksSkeleton } from '@/components/dashboard/dashboard-skeleton';
 import { MyTasks } from '@/components/dashboard/my-tasks';
 
-async function getTeamActivity(supabase: SupabaseClient, profile: { role?: string; assigned_brands?: string[] } | null) { // TODO: Type as SupabaseClient<Database> when types are regenerated
-  if (!profile) return [];
+type DashboardProfile = { role?: string; assigned_brands?: string[] } | null;
 
-  let query = supabase
-    .from('content')
-    .select(`
-      id,
-      created_at,
-      title,
-      status,
-      created_by,
-      brand_id,
-      profiles ( id, full_name, avatar_url )
-    `);
-
-  if (profile.role !== 'admin') {
-    if (!profile.assigned_brands || profile.assigned_brands.length === 0) return [];
-    query = query.in('brand_id', profile.assigned_brands);
+async function getTeamActivity(
+  supabase: SupabaseClient,
+  profile: DashboardProfile,
+  limit = 30
+) {
+  if (!profile) {
+    return { activity: [], hasMore: false };
   }
-    
-  const { data, error } = await query
+
+  const isAdmin = profile.role === 'admin';
+  const assignedBrands = isAdmin ? [] : profile.assigned_brands ?? [];
+  if (!isAdmin && assignedBrands.length === 0) {
+    return { activity: [], hasMore: false };
+  }
+
+  const allProfiles = new Map<string, { id: string; full_name: string | null; avatar_url: string | null }>();
+
+  const baseQuery = supabase
+    .from('content')
+    .select(
+      `
+        id,
+        created_at,
+        title,
+        status,
+        created_by,
+        brand_id
+      `,
+      { count: 'exact' }
+    );
+
+  const query = !isAdmin
+    ? baseQuery.in('brand_id', assignedBrands)
+    : baseQuery;
+
+  const { data, error, count } = await query
     .order('created_at', { ascending: false })
-    .limit(30);
+    .range(0, limit);
 
   if (error) {
     console.error('Error fetching team activity:', error);
-    return [];
+    return { activity: [], hasMore: false };
   }
 
-  return (data || []).map((item) => ({
+  const userIds = Array.from(
+    new Set((data ?? []).map(item => item.created_by).filter(Boolean) as string[])
+  );
+
+  if (userIds.length) {
+    const { data: profilesData, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url')
+      .in('id', userIds);
+
+    if (!profilesError && Array.isArray(profilesData)) {
+      profilesData.forEach(profileRecord => {
+        allProfiles.set(profileRecord.id, {
+          id: profileRecord.id,
+          full_name: profileRecord.full_name ?? null,
+          avatar_url: profileRecord.avatar_url ?? null,
+        });
+      });
+    }
+  }
+
+  const activity = (data || []).map((item) => ({
     id: item.id,
     type: item.status === 'draft' ? 'content_created' as const : 'content_updated' as const,
     created_at: item.created_at || new Date().toISOString(),
-    user: (() => {
-      const rawProfile = (item as any).profiles;
-      const profileRecord = Array.isArray(rawProfile) ? rawProfile?.[0] : rawProfile;
-      return {
-        id: profileRecord?.id ?? '',
-        full_name: profileRecord?.full_name ?? null,
-        avatar_url: profileRecord?.avatar_url ?? null,
-      };
-    })(),
+    user: allProfiles.get(item.created_by as string) ?? {
+      id: item.created_by as string,
+      full_name: null,
+      avatar_url: null,
+    },
     target: {
       id: item.id,
-      name: item.title,
+      name: item.title ?? 'Untitled content',
       type: 'content' as const,
     },
   }));
+
+  return {
+    activity,
+    hasMore: typeof count === 'number' ? activity.length < count : false,
+  };
 }
 
-async function getMostAgedContent(supabase: SupabaseClient<any>, profile: { role?: string; assigned_brands?: string[] } | null) { // TODO: Type as SupabaseClient<Database> when types are regenerated
+async function getMostAgedContent(
+  supabase: SupabaseClient<any>,
+  profile: DashboardProfile,
+  limit = 5
+) {
   if (!profile) return [];
+
+  const isAdmin = profile.role === 'admin';
+  const assignedBrands = isAdmin ? [] : profile.assigned_brands ?? [];
+  if (!isAdmin && assignedBrands.length === 0) {
+    return [];
+  }
 
   const now = new Date();
   const staleThreshold = new Date(now);
@@ -70,9 +119,8 @@ async function getMostAgedContent(supabase: SupabaseClient<any>, profile: { role
     .select('id, title, updated_at, created_at, due_date, status, brand_id, brands ( name, brand_color, logo_url )')
     .in('status', ['draft', 'pending_review']);
 
-  if (profile.role !== 'admin') {
-    if (!profile.assigned_brands || profile.assigned_brands.length === 0) return [];
-    query = query.in('brand_id', profile.assigned_brands);
+  if (!isAdmin) {
+    query = query.in('brand_id', assignedBrands);
   }
 
   query = query.or(
@@ -81,7 +129,7 @@ async function getMostAgedContent(supabase: SupabaseClient<any>, profile: { role
 
   const { data, error } = await query
     .order('updated_at', { ascending: true, nullsFirst: true })
-    .limit(50);
+    .limit(limit * 3); // fetch a few extra so we can filter client-side
 
   if (error) {
     console.error('Error fetching most aged content:', error);
@@ -127,7 +175,7 @@ async function getMostAgedContent(supabase: SupabaseClient<any>, profile: { role
 
       acc.push({
         ...rest,
-        brands: brands as any, // TODO: Remove type assertion when types are regenerated
+        brands: brands as any,
         isOverdue,
         isStale,
         stalledSince,
@@ -136,7 +184,7 @@ async function getMostAgedContent(supabase: SupabaseClient<any>, profile: { role
       return acc;
     }, [])
     .sort((a, b) => new Date(a.stalledSince).getTime() - new Date(b.stalledSince).getTime())
-    .slice(0, 5);
+    .slice(0, limit);
 
   return processed;
 }
@@ -159,7 +207,7 @@ export default async function DashboardPage() {
   }
   
   // Fetch data in parallel
-  const [teamActivity, mostAgedContent] = await Promise.all([
+  const [{ activity: teamActivity, hasMore }, mostAgedContent] = await Promise.all([
     getTeamActivity(supabase, profile),
     getMostAgedContent(supabase, profile),
   ]);
@@ -191,10 +239,15 @@ export default async function DashboardPage() {
         
         {/* Right Column - Team Activity (Condensed, Full Height) */}
         <div className="lg:col-span-1">
-          <div className="lg:sticky lg:top-24 lg:h-[calc(100vh-6rem)]">
+          <div className="lg:sticky lg:top-24 lg:h-[calc(100vh-6rem)] space-y-4">
             <Suspense fallback={<TasksSkeleton />}>
-              <TeamActivityFeed initialActivity={teamActivity} condensed={true} />
+              <TeamActivityFeed initialActivity={teamActivity} condensed />
             </Suspense>
+            {hasMore && (
+              <div className="text-center text-xs text-muted-foreground">
+                Showing the latest {teamActivity.length} activities. Visit the activity log for more.
+              </div>
+            )}
           </div>
         </div>
       </div>

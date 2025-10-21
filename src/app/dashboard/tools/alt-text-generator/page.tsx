@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Loader2, ClipboardCopy, Image as ImageIcon, ArrowLeft, AlertTriangle, ExternalLink, Languages, History } from 'lucide-react';
+import { Loader2, ClipboardCopy, Image as ImageIcon, ArrowLeft, AlertTriangle, ExternalLink, Languages, History, ShieldAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -30,7 +30,8 @@ import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { apiFetch } from '@/lib/api-client';
-
+import { useToolAccess } from '../use-tool-access';
+import { useToolHistory } from '../use-tool-history';
 
 interface AltTextResultItem {
   imageUrl: string;
@@ -39,19 +40,6 @@ interface AltTextResultItem {
 }
 
 // Define UserSessionData interface
-interface UserSessionData {
-  id: string;
-  email?: string;
-  user_metadata?: {
-    role?: string; 
-    full_name?: string;
-  };
-  brand_permissions?: Array<{
-    brand_id: string;
-    role: string; 
-  }>;
-}
-
 // Re-usable definitions (could be moved to a shared utils file)
 const supportedLanguages = [
   { code: 'en', name: 'English' },
@@ -118,6 +106,30 @@ interface EnhancedHistoryItem extends ToolRunHistoryItem {
   domain?: string;
 }
 
+const HISTORY_PAGE_SIZE = 20;
+
+const SessionErrorState = ({ message, onRetry }: { message: string; onRetry: () => void }) => (
+  <div className="flex flex-col items-center justify-center min-h-[300px] py-10 text-center">
+    <AlertTriangle className="mb-4 h-16 w-16 text-destructive" />
+    <h3 className="text-xl font-bold mb-2">Unable to verify your access</h3>
+    <p className="text-muted-foreground mb-4 max-w-md">{message}</p>
+    <Button onClick={onRetry}>Try Again</Button>
+  </div>
+);
+
+const AccessDeniedState = ({ message }: { message?: string }) => (
+  <div className="flex flex-col items-center justify-center min-h-[300px] py-10 text-center">
+    <ShieldAlert className="mb-4 h-16 w-16 text-destructive" />
+    <h3 className="text-xl font-bold mb-2">Access Denied</h3>
+    <p className="text-muted-foreground mb-4 max-w-md">
+      {message || 'You do not have permission to use this tool.'}
+    </p>
+    <Button variant="outline" onClick={() => window.location.href = '/dashboard/tools'}>
+      Return to Tools
+    </Button>
+  </div>
+);
+
 const getDomainFromUrl = (url: string): string => {
   try {
     if (url.startsWith('data:')) return 'data:image';
@@ -168,64 +180,27 @@ export default function AltTextGeneratorPage() {
   const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
   const router = useRouter();
 
-  // RBAC State
-  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true); // For user session loading
-  const [userError, setUserError] = useState<string | null>(null);
-  const [isAllowedToAccess, setIsAllowedToAccess] = useState<boolean>(false);
-  const [isCheckingPermissions, setIsCheckingPermissions] = useState<boolean>(true);
+  const {
+    isLoading: isLoadingSession,
+    isFetching: isFetchingSession,
+    error: sessionError,
+    status: sessionStatus,
+    hasAccess,
+    refetch: refetchSession,
+  } = useToolAccess();
 
-  // History State
-  const [, setRunHistory] = useState<ToolRunHistoryItem[]>([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [historyError, setHistoryError] = useState<string | null>(null);
-  const [enhancedHistory, setEnhancedHistory] = useState<EnhancedHistoryItem[]>([]);
-
-  // Fetch current user
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      setIsLoadingUser(true);
-      setUserError(null);
-      try {
-        const response = await fetch('/api/me');
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch user session' }));
-          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        if (data.success && data.user) {
-          setCurrentUser(data.user);
-        } else {
-          setCurrentUser(null);
-          setUserError(data.error || 'User data not found in session.');
-        }
-      } catch (error) {
-        console.error('[AltTextGeneratorPage] Error fetching current user:', error);
-        setCurrentUser(null);
-        setUserError((error as Error).message || 'An unexpected error occurred while fetching user data.');
-      } finally {
-        setIsLoadingUser(false);
-      }
-    };
-    fetchCurrentUser();
-  }, []);
-
-  // Check permissions
-  useEffect(() => {
-    if (!isLoadingUser && currentUser) {
-      setIsCheckingPermissions(true);
-      const userRole = currentUser.user_metadata?.role;
-      if (userRole === 'admin' || userRole === 'editor') {
-        setIsAllowedToAccess(true);
-      } else {
-        setIsAllowedToAccess(false);
-      }
-      setIsCheckingPermissions(false);
-    } else if (!isLoadingUser && !currentUser) {
-      setIsAllowedToAccess(false);
-      setIsCheckingPermissions(false);
-    }
-  }, [currentUser, isLoadingUser]);
+  const {
+    items: enhancedHistory,
+    isLoading: isLoadingHistory,
+    error: historyError,
+    hasMore: hasMoreHistory,
+    loadMore: loadMoreHistory,
+    refresh: refreshHistory,
+  } = useToolHistory<EnhancedHistoryItem>('alt_text_generator', {
+    enabled: hasAccess,
+    pageSize: HISTORY_PAGE_SIZE,
+    transform: enhanceHistory,
+  });
 
   useEffect(() => {
     const firstUrl = imageUrlsInput.split(/\s+/).map(u => u.trim()).find(u => {
@@ -243,42 +218,6 @@ export default function AltTextGeneratorPage() {
         setSelectedLanguage('en');
     }
   }, [imageUrlsInput]);
-
-  // Fetch Run History
-  useEffect(() => {
-    const fetchHistory = async () => {
-      if (!currentUser || !isAllowedToAccess) return;
-
-      setIsLoadingHistory(true);
-      setHistoryError(null);
-      try {
-        const response = await fetch('/api/me/tool-run-history?tool_name=alt_text_generator');
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch history' }));
-          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        if (data.success && data.history) {
-          setRunHistory(data.history);
-          const enhanced = enhanceHistory(data.history);
-          setEnhancedHistory(enhanced);
-        } else {
-          setRunHistory([]);
-          setEnhancedHistory([]);
-          setHistoryError(data.error || 'History data not found.');
-        }
-      } catch (error) {
-        console.error('[AltTextGeneratorPage] Error fetching run history:', error);
-        setRunHistory([]);
-        setHistoryError((error as Error).message || 'An unexpected error occurred while fetching history.');
-      } finally {
-        setIsLoadingHistory(false);
-      }
-    };
-
-    fetchHistory();
-  }, [currentUser, isAllowedToAccess]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -375,35 +314,8 @@ export default function AltTextGeneratorPage() {
     }
 
     // After successful or failed run, refetch history
-    if (currentUser && isAllowedToAccess) {
-        const fetchHistory = async () => {
-            setIsLoadingHistory(true);
-            setHistoryError(null);
-            try {
-                const response = await fetch('/api/me/tool-run-history?tool_name=alt_text_generator');
-                if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: 'Failed to fetch history' }));
-                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                if (data.success && data.history) {
-                setRunHistory(data.history);
-                const enhanced = enhanceHistory(data.history);
-                setEnhancedHistory(enhanced);
-                } else {
-                setRunHistory([]);
-                setEnhancedHistory([]);
-                setHistoryError(data.error || 'History data not found.');
-                }
-            } catch (error) {
-                console.error('[AltTextGeneratorPage] Error fetching run history post-submit:', error);
-                setRunHistory([]);
-                setHistoryError((error as Error).message || 'An unexpected error occurred while fetching history.');
-            } finally {
-                setIsLoadingHistory(false);
-            }
-        };
-        fetchHistory();
+    if (hasAccess) {
+      refreshHistory();
     }
   };
 
@@ -425,45 +337,25 @@ export default function AltTextGeneratorPage() {
   };
 
 
-  // --- Loading and Access Denied States ---
-  if (isLoadingUser || isCheckingPermissions) {
+  const isSessionLoading = isLoadingSession || isFetchingSession;
+
+  if (isSessionLoading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-8 w-1/3 mb-4" /> {/* Breadcrumbs skeleton */}
-        <Skeleton className="h-12 w-1/2 mb-2" /> {/* Page title skeleton */}
-        <Skeleton className="h-6 w-3/4 mb-6" /> {/* Page description skeleton */}
-        <Card>
-          <CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-10 w-1/3" />
-          </CardContent>
-        </Card>
+        <Skeleton className="h-8 w-1/3 mb-4" />
+        <Skeleton className="h-12 w-1/2 mb-2" />
+        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-48 w-full" />
       </div>
     );
   }
 
-  if (userError) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
-        <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
-        <p className="text-destructive-foreground">Error loading user data: {userError}</p>
-        <Button variant="outline" onClick={() => router.push('/dashboard')} className="mt-4">Go to Dashboard</Button>
-      </div>
-    );
+  if (sessionError && sessionStatus !== 403) {
+    return <SessionErrorState message={sessionError} onRetry={() => refetchSession()} />;
   }
-  
-  if (!isAllowedToAccess) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
-        <AlertTriangle className="h-16 w-16 text-destructive mb-4" /> {/* Changed icon to AlertTriangle for consistency */}
-        <h3 className="text-xl font-semibold mb-2">Access Denied</h3>
-        <p className="text-muted-foreground text-center mb-6">You do not have permission to access the Alt Text Generator.</p>
-        <Link href="/dashboard/tools" passHref>
-          <Button variant="outline">Back to Tools</Button>
-        </Link>
-      </div>
-    );
+
+  if (!hasAccess) {
+    return <AccessDeniedState message={sessionStatus === 403 ? sessionError ?? undefined : undefined} />;
   }
   // --- Main Page Content ---
   return (
@@ -819,6 +711,13 @@ export default function AltTextGeneratorPage() {
                   ))}
                 </TableBody>
               </Table>
+            )}
+            {hasMoreHistory && !isLoadingHistory && (
+              <div className="mt-4 flex justify-center">
+                <Button variant="outline" onClick={loadMoreHistory}>
+                  Load More
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>

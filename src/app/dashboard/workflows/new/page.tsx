@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { BrandIcon } from '@/components/brand-icon';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { apiFetch } from '@/lib/api-client';
+import { useCurrentUser } from '@/hooks/use-common-data';
 
 /**
  * NewWorkflowPage allows users to create a new content approval workflow.
@@ -27,19 +28,6 @@ import { apiFetch } from '@/lib/api-client';
  * description, assigned role, approval requirements, and user assignees by email.
  * This page currently uses mock data for brand selection.
  */
-
-interface UserSessionData {
-  id: string;
-  email?: string;
-  user_metadata?: {
-    role?: string; 
-    full_name?: string;
-  };
-  brand_permissions?: Array<{
-    brand_id: string;
-    role: string; 
-  }>;
-}
 
 interface Brand {
   id: string;
@@ -140,8 +128,11 @@ export default function NewWorkflowPage() {
 
   const [stepDescLoading, setStepDescLoading] = useState<Record<number, boolean>>({});
 
-  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const {
+    data: currentUser,
+    isLoading: isLoadingUser,
+    error: currentUserError,
+  } = useCurrentUser();
 
   const [workflow, setWorkflow] = useState<WorkflowData>(() => ({ 
     name: '',
@@ -167,32 +158,9 @@ export default function NewWorkflowPage() {
   const [assigneeInputs, setAssigneeInputs] = useState<string[]>(() => new Array(workflow.steps.length).fill(''));
   const [userSearchResults, setUserSearchResults] = useState<Record<number, UserOption[]>>({});
   const [userSearchLoading, setUserSearchLoading] = useState<Record<number, boolean>>({});
+  const userSearchControllers = useRef<Record<number, AbortController>>({});
   
   
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      setIsLoadingUser(true);
-      try {
-        const response = await fetch('/api/me');
-        if (!response.ok) throw new Error('Failed to fetch user session');
-        const data = await response.json();
-        if (data.success && data.user) {
-          setCurrentUser(data.user);
-        } else {
-          setCurrentUser(null);
-          toast.error(data.error || 'Could not verify your session.');
-        }
-      } catch (err) {
-        console.error('Error fetching current user:', err);
-        setCurrentUser(null);
-        toast.error('Error fetching user data: ' + (err as Error).message);
-      } finally {
-        setIsLoadingUser(false);
-      }
-    };
-    fetchCurrentUser();
-  }, []);
-
   const isGlobalAdmin = currentUser?.user_metadata?.role === 'admin';
   
   const hasAnyBrandAdminPermission = currentUser?.brand_permissions?.some(p => p.role === 'admin');
@@ -200,77 +168,117 @@ export default function NewWorkflowPage() {
   const canAccessPage = isGlobalAdmin || hasAnyBrandAdminPermission;
 
   useEffect(() => {
-    if (isLoadingUser) return; 
-
-    if (!canAccessPage) {
-      setIsLoading(false); 
-      // Redirect or show access denied message.
-      // router.push('/dashboard'); // Example redirect
-      // toast.error("You don't have permission to create workflows.");
+    if (isLoadingUser) {
       return;
     }
+
+    if (currentUserError) {
+      setIsLoading(false);
+      setAllFetchedBrands([]);
+      setContentTemplates([]);
+      return;
+    }
+
+    if (!canAccessPage) {
+      setIsLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const isAbortError = (error: unknown) =>
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      (error as { name?: string }).name === 'AbortError';
 
     const fetchInitialData = async () => {
       setIsLoading(true);
       try {
-        const brandsResponse = await fetch('/api/brands');
-        if (!brandsResponse.ok) throw new Error(`Failed to fetch brands: ${brandsResponse.status}`);
+        const [brandsResponse, templatesResponse] = await Promise.all([
+          apiFetch('/api/brands', { cache: 'no-store', signal: controller.signal }),
+          apiFetch('/api/content-templates', { cache: 'no-store', signal: controller.signal }),
+        ]);
+
         const brandsData = await brandsResponse.json();
-        if (!brandsData.success) throw new Error(brandsData.error || 'Failed to process brands data');
-        const fetchedBrandsFromApi = brandsData.data || [];
-        setAllFetchedBrands(fetchedBrandsFromApi);
+        if (!brandsData.success) {
+          throw new Error(brandsData.error || 'Failed to process brands data');
+        }
+        setAllFetchedBrands(Array.isArray(brandsData.data) ? brandsData.data : []);
 
-        const templatesResponse = await fetch('/api/content-templates');
-        if (!templatesResponse.ok) throw new Error(`Failed to fetch content templates: ${templatesResponse.status}`);
         const templatesData = await templatesResponse.json();
-        if (!templatesData.success) throw new Error(templatesData.error || 'Failed to fetch content templates data');
-        console.log('Fetched templates:', templatesData.templates);
+        if (!templatesData.success) {
+          throw new Error(templatesData.error || 'Failed to fetch content templates data');
+        }
         setContentTemplates(Array.isArray(templatesData.templates) ? templatesData.templates : []);
-
       } catch (error) {
+        if (isAbortError(error)) {
+          return;
+        }
         console.error('Error fetching initial data for new workflow page:', error);
         toast.error((error as Error).message || 'Failed to load initial data.');
       } finally {
-        setIsLoading(false); 
+        setIsLoading(false);
       }
     };
-    fetchInitialData();
-  }, [isLoadingUser, canAccessPage, router]);
+
+    void fetchInitialData();
+
+    return () => controller.abort();
+  }, [isLoadingUser, canAccessPage, currentUserError]);
 
 
   useEffect(() => {
-    if (isLoadingUser || !currentUser) return;
+    if (isLoadingUser || currentUserError) {
+      return;
+    }
+    if (!currentUser) {
+      return;
+    }
 
     let userSpecificBrands: Brand[];
     if (isGlobalAdmin) {
       userSpecificBrands = allFetchedBrands;
     } else {
-      const adminBrandIds = currentUser?.brand_permissions
-                              ?.filter(p => p.role === 'admin')
-                              .map(p => p.brand_id) || [];
-      userSpecificBrands = allFetchedBrands.filter(brand => adminBrandIds.includes(brand.id));
-    }
-    setBrands(userSpecificBrands);
-    
-    if (userSpecificBrands.length > 0 && !workflow.brand_id) {
-      setWorkflow(prev => ({ ...prev, brand_id: userSpecificBrands[0].id }));
-    } else if (userSpecificBrands.length === 0 && !isGlobalAdmin) {
-       toast.info("You are not an administrator for any brands. Please contact an administrator to gain access.", { duration: 5000 });
+      const adminBrandIds =
+        currentUser.brand_permissions
+          ?.filter((permission) => permission.role === 'admin')
+          .map((permission) => permission.brand_id) ?? [];
+      userSpecificBrands = allFetchedBrands.filter((brand) => adminBrandIds.includes(brand.id));
     }
 
-  }, [isLoadingUser, currentUser, allFetchedBrands, isGlobalAdmin, workflow.brand_id]);
+    setBrands(userSpecificBrands);
+
+    if (userSpecificBrands.length > 0 && !workflow.brand_id) {
+      setWorkflow((prev) => ({ ...prev, brand_id: userSpecificBrands[0].id }));
+    } else if (userSpecificBrands.length === 0 && !isGlobalAdmin) {
+      toast.info(
+        "You are not an administrator for any brands. Please contact an administrator to gain access.",
+        { duration: 5000 }
+      );
+    }
+  }, [isLoadingUser, currentUser, allFetchedBrands, isGlobalAdmin, workflow.brand_id, currentUserError]);
 
   // Fetch workflows for the selected brand
   useEffect(() => {
     if (!workflow.brand_id) {
-      setBrandWorkflows([]); // Clear if no brand is selected
+      setBrandWorkflows([]);
       return;
     }
+
+    const controller = new AbortController();
+    const isAbortError = (error: unknown) =>
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      (error as { name?: string }).name === 'AbortError';
+
     const fetchBrandWorkflows = async () => {
       setIsLoadingBrandWorkflows(true);
       try {
-        const response = await fetch(`/api/workflows?brand_id=${workflow.brand_id}`);
-        if (!response.ok) throw new Error('Failed to fetch workflows for brand');
+        const response = await apiFetch(`/api/workflows?brand_id=${workflow.brand_id}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
         const data = await response.json();
         if (data.success && Array.isArray(data.data)) {
           setBrandWorkflows(data.data);
@@ -279,6 +287,9 @@ export default function NewWorkflowPage() {
           toast.error(data.error || 'Could not load workflows for the selected brand.');
         }
       } catch (error) {
+        if (isAbortError(error)) {
+          return;
+        }
         console.error('Error fetching brand workflows:', error);
         toast.error((error as Error).message || 'Failed to load workflows for brand.');
         setBrandWorkflows([]);
@@ -286,7 +297,10 @@ export default function NewWorkflowPage() {
         setIsLoadingBrandWorkflows(false);
       }
     };
-    fetchBrandWorkflows();
+
+    void fetchBrandWorkflows();
+
+    return () => controller.abort();
   }, [workflow.brand_id]);
 
   // Memoize available content templates
@@ -304,35 +318,76 @@ export default function NewWorkflowPage() {
     return contentTemplates.filter(template => !usedTemplateIds.has(template.id));
   }, [contentTemplates, brandWorkflows, workflow.brand_id, isLoadingBrandWorkflows]);
 
-  const debouncedUserSearch = useCallback(
-    (searchTerm: string, stepIndex: number) => {
-      const debouncedFn = debounce(async (term: string, index: number) => {
-        if (term.trim().length < 2) {
-          setUserSearchResults(prev => ({ ...prev, [index]: [] }));
+  const performUserSearch = useCallback(
+    async (searchTerm: string, stepIndex: number) => {
+      const normalized = searchTerm.trim();
+
+      if (normalized.length < 2) {
+        setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
+        setUserSearchLoading(prev => ({ ...prev, [stepIndex]: false }));
+        return;
+      }
+
+      if (userSearchControllers.current[stepIndex]) {
+        userSearchControllers.current[stepIndex].abort();
+      }
+
+      const controller = new AbortController();
+      userSearchControllers.current[stepIndex] = controller;
+
+      setUserSearchLoading(prev => ({ ...prev, [stepIndex]: true }));
+
+      try {
+        const response = await apiFetch(
+          `/api/users/search?query=${encodeURIComponent(normalized)}`,
+          {
+            cache: 'no-store',
+            signal: controller.signal,
+          }
+        );
+        const data = await response.json();
+        if (data.success && Array.isArray(data.users)) {
+          setUserSearchResults(prev => ({ ...prev, [stepIndex]: data.users }));
+        } else {
+          setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
+          if (data?.error) {
+            toast.error(data.error);
+          }
+        }
+      } catch (error) {
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          'name' in error &&
+          (error as { name?: string }).name === 'AbortError'
+        ) {
           return;
         }
-        setUserSearchLoading(prev => ({ ...prev, [index]: true }));
-        try {
-          const response = await fetch(`/api/users/search?query=${encodeURIComponent(term)}`);
-          const data = await response.json();
-          if (data.success) {
-            setUserSearchResults(prev => ({ ...prev, [index]: data.users }));
-          } else {
-            setUserSearchResults(prev => ({ ...prev, [index]: [] }));
-            // Optionally toast an error: toast.error(`Search failed: ${data.error}`);
-          }
-        } catch (error) {
-          console.error('User search error:', error);
-          setUserSearchResults(prev => ({ ...prev, [index]: [] }));
-          // Optionally toast an error: toast.error('Failed to search users.');
-        } finally {
-          setUserSearchLoading(prev => ({ ...prev, [index]: false }));
-        }
-      }, 300);
-      debouncedFn(searchTerm, stepIndex);
+        console.error('User search error:', error);
+        setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
+        toast.error((error as Error).message || 'Failed to search users.');
+      } finally {
+        setUserSearchLoading(prev => ({ ...prev, [stepIndex]: false }));
+      }
     },
     []
   );
+
+  const debouncedUserSearch = useMemo(
+    () =>
+      debounce((term: string, stepIndex: number) => {
+        void performUserSearch(term, stepIndex);
+      }, 300),
+    [performUserSearch]
+  );
+
+  useEffect(() => {
+    const controllersRef = userSearchControllers.current;
+    return () => {
+      debouncedUserSearch.cancel();
+      Object.values(controllersRef).forEach(controller => controller.abort());
+    };
+  }, [debouncedUserSearch]);
 
   const handleAssigneeInputChange = (stepIndex: number, value: string) => {
     setAssigneeInputs(prev => {
@@ -343,6 +398,11 @@ export default function NewWorkflowPage() {
     if (value.trim()) {
       debouncedUserSearch(value, stepIndex);
     } else {
+      if (userSearchControllers.current[stepIndex]) {
+        userSearchControllers.current[stepIndex].abort();
+        delete userSearchControllers.current[stepIndex];
+      }
+      setUserSearchLoading(prev => ({ ...prev, [stepIndex]: false }));
       setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] })); // Clear results if input is empty
     }
   };
@@ -683,6 +743,24 @@ export default function NewWorkflowPage() {
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
         <p className="text-muted-foreground mt-4">Loading user data...</p>
+      </div>
+    );
+  }
+
+  if (currentUserError) {
+    const message =
+      currentUserError instanceof Error
+        ? currentUserError.message
+        : 'Unable to verify your permissions. Please try again later.';
+
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
+        <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
+        <h3 className="text-xl font-semibold mb-2">Session Error</h3>
+        <p className="text-muted-foreground text-center mb-6">{message}</p>
+        <Link href="/dashboard" passHref>
+          <Button variant="outline">Back to Dashboard</Button>
+        </Link>
       </div>
     );
   }

@@ -11,8 +11,6 @@ import { formatDate } from '@/lib/utils/date';
 import { useDebounce } from '@/lib/hooks/use-debounce';
 import { useSearchParams } from 'next/navigation';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { createBrowserClient } from '@supabase/ssr';
-
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandDisplay } from '@/components/ui/brand-display'; 
 import { FileText, AlertTriangle, RefreshCw, CheckCircle, XCircle, ListFilter, Archive, Trash2, HelpCircle, MoreVertical, Pencil } from 'lucide-react';
@@ -27,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { DueDateIndicator } from '@/components/ui/due-date-indicator';
 import { apiFetch } from '@/lib/api-client';
+import { useCurrentUser } from '@/hooks/use-common-data';
 
 // Define types
 type ContentFilterStatus = 'active' | 'approved' | 'rejected' | 'all';
@@ -57,22 +56,6 @@ interface ContentItem {
 }
 
 // Define UserSessionData interface (mirroring what /api/me is expected to return)
-interface UserSessionData {
-  id: string;
-  email?: string;
-  user_metadata?: {
-    role?: string; 
-    full_name?: string;
-    avatar_url?: string;
-  };
-  brand_permissions?: Array<{
-    brand_id: string;
-    role: string; 
-  }>;
-  avatar_url?: string; 
-  full_name?: string; 
-}
-
 // Placeholder Breadcrumbs component
 const Breadcrumbs = ({ items }: { items: { label: string, href?: string }[] }) => (
   <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted-foreground">
@@ -103,53 +86,18 @@ export default function ContentPageClient() {
   const searchParams = useSearchParams();
   const brandIdFromParams = searchParams?.get('brandId');
   const [activeBrandData, setActiveBrandData] = useState<{ id: string; name: string; brand_color?: string; logo_url?: string } | null>(null); 
-  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
-  const [, setIsLoadingUser] = useState(true);
-  const [, setUserError] = useState<string | null>(null);
+  const { data: currentUser } = useCurrentUser();
 
   // State for delete confirmation
   const [itemToDelete, setItemToDelete] = useState<ContentItem | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-  );
-
   useEffect(() => {
-    const fetchCurrentUser = async () => {
-      setIsLoadingUser(true);
-      setUserError(null);
-      try {
-        const response = await fetch('/api/me');
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch user session' }));
-          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        if (data.success && data.user) {
-          setCurrentUser(data.user);
-        } else {
-          setCurrentUser(null);
-          setUserError(data.error || 'User data not found in session.');
-          sonnerToast.error(data.error || 'Could not verify your session.');
-        }
-      } catch (error: unknown) {
-        console.error('[ContentPageClient] Error fetching current user:', error);
-        setCurrentUser(null);
-        setUserError(error instanceof Error ? error.message : 'An unexpected error occurred while fetching user data.');
-        sonnerToast.error('Error fetching user data: ' + (error instanceof Error ? error.message : 'Please try again.'));
-      } finally {
-        setIsLoadingUser(false);
-      }
-    };
-    fetchCurrentUser();
-  }, []);
-
-  useEffect(() => {
+    const abortController = new AbortController();
     async function fetchContentData() {
       setIsLoading(true);
+      setError(null);
       try {
         let apiUrl = '/api/content';
         const params = new URLSearchParams();
@@ -169,8 +117,11 @@ export default function ContentPageClient() {
           apiUrl += `?${queryString}`;
         }
         
-        const response = await fetch(apiUrl);
-        if (!response.ok) throw new Error('Failed to fetch content data from API');
+        const response = await apiFetch(apiUrl, { signal: abortController.signal });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.error || 'Failed to fetch content data from API');
+        }
         const data = await response.json();
         if (data.success) {
           setContent(data.data.map((item: unknown) => {
@@ -182,22 +133,30 @@ export default function ContentPageClient() {
           throw new Error(data.error || 'API returned error fetching content');
         }
       } catch (err) {
+        if (abortController.signal.aborted) return;
         console.error('Error in fetchContentData:', err);
         setError((err as Error).message || 'Failed to load content data');
         setContent([]);
         sonnerToast.error("Failed to load content", { description: (err as Error).message || "Please try again." });
       } finally {
-        setIsLoading(false);
+        if (!abortController.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     }
     fetchContentData();
-  }, [debouncedSearchQuery, brandIdFromParams, statusFilter, supabase]);
+    return () => abortController.abort();
+  }, [debouncedSearchQuery, brandIdFromParams, statusFilter]);
 
   useEffect(() => {
+    const abortController = new AbortController();
     const fetchActiveBrand = async () => {
       if (brandIdFromParams) {
         try {
-          const res = await fetch(`/api/brands/${brandIdFromParams}`);
+          const res = await apiFetch(`/api/brands/${brandIdFromParams}`, { signal: abortController.signal });
+          if (!res.ok) {
+            throw new Error('Failed to fetch brand');
+          }
           const data = await res.json();
           if (data.success && data.brand) {
             setActiveBrandData(data.brand);
@@ -214,6 +173,7 @@ export default function ContentPageClient() {
       }
     };
     fetchActiveBrand();
+    return () => abortController.abort();
   }, [brandIdFromParams]);
 
   const groupedContent = useMemo(() => {

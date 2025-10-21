@@ -4,10 +4,16 @@ import { withAuthAndCSRF } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
 import { buildPreferences, mapProfileToSettings, NotificationSettingsSchema } from './helpers';
 
+type ProfileSettingsRow = {
+  email_notifications_enabled: boolean | null;
+  email_preferences: unknown;
+  notification_settings_version?: number | null;
+};
+
 async function fetchProfile(supabase: ReturnType<typeof createSupabaseServerClient>, userId: string) {
   const { data, error } = await supabase
     .from('profiles')
-    .select('email_notifications_enabled, email_preferences, updated_at')
+    .select('email_notifications_enabled, email_preferences, notification_settings_version')
     .eq('id', userId)
     .maybeSingle();
 
@@ -15,7 +21,7 @@ async function fetchProfile(supabase: ReturnType<typeof createSupabaseServerClie
     throw error;
   }
 
-  return data;
+  return (data ?? null) as unknown as ProfileSettingsRow | null;
 }
 
 export const GET = withAuthAndCSRF(async function (req: NextRequest, user: User) {
@@ -28,7 +34,7 @@ export const GET = withAuthAndCSRF(async function (req: NextRequest, user: User)
       email_preferences: null,
     });
 
-    const version = profile?.updated_at ?? 'null';
+    const version = profile ? String(profile.notification_settings_version ?? 0) : '0';
 
     const response = NextResponse.json({
       success: true,
@@ -68,9 +74,15 @@ export const POST = withAuthAndCSRF(async function (request: NextRequest, user: 
     }
 
     const profile = await fetchProfile(supabase, user.id);
-    const currentVersion = profile?.updated_at ?? 'null';
+    const currentVersion = profile ? Number(profile.notification_settings_version ?? 0) : 0;
+    const ifMatchVersion = (() => {
+      if (ifMatch === '*') return currentVersion;
+      if (ifMatch === 'null') return 0;
+      const parsed = Number(ifMatch);
+      return Number.isFinite(parsed) ? parsed : NaN;
+    })();
 
-    if (ifMatch !== currentVersion && ifMatch !== '*') {
+    if (!Number.isFinite(ifMatchVersion) || (ifMatch !== '*' && ifMatchVersion !== currentVersion)) {
       return NextResponse.json(
         { success: false, error: 'Notification settings have been modified by another session.' },
         { status: 412 }
@@ -86,8 +98,7 @@ export const POST = withAuthAndCSRF(async function (request: NextRequest, user: 
     };
 
     const emailPreferences = buildPreferences(targetSettings);
-
-    const updated_at = new Date().toISOString();
+    const nextVersion = currentVersion + 1;
 
     let updatedProfile;
     if (profile) {
@@ -96,10 +107,10 @@ export const POST = withAuthAndCSRF(async function (request: NextRequest, user: 
         .update({
           email_notifications_enabled: targetSettings.emailNotifications,
           email_preferences: emailPreferences,
-          updated_at,
+          notification_settings_version: nextVersion,
         })
         .eq('id', user.id)
-        .select('email_notifications_enabled, email_preferences, updated_at')
+        .select('email_notifications_enabled, email_preferences, notification_settings_version')
         .single();
 
       if (error) {
@@ -113,9 +124,9 @@ export const POST = withAuthAndCSRF(async function (request: NextRequest, user: 
           id: user.id,
           email_notifications_enabled: targetSettings.emailNotifications,
           email_preferences: emailPreferences,
-          updated_at,
+          notification_settings_version: 1,
         })
-        .select('email_notifications_enabled, email_preferences, updated_at')
+        .select('email_notifications_enabled, email_preferences, notification_settings_version')
         .single();
 
       if (error) {
@@ -125,12 +136,13 @@ export const POST = withAuthAndCSRF(async function (request: NextRequest, user: 
     }
 
     const settings = mapProfileToSettings(updatedProfile);
+    const versionValue = String(updatedProfile?.notification_settings_version ?? nextVersion);
     const response = NextResponse.json({
       success: true,
       data: settings,
-      version: updatedProfile.updated_at ?? 'null',
+      version: versionValue,
     });
-    response.headers.set('ETag', updatedProfile.updated_at ?? 'null');
+    response.headers.set('ETag', versionValue);
     return response;
   } catch (error) {
     console.error('Error saving notification settings:', error);
@@ -163,9 +175,15 @@ export const PATCH = withAuthAndCSRF(async function (request: NextRequest, user:
     }
 
     const profile = await fetchProfile(supabase, user.id);
-    const currentVersion = profile?.updated_at ?? 'null';
+    const currentVersion = profile ? Number(profile.notification_settings_version ?? 0) : 0;
+    const ifMatchVersion = (() => {
+      if (ifMatch === '*') return currentVersion;
+      if (ifMatch === 'null') return 0;
+      const parsed = Number(ifMatch);
+      return Number.isFinite(parsed) ? parsed : NaN;
+    })();
 
-    if (ifMatch !== currentVersion && ifMatch !== '*') {
+    if (!Number.isFinite(ifMatchVersion) || (ifMatch !== '*' && ifMatchVersion !== currentVersion)) {
       return NextResponse.json(
         { success: false, error: 'Notification settings have been modified by another session.' },
         { status: 412 }
@@ -186,7 +204,7 @@ export const PATCH = withAuthAndCSRF(async function (request: NextRequest, user:
     };
 
     const emailPreferences = buildPreferences(updatedSettings);
-    const updated_at = new Date().toISOString();
+    const nextVersion = currentVersion + 1;
 
     let updatedProfile;
     if (profile) {
@@ -195,10 +213,10 @@ export const PATCH = withAuthAndCSRF(async function (request: NextRequest, user:
         .update({
           email_notifications_enabled: updatedSettings.emailNotifications,
           email_preferences: emailPreferences,
-          updated_at,
+          notification_settings_version: nextVersion,
         })
         .eq('id', user.id)
-        .select('email_notifications_enabled, email_preferences, updated_at')
+        .select('email_notifications_enabled, email_preferences, notification_settings_version')
         .single();
 
       if (error) {
@@ -212,9 +230,9 @@ export const PATCH = withAuthAndCSRF(async function (request: NextRequest, user:
           id: user.id,
           email_notifications_enabled: updatedSettings.emailNotifications,
           email_preferences: emailPreferences,
-          updated_at,
+          notification_settings_version: 1,
         })
-        .select('email_notifications_enabled, email_preferences, updated_at')
+        .select('email_notifications_enabled, email_preferences, notification_settings_version')
         .single();
 
       if (error) {
@@ -224,12 +242,13 @@ export const PATCH = withAuthAndCSRF(async function (request: NextRequest, user:
     }
 
     const settings = mapProfileToSettings(updatedProfile);
+    const versionValue = String(updatedProfile?.notification_settings_version ?? nextVersion);
     const response = NextResponse.json({
       success: true,
       data: settings,
-      version: updatedProfile.updated_at ?? 'null',
+      version: versionValue,
     });
-    response.headers.set('ETag', updatedProfile.updated_at ?? 'null');
+    response.headers.set('ETag', versionValue);
     return response;
   } catch (error) {
     console.error('Error updating notification settings:', error);

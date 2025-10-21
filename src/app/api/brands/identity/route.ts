@@ -5,11 +5,14 @@ import sanitizeHtml from 'sanitize-html';
 import dns from 'dns';
 import ipaddr from 'ipaddr.js';
 import { z } from 'zod';
+import { Readable } from 'stream';
 
 import { COUNTRIES } from '@/lib/constants';
 import { withAdminAuthAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import { getServerEnv } from '@/lib/env';
+
+export const runtime = 'nodejs';
 
 // Rate limiting is now handled globally in middleware
 
@@ -142,6 +145,8 @@ function getLanguageName(languageCode: string): string {
 }
 
 // Function to extract website content from a URL
+const MAX_DOWNLOAD_BYTES = MAX_SCRAPED_CHARACTERS * 120; // cap raw payload before sanitisation
+
 async function scrapeWebsiteContent(url: string): Promise<string> {
   try {
     const parsed = new URL(url);
@@ -168,20 +173,45 @@ async function scrapeWebsiteContent(url: string): Promise<string> {
     const response = await axios.get(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 compatible MixerAIContentScraper/1.0',
-        'Accept': 'text/html',
+        'Accept': 'text/plain, text/html;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-GB,en;q=0.5',
         'Accept-Encoding': 'identity',
       },
       timeout: 8000,
-      maxContentLength: MAX_SCRAPED_CHARACTERS * 20,
-      maxBodyLength: MAX_SCRAPED_CHARACTERS * 20,
+      responseType: 'stream',
+      decompress: true,
     });
 
-    if (typeof response.data !== 'string' || !response.data.trim()) {
-      throw new Error('The page did not return readable HTML content.');
+    const stream = response.data as Readable;
+    const chunks: Buffer[] = [];
+    let totalBytes = 0;
+
+    try {
+      for await (const chunk of stream) {
+        const buffer = Buffer.isBuffer(chunk)
+          ? chunk
+          : Buffer.from(typeof chunk === 'string' ? chunk : new Uint8Array(chunk as ArrayBuffer));
+        totalBytes += buffer.length;
+        if (totalBytes > MAX_DOWNLOAD_BYTES) {
+          if (typeof stream.destroy === 'function') {
+            stream.destroy();
+          } else if (typeof (stream as unknown as { cancel?: () => Promise<void> | void }).cancel === 'function') {
+            await (stream as unknown as { cancel: () => Promise<void> | void }).cancel();
+          }
+          throw new Error(`Page content exceeded the ${Math.round(MAX_DOWNLOAD_BYTES / 1024)}KB limit.`);
+        }
+        chunks.push(buffer);
+      }
+    } catch (streamError) {
+      throw streamError;
     }
 
-    const textContent = sanitizeHtml(response.data, {
+    const rawContent = Buffer.concat(chunks).toString('utf-8');
+    if (!rawContent.trim()) {
+      throw new Error('The page did not return readable content.');
+    }
+
+    const textContent = sanitizeHtml(rawContent, {
       allowedTags: [],
       allowedAttributes: {},
       textFilter(text: string) {

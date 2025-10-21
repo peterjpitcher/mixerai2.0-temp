@@ -32,10 +32,9 @@ function getSessionStore(): SessionStore {
   }
 
   if (!globalSymbols[SESSION_WARNING_PRINTED] && process.env.SKIP_REDIS_WARNING !== 'true') {
-    if (buildPhase) {
-      console.warn('[session-manager] Redis configuration missing during build. Falling back to in-memory sessions for build-time rendering only.');
+    if (!buildPhase) {
+      console.warn('[session-manager] Redis configuration missing. Falling back to in-memory sessions. This is unsafe for production.');
     }
-    console.warn('[session-manager] Redis configuration missing. Falling back to in-memory sessions. This is unsafe for production.');
     globalSymbols[SESSION_WARNING_PRINTED] = true;
   }
 

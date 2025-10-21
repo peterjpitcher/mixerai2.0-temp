@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, FormEvent, ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,6 @@ import { AvatarUpload } from '@/components/ui/avatar-upload';
 import { validatePassword } from '@/lib/auth/session-config';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api-client';
-import { createSupabaseClient } from '@/lib/supabase/client';
 
 // Page metadata should ideally be exported from a server component or the page file if it's RSC.
 // For client components, this is more of a placeholder for what should be set.
@@ -54,9 +53,8 @@ export default function AccountPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [session, setSession] = useState<Record<string, unknown> | null>(null);
-  
-  const supabase = useMemo(() => createSupabaseClient(), []);
+  const [userId, setUserId] = useState<string>('');
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   const [profileData, setProfileData] = useState({
     fullName: '',
@@ -67,14 +65,14 @@ export default function AccountPage() {
   });
 
   // Mock notification settings - this should be fetched and saved via an API
-const [notificationSettings, setNotificationSettings] = useState({
-  emailNotifications: true,
-  contentUpdates: true,
-  newComments: true,
-  taskReminders: false,
-  marketingEmails: false,
-});
-const [notificationVersion, setNotificationVersion] = useState<string | null>(null);
+  const [notificationSettings, setNotificationSettings] = useState({
+    emailNotifications: true,
+    contentUpdates: true,
+    newComments: true,
+    taskReminders: false,
+    marketingEmails: false,
+  });
+  const [notificationVersion, setNotificationVersion] = useState<string | null>(null);
   const syncNotificationVersion = useCallback((response: Response, payload?: { version?: string | null }) => {
     const etag = response.headers.get('etag');
     const nextVersion = etag ?? (payload?.version ?? null);
@@ -83,12 +81,12 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
 
   const refreshNotificationSettings = useCallback(async () => {
     try {
-      const response = await fetch('/api/user/notification-settings', { cache: 'no-store' });
+      const response = await apiFetch('/api/user/notification-settings', { cache: 'no-store' });
       if (!response.ok) {
         setNotificationVersion(null);
         return;
       }
-      const payload = await response.json();
+      const payload = await response.json().catch(() => ({}));
       if (payload?.success) {
         setNotificationSettings(payload.data);
         syncNotificationVersion(response, payload);
@@ -99,102 +97,66 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
   }, [syncNotificationVersion]);
 
   useEffect(() => {
-    async function fetchUserData() {
-      setIsLoading(true); // Ensure loading is true at the start of fetch
+    const controller = new AbortController();
+
+    async function loadProfile() {
+      setIsLoading(true);
       try {
-        const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
-        if (authError) throw authError;
-        if (!currentUser) {
-          window.location.href = '/auth/login'; // Redirect if not logged in
+        const response = await apiFetch('/api/user/profile', {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+
+        if (controller.signal.aborted) return;
+
+        if (response.status === 401) {
+          router.push('/auth/login');
           return;
         }
-        setSession({ user: currentUser } as unknown as Record<string, unknown>);
-        
-        const userId = currentUser.id;
-        const userEmail = currentUser.email || '';
 
-        const { data: userData, error: userError } = await supabase
-          .from('profiles')
-          .select('full_name, company, job_title, avatar_url, updated_at')
-          .eq('id', userId)
-          .single();
-        
-        if (userError && userError.code !== 'PGRST116') throw userError;
-        
-        // If no profile exists, create one
-        let profileData = userData;
-        if (!userData) {
-          const newProfileData = {
-            id: userId,
-            full_name: currentUser.user_metadata?.full_name || userEmail,
-            email: userEmail,
-            company: currentUser.user_metadata?.company || '',
-            job_title: currentUser.user_metadata?.job_title || '',
-            updated_at: new Date().toISOString(),
-          };
-          
-          const { data: createdProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert(newProfileData)
-            .select('full_name, company, job_title, avatar_url, updated_at')
-            .single();
-          
-          if (createError) {
-            console.error('Error creating profile:', createError);
-          } else {
-            // Use the newly created profile data
-            profileData = {
-              full_name: createdProfile?.full_name ?? newProfileData.full_name,
-              company: createdProfile?.company ?? newProfileData.company,
-              job_title: createdProfile?.job_title ?? newProfileData.job_title,
-              avatar_url: createdProfile?.avatar_url ?? null,
-              updated_at: createdProfile?.updated_at ?? newProfileData.updated_at,
-            };
-          }
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok || !payload?.success) {
+          throw new Error(payload?.error || 'Failed to load profile data.');
         }
-        
-        // Auth user data is the source of truth for email and potentially some metadata fallbacks
-        const { data: { user: authUser }, error: authError2 } = await supabase.auth.getUser();
-        if (authError2) throw authError2;
-        
+
+        const profile = payload.profile as {
+          id: string;
+          email: string;
+          fullName: string;
+          company: string;
+          jobTitle: string;
+          avatarUrl: string;
+        };
+
+        setUserId(profile.id ?? '');
         setProfileData({
-          fullName: profileData?.full_name || authUser?.user_metadata?.full_name || '',
-          email: userEmail, // Use email from active session
-          company: profileData?.company || authUser?.user_metadata?.company || '',
-          jobTitle: profileData?.job_title || authUser?.user_metadata?.job_title || '',
-          avatarUrl: profileData?.avatar_url || '',
+          fullName: profile.fullName ?? '',
+          email: profile.email ?? '',
+          company: profile.company ?? '',
+          jobTitle: profile.jobTitle ?? '',
+          avatarUrl: profile.avatarUrl ?? '',
         });
-        setNotificationVersion(profileData?.updated_at || null);
-        
-        // Fetch notification settings
-        const notificationResponse = await fetch('/api/user/notification-settings');
-        if (notificationResponse.ok) {
-          const notificationData = await notificationResponse.json();
-          if (notificationData.success) {
-            setNotificationSettings(notificationData.data);
-            syncNotificationVersion(notificationResponse, notificationData);
-          } else {
-            setNotificationVersion(null);
-          }
-        } else {
-          setNotificationVersion(null);
-        }
-        
-      } catch (error: unknown) {
-        // console.error removed
-        const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-        toast.error(
-          errorMessage || 'Failed to load your profile data. Please try again later.',
-          { description: 'Error Loading Profile' }
-        );
+        setProfileError(null);
+
+        await refreshNotificationSettings();
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        const message = error instanceof Error ? error.message : 'Failed to load your profile data.';
+        setProfileError(message);
+        toast.error(message, { description: 'Error Loading Profile' });
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     }
-    fetchUserData();
-  }, [supabase, syncNotificationVersion]); // supabase.auth might be too broad, consider specific dependencies if issues arise
 
-  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    void loadProfile();
+    return () => controller.abort();
+  }, [refreshNotificationSettings, router]);
+
+  const handleProfileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setProfileData(prev => ({ ...prev, [id]: value }));
   };
@@ -235,65 +197,49 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
     }
   };
 
-  const handleProfileSubmit = async (e: React.FormEvent) => {
+  const handleProfileSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
-    // Validate full name is not empty
+
     if (!profileData.fullName.trim()) {
       toast.error('Full name is required and cannot be empty.', { description: 'Validation Error' });
       return;
     }
-    
+
     setIsSubmitting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated. Please log in again.');
-      const userId = user.id;
-      
-      const profileUpdates = {
-        id: userId,
-        full_name: profileData.fullName.trim(),
-        company: profileData.company.trim(),
-        job_title: profileData.jobTitle.trim(),
-        updated_at: new Date().toISOString()
-      };
-      const { data: updatedProfile, error: profileError } = await supabase
-        .from('profiles')
-        .upsert(profileUpdates, { onConflict: 'id' })
-        .select('full_name, company, job_title, avatar_url, updated_at')
-        .single();
-      if (profileError) throw profileError;
-      if (updatedProfile) {
-        setProfileData(prev => ({
-          ...prev,
-          fullName: updatedProfile.full_name ?? prev.fullName,
-          company: updatedProfile.company ?? prev.company,
-          jobTitle: updatedProfile.job_title ?? prev.jobTitle,
-          avatarUrl: updatedProfile.avatar_url ?? prev.avatarUrl,
-        }));
-        setNotificationVersion(updatedProfile.updated_at ?? null);
+      if (!userId) {
+        throw new Error('User information is still loading. Please try again in a moment.');
       }
-      
-      const userMetadataUpdates = {
-        full_name: profileData.fullName.trim(),
-        company: profileData.company.trim(),
-        job_title: profileData.jobTitle.trim()
-      };
-      // Only update metadata if there are actual changes to avoid unnecessary calls
-      const metadataChanged = Object.entries(userMetadataUpdates).some(([key, value]) => {
-        const currentValue = (user.user_metadata?.[key as keyof typeof userMetadataUpdates] as string | undefined) || '';
-        return value !== currentValue;
+
+      const response = await apiFetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: profileData.fullName.trim(),
+          company: profileData.company.trim(),
+          jobTitle: profileData.jobTitle.trim(),
+        }),
       });
 
-      if (metadataChanged) {
-        const { error: metadataError } = await supabase.auth.updateUser({ data: userMetadataUpdates });
-        if (metadataError) throw metadataError;
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || 'Failed to update your profile.');
       }
-      
+
+      const updatedProfile = payload.profile ?? {};
+      setProfileData(prev => ({
+        ...prev,
+        fullName: updatedProfile.fullName ?? prev.fullName,
+        email: updatedProfile.email ?? prev.email,
+        company: updatedProfile.company ?? prev.company,
+        jobTitle: updatedProfile.jobTitle ?? prev.jobTitle,
+        avatarUrl: updatedProfile.avatarUrl ?? prev.avatarUrl,
+      }));
+
+      setProfileError(null);
       toast('Your profile information has been successfully updated.', { description: 'Profile Updated' });
-      await refreshNotificationSettings();
     } catch (error: unknown) {
-      // console.error removed
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
       toast.error(errorMessage || 'Failed to update your profile. Please try again.', { description: 'Profile Update Error' });
     } finally {
@@ -301,9 +247,9 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
     }
   };
 
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const form = e.target as HTMLFormElement;
+    const form = e.currentTarget;
     const currentPassword = (form.elements.namedItem('current-password') as HTMLInputElement)?.value;
     const newPassword = (form.elements.namedItem('new-password') as HTMLInputElement)?.value;
     const confirmPassword = (form.elements.namedItem('confirm-password') as HTMLInputElement)?.value;
@@ -329,12 +275,6 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
     
     setIsSubmitting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !user.email) {
-        throw new Error('Unable to verify your account. Please try logging in again.');
-      }
-
-      // Check if re-authentication is required
       const reauthResponse = await apiFetch('/api/auth/check-reauthentication', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -350,26 +290,20 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
         toast.error('For security reasons, please log in again before changing your password.', {
           description: 'Re-authentication Required',
         });
-        // Optionally redirect to login with return URL
         router.push(`/auth/login?from=${encodeURIComponent('/dashboard/account?tab=password')}`);
         return;
       }
 
-      const { error: passwordCheckError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: currentPassword,
+      const changeResponse = await apiFetch('/api/user/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
       });
 
-      if (passwordCheckError) {
-        throw new Error('Current password is incorrect.');
+      const changeData = await changeResponse.json().catch(() => ({}));
+      if (!changeResponse.ok || !changeData?.success) {
+        throw new Error(changeData?.error || 'Failed to change your password.');
       }
-
-      // Supabase updateUser for password doesn't require currentPassword if user is already authenticated.
-      // However, asking for it is a good security practice to prevent session hijacking leading to password change.
-      // For true verification of currentPassword, a custom server-side check would be needed.
-      // Here we rely on the fact that this action is performed by an authenticated user.
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) throw error;
 
       try {
         await apiFetch('/api/auth/clear-lockout', { method: 'POST' });
@@ -387,7 +321,7 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
     }
   };
 
-  const handleNotificationSettingsSubmit = async (e: React.FormEvent) => {
+  const handleNotificationSettingsSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
@@ -437,6 +371,25 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
     );
   }
 
+  if (profileError) {
+    return (
+      <div className="space-y-6">
+        <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Account Settings" }]} />
+        <Card>
+          <CardHeader>
+            <CardTitle>Unable to load account settings</CardTitle>
+            <CardDescription>
+              {profileError || 'An unexpected error occurred while loading your profile.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button variant="outline" onClick={() => router.refresh()}>Try again</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Account Settings" }]} />
@@ -477,10 +430,9 @@ const [notificationVersion, setNotificationVersion] = useState<string | null>(nu
                   <AvatarUpload
                     currentAvatarUrl={profileData.avatarUrl}
                     onAvatarChange={(url) => setProfileData(prev => ({ ...prev, avatarUrl: url }))}
-                    userId={((session as Record<string, unknown>)?.user as Record<string, unknown>)?.id as string || ''}
+                    userId={userId}
                     fullName={profileData.fullName}
                     email={profileData.email}
-                    onProfileVersionChange={setNotificationVersion}
                   />
                 </div>
                 

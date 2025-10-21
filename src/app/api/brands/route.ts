@@ -10,7 +10,7 @@ import { getUserAuthByEmail, inviteNewUserWithAppMetadata } from '@/lib/auth/use
 import { User } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { validateRequest, commonSchemas } from '@/lib/api/validation';
-import { executeTransaction } from '@/lib/db/transactions';
+import { CompensatingTransaction } from '@/lib/db/transactions';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -92,6 +92,23 @@ function mapSupabasePriorityToNumber(priority: SupabaseVettingAgencyPriority): n
     case "Medium": return 2;
     case "Low": return 3;
     default: return Number.MAX_SAFE_INTEGER; // Default for null or unexpected values
+  }
+}
+
+function normalizeWebsiteDomain(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    let host = parsed.hostname.toLowerCase();
+    if (host.startsWith('www.')) {
+      host = host.slice(4);
+    }
+    if (!host.includes('.')) {
+      return null;
+    }
+    return host;
+  } catch {
+    return null;
   }
 }
 
@@ -347,44 +364,76 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
       }
     }
 
-    // Use transactional function to create brand with all related data
-    const transactionResult = await executeTransaction<{ brand_id: string }>(
-      supabase,
-      'create_brand_with_permissions',
-      {
-        p_creator_user_id: user.id,
-        p_brand_name: body.name,
-        p_website_url: body.website_url || null,
-        p_country: body.country || null,
-        p_language: body.language || null,
-        p_brand_identity: body.brand_identity || null,
-        p_tone_of_voice: body.tone_of_voice || null,
-        p_guardrails: formattedGuardrails,
-        p_brand_color: body.brand_color || null,
-        p_logo_url: body.logo_url || null,
-        p_approved_content_types: body.approved_content_types || null,
-        p_master_claim_brand_id: body.master_claim_brand_id || null,
-        p_agency_ids: body.selected_agency_ids || null
-      }
-    );
+    const uniqueAdditionalUrls =
+      body.additional_website_urls && Array.isArray(body.additional_website_urls)
+        ? Array.from(new Set(body.additional_website_urls.filter((url: string) => typeof url === 'string' && url.trim() !== '')))
+        : null;
 
-    if (!transactionResult.success || !transactionResult.data?.[0]?.brand_id) {
-      throw new Error(transactionResult.error || 'Failed to create brand');
+    const normalizedDomain = normalizeWebsiteDomain(body.website_url);
+
+    const insertPayload = {
+      name: body.name,
+      website_url: body.website_url || null,
+      country: body.country || null,
+      language: body.language || null,
+      brand_identity: body.brand_identity || null,
+      tone_of_voice: body.tone_of_voice || null,
+      guardrails: formattedGuardrails,
+      brand_color: body.brand_color || null,
+      logo_url: body.logo_url || null,
+      approved_content_types: body.approved_content_types || null,
+      master_claim_brand_id: body.master_claim_brand_id || null,
+      additional_website_urls: uniqueAdditionalUrls && uniqueAdditionalUrls.length ? uniqueAdditionalUrls : null,
+      normalized_website_domain: normalizedDomain,
+    };
+
+    const { data: insertedBrand, error: insertError } = await supabase
+      .from('brands')
+      .insert(insertPayload)
+      .select('*')
+      .single();
+
+    if (insertError || !insertedBrand) {
+      console.error('[API /api/brands POST] Brand insert failed:', insertError);
+      return NextResponse.json(
+        { success: false, error: insertError?.message || 'Failed to create brand' },
+        { status: 500 }
+      );
     }
 
-    const newBrandId = transactionResult.data[0].brand_id;
-    
-    // Update brand with additional_website_urls if provided
-    if (body.additional_website_urls && Array.isArray(body.additional_website_urls) && body.additional_website_urls.length > 0) {
-      const { error: updateError } = await supabase
+    const newBrandId = insertedBrand.id as string;
+
+    const compensatingTransaction = new CompensatingTransaction();
+    compensatingTransaction.addRollback(async () => {
+      const { error: rollbackDeleteError } = await supabase
         .from('brands')
-        .update({ additional_website_urls: body.additional_website_urls })
+        .delete()
         .eq('id', newBrandId);
-      
-      if (updateError) {
-        console.warn(`[API /api/brands POST] Error updating additional_website_urls for brand ${newBrandId}:`, updateError);
-        // Continue anyway as the brand was created successfully
+      if (rollbackDeleteError) {
+        console.error('[API /api/brands POST] Rollback brand delete failed:', rollbackDeleteError);
       }
+    });
+
+    const abortWithCleanup = async (message: string, status = 500, detail?: string) => {
+      try {
+        await compensatingTransaction.rollback();
+      } catch (rollbackError) {
+        console.error('[API /api/brands POST] Rollback operation failed:', rollbackError);
+      }
+      const errorMessage = detail ? `${message} (${detail})` : message;
+      return NextResponse.json({ success: false, error: errorMessage }, { status });
+    };
+    
+    const { error: creatorPermissionError } = await supabase
+      .from('user_brand_permissions')
+      .upsert(
+        { user_id: user.id, brand_id: newBrandId, role: 'admin' },
+        { onConflict: 'user_id,brand_id' }
+      );
+
+    if (creatorPermissionError) {
+      console.error('[API /api/brands POST] Error assigning creator brand admin permission:', creatorPermissionError);
+      return abortWithCleanup('Failed to assign creator brand permissions.', 500, creatorPermissionError.message);
     }
     
     // --- Process Additional Brand Admins ---
@@ -421,9 +470,15 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
           );
 
           if (inviteError || !invitedAdmin) {
-            // console.warn(`[API /api/brands POST] Failed to invite new admin ${identifier} for brand ${newBrandId}. Error: ${inviteError?.message}`);
-            // Decide on error handling: skip this admin, or fail request? For now, skip.
-            continue;
+            console.error(
+              `[API /api/brands POST] Failed to invite new admin ${identifier} for brand ${newBrandId}.`,
+              inviteError
+            );
+            return abortWithCleanup(
+              `Failed to invite ${identifier} as a brand admin. Please try again.`,
+              500,
+              inviteError?.message
+            );
           }
           adminUser = invitedAdmin;
           isNewAdmin = true;
@@ -446,7 +501,8 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
     }
 
     if (resolvedAdminUserIds.length > 0) {
-      const permissionUpserts = resolvedAdminUserIds.map((adminId: string) => ({
+      const uniqueAdminIds = Array.from(new Set(resolvedAdminUserIds));
+      const permissionUpserts = uniqueAdminIds.map((adminId: string) => ({
         user_id: adminId,
         brand_id: newBrandId as string,
         role: 'admin' as const
@@ -455,9 +511,8 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
       const { error: permissionError } = await supabase.from('user_brand_permissions').upsert(permissionUpserts, { onConflict: 'user_id,brand_id' });
 
       if (permissionError) {
-        // console.error('[API /api/brands POST] Error setting brand admin permissions for existing users:', permissionError);
-        // Non-critical if some permissions fail for existing users? Or rollback?
-        // For now, log and continue.
+        console.error('[API /api/brands POST] Error setting brand admin permissions for existing users:', permissionError);
+        return abortWithCleanup('Failed to assign brand admin permissions.', 500, permissionError.message);
       }
     }
     // --- End Process Additional Brand Admins ---
@@ -470,8 +525,11 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
         .eq('brand_id', newBrandId);
 
       if (fetchLinksError) {
-        // console.warn(`[API /api/brands POST] Error fetching existing agency links for brand ${newBrandId}:`, fetchLinksError);
-        // Decide if this is critical. For now, proceed cautiously.
+        console.error(
+          `[API /api/brands POST] Error fetching existing agency links for brand ${newBrandId}:`,
+          fetchLinksError
+        );
+        return abortWithCleanup('Failed to verify existing agency relationships.', 500, fetchLinksError.message);
       }
 
       const existingAgencyIds = existingLinks ? existingLinks.map(link => link.agency_id) : [];
@@ -488,8 +546,8 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
           .insert(agencyInserts);
 
         if (agencyError) {
-          // console.warn('[API /api/brands POST] Error linking new agencies to brand:', agencyError);
-          // Log and continue, as brand creation itself was successful.
+          console.error('[API /api/brands POST] Error linking new agencies to brand:', agencyError);
+          return abortWithCleanup('Failed to associate vetting agencies with the brand.', 500, agencyError.message);
         }
       }
     }
@@ -509,7 +567,7 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
         
         if (insertError) {
           console.error(`[API /api/brands POST] Error inserting master claim brand links for brand ${newBrandId}:`, insertError);
-          // Continue anyway as the brand was created successfully
+          return abortWithCleanup('Failed to link selected Product Claims Brands.', 500, insertError.message);
         }
       }
     }
@@ -522,7 +580,8 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
       .single();
 
     if (fetchBrandError || !newBrandDataFromDB) {
-      throw new Error(fetchBrandError?.message || 'Failed to fetch newly created brand.');
+      console.error(`[API /api/brands POST] Failed to fetch newly created brand ${newBrandId}:`, fetchBrandError);
+      return abortWithCleanup('Brand was created but could not be retrieved. Please try again.', 500, fetchBrandError?.message);
     }
 
     // Fetch selected agencies with Supabase client
@@ -532,7 +591,8 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
       .eq('brand_id', newBrandId);
     
     if (fetchAgenciesError) {
-        // console.warn('[API /api/brands POST] Error fetching agencies for new brand:', fetchAgenciesError);
+        console.error('[API /api/brands POST] Error fetching agencies for new brand:', fetchAgenciesError);
+        return abortWithCleanup('Brand was created but agency details could not be retrieved. Please try again.', 500, fetchAgenciesError.message);
     }
 
     const finalSelectedVettingAgencies: VettingAgency[] = (finalSelectedSupabaseAgencies || [])
@@ -561,6 +621,8 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
       content_count: 0, 
       selected_vetting_agencies: finalSelectedVettingAgencies,
     };
+
+    compensatingTransaction.clear();
 
     return NextResponse.json({ 
       success: true, 

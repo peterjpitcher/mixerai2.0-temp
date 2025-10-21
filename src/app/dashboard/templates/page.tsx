@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { PlusCircle, LayoutTemplate, ShieldAlert, Copy, Eye, Trash2, MoreVertical, Pencil, Loader2 } from 'lucide-react';
+import { PlusCircle, LayoutTemplate, ShieldAlert, Copy, Eye, Trash2, MoreVertical, Pencil, Loader2, AlertTriangle } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { touchFriendly } from '@/lib/utils/touch-target';
 import type { InputField, OutputField } from '@/types/template';
@@ -30,15 +30,18 @@ import {
 import { CardGridSkeleton } from '@/components/ui/loading-skeletons';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { apiFetch } from '@/lib/api-client';
+import { useTemplateSession } from './use-template-session';
+
+interface TemplateFields {
+  inputFields: InputField[];
+  outputFields: OutputField[];
+}
 
 interface Template {
   id: string;
   name: string;
   description: string;
-  fields: {
-    inputFields: InputField[];
-    outputFields: OutputField[];
-  };
+  fields?: TemplateFields;
   icon?: string | null;
   brand_id?: string | null;
   usageCount?: number;
@@ -47,19 +50,14 @@ interface Template {
   created_by?: string;
 }
 
-// Define UserSessionData interface (if not already defined or imported)
-interface UserSessionData {
-  id: string;
-  email?: string;
-  user_metadata?: {
-    role?: string; // Global role e.g., 'admin', 'editor'
-    full_name?: string;
-  };
-  brand_permissions?: Array<{ // Brand-specific permissions (not directly used here but good for consistency)
-    brand_id: string;
-    role: string;
-  }>;
-}
+const SessionErrorState = ({ message, onRetry }: { message: string; onRetry: () => void }) => (
+  <div className="flex flex-col items-center justify-center min-h-[300px] py-10 text-center">
+    <AlertTriangle className="mb-4 h-16 w-16 text-destructive" />
+    <h3 className="text-xl font-bold mb-2">Unable to verify your access</h3>
+    <p className="text-muted-foreground mb-4 max-w-md">{message}</p>
+    <Button onClick={onRetry}>Try Again</Button>
+  </div>
+);
 
 /**
  * TemplatesPage component.
@@ -74,33 +72,13 @@ export default function TemplatesPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState<string | null>(null);
-
-  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
-
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      setIsLoadingUser(true);
-      try {
-        const response = await fetch('/api/me');
-        if (!response.ok) throw new Error('Failed to fetch user session');
-        const data = await response.json();
-        if (data.success && data.user) {
-          setCurrentUser(data.user);
-        } else {
-          setCurrentUser(null);
-          toast.error(data.error || 'Could not verify your session.');
-        }
-      } catch (err: unknown) {
-        console.error('Error fetching current user:', err);
-        setCurrentUser(null);
-        toast.error('Error fetching user data: ' + (err instanceof Error ? err.message : 'Unknown error'));
-      } finally {
-        setIsLoadingUser(false);
-      }
-    };
-    fetchCurrentUser();
-  }, []);
+  const {
+    user: currentUser,
+    isLoading: isLoadingUser,
+    error: sessionError,
+    status: sessionStatus,
+    refetch: refetchSession,
+  } = useTemplateSession();
 
   const userRole = currentUser?.user_metadata?.role;
   const userBrandPermissions = currentUser?.brand_permissions || [];
@@ -113,38 +91,57 @@ export default function TemplatesPage() {
       return;
     }
 
+    if (sessionError && sessionStatus !== 403) {
+      setLoading(false);
+      return;
+    }
+
     if (!currentUser || !canViewTemplates) {
+      setTemplates([]);
       setLoading(false);
       return;
     }
 
     const fetchTemplates = async () => {
+      setLoading(true);
       try {
-        setLoading(true);
-
-        const response = await fetch('/api/content-templates');
-        const data = await response.json();
+        const response = await apiFetch('/api/content-templates', {
+          retry: 1,
+          retryDelayMs: 300,
+        });
+        const data = await response.json() as {
+          success: boolean;
+          templates?: Template[];
+          error?: string;
+        };
 
         if (data.success && Array.isArray(data.templates)) {
-          setTemplates(data.templates);
+          const normalizedTemplates = data.templates.map((template) => ({
+            ...template,
+            fields: {
+              inputFields: template.fields?.inputFields ?? [],
+              outputFields: template.fields?.outputFields ?? [],
+            },
+            usageCount: template.usageCount ?? 0,
+          }));
+          setTemplates(normalizedTemplates);
         } else {
           setTemplates([]);
-          if (!data.success) {
-            toast.error('Error Loading Templates', {
-              description: data.error || 'An unknown error occurred while fetching templates.',
-            });
-          }
+          toast.error('Error Loading Templates', {
+            description: data.error || 'An unknown error occurred while fetching templates.',
+          });
         }
       } catch (error) {
         console.error('Error fetching templates:', error);
+        setTemplates([]);
         toast.error('Failed to load templates. Please try refreshing the page.');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchTemplates();
-  }, [isLoadingUser, currentUser, canViewTemplates]);
+    void fetchTemplates();
+  }, [isLoadingUser, currentUser, canViewTemplates, sessionError, sessionStatus]);
 
   const generateFieldId = () => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -326,24 +323,38 @@ export default function TemplatesPage() {
     {
       id: "inputFields",
       header: "Input Fields",
-      cell: ({ row }) => (
-        <Badge variant="secondary">
-          {row.fields.inputFields.length} field{row.fields.inputFields.length !== 1 ? 's' : ''}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        const count = row.fields?.inputFields?.length ?? 0;
+        return (
+          <Badge variant="secondary">
+            {count} field{count !== 1 ? 's' : ''}
+          </Badge>
+        );
+      },
       enableSorting: true,
-      sortingFn: (a, b) => a.fields.inputFields.length - b.fields.inputFields.length,
+      sortingFn: (a, b) => {
+        const aCount = a.fields?.inputFields?.length ?? 0;
+        const bCount = b.fields?.inputFields?.length ?? 0;
+        return aCount - bCount;
+      },
     },
     {
       id: "outputFields",
       header: "Output Fields",
-      cell: ({ row }) => (
-        <Badge variant="secondary">
-          {row.fields.outputFields.length} field{row.fields.outputFields.length !== 1 ? 's' : ''}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        const count = row.fields?.outputFields?.length ?? 0;
+        return (
+          <Badge variant="secondary">
+            {count} field{count !== 1 ? 's' : ''}
+          </Badge>
+        );
+      },
       enableSorting: true,
-      sortingFn: (a, b) => a.fields.outputFields.length - b.fields.outputFields.length,
+      sortingFn: (a, b) => {
+        const aCount = a.fields?.outputFields?.length ?? 0;
+        const bCount = b.fields?.outputFields?.length ?? 0;
+        return aCount - bCount;
+      },
     },
     {
       id: "usageCount",
@@ -441,7 +452,7 @@ export default function TemplatesPage() {
     },
   ];
 
-  if (isLoadingUser || loading) { // Combined loading state
+  if (isLoadingUser || (loading && !sessionError)) { // Combined loading state
     return (
       <div className="space-y-8">
         <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Content Templates" }]} />
@@ -458,12 +469,24 @@ export default function TemplatesPage() {
     );
   }
 
-  if (!canViewTemplates) {
+  if (!isLoadingUser && sessionError && sessionStatus !== 403) {
+    return <SessionErrorState message={sessionError} onRetry={() => void refetchSession()} />;
+  }
+
+  const isForbidden =
+    !isLoadingUser &&
+    (sessionStatus === 403 || (!!currentUser && !canViewTemplates));
+
+  if (isForbidden) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
         <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
         <h3 className="text-xl font-bold mb-2">Access Denied</h3>
-        <p className="text-muted-foreground">You do not have permission to view or manage Content Templates.</p>
+        <p className="text-muted-foreground">
+          {sessionStatus === 403
+            ? sessionError || 'You do not have permission to view or manage Content Templates.'
+            : 'You do not have permission to view or manage Content Templates.'}
+        </p>
         <Link href="/dashboard">
           <Button variant="outline" className="mt-4">Go to Dashboard</Button>
         </Link>

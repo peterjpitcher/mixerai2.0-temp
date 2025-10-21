@@ -1,35 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Force dynamic rendering for this route
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
+import type {
+  BrandPermissionRecord,
+  BrandRecord,
+  InvitationStatusRecord,
+  ProfileRecord,
+} from './user-utils';
+import { buildUserResponse } from './user-utils';
 
-// Define the shape of user profiles returned from Supabase
-interface ProfileRecord {
-  id: string;
-  full_name: string | null;
-  email?: string;
-  avatar_url: string | null;
-  created_at: string;
-  updated_at: string;
-  user_brand_permissions?: {
-    id: string;
-    brand_id: string;
-    role: 'admin' | 'editor' | 'viewer';
-  }[];
-  job_title?: string;
-  company?: string;
-}
+const MAX_PAGE_SIZE = 100;
+const DEFAULT_PAGE_SIZE = 25;
 
-/**
- * GET endpoint to retrieve all users with profile information
- */
-export const GET = withAuth(async (_req: NextRequest, user) => {
+export const GET = withAuth(async (req: NextRequest, user) => {
   try {
-    // Role check: Only Global Admins can list all users
     if (user.user_metadata?.role !== 'admin') {
       return NextResponse.json(
         { success: false, error: 'Forbidden: You do not have permission to access this resource.' },
@@ -37,105 +25,118 @@ export const GET = withAuth(async (_req: NextRequest, user) => {
       );
     }
 
+    const { searchParams } = new URL(req.url);
+    const pageParam = Number.parseInt(searchParams.get('page') ?? '1', 10);
+    const perPageParam = Number.parseInt(searchParams.get('pageSize') ?? `${DEFAULT_PAGE_SIZE}`, 10);
+    const includeInactive = searchParams.get('includeInactive') === 'true';
+
+    const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
+    const requestedPageSize = Number.isFinite(perPageParam) && perPageParam > 0 ? perPageParam : DEFAULT_PAGE_SIZE;
+    const pageSize = Math.min(Math.max(requestedPageSize, 1), MAX_PAGE_SIZE);
+
+    const supabaseAdmin = createSupabaseAdminClient();
     const supabase = createSupabaseAdminClient();
-    
-    // Fetch all required data in parallel for better performance
-    // This reduces the total request time from sequential to concurrent
-    const [authUsersResult, profilesResult, invitationStatusResult] = await Promise.all([
-      supabase.auth.admin.listUsers(),
+
+    const [authUsersResult, totalCountResult] = await Promise.all([
+      supabaseAdmin.auth.admin.listUsers({
+        page,
+        perPage: pageSize,
+      }),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).throwOnError(),
+    ]);
+
+    const { data: authUsersData, error: authError } = authUsersResult;
+    if (authError) throw authError;
+    if (!authUsersData) throw new Error('Failed to fetch auth users list.');
+
+    const totalUsers = totalCountResult.count ?? authUsersData.users.length ?? 0;
+    const authUsers = authUsersData.users ?? [];
+
+    if (authUsers.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        pagination: {
+          page,
+          pageSize,
+          total: totalUsers,
+        },
+      });
+    }
+
+    const userIds = authUsers.map(authUser => authUser.id);
+
+    const [profilesResult, brandPermissionsResult, invitationStatusResult, brandsResult] = await Promise.all([
       supabase
         .from('profiles')
-        .select(`
-          *,
-          user_brand_permissions:user_brand_permissions(
-            id,
-            brand_id,
-            role
-          )
-        `)
-        .order('created_at', { ascending: false }),
+        .select('id, full_name, email, avatar_url, job_title, company')
+        .in('id', userIds),
+      supabase
+        .from('user_brand_permissions')
+        .select('user_id, brand_id, role')
+        .in('user_id', userIds),
       supabase
         .from('user_invitation_status')
         .select('*')
+        .in('id', userIds),
+      supabase.from('brands').select('id, name, brand_color, logo_url'),
     ]);
-    
-    const { data: authUsersData, error: authError } = authUsersResult;
+
     const { data: profilesData, error: profilesError } = profilesResult;
+    const { data: brandPermissionsData, error: brandPermissionsError } = brandPermissionsResult;
     const { data: invitationStatusData, error: invitationError } = invitationStatusResult;
-    
-    if (authError) throw authError;
-    if (!authUsersData) throw new Error('Failed to fetch auth users list.');
-    
-    if (invitationError) {
-      console.error('Error fetching invitation status:', invitationError);
-    }
-    
+    const { data: brandsData, error: brandsError } = brandsResult;
+
     if (profilesError) throw profilesError;
-    if (!profilesData) throw new Error('Failed to fetch profiles data.');
-    
-    // Create Maps for O(1) lookups instead of O(n) find operations
+    if (brandPermissionsError) throw brandPermissionsError;
+    if (brandsError) throw brandsError;
+    if (invitationError) {
+      console.error('[users] Failed to fetch invitation status data:', invitationError);
+    }
+
     const profilesMap = new Map<string, ProfileRecord>(
-      (profilesData as ProfileRecord[]).map(p => [p.id, p])
+      ((profilesData ?? []) as ProfileRecord[]).map(profile => [profile.id, profile])
     );
-    const invitationStatusMap = new Map<string, Record<string, unknown>>(
-      invitationStatusData?.map((inv: Record<string, unknown>) => [inv.id as string, inv]) || []
-    );
-    
-    const mergedUsers = authUsersData.users.map(authUser => {
-      const profile = profilesMap.get(authUser.id);
-      const invitationStatus = invitationStatusMap.get(authUser.id);
-      
-      let highestRole = 'viewer';
-      if (profile?.user_brand_permissions && Array.isArray(profile.user_brand_permissions) && profile.user_brand_permissions.length > 0) {
-        for (const permission of profile.user_brand_permissions) {
-          if (permission && permission.role === 'admin') {
-            highestRole = 'admin';
-            break;
-          } else if (permission && permission.role === 'editor' && highestRole !== 'admin') {
-            highestRole = 'editor';
-          }
-        }
-      }
-      
-      // Role Determination Logic (Issue #97):
-      // 1. Find the highest role ('admin' > 'editor' > 'viewer') across all the user's brand permissions.
-      // 2. If the highest brand permission role is still 'viewer', check auth.user_metadata.role as a fallback.
-      // 3. This provides a primary role for display but conflates brand-specific and potential global roles.
-      // TODO: Conduct full role system audit - clarify if user_metadata.role represents a true global role
-      //       and ensure API authorization checks the correct permission source (brand vs. global).
-      if (highestRole === 'viewer' && authUser.user_metadata?.role) {
-        const metadataRole = typeof authUser.user_metadata.role === 'string' ? 
-          authUser.user_metadata.role.toLowerCase() : '';
-        if (metadataRole === 'admin') highestRole = 'admin';
-        else if (metadataRole === 'editor') highestRole = 'editor';
-      }
-      
-      // Check user status from metadata (set by deactivation) or invitation status view
-      const userStatus = authUser.user_metadata?.status || invitationStatus?.user_status || 'active';
-      
-      return {
-        id: authUser.id,
-        full_name: profile?.full_name || authUser.user_metadata?.full_name || 'Unnamed User',
-        email: authUser.email,
-        avatar_url: profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUser.id}`,
-        job_title: profile?.job_title || authUser.user_metadata?.job_title || '',
-        company: profile?.company || authUser.user_metadata?.company || '',
-        role: highestRole.charAt(0).toUpperCase() + highestRole.slice(1),
-        created_at: authUser.created_at,
-        last_sign_in_at: authUser.last_sign_in_at,
-        brand_permissions: profile?.user_brand_permissions || [],
-        invitation_status: invitationStatus?.invitation_status || null,
-        invitation_expires_at: invitationStatus?.expires_at || null,
-        user_status: userStatus,
-        is_current_user: authUser.id === user.id
-      };
+
+    const brandPermissionsByUser = new Map<string, BrandPermissionRecord[]>();
+    ((brandPermissionsData ?? []) as BrandPermissionRecord[]).forEach(record => {
+      if (!record.user_id) return;
+      const list = brandPermissionsByUser.get(record.user_id) ?? [];
+      list.push(record);
+      brandPermissionsByUser.set(record.user_id, list);
     });
 
-    return NextResponse.json({ 
-      success: true, 
-      data: mergedUsers 
+    const invitationStatusMap = new Map<string, InvitationStatusRecord>(
+      ((invitationStatusData ?? []) as InvitationStatusRecord[]).map(status => [status.id, status])
+    );
+
+    const brandsMap = new Map<string, BrandRecord>(
+      ((brandsData ?? []) as BrandRecord[]).map(brand => [brand.id, brand])
+    );
+
+    const mergedUsers = authUsers
+      .map(authUser =>
+        buildUserResponse(
+          authUser,
+          profilesMap.get(authUser.id),
+          brandPermissionsByUser.get(authUser.id),
+          brandsMap,
+          invitationStatusMap.get(authUser.id),
+          user.id
+        )
+      )
+      .filter(merged => includeInactive || merged.user_status !== 'inactive');
+
+    return NextResponse.json({
+      success: true,
+      data: mergedUsers,
+      pagination: {
+        page,
+        pageSize,
+        total: totalUsers,
+      },
     });
   } catch (error: unknown) {
     return handleApiError(error, 'Error fetching users');
   }
-}); 
+});

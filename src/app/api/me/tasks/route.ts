@@ -7,8 +7,6 @@ import { withAuth } from '@/lib/auth/api-auth';
 
 export const dynamic = "force-dynamic";
 
-const MAX_TASK_RESULTS = 200;
-
 export const GET = withAuth(async (request: NextRequest, user) => {
   if (!user) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
@@ -17,6 +15,13 @@ export const GET = withAuth(async (request: NextRequest, user) => {
   const supabase = createSupabaseAdminClient();
   const globalRole = user?.user_metadata?.role;
   let permittedBrandIds: string[] = [];
+
+  const url = new URL(request.url);
+  const pageParam = parseInt(url.searchParams.get('page') || '1', 10);
+  const limitParam = parseInt(url.searchParams.get('limit') || '20', 10);
+  const validatedPage = Number.isFinite(pageParam) ? Math.max(1, pageParam) : 1;
+  const validatedLimit = Number.isFinite(limitParam) ? Math.min(100, Math.max(1, limitParam)) : 20;
+  const offset = (validatedPage - 1) * validatedLimit;
 
   if (globalRole !== 'admin') {
     // Fetch brand_permissions directly for the user
@@ -48,6 +53,8 @@ export const GET = withAuth(async (request: NextRequest, user) => {
   }
 
   try {
+    const assignedFilter = `assigned_to.cs.${JSON.stringify([user.id])},assigned_to.eq.${user.id}`;
+
     // Query directly from the 'content' table
     let contentQuery = supabase
       .from('content')
@@ -62,9 +69,9 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         brand:brands!brand_id (id, name, brand_color, logo_url),
         workflow:workflows!workflow_id (id, name),
         workflow_step_details:workflow_steps!current_step (id, name, step_order)
-      `)
-      // Filter for content assigned to the current user
-      .contains('assigned_to', [user.id])
+      `, { count: 'exact' })
+      // Filter for content assigned to the current user (handles array or scalar storage)
+      .or(assignedFilter)
       // Filter for actionable content statuses (active content in review)
       .in('status', ['draft', 'pending_review']);
 
@@ -75,9 +82,9 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       // Admin user - fetch tasks from all brands
     }
 
-    const { data: contentItems, error } = await contentQuery
+    const { data: contentItems, error, count } = await contentQuery
       .order('updated_at', { ascending: false })
-      .limit(MAX_TASK_RESULTS);
+      .range(offset, offset + validatedLimit - 1);
 
     if (error) {
       console.error('Error fetching user tasks from content:', error);
@@ -114,7 +121,21 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       };
     });
 
-    return NextResponse.json({ success: true, data: formattedTasks });
+    const total = count ?? formattedTasks.length;
+    const totalPages = total === 0 ? 0 : Math.ceil(total / validatedLimit);
+
+    return NextResponse.json({
+      success: true,
+      data: formattedTasks,
+      pagination: {
+        page: validatedPage,
+        limit: validatedLimit,
+        total,
+        totalPages,
+        hasNextPage: validatedPage < totalPages,
+        hasPreviousPage: validatedPage > 1
+      }
+    });
 
   } catch (error: unknown) {
     return handleApiError(error, 'Failed to fetch user tasks');

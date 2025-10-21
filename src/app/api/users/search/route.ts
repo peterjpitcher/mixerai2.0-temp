@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+
+export const dynamic = 'force-dynamic';
+
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
@@ -6,39 +9,34 @@ import { withAuth } from '@/lib/auth/api-auth';
 import { BrandPermissionVerificationError, requireBrandAccess } from '@/lib/auth/brand-access';
 import { isGlobalAdmin } from '@/lib/auth/user-role';
 import { z } from 'zod';
+import type {
+  BrandPermissionRecord,
+  BrandRecord,
+  InvitationStatusRecord,
+  ProfileRecord,
+} from '../user-utils';
+import { buildUserResponse } from '../user-utils';
 
-// Force dynamic rendering for this route
-export const dynamic = "force-dynamic";
-
-// Input validation schema
 const SearchSchema = z.object({
-  query: z.string().min(0).max(100).default(''),
+  query: z.string().trim().max(100).default(''),
   brandId: z.string().uuid().optional(),
-  limit: z.number().int().min(1).max(50).default(10)
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  page: z.coerce.number().int().min(1).default(1),
+  includeInactive: z.coerce.boolean().optional(),
 });
 
-interface UserSearchResult {
-  id: string;
-  full_name: string | null;
-  email: string | null;
-  avatar_url: string | null;
-  job_title?: string | null;
-}
-
-/**
- * GET endpoint to search for users by email or name.
- * Uses brand-scoped view to ensure only active, non-deleted users are returned.
- * Implements proper multi-tenant safety and search performance optimizations.
- */
 export const GET = withAuth(async (request: NextRequest, sessionUser) => {
   try {
+    const supabaseRls = createSupabaseServerClient();
+    const supabase = createSupabaseAdminClient();
+
     const searchParams = request.nextUrl.searchParams;
-    
-    // Parse and validate input
     const validation = SearchSchema.safeParse({
-      query: searchParams.get('query') || '',
-      brandId: searchParams.get('brandId') || undefined,
-      limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!, 10) : 10
+      query: searchParams.get('query') ?? '',
+      brandId: searchParams.get('brandId') ?? undefined,
+      limit: searchParams.get('limit') ?? undefined,
+      page: searchParams.get('page') ?? undefined,
+      includeInactive: searchParams.get('includeInactive') ?? undefined,
     });
 
     if (!validation.success) {
@@ -48,27 +46,22 @@ export const GET = withAuth(async (request: NextRequest, sessionUser) => {
       );
     }
 
-    const { query: searchQuery, brandId, limit } = validation.data;
+    const { query, brandId, limit, page, includeInactive } = validation.data;
 
-    // Minimum search term length for performance
-    if (searchQuery && searchQuery.length < 2) {
+    if (query && query.length > 0 && query.length < 2) {
       return NextResponse.json(
-        { success: false, error: 'Search term must be at least 2 characters' },
+        { success: false, error: 'Search term must be at least 2 characters long.' },
         { status: 400 }
       );
     }
-    
-    const supabase = createSupabaseServerClient();
-    const adminSupabase = createSupabaseAdminClient();
 
     const isAdmin = isGlobalAdmin(sessionUser);
-    const authUsersMap = new Map<string, any>();
+    let brandScopeUserIds: string[] | null = null;
 
-    let permittedBrandIds: string[] = [];
     if (brandId) {
       if (!isAdmin) {
         try {
-          await requireBrandAccess(supabase, sessionUser, brandId);
+          await requireBrandAccess(supabaseRls, sessionUser, brandId);
         } catch (error) {
           if (error instanceof BrandPermissionVerificationError) {
             return NextResponse.json(
@@ -85,22 +78,50 @@ export const GET = withAuth(async (request: NextRequest, sessionUser) => {
           throw error;
         }
       }
-      permittedBrandIds = [brandId];
+
+      const { data: brandUsers, error: brandUsersError } = await supabase
+        .from('user_brand_permissions')
+        .select('user_id')
+        .eq('brand_id', brandId);
+
+      if (brandUsersError) {
+        console.error('[users/search] Failed to load brand user permissions', brandUsersError);
+        return NextResponse.json(
+          { success: false, error: 'Unable to load brand users.' },
+          { status: 500 }
+        );
+      }
+
+      brandScopeUserIds = (brandUsers ?? [])
+        .map(record => record.user_id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+      if (brandScopeUserIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          users: [],
+          pagination: {
+            page,
+            limit,
+            total: 0,
+          },
+        });
+      }
     } else if (!isAdmin) {
-      const { data: userBrands, error: userBrandsError } = await supabase
+      const { data: accessibleBrands, error: brandsError } = await supabase
         .from('user_brand_permissions')
         .select('brand_id')
         .eq('user_id', sessionUser.id);
 
-      if (userBrandsError) {
-        console.error('[users/search] Failed to load user brand permissions', userBrandsError);
+      if (brandsError) {
+        console.error('[users/search] Failed to load accessible brands', brandsError);
         return NextResponse.json(
           { success: false, error: 'Unable to load brand context.' },
           { status: 500 }
         );
       }
 
-      permittedBrandIds = (userBrands || [])
+      const permittedBrandIds = (accessibleBrands ?? [])
         .map(record => record.brand_id)
         .filter((id): id is string => typeof id === 'string' && id.length > 0);
 
@@ -108,26 +129,13 @@ export const GET = withAuth(async (request: NextRequest, sessionUser) => {
         return NextResponse.json({
           success: true,
           users: [],
-          count: 0,
-          metadata: { brandId, searchQuery, limit }
+          pagination: {
+            page,
+            limit,
+            total: 0,
+          },
         });
       }
-    }
-
-    if (isAdmin) {
-      const { data: authUsersData } = await adminSupabase.auth.admin.listUsers({
-        page: 1,
-        perPage: 1000,
-      });
-
-      authUsersData?.users?.forEach((authUser) => {
-        if (authUser.user_metadata?.deleted_at || authUser.user_metadata?.status === 'inactive') {
-          return;
-        }
-        authUsersMap.set(authUser.id, authUser);
-      });
-    } else {
-      const candidateIds = new Set<string>();
 
       const { data: brandUsers, error: brandUsersError } = await supabase
         .from('user_brand_permissions')
@@ -135,138 +143,154 @@ export const GET = withAuth(async (request: NextRequest, sessionUser) => {
         .in('brand_id', permittedBrandIds);
 
       if (brandUsersError) {
-        console.error('[users/search] Failed to load brand user permissions', brandUsersError);
+        console.error('[users/search] Failed to load scoped brand users', brandUsersError);
         return NextResponse.json(
           { success: false, error: 'Unable to load brand users.' },
           { status: 500 }
         );
       }
 
-      brandUsers?.forEach(record => {
-        if (record.user_id) {
-          candidateIds.add(record.user_id);
-        }
-      });
+      brandScopeUserIds = Array.from(
+        new Set(
+          (brandUsers ?? [])
+            .map(record => record.user_id)
+            .filter((id): id is string => typeof id === 'string' && id.length > 0)
+        )
+      );
 
-      candidateIds.add(sessionUser.id);
-
-      if (candidateIds.size === 0) {
+      if (brandScopeUserIds.length === 0) {
         return NextResponse.json({
           success: true,
           users: [],
-          count: 0,
-          metadata: { brandId, searchQuery, limit }
+          pagination: {
+            page,
+            limit,
+            total: 0,
+          },
         });
       }
-
-      const candidateResults = await Promise.all(
-        Array.from(candidateIds).map(async (userId) => {
-          try {
-            const { data } = await adminSupabase.auth.admin.getUserById(userId);
-            const user = data?.user;
-            if (!user) return null;
-            if (user.user_metadata?.deleted_at || user.user_metadata?.status === 'inactive') {
-              return null;
-            }
-            return user;
-          } catch (error) {
-            console.error('[users/search] Failed to load auth user by id', userId, error);
-            return null;
-          }
-        })
-      );
-
-      candidateResults.forEach((user) => {
-        if (user) {
-          authUsersMap.set(user.id, user);
-        }
-      });
     }
 
-    const activeUserIds = Array.from(authUsersMap.keys());
+    const offset = (page - 1) * limit;
 
-    if (activeUserIds.length === 0) {
+    const escapedQuery = query.replace(/[%_]/g, '\\$&');
+
+    let profilesQuery = supabase
+      .from('profiles')
+      .select('id, full_name, email, avatar_url, job_title, company', { count: 'exact' })
+      .order('full_name', { ascending: true })
+      .order('id', { ascending: true })
+      .range(offset, offset + limit - 1);
+
+    if (escapedQuery) {
+      profilesQuery = profilesQuery.or(
+        `full_name.ilike.%${escapedQuery}%,email.ilike.%${escapedQuery}%`
+      );
+    }
+
+    if (brandScopeUserIds && brandScopeUserIds.length > 0) {
+      profilesQuery = profilesQuery.in('id', brandScopeUserIds);
+    }
+
+    const { data: profilesData, error: profilesError, count } = await profilesQuery;
+
+    if (profilesError) {
+      console.error('[users/search] Failed to load profiles', profilesError);
+      throw profilesError;
+    }
+
+    const profileRows = (profilesData ?? []) as ProfileRecord[];
+    const userIds = profileRows.map(profile => profile.id);
+
+    if (userIds.length === 0) {
       return NextResponse.json({
         success: true,
         users: [],
-        count: 0,
-        metadata: { brandId, searchQuery, limit }
+        pagination: {
+          page,
+          limit,
+          total: count ?? 0,
+        },
       });
     }
 
-    let dbQuery = supabase
-      .from('profiles')
-      .select('id, email, full_name, avatar_url, job_title')
-      .in('id', activeUserIds);
-
-    if (brandId) {
-      const { data: brandScopedUsers, error: brandUsersError } = await supabase
+    const [authUsers, brandPermissionsResult, invitationStatusResult, brandsResult] = await Promise.all([
+      Promise.all(
+        userIds.map(async id => {
+          try {
+            const { data } = await supabase.auth.admin.getUserById(id);
+            return data?.user ?? null;
+          } catch (error) {
+            console.error('[users/search] Failed to fetch auth user', id, error);
+            return null;
+          }
+        })
+      ).then(results => results.filter((user): user is NonNullable<typeof user> => Boolean(user))),
+      supabase
         .from('user_brand_permissions')
-        .select('user_id')
-        .eq('brand_id', brandId)
-        .in('user_id', activeUserIds);
+        .select('user_id, brand_id, role')
+        .in('user_id', userIds),
+      supabase
+        .from('user_invitation_status')
+        .select('*')
+        .in('id', userIds),
+      supabase
+        .from('brands')
+        .select('id, name, brand_color, logo_url'),
+    ]);
 
-      if (brandUsersError) {
-        console.error('[users/search] Failed to load brand user permissions', brandUsersError);
-        return NextResponse.json(
-          { success: false, error: 'Unable to load brand users.' },
-          { status: 500 }
-        );
-      }
+    const { data: brandPermissionsData, error: brandPermissionsError } = brandPermissionsResult;
+    const { data: invitationStatusData, error: invitationError } = invitationStatusResult;
+    const { data: brandsData, error: brandsError } = brandsResult;
 
-      const brandUserIds = brandScopedUsers?.map(record => record.user_id).filter((id): id is string => !!id) || [];
-      dbQuery = dbQuery.in('id', brandUserIds);
+    if (brandPermissionsError) throw brandPermissionsError;
+    if (brandsError) throw brandsError;
+    if (invitationError) {
+      console.error('[users/search] Failed to fetch invitation status data:', invitationError);
     }
 
-    // Apply search filter if query provided
-    if (searchQuery) {
-      // Escape special characters to prevent SQL injection
-      const escapedQuery = searchQuery.replace(/[%_]/g, '\\$&');
-      dbQuery = dbQuery.or(`email.ilike.%${escapedQuery}%,full_name.ilike.%${escapedQuery}%`);
-    }
+    const profilesMap = new Map<string, ProfileRecord>(profileRows.map(profile => [profile.id, profile]));
 
-    // Add deterministic ordering for pagination stability
-    dbQuery = dbQuery
-      .order('full_name', { ascending: true })
-      .order('id', { ascending: true })
-      .limit(limit);
-
-    const { data: profileRows, error } = await dbQuery;
-
-    if (error) {
-      console.error('Error searching users:', error);
-      throw error;
-    }
-
-    const results: UserSearchResult[] = (profileRows || []).map((profile) => {
-      const authUser = authUsersMap.get(profile.id);
-      const email = authUser?.email || (profile as Record<string, unknown>).email || '';
-      const fullName = profile.full_name || authUser?.user_metadata?.full_name || 'Unnamed User';
-      const avatarUrl = profile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.id}`;
-      const jobTitle = profile.job_title || authUser?.user_metadata?.job_title || '';
-
-      return {
-        id: profile.id,
-        email,
-        full_name: fullName,
-        avatar_url: avatarUrl,
-        job_title: jobTitle,
-      } satisfies UserSearchResult;
+    const brandPermissionsByUser = new Map<string, BrandPermissionRecord[]>();
+    ((brandPermissionsData ?? []) as BrandPermissionRecord[]).forEach(record => {
+      if (!record.user_id) return;
+      const list = brandPermissionsByUser.get(record.user_id) ?? [];
+      list.push(record);
+      brandPermissionsByUser.set(record.user_id, list);
     });
+
+    const invitationStatusMap = new Map<string, InvitationStatusRecord>(
+      ((invitationStatusData ?? []) as InvitationStatusRecord[]).map(status => [status.id, status])
+    );
+
+    const brandsMap = new Map<string, BrandRecord>(
+      ((brandsData ?? []) as BrandRecord[]).map(brand => [brand.id, brand])
+    );
+
+    const mergedUsers = authUsers
+      .map(authUser =>
+        buildUserResponse(
+          authUser,
+          profilesMap.get(authUser.id),
+          brandPermissionsByUser.get(authUser.id),
+          brandsMap,
+          invitationStatusMap.get(authUser.id),
+          sessionUser.id
+        )
+      )
+      .filter(merged => includeInactive || merged.user_status !== 'inactive');
 
     return NextResponse.json({
       success: true,
-      users: results,
-      count: results.length,
-      metadata: {
-        brandId,
-        searchQuery,
+      users: mergedUsers,
+      pagination: {
+        page,
         limit,
+        total: count ?? mergedUsers.length,
       },
     });
-
   } catch (error) {
-    console.error('Error searching users:', error);
+    console.error('[users/search] Error searching users:', error);
     return handleApiError(error, 'Error searching users');
   }
-}); 
+});

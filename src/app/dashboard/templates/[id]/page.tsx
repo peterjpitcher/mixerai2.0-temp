@@ -5,7 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { TemplateForm } from '@/components/template/template-form';
-import { Loader2, ArrowLeft, Trash2, ShieldAlert } from 'lucide-react';
+import { Loader2, ArrowLeft, Trash2, ShieldAlert, AlertTriangle } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,20 +20,16 @@ import { toast } from 'sonner';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import type { ContentTemplate } from '@/types/template';
 import { apiFetch } from '@/lib/api-client';
+import { useTemplateSession } from '../use-template-session';
 
-// Define UserSessionData interface
-interface UserSessionData {
-  id: string;
-  email?: string;
-  user_metadata?: {
-    role?: string; 
-    full_name?: string;
-  };
-  brand_permissions?: Array<{
-    brand_id: string;
-    role: string;
-  }>;
-}
+const SessionErrorState = ({ message, onRetry }: { message: string; onRetry: () => void }) => (
+  <div className="flex flex-col items-center justify-center min-h-[300px] py-10 text-center">
+    <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
+    <h3 className="text-xl font-bold mb-2">Unable to verify your access</h3>
+    <p className="text-muted-foreground mb-4 max-w-md">{message}</p>
+    <Button onClick={onRetry}>Try Again</Button>
+  </div>
+);
 
 // Default templates data for system templates
 const defaultTemplates = {
@@ -183,86 +179,105 @@ export default function TemplateEditPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   // const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const {
+    user: currentUser,
+    isLoading: isLoadingUser,
+    error: sessionError,
+    status: sessionStatus,
+    refetch: refetchSession,
+  } = useTemplateSession();
 
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      setIsLoadingUser(true);
-      try {
-        const response = await apiFetch('/api/me');
-        if (!response.ok) throw new Error('Failed to fetch user session');
-        const data = await response.json();
-        if (data.success && data.user) {
-          setCurrentUser(data.user);
-        } else {
-          setCurrentUser(null);
-          toast.error(data.error || 'Could not verify your session.');
-        }
-      } catch (err) {
-        console.error('Error fetching current user:', err);
-        setCurrentUser(null);
-        toast.error('Error fetching user data: ' + (err as Error).message);
-      } finally {
-        setIsLoadingUser(false);
-      }
-    };
-    fetchCurrentUser();
-  }, []);
+  const userRole = currentUser?.user_metadata?.role;
+  const canEditTemplate = userRole === 'admin'; // Only admins can edit/delete templates
+  const canViewTemplate = userRole === 'admin' || userRole === 'editor' || userRole === 'viewer';
 
   useEffect(() => {
     if (!id) {
       setLoading(false);
       toast.error('Template ID is missing.');
-      // Optionally redirect if ID is crucial and missing from start
-      // router.push('/dashboard/templates'); 
       return;
     }
 
-    // Wait for user to be loaded before deciding to fetch template data
-    if (isLoadingUser) return;
+    if (isLoadingUser) {
+      return;
+    }
 
-    // If user is loaded and doesn't have at least viewer role, don't fetch template
-    const userRole = currentUser?.user_metadata?.role;
-    const canViewTemplate = userRole === 'admin' || userRole === 'editor' || userRole === 'viewer';
+    if (sessionError && sessionStatus !== 403) {
+      setLoading(false);
+      return;
+    }
+
     if (!currentUser || !canViewTemplate) {
       setLoading(false);
-      return; 
+      return;
     }
 
     const fetchTemplate = async () => {
       setLoading(true);
+
       if (defaultTemplates[id as keyof typeof defaultTemplates]) {
-        setTemplate(defaultTemplates[id as keyof typeof defaultTemplates]);
+        setTemplate(defaultTemplates[id as keyof typeof defaultTemplates] as Record<string, unknown>);
         setLoading(false);
-      } else {
-        try {
-          const response = await fetch(`/api/content-templates/${id}`);
-          const data = await response.json();
-          if (data.success && data.template) {
-            setTemplate(data.template);
-          } else {
-            setTemplate(null); // Explicitly set to null if not found or error
-            toast.error(data.error || 'Template not found.');
-          }
-        } catch (error) {
-          console.error('Error fetching template:', error);
-          toast.error('Failed to load template details.');
+        return;
+      }
+
+      try {
+        const response = await apiFetch(`/api/content-templates/${id}`, {
+          retry: 1,
+          retryDelayMs: 300,
+        });
+        const data = await response.json() as {
+          success: boolean;
+          template?: Record<string, unknown> & {
+            fields?: {
+              inputFields?: unknown[];
+              outputFields?: unknown[];
+            };
+            inputFields?: unknown[];
+            outputFields?: unknown[];
+          };
+          error?: string;
+        };
+
+        if (data.success && data.template) {
+          const templateFields = data.template.fields ?? {
+            inputFields: Array.isArray(data.template.inputFields) ? data.template.inputFields : [],
+            outputFields: Array.isArray(data.template.outputFields) ? data.template.outputFields : [],
+          };
+
+          setTemplate({
+            ...data.template,
+            fields: {
+              inputFields: Array.isArray(templateFields.inputFields) ? templateFields.inputFields : [],
+              outputFields: Array.isArray(templateFields.outputFields) ? templateFields.outputFields : [],
+            },
+          });
+        } else {
           setTemplate(null);
-        } finally {
-          setLoading(false);
+          toast.error(data.error || 'Template not found.');
         }
+      } catch (error) {
+        console.error('Error fetching template:', error);
+        toast.error('Failed to load template details.');
+        setTemplate(null);
+      } finally {
+        setLoading(false);
       }
     };
-    fetchTemplate();
-  }, [id, isLoadingUser, currentUser, router]); // Added router to dependencies due to potential use
 
-  const userRole = currentUser?.user_metadata?.role;
-  const canEditTemplate = userRole === 'admin'; // Only admins can edit/delete templates
-  const canViewTemplate = userRole === 'admin' || userRole === 'editor' || userRole === 'viewer';
+    void fetchTemplate();
+  }, [
+    id,
+    isLoadingUser,
+    currentUser,
+    canViewTemplate,
+    sessionError,
+    sessionStatus,
+  ]);
+
   const isSystemTemplate = defaultTemplates[id as keyof typeof defaultTemplates];
 
-  if (isLoadingUser || loading) {
+  if (isLoadingUser || (loading && !sessionError)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -271,12 +286,24 @@ export default function TemplateEditPage() {
     );
   }
 
-  if (!canViewTemplate) {
+  if (!isLoadingUser && sessionError && sessionStatus !== 403) {
+    return <SessionErrorState message={sessionError} onRetry={() => void refetchSession()} />;
+  }
+
+  const isForbidden =
+    !isLoadingUser &&
+    (sessionStatus === 403 || (!!currentUser && !canViewTemplate));
+
+  if (isForbidden) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px] py-10">
         <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
         <h3 className="text-xl font-bold mb-2">Access Denied</h3>
-        <p className="text-muted-foreground">You do not have permission to view this Content Template.</p>
+        <p className="text-muted-foreground">
+          {sessionStatus === 403
+            ? sessionError || 'You do not have permission to view this Content Template.'
+            : 'You do not have permission to view this Content Template.'}
+        </p>
         <Link href="/dashboard/templates">
           <Button variant="outline" className="mt-4">Back to Templates</Button>
         </Link>

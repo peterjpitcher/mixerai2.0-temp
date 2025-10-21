@@ -11,7 +11,6 @@ import { MarkdownDisplay } from '@/components/content/markdown-display';
 import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
 import { VettingAgencyFeedbackCard } from '@/components/content/vetting-agency-feedback-card';
 import { toast } from 'sonner';
-import { createBrowserClient } from '@supabase/ssr';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandIcon,  } from '@/components/brand-icon';
 import { ArrowLeft, Edit3, CheckCircle } from 'lucide-react';
@@ -21,6 +20,8 @@ import { format as formatDateFns } from 'date-fns';
 import { normalizeOutputsMap } from '@/lib/content/html-normalizer';
 import type { NormalizedContent } from '@/types/template';
 import type { VettingFeedbackStageResult } from '@/types/vetting-feedback';
+import { apiFetch } from '@/lib/api-client';
+import { useCurrentUser } from '@/hooks/use-common-data';
 
 interface TemplateOutputField {
   id: string;
@@ -132,16 +133,12 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   const [content, setContent] = useState<ContentData | null>(null);
   const [versions, setVersions] = useState<ContentVersion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [activeBrandData, setActiveBrandData] = useState<BrandData | null>(null);
   const [template, setTemplate] = useState<Template | null>(null);
   const router = useRouter();
   const pathname = usePathname();
-
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const { data: currentUser } = useCurrentUser();
+  const currentUserId = currentUser?.id ?? null;
 
   useEffect(() => {
     const mainEl = document.querySelector<HTMLElement>('[data-dashboard-main]');
@@ -153,118 +150,118 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   }, []);
 
   useEffect(() => {
-    const getCurrentUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setCurrentUserId(user?.id || null);
-    };
-    getCurrentUser();
-  }, [supabase.auth]);
+    const abortController = new AbortController();
 
-  useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const contentResponse = await fetch(`/api/content/${id}`);
+        const contentResponse = await apiFetch(`/api/content/${id}`, {
+          signal: abortController.signal,
+        });
 
         if (!contentResponse.ok) {
-          if (contentResponse.status === 404) notFound();
-          throw new Error(`Failed to fetch content: ${contentResponse.statusText}`);
+          if (contentResponse.status === 404) {
+            notFound();
+            return;
+          }
+          const payload = await contentResponse.json().catch(() => ({}));
+          throw new Error(payload.error || `Failed to fetch content (${contentResponse.status})`);
         }
+
         const contentResult = await contentResponse.json();
-        if (contentResult.success && contentResult.data) {
-          setContent(contentResult.data);
-          console.log('[ContentDetailPage] Received content data:', contentResult.data);
-          const fetchedVersions = contentResult.data.versions || [];
-          setVersions(fetchedVersions);
-          console.log('[ContentDetailPage] Set versions state to:', fetchedVersions);
-          if (contentResult.data.brand_id) {
-            fetch(`/api/brands/${contentResult.data.brand_id}`)
-              .then(res => res.json())
-              .then(brandRes => {
-                if (brandRes.success && brandRes.brand) {
-                  setActiveBrandData(brandRes.brand);
-                }
-              });
-          } else if (contentResult.data.brands) {
-             setActiveBrandData(contentResult.data.brands);
-          }
-
-          if (process.env.NODE_ENV === 'development') {
-            console.log('[Template Debug] Attempting to load template. Template ID from content:', contentResult.data.template_id);
-            if (contentResult.data.content_templates) {
-              console.log('[Template Debug] Found embedded template data in content:', JSON.stringify(contentResult.data.content_templates, null, 2));
-            }
-          }
-
-          if (contentResult.data.template_id) {
-            fetch(`/api/content-templates/${contentResult.data.template_id}`)
-              .then(res => res.json())
-              .then(templateRes => {
-                if (process.env.NODE_ENV === 'development') {
-                  console.log('[Template Debug] Received template API response:', JSON.stringify(templateRes, null, 2));
-                }
-                if (templateRes.success && templateRes.template) {
-                  const apiTemplateData = templateRes.template;
-                  // Normalize the API template structure to match the component's Template interface
-                  const normalizedTemplate: Template = {
-                    id: apiTemplateData.id,
-                    name: apiTemplateData.name,
-                    description: apiTemplateData.description,
-                    // Ensure 'fields' property exists and contains inputFields and outputFields
-                    fields: {
-                      inputFields: apiTemplateData.inputFields || [],
-                      outputFields: apiTemplateData.outputFields || []
-                    }
-                  };
-                  setTemplate(normalizedTemplate);
-                  if (process.env.NODE_ENV === 'development') {
-                    console.log('[Template Debug] Successfully set template state (normalized):', JSON.stringify(normalizedTemplate, null, 2));
-                  }
-                } else {
-                  console.error('Failed to fetch template:', templateRes.error);
-                  toast.error('Could not load content template structure.');
-                  if (process.env.NODE_ENV === 'development') {
-                    console.log('[Template Debug] Failed to set template state. Error:', templateRes.error);
-                  }
-                }
-              })
-              .catch(err => {
-                console.error('Error fetching template:', err);
-                toast.error('Error loading content template structure.');
-                if (process.env.NODE_ENV === 'development') {
-                  console.log('[Template Debug] Exception during template fetch:', err.message);
-                }
-              });
-          } else if (contentResult.data.content_templates) {
-            setTemplate(contentResult.data.content_templates);
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[Template Debug] Set template state from embedded data:', JSON.stringify(contentResult.data.content_templates, null, 2));
-            }
-          } else {
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[Template Debug] No template_id found and no embedded template data in content.');
-            }
-            toast.message('Content does not have an associated template. Field names may not display correctly in history.');
-          }
-
-        } else {
+        if (!contentResult.success || !contentResult.data) {
           throw new Error(contentResult.error || 'Failed to load content data.');
         }
 
+        if (abortController.signal.aborted) return;
+
+        setContent(contentResult.data);
+        setVersions(contentResult.data.versions || []);
+
+        if (contentResult.data.brand_id) {
+          try {
+            const brandRes = await apiFetch(`/api/brands/${contentResult.data.brand_id}`, {
+              signal: abortController.signal,
+            });
+            if (brandRes.ok) {
+              const brandJson = await brandRes.json();
+              if (!abortController.signal.aborted) {
+                setActiveBrandData(brandJson.success ? brandJson.brand ?? null : null);
+              }
+            } else if (!abortController.signal.aborted) {
+              setActiveBrandData(null);
+            }
+          } catch (brandError) {
+            if (!abortController.signal.aborted) {
+              console.warn('Error fetching brand data:', brandError);
+              setActiveBrandData(null);
+            }
+          }
+        } else if (contentResult.data.brands) {
+          setActiveBrandData(contentResult.data.brands as BrandData);
+        } else {
+          setActiveBrandData(null);
+        }
+
+        let templateResolved = false;
+
+        if (contentResult.data.template_id) {
+          try {
+            const templateRes = await apiFetch(`/api/content-templates/${contentResult.data.template_id}`, {
+              signal: abortController.signal,
+            });
+            if (templateRes.ok) {
+              const templateJson = await templateRes.json();
+              if (templateJson.success && templateJson.template && !abortController.signal.aborted) {
+                const apiTemplateData = templateJson.template;
+                const normalizedTemplate: Template = {
+                  id: apiTemplateData.id,
+                  name: apiTemplateData.name,
+                  description: apiTemplateData.description,
+                  fields: {
+                    inputFields: apiTemplateData.inputFields || [],
+                    outputFields: apiTemplateData.outputFields || [],
+                  },
+                };
+                setTemplate(normalizedTemplate);
+                templateResolved = true;
+              }
+            } else if (!abortController.signal.aborted) {
+              const errorPayload = await templateRes.json().catch(() => ({}));
+              toast.error(errorPayload.error || 'Could not load content template structure.');
+              setTemplate(null);
+            }
+          } catch (templateError) {
+            if (!abortController.signal.aborted) {
+              console.error('Error fetching template:', templateError);
+              toast.error('Error loading content template structure.');
+              setTemplate(null);
+            }
+          }
+        } else if (contentResult.data.content_templates) {
+          setTemplate(contentResult.data.content_templates);
+          templateResolved = true;
+        }
+
+        if (!templateResolved && !contentResult.data.template_id && !contentResult.data.content_templates) {
+          toast.message('Content does not have an associated template. Field names may not display correctly in history.');
+        }
       } catch (error: unknown) {
+        if (abortController.signal.aborted) return;
         console.error('Error fetching page data:', error);
         toast.error(error instanceof Error ? error.message : 'Failed to load page data. Please try again.');
-        if (error instanceof Error && (error.message.includes('404') || (error as unknown as Record<string, unknown>).response && (error as unknown as Record<string, { status?: number }>).response.status === 404)) {
-           notFound();
-        }
       } finally {
-        setIsLoading(false);
+        if (!abortController.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     };
-    
+
     if (id) {
       fetchData();
     }
+
+    return () => abortController.abort();
   }, [id]);
 
   const outputFieldIdToNameMap = useMemo(() => {
@@ -301,19 +298,21 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const contentResponse = await fetch(`/api/content/${id}`);
+        const contentResponse = await apiFetch(`/api/content/${id}`);
 
         if (!contentResponse.ok) {
-          if (contentResponse.status === 404) notFound();
-          throw new Error(`Failed to fetch content: ${contentResponse.statusText}`);
+          if (contentResponse.status === 404) {
+            notFound();
+            return;
+          }
+          const payload = await contentResponse.json().catch(() => ({}));
+          throw new Error(payload.error || `Failed to fetch content (${contentResponse.status})`);
         }
         const contentResult = await contentResponse.json();
         if (contentResult.success && contentResult.data) {
           setContent(contentResult.data);
-          console.log('[ContentDetailPage] Refreshed content data:', contentResult.data);
           const refreshedVersions = contentResult.data.versions || [];
           setVersions(refreshedVersions);
-          console.log('[ContentDetailPage] Set versions state after refresh to:', refreshedVersions);
         } else {
           throw new Error(contentResult.error || 'Failed to load content data.');
         }

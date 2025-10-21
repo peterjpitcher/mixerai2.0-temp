@@ -9,16 +9,46 @@ import { z } from 'zod';
 import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth/brand-access';
  // TODO: Uncomment when types are regenerated
 
+type RateLimitEntry = {
+  count: number;
+  timestamp: number;
+  resetTimer: NodeJS.Timeout | null;
+};
+
 // In-memory rate limiting
-const rateLimit = new Map<string, { count: number, timestamp: number }>();
+const rateLimit = new Map<string, RateLimitEntry>();
 const RATE_LIMIT_PERIOD = 60 * 1000; // 1 minute
 const MAX_REQUESTS_PER_MINUTE = 60; // Allow 60 requests per minute per IP (relaxed)
+const MAX_URLS_PER_REQUEST = 5;
+
+function getOrCreateRateLimitEntry(ip: string, now: number): RateLimitEntry {
+  let entry = rateLimit.get(ip);
+
+  if (!entry) {
+    entry = { count: 0, timestamp: now, resetTimer: null };
+    rateLimit.set(ip, entry);
+  } else if (now - entry.timestamp > RATE_LIMIT_PERIOD) {
+    if (entry.resetTimer) {
+      clearTimeout(entry.resetTimer);
+    }
+    entry.count = 0;
+    entry.timestamp = now;
+  }
+
+  if (!entry.resetTimer) {
+    entry.resetTimer = setTimeout(() => {
+      rateLimit.delete(ip);
+    }, RATE_LIMIT_PERIOD);
+  }
+
+  return entry;
+}
 
 const MetadataGenerationSchema = z.object({
   urls: z
     .array(z.string().min(1))
     .min(1, 'At least one URL is required')
-    .max(10, 'A maximum of 10 URLs can be processed at once'),
+    .max(MAX_URLS_PER_REQUEST, `A maximum of ${MAX_URLS_PER_REQUEST} URLs can be processed at once`),
   language: z.string().min(2).max(10).optional(),
   processBatch: z.boolean().optional(),
   brand_id: z.string().uuid().optional(),
@@ -59,39 +89,33 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
   const ip = request.headers.get('x-forwarded-for') || request.ip || 'unknown';
   const now = Date.now();
 
-  if (rateLimit.has(ip)) {
-    const userRateLimit = rateLimit.get(ip)!;
-    if (now - userRateLimit.timestamp > RATE_LIMIT_PERIOD) {
-      // Reset count if period has passed
-      userRateLimit.count = 1;
-      userRateLimit.timestamp = now;
-    } else if (userRateLimit.count >= MAX_REQUESTS_PER_MINUTE) {
-      console.warn(`[RateLimit] Blocked ${ip} for metadata-generator. Count: ${userRateLimit.count}`);
-      historyEntryStatus = 'failure';
-      historyErrorMessage = 'Rate limit exceeded.';
-      try {
-        await supabaseAdmin.from('tool_run_history').insert({
-            user_id: user.id,
-            tool_name: 'metadata_generator',
-            inputs: { error: 'Rate limit exceeded for initial request' } as Json,
-            outputs: { error: 'Rate limit exceeded' } as Json,
-            status: historyEntryStatus,
-            error_message: historyErrorMessage,
-            brand_id: null
-        });
-      } catch (logError) {
-        console.error('[HistoryLoggingError] Failed to log rate limit error for metadata-generator:', logError);
-      }
-      return NextResponse.json(
-        { success: false, error: 'Rate limit exceeded. Please try again in a minute.' },
-        { status: 429 }
-      );
-    } else {
-      userRateLimit.count += 1;
+  const rateEntry = getOrCreateRateLimitEntry(ip, now);
+  rateEntry.timestamp = now;
+
+  if (rateEntry.count >= MAX_REQUESTS_PER_MINUTE) {
+    console.warn(`[RateLimit] Blocked ${ip} for metadata-generator. Count: ${rateEntry.count}`);
+    historyEntryStatus = 'failure';
+    historyErrorMessage = 'Rate limit exceeded.';
+    try {
+      await supabaseAdmin.from('tool_run_history').insert({
+          user_id: user.id,
+          tool_name: 'metadata_generator',
+          inputs: { error: 'Rate limit exceeded for initial request' } as Json,
+          outputs: { error: 'Rate limit exceeded' } as Json,
+          status: historyEntryStatus,
+          error_message: historyErrorMessage,
+          brand_id: null
+      });
+    } catch (logError) {
+      console.error('[HistoryLoggingError] Failed to log rate limit error for metadata-generator:', logError);
     }
-  } else {
-    rateLimit.set(ip, { count: 1, timestamp: now });
+    return NextResponse.json(
+      { success: false, error: 'Rate limit exceeded. Please try again in a minute.' },
+      { status: 429 }
+    );
   }
+
+  rateEntry.count += 1;
 
   try {
     const parsedBody = MetadataGenerationSchema.safeParse(await request.json());
@@ -187,10 +211,6 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
           pageContent = await fetchWebPageContent(url);
         } catch (fetchError) {
           console.warn(`[MetadataGen] Failed to fetch content for URL ${url}: ${(fetchError as Error).message}`);
-        }
-
-        if (i > 0) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
         }
 
         const generatedMetadata = await generateMetadata(

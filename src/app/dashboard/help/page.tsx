@@ -6,7 +6,9 @@ import fs from 'fs/promises';
 import path from 'path';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { cache } from 'react';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
+import { parseFrontmatter } from '@/lib/utils/markdown';
 
 export const metadata = {
   title: 'Help Wiki | MixerAI',
@@ -19,68 +21,62 @@ interface HelpArticle {
   content?: string;
 }
 
-// Function to parse YAML frontmatter (simplified)
-function parseFrontmatter(fileContent: string): { title?: string; content: string } {
-  const match = fileContent.match(/^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/);
-  if (match) {
-    const frontmatter = match[1];
-    const content = match[2];
-    let title;
-    const titleMatch = frontmatter.match(/^title:\s*(.*)/m);
-    if (titleMatch) {
-      title = titleMatch[1].trim().replace(/['"`]/g, ''); // Remove quotes
-    }
-    return { title, content };
-  }
-  return { content: fileContent }; // No frontmatter found
-}
+const wikiDir = path.join(process.cwd(), 'src', 'content', 'help-wiki');
 
-async function getHelpArticles(): Promise<HelpArticle[]> {
-  const wikiDir = path.join(process.cwd(), 'src', 'content', 'help-wiki');
+const getHelpArticles = cache(async (): Promise<HelpArticle[]> => {
   try {
     const files = await fs.readdir(wikiDir);
-    const markdownFiles = files.filter(file => file.endsWith('.md'));
+    const markdownFiles = files.filter(file => file.endsWith('.md')).sort();
 
-    const articles: HelpArticle[] = [];
-    for (const file of markdownFiles.sort()) {
-      const filePath = path.join(wikiDir, file);
-      const rawFileContent = await fs.readFile(filePath, 'utf-8');
-      
-      const { title: fmTitle, content: bodyContent } = parseFrontmatter(rawFileContent);
-      let articleTitle = fmTitle;
+    const deduped: HelpArticle[] = [];
+    const seen = new Set<string>();
 
-      if (!articleTitle) {
-        const firstLine = bodyContent.split('\n')[0];
-        articleTitle = firstLine.replace(/^#\s*/, '').trim() || file.replace('.md', '');
+    for (const file of markdownFiles) {
+      const slug = file.replace(/\.md$/i, '');
+      if (seen.has(slug)) {
+        continue;
       }
-      
-      articles.push({
-        slug: file.replace('.md', ''),
-        title: articleTitle,
+      seen.add(slug);
+
+      let articleTitle: string | undefined;
+      try {
+        const filePath = path.join(wikiDir, file);
+        const rawFileContent = await fs.readFile(filePath, 'utf-8');
+        const { title: fmTitle, content: bodyContent } = parseFrontmatter(rawFileContent);
+        articleTitle = fmTitle || bodyContent.split('\n')[0]?.replace(/^#\s*/, '').trim();
+      } catch {
+        // If a single file fails to read we continue without crashing the page.
+        articleTitle = undefined;
+      }
+
+      deduped.push({
+        slug,
+        title: articleTitle && articleTitle.length > 0 ? articleTitle : slug,
       });
     }
-    return articles;
+
+    return deduped;
   } catch (error) {
     console.error('Failed to load help articles list:', error);
     return [];
   }
-}
+});
 
-async function getHelpArticleContent(slug: string): Promise<string | null> {
+const getHelpArticleContent = cache(async (slug: string): Promise<string | null> => {
   if (!slug || !/^[a-zA-Z0-9_-]+$/.test(slug)) {
-    console.error('Invalid slug provided for help article:', slug);
     return null;
   }
-  const filePath = path.join(process.cwd(), 'src', 'content', 'help-wiki', `${slug}.md`);
+
   try {
+    const filePath = path.join(wikiDir, `${slug}.md`);
     const rawFileContent = await fs.readFile(filePath, 'utf-8');
-    const { content } = parseFrontmatter(rawFileContent); // Get content after frontmatter
+    const { content } = parseFrontmatter(rawFileContent);
     return content;
   } catch (error) {
     console.error(`Failed to load help article content for ${slug}:`, error);
     return null;
   }
-}
+});
 
 interface HelpPageProps {
   searchParams?: { article?: string };
@@ -94,7 +90,11 @@ interface HelpPageProps {
 export default async function HelpPage({ searchParams }: HelpPageProps) {
   await requireAuth();
   const articles = await getHelpArticles();
-  const currentArticleSlug = searchParams?.article || articles[0]?.slug || '01-overview';
+  const fallbackSlug = articles[0]?.slug || '01-overview';
+  const requestedSlug = searchParams?.article;
+  const currentArticleSlug = (requestedSlug && articles.some(article => article.slug === requestedSlug))
+    ? requestedSlug
+    : fallbackSlug;
 
   const currentArticleContent = await getHelpArticleContent(currentArticleSlug);
   const currentArticleTitle = articles.find(a => a.slug === currentArticleSlug)?.title || 'Help Article';
@@ -145,7 +145,10 @@ export default async function HelpPage({ searchParams }: HelpPageProps) {
                  <CardTitle className="text-2xl font-bold">{currentArticleTitle}</CardTitle>
               </CardHeader>
               <CardContent className="prose prose-sm max-w-none pt-2">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  skipHtml
+                >
                   {currentArticleContent}
                 </ReactMarkdown>
               </CardContent>

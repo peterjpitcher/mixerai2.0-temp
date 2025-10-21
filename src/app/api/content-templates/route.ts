@@ -5,7 +5,7 @@ import { withAuth } from '@/lib/auth/api-auth';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { z } from 'zod';
 import { validateRequest, commonSchemas } from '@/lib/api/validation';
-import { InputFieldSchema, OutputFieldSchema } from '@/lib/schemas/template';
+import { InputFieldSchema, OutputFieldSchema, TemplateFieldsSchema } from '@/lib/schemas/template';
 import type { Json } from '@/types/supabase';
 
 // Force dynamic rendering for this route
@@ -37,6 +37,26 @@ async function getAccessibleBrandIds(
   return (data || [])
     .map(record => record.brand_id)
     .filter((brandId): brandId is string => Boolean(brandId));
+}
+
+function resolveInternalApiUrl(request: NextRequest, path: string): URL | null {
+  const candidates = [
+    request?.nextUrl?.origin,
+    process.env.APP_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
+  ].filter((value): value is string => Boolean(value));
+
+  for (const candidate of candidates) {
+    try {
+      const base = new URL(candidate);
+      return new URL(path, base);
+    } catch {
+      // Skip invalid candidates and continue searching for a usable origin.
+      continue;
+    }
+  }
+
+  return null;
 }
 
 // Validation schema for creating a template
@@ -200,9 +220,19 @@ export const GET = withAuth(async (request: NextRequest, user: AuthenticatedUser
         }
       }
 
+      const parsedFields = TemplateFieldsSchema.safeParse(data.fields);
+      const normalizedTemplate = {
+        ...data,
+        fields: parsedFields.success ? parsedFields.data : { inputFields: [], outputFields: [] },
+      };
+
       return NextResponse.json({
         success: true,
-        template: data
+        template: {
+          ...normalizedTemplate,
+          inputFields: normalizedTemplate.fields.inputFields,
+          outputFields: normalizedTemplate.fields.outputFields,
+        }
       });
     }
     
@@ -230,9 +260,36 @@ export const GET = withAuth(async (request: NextRequest, user: AuthenticatedUser
     }
 
     const formattedTemplates = (templatesData || []).map(template => {
-      const { content_count: rawCount, ...rest } = template as Record<string, unknown> & { content_count?: Array<{ count: number }> };
+      const {
+        content_count: rawCount,
+        fields,
+        inputFields,
+        outputFields,
+        ...rest
+      } = template as Record<string, unknown> & {
+        content_count?: Array<{ count: number }>;
+        fields?: unknown;
+        inputFields?: unknown;
+        outputFields?: unknown;
+      };
+
+      const parsedFieldsResult = TemplateFieldsSchema.safeParse(
+        fields ?? {
+          inputFields,
+          outputFields,
+        }
+      );
+
+      const normalizedFields = parsedFieldsResult.success
+        ? parsedFieldsResult.data
+        : { inputFields: [], outputFields: [] };
+
       const usageCount = Array.isArray(rawCount) && rawCount.length > 0 ? rawCount[0]?.count ?? 0 : 0;
-      return { ...rest, usageCount };
+      return {
+        ...rest,
+        fields: normalizedFields,
+        usageCount,
+      };
     });
 
     return NextResponse.json({ 
@@ -272,14 +329,19 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: Authentic
       const inputFieldNames = (data.inputFields || []).map((f: Record<string, unknown>) => f.name).filter(Boolean);
       const outputFieldNames = (data.outputFields || []).map((f: Record<string, unknown>) => f.name).filter(Boolean);
 
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-      const aiDescriptionResponse = await fetch(`${baseUrl}/api/ai/generate-template-description`, {
+      const aiEndpointUrl = resolveInternalApiUrl(request, '/api/ai/generate-template-description');
+
+      if (!aiEndpointUrl) {
+        console.warn('[content-templates][POST] Unable to determine origin for AI description request. Skipping generation.');
+      } else {
+        const aiDescriptionResponse = await fetch(aiEndpointUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           templateName: data.name,
           inputFields: inputFieldNames,
           outputFields: outputFieldNames,
+          brand_id: data.brand_id ?? undefined,
         }),
       });
 
@@ -288,6 +350,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: Authentic
         if (aiData.success && aiData.description) {
           generatedDescription = aiData.description;
         }
+      }
       }
     } catch {
       // console.warn('Error calling AI template description generation service:', aiError);
@@ -315,9 +378,18 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: Authentic
       throw error;
     }
     
+    const parsedFields = TemplateFieldsSchema.safeParse(newTemplate?.fields);
+
+    const responseTemplate = newTemplate
+      ? {
+          ...newTemplate,
+          fields: parsedFields.success ? parsedFields.data : { inputFields: [], outputFields: [] },
+        }
+      : null;
+
     return NextResponse.json({
       success: true,
-      template: newTemplate
+      template: responseTemplate
     });
   } catch (error) {
     return handleApiError(error, 'Failed to create content template');

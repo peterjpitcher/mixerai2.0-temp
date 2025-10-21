@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { BrandIcon } from '@/components/brand-icon';
 import { ActiveBrandIndicator } from '@/components/ui/active-brand-indicator';
 import { apiFetch } from '@/lib/api-client';
+import { useCurrentUser } from '@/hooks/use-common-data';
 // Assuming UserOption might be defined elsewhere or keep it local if specific
 // import { MultiSelectUserCombobox, UserOption } from '@/components/ui/multi-select-user-combobox';
 
@@ -31,19 +32,6 @@ interface WorkflowEditPageProps {
     id: string;
   };
   searchParams?: { [key: string]: string | string[] | undefined };
-}
-
-interface UserSessionData {
-  id: string;
-  email?: string;
-  user_metadata?: {
-    role?: string;
-    full_name?: string;
-  };
-  brand_permissions?: Array<{
-    brand_id: string;
-    role: string;
-  }>;
 }
 
 interface BrandSummary {
@@ -166,6 +154,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
   const [assigneeInputs, setAssigneeInputs] = useState<string[]>([]);
   const [userSearchResults, setUserSearchResults] = useState<Record<number, UserOption[]>>({});
   const [userSearchLoading, setUserSearchLoading] = useState<Record<number, boolean>>({});
+  const userSearchControllers = useRef<Record<number, AbortController>>({});
   const [brands, setBrands] = useState<BrandSummary[]>([]);
   const [contentTemplates, setContentTemplates] = useState<ContentTemplateSummary[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('NO_TEMPLATE_SELECTED');
@@ -173,8 +162,11 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [stepDescLoading, setStepDescLoading] = useState<Record<number, boolean>>({});
   
-  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const {
+    data: currentUser,
+    isLoading: isLoadingUser,
+    error: currentUserError,
+  } = useCurrentUser();
   const [allFetchedBrands, setAllFetchedBrands] = useState<BrandSummary[]>([]);
 
   const [otherBrandWorkflows, setOtherBrandWorkflows] = useState<WorkflowSummary[]>([]);
@@ -184,61 +176,60 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
   const currentBrandForDisplay = brands.find(b => b.id === workflow?.brand_id);
 
   useEffect(() => {
-    const fetchCurrentUser = async () => {
-      setIsLoadingUser(true);
-      try {
-        const response = await fetch('/api/me');
-        if (!response.ok) throw new Error('Failed to fetch user session');
-        const data = await response.json();
-        if (data.success && data.user) {
-          setCurrentUser(data.user);
-        } else {
-          setCurrentUser(null);
-          toast.error(data.error || 'Could not verify your session.');
-        }
-      } catch (err) {
-        console.error('Error fetching current user:', err);
-        setCurrentUser(null);
-        toast.error('Error fetching user data: ' + (err as Error).message);
-      } finally {
-        setIsLoadingUser(false);
-      }
-    };
-    fetchCurrentUser();
-  }, []);
+    if (isLoadingUser) {
+      return;
+    }
 
-  useEffect(() => {
+    if (currentUserError) {
+      const message =
+        currentUserError instanceof Error
+          ? currentUserError.message
+          : 'Failed to verify your session.';
+      setError(message);
+      setIsLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const isAbortError = (error: unknown) =>
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      (error as { name?: string }).name === 'AbortError';
+
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
-      
-      // Check if this is a duplicated workflow
+
       const isDuplicatedWorkflow = searchParams?.duplicated === 'true';
       setIsDuplicated(isDuplicatedWorkflow);
-      
+
       try {
-        const workflowResponse = await fetch(`/api/workflows/${id}`);
-        if (!workflowResponse.ok) {
-          if (workflowResponse.status === 404) {
-            // notFound(); // Alternative: use error state to display message
-            setError("Workflow not found.");
-            throw new Error('Workflow not found');
-          } 
-          throw new Error(`Failed to fetch workflow: ${workflowResponse.statusText}`);
-        }
+        const workflowResponse = await apiFetch(`/api/workflows/${id}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
         const workflowData = await workflowResponse.json();
-        if (!workflowData.success || !workflowData.workflow) {
-          throw new Error(workflowData.error || 'Failed to process workflow data');
+
+        if (workflowResponse.status === 404) {
+          setWorkflow(null);
+          throw Object.assign(new Error('Workflow not found.'), { status: 404 });
         }
-        
-        // If this is a duplicated workflow, work with fresh objects while retaining the duplicate's IDs
+
+        if (!workflowResponse.ok || !workflowData?.success || !workflowData?.workflow) {
+          throw new Error(workflowData?.error || 'Failed to fetch workflow.');
+        }
+
         const mapStepsWithRequirements = (steps: WorkflowStepDefinition[] | undefined) => {
           if (!Array.isArray(steps)) return [];
           return steps.map((step) => {
-            const rawFormRequirements = step.formRequirements && typeof step.formRequirements === 'object'
-              ? { ...step.formRequirements }
-              : {};
-            const requiresPublishedUrl = Boolean(step.requiresPublishedUrl ?? rawFormRequirements.requiresPublishedUrl);
+            const rawFormRequirements =
+              step.formRequirements && typeof step.formRequirements === 'object'
+                ? { ...step.formRequirements }
+                : {};
+            const requiresPublishedUrl = Boolean(
+              step.requiresPublishedUrl ?? rawFormRequirements.requiresPublishedUrl
+            );
             if (!requiresPublishedUrl && 'requiresPublishedUrl' in rawFormRequirements) {
               delete (rawFormRequirements as { requiresPublishedUrl?: unknown }).requiresPublishedUrl;
             }
@@ -253,56 +244,71 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         const processedWorkflow = isDuplicatedWorkflow
           ? {
               ...workflowData.workflow,
-              // Ensure we work with fresh objects but keep the IDs generated when the duplicate shell was created
-              steps: mapStepsWithRequirements(workflowData.workflow.steps)
+              steps: mapStepsWithRequirements(workflowData.workflow.steps),
             }
           : {
               ...workflowData.workflow,
               steps: mapStepsWithRequirements(workflowData.workflow.steps),
             };
-        
+
         setWorkflow(processedWorkflow);
         setSelectedTemplateId(processedWorkflow?.template_id || 'NO_TEMPLATE_SELECTED');
         setAssigneeInputs(new Array(processedWorkflow?.steps?.length || 0).fill(''));
 
+        const [brandsResponse, templatesResponse] = await Promise.all([
+          apiFetch('/api/brands', { cache: 'no-store', signal: controller.signal }),
+          apiFetch('/api/content-templates', { cache: 'no-store', signal: controller.signal }),
+        ]);
 
-        const brandsResponse = await fetch('/api/brands');
-        if (!brandsResponse.ok) throw new Error(`Failed to fetch brands: ${brandsResponse.statusText}`);
         const brandsData = await brandsResponse.json();
-        if (!brandsData.success) throw new Error(brandsData.error || 'Failed to process brands data');
+        if (!brandsResponse.ok || !brandsData?.success) {
+          throw new Error(brandsData?.error || 'Failed to load brands.');
+        }
         setAllFetchedBrands(Array.isArray(brandsData.data) ? brandsData.data : []);
 
-        const templatesResponse = await fetch('/api/content-templates');
-        if (!templatesResponse.ok) throw new Error(`Failed to fetch content templates: ${templatesResponse.statusText}`);
         const templatesData = await templatesResponse.json();
-        if (!templatesData.success) throw new Error(templatesData.error || 'Failed to process content templates data');
+        if (!templatesResponse.ok || !templatesData?.success) {
+          throw new Error(templatesData?.error || 'Failed to load content templates.');
+        }
         setContentTemplates(Array.isArray(templatesData.templates) ? templatesData.templates : []);
-
       } catch (err) {
-        setError((err as Error).message || 'Failed to load workflow data.');
-        toast.error((err as Error).message || 'Failed to load workflow data.');
+        if (isAbortError(err)) {
+          return;
+        }
+        const message = err instanceof Error ? err.message : 'Failed to load workflow data.';
+        setError(message);
+        toast.error(message);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchData();
-  }, [id, searchParams]);
+
+    void fetchData();
+
+    return () => controller.abort();
+  }, [id, searchParams, isLoadingUser, currentUserError]);
 
   useEffect(() => {
-    if (isLoadingUser || isLoading || !currentUser || !workflow || allFetchedBrands.length === 0) return;
+    if (isLoadingUser || isLoading || currentUserError) {
+      return;
+    }
+    if (!currentUser || !workflow || allFetchedBrands.length === 0) {
+      return;
+    }
 
-    const isGlobalAdminUser = currentUser?.user_metadata?.role === 'admin';
-    const userBrandAdminPerms = currentUser?.brand_permissions?.filter(p => p.role === 'admin').map(p => p.brand_id) || [];
+    const isGlobalAdminUser = currentUser.user_metadata?.role === 'admin';
+    const userBrandAdminPerms =
+      currentUser.brand_permissions?.filter(permission => permission.role === 'admin').map(permission => permission.brand_id) || [];
 
     if (isGlobalAdminUser) {
       setBrands(allFetchedBrands);
     } else if (userBrandAdminPerms.length > 0) {
-      const manageableBrands = allFetchedBrands.filter(b => userBrandAdminPerms.includes(b.id));
+      const manageableBrands = allFetchedBrands.filter(brand => userBrandAdminPerms.includes(brand.id));
       setBrands(manageableBrands);
     } else {
       setBrands([]);
     }
-  }, [isLoadingUser, isLoading, currentUser, workflow, allFetchedBrands]);
+  }, [isLoadingUser, isLoading, currentUser, workflow, allFetchedBrands, currentUserError]);
 
   useEffect(() => {
     const currentBrandId = workflow?.brand_id;
@@ -310,11 +316,21 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
       setOtherBrandWorkflows([]);
       return;
     }
+
+    const controller = new AbortController();
+    const isAbortError = (error: unknown) =>
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      (error as { name?: string }).name === 'AbortError';
+
     const fetchOtherBrandWorkflows = async () => {
       setIsLoadingBrandWorkflows(true);
       try {
-        const response = await fetch(`/api/workflows?brand_id=${currentBrandId}`);
-        if (!response.ok) throw new Error('Failed to fetch other workflows for brand');
+        const response = await apiFetch(`/api/workflows?brand_id=${currentBrandId}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
         const data = await response.json();
         if (data.success && Array.isArray(data.data)) {
           setOtherBrandWorkflows(data.data.filter((wf: WorkflowSummary) => wf.id !== id));
@@ -323,6 +339,9 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
           toast.error(data.error || 'Could not load other workflows for the brand.');
         }
       } catch (error) {
+        if (isAbortError(error)) {
+          return;
+        }
         console.error('Error fetching other brand workflows:', error);
         toast.error((error as Error).message || 'Failed to load other workflows for brand.');
         setOtherBrandWorkflows([]);
@@ -330,7 +349,10 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         setIsLoadingBrandWorkflows(false);
       }
     };
-    fetchOtherBrandWorkflows();
+
+    void fetchOtherBrandWorkflows();
+
+    return () => controller.abort();
   }, [workflow?.brand_id, id]);
 
   const availableContentTemplates = useMemo(() => {
@@ -351,33 +373,76 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
   const userBrandAdminPermissions = currentUser?.brand_permissions?.filter(p => p.role === 'admin').map(p => p.brand_id) || [];
   const canEditThisWorkflow = workflow && (isGlobalAdmin || (workflow.brand_id && userBrandAdminPermissions.includes(workflow.brand_id)));
 
-  const debouncedUserSearch = useCallback(
-    (searchTerm: string, stepIndex: number) => {
-      const debouncedFn = debounce(async (term: string, index: number) => {
-        if (term.trim().length < 2) {
-          setUserSearchResults(prev => ({ ...prev, [index]: [] }));
+  const performUserSearch = useCallback(
+    async (searchTerm: string, stepIndex: number) => {
+      const normalized = searchTerm.trim();
+
+      if (normalized.length < 2) {
+        setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
+        setUserSearchLoading(prev => ({ ...prev, [stepIndex]: false }));
+        return;
+      }
+
+      if (userSearchControllers.current[stepIndex]) {
+        userSearchControllers.current[stepIndex].abort();
+      }
+
+      const controller = new AbortController();
+      userSearchControllers.current[stepIndex] = controller;
+
+      setUserSearchLoading(prev => ({ ...prev, [stepIndex]: true }));
+
+      try {
+        const response = await apiFetch(
+          `/api/users/search?query=${encodeURIComponent(normalized)}`,
+          {
+            cache: 'no-store',
+            signal: controller.signal,
+          }
+        );
+        const data = await response.json();
+        if (data.success && Array.isArray(data.users)) {
+          setUserSearchResults(prev => ({ ...prev, [stepIndex]: data.users }));
+        } else {
+          setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
+          if (data?.error) {
+            toast.error(data.error);
+          }
+        }
+      } catch (error) {
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          'name' in error &&
+          (error as { name?: string }).name === 'AbortError'
+        ) {
           return;
         }
-        setUserSearchLoading(prev => ({ ...prev, [index]: true }));
-        try {
-          const response = await fetch(`/api/users/search?query=${encodeURIComponent(term)}`);
-          const data = await response.json();
-          if (data.success && Array.isArray(data.users)) {
-            setUserSearchResults(prev => ({ ...prev, [index]: data.users }));
-          } else {
-            setUserSearchResults(prev => ({ ...prev, [index]: [] }));
-          }
-        } catch (error) {
-          console.error('User search error:', error);
-          setUserSearchResults(prev => ({ ...prev, [index]: [] }));
-        } finally {
-          setUserSearchLoading(prev => ({ ...prev, [index]: false }));
-        }
-      }, 300);
-      debouncedFn(searchTerm, stepIndex);
+        console.error('User search error:', error);
+        setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
+        toast.error((error as Error).message || 'Failed to search users.');
+      } finally {
+        setUserSearchLoading(prev => ({ ...prev, [stepIndex]: false }));
+      }
     },
     []
   );
+
+  const debouncedUserSearch = useMemo(
+    () =>
+      debounce((term: string, stepIndex: number) => {
+        void performUserSearch(term, stepIndex);
+      }, 300),
+    [performUserSearch]
+  );
+
+  useEffect(() => {
+    const controllersRef = userSearchControllers.current;
+    return () => {
+      debouncedUserSearch.cancel();
+      Object.values(controllersRef).forEach(controller => controller.abort());
+    };
+  }, [debouncedUserSearch]);
 
   const handleAssigneeInputChange = (stepIndex: number, value: string) => {
     setAssigneeInputs(prev => {
@@ -388,6 +453,11 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
     if (value.trim()) {
       debouncedUserSearch(value, stepIndex);
     } else {
+      if (userSearchControllers.current[stepIndex]) {
+        userSearchControllers.current[stepIndex].abort();
+        delete userSearchControllers.current[stepIndex];
+      }
+      setUserSearchLoading(prev => ({ ...prev, [stepIndex]: false }));
       setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
     }
   };
@@ -835,7 +905,34 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
     }
   };
   
-  if (isLoadingUser || isLoading) {
+  if (isLoadingUser) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground mt-4">Loading workflow details...</p>
+      </div>
+    );
+  }
+
+  if (currentUserError) {
+    const message =
+      currentUserError instanceof Error
+        ? currentUserError.message
+        : 'Unable to verify your permissions. Please try again later.';
+
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
+        <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
+        <h3 className="text-xl font-semibold mb-2">Session Error</h3>
+        <p className="text-muted-foreground text-center mb-6">{message}</p>
+        <Link href="/dashboard/workflows" passHref>
+          <Button variant="outline">Back to Workflows</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />

@@ -29,19 +29,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { apiFetch } from '@/lib/api-client';
-
-interface UserSessionData {
-  id: string;
-  email?: string;
-  user_metadata?: {
-    role?: string; 
-    full_name?: string;
-  };
-  brand_permissions?: Array<{
-    brand_id: string;
-    role: string; // e.g., 'admin', 'editor', 'viewer' for that brand
-  }>;
-}
+import { useCurrentUser } from '@/hooks/use-common-data';
 
 interface WorkflowFromAPI {
   id: string;
@@ -77,8 +65,11 @@ export default function WorkflowsPage() {
   const [allWorkflows, setAllWorkflows] = useState<WorkflowFromAPI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const {
+    data: currentUser,
+    isLoading: isLoadingUser,
+    error: currentUserError,
+  } = useCurrentUser();
 
   // State for delete confirmation
   const [workflowToDelete, setWorkflowToDelete] = useState<WorkflowFromAPI | null>(null);
@@ -88,67 +79,72 @@ export default function WorkflowsPage() {
   // State for duplicate action
   const [isDuplicating, setIsDuplicating] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      setIsLoadingUser(true);
-      try {
-        const response = await fetch('/api/me');
-        if (!response.ok) throw new Error('Failed to fetch user session');
-        const data = await response.json();
-        if (data.success && data.user) {
-          setCurrentUser(data.user);
-        } else {
-          setCurrentUser(null);
-          toast.error(data.error || 'Could not verify your session.');
-        }
-      } catch (err) {
-        console.error('Error fetching current user:', err);
-        setCurrentUser(null);
-        toast.error('Error fetching user data: ' + (err as Error).message);
-      } finally {
-        setIsLoadingUser(false);
-      }
-    };
-    fetchCurrentUser();
-  }, []);
-
   const isGlobalAdmin = currentUser?.user_metadata?.role === 'admin';
   const hasAnyBrandAdminPermission = currentUser?.brand_permissions?.some(p => p.role === 'admin');
   const canAccessPage = isGlobalAdmin || hasAnyBrandAdminPermission;
 
   useEffect(() => {
-    if (isLoadingUser) return; // Don't fetch workflows until user is loaded
+    if (isLoadingUser) {
+      return;
+    }
 
-    if (!canAccessPage) {
-      setIsLoading(false); // Not loading workflows if no access
+    if (currentUserError) {
+      const message =
+        currentUserError instanceof Error
+          ? currentUserError.message
+          : 'Unable to verify your permissions.';
+      setError(message);
+      setIsLoading(false);
       setAllWorkflows([]);
       return;
     }
+
+    if (!canAccessPage) {
+      setIsLoading(false);
+      setAllWorkflows([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const isAbortError = (error: unknown) =>
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      (error as { name?: string }).name === 'AbortError';
 
     const fetchWorkflows = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch('/api/workflows');
+        const response = await apiFetch('/api/workflows', {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
         const apiResponse = await response.json();
-        
+
         if (!apiResponse.success) {
           throw new Error(apiResponse.error || 'Failed to fetch workflows');
         }
-        
+
         setAllWorkflows(apiResponse.data || []);
       } catch (err) {
-        const errorMessage = (err instanceof Error) ? err.message : 'Failed to load workflows. Please try again.';
+        if (isAbortError(err)) {
+          return;
+        }
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to load workflows. Please try again.';
         setError(errorMessage);
         toast.error(errorMessage);
-        setAllWorkflows([]); // Clear workflows on error
+        setAllWorkflows([]);
       } finally {
         setIsLoading(false);
       }
     };
-    
-    fetchWorkflows();
-  }, [isLoadingUser, canAccessPage, currentUser]);
+
+    void fetchWorkflows();
+
+    return () => controller.abort();
+  }, [isLoadingUser, currentUserError, canAccessPage, currentUser]);
 
   const handleDuplicateWorkflow = async (workflowId: string) => {
     setIsDuplicating(workflowId);

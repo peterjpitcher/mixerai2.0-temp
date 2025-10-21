@@ -473,7 +473,7 @@ export const PUT = withAuthAndCSRF(async (
 
     const { data: rpcData, error: rpcError } = await supabase.rpc(
       'update_workflow_and_handle_invites',
-      paramsToPass as any
+      paramsToPass
     );
 
     // Enhanced logging for RPC response
@@ -658,36 +658,22 @@ export const DELETE = withAuthAndCSRF(async (
       );
     }
 
-    // First, delete associated workflow steps to maintain data integrity if ON DELETE CASCADE is not set
-    const { error: deleteStepsError } = await supabase
-      .from('workflow_steps')
-      .delete()
-      .eq('workflow_id', workflowId);
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('delete_workflow_and_dependents', {
+      p_workflow_id: workflowId,
+    });
 
-    if (deleteStepsError) {
-      console.error(`Error deleting steps for workflow ${workflowId}:`, deleteStepsError);
-      // Decide if this is a fatal error for workflow deletion. For now, log and continue.
-    }
-    
-    // Then, delete associated workflow invitations
-    const { error: deleteInvitesError } = await supabase
-      .from('workflow_invitations')
-      .delete()
-      .eq('workflow_id', workflowId);
-      
-    if (deleteInvitesError) {
-        console.error(`Error deleting invitations for workflow ${workflowId}:`, deleteInvitesError);
-        // Log and continue
+    if (rpcError) {
+      return handleApiError(rpcError, 'Failed to delete workflow');
     }
 
-    // Finally, delete the workflow itself
-    const { error: deleteWorkflowError } = await supabase
-      .from('workflows')
-      .delete()
-      .eq('id', workflowId);
-
-    if (deleteWorkflowError) {
-      throw deleteWorkflowError;
+    if (!rpcResult) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Workflow could not be deleted because it no longer exists.',
+        },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({ 

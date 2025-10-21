@@ -4,6 +4,8 @@ import { cookies } from 'next/headers';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { requiresReauthentication, validateSession } from '@/lib/auth/session-manager';
 
+export const runtime = 'nodejs';
+
 export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
   try {
     const body = await req.json();

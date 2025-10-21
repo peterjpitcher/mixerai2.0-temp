@@ -32,12 +32,22 @@ interface TaskItem {
   workflow_step_order?: number | null;
 }
 
+interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
 export default function MyTasksPage() {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   // currentUserId is not strictly needed anymore if API handles user-specific tasks,
   // but keeping it doesn't harm and might be useful for other client-side checks if any.
   // const [currentUserId, setCurrentUserId] = useState<string | null>(null); 
@@ -49,6 +59,7 @@ export default function MyTasksPage() {
       setIsLoading(true);
       setError(null);
       setAuthError(false);
+      setPagination(null);
 
       try {
         const response = await fetch('/api/me/tasks', {
@@ -84,13 +95,24 @@ export default function MyTasksPage() {
           throw new Error(data.error || 'Failed to fetch tasks data');
         }
 
-        setTasks(data.data as TaskItem[]);
+        const paginationMeta = (data as typeof data & { pagination?: PaginationMeta }).pagination;
+        if (paginationMeta && typeof paginationMeta.page === 'number') {
+          setPagination(paginationMeta);
+        }
+
+        setTasks((data.data as TaskItem[]).map(task => ({
+          ...task,
+          content_title: task.content_title ?? 'Untitled Content',
+          brand_name: task.brand_name ?? 'N/A',
+          workflow_step_name: task.workflow_step_name ?? 'N/A',
+        })));
       } catch (err) {
         if (abortController.signal.aborted) return;
 
         const message = err instanceof Error ? err.message : 'Failed to load tasks';
         setError(message);
         setTasks([]);
+        setPagination(null);
         toast.error('Failed to load your tasks. Please try again.', {
           description: message,
         });
@@ -192,7 +214,10 @@ export default function MyTasksPage() {
         <Card>
           <CardHeader>
             <CardTitle>Pending Your Action</CardTitle>
-            <CardDescription>{tasks.length} item(s) requiring your attention based on their current active status.</CardDescription>
+            <CardDescription>
+              Showing {tasks.length} item{tasks.length === 1 ? '' : 's'}
+              {pagination?.total ? ` out of ${pagination.total}` : ''} requiring your attention.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">

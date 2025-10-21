@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,9 +46,10 @@ import { format as formatDateFns } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { BrandIcon } from '@/components/brand-icon';
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, apiFetchJson } from '@/lib/api-client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getAvatarUrl, getNameInitials } from '@/lib/utils/avatar';
+import { useCurrentUser } from '@/hooks/use-common-data';
 
 // export const metadata: Metadata = {
 //   title: 'Manage Users | MixerAI 2.0',
@@ -65,33 +66,24 @@ interface Brand {
 interface User {
   id: string;
   full_name: string;
-  email: string;
+  email: string | null;
   avatar_url: string;
   role: string;
-  created_at: string;
-  last_sign_in_at?: string;
-  brand_permissions?: {
-    id: string;
+  global_role?: string | null;
+  highest_brand_role?: string | null;
+  created_at: string | null;
+  last_sign_in_at: string | null;
+  brand_permissions?: Array<{
     brand_id: string;
     role: string;
     brand?: Brand;
-  }[];
+  }>;
   job_title?: string;
   company?: string;
   invitation_status?: string | null;
   invitation_expires_at?: string | null;
   user_status?: string;
-}
-
-// Define UserSessionData interface
-interface UserSessionData {
-  id: string;
-  email?: string;
-  user_metadata?: {
-    role?: string; 
-    full_name?: string;
-  };
-  // brand_permissions not strictly needed for this page's top-level access check, but good for consistency
+  is_current_user?: boolean;
 }
 
 /**
@@ -99,10 +91,19 @@ interface UserSessionData {
  * It allows for searching, sorting, and managing users, including inviting new users
  * and deleting existing ones. User roles and brand permissions are also displayed.
  */
+const PAGE_SIZE = 25;
+
 export default function UsersPage() {
+  const { data: currentUser, isLoading: isLoadingUser, error: currentUserError } = useCurrentUser();
+  const isAllowedToAccess = currentUser?.user_metadata?.role === 'admin';
+
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [sortField, setSortField] = useState<'full_name' | 'role' | 'email' | 'company' | 'last_sign_in_at'>('role');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
@@ -110,129 +111,120 @@ export default function UsersPage() {
   const [resendingInviteToUserId, setResendingInviteToUserId] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState<boolean>(false);
 
-  // RBAC State
-  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true); // For user session loading
-  const [userSessionError, setUserSessionError] = useState<string | null>(null); // Renamed to avoid conflict with page-level error
-  const [isAllowedToAccess, setIsAllowedToAccess] = useState<boolean>(false);
-  const [isCheckingPermissions, setIsCheckingPermissions] = useState<boolean>(true);
-
-  // Fetch current user for RBAC
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      setIsLoadingUser(true);
-      setUserSessionError(null);
-      try {
-        const response = await fetch('/api/me');
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch user session' }));
-          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        if (data.success && data.user) {
-          setCurrentUser(data.user);
-        } else {
-          setCurrentUser(null);
-          setUserSessionError(data.error || 'User data not found in session.');
-        }
-      } catch (error) {
-        console.error('[UsersPage] Error fetching current user:', error);
-        setCurrentUser(null);
-        setUserSessionError((error as Error).message || 'An unexpected error occurred.');
-      } finally {
-        setIsLoadingUser(false);
-      }
-    };
-    fetchCurrentUser();
-  }, []);
-
-  // Check permissions
-  useEffect(() => {
-    if (!isLoadingUser && currentUser) {
-      setIsCheckingPermissions(true);
-      if (currentUser.user_metadata?.role === 'admin') {
-        setIsAllowedToAccess(true);
-      } else {
-        setIsAllowedToAccess(false);
-      }
-      setIsCheckingPermissions(false);
-    } else if (!isLoadingUser && !currentUser) {
-      setIsAllowedToAccess(false);
-      setIsCheckingPermissions(false);
+  const sessionErrorMessage = useMemo(() => {
+    if (!currentUserError) return null;
+    if (currentUserError instanceof Error) return currentUserError.message;
+    if (typeof currentUserError === 'string') return currentUserError;
+    try {
+      return JSON.stringify(currentUserError);
+    } catch {
+      return 'Failed to load user session.';
     }
-  }, [currentUser, isLoadingUser]);
+  }, [currentUserError]);
 
-  // Fetch users and brands data - only if allowed
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Fetch users
-        const usersResponse = await fetch('/api/users');
-        const usersData = await usersResponse.json();
-        
-        if (!usersData.success) {
-          throw new Error(usersData.error || 'Failed to fetch users');
-        }
-        
-        // Fetch brands to get their colors
-        const brandsResponse = await fetch('/api/brands');
-        const brandsData = await brandsResponse.json();
-        
-        if (brandsData.success) {
-          const fetchedBrands = brandsData.data || [];
-          
-          // Merge brand data with user permissions
-          const usersWithBrands = (usersData.data || []).map((user: User) => {
-            if (user.brand_permissions && user.brand_permissions.length > 0) {
-              user.brand_permissions = user.brand_permissions.map(permission => {
-                const brand = fetchedBrands.find((b: Brand) => b.id === permission.brand_id);
-                return {
-                  ...permission,
-                  brand: brand || undefined
-                };
-              });
-            }
-            return user;
-          });
-          
-          setUsers(usersWithBrands);
-        } else {
-          // Just set users without brand data
-          setUsers(usersData.data || []);
-        }
-      } catch (error) {
-        console.error('Error loading data:', error);
-        toast.error('Failed to load users. Please try again.');
-      } finally {
+    const timeout = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+      setPage(1);
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [showInactive]);
+
+  const fetchUsers = useCallback(
+    async (search: string, signal?: AbortSignal) => {
+      if (!isAllowedToAccess) {
+        setUsers([]);
+        setTotalCount(0);
         setIsLoading(false);
+        return;
       }
-    };
-    
-    if (isAllowedToAccess && !isLoadingUser && !isCheckingPermissions) {
-      fetchData();
-    } else if (!isLoadingUser && !isCheckingPermissions && !isAllowedToAccess) {
-      setIsLoading(false); // Stop main loading indicator if access is denied
+
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        if (search) {
+          const params = new URLSearchParams({
+            query: search,
+            limit: String(PAGE_SIZE),
+            page: String(page),
+          });
+          if (showInactive) params.set('includeInactive', 'true');
+
+          const response = await apiFetchJson<{
+            success: boolean;
+            users: User[];
+            error?: string;
+            pagination?: { total?: number };
+          }>(`/api/users/search?${params.toString()}`, { signal });
+
+          if (!response.success) {
+            throw new Error(response.error || 'Failed to search users.');
+          }
+
+          setUsers(response.users ?? []);
+          setTotalCount(response.pagination?.total ?? (response.users?.length ?? 0));
+        } else {
+          const params = new URLSearchParams({
+            page: String(page),
+            pageSize: String(PAGE_SIZE),
+          });
+          if (showInactive) params.set('includeInactive', 'true');
+
+          const response = await apiFetchJson<{
+            success: boolean;
+            data: User[];
+            error?: string;
+            pagination?: { total?: number };
+          }>(`/api/users?${params.toString()}`, { signal });
+
+          if (!response.success) {
+            throw new Error(response.error || 'Failed to load users.');
+          }
+
+          setUsers(response.data ?? []);
+          setTotalCount(response.pagination?.total ?? (response.data?.length ?? 0));
+        }
+      } catch (error) {
+        if (signal?.aborted) return;
+        console.error('[UsersPage] Failed to load users:', error);
+        const message = error instanceof Error ? error.message : 'Failed to load users.';
+        setLoadError(message);
+        toast.error('Failed to load users. Please try again.');
+        setUsers([]);
+        setTotalCount(0);
+      } finally {
+        if (!signal?.aborted) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [isAllowedToAccess, page, showInactive]
+  );
+
+  useEffect(() => {
+    if (isLoadingUser) return;
+
+    if (!isAllowedToAccess) {
+      setIsLoading(false);
+      return;
     }
-  }, [isAllowedToAccess, isLoadingUser, isCheckingPermissions]);
+
+    const controller = new AbortController();
+    void fetchUsers(debouncedSearch, controller.signal);
+    return () => controller.abort();
+  }, [fetchUsers, debouncedSearch, isAllowedToAccess, isLoadingUser]);
   
   // Search filter
-  const filteredUsers = searchTerm.trim() === ''
-    ? users
-    : users.filter(user =>
-        (user.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (user.role?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (user.company?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (user.job_title?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-      );
-
-  // Hide inactive users by default unless toggled on
   const visibleUsers = showInactive
-    ? filteredUsers
-    : filteredUsers.filter(u => u.user_status !== 'inactive');
-  
+    ? users
+    : users.filter(u => u.user_status !== 'inactive');
+
   // Sort users based on sort field and direction
   const sortedUsers = [...visibleUsers].sort((a, b) => {
     // First, priority sort by role (Admin at top)
@@ -257,6 +249,8 @@ export default function UsersPage() {
     const comparison = valueA.localeCompare(valueB);
     return sortDirection === 'asc' ? comparison : -comparison;
   });
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(totalCount / PAGE_SIZE)), [totalCount]);
   
   // Handle sort change
   const handleSort = (field: 'full_name' | 'role' | 'email' | 'company' | 'last_sign_in_at') => {
@@ -280,12 +274,8 @@ export default function UsersPage() {
       });
       const data = await response.json();
       if (data.success) {
-        setUsers(users.map(u => 
-          u.id === userToDelete.id 
-            ? { ...u, user_status: 'inactive' } 
-            : u
-        ));
         toast.success(`User ${userToDelete.full_name} deactivated successfully.`);
+        await fetchUsers(debouncedSearch);
       } else {
         toast.error(data.error || 'Failed to deactivate user.');
       }
@@ -306,12 +296,8 @@ export default function UsersPage() {
       });
       const data = await response.json();
       if (data.success) {
-        setUsers(users.map(u => 
-          u.id === userId 
-            ? { ...u, user_status: 'active' } 
-            : u
-        ));
         toast.success('User reactivated successfully.');
+        await fetchUsers(debouncedSearch);
       } else {
         toast.error(data.error || 'Failed to reactivate user.');
       }
@@ -321,7 +307,11 @@ export default function UsersPage() {
     }
   };
 
-  const handleResendInvite = async (userId: string, email: string) => {
+  const handleResendInvite = async (userId: string, email: string | null) => {
+    if (!email) {
+      toast.error('Cannot resend invite – email address is missing.');
+      return;
+    }
     setResendingInviteToUserId(userId);
     try {
       const response = await apiFetch('/api/users/resend-invite', {
@@ -345,7 +335,7 @@ export default function UsersPage() {
     }
   };
 
-  const formatDate = (dateString?: string) => {
+  const formatDate = (dateString?: string | null) => {
     if (!dateString) return 'Never';
     const date = new Date(dateString);
     return formatDateFns(date, 'MMMM d, yyyy');
@@ -399,7 +389,7 @@ export default function UsersPage() {
   };
 
   // --- Loading and Access Denied States ---
-  if (isLoadingUser || isCheckingPermissions) {
+  if (isLoadingUser) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-1/3 mb-4" /> {/* Breadcrumbs skeleton */}
@@ -414,11 +404,11 @@ export default function UsersPage() {
     );
   }
 
-  if (userSessionError) {
+  if (sessionErrorMessage) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
         <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-        <p className="text-destructive-foreground">Error loading user data: {userSessionError}</p>
+        <p className="text-destructive-foreground">Error loading user data: {sessionErrorMessage}</p>
         <Button variant="outline" onClick={() => window.location.reload()} className="mt-4">Try Again</Button>
       </div>
     );
@@ -470,6 +460,13 @@ export default function UsersPage() {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
+
+      {loadError && (
+        <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4" />
+          <span>{loadError}</span>
+        </div>
+      )}
       
       {isLoading ? (
         <div className="py-10 flex justify-center items-center min-h-[300px]">
@@ -485,7 +482,7 @@ export default function UsersPage() {
           </div>
           <h3 className="text-xl font-semibold mb-2">No Users Found</h3>
           <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            {searchTerm ? 'No results match your search criteria. Try a different search term.' : 'No users have been created yet. Invite your first user to get started.'}
+            {debouncedSearch ? 'No results match your search criteria. Try a different search term.' : 'No users have been created yet. Invite your first user to get started.'}
           </p>
           {!searchTerm && (
             <Button size="lg" asChild>
@@ -619,6 +616,31 @@ export default function UsersPage() {
               ))}
             </TableBody>
           </Table>
+          {totalPages > 1 && (
+            <div className="flex flex-col gap-2 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm text-muted-foreground">
+                Page {page} of {totalPages} • Showing {users.length} of {totalCount} users
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                  disabled={page === 1 || isLoading}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={page >= totalPages || isLoading}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
       

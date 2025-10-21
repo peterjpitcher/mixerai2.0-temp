@@ -1,13 +1,16 @@
 import { Resend } from 'resend';
 
+const buildPhase = ['phase-production-build', 'phase-development-build', 'phase-export']
+  .includes(process.env.NEXT_PHASE || '');
+
 // Initialize Resend client
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
-// Log configuration status on initialization
-if (!process.env.RESEND_API_KEY) {
+// Log configuration status on initialization outside of build steps to avoid noisy output
+if (!process.env.RESEND_API_KEY && !buildPhase) {
   console.warn('[Email Service] RESEND_API_KEY not configured - email notifications will be disabled');
-} else {
-  console.log('[Email Service] Resend client initialized successfully');
+} else if (process.env.RESEND_API_KEY && !buildPhase) {
+  console.info('[Email Service] Resend client initialized successfully');
 }
 
 export interface EmailOptions {
@@ -28,7 +31,7 @@ export async function sendEmail({
   replyTo
 }: EmailOptions) {
   if (!resend) {
-    console.warn('Email sending is disabled - RESEND_API_KEY not configured');
+    console.info('Email sending is disabled - RESEND_API_KEY not configured');
     return { success: true, error: undefined };
   }
 

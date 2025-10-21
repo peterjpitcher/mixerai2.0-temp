@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MultiSelectCheckboxCombobox } from '@/components/ui/MultiSelectCheckboxCombobox';
 import { toast } from 'sonner';
-import { Loader2, X, PlusCircle, ArrowLeft, Info, HelpCircle } from 'lucide-react';
+import { Loader2, X, PlusCircle, ArrowLeft, Info, HelpCircle, AlertTriangle } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
 import { BrandLogoUpload } from '@/components/ui/brand-logo-upload';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
@@ -110,6 +110,7 @@ export default function NewBrandPage() {
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [isForbidden, setIsForbidden] = useState(false);
+  const [userLoadError, setUserLoadError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -133,6 +134,12 @@ export default function NewBrandPage() {
 
   const [masterClaimBrands, setMasterClaimBrands] = useState<MasterClaimBrand[]>([]);
   const [isLoadingMasterClaimBrands, setIsLoadingMasterClaimBrands] = useState(true);
+
+  const draftBrandIdRef = useRef<string | null>(null);
+  if (!draftBrandIdRef.current) {
+    draftBrandIdRef.current = uuidv4();
+  }
+  const draftBrandId = draftBrandIdRef.current;
 
   const agencyLookupById = useMemo(() => {
     const map = new Map<string, VettingAgency>();
@@ -207,10 +214,53 @@ export default function NewBrandPage() {
     [agencyLookupById, agencyLookupByName]
   );
 
+  const fetchCurrentUser = useCallback(async () => {
+    setIsLoadingUser(true);
+    setUserLoadError(null);
+    try {
+      const response = await apiFetch('/api/me', { retry: 2, retryDelayMs: 400 });
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          setCurrentUser(null);
+          setIsForbidden(true);
+          return;
+        }
+        const errorBody = await response.json().catch(() => ({}));
+        const message =
+          typeof errorBody === 'object' && errorBody && 'error' in errorBody && typeof errorBody.error === 'string'
+            ? errorBody.error
+            : 'Failed to fetch user session';
+        throw new Error(message);
+      }
+      const data = await response.json();
+      if (data.success && data.user) {
+        setCurrentUser(data.user);
+        const userRole = data.user.user_metadata?.role;
+        setIsForbidden(userRole !== 'admin');
+      } else {
+        const fallbackMessage =
+          (typeof data?.error === 'string' && data.error) ||
+          'Your session could not be verified. Please try again.';
+        throw new Error(fallbackMessage);
+      }
+    } catch (error) {
+      console.error('Error fetching current user:', error);
+      setCurrentUser(null);
+      setIsForbidden(false);
+      setUserLoadError((error as Error).message || 'Could not verify your permissions.');
+    } finally {
+      setIsLoadingUser(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCurrentUser();
+  }, [fetchCurrentUser]);
+
   // Fetch Master Claim Brands
   useEffect(() => {
     const fetchMasterClaimBrands = async () => {
-      if (isForbidden || isLoadingUser) return;
+      if (isForbidden || isLoadingUser || userLoadError) return;
       setIsLoadingMasterClaimBrands(true);
       try {
         const response = await apiFetch('/api/master-claim-brands');
@@ -231,41 +281,12 @@ export default function NewBrandPage() {
       }
     };
     fetchMasterClaimBrands();
-  }, [isForbidden, isLoadingUser]);
-
-  // Effect for fetching current user data and checking permissions
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      setIsLoadingUser(true);
-      try {
-        const response = await apiFetch('/api/me');
-        if (!response.ok) throw new Error('Failed to fetch user session');
-        const data = await response.json();
-        if (data.success && data.user) {
-          setCurrentUser(data.user);
-          if (data.user.user_metadata?.role !== 'admin') {
-            setIsForbidden(true);
-          }
-        } else {
-          setCurrentUser(null);
-          setIsForbidden(true);
-        }
-      } catch (error) {
-        console.error('Error fetching current user:', error);
-        setCurrentUser(null);
-        setIsForbidden(true);
-        toast.error('Could not verify your permissions.');
-      } finally {
-        setIsLoadingUser(false);
-      }
-    };
-    fetchCurrentUser();
-  }, []);
+  }, [isForbidden, isLoadingUser, userLoadError]);
 
   // Effect for fetching vetting agencies
   useEffect(() => {
     const fetchAllVettingAgencies = async () => {
-      if (isForbidden || isLoadingUser) return; 
+      if (isForbidden || isLoadingUser || userLoadError) return; 
       const apiUrl = '/api/content-vetting-agencies';
       setIsLoading(true);
       try {
@@ -291,7 +312,7 @@ export default function NewBrandPage() {
       }
     };
     fetchAllVettingAgencies();
-  }, [isForbidden, isLoadingUser]); // Removed formData and formData.country dependency to fetch all initially
+  }, [isForbidden, isLoadingUser, userLoadError]); // Removed formData and formData.country dependency to fetch all initially
 
   // Conditional rendering for loading and forbidden states
   // These MUST come AFTER all hook calls (useState, useEffect)
@@ -300,6 +321,34 @@ export default function NewBrandPage() {
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
         <p className="ml-4 text-lg">Loading your details...</p>
+      </div>
+    );
+  }
+
+  if (userLoadError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen p-8 text-center">
+        <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
+        <h1 className="text-3xl font-bold mb-2">Unable to verify permissions</h1>
+        <p className="text-lg text-muted-foreground mb-6 max-w-xl">
+          {userLoadError}
+        </p>
+        <div className="flex flex-wrap gap-3 justify-center">
+          <Button onClick={fetchCurrentUser} disabled={isLoadingUser}>
+            {isLoadingUser ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Retrying...
+              </>
+            ) : (
+              'Try Again'
+            )}
+          </Button>
+          <Button variant="outline" onClick={() => router.push('/dashboard')}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Return to Dashboard
+          </Button>
+        </div>
       </div>
     );
   }
@@ -819,7 +868,7 @@ export default function NewBrandPage() {
                       <BrandLogoUpload
                         currentLogoUrl={formData.logo_url}
                         onLogoChange={(url) => setFormData(prev => ({ ...prev, logo_url: url }))}
-                        brandId={uuidv4()} // Temporary ID for new brand
+                        brandId={draftBrandId}
                         brandName={formData.name}
                         isDisabled={isSaving}
                       />

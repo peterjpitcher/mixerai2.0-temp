@@ -2775,15 +2775,21 @@ export type Database = {
         }
         Returns: undefined
       }
+      delete_workflow_and_dependents: {
+        Args: {
+          p_workflow_id: string
+        }
+        Returns: boolean
+      }
       update_workflow_and_handle_invites: {
         Args: {
           p_workflow_id: string
-          p_name: string
-          p_brand_id: string
-          p_steps: Json
-          p_template_id: string
-          p_description: string
-          p_new_invitation_items: Json
+          p_name?: string | null
+          p_brand_id?: string | null
+          p_steps?: Json | null
+          p_template_id?: string | null
+          p_description?: string | null
+          p_new_invitation_items?: Json | null
         }
         Returns: boolean
       }

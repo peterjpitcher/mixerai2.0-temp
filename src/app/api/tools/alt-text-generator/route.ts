@@ -9,16 +9,46 @@ import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth
 import dns from 'dns';
 import ipaddr from 'ipaddr.js';
 
+type RateLimitEntry = {
+  count: number;
+  timestamp: number;
+  resetTimer: NodeJS.Timeout | null;
+};
+
 // In-memory rate limiting
-const rateLimit = new Map<string, { count: number, timestamp: number }>();
+const rateLimit = new Map<string, RateLimitEntry>();
 const RATE_LIMIT_PERIOD = 60 * 1000; // 1 minute
 const MAX_REQUESTS_PER_MINUTE = 60; // Allow 60 requests per minute per IP (relaxed)
+const MAX_IMAGES_PER_REQUEST = 5;
+
+function getOrCreateRateLimitEntry(ip: string, now: number): RateLimitEntry {
+  let entry = rateLimit.get(ip);
+
+  if (!entry) {
+    entry = { count: 0, timestamp: now, resetTimer: null };
+    rateLimit.set(ip, entry);
+  } else if (now - entry.timestamp > RATE_LIMIT_PERIOD) {
+    if (entry.resetTimer) {
+      clearTimeout(entry.resetTimer);
+    }
+    entry.count = 0;
+    entry.timestamp = now;
+  }
+
+  if (!entry.resetTimer) {
+    entry.resetTimer = setTimeout(() => {
+      rateLimit.delete(ip);
+    }, RATE_LIMIT_PERIOD);
+  }
+
+  return entry;
+}
 
 const AltTextGenerationSchema = z.object({
   imageUrls: z
     .array(z.string().min(1))
     .min(1, 'At least one image URL is required')
-    .max(20, 'A maximum of 20 images can be processed at once'),
+    .max(MAX_IMAGES_PER_REQUEST, `A maximum of ${MAX_IMAGES_PER_REQUEST} images can be processed at once`),
   language: z.string().min(2).max(10).optional(),
   processBatch: z.boolean().optional(),
   brand_id: z.string().uuid().optional(),
@@ -43,7 +73,10 @@ function isPrivateAddress(address: string): boolean {
   }
 }
 
-async function ensureSafeHostname(hostname: string) {
+async function ensureSafeHostname(
+  hostname: string,
+  lookupCache: Map<string, dns.LookupAddress[]>
+) {
   const lowerHost = hostname.toLowerCase();
   if (lowerHost === 'localhost' || lowerHost === '127.0.0.1' || lowerHost === '[::1]') {
     throw new Error('Internal or localhost URLs are not allowed');
@@ -53,7 +86,11 @@ async function ensureSafeHostname(hostname: string) {
     throw new Error('Requests to internal or reserved IP addresses are not allowed.');
   }
 
-  const lookupResults = await dns.promises.lookup(lowerHost, { all: true });
+  let lookupResults = lookupCache.get(lowerHost);
+  if (!lookupResults) {
+    lookupResults = await dns.promises.lookup(lowerHost, { all: true });
+    lookupCache.set(lowerHost, lookupResults);
+  }
   if (!lookupResults.length) {
     throw new Error('Unable to resolve image host.');
   }
@@ -140,40 +177,33 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
   const ip = request.headers.get('x-forwarded-for') || request.ip || 'unknown';
   const now = Date.now();
 
-  if (rateLimit.has(ip)) {
-    const userRateLimit = rateLimit.get(ip)!;
-    if (now - userRateLimit.timestamp > RATE_LIMIT_PERIOD) {
-      // Reset count if period has passed
-      userRateLimit.count = 1;
-      userRateLimit.timestamp = now;
-    } else if (userRateLimit.count >= MAX_REQUESTS_PER_MINUTE) {
-      console.warn(`[RateLimit] Blocked ${ip} for alt-text-generator. Count: ${userRateLimit.count}`);
-      historyEntryStatus = 'failure';
-      historyErrorMessage = 'Rate limit exceeded.';
-      // Log history before returning
-      try {
-        await supabaseAdmin.from('tool_run_history').insert({
-            user_id: user.id,
-            tool_name: 'alt_text_generator',
-            inputs: { error: 'Rate limit exceeded for initial request' }, // Or apiInputs if available
-            outputs: { error: 'Rate limit exceeded' },
-            status: historyEntryStatus,
-            error_message: historyErrorMessage,
-            brand_id: null // Alt text gen currently has no brand context
-        });
-      } catch (logError) {
-        console.error('[HistoryLoggingError] Failed to log rate limit error for alt-text-generator:', logError);
-      }
-      return NextResponse.json(
-        { success: false, error: 'Rate limit exceeded. Please try again in a minute.' },
-        { status: 429 }
-      );
-    } else {
-      userRateLimit.count += 1;
+  const rateEntry = getOrCreateRateLimitEntry(ip, now);
+  rateEntry.timestamp = now;
+
+  if (rateEntry.count >= MAX_REQUESTS_PER_MINUTE) {
+    console.warn(`[RateLimit] Blocked ${ip} for alt-text-generator. Count: ${rateEntry.count}`);
+    historyEntryStatus = 'failure';
+    historyErrorMessage = 'Rate limit exceeded.';
+    try {
+      await supabaseAdmin.from('tool_run_history').insert({
+          user_id: user.id,
+          tool_name: 'alt_text_generator',
+          inputs: { error: 'Rate limit exceeded for initial request' },
+          outputs: { error: 'Rate limit exceeded' },
+          status: historyEntryStatus,
+          error_message: historyErrorMessage,
+          brand_id: null
+      });
+    } catch (logError) {
+      console.error('[HistoryLoggingError] Failed to log rate limit error for alt-text-generator:', logError);
     }
-  } else {
-    rateLimit.set(ip, { count: 1, timestamp: now });
+    return NextResponse.json(
+      { success: false, error: 'Rate limit exceeded. Please try again in a minute.' },
+      { status: 429 }
+    );
   }
+
+  rateEntry.count += 1;
 
   try {
     const parsedBody = AltTextGenerationSchema.safeParse(await request.json());
@@ -243,6 +273,8 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
 
     const results: AltTextResultItem[] = [];
 
+    const dnsLookupCache = new Map<string, dns.LookupAddress[]>();
+
     for (const imageUrl of data.imageUrls) {
       const requestedLanguage = data.language;
       let language = brandLanguage || 'en';
@@ -285,7 +317,7 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
             throw new Error('Internal or localhost URLs are not allowed');
           }
 
-          await ensureSafeHostname(url.hostname);
+          await ensureSafeHostname(url.hostname, dnsLookupCache);
           
           // Validate image file extension if present in URL
           const pathname = url.pathname.toLowerCase();
@@ -348,13 +380,6 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
       }
       
       try {
-        // Add delay between image processing to avoid rate limiting (except for the first image)
-        if (results.length > 0) {
-          console.log(`[Delay] Alt-Text Gen: Waiting 2 seconds before processing next image...`);
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-
-        // console.log(`[AltTextGen] Generating for ${imageUrl} with lang: ${language}, country: ${country}`);
         const generatedAltTextResult = await generateAltText(
           imageUrl,
           language,

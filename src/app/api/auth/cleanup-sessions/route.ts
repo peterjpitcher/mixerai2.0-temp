@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cleanupExpiredSessions } from '@/lib/auth/session-manager';
 
+export const runtime = 'nodejs';
+
 let lastCleanupRun = 0;
 const MIN_INTERVAL_MS = 60_000; // 1 minute throttle
 

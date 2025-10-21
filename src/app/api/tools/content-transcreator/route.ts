@@ -7,10 +7,39 @@ import { Json } from '@/types/supabase';
 import { z } from 'zod';
 import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth/brand-access';
 
+type RateLimitEntry = {
+  count: number;
+  timestamp: number;
+  resetTimer: NodeJS.Timeout | null;
+};
+
 // In-memory rate limiting
-const rateLimit = new Map<string, { count: number, timestamp: number }>();
+const rateLimit = new Map<string, RateLimitEntry>();
 const RATE_LIMIT_PERIOD = 60 * 1000; // 1 minute
 const MAX_REQUESTS_PER_MINUTE = 60; // Allow 60 requests per minute per IP (relaxed)
+
+function getOrCreateRateLimitEntry(ip: string, now: number): RateLimitEntry {
+  let entry = rateLimit.get(ip);
+
+  if (!entry) {
+    entry = { count: 0, timestamp: now, resetTimer: null };
+    rateLimit.set(ip, entry);
+  } else if (now - entry.timestamp > RATE_LIMIT_PERIOD) {
+    if (entry.resetTimer) {
+      clearTimeout(entry.resetTimer);
+    }
+    entry.count = 0;
+    entry.timestamp = now;
+  }
+
+  if (!entry.resetTimer) {
+    entry.resetTimer = setTimeout(() => {
+      rateLimit.delete(ip);
+    }, RATE_LIMIT_PERIOD);
+  }
+
+  return entry;
+}
 
 const ContentTransCreationSchema = z.object({
   content: z.string().min(1, 'Content is required'),
@@ -66,41 +95,35 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
   const ip = request.headers.get('x-forwarded-for') || request.ip || 'unknown';
   const now = Date.now();
 
-  if (rateLimit.has(ip)) {
-    const userRateLimit = rateLimit.get(ip)!;
-    if (now - userRateLimit.timestamp > RATE_LIMIT_PERIOD) {
-      // Reset count if period has passed
-      userRateLimit.count = 1;
-      userRateLimit.timestamp = now;
-    } else if (userRateLimit.count >= MAX_REQUESTS_PER_MINUTE) {
-      console.warn(`[RateLimit] Blocked ${ip} for content-transcreator. Count: ${userRateLimit.count}`);
-      historyEntryStatus = 'failure';
-      historyErrorMessage = 'Rate limit exceeded.';
-      try {
-        await supabaseAdmin.from('tool_run_history').insert({
-            user_id: user.id,
-            tool_name: 'content_transcreator',
-            inputs: { error: 'Rate limit exceeded for initial request' } as unknown as Json,
-            outputs: { error: 'Rate limit exceeded' } as unknown as Json,
-            status: historyEntryStatus,
-            error_message: historyErrorMessage,
-            brand_id: data.brand_id,
-            batch_id: data.batch_id || null,
-            batch_sequence: data.batch_sequence || null
-        });
-      } catch (logError) {
-        console.error('[HistoryLoggingError] Failed to log rate limit error for content-transcreator:', logError);
-      }
-      return NextResponse.json(
-        { success: false, error: 'Rate limit exceeded. Please try again in a minute.' },
-        { status: 429 }
-      );
-    } else {
-      userRateLimit.count += 1;
+  const rateEntry = getOrCreateRateLimitEntry(ip, now);
+  rateEntry.timestamp = now;
+
+  if (rateEntry.count >= MAX_REQUESTS_PER_MINUTE) {
+    console.warn(`[RateLimit] Blocked ${ip} for content-transcreator. Count: ${rateEntry.count}`);
+    historyEntryStatus = 'failure';
+    historyErrorMessage = 'Rate limit exceeded.';
+    try {
+      await supabaseAdmin.from('tool_run_history').insert({
+          user_id: user.id,
+          tool_name: 'content_transcreator',
+          inputs: { error: 'Rate limit exceeded for initial request' } as unknown as Json,
+          outputs: { error: 'Rate limit exceeded' } as unknown as Json,
+          status: historyEntryStatus,
+          error_message: historyErrorMessage,
+          brand_id: data.brand_id,
+          batch_id: data.batch_id || null,
+          batch_sequence: data.batch_sequence || null
+      });
+    } catch (logError) {
+      console.error('[HistoryLoggingError] Failed to log rate limit error for content-transcreator:', logError);
     }
-  } else {
-    rateLimit.set(ip, { count: 1, timestamp: now });
+    return NextResponse.json(
+      { success: false, error: 'Rate limit exceeded. Please try again in a minute.' },
+      { status: 429 }
+    );
   }
+
+  rateEntry.count += 1;
 
   try {
     try {

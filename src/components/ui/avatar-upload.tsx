@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Camera, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -13,6 +13,7 @@ import {
   validateImageDimensions 
 } from '@/lib/validation/file-upload';
 import { createSupabaseClient } from '@/lib/supabase/client';
+import { apiFetch } from '@/lib/api-client';
 
 interface AvatarUploadProps {
   currentAvatarUrl?: string | null;
@@ -20,7 +21,6 @@ interface AvatarUploadProps {
   userId: string;
   fullName?: string;
   email?: string;
-  onProfileVersionChange?: (version: string | null) => void;
 }
 
 export function AvatarUpload({ 
@@ -29,13 +29,28 @@ export function AvatarUpload({
   userId,
   fullName,
   email,
-  onProfileVersionChange,
 }: AvatarUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentAvatarUrl || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  const supabase = useMemo(() => createSupabaseClient(), []);
+  const [supabaseClient, setSupabaseClient] = useState<ReturnType<typeof createSupabaseClient> | null>(null);
+  const [supabaseError, setSupabaseError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const client = createSupabaseClient();
+      setSupabaseClient(client);
+      setSupabaseError(null);
+    } catch (error) {
+      const debugMessage =
+        error instanceof Error
+          ? error.message
+          : 'Supabase client could not be initialised for avatar uploads.';
+      console.error('[avatar-upload] Failed to initialise Supabase client', debugMessage, error);
+      setSupabaseClient(null);
+      setSupabaseError('Profile photo uploads are currently unavailable. Please contact support.');
+    }
+  }, []);
 
   useEffect(() => {
     setPreviewUrl(currentAvatarUrl || null);
@@ -44,6 +59,10 @@ export function AvatarUpload({
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (!userId) {
+      toast.error('User information is not ready. Please try again.');
+      return;
+    }
 
     // Validate file using comprehensive validation
     const validationResult = validateFile(file, { category: 'avatar' });
@@ -72,6 +91,13 @@ export function AvatarUpload({
       return;
     }
 
+    const client = supabaseClient;
+    if (!client) {
+      toast.error(supabaseError ?? 'Profile photo uploads are currently unavailable. Please try again later.');
+      event.target.value = '';
+      return;
+    }
+
     setIsUploading(true);
 
     try {
@@ -79,7 +105,7 @@ export function AvatarUpload({
       const filePath = generateUniqueFileName(file.name, userId);
 
       // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await client.storage
         .from('avatars')
         .upload(filePath, file, {
           cacheControl: '3600',
@@ -91,7 +117,7 @@ export function AvatarUpload({
       }
 
       // Get public URL
-      const { data: { publicUrl } } = supabase.storage
+      const { data: { publicUrl } } = client.storage
         .from('avatars')
         .getPublicUrl(filePath);
 
@@ -99,20 +125,19 @@ export function AvatarUpload({
       setPreviewUrl(publicUrl);
       
       // Update the profile
-      const { data: updatedProfile, error: updateError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: publicUrl })
-        .eq('id', userId)
-        .select('updated_at')
-        .single();
+      const response = await apiFetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatarUrl: publicUrl }),
+      });
 
-      if (updateError) {
-        throw updateError;
+      const payload = await response.json();
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || 'Failed to update profile photo.');
       }
 
       // Call the parent callback
       onAvatarChange(publicUrl);
-      onProfileVersionChange?.(updatedProfile?.updated_at ?? null);
       
       toast.success('Profile photo updated successfully');
     } catch (error) {
@@ -132,21 +157,23 @@ export function AvatarUpload({
     
     setIsUploading(true);
     try {
-      // Update profile to remove avatar
-      const { data: updatedProfile, error: updateError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: null })
-        .eq('id', userId)
-        .select('updated_at')
-        .single();
+      if (!userId) {
+        throw new Error('User information is not ready.');
+      }
 
-      if (updateError) {
-        throw updateError;
+      const response = await apiFetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatarUrl: null }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || 'Failed to remove profile photo.');
       }
 
       setPreviewUrl(null);
       onAvatarChange('');
-      onProfileVersionChange?.(updatedProfile?.updated_at ?? null);
       toast.success('Profile photo removed');
     } catch (error) {
       console.error('Error removing avatar:', error);
@@ -195,7 +222,7 @@ export function AvatarUpload({
           accept="image/jpeg,image/jpg,image/png,image/webp"
           onChange={handleFileSelect}
           className="hidden"
-          disabled={isUploading}
+          disabled={isUploading || !supabaseClient}
         />
         
         <Button
@@ -203,7 +230,7 @@ export function AvatarUpload({
           variant="outline"
           size="sm"
           onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
+          disabled={isUploading || !supabaseClient}
         >
           {previewUrl ? (
             <>
@@ -229,6 +256,12 @@ export function AvatarUpload({
             <X className="h-4 w-4 mr-2" />
             Remove
           </Button>
+        )}
+        
+        {supabaseError && (
+          <p className="text-xs text-destructive">
+            Profile photo uploads are unavailable: {supabaseError}
+          </p>
         )}
       </div>
     </div>

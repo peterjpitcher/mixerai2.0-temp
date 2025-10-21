@@ -7,9 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Loader2, ClipboardCopy, Globe, ArrowLeft, AlertTriangle, Briefcase, History, ExternalLink } from 'lucide-react';
+import { Loader2, ClipboardCopy, Globe, AlertTriangle, Briefcase, History, ExternalLink, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BrandIcon } from '@/components/brand-icon';
@@ -19,6 +18,8 @@ import { Table, TableHeader, TableBody, TableCell, TableHead, TableRow } from "@
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { apiFetch } from '@/lib/api-client';
+import { useToolAccess } from '../use-tool-access';
+import { useToolHistory, type ToolRunHistoryRecord } from '../use-tool-history';
 
 
 // Language options - can be kept for source language or if no brand is selected (though API requires brand)
@@ -37,18 +38,29 @@ const languageOptions = [
 
 // Country options - will be determined by selected brand's settings
 
-interface UserSessionData {
-  id: string;
-  email?: string;
-  user_metadata?: {
-    role?: string; 
-    full_name?: string;
-  };
-  brand_permissions?: Array<{
-    brand_id: string;
-    role: string; 
-  }>;
-}
+const HISTORY_PAGE_SIZE = 20;
+
+const SessionErrorState = ({ message, onRetry }: { message: string; onRetry: () => void }) => (
+  <div className="flex flex-col items-center justify-center min-h-[300px] py-10 text-center">
+    <AlertTriangle className="mb-4 h-16 w-16 text-destructive" />
+    <h3 className="text-xl font-bold mb-2">Unable to verify your access</h3>
+    <p className="text-muted-foreground mb-4 max-w-md">{message}</p>
+    <Button onClick={onRetry}>Try Again</Button>
+  </div>
+);
+
+const AccessDeniedState = ({ message }: { message?: string }) => (
+  <div className="flex flex-col items-center justify-center min-h-[300px] py-10 text-center">
+    <ShieldAlert className="mb-4 h-16 w-16 text-destructive" />
+    <h3 className="text-xl font-bold mb-2">Access Denied</h3>
+    <p className="text-muted-foreground mb-4 max-w-md">
+      {message || 'You do not have permission to use this tool.'}
+    </p>
+    <Button variant="outline" onClick={() => window.location.href = '/dashboard/tools'}>
+      Return to Tools
+    </Button>
+  </div>
+);
 
 interface Brand {
   id: string;
@@ -60,19 +72,7 @@ interface Brand {
 }
 
 // Define ToolRunHistoryItem interface
-interface ToolRunHistoryItem {
-  id: string;
-  user_id: string;
-  tool_name: string;
-  brand_id?: string | null;
-  inputs: Record<string, unknown>; 
-  outputs: Record<string, unknown>; 
-  run_at: string; 
-  status: 'success' | 'failure';
-  error_message?: string | null;
-  batch_id?: string | null;
-  batch_sequence?: number | null;
-}
+type ToolRunHistoryItem = ToolRunHistoryRecord;
 
 interface BatchGroup {
   batch_id: string;
@@ -99,24 +99,22 @@ export default function ContentTransCreatorPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<{ transCreatedContent: string, targetLanguage: string, targetCountry: string } | null>(null);
   const [characterCount, setCharacterCount] = useState(0);
-  const router = useRouter();
   
   // Batch mode states
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [batchContent, setBatchContent] = useState('');
   const [batchResults, setBatchResults] = useState<Array<{ content: string; transCreatedContent?: string; error?: string }>>([]);
+  const [brandsError, setBrandsError] = useState<string | null>(null);
 
-  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
-  const [userError, setUserError] = useState<string | null>(null);
-  const [isAllowedToAccess, setIsAllowedToAccess] = useState<boolean>(false);
-  const [isCheckingPermissions, setIsCheckingPermissions] = useState<boolean>(true);
+  const {
+    isLoading: isLoadingSession,
+    isFetching: isFetchingSession,
+    error: sessionError,
+    status: sessionStatus,
+    hasAccess,
+    refetch: refetchSession,
+  } = useToolAccess();
 
-  // History State
-  const [, setRunHistory] = useState<ToolRunHistoryItem[]>([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [historyError, setHistoryError] = useState<string | null>(null);
-  const [groupedHistory, setGroupedHistory] = useState<BatchGroup[]>([]);
   const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set());
 
   // Group history items by batch_id
@@ -194,110 +192,76 @@ export default function ContentTransCreatorPage() {
     return groups.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [brands]);
 
-  useEffect(() => {
-    const fetchCurrentUserAndBrands = async () => {
-      setIsLoadingUser(true);
-      setIsLoadingBrands(true);
-      setUserError(null);
-      try {
-        const userResponse = await fetch('/api/me');
-        if (!userResponse.ok) {
-          const errorData = await userResponse.json().catch(() => ({ error: 'Failed to fetch user session' }));
-          throw new Error(errorData.error || `HTTP error! status: ${userResponse.status}`);
-        }
-        const userData = await userResponse.json();
-        if (userData.success && userData.user) {
-          setCurrentUser(userData.user);
-          
-          // User is fetched, now fetch brands
-          const brandsResponse = await fetch('/api/brands');
-          if (!brandsResponse.ok) {
-            throw new Error('Failed to fetch brands');
-          }
-          const brandsData = await brandsResponse.json();
-          if (brandsData.success && Array.isArray(brandsData.data)) {
-            // Filter brands to only include those with language and country
-            const validBrands = brandsData.data.filter((b: Brand) => b.language && b.country);
-            setBrands(validBrands);
-            if (validBrands.length > 0) {
-              setSelectedBrandId(validBrands[0].id); // Default to first valid brand
-            } else {
-               toast.info("No brands with required language/country settings found. Please configure a brand first.");
-            }
-          } else {
-            setBrands([]);
-            toast.error(brandsData.error || 'Could not load brands.');
-          }
+  const historyTransform = useCallback(
+    (records: ToolRunHistoryRecord[]) => groupHistoryByBatch(records),
+    [groupHistoryByBatch]
+  );
 
+  const {
+    items: groupedHistory,
+    isLoading: isLoadingHistory,
+    error: historyError,
+    hasMore: hasMoreHistory,
+    loadMore: loadMoreHistory,
+    refresh: refreshHistory,
+  } = useToolHistory<BatchGroup>('content_transcreator', {
+    enabled: hasAccess,
+    pageSize: HISTORY_PAGE_SIZE,
+    transform: historyTransform,
+  });
+
+  useEffect(() => {
+    if (isLoadingSession || isFetchingSession) {
+      return;
+    }
+
+    if (!hasAccess) {
+      setBrands([]);
+      setSelectedBrandId(null);
+      setBrandsError(null);
+      setIsLoadingBrands(false);
+      return;
+    }
+
+    const fetchBrands = async () => {
+      setIsLoadingBrands(true);
+      setBrandsError(null);
+      try {
+        const response = await apiFetch('/api/brands');
+        const data = await response.json();
+
+        if (!response.ok || !data.success || !Array.isArray(data.data)) {
+          throw new Error(data.error || 'Failed to load brands.');
+        }
+
+        const validBrands = data.data.filter((b: Brand) => b.language && b.country);
+        setBrands(validBrands);
+
+        if (validBrands.length > 0) {
+          setSelectedBrandId(prev => {
+            if (prev && validBrands.some(brand => brand.id === prev)) {
+              return prev;
+            }
+            return validBrands[0].id;
+          });
         } else {
-          setCurrentUser(null);
-          setUserError(userData.error || 'User data not found in session.');
+          setSelectedBrandId(null);
+          toast.info('No brands with required language/country settings found. Please configure a brand first.');
         }
       } catch (error) {
-        console.error('[ContentTransCreatorPage] Error fetching initial data:', error);
-        setUserError((error as Error).message || 'An unexpected error occurred while fetching data.');
-        toast.error((error as Error).message || 'Failed to load required data.');
+        console.error('[ContentTransCreatorPage] Error fetching brands:', error);
+        setBrands([]);
+        setSelectedBrandId(null);
+        const message = error instanceof Error ? error.message : 'Failed to load brands.';
+        setBrandsError(message);
+        toast.error(message);
       } finally {
-        setIsLoadingUser(false);
         setIsLoadingBrands(false);
       }
     };
-    fetchCurrentUserAndBrands();
-  }, []);
 
-  useEffect(() => {
-    if (!isLoadingUser && currentUser) {
-      setIsCheckingPermissions(true);
-      const userRole = currentUser.user_metadata?.role;
-      const canAccess = userRole === 'admin' || userRole === 'editor';
-      setIsAllowedToAccess(canAccess);
-      if (!canAccess) {
-        toast.error("You don&apos;t have permission to access this tool.");
-      }
-      setIsCheckingPermissions(false);
-    } else if (!isLoadingUser && !currentUser) {
-      setIsAllowedToAccess(false);
-      setIsCheckingPermissions(false);
-    }
-  }, [currentUser, isLoadingUser]);
-
-  // Fetch Run History
-  useEffect(() => {
-    const fetchHistory = async () => {
-      if (!currentUser || !isAllowedToAccess) return;
-
-      setIsLoadingHistory(true);
-      setHistoryError(null);
-      try {
-        const response = await fetch('/api/me/tool-run-history?tool_name=content_transcreator');
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch history' }));
-          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        if (data.success && data.history) {
-          setRunHistory(data.history);
-          const grouped = groupHistoryByBatch(data.history);
-          setGroupedHistory(grouped);
-        } else {
-          setRunHistory([]);
-          setGroupedHistory([]);
-          setHistoryError(data.error || 'History data not found.');
-        }
-      } catch (error) {
-        console.error('[ContentTransCreatorPage] Error fetching run history:', error);
-        setRunHistory([]);
-        setHistoryError((error as Error).message || 'An unexpected error occurred while fetching history.');
-      } finally {
-        setIsLoadingHistory(false);
-      }
-    };
-
-    if (currentUser && isAllowedToAccess) { // Fetch only if user is loaded and allowed
-      fetchHistory();
-    }
-  }, [currentUser, isAllowedToAccess, groupHistoryByBatch]);
-
+    void fetchBrands();
+  }, [hasAccess, isLoadingSession, isFetchingSession]);
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value);
     setCharacterCount(e.target.value.length);
@@ -308,7 +272,7 @@ export default function ContentTransCreatorPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!isAllowedToAccess) {
+    if (!hasAccess) {
       toast.error("You do not have permission to use this tool.");
       return;
     }
@@ -386,7 +350,7 @@ export default function ContentTransCreatorPage() {
       } finally {
         setIsLoading(false);
         // Refetch history
-        await refreshHistory();
+        refreshHistory();
       }
     } else {
       // Single mode processing
@@ -437,49 +401,21 @@ export default function ContentTransCreatorPage() {
       } finally {
         setIsLoading(false);
         // Refetch history
-        await refreshHistory();
+        refreshHistory();
       }
     }
   };
   
-  const refreshHistory = async () => {
-    if (currentUser && isAllowedToAccess) {
-      setIsLoadingHistory(true);
-      setHistoryError(null);
-      try {
-        const response = await fetch('/api/me/tool-run-history?tool_name=content_transcreator');
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch history' }));
-          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        if (data.success && data.history) {
-          setRunHistory(data.history);
-          const grouped = groupHistoryByBatch(data.history);
-          setGroupedHistory(grouped);
-        } else {
-          setRunHistory([]);
-          setGroupedHistory([]);
-          setHistoryError(data.error || 'History data not found.');
-        }
-      } catch (error) {
-        console.error('[ContentTransCreatorPage] Error fetching run history:', error);
-        setRunHistory([]);
-        setHistoryError((error as Error).message || 'An unexpected error occurred while fetching history.');
-      } finally {
-        setIsLoadingHistory(false);
-      }
-    }
-  };
-
   const handleCopyContent = () => {
     if (results?.transCreatedContent) {
       copyToClipboard(results.transCreatedContent);
       toast.success('Trans-created content copied to clipboard!');
     }
   };
-  
-  if (isLoadingUser || isCheckingPermissions || isLoadingBrands) {
+
+  const isSessionLoading = isLoadingSession || isFetchingSession;
+
+  if (isSessionLoading || isLoadingBrands) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -488,34 +424,12 @@ export default function ContentTransCreatorPage() {
     );
   }
 
-  if (!isAllowedToAccess && !userError) { // If no specific user error, but not allowed
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10 text-center">
-        <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
-        <p className="text-muted-foreground mb-4">
-          You do not have the necessary permissions (Admin or Editor role required) to use this tool.
-        </p>
-        <Button onClick={() => router.push('/dashboard')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Dashboard
-        </Button>
-      </div>
-    );
+  if (sessionError && sessionStatus !== 403) {
+    return <SessionErrorState message={sessionError} onRetry={() => refetchSession()} />;
   }
-  
-  if (userError) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-theme(spacing.12))] py-10 text-center">
-        <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Error Loading User</h2>
-        <p className="text-muted-foreground mb-4">{userError}</p>
-        <Button onClick={() => router.push('/dashboard')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Dashboard
-        </Button>
-      </div>
-    );
+
+  if (!hasAccess) {
+    return <AccessDeniedState message={sessionStatus === 403 ? sessionError ?? undefined : undefined} />;
   }
 
   return (
@@ -588,6 +502,9 @@ export default function ContentTransCreatorPage() {
                           ))}
                         </SelectContent>
                       </Select>
+                    )}
+                    {brandsError && !isLoadingBrands && (
+                      <p className="mt-2 text-sm text-destructive">{brandsError}</p>
                     )}
                   </div>
                 </div>
@@ -881,6 +798,13 @@ export default function ContentTransCreatorPage() {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+              {hasMoreHistory && !isLoadingHistory && (
+                <div className="mt-4 flex justify-center">
+                  <Button variant="outline" onClick={loadMoreHistory}>
+                    Load More
+                  </Button>
                 </div>
               )}
             </CardContent>
