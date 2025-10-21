@@ -33,9 +33,21 @@ interface MasterClaimBrand {
 interface VettingAgency {
   id: string;
   name: string;
-  description?: string | null;
-  country_code?: string | null;
-  priority: 'High' | 'Medium' | 'Low' | null;
+  description: string | null;
+  countryCode: string | null;
+  priorityRank: number | null;
+  priorityLabel: 'High' | 'Medium' | 'Low' | null;
+  status: string;
+  regulatoryScope: string | null;
+  categoryTags: string[];
+  languageCodes: string[];
+  websiteUrl: string | null;
+  rationale: string | null;
+  source: string;
+  sourceMetadata: Record<string, unknown>;
+  isFallback: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 /**
@@ -114,11 +126,43 @@ export function useVettingAgencies() {
         );
 
         if (data.success && Array.isArray(data.data)) {
-          // Transform numeric priority to string labels
-          return data.data.map((agency: any) => ({
-            ...agency,
-            priority: mapNumericPriorityToLabel(agency.priority),
-          })) as VettingAgency[];
+          return data.data.map((agency: any): VettingAgency => {
+            const priorityLabel = mapNumericPriorityToLabel(
+              agency.priority_label ?? agency.priority,
+            );
+            const priorityRank =
+              typeof agency.priority === 'number'
+                ? agency.priority
+                : priorityLabel
+                ? mapPriorityLabelToRank(priorityLabel)
+                : null;
+
+            return {
+              id: agency.id,
+              name: agency.name,
+              description: agency.description ?? null,
+              countryCode: agency.country_code ?? null,
+              priorityRank,
+              priorityLabel,
+              status: agency.status ?? 'approved',
+              regulatoryScope: agency.regulatory_scope ?? null,
+              categoryTags: Array.isArray(agency.category_tags)
+                ? agency.category_tags
+                : [],
+              languageCodes: Array.isArray(agency.language_codes)
+                ? agency.language_codes
+                : [],
+              websiteUrl: agency.website_url ?? null,
+              rationale: agency.rationale ?? null,
+              source: agency.source ?? 'unknown',
+              sourceMetadata:
+                (agency.source_metadata as Record<string, unknown> | undefined) ??
+                {},
+              isFallback: Boolean(agency.is_fallback),
+              createdAt: agency.created_at ?? null,
+              updatedAt: agency.updated_at ?? null,
+            };
+          });
         }
         throw new Error(data.error || 'Invalid vetting agencies data');
       } catch (error) {
@@ -140,5 +184,12 @@ function mapNumericPriorityToLabel(priority: number | string | null | undefined)
   if (priority === 1 || priority === 'High') return 'High';
   if (priority === 2 || priority === 'Medium') return 'Medium';
   if (priority === 3 || priority === 'Low') return 'Low';
+  return null;
+}
+
+function mapPriorityLabelToRank(label: string | null | undefined): number | null {
+  if (label === 'High') return 1;
+  if (label === 'Medium') return 2;
+  if (label === 'Low') return 3;
   return null;
 }

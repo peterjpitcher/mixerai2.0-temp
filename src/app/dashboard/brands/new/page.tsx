@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MultiSelectCheckboxCombobox } from '@/components/ui/MultiSelectCheckboxCombobox';
 import { toast } from 'sonner';
-import { Loader2, X, PlusCircle, ArrowLeft, Info, HelpCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, X, PlusCircle, ArrowLeft, Info, HelpCircle, AlertTriangle, Sparkles } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
 import { BrandLogoUpload } from '@/components/ui/brand-logo-upload';
 import { COUNTRIES, LANGUAGES, getLanguagesForCountry, getLanguageLabel } from '@/lib/constants';
@@ -72,6 +72,16 @@ const getPriorityAgencyStyles = (priority: 'High' | 'Medium' | 'Low' | null | un
   return 'font-normal text-gray-700 dark:text-gray-300';
 };
 
+const mergeAgencies = (
+  existing: VettingAgency[],
+  additions: VettingAgency[],
+): VettingAgency[] => {
+  const map = new Map<string, VettingAgency>();
+  existing.forEach((agency) => map.set(agency.id, agency));
+  additions.forEach((agency) => map.set(agency.id, agency));
+  return Array.from(map.values());
+};
+
 
 interface MasterClaimBrand {
   id: string;
@@ -105,6 +115,7 @@ export default function NewBrandPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingAgencies, setIsGeneratingAgencies] = useState(false);
   const [isLoading, setIsLoading] = useState(false); 
 
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
@@ -283,36 +294,36 @@ export default function NewBrandPage() {
     fetchMasterClaimBrands();
   }, [isForbidden, isLoadingUser, userLoadError]);
 
-  // Effect for fetching vetting agencies
-  useEffect(() => {
-    const fetchAllVettingAgencies = async () => {
-      if (isForbidden || isLoadingUser || userLoadError) return; 
-      const apiUrl = '/api/content-vetting-agencies';
-      setIsLoading(true);
-      try {
-        const response = await apiFetch(apiUrl);
-        if (!response.ok) throw new Error('Failed to fetch vetting agencies');
-        const data = await response.json();
-        if (data.success && Array.isArray(data.data)) {
-          const transformedAgencies: VettingAgency[] = data.data.map((agency: VettingAgencyFromAPI) => ({
-            ...agency,
-            priority: mapNumericPriorityToLabel(agency.priority),
-          }));
-          setAllVettingAgencies(transformedAgencies);
-        } else {
-          toast.error(data.error || 'Could not load vetting agencies.');
-          setAllVettingAgencies([]); 
-        }
-      } catch (err) {
-        toast.error('Failed to fetch vetting agencies list.');
-        console.error('Error fetching all vetting agencies:', err);
+  const fetchAllVettingAgencies = useCallback(async () => {
+    if (isForbidden || isLoadingUser || userLoadError) return;
+    const apiUrl = '/api/content-vetting-agencies';
+    setIsLoading(true);
+    try {
+      const response = await apiFetch(apiUrl);
+      if (!response.ok) throw new Error('Failed to fetch vetting agencies');
+      const data = await response.json();
+      if (data.success && Array.isArray(data.data)) {
+        const transformedAgencies: VettingAgency[] = data.data.map((agency: VettingAgencyFromAPI) => ({
+          ...agency,
+          priority: mapNumericPriorityToLabel(agency.priority),
+        }));
+        setAllVettingAgencies(transformedAgencies);
+      } else {
+        toast.error(data.error || 'Could not load vetting agencies.');
         setAllVettingAgencies([]);
-      } finally {
-        setIsLoading(false);
       }
-    };
+    } catch (err) {
+      toast.error('Failed to fetch vetting agencies list.');
+      console.error('Error fetching all vetting agencies:', err);
+      setAllVettingAgencies([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isForbidden, isLoadingUser, userLoadError]);
+
+  useEffect(() => {
     fetchAllVettingAgencies();
-  }, [isForbidden, isLoadingUser, userLoadError]); // Removed formData and formData.country dependency to fetch all initially
+  }, [fetchAllVettingAgencies]);
 
   // Conditional rendering for loading and forbidden states
   // These MUST come AFTER all hook calls (useState, useEffect)
@@ -420,6 +431,7 @@ export default function NewBrandPage() {
   };
 
   const canGenerateIdentity = formData.additional_website_urls.some(url => url.value.trim() !== '') || (formData.website_url && formData.website_url.trim() !== '');
+  const canGenerateAgencyRecommendations = Boolean(formData.name?.trim()) && Boolean(formData.country?.trim());
 
   const handleGenerateBrandIdentity = async () => {
     if (!formData.name) {
@@ -495,6 +507,89 @@ export default function NewBrandPage() {
       toast.error((error as Error).message || 'An error occurred during identity generation.');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleGenerateAgencies = async () => {
+    if (!canGenerateAgencyRecommendations) {
+      toast.error('Please provide a brand name and country before generating vetting agencies.');
+      return;
+    }
+
+    setIsGeneratingAgencies(true);
+    try {
+      const response = await apiFetch('/api/content-vetting-agencies/recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brandName: formData.name?.trim(),
+          countryCode: formData.country?.trim(),
+          languageCodes: formData.language ? [formData.language] : [],
+          brandSummary: formData.brand_identity || null,
+          existingAgencyIds: formData.content_vetting_agencies,
+        }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || 'Failed to generate vetting agencies');
+      }
+
+      const suggestionIds: string[] = Array.isArray(payload.data?.suggestions)
+        ? payload.data.suggestions
+            .map((entry: { record?: { id?: string } }) => entry?.record?.id)
+            .filter((id: unknown): id is string => typeof id === 'string')
+        : [];
+
+      if (suggestionIds.length > 0) {
+        setFormData((prev) => ({
+          ...prev,
+          content_vetting_agencies: Array.from(
+            new Set([...(prev.content_vetting_agencies ?? []), ...suggestionIds])
+          ),
+        }));
+      }
+
+      if (Array.isArray(payload.data?.warnings) && payload.data.warnings.length > 0) {
+        toast.warning('Review suggested agencies', {
+          description: payload.data.warnings.join('\\n').slice(0, 400),
+        });
+      }
+
+      if (payload.data?.fallbackApplied) {
+        toast.info('Used fallback catalogue while generating vetting agencies.');
+      }
+
+      const catalogRecordsRaw = Array.isArray(payload.data?.catalog) ? payload.data.catalog : [];
+      const normalizedCatalog: VettingAgency[] = catalogRecordsRaw
+        .map((record: Record<string, unknown>) => ({
+          id: String(record.id ?? ''),
+          name: String(record.name ?? ''),
+          description: (record.description as string | null) ?? null,
+          country_code: record.countryCode
+            ? String(record.countryCode).toUpperCase()
+            : record.country_code
+            ? String(record.country_code).toUpperCase()
+            : null,
+          priority: mapNumericPriorityToLabel(
+            (record.priority as number | string | null | undefined) ??
+              (record.priorityLabel as string | null | undefined),
+          ),
+        }))
+        .filter((agency) => agency.id && agency.name);
+
+      if (normalizedCatalog.length > 0) {
+        setAllVettingAgencies((prev) => mergeAgencies(prev, normalizedCatalog));
+      }
+
+      await fetchAllVettingAgencies();
+      toast.success('Vetting agencies generated successfully.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to generate vetting agencies.';
+      toast.error(message);
+    } finally {
+      setIsGeneratingAgencies(false);
     }
   };
 
@@ -746,6 +841,36 @@ export default function NewBrandPage() {
                         {(() => { // IIFE to manage filteredAgencies
                         const filteredAgenciesByIdentityTab = allVettingAgencies.filter(agency => !formData.country || !agency.country_code || agency.country_code === formData.country);
 
+                        const renderGenerationCta = (message: string) => (
+                          <div className="space-y-3">
+                            <p className="text-sm text-muted-foreground">{message}</p>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              onClick={handleGenerateAgencies}
+                              disabled={isGeneratingAgencies || !canGenerateAgencyRecommendations}
+                              className="inline-flex items-center"
+                            >
+                              {isGeneratingAgencies ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Generating…
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="mr-2 h-4 w-4" />
+                                  Generate vetting agencies
+                                </>
+                              )}
+                            </Button>
+                            {!canGenerateAgencyRecommendations && (
+                              <p className="text-xs text-muted-foreground">
+                                Add a brand name and country to enable AI-generated recommendations.
+                              </p>
+                            )}
+                          </div>
+                        );
+
                         if (!isLoading && !formData.country && allVettingAgencies.length > 0) {
                           return (
                             <p className="text-sm text-muted-foreground">
@@ -755,19 +880,11 @@ export default function NewBrandPage() {
                         }
 
                         if (!isLoading && formData.country && filteredAgenciesByIdentityTab.length === 0) {
-                          return (
-                            <p className="text-sm text-muted-foreground">
-                              No specific vetting agencies found for {COUNTRIES.find(c => c.value === formData.country)?.label || formData.country}.
-                            </p>
-                          );
+                          return renderGenerationCta(`No specific vetting agencies found for ${COUNTRIES.find(c => c.value === formData.country)?.label || formData.country}.`);
                         }
 
                         if (!isLoading && allVettingAgencies.length === 0) {
-                           return (
-                             <p className="text-sm text-muted-foreground">
-                               No vetting agencies found in the system.
-                             </p>
-                           );
+                           return renderGenerationCta('No vetting agencies found in the system. Generate suggestions to seed the catalogue.');
                         }
                         
                         // Render agency groups only if there are agencies to show (either all or filtered)

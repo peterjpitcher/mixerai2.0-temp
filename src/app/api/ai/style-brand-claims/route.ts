@@ -28,11 +28,11 @@ function countStyledClaims(styled: StyledClaims): number {
 
 // Function to fetch all claims related to a master claim brand
 async function fetchAllBrandClaims(supabase: ReturnType<typeof createSupabaseAdminClient>, masterClaimBrandId: string, productId: string | undefined, countryCode: string | undefined): Promise<Claim[]> {
-  const { data, error } = await supabase.rpc('get_all_claims_for_master_brand', {
+  const { data, error } = await supabase.rpc('get_all_claims_for_master_brand' as never, {
     master_brand_id_param: masterClaimBrandId,
     product_id_param: productId,
     country_code_param: countryCode
-  });
+  } as never);
 
   if (error) {
     console.error('Error fetching all brand claims:', error);

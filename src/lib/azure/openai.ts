@@ -4,6 +4,7 @@ import type { StyledClaims } from "@/types/claims";
 import { normalizeFieldContent, extractFirstHtmlValue, type NormalizedContent } from "@/lib/content/html-normalizer";
 import { activityTracker } from "./activity-tracker";
 import type { VettingFeedbackItem, VettingFeedbackPriority } from '@/types/vetting-feedback';
+import { COUNTRIES, getLanguageLabel } from '@/lib/constants';
 
 type TemplateInputField = {
   id: string;
@@ -34,6 +35,39 @@ type TemplateOutputField = {
 
 const MAX_COMPLETION_TOKENS = 4000;
 
+export const VETTING_AGENCY_PROMPT_VERSION = '2025-10-01';
+
+export interface VettingAgencyModelInput {
+  brandName: string;
+  countryCode: string;
+  languageCodes?: string[];
+  categoryTags?: string[];
+  brandSummary?: string | null;
+  existingAgencies?: string[];
+}
+
+export interface VettingAgencyModelSuggestion {
+  name: string;
+  description: string;
+  regulatory_scope: string | null;
+  rationale: string | null;
+  category_tags: string[];
+  priority: 'High' | 'Medium' | 'Low' | null;
+  website_url: string | null;
+  language_codes: string[];
+  confidence: number | null;
+}
+
+export interface VettingAgencyModelResult {
+  agencies: VettingAgencyModelSuggestion[];
+  warnings: string[];
+  metadata: {
+    prompt_version: string;
+    model: string;
+    raw?: Record<string, unknown> | null;
+  };
+}
+
 // Helper function to extract rate limit headers
 function extractRateLimitHeaders(response: Response): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -47,6 +81,226 @@ function extractRateLimitHeaders(response: Response): Record<string, string> {
   if (retryAfter) headers['retry-after'] = retryAfter;
   
   return headers;
+}
+
+function resolveCountryName(countryCode: string): string {
+  if (!countryCode) {
+    return 'Unknown market';
+  }
+  const normalized = countryCode.trim().toUpperCase();
+  const match = COUNTRIES.find((country) => country.value.toUpperCase() === normalized);
+  return match ? match.label : normalized || 'Unknown market';
+}
+
+function formatLanguageList(languageCodes?: string[]): string {
+  if (!languageCodes || languageCodes.length === 0) {
+    return 'Not specified';
+  }
+  const labels = languageCodes
+    .map((code) => getLanguageLabel(code) || code.toUpperCase())
+    .filter((label) => typeof label === 'string' && label.trim().length > 0);
+  if (labels.length === 0) {
+    return 'Not specified';
+  }
+  return labels.join(', ');
+}
+
+function sanitizeModelSuggestion(input: unknown): VettingAgencyModelSuggestion | null {
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
+
+  const raw = input as Record<string, unknown>;
+
+  const name = typeof raw.name === 'string' ? raw.name.trim() : '';
+  const description = typeof raw.description === 'string' ? raw.description.trim() : '';
+
+  if (!name || !description) {
+    return null;
+  }
+
+  const scope = typeof raw.regulatory_scope === 'string' ? raw.regulatory_scope.trim() : null;
+  const rationale = typeof raw.rationale === 'string' ? raw.rationale.trim() : null;
+  const website = typeof raw.website_url === 'string' ? raw.website_url.trim() : null;
+
+  const rawPriority = typeof raw.priority === 'string' ? raw.priority.trim().toLowerCase() : '';
+  let priority: 'High' | 'Medium' | 'Low' | null = null;
+  if (rawPriority === 'high') priority = 'High';
+  if (rawPriority === 'medium') priority = 'Medium';
+  if (rawPriority === 'low') priority = 'Low';
+
+  const categoryTags = Array.isArray(raw.category_tags)
+    ? raw.category_tags
+        .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
+        .filter((tag) => tag.length > 0)
+    : [];
+
+  const languageCodes = Array.isArray(raw.language_codes)
+    ? raw.language_codes
+        .map((code) => (typeof code === 'string' ? code.trim() : ''))
+        .filter((code) => code.length > 0)
+    : [];
+
+  let confidence: number | null = null;
+  if (typeof raw.confidence === 'number' && Number.isFinite(raw.confidence)) {
+    confidence = Math.max(0, Math.min(1, raw.confidence));
+  } else if (typeof raw.confidence === 'string') {
+    const parsed = Number.parseFloat(raw.confidence);
+    if (Number.isFinite(parsed)) {
+      confidence = Math.max(0, Math.min(1, parsed));
+    }
+  }
+
+  return {
+    name,
+    description,
+    regulatory_scope: scope && scope.length > 0 ? scope : null,
+    rationale: rationale && rationale.length > 0 ? rationale : null,
+    category_tags: categoryTags,
+    priority,
+    website_url: website && website.length > 0 ? website : null,
+    language_codes: languageCodes,
+    confidence,
+  };
+}
+
+export async function generateVettingAgencyModelSuggestions(
+  input: VettingAgencyModelInput,
+): Promise<VettingAgencyModelResult> {
+  const deploymentName = getModelName();
+  const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
+
+  if (!endpoint) {
+    throw new Error('Azure OpenAI endpoint is not configured.');
+  }
+
+  const countryName = resolveCountryName(input.countryCode);
+  const languageList = formatLanguageList(input.languageCodes);
+  const categorySummary = input.categoryTags && input.categoryTags.length > 0
+    ? input.categoryTags.join(', ')
+    : 'Not specified';
+  const existingSummary = input.existingAgencies && input.existingAgencies.length > 0
+    ? input.existingAgencies.join(', ')
+    : 'None provided';
+
+  const truncatedSummary = input.brandSummary
+    ? input.brandSummary.slice(0, 1000)
+    : null;
+
+  const systemPrompt = `You are a senior regulatory intelligence analyst helping a marketing team stay compliant.
+Always return a JSON object with the following shape:
+{
+  "agencies": [
+    {
+      "name": string,
+      "description": string,
+      "regulatory_scope": string,
+      "rationale": string,
+      "category_tags": string[],
+      "priority": "High" | "Medium" | "Low",
+      "website_url": string,
+      "language_codes": string[],
+      "confidence": number
+    }
+  ],
+  "warnings": string[]
+}
+Only include agencies that are real, current, and applicable to the target market.
+Return between 3 and 6 agencies unless fewer exist.
+If you are uncertain about an agency, lower its confidence and include an explanation in warnings.
+Do not fabricate organisations. Prefer government or well-established regulatory bodies.`;
+
+  const userPromptLines = [
+    `Brand: ${input.brandName}`,
+    `Country: ${countryName} (${input.countryCode.toUpperCase()})`,
+    `Primary languages for compliance materials: ${languageList}`,
+    `Focus categories or NAICS themes: ${categorySummary}`,
+    `Existing agencies already linked to this brand: ${existingSummary}`,
+  ];
+
+  if (truncatedSummary) {
+    userPromptLines.push(`Brand context summary: ${truncatedSummary}`);
+  }
+
+  userPromptLines.push(
+    'Return the JSON object described above. Each agency must be applicable to the specified country and help ensure truthful, compliant marketing claims.',
+  );
+
+  const userPrompt = userPromptLines.join('\n');
+
+  const completionRequest = {
+    model: deploymentName,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+    temperature: 0.2,
+    max_tokens: 1200,
+    response_format: { type: 'json_object' as const },
+  };
+
+  const requestId = activityTracker.startRequest('generateVettingAgencySuggestions');
+
+  try {
+    const response = await fetch(
+      `${endpoint}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': process.env.AZURE_OPENAI_API_KEY || '',
+        },
+        body: JSON.stringify(completionRequest),
+      },
+    );
+
+    const rateLimitHeaders = extractRateLimitHeaders(response);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      const status = response.status === 429 ? 'rate_limited' : 'error';
+      activityTracker.completeRequest(requestId, status, rateLimitHeaders);
+      throw new Error(`Azure OpenAI request failed (${response.status}): ${errorText}`);
+    }
+
+    const payload = await response.json();
+    activityTracker.completeRequest(requestId, 'success', rateLimitHeaders);
+
+    const content = payload?.choices?.[0]?.message?.content ?? '{}';
+
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(content);
+    } catch (error) {
+      throw new Error(
+        `Failed to parse vetting agency suggestions JSON: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+
+    const agenciesRaw = Array.isArray(parsed.agencies) ? parsed.agencies : [];
+    const agencies = agenciesRaw
+      .map((entry) => sanitizeModelSuggestion(entry))
+      .filter((entry): entry is VettingAgencyModelSuggestion => entry !== null);
+
+    const warningsRaw = Array.isArray(parsed.warnings) ? parsed.warnings : [];
+    const warnings = warningsRaw.map((warning) => String(warning)).slice(0, 10);
+
+    return {
+      agencies,
+      warnings,
+      metadata: {
+        prompt_version: VETTING_AGENCY_PROMPT_VERSION,
+        model: deploymentName,
+        raw:
+          typeof parsed.metadata === 'object' && parsed.metadata !== null
+            ? (parsed.metadata as Record<string, unknown>)
+            : null,
+      },
+    };
+  } catch (error) {
+    activityTracker.completeRequest(requestId, 'error');
+    throw error;
+  }
 }
 
 // Initialize the Azure OpenAI client
@@ -1229,12 +1483,12 @@ export async function generateBrandIdentityFromUrls(
       
       3. CONTENT GUARDRAILS: Provide 5 specific guidelines that content creators should follow when creating content for this brand. Format these as a bulleted list of strings.
       
-      4. SUGGESTED VETTING AGENCIES: Based on the industry and ${country}, recommend 3-5 regulatory or vetting agencies relevant to this brand. Provide their name, a brief description, and assign a priority level (high, medium, or low) based on perceived criticality for this brand in ${country}.
+      4. BRAND COLOR: Suggest a primary brand color that would best represent this brand's identity and values. Provide the color in hex format (e.g., #FF5733).
       
-      5. BRAND COLOR: Suggest a primary brand color that would best represent this brand's identity and values. Provide the color in hex format (e.g., #FF5733).
+      Set the "suggestedAgencies" field in your JSON response to an empty array; compliance recommendations are generated in a separate step.
       
-      IMPORTANT: ALL textual content in your response (brandIdentity, toneOfVoice, guardrails items, and agency descriptions) MUST be in ${language.toUpperCase()}.
-      Format your response as a JSON object with these keys: brandIdentity, toneOfVoice, guardrails (as an array of strings), suggestedAgencies (as an array of objects with name, description, and priority fields), and brandColor (as a hex color code).
+      IMPORTANT: ALL textual content in your response (brandIdentity, toneOfVoice, guardrails items) MUST be in ${language.toUpperCase()}.
+      Format your response as a JSON object with these keys: brandIdentity, toneOfVoice, guardrails (as an array of strings), suggestedAgencies, and brandColor (as a hex color code).
       `;
       
       // Make the API call

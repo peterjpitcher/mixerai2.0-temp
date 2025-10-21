@@ -141,7 +141,24 @@ export const GET = withAuth(async (request: NextRequest, user: User, context?: u
       // For now, we'll proceed and versions will be an empty array
       versions = []; // Ensure versions is an empty array on error
     } else {
-      versions = (versionData as ContentVersionWithReviewer[]) || []; // Explicit cast
+      const normalizedVersions = (versionData ?? []).map((entry) => {
+        const reviewer =
+          entry && typeof entry === 'object' && 'reviewer' in entry
+            ? (entry.reviewer as { full_name?: string | null; avatar_url?: string | null } | null)
+            : null;
+
+        const safeReviewer =
+          reviewer && typeof reviewer === 'object' && 'full_name' in reviewer
+            ? { full_name: reviewer.full_name ?? null, avatar_url: reviewer.avatar_url ?? null }
+            : null;
+
+        return {
+          ...entry,
+          reviewer: safeReviewer,
+        };
+      });
+
+      versions = normalizedVersions as ContentVersionWithReviewer[];
       console.log(`[API /content/${id}] Fetched versions:`, JSON.stringify(versions, null, 2)); // Log fetched versions
     }
 
@@ -224,11 +241,17 @@ export const GET = withAuth(async (request: NextRequest, user: User, context?: u
       }
     }
 
+    const creatorProfileRaw = content.profiles;
+    const creatorName =
+      creatorProfileRaw && typeof creatorProfileRaw === 'object' && 'full_name' in creatorProfileRaw
+        ? (creatorProfileRaw as { full_name?: string | null }).full_name ?? null
+        : null;
+
     const formattedContent = {
       ...content,
       brand_name: content.brands?.name || null,
       brand_color: content.brands?.brand_color || null,
-      created_by_name: content.profiles?.full_name || null,
+      created_by_name: creatorName,
       template_name: content.content_templates?.name || null,
       template_icon: content.content_templates?.icon || null,
       workflow: workflowDataWithSteps, // Embed the workflow with its steps and assignees

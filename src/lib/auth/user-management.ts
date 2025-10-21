@@ -20,9 +20,9 @@ export async function getUserAuthByEmail(
   }
 
   try {
-    const { data, error } = await supabaseAdmin.rpc('get_user_by_email', {
+    const { data, error } = await supabaseAdmin.rpc('get_user_by_email' as never, {
       user_email: email.toLowerCase(), // Ensure email is lowercased for consistent lookup
-    });
+    } as never);
 
     if (error) {
       console.error(`[getUserAuthByEmail] RPC error for email ${email}:`, error);

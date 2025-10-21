@@ -57,7 +57,7 @@ export const GET = withAuth(async (
     // If global admin or has specific permission, proceed to fetch brand details
 
     const { data: brandDetails, error: rpcError } = await supabase
-      .rpc('get_brand_details_by_id', { p_brand_id: brandId })
+      .rpc('get_brand_details_by_id' as never, { p_brand_id: brandId } as never)
       .single();
 
     if (rpcError) {

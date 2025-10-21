@@ -459,21 +459,35 @@ export const PUT = withAuthAndCSRF(async (
     // Since we are not inviting new users, p_new_invitation_items is always null
     const newInvitationItemsForRpc = null;
 
-    const paramsToPass = {
+    const descriptionToUse = body.description ?? workflowDescriptionToUpdate ?? undefined;
+
+    const paramsToPass: Record<string, unknown> = {
       p_workflow_id: workflowId,
-      p_name: body.name || null,
-      p_brand_id: brandIdForUpdate || null,
       p_steps: processedStepsForRpc as unknown as Json,
-      p_template_id: body.template_id || null,
-      p_description: body.description ?? workflowDescriptionToUpdate ?? null,
-      p_new_invitation_items: newInvitationItemsForRpc as unknown as Json
+      p_new_invitation_items: newInvitationItemsForRpc as unknown as Json,
     };
+
+    if (typeof body.name === 'string') {
+      paramsToPass.p_name = body.name;
+    }
+
+    if (brandIdForUpdate) {
+      paramsToPass.p_brand_id = brandIdForUpdate;
+    }
+
+    if (body.template_id) {
+      paramsToPass.p_template_id = body.template_id;
+    }
+
+    if (typeof descriptionToUse === 'string') {
+      paramsToPass.p_description = descriptionToUse;
+    }
 
     console.log('Calling RPC update_workflow_and_handle_invites with params:', JSON.stringify(paramsToPass, null, 2));
 
     const { data: rpcData, error: rpcError } = await supabase.rpc(
       'update_workflow_and_handle_invites',
-      paramsToPass
+      paramsToPass as never
     );
 
     // Enhanced logging for RPC response

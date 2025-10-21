@@ -1,4 +1,4 @@
-import { interpolatePrompt } from '../generate-field/route';
+import { interpolatePrompt } from '../generate-field/interpolate-prompt';
 import { createLocaleDirectives, describeLanguage } from '@/lib/utils/locale';
 
 describe('locale helpers', () => {

@@ -61,7 +61,7 @@ export const DELETE = withRouteAuthAndCSRF(async (_request: NextRequest, user: U
 
     // Get the updated user details
     const { data: updatedUser, error: fetchError } = await supabase
-      .rpc('get_user_details', { p_user_id: params.id })
+      .rpc('get_user_details' as never, { p_user_id: params.id } as never)
       .single();
 
     if (fetchError) throw fetchError;

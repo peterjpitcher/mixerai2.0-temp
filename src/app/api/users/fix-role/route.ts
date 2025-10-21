@@ -83,11 +83,11 @@ export const POST = withAdminAuth(async (request: NextRequest, _adminUser: User)
     // If user has existing permissions, update them all to the new role using RPC
     if (existingPermissions && existingPermissions.length > 0) {
       const { data: updatedCount, error: rpcError } = await supabase.rpc(
-        'set_user_role_for_all_assigned_brands', // TODO: Regenerate types
+        'set_user_role_for_all_assigned_brands' as never,
         {
           target_user_id: userId,
           new_role: role
-        }
+        } as never
       );
 
       if (rpcError) {

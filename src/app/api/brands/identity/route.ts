@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { Readable } from 'stream';
 
 import { COUNTRIES } from '@/lib/constants';
+import { recommendVettingAgencies } from '@/lib/vetting-agencies/recommendations';
 import { withAdminAuthAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import { getServerEnv } from '@/lib/env';
@@ -339,11 +340,11 @@ Please provide the following elements:
 
 3. CONTENT GUARDRAILS: 5 specific guidelines that content creators must follow when creating content for this brand. Format as bullet points.
 
-4. SUGGESTED AGENCIES: 10 regulatory bodies or vetting agencies relevant to this brand in ${countryName}. For these agencies, it is acceptable to mention the country if it is part of their official name.
+4. BRAND COLOR: From the provided website content and URLs, identify the brand's primary, official color. This is likely the main color used in their logo, headers, buttons, or defined in their CSS as a primary brand color. Do not invent a color or suggest one that "would be appropriate". Identify the most dominant and consistently used color that represents their core visual identity. Provide this color in hex format (e.g., #FF5733). If multiple prominent colors are used, identify the one that appears to be the most central to their official branding.
 
-5. BRAND COLOR: From the provided website content and URLs, identify the brand's primary, official color. This is likely the main color used in their logo, headers, buttons, or defined in their CSS as a primary brand color. Do not invent a color or suggest one that "would be appropriate". Identify the most dominant and consistently used color that represents their core visual identity. Provide this color in hex format (e.g., #FF5733). If multiple prominent colors are used, identify the one that appears to be the most central to their official branding.
+Set the "suggestedAgencies" field in your response to an empty array; compliance recommendations will be generated separately.
 
-Format your response as a structured JSON object with these keys: brandIdentity, toneOfVoice, guardrails, suggestedAgencies (as an array of objects with name, description, and priority), and brandColor.
+Format your response as a structured JSON object with these keys: brandIdentity, toneOfVoice, guardrails, suggestedAgencies, and brandColor.
 Remember that ALL text fields (except potentially within agency names) must be written in ${specificLanguageName}, and should avoid mentioning "${countryName}" or its nationality.`;
     
     try {
@@ -378,13 +379,76 @@ Remember that ALL text fields (except potentially within agency names) must be w
         normalizationWarnings,
         // usedFallback: false, // This flag is no longer relevant
       };
-      
+
       // Ensure all expected fields are present, even if null, to maintain consistent structure
       const requiredKeys = ['brandIdentity', 'toneOfVoice', 'guardrails', 'suggestedAgencies', 'brandColor'];
       for (const key of requiredKeys) {
         if (!(key in result) || result[key as keyof typeof result] === undefined) {
           (result as Record<string, unknown>)[key] = null; // Set to null if undefined or missing
         }
+      }
+
+      try {
+        const recommendation = await recommendVettingAgencies({
+          brandId: null,
+          brandName: name,
+          countryCode: country,
+          languageCodes: [language],
+          categoryTags: [],
+          brandSummary:
+            typeof result.brandIdentity === 'string'
+              ? result.brandIdentity
+              : null,
+        });
+
+        const suggestionPayload = recommendation.suggestions.map((entry) => ({
+          id: entry.record.id,
+          name: entry.record.name,
+          description: entry.record.description,
+          countryCode: entry.record.countryCode,
+          priority: entry.record.priorityLabel,
+          priorityLabel: entry.record.priorityLabel,
+          priorityRank: entry.record.priorityRank,
+          status: entry.record.status,
+          regulatoryScope: entry.record.regulatoryScope,
+          categoryTags: entry.record.categoryTags,
+          languageCodes: entry.record.languageCodes,
+          websiteUrl: entry.record.websiteUrl,
+          rationale: entry.rationale,
+          confidence: entry.confidence,
+          source: entry.source,
+          isFallback: entry.record.isFallback,
+        }));
+
+        const catalogPayload = recommendation.catalog.map((record) => ({
+          id: record.id,
+          name: record.name,
+          description: record.description,
+          countryCode: record.countryCode,
+          priority: record.priorityLabel,
+          priorityLabel: record.priorityLabel,
+          priorityRank: record.priorityRank,
+          status: record.status,
+          regulatoryScope: record.regulatoryScope,
+          categoryTags: record.categoryTags,
+          languageCodes: record.languageCodes,
+          websiteUrl: record.websiteUrl,
+          rationale: record.rationale,
+          source: record.source,
+          isFallback: record.isFallback,
+        }));
+
+        result.suggestedAgencies = suggestionPayload;
+        (result as Record<string, unknown>).vettingAgencies = {
+          suggestions: suggestionPayload,
+          catalog: catalogPayload,
+          warnings: recommendation.warnings,
+          fallbackApplied: recommendation.fallbackApplied,
+          metadata: recommendation.metadata,
+        };
+      } catch (recommendationError) {
+        console.error('Failed to recommend vetting agencies:', recommendationError);
+        (result as Record<string, unknown>).vettingAgenciesError = 'Failed to recommend vetting agencies';
       }
 
       return NextResponse.json({ success: true, data: result });

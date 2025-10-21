@@ -24,7 +24,7 @@ export const GET = withRouteAuth(async (_request: NextRequest, user: User, conte
     }
 
     const { data: userDetails, error: rpcError } = await supabase
-      .rpc('get_user_details', { p_user_id: params.id })
+      .rpc('get_user_details' as never, { p_user_id: params.id } as never)
       .single();
     
     if (rpcError) throw rpcError;
@@ -33,10 +33,12 @@ export const GET = withRouteAuth(async (_request: NextRequest, user: User, conte
       return NextResponse.json({ success: false, error: 'User not found or invalid data format' }, { status: 404 });
     }
 
+    const normalizedUserDetails = userDetails as Record<string, unknown>;
+
     return NextResponse.json({
       success: true,
       user: {
-        ...userDetails,
+        ...normalizedUserDetails,
         is_current_user: isViewingOwnProfile
       }
     });
@@ -103,7 +105,7 @@ export const PUT = withRouteAuthAndCSRF(async (request: NextRequest, user: User,
 
     // Note: The enhanced update_user_details function that returns reassignment data
     // is not yet deployed. Once deployed, we can capture reassignment results.
-    const { error: rpcError } = await supabase.rpc('update_user_details', rpcParams);
+    const { error: rpcError } = await supabase.rpc('update_user_details' as never, rpcParams as never);
 
     if (rpcError) {
       console.error('RPC Error:', rpcError);
@@ -111,7 +113,7 @@ export const PUT = withRouteAuthAndCSRF(async (request: NextRequest, user: User,
     }
 
     const { data: updatedUserDetails, error: fetchError } = await supabase
-      .rpc('get_user_details', { p_user_id: params.id })
+      .rpc('get_user_details' as never, { p_user_id: params.id } as never)
       .single();
 
     if (fetchError) throw fetchError;
@@ -120,10 +122,12 @@ export const PUT = withRouteAuthAndCSRF(async (request: NextRequest, user: User,
       return NextResponse.json({ success: false, error: 'User not found after update or invalid data format' }, { status: 404 });
     }
 
+    const normalizedUpdatedDetails = updatedUserDetails as Record<string, unknown>;
+
     return NextResponse.json({
       success: true,
       user: {
-        ...updatedUserDetails,
+        ...normalizedUpdatedDetails,
         is_current_user: isSelf
       }
     });
@@ -152,9 +156,9 @@ export const DELETE = withRouteAuthAndCSRF(async (_request: NextRequest, user: U
       );
     }
     
-    const { error: rpcError } = await supabase.rpc('delete_user_and_reassign_tasks', {
+    const { error: rpcError } = await supabase.rpc('delete_user_and_reassign_tasks' as never, {
       p_user_id_to_delete: params.id,
-    });
+    } as never);
 
     if (rpcError) throw rpcError;
     

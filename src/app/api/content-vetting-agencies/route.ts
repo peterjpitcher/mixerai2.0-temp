@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
-import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { COUNTRIES } from '@/lib/constants';
+import { fetchVettingAgencies } from '@/lib/vetting-agencies/service';
+import type { VettingAgencyStatus } from '@/lib/vetting-agencies/service';
 
 export const dynamic = 'force-dynamic';
 
-type SupabaseVettingAgencyPriority = 'High' | 'Medium' | 'Low';
-type SupabaseVettingAgencyPriorityNullable = SupabaseVettingAgencyPriority | null;
+type PriorityLabel = 'High' | 'Medium' | 'Low';
+type PriorityLabelNullable = PriorityLabel | null;
+type StatusFilter = VettingAgencyStatus;
 
 const MAX_PAGE_SIZE = 1000;
 
@@ -23,7 +25,22 @@ const COUNTRY_SYNONYM_MAP: Record<string, string> = {
   'U.S.A.': 'US',
 };
 
-function mapSupabasePriorityToNumber(priority: SupabaseVettingAgencyPriorityNullable): number {
+function normalizeCountryQuery(input: string): string {
+  if (!input) return '';
+  const trimmed = input.trim();
+  if (!trimmed) return '';
+  const lower = trimmed.toLowerCase();
+
+  for (const country of COUNTRIES) {
+    if (country.value.toLowerCase() === lower) return country.value;
+    if (country.label.toLowerCase() === lower) return country.value;
+  }
+
+  const synonym = COUNTRY_SYNONYM_MAP[trimmed.toUpperCase()];
+  return synonym ?? trimmed.toUpperCase();
+}
+
+function mapPriorityLabelToNumber(priority: PriorityLabelNullable): number {
   switch (priority) {
     case 'High':
       return 1;
@@ -36,13 +53,44 @@ function mapSupabasePriorityToNumber(priority: SupabaseVettingAgencyPriorityNull
   }
 }
 
+function normalizePriorityFilter(value: string): PriorityLabel | null {
+  if (!value) return null;
+  const trimmed = value.trim().toLowerCase();
+  if (trimmed === 'high') return 'High';
+  if (trimmed === 'medium') return 'Medium';
+  if (trimmed === 'low') return 'Low';
+  return null;
+}
+
+function normalizeStatusFilter(value: string): StatusFilter | null {
+  if (!value) return null;
+  const trimmed = value.trim().toLowerCase();
+  if (trimmed === 'approved') return 'approved';
+  if (trimmed === 'pending' || trimmed === 'pending_verification') {
+    return 'pending_verification';
+  }
+  if (trimmed === 'rejected') return 'rejected';
+  return null;
+}
+
 interface VettingAgencyForApiResponse {
   id: string;
   name: string;
   description: string | null;
   country_code: string;
   priority: number;
-  priority_label?: SupabaseVettingAgencyPriorityNullable;
+  priority_label?: PriorityLabelNullable;
+  status: string;
+  regulatory_scope: string | null;
+  category_tags: string[];
+  language_codes: string[];
+  website_url: string | null;
+  rationale: string | null;
+  source: string;
+  source_metadata: Record<string, unknown>;
+  is_fallback: boolean;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 function parseQuery(request: Request) {
@@ -50,6 +98,7 @@ function parseQuery(request: Request) {
   const search = url.searchParams.get('search')?.trim() ?? '';
   const country = url.searchParams.get('country')?.trim() ?? '';
   const priority = url.searchParams.get('priority')?.trim() ?? '';
+  const status = url.searchParams.get('status')?.trim() ?? '';
 
   const limitParamRaw = url.searchParams.get('perPage') ?? url.searchParams.get('limit');
   const pageParamRaw = url.searchParams.get('page');
@@ -70,7 +119,7 @@ function parseQuery(request: Request) {
 
   const offset = limit !== null ? (page - 1) * limit : 0;
 
-  return { search, country, priority, limit, page, offset, paginationRequested };
+  return { search, country, priority, status, limit, page, offset, paginationRequested };
 }
 
 function buildHeaders(total: number) {
@@ -82,86 +131,90 @@ function buildHeaders(total: number) {
 
 export const GET = withAuth(async (request) => {
   try {
-    const supabase = createSupabaseAdminClient();
-    const { search, country, priority, limit, page, offset, paginationRequested } = parseQuery(request);
+    const { search, country, priority, status, limit, page, offset, paginationRequested } = parseQuery(request);
 
-    const escapedSearch = search.replace(/%/g, '\\%').replace(/_/g, '\\_');
-    const normalizedPriority = priority ? priority.toLowerCase() : '';
-
-    const normalizeCountryQuery = (input: string) => {
-      if (!input) return '';
-      const trimmed = input.trim();
-      if (!trimmed) return '';
-      const lower = trimmed.toLowerCase();
-
-      for (const country of COUNTRIES) {
-        if (country.value.toLowerCase() === lower) return country.value;
-        if (country.label.toLowerCase() === lower) return country.value;
-      }
-
-      const synonym = COUNTRY_SYNONYM_MAP[trimmed.toUpperCase()];
-      return synonym ?? trimmed.toUpperCase();
-    };
-
-    let query = supabase
-      .from('content_vetting_agencies')
-      .select('id, name, description, country_code, priority', { count: 'exact' });
-
-    if (escapedSearch) {
-      query = query.or(
-        `name.ilike.%${escapedSearch}%,description.ilike.%${escapedSearch}%,country_code.ilike.%${escapedSearch}%`
+    const priorityLabel = normalizePriorityFilter(priority);
+    if (priority && !priorityLabel) {
+      return NextResponse.json(
+        {
+          success: true,
+          data: [],
+          pagination: {
+            page,
+            limit: paginationRequested ? (limit ?? 0) : 0,
+            total: 0,
+          },
+        },
+        { headers: buildHeaders(0) },
       );
     }
 
-    if (country) {
-      const normalizedCountry = normalizeCountryQuery(country);
-      if (normalizedCountry) {
-        query = query.ilike('country_code', normalizedCountry);
-      }
+    const statusFilters = status
+      ? status
+          .split(',')
+          .map((value) => normalizeStatusFilter(value))
+          .filter((value): value is StatusFilter => value !== null)
+      : undefined;
+
+    if (status && (!statusFilters || statusFilters.length === 0)) {
+      return NextResponse.json(
+        {
+          success: true,
+          data: [],
+          pagination: {
+            page,
+            limit: paginationRequested ? (limit ?? 0) : 0,
+            total: 0,
+          },
+        },
+        { headers: buildHeaders(0) },
+      );
     }
 
-    if (normalizedPriority) {
-      if (['high', 'medium', 'low'].includes(normalizedPriority)) {
-        const label = normalizedPriority.charAt(0).toUpperCase() + normalizedPriority.slice(1) as SupabaseVettingAgencyPriority;
-        query = query.eq('priority', label);
-      } else {
-        return NextResponse.json({ success: true, data: [], pagination: { page, limit: paginationRequested ? (limit ?? 0) : 0, total: 0 } }, { headers: buildHeaders(0) });
-      }
-    }
+    const normalizedCountry = country ? normalizeCountryQuery(country) : '';
 
-    query = query
-      .order('country_code', { ascending: true })
-      .order('priority', { ascending: true, nullsFirst: false })
-      .order('name', { ascending: true });
+    const { agencies: records, total, fallbackApplied } = await fetchVettingAgencies(
+      {
+        countryCode: normalizedCountry || undefined,
+        search: search || null,
+        priority: priorityLabel ?? undefined,
+        status: statusFilters && statusFilters.length > 0 ? statusFilters : undefined,
+        limit: limit ?? undefined,
+        offset,
+      },
+    );
 
-    if (limit !== null) {
-      query = query.range(offset, offset + limit - 1);
-    }
-
-    const { data, error, count } = await query;
-
-    if (error) {
-      console.error('Error fetching content vetting agencies:', error);
-      throw error;
-    }
-
-    const agencies = (data ?? []).map((agency) => {
-      const numericPriority = mapSupabasePriorityToNumber(agency.priority as SupabaseVettingAgencyPriorityNullable);
+    const agencies = records.map((agency): VettingAgencyForApiResponse => {
+      const numericPriority = mapPriorityLabelToNumber(agency.priorityLabel ?? null);
       return {
         id: agency.id,
         name: agency.name,
         description: agency.description,
-        country_code: agency.country_code,
+        country_code: agency.countryCode,
         priority: numericPriority,
-        priority_label: agency.priority as SupabaseVettingAgencyPriorityNullable,
-      } satisfies VettingAgencyForApiResponse;
+        priority_label: agency.priorityLabel ?? null,
+        status: agency.status,
+        regulatory_scope: agency.regulatoryScope,
+        category_tags: agency.categoryTags,
+        language_codes: agency.languageCodes,
+        website_url: agency.websiteUrl,
+        rationale: agency.rationale,
+        source: agency.source,
+        source_metadata: agency.sourceMetadata,
+        is_fallback: agency.isFallback,
+        created_at: agency.createdAt,
+        updated_at: agency.updatedAt,
+      };
     });
-
-    const total = typeof count === 'number' ? count : agencies.length;
 
     const responseLimit = paginationRequested
       ? (limit ?? agencies.length)
       : agencies.length;
+
+    const headers = {
+      ...buildHeaders(total),
+      'X-Vetting-Fallback': fallbackApplied ? '1' : '0',
+    };
 
     return NextResponse.json({
       success: true,
@@ -171,7 +224,8 @@ export const GET = withAuth(async (request) => {
         limit: responseLimit,
         total,
       },
-    }, { headers: buildHeaders(total) });
+      fallback_applied: fallbackApplied,
+    }, { headers });
 
   } catch (error) {
     return handleApiError(error, 'Error fetching content vetting agencies');

@@ -6,11 +6,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { useRouter } from 'next/navigation';
-import { Image, FileText, Languages, ArrowRight, ShieldAlert } from 'lucide-react';
+import { Image, FileText, Languages, ArrowRight, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrentUser } from '@/hooks/use-common-data';
 
-const tools = [
+type ToolConfig = {
+  id: string;
+  name: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  href: string;
+  color: string;
+  allowedRoles?: ReadonlyArray<string>;
+};
+
+const tools: ToolConfig[] = [
   {
     id: 'alt-text-generator',
     name: 'Alt Text Generator',
@@ -18,7 +28,7 @@ const tools = [
     icon: Image,
     href: '/dashboard/tools/alt-text-generator',
     color: 'text-blue-500',
-    allowedRoles: ['admin', 'editor'] as const,
+    allowedRoles: ['admin', 'editor'],
   },
   {
     id: 'metadata-generator',
@@ -27,7 +37,7 @@ const tools = [
     icon: FileText,
     href: '/dashboard/tools/metadata-generator',
     color: 'text-green-500',
-    allowedRoles: ['admin', 'editor'] as const,
+    allowedRoles: ['admin', 'editor'],
   },
   {
     id: 'content-transcreator',
@@ -36,8 +46,17 @@ const tools = [
     icon: Languages,
     href: '/dashboard/tools/content-transcreator',
     color: 'text-purple-500',
-    allowedRoles: ['admin', 'editor'] as const,
-  }
+    allowedRoles: ['admin', 'editor'],
+  },
+  {
+    id: 'vetting-agencies',
+    name: 'Agency Catalogue',
+    description: 'Approve AI-suggested regulators before they reach brand workflows',
+    icon: ShieldCheck,
+    href: '/dashboard/tools/vetting-agencies',
+    color: 'text-orange-500',
+    allowedRoles: ['admin'],
+  },
 ];
 
 export default function ToolsPage() {
@@ -50,12 +69,12 @@ export default function ToolsPage() {
     if (!userRole) {
       return [];
     }
-    return tools.filter((tool) => {
-      if (!tool.allowedRoles) {
-        return true;
-      }
-      return tool.allowedRoles.includes(userRole as typeof tool.allowedRoles[number]);
-    });
+      return tools.filter((tool) => {
+        if (!tool.allowedRoles || tool.allowedRoles.length === 0) {
+          return true;
+        }
+        return tool.allowedRoles.includes(userRole);
+      });
   }, [userRole]);
 
   return (

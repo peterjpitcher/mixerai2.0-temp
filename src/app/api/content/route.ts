@@ -212,11 +212,18 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       
       // Determine Creator Avatar URL
       let finalCreatorAvatarUrl: string | null = null;
-      if (item.creator_profile) {
+      const creatorProfileRaw = item.creator_profile && typeof item.creator_profile === 'object'
+        ? item.creator_profile
+        : null;
+      const creatorProfile = creatorProfileRaw && 'full_name' in creatorProfileRaw
+        ? (creatorProfileRaw as { id?: string | null; full_name?: string | null; avatar_url?: string | null })
+        : null;
+
+      if (creatorProfile) {
         finalCreatorAvatarUrl =
-          item.creator_profile.avatar_url ||
-          (item.creator_profile.id
-            ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.creator_profile.id}`
+          creatorProfile.avatar_url ||
+          (creatorProfile.id
+            ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${creatorProfile.id}`
             : null);
       }
 
@@ -242,7 +249,7 @@ export const GET = withAuth(async (request: NextRequest, user) => {
         content_type_id: item.content_type_id,
         content_type_name: item.content_types?.name || null,
         created_by: item.created_by,
-        created_by_name: item.creator_profile?.full_name || null,
+        created_by_name: creatorProfile?.full_name ?? null,
         creator_avatar_url: finalCreatorAvatarUrl, // Use determined URL
         template_id: item.template_id,
         template_name: item.content_templates?.name || null,

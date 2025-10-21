@@ -48,6 +48,10 @@ thumbs.db
 *.orig
 CLAUDE.md.backup-*
 
+# Supabase CLI scratch files
+supabase/.temp/*
+!supabase/.temp/.gitkeep
+
 # SQL files in root (should be in proper directories)
 /*.sql
 

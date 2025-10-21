@@ -1,3 +1,7 @@
+// This file is auto-generated. Do not edit manually.
+// Regenerate using: npm run db:types or ./scripts/regenerate-types.sh
+
+
 export type Json =
   | string
   | number
@@ -7,6 +11,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       analytics: {
@@ -209,14 +238,7 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "fk_brands_master_claim_brand"
-            columns: ["master_claim_brand_id"]
-            isOneToOne: false
-            referencedRelation: "master_claim_brands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_master_claim_brand"
+            foreignKeyName: "brands_master_claim_brand_id_fkey"
             columns: ["master_claim_brand_id"]
             isOneToOne: false
             referencedRelation: "master_claim_brands"
@@ -257,6 +279,27 @@ export type Database = {
           },
           {
             foreignKeyName: "claim_countries_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims_with_arrays"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_claim_countries_claim_id"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_claim_countries_claim_id"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims_pending_approval"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_claim_countries_claim_id"
             columns: ["claim_id"]
             isOneToOne: false
             referencedRelation: "claims_with_arrays"
@@ -309,6 +352,34 @@ export type Database = {
             referencedRelation: "ingredients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_claim_ingredients_claim_id"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_claim_ingredients_claim_id"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims_pending_approval"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_claim_ingredients_claim_id"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims_with_arrays"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_claim_ingredients_ingredient_id"
+            columns: ["ingredient_id"]
+            isOneToOne: false
+            referencedRelation: "ingredients"
+            referencedColumns: ["id"]
+          },
         ]
       }
       claim_products: {
@@ -351,6 +422,34 @@ export type Database = {
           },
           {
             foreignKeyName: "claim_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_claim_products_claim_id"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_claim_products_claim_id"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims_pending_approval"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_claim_products_claim_id"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims_with_arrays"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_claim_products_product_id"
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
@@ -407,7 +506,6 @@ export type Database = {
           created_at: string
           feedback: string | null
           id: string
-          published_url: string | null
           reviewer_id: string | null
           step_name: string | null
           updated_claim_text: string | null
@@ -420,7 +518,6 @@ export type Database = {
           created_at?: string
           feedback?: string | null
           id?: string
-          published_url?: string | null
           reviewer_id?: string | null
           step_name?: string | null
           updated_claim_text?: string | null
@@ -433,7 +530,6 @@ export type Database = {
           created_at?: string
           feedback?: string | null
           id?: string
-          published_url?: string | null
           reviewer_id?: string | null
           step_name?: string | null
           updated_claim_text?: string | null
@@ -462,27 +558,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "claim_workflow_history_reviewer_id_fkey"
-            columns: ["reviewer_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "claim_workflow_history_reviewer_id_fkey"
-            columns: ["reviewer_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "claim_workflow_history_reviewer_id_fkey"
-            columns: ["reviewer_id"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "claim_workflow_history_workflow_step_id_fkey"
             columns: ["workflow_step_id"]
             isOneToOne: false
@@ -501,7 +576,6 @@ export type Database = {
           created_by: string | null
           current_workflow_step: string | null
           description: string | null
-          form_requirements: Json
           id: string
           ingredient_id: string | null
           level: Database["public"]["Enums"]["claim_level_enum"]
@@ -521,7 +595,6 @@ export type Database = {
           created_by?: string | null
           current_workflow_step?: string | null
           description?: string | null
-          form_requirements?: Json
           id?: string
           ingredient_id?: string | null
           level: Database["public"]["Enums"]["claim_level_enum"]
@@ -541,7 +614,6 @@ export type Database = {
           created_by?: string | null
           current_workflow_step?: string | null
           description?: string | null
-          form_requirements?: Json
           id?: string
           ingredient_id?: string | null
           level?: Database["public"]["Enums"]["claim_level_enum"]
@@ -553,27 +625,6 @@ export type Database = {
           workflow_status?: Database["public"]["Enums"]["content_status"] | null
         }
         Relationships: [
-          {
-            foreignKeyName: "claims_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "claims_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "claims_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "claims_current_workflow_step_fkey"
             columns: ["current_workflow_step"]
@@ -617,7 +668,6 @@ export type Database = {
           assigned_user_ids: string[] | null
           created_at: string
           description: string | null
-          form_requirements: Json
           id: string
           name: string
           role: string
@@ -630,7 +680,6 @@ export type Database = {
           assigned_user_ids?: string[] | null
           created_at?: string
           description?: string | null
-          form_requirements?: Json
           id?: string
           name: string
           role: string
@@ -643,7 +692,6 @@ export type Database = {
           assigned_user_ids?: string[] | null
           created_at?: string
           description?: string | null
-          form_requirements?: Json
           id?: string
           name?: string
           role?: string
@@ -698,27 +746,6 @@ export type Database = {
             columns: ["brand_id"]
             isOneToOne: false
             referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "claims_workflows_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "claims_workflows_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "claims_workflows_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
             referencedColumns: ["id"]
           },
         ]
@@ -809,27 +836,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "content_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "content_current_step_fkey"
             columns: ["current_step"]
             isOneToOne: false
@@ -882,73 +888,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "content_ownership_history_changed_by_fkey"
-            columns: ["changed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_ownership_history_changed_by_fkey"
-            columns: ["changed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_ownership_history_changed_by_fkey"
-            columns: ["changed_by"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "content_ownership_history_content_id_fkey"
             columns: ["content_id"]
             isOneToOne: false
             referencedRelation: "content"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_ownership_history_new_owner_fkey"
-            columns: ["new_owner"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_ownership_history_new_owner_fkey"
-            columns: ["new_owner"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_ownership_history_new_owner_fkey"
-            columns: ["new_owner"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_ownership_history_previous_owner_fkey"
-            columns: ["previous_owner"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_ownership_history_previous_owner_fkey"
-            columns: ["previous_owner"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_ownership_history_previous_owner_fkey"
-            columns: ["previous_owner"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
             referencedColumns: ["id"]
           },
         ]
@@ -995,27 +938,6 @@ export type Database = {
             referencedRelation: "brands"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "content_templates_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_templates_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_templates_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
-            referencedColumns: ["id"]
-          },
         ]
       }
       content_types: {
@@ -1050,6 +972,7 @@ export type Database = {
           created_at: string
           feedback: string | null
           id: string
+          published_url: string | null
           reviewer_id: string | null
           step_name: string | null
           version_number: number
@@ -1062,6 +985,7 @@ export type Database = {
           created_at?: string
           feedback?: string | null
           id?: string
+          published_url?: string | null
           reviewer_id?: string | null
           step_name?: string | null
           version_number: number
@@ -1074,6 +998,7 @@ export type Database = {
           created_at?: string
           feedback?: string | null
           id?: string
+          published_url?: string | null
           reviewer_id?: string | null
           step_name?: string | null
           version_number?: number
@@ -1087,64 +1012,118 @@ export type Database = {
             referencedRelation: "content"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "content_versions_reviewer_id_fkey"
-            columns: ["reviewer_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_versions_reviewer_id_fkey"
-            columns: ["reviewer_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_versions_reviewer_id_fkey"
-            columns: ["reviewer_id"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
-            referencedColumns: ["id"]
-          },
         ]
       }
       content_vetting_agencies: {
         Row: {
+          category_tags: string[]
           country_code: string
           created_at: string | null
           description: string | null
           id: string
+          language_codes: string[]
           name: string
           priority:
             | Database["public"]["Enums"]["vetting_agency_priority_level"]
             | null
+          rationale: string | null
+          regulatory_scope: string | null
+          source: string
+          source_metadata: Json
+          status: Database["public"]["Enums"]["vetting_agency_status"]
           updated_at: string | null
+          website_url: string | null
         }
         Insert: {
+          category_tags?: string[]
           country_code: string
           created_at?: string | null
           description?: string | null
           id?: string
+          language_codes?: string[]
           name: string
           priority?:
             | Database["public"]["Enums"]["vetting_agency_priority_level"]
             | null
+          rationale?: string | null
+          regulatory_scope?: string | null
+          source?: string
+          source_metadata?: Json
+          status?: Database["public"]["Enums"]["vetting_agency_status"]
           updated_at?: string | null
+          website_url?: string | null
         }
         Update: {
+          category_tags?: string[]
           country_code?: string
           created_at?: string | null
           description?: string | null
           id?: string
+          language_codes?: string[]
           name?: string
           priority?:
             | Database["public"]["Enums"]["vetting_agency_priority_level"]
             | null
+          rationale?: string | null
+          regulatory_scope?: string | null
+          source?: string
+          source_metadata?: Json
+          status?: Database["public"]["Enums"]["vetting_agency_status"]
           updated_at?: string | null
+          website_url?: string | null
         }
         Relationships: []
+      }
+      content_vetting_agency_events: {
+        Row: {
+          agency_id: string | null
+          brand_id: string | null
+          category_tags: string[]
+          country_code: string | null
+          created_at: string
+          created_by: string | null
+          event_type: Database["public"]["Enums"]["vetting_agency_event_type"]
+          id: string
+          metadata: Json
+        }
+        Insert: {
+          agency_id?: string | null
+          brand_id?: string | null
+          category_tags?: string[]
+          country_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_type: Database["public"]["Enums"]["vetting_agency_event_type"]
+          id?: string
+          metadata?: Json
+        }
+        Update: {
+          agency_id?: string | null
+          brand_id?: string | null
+          category_tags?: string[]
+          country_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_type?: Database["public"]["Enums"]["vetting_agency_event_type"]
+          id?: string
+          metadata?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_vetting_agency_events_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "content_vetting_agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_vetting_agency_events_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       countries: {
         Row: {
@@ -1170,6 +1149,39 @@ export type Database = {
           is_active?: boolean | null
           name?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      error_reports: {
+        Row: {
+          created_at: string
+          fingerprint: string | null
+          id: string
+          payload: Json
+          reporter_ip: string | null
+          severity: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          fingerprint?: string | null
+          id?: string
+          payload: Json
+          reporter_ip?: string | null
+          severity?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          fingerprint?: string | null
+          id?: string
+          payload?: Json
+          reporter_ip?: string | null
+          severity?: string | null
+          user_agent?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -1269,6 +1281,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "feedback_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_invitation_status"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "feedback_items_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
@@ -1289,25 +1322,45 @@ export type Database = {
             referencedRelation: "user_invitation_status"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      global_override_audit: {
+        Row: {
+          action: string
+          affected_countries: string[]
+          created_at: string | null
+          id: string
+          new_state: Json | null
+          override_id: string
+          previous_state: Json | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          affected_countries: string[]
+          created_at?: string | null
+          id?: string
+          new_state?: Json | null
+          override_id: string
+          previous_state?: Json | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          affected_countries?: string[]
+          created_at?: string | null
+          id?: string
+          new_state?: Json | null
+          override_id?: string
+          previous_state?: Json | null
+          user_id?: string
+        }
+        Relationships: [
           {
-            foreignKeyName: "fk_feedback_created_by"
-            columns: ["created_by"]
+            foreignKeyName: "global_override_audit_override_id_fkey"
+            columns: ["override_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_feedback_created_by"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_feedback_created_by"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
+            referencedRelation: "market_claim_overrides"
             referencedColumns: ["id"]
           },
         ]
@@ -1372,27 +1425,6 @@ export type Database = {
             referencedRelation: "brands"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "invitation_logs_invited_by_fkey"
-            columns: ["invited_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invitation_logs_invited_by_fkey"
-            columns: ["invited_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invitation_logs_invited_by_fkey"
-            columns: ["invited_by"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
-            referencedColumns: ["id"]
-          },
         ]
       }
       market_claim_overrides: {
@@ -1430,27 +1462,6 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "market_claim_overrides_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "market_claim_overrides_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "market_claim_overrides_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "market_claim_overrides_master_claim_id_fkey"
             columns: ["master_claim_id"]
@@ -1526,13 +1537,73 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "global_claim_brands_mixerai_brand_id_fkey"
+            foreignKeyName: "master_claim_brands_mixerai_brand_id_fkey"
             columns: ["mixerai_brand_id"]
             isOneToOne: false
             referencedRelation: "brands"
             referencedColumns: ["id"]
           },
         ]
+      }
+      notification_outbox: {
+        Row: {
+          attempts: number | null
+          created_at: string | null
+          error_message: string | null
+          failed_at: string | null
+          id: string
+          max_attempts: number | null
+          metadata: Json | null
+          priority: number | null
+          recipient_email: string | null
+          recipient_id: string | null
+          scheduled_for: string | null
+          sent_at: string | null
+          status: string | null
+          subject: string
+          template_data: Json
+          template_name: string
+          type: string
+        }
+        Insert: {
+          attempts?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          failed_at?: string | null
+          id?: string
+          max_attempts?: number | null
+          metadata?: Json | null
+          priority?: number | null
+          recipient_email?: string | null
+          recipient_id?: string | null
+          scheduled_for?: string | null
+          sent_at?: string | null
+          status?: string | null
+          subject: string
+          template_data: Json
+          template_name: string
+          type: string
+        }
+        Update: {
+          attempts?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          failed_at?: string | null
+          id?: string
+          max_attempts?: number | null
+          metadata?: Json | null
+          priority?: number | null
+          recipient_email?: string | null
+          recipient_id?: string | null
+          scheduled_for?: string | null
+          sent_at?: string | null
+          status?: string | null
+          subject?: string
+          template_data?: Json
+          template_name?: string
+          type?: string
+        }
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -1577,29 +1648,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "notifications_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "notifications_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "notifications_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       product_ingredients: {
         Row: {
@@ -1682,6 +1731,7 @@ export type Database = {
           id: string
           job_title: string | null
           notification_settings: Json | null
+          notification_settings_version: number
           updated_at: string | null
         }
         Insert: {
@@ -1696,6 +1746,7 @@ export type Database = {
           id: string
           job_title?: string | null
           notification_settings?: Json | null
+          notification_settings_version?: number
           updated_at?: string | null
         }
         Update: {
@@ -1710,6 +1761,7 @@ export type Database = {
           id?: string
           job_title?: string | null
           notification_settings?: Json | null
+          notification_settings_version?: number
           updated_at?: string | null
         }
         Relationships: []
@@ -1794,6 +1846,87 @@ export type Database = {
           },
         ]
       }
+      user_accounts: {
+        Row: {
+          created_at: string | null
+          id: string
+          status: string
+          status_changed_at: string | null
+          status_changed_by: string | null
+          status_reason: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id: string
+          status?: string
+          status_changed_at?: string | null
+          status_changed_by?: string | null
+          status_reason?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          status?: string
+          status_changed_at?: string | null
+          status_changed_by?: string | null
+          status_reason?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      user_activity_log: {
+        Row: {
+          action_category: string
+          action_type: string
+          brand_id: string | null
+          created_at: string | null
+          duration_ms: number | null
+          id: string
+          ip_address: unknown
+          metadata: Json | null
+          resource_id: string | null
+          resource_name: string | null
+          resource_type: string | null
+          session_id: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          action_category: string
+          action_type: string
+          brand_id?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          resource_id?: string | null
+          resource_name?: string | null
+          resource_type?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          action_category?: string
+          action_type?: string
+          brand_id?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          resource_id?: string | null
+          resource_name?: string | null
+          resource_type?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_brand_permissions: {
         Row: {
           brand_id: string | null
@@ -1825,27 +1958,6 @@ export type Database = {
             columns: ["brand_id"]
             isOneToOne: false
             referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_brand_permissions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_brand_permissions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_brand_permissions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
             referencedColumns: ["id"]
           },
         ]
@@ -1898,27 +2010,46 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "user_invitations_invited_by_fkey"
-            columns: ["invited_by"]
+            foreignKeyName: "user_invitations_source_id_fkey"
+            columns: ["source_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_invitations_invited_by_fkey"
-            columns: ["invited_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_invitations_invited_by_fkey"
-            columns: ["invited_by"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
+            referencedRelation: "brands"
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_status_history: {
+        Row: {
+          changed_at: string | null
+          changed_by: string | null
+          id: string
+          metadata: Json | null
+          new_status: string
+          old_status: string | null
+          reason: string | null
+          user_id: string
+        }
+        Insert: {
+          changed_at?: string | null
+          changed_by?: string | null
+          id?: string
+          metadata?: Json | null
+          new_status: string
+          old_status?: string | null
+          reason?: string | null
+          user_id: string
+        }
+        Update: {
+          changed_at?: string | null
+          changed_by?: string | null
+          id?: string
+          metadata?: Json | null
+          new_status?: string
+          old_status?: string | null
+          reason?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       user_system_roles: {
         Row: {
@@ -1942,29 +2073,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "user_system_roles_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_system_roles_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_system_roles_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       user_tasks: {
         Row: {
@@ -2012,27 +2121,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "user_tasks_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_tasks_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_tasks_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "user_tasks_workflow_id_fkey"
             columns: ["workflow_id"]
             isOneToOne: false
@@ -2040,13 +2128,31 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "ut_workflow_step_id_fkey"
+            foreignKeyName: "user_tasks_workflow_step_id_fkey"
             columns: ["workflow_step_id"]
             isOneToOne: false
             referencedRelation: "workflow_steps"
             referencedColumns: ["id"]
           },
         ]
+      }
+      waitlist_subscribers: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+        }
+        Relationships: []
       }
       workflow_invitations: {
         Row: {
@@ -2094,27 +2200,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "workflow_invitations_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_invitations_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_invitations_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "workflow_invitations_workflow_id_fkey"
             columns: ["workflow_id"]
             isOneToOne: false
@@ -2122,6 +2207,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      workflow_step_assignments: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: string
+          step_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: string
+          step_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: string
+          step_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       workflow_steps: {
         Row: {
@@ -2206,24 +2318,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "workflow_user_assignments_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "workflow_user_assignments_step_id_fkey"
+            columns: ["step_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_user_assignments_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_user_assignments_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
+            referencedRelation: "workflow_steps"
             referencedColumns: ["id"]
           },
           {
@@ -2231,13 +2329,6 @@ export type Database = {
             columns: ["workflow_id"]
             isOneToOne: false
             referencedRelation: "workflows"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "wua_step_id_fkey"
-            columns: ["step_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_steps"
             referencedColumns: ["id"]
           },
         ]
@@ -2288,27 +2379,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "workflows_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflows_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflows_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "workflows_template_id_fkey"
             columns: ["template_id"]
             isOneToOne: false
@@ -2343,27 +2413,6 @@ export type Database = {
           workflow_status: Database["public"]["Enums"]["content_status"] | null
         }
         Relationships: [
-          {
-            foreignKeyName: "claims_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "claims_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "claims_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "claims_current_workflow_step_fkey"
             columns: ["current_workflow_step"]
@@ -2405,27 +2454,6 @@ export type Database = {
           workflow_status: Database["public"]["Enums"]["content_status"] | null
         }
         Relationships: [
-          {
-            foreignKeyName: "claims_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "claims_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "claims_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "user_invitation_status"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "claims_current_workflow_step_fkey"
             columns: ["current_workflow_step"]
@@ -2482,98 +2510,158 @@ export type Database = {
     }
     Functions: {
       advance_claim_workflow: {
-        Args:
-          | {
-              p_claim_id: string
-              p_action: string
-              p_feedback: string
-              p_reviewer_id: string
-            }
-          | {
-              p_claim_id: string
-              p_action: string
-              p_feedback?: string
-              p_reviewer_id?: string
-              p_comment?: string
-              p_updated_claim_text?: string
-            }
+        Args: {
+          p_action: string
+          p_claim_id: string
+          p_comment?: string
+          p_feedback?: string
+          p_reviewer_id?: string
+          p_updated_claim_text?: string
+        }
         Returns: Json
       }
       assign_workflow_to_claim: {
         Args: { p_claim_id: string; p_workflow_id: string }
         Returns: Json
       }
+      can_deactivate_user: { Args: { p_user_id: string }; Returns: boolean }
+      claim_notifications: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number | null
+          created_at: string | null
+          error_message: string | null
+          failed_at: string | null
+          id: string
+          max_attempts: number | null
+          metadata: Json | null
+          priority: number | null
+          recipient_email: string | null
+          recipient_id: string | null
+          scheduled_for: string | null
+          sent_at: string | null
+          status: string | null
+          subject: string
+          template_data: Json
+          template_name: string
+          type: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "notification_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      cleanup_old_activity_logs: {
+        Args: { p_retention_days?: number }
+        Returns: number
+      }
       create_brand_and_set_admin: {
         Args: {
-          creator_user_id: string
-          brand_name: string
-          brand_website_url?: string
-          brand_country?: string
-          brand_language?: string
-          brand_identity_text?: string
-          brand_tone_of_voice?: string
-          brand_guardrails?: string
-          brand_content_vetting_agencies_input?: string[]
-          brand_color_input?: string
           approved_content_types_input?: Json
+          brand_color_input?: string
+          brand_content_vetting_agencies_input?: string[]
+          brand_country?: string
+          brand_guardrails?: string
+          brand_identity_text?: string
+          brand_language?: string
+          brand_name: string
+          brand_tone_of_voice?: string
+          brand_website_url?: string
+          creator_user_id: string
         }
         Returns: string
       }
       create_brand_with_permissions: {
         Args: {
-          p_creator_user_id: string
-          p_brand_name: string
-          p_website_url?: string
-          p_country?: string
-          p_language?: string
-          p_brand_identity?: string
-          p_tone_of_voice?: string
-          p_guardrails?: string
-          p_brand_color?: string
-          p_logo_url?: string
-          p_approved_content_types?: Json
-          p_master_claim_brand_id?: string
           p_agency_ids?: string[]
+          p_approved_content_types?: Json
+          p_brand_color?: string
+          p_brand_identity?: string
+          p_brand_name: string
+          p_country?: string
+          p_creator_user_id: string
+          p_guardrails?: string
+          p_language?: string
+          p_logo_url?: string
+          p_master_claim_brand_id?: string
+          p_tone_of_voice?: string
+          p_website_url?: string
         }
         Returns: {
           brand_id: string
-          success: boolean
           error_message: string
+          success: boolean
         }[]
       }
-      create_claim_with_associations: {
-        Args: {
-          p_claim_text: string
-          p_claim_type: Database["public"]["Enums"]["claim_type_enum"]
-          p_level: Database["public"]["Enums"]["claim_level_enum"]
-          p_master_brand_id?: string
-          p_ingredient_id?: string
-          p_ingredient_ids?: string[]
-          p_product_ids?: string[]
-          p_country_codes?: string[]
-          p_description?: string
-          p_created_by?: string
-          p_workflow_id?: string
-        }
-        Returns: string
-      }
+      create_claim_with_associations:
+        | {
+            Args: {
+              p_claim_text: string
+              p_claim_type: Database["public"]["Enums"]["claim_type_enum"]
+              p_country_codes?: string[]
+              p_created_by?: string
+              p_description?: string
+              p_ingredient_id?: string
+              p_ingredient_ids?: string[]
+              p_level: Database["public"]["Enums"]["claim_level_enum"]
+              p_master_brand_id?: string
+              p_product_ids?: string[]
+              p_workflow_id?: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_claim_text: string
+              p_claim_type: string
+              p_country_codes?: string[]
+              p_created_by?: string
+              p_description?: string
+              p_ingredient_id?: string
+              p_ingredient_ids?: string[]
+              p_level: string
+              p_master_brand_id?: string
+              p_product_ids?: string[]
+              p_workflow_id?: string
+            }
+            Returns: string
+          }
       create_claims_batch: {
-        Args: { p_claims: Json; p_workflow_id?: string; p_created_by?: string }
+        Args: { p_claims: Json; p_created_by?: string; p_workflow_id?: string }
         Returns: {
-          success: boolean
-          error_message: string
           created_claim_ids: string[]
+          error_message: string
+          success: boolean
         }[]
       }
-      create_workflow_and_log_invitations: {
-        Args: {
-          p_name: string
-          p_brand_id: string
-          p_steps_definition: Json
-          p_created_by: string
-          p_invitation_items: Json
-        }
-        Returns: string
+      create_workflow_and_log_invitations:
+        | {
+            Args: {
+              p_brand_id: string
+              p_created_by: string
+              p_status?: string
+              p_template_id?: string
+              p_workflow_description: string
+              p_workflow_name: string
+              p_workflow_steps: Json
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_brand_id: string
+              p_created_by: string
+              p_invitation_items: Json
+              p_name: string
+              p_steps_definition: Json
+            }
+            Returns: string
+          }
+      deactivate_user: {
+        Args: { p_changed_by?: string; p_reason?: string; p_user_id: string }
+        Returns: Json
       }
       delete_brand_and_dependents: {
         Args: { brand_id_to_delete: string }
@@ -2582,226 +2670,122 @@ export type Database = {
       delete_brand_cascade: {
         Args: { p_brand_id: string; p_deleting_user_id: string }
         Returns: {
-          success: boolean
-          error_message: string
           deleted_content_count: number
           deleted_workflow_count: number
+          error_message: string
+          success: boolean
         }[]
       }
       delete_template_and_update_content: {
         Args: { template_id_to_delete: string }
         Returns: undefined
       }
-      delete_user_and_reassign_tasks: {
-        Args: { p_user_id_to_delete: string }
-        Returns: undefined
+      delete_workflow_and_dependents: {
+        Args: { p_workflow_id: string }
+        Returns: boolean
       }
-      get_all_claims_for_master_brand: {
-        Args:
-          | { master_brand_id_param: string }
-          | {
-              master_brand_id_param: string
-              product_id_param?: string
-              country_code_param?: string
-            }
-        Returns: {
-          claim_text: string
-          claim_type: string
-          level: string
-          country_code: string
-        }[]
-      }
-      get_brand_details_by_id: {
-        Args: { p_brand_id: string }
-        Returns: Json
-      }
-      get_brand_urls: {
-        Args: { brand_uuid: string }
-        Returns: string[]
-      }
-      get_claim_countries: {
-        Args: { claim_uuid: string }
-        Returns: string[]
-      }
-      get_claim_ingredients: {
-        Args: { claim_uuid: string }
-        Returns: string[]
-      }
-      get_claim_products: {
-        Args: { claim_uuid: string }
-        Returns: string[]
-      }
-      get_current_user_role: {
-        Args: Record<PropertyKey, never>
+      enqueue_notification: {
+        Args: {
+          p_metadata?: Json
+          p_priority?: number
+          p_recipient_email?: string
+          p_recipient_id?: string
+          p_subject: string
+          p_template_data: Json
+          p_template_name: string
+          p_type: string
+        }
         Returns: string
       }
-      get_template_input_fields: {
-        Args: { template_uuid: string }
-        Returns: Json
+      enqueue_workflow_notification: {
+        Args: {
+          p_action: string
+          p_brand_name: string
+          p_comment?: string
+          p_content_id: string
+          p_content_title: string
+          p_recipient_id: string
+          p_step_id: string
+          p_step_name: string
+          p_workflow_id: string
+        }
+        Returns: string
       }
-      get_template_output_fields: {
-        Args: { template_uuid: string }
-        Returns: Json
-      }
-      get_user_by_email: {
-        Args: { user_email: string }
-        Returns: unknown[]
-      }
-      get_user_details: {
-        Args: { p_user_id: string }
-        Returns: Json
-      }
-      get_user_templates: {
-        Args: { p_user_id: string; p_brand_id?: string }
+      get_brand_urls: { Args: { brand_uuid: string }; Returns: string[] }
+      get_claim_countries: { Args: { claim_uuid: string }; Returns: string[] }
+      get_claim_ingredients: { Args: { claim_uuid: string }; Returns: string[] }
+      get_claim_products: { Args: { claim_uuid: string }; Returns: string[] }
+      get_user_activity: {
+        Args: { p_days?: number; p_user_id: string }
         Returns: {
-          id: string
-          name: string
-          description: string
-          category: string
-          template_structure: Json
-          content_type_id: string
+          action_category: string
+          action_type: string
           brand_id: string
-          created_by: string
           created_at: string
-          updated_at: string
-          is_active: boolean
-          usage_count: number
-          brand_name: string
-          content_type_name: string
-          creator_name: string
+          duration_ms: number
+          id: string
+          metadata: Json
+          resource_id: string
+          resource_name: string
+          resource_type: string
         }[]
+      }
+      get_user_activity_summary: {
+        Args: { p_days?: number; p_user_id: string }
+        Returns: Json
       }
       has_brand_permission: {
         Args: {
-          user_id: string
-          target_brand_id: string
           allowed_roles: string[]
+          target_brand_id: string
+          user_id: string
         }
         Returns: boolean
       }
-      integer_to_uuid: {
-        Args: { "": number }
-        Returns: string
-      }
-      is_global_admin: {
-        Args: Record<PropertyKey, never> | { user_id: string }
-        Returns: boolean
-      }
+      is_global_admin:
+        | { Args: { user_id: string }; Returns: boolean }
+        | { Args: never; Returns: boolean }
+      is_user_active: { Args: { user_id: string }; Returns: boolean }
       log_security_event: {
         Args: {
-          p_event_type: string
           p_details?: Json
-          p_user_id?: string
+          p_event_type: string
           p_ip_address?: string
+          p_user_id?: string
         }
         Returns: string
       }
-      normalize_website_domain: {
-        Args: { url: string }
-        Returns: string
-      }
-      set_user_role_for_all_assigned_brands: {
+      log_user_activity: {
         Args: {
-          target_user_id: string
-          new_role: Database["public"]["Enums"]["user_role"]
+          p_action_category: string
+          p_action_type: string
+          p_brand_id?: string
+          p_duration_ms?: number
+          p_ip_address?: unknown
+          p_metadata?: Json
+          p_resource_id?: string
+          p_resource_name?: string
+          p_resource_type?: string
+          p_session_id?: string
+          p_user_agent?: string
+          p_user_id: string
         }
-        Returns: number
+        Returns: string
       }
-      test_plpgsql_declare: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      update_brand_with_agencies: {
-        Args:
-          | {
-              p_brand_id_to_update: string
-              p_name: string
-              p_website_url: string
-              p_additional_website_urls: string[]
-              p_country: string
-              p_language: string
-              p_brand_identity: string
-              p_tone_of_voice: string
-              p_guardrails: string
-              p_brand_color: string
-              p_master_claim_brand_id: string
-              p_selected_agency_ids: string[]
-              p_new_custom_agency_names: string[]
-              p_user_id: string
-            }
-          | {
-              p_brand_id_to_update: string
-              p_name: string
-              p_website_url: string
-              p_additional_website_urls: string[]
-              p_country: string
-              p_language: string
-              p_brand_identity: string
-              p_tone_of_voice: string
-              p_guardrails: string
-              p_brand_color: string
-              p_master_claim_brand_id: string
-              p_selected_agency_ids: string[]
-              p_new_custom_agency_names: string[]
-              p_user_id: string
-              p_logo_url?: string
-            }
+      normalize_website_domain: { Args: { url: string }; Returns: string }
+      reactivate_user: {
+        Args: { p_changed_by?: string; p_reason?: string; p_user_id: string }
         Returns: Json
-      }
-      update_content_workflow_status: {
-        Args: {
-          p_content_id: string
-          p_user_id: string
-          p_action: string
-          p_comments?: string
-          p_new_assignee_id?: string
-          p_version_data?: Json
-        }
-        Returns: {
-          success: boolean
-          error_message: string
-          new_status: string
-          new_step: number
-        }[]
-      }
-      update_user_details: {
-        Args: {
-          p_user_id: string
-          p_full_name: string
-          p_job_title: string
-          p_company: string
-          p_role?: string
-          p_brand_permissions?: Json
-        }
-        Returns: undefined
-      }
-      delete_workflow_and_dependents: {
-        Args: {
-          p_workflow_id: string
-        }
-        Returns: boolean
       }
       update_workflow_and_handle_invites: {
         Args: {
-          p_workflow_id: string
-          p_name?: string | null
-          p_brand_id?: string | null
-          p_steps?: Json | null
-          p_template_id?: string | null
-          p_description?: string | null
-          p_new_invitation_items?: Json | null
-        }
-        Returns: boolean
-      }
-      update_workflow_and_handle_invites_invoker_version_temp: {
-        Args: {
-          p_workflow_id: string
-          p_name?: string
           p_brand_id?: string
+          p_description?: string
+          p_name?: string
+          p_new_invitation_items?: Json
           p_steps?: Json
           p_template_id?: string
-          p_description?: string
-          p_new_invitation_items?: Json
+          p_workflow_id: string
         }
         Returns: boolean
       }
@@ -2849,8 +2833,16 @@ export type Database = {
       tool_run_status: "success" | "failure"
       user_brand_role_enum: "admin" | "editor" | "viewer"
       user_role: "admin" | "editor" | "viewer"
+      user_status: "active" | "inactive" | "pending" | "suspended"
+      vetting_agency_event_type:
+        | "suggested"
+        | "accepted"
+        | "dismissed"
+        | "auto_applied"
+        | "auto_rejected"
       vetting_agency_priority_level: "High" | "Medium" | "Low"
-      workflow_status: "active" | "draft" | "archived"
+      vetting_agency_status: "approved" | "pending_verification" | "rejected"
+      workflow_status: "draft" | "active" | "archived"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2858,21 +2850,25 @@ export type Database = {
   }
 }
 
-type DefaultSchema = Database[Extract<keyof Database, "public">]
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
@@ -2890,14 +2886,16 @@ export type Tables<
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
@@ -2913,14 +2911,16 @@ export type TablesInsert<
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
@@ -2936,14 +2936,16 @@ export type TablesUpdate<
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
@@ -2951,19 +2953,24 @@ export type Enums<
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       claim_category_enum: [
@@ -3011,8 +3018,18 @@ export const Constants = {
       tool_run_status: ["success", "failure"],
       user_brand_role_enum: ["admin", "editor", "viewer"],
       user_role: ["admin", "editor", "viewer"],
+      user_status: ["active", "inactive", "pending", "suspended"],
+      vetting_agency_event_type: [
+        "suggested",
+        "accepted",
+        "dismissed",
+        "auto_applied",
+        "auto_rejected",
+      ],
       vetting_agency_priority_level: ["High", "Medium", "Low"],
-      workflow_status: ["active", "draft", "archived"],
+      vetting_agency_status: ["approved", "pending_verification", "rejected"],
+      workflow_status: ["draft", "active", "archived"],
     },
   },
 } as const
+
