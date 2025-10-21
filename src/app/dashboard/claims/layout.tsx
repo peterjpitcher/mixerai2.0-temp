@@ -1,3 +1,4 @@
+// DEPRECATION NOTICE: The claims dashboard section is slated for removal; avoid referencing or extending it.
 import type { ReactNode } from 'react';
 import { ProductClaimsAnnouncement } from '@/components/dashboard/claims/product-claims-announcement';
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from '@/components/ui/button';
 import { BrandCell } from "@/components/ui/brand-display";
-import { COUNTRIES, LANGUAGES } from "@/lib/constants";
+import { COUNTRIES, getLanguageLabel } from "@/lib/constants";
 import { PackageOpen, AlertTriangle, Eye, Pencil, Trash2, Plus, MoreVertical } from "lucide-react";
 import { toast } from 'sonner';
 import { formatDate } from '@/lib/utils/date';
@@ -140,7 +140,7 @@ export default function BrandsPage() {
       header: "Language",
       cell: ({ row }) => (
         <Badge variant="secondary">
-          {LANGUAGES.find(l => l.value === row.language)?.label || row.language}
+          {getLanguageLabel(row.language)}
         </Badge>
       ),
       enableSorting: true,
@@ -228,7 +228,7 @@ export default function BrandsPage() {
     const languages = new Set(brands.map(b => b.language).filter(Boolean));
     return Array.from(languages).map(language => ({
       value: language,
-      label: LANGUAGES.find(l => l.value === language)?.label || language
+      label: getLanguageLabel(language)
     })).sort((a, b) => a.label.localeCompare(b.label));
   }, [brands]);
 

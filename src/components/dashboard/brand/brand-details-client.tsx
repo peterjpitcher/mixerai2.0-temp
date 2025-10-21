@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { COUNTRIES, LANGUAGES } from '@/lib/constants';
+import { COUNTRIES, getLanguageLabel } from '@/lib/constants';
 import { FileText as ContentIcon, GitFork as WorkflowIcon, Users, ExternalLink, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Label } from "@/components/ui/label";
@@ -35,7 +35,7 @@ interface Brand {
 export function BrandDetailsClient({ brand, canEditBrand }: { brand: Brand, canEditBrand: boolean }) {
   const router = useRouter();
   const countryName = COUNTRIES.find(c => c.value === brand.country)?.label || brand.country || 'Not specified';
-  const languageName = LANGUAGES.find(l => l.value === brand.language)?.label || brand.language || 'Not specified';
+  const languageName = brand.language ? getLanguageLabel(brand.language) : 'Not specified';
   const brandAdmins = brand.admins || [];
   
   const breadcrumbItems = [

@@ -1,5 +1,6 @@
 'use client';
 
+// DEPRECATION NOTICE: The claims dashboard section is slated for removal; avoid referencing or extending it.
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

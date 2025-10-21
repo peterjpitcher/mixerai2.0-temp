@@ -1,5 +1,6 @@
 "use client";
 
+// DEPRECATION NOTICE: The claims dashboard section is slated for removal; avoid referencing or extending it.
 import React, { useEffect, useState, useCallback } from "react";
 
 // Force dynamic rendering to prevent static generation errors

@@ -1,3 +1,4 @@
+// DEPRECATION NOTICE: The claims dashboard section is slated for removal; avoid referencing or extending it.
 import { redirect } from 'next/navigation';
 
 interface ClaimWorkflowDetailPageProps {

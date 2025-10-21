@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import { Loader2, X, PlusCircle, ArrowLeft, Info, HelpCircle, AlertTriangle } from 'lucide-react';
 import { BrandIcon } from '@/components/brand-icon';
 import { BrandLogoUpload } from '@/components/ui/brand-logo-upload';
-import { COUNTRIES, LANGUAGES } from '@/lib/constants';
+import { COUNTRIES, LANGUAGES, getLanguagesForCountry, getLanguageLabel } from '@/lib/constants';
 import { Checkbox } from '@/components/ui/checkbox';
 import { v4 as uuidv4 } from 'uuid';
 import { apiFetch } from '@/lib/api-client';
@@ -569,7 +569,9 @@ export default function NewBrandPage() {
   };
 
   const countryName = COUNTRIES.find(c => c.value === formData.country)?.label || formData.country || 'Select country';
-  const languageName = LANGUAGES.find(l => l.value === formData.language)?.label || formData.language || 'Select language';
+  const languageName = formData.language ? getLanguageLabel(formData.language) : 'Select language';
+  const languagesForCountry = getLanguagesForCountry(formData.country);
+  const availableLanguageOptions = languagesForCountry.length ? languagesForCountry : LANGUAGES;
   
   return (
     <div className="space-y-6">
@@ -642,7 +644,7 @@ export default function NewBrandPage() {
                       <SelectValue placeholder="Select language" />
                     </SelectTrigger>
                     <SelectContent className="max-h-[300px]">
-                      {LANGUAGES.map(l => (<SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>))}
+                      {availableLanguageOptions.map(l => (<SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>))}
                     </SelectContent>
                   </Select>
                 </div>

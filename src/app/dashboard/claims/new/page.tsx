@@ -1,5 +1,6 @@
 "use client";
 
+// DEPRECATION NOTICE: The claims dashboard section is slated for removal; avoid referencing or extending it.
 import Link from 'next/link';
 import { ArrowLeft, AlertOctagon } from 'lucide-react';
 import { Button } from '@/components/ui/button';

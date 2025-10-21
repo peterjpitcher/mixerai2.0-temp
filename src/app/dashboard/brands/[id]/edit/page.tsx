@@ -16,7 +16,7 @@ import { BrandIcon } from '@/components/brand-icon';
 import { BrandLogoUpload } from '@/components/ui/brand-logo-upload';
 import { useAutoSave } from '@/hooks/use-auto-save';
 import { SaveStatusIndicator } from '@/components/ui/save-status';
-import { COUNTRIES, LANGUAGES } from '@/lib/constants';
+import { COUNTRIES, LANGUAGES, getLanguagesForCountry, getLanguageLabel } from '@/lib/constants';
 import { Checkbox } from '@/components/ui/checkbox';
 import { apiFetch } from '@/lib/api-client';
 import { v4 as uuidv4 } from 'uuid';
@@ -629,7 +629,9 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
   });
 
   const countryName = COUNTRIES.find(c => c.value === formData.country)?.label || formData.country || 'Select country';
-  const languageName = LANGUAGES.find(l => l.value === formData.language)?.label || formData.language || 'Select language';
+  const languageName = formData.language ? getLanguageLabel(formData.language) : 'Select language';
+  const languagesForCountry = getLanguagesForCountry(formData.country);
+  const availableLanguageOptions = languagesForCountry.length ? languagesForCountry : LANGUAGES;
 
   const renderVettingAgencyCheckboxes = () => {
     if (isLoadingAgencies) {
@@ -864,8 +866,8 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                     <div className="col-span-12 sm:col-span-9">
                       <Select value={formData.language} onValueChange={(v) => handleSelectChange('language', v)}>
                         <SelectTrigger><SelectValue placeholder="Select language" /></SelectTrigger>
-                        <SelectContent className="max-h-[300px]">
-                          {LANGUAGES.map(l => (<SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>))}
+                    <SelectContent className="max-h-[300px]">
+                      {availableLanguageOptions.map(l => (<SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>))}
                         </SelectContent>
                       </Select>
                     </div>

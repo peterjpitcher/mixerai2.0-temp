@@ -1,5 +1,6 @@
 'use client';
 
+// DEPRECATION NOTICE: The claims dashboard section is slated for removal; avoid referencing or extending it.
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
