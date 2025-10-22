@@ -36,6 +36,7 @@ import { useAuth, usePermissions } from '@/contexts/auth-context';
 import { useBrands } from '@/contexts/brand-context';
 import { useWorkflowsList } from '@/hooks/queries/use-workflows';
 import { apiFetchJson } from '@/lib/api-client';
+import { getGlobalRole } from '@/lib/auth/user-role';
 
 interface NavigationBase {
   id: string;
@@ -546,12 +547,21 @@ export function deriveRoleFlags({
   hasBrandPermission: ReturnType<typeof usePermissions>['hasBrandPermission'];
 }) {
   const isAuthenticatedUser = Boolean(user);
-  const isPlatformAdmin = Boolean(user) && isGlobalAdmin;
+  const globalRole = getGlobalRole(
+    user
+      ? {
+          app_metadata: user.app_metadata ?? {},
+          user_metadata: user.user_metadata ?? {},
+        }
+      : null,
+    { fallbackToUserMetadata: true }
+  );
+  const isPlatformAdmin = Boolean(user) && (isGlobalAdmin || globalRole === 'admin');
   const hasScopedAdminAccess = brands.some((brand) => hasBrandPermission(brand.id, 'admin'));
   const hasScopedEditorAccess = brands.some((brand) => hasBrandPermission(brand.id, 'editor'));
 
   const isScopedAdmin = !isPlatformAdmin && hasScopedAdminAccess;
-  const isEditor = !isPlatformAdmin && !isScopedAdmin && hasScopedEditorAccess;
+  const isEditor = !isPlatformAdmin && !isScopedAdmin && (hasScopedEditorAccess || globalRole === 'editor');
   const isViewer = Boolean(user) && !isPlatformAdmin && !isScopedAdmin && !isEditor;
 
   return { isAuthenticatedUser, isPlatformAdmin, isScopedAdmin, isEditor, isViewer };
