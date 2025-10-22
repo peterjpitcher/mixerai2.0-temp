@@ -71,27 +71,47 @@ export default function BrandsPage() {
   const fetchBrands = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+
     try {
-      const response = await fetch('/api/brands');
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch brands');
+      const aggregated: Brand[] = [];
+      const pageSize = 100;
+      let page = 1;
+      let hasNext = true;
+
+      while (hasNext) {
+        const params = new URLSearchParams({
+          page: String(page),
+          limit: String(pageSize),
+        });
+
+        const response = await fetch(`/api/brands?${params.toString()}`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch brands (status ${response.status})`);
+        }
+
+        const payload = await response.json();
+        if (!payload?.success) {
+          throw new Error(payload?.error || 'Failed to fetch brands');
+        }
+
+        const chunk: Brand[] = Array.isArray(payload.data) ? payload.data : [];
+        aggregated.push(...chunk);
+
+        const pagination = payload.pagination;
+        hasNext = Boolean(pagination?.hasNextPage);
+        if (!hasNext) {
+          break;
+        }
+
+        page += 1;
       }
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        console.log('Fetched brands data:', data.data);
-        console.log('First brand logo_url:', data.data[0]?.logo_url);
-        setBrands(Array.isArray(data.data) ? data.data : []);
-      } else {
-        throw new Error(data.error || 'Failed to fetch brands');
-      }
+
+      setBrands(aggregated);
     } catch (error) {
       console.error('Error fetching brands:', error);
       setError((error as Error).message || 'Failed to load brands');
-      toast.error("Failed to load brands. Please try again.", {
-        description: "Error",
+      toast.error('Failed to load brands. Please try again.', {
+        description: 'Error',
       });
     } finally {
       setIsLoading(false);
