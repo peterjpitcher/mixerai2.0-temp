@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -72,6 +72,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [brandSearch, setBrandSearch] = useState('');
   const [form, setForm] = useState({
     full_name: '',
     job_title: '',
@@ -88,6 +89,13 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
   const [userSessionError, setUserSessionError] = useState<string | null>(null);
   const [isAllowedToAccess, setIsAllowedToAccess] = useState<boolean>(false);
   const [isCheckingPermissions, setIsCheckingPermissions] = useState<boolean>(true);
+
+  const filteredBrands = useMemo(() => {
+    const term = brandSearch.trim().toLowerCase();
+    if (!term) return brands;
+    return brands.filter((brand) => (brand.name || '').toLowerCase().includes(term));
+  }, [brandSearch, brands]);
+
 
   // Fetch current user for RBAC
   useEffect(() => {
@@ -204,18 +212,18 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
         // Initialize the selectedBrands state
         const brandPermissions: {[key: string]: {selected: boolean, role: string}} = {};
         
-        // First, set all brands as unselected with default role of 'viewer'
+        // First, set all brands as unselected with default role of 'editor'
         sortedBrands.forEach((brand: Brand) => {
-          brandPermissions[brand.id] = { selected: false, role: 'viewer' };
+          brandPermissions[brand.id] = { selected: false, role: 'editor' };
         });
         
         // Then, update with the user's actual permissions
         if (userData.user.brand_permissions && userData.user.brand_permissions.length > 0) {
           userData.user.brand_permissions.forEach((permission: BrandPermission) => {
             if (permission.brand_id) {
-              brandPermissions[permission.brand_id] = { 
-                selected: true, 
-                role: permission.role || 'viewer' 
+              brandPermissions[permission.brand_id] = {
+                selected: true,
+                role: permission.role || 'editor'
               };
             }
           });
@@ -297,7 +305,10 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
   const handleBrandSelectionChange = (brandId: string, checked: boolean) => {
     setSelectedBrands(prev => ({
       ...prev,
-      [brandId]: { ...prev[brandId], selected: checked }
+      [brandId]: {
+        selected: checked,
+        role: prev[brandId]?.role ?? 'editor'
+      }
     }));
   };
   
@@ -541,6 +552,22 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
 
             {!isLoading && brands.length > 0 && (
               <>
+                <div className="sticky top-0 bg-background pb-2">
+                  <Label htmlFor="brand-search" className="sr-only">Search brands</Label>
+                  <Input
+                    id="brand-search"
+                    value={brandSearch}
+                    onChange={(event) => setBrandSearch(event.target.value)}
+                    placeholder="Search brands..."
+                    className="mt-2"
+                  />
+                </div>
+                {filteredBrands.length === 0 ? (
+                  <div className="rounded-md border p-3 bg-muted text-muted-foreground text-sm">
+                    No brands match "{brandSearch}". Try a different search term.
+                  </div>
+                ) : (
+                  <>
                 <div className="flex items-center gap-2 pb-2 border-b">
                   <Checkbox
                     id="assigned-brand-master"
@@ -551,7 +578,10 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                         const next: typeof prev = {};
                         for (const b of brands) {
                           const current = prev[b.id];
-                          next[b.id] = { selected: v, role: current?.role ?? 'viewer' };
+                          next[b.id] = {
+                            selected: v,
+                            role: current?.role ?? 'editor'
+                          };
                         }
                         return next;
                       });
@@ -564,7 +594,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                 <div className="text-xs text-muted-foreground mb-2">
                   ✓ Tick to assign this user to a brand, then choose their role
                 </div>
-                {brands.map((brand) => (
+                {filteredBrands.map((brand) => (
               <div key={brand.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 transition-colors">
                 <div className="flex items-center space-x-3">
                   <Checkbox
@@ -582,8 +612,8 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                     {brand.name}
                   </label>
                 </div>
-                <Select
-                  value={selectedBrands[brand.id]?.role || 'viewer'}
+                  <Select
+                  value={selectedBrands[brand.id]?.role || 'editor'}
                   onValueChange={(value) => handleBrandRoleChange(brand.id, value)}
                   disabled={!selectedBrands[brand.id]?.selected}
                 >
@@ -598,6 +628,8 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                 </Select>
               </div>
                 ))}
+                  </>
+                )}
               </>
             )}
           </CardContent>
@@ -614,4 +646,4 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
       </form>
     </div>
   );
-} 
+}
