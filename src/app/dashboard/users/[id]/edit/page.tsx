@@ -159,36 +159,69 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
           throw new Error(userData.error || 'Failed to fetch user.');
         }
         
-        // Fetch all brands
-        const brandsResponse = await fetch('/api/brands');
-        const brandsData = await brandsResponse.json();
-        
-        if (brandsData.success) {
-          const currentBrands = Array.isArray(brandsData.data) ? brandsData.data : [];
-          setBrands(currentBrands);
-          
-          // Initialize the selectedBrands state
-          const brandPermissions: {[key: string]: {selected: boolean, role: string}} = {};
-          
-          // First, set all brands as unselected with default role of 'viewer'
-          currentBrands.forEach((brand: Brand) => {
-            brandPermissions[brand.id] = { selected: false, role: 'viewer' };
-          });
-          
-          // Then, update with the user's actual permissions
-          if (userData.user.brand_permissions && userData.user.brand_permissions.length > 0) {
-            userData.user.brand_permissions.forEach((permission: BrandPermission) => {
-              if (permission.brand_id) {
-                brandPermissions[permission.brand_id] = { 
-                  selected: true, 
-                  role: permission.role || 'viewer' 
-                };
-              }
-            });
+        // Fetch all brands with pagination to ensure the full list is available
+        const collectedBrands: Brand[] = [];
+        const pageSize = 200;
+        let page = 1;
+        let keepFetching = true;
+
+        while (keepFetching) {
+          const response = await fetch(`/api/brands?page=${page}&limit=${pageSize}`);
+          if (!response.ok) {
+            const errorBody = await response.json().catch(() => ({}));
+            const message =
+              typeof errorBody?.error === 'string'
+                ? errorBody.error
+                : `Failed to fetch brands (status ${response.status})`;
+            throw new Error(message);
           }
-          
-          setSelectedBrands(brandPermissions);
+
+          const payload = await response.json();
+          if (!payload?.success) {
+            throw new Error(payload?.error || 'Failed to fetch brands.');
+          }
+
+          const pageBrands: Brand[] = Array.isArray(payload.data) ? payload.data : [];
+          collectedBrands.push(...pageBrands);
+
+          const pagination = payload.pagination;
+          if (!pagination || !pagination.hasNextPage) {
+            keepFetching = false;
+          } else {
+            page += 1;
+          }
         }
+
+        const sortedBrands = collectedBrands.sort((a, b) =>
+          (a.name || '').localeCompare(b.name || '', undefined, {
+            sensitivity: 'base',
+            ignorePunctuation: true,
+          })
+        );
+
+        setBrands(sortedBrands);
+        
+        // Initialize the selectedBrands state
+        const brandPermissions: {[key: string]: {selected: boolean, role: string}} = {};
+        
+        // First, set all brands as unselected with default role of 'viewer'
+        sortedBrands.forEach((brand: Brand) => {
+          brandPermissions[brand.id] = { selected: false, role: 'viewer' };
+        });
+        
+        // Then, update with the user's actual permissions
+        if (userData.user.brand_permissions && userData.user.brand_permissions.length > 0) {
+          userData.user.brand_permissions.forEach((permission: BrandPermission) => {
+            if (permission.brand_id) {
+              brandPermissions[permission.brand_id] = { 
+                selected: true, 
+                role: permission.role || 'viewer' 
+              };
+            }
+          });
+        }
+        
+        setSelectedBrands(brandPermissions);
         
         // Set user data
         setUser(userData.user);
@@ -274,7 +307,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
           job_title: form.job_title || null,
           company: form.company || null,
           role: form.globalRole || null, // Send globalRole as 'role' in the payload
-          brand_permissions: brandPermissions.length > 0 ? brandPermissions : null
+          brand_permissions: brandPermissions
         })
       });
       

@@ -40,6 +40,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { touchFriendly } from '@/lib/utils/touch-target';
 import { format as formatDateFns } from 'date-fns';
@@ -97,19 +98,23 @@ export default function UsersPage() {
   const { data: currentUser, isLoading: isLoadingUser, error: currentUserError } = useCurrentUser();
   const isAllowedToAccess = currentUser?.user_metadata?.role === 'admin';
 
-  const [users, setUsers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const [sortField, setSortField] = useState<'full_name' | 'role' | 'email' | 'company' | 'last_sign_in_at'>('role');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [sortField, setSortField] = useState<'full_name' | 'role' | 'email' | 'company' | 'last_sign_in_at'>('full_name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [resendingInviteToUserId, setResendingInviteToUserId] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState<boolean>(false);
+  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'editor' | 'viewer'>('all');
+  const [brandFilter, setBrandFilter] = useState<string>('all');
+  const [staleFilter, setStaleFilter] = useState(false);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [isLoadingBrands, setIsLoadingBrands] = useState(false);
 
   const sessionErrorMessage = useMemo(() => {
     if (!currentUserError) return null;
@@ -133,52 +138,36 @@ export default function UsersPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [showInactive]);
+  }, [showInactive, roleFilter, brandFilter, staleFilter, debouncedSearch]);
 
-  const fetchUsers = useCallback(
-    async (search: string, signal?: AbortSignal) => {
+  const fetchAllUsers = useCallback(
+    async (options?: { signal?: AbortSignal }) => {
       if (!isAllowedToAccess) {
-        setUsers([]);
-        setTotalCount(0);
+        setAllUsers([]);
         setIsLoading(false);
         return;
       }
 
+      const signal = options?.signal;
       setIsLoading(true);
       setLoadError(null);
 
       try {
-        if (search) {
+        const aggregated: User[] = [];
+        const perPage = 100;
+        let nextPage = 1;
+        let total = Number.POSITIVE_INFINITY;
+
+        while (!signal?.aborted && aggregated.length < total) {
           const params = new URLSearchParams({
-            query: search,
-            limit: String(PAGE_SIZE),
-            page: String(page),
+            page: String(nextPage),
+            pageSize: String(perPage),
+            includeInactive: 'true',
           });
-          if (showInactive) params.set('includeInactive', 'true');
 
           const response = await apiFetchJson<{
             success: boolean;
-            users: User[];
-            error?: string;
-            pagination?: { total?: number };
-          }>(`/api/users/search?${params.toString()}`, { signal });
-
-          if (!response.success) {
-            throw new Error(response.error || 'Failed to search users.');
-          }
-
-          setUsers(response.users ?? []);
-          setTotalCount(response.pagination?.total ?? (response.users?.length ?? 0));
-        } else {
-          const params = new URLSearchParams({
-            page: String(page),
-            pageSize: String(PAGE_SIZE),
-          });
-          if (showInactive) params.set('includeInactive', 'true');
-
-          const response = await apiFetchJson<{
-            success: boolean;
-            data: User[];
+            data?: User[];
             error?: string;
             pagination?: { total?: number };
           }>(`/api/users?${params.toString()}`, { signal });
@@ -187,24 +176,32 @@ export default function UsersPage() {
             throw new Error(response.error || 'Failed to load users.');
           }
 
-          setUsers(response.data ?? []);
-          setTotalCount(response.pagination?.total ?? (response.data?.length ?? 0));
+          const chunk = response.data ?? [];
+          aggregated.push(...chunk);
+          total = response.pagination?.total ?? aggregated.length;
+          if (chunk.length < perPage) {
+            break;
+          }
+
+          nextPage += 1;
         }
+
+        if (signal?.aborted) return;
+        setAllUsers(aggregated);
       } catch (error) {
         if (signal?.aborted) return;
         console.error('[UsersPage] Failed to load users:', error);
         const message = error instanceof Error ? error.message : 'Failed to load users.';
         setLoadError(message);
         toast.error('Failed to load users. Please try again.');
-        setUsers([]);
-        setTotalCount(0);
+        setAllUsers([]);
       } finally {
         if (!signal?.aborted) {
           setIsLoading(false);
         }
       }
     },
-    [isAllowedToAccess, page, showInactive]
+    [isAllowedToAccess]
   );
 
   useEffect(() => {
@@ -216,41 +213,159 @@ export default function UsersPage() {
     }
 
     const controller = new AbortController();
-    void fetchUsers(debouncedSearch, controller.signal);
+    void fetchAllUsers({ signal: controller.signal });
     return () => controller.abort();
-  }, [fetchUsers, debouncedSearch, isAllowedToAccess, isLoadingUser]);
+  }, [fetchAllUsers, isAllowedToAccess, isLoadingUser]);
+
+  useEffect(() => {
+    if (isLoadingUser || !isAllowedToAccess) return;
+
+    const controller = new AbortController();
+    const loadBrands = async () => {
+      setIsLoadingBrands(true);
+      try {
+        const aggregated: Brand[] = [];
+        const perPage = 200;
+        let nextPage = 1;
+        let total = Number.POSITIVE_INFINITY;
+
+        while (!controller.signal.aborted && aggregated.length < total) {
+          const params = new URLSearchParams({
+            page: String(nextPage),
+            limit: String(perPage),
+          });
+          const response = await apiFetchJson<{
+            success: boolean;
+            data?: Brand[];
+            error?: string;
+            pagination?: { total?: number };
+          }>(`/api/brands?${params.toString()}`, { signal: controller.signal });
+
+          if (!response.success) {
+            throw new Error(response.error || 'Failed to load brands.');
+          }
+
+          const chunk = response.data ?? [];
+          aggregated.push(...chunk);
+          total = response.pagination?.total ?? aggregated.length;
+          if (chunk.length < perPage) {
+            break;
+          }
+          nextPage += 1;
+        }
+
+        if (controller.signal.aborted) return;
+        const sorted = aggregated.sort((a, b) =>
+          (a.name || '').localeCompare(b.name || '', undefined, {
+            sensitivity: 'base',
+            ignorePunctuation: true,
+          })
+        );
+        setBrands(sorted);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error('[UsersPage] Failed to load brands:', error);
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoadingBrands(false);
+        }
+      }
+    };
+
+    void loadBrands();
+    return () => controller.abort();
+  }, [isAllowedToAccess, isLoadingUser]);
   
-  // Search filter
-  const visibleUsers = showInactive
-    ? users
-    : users.filter(u => u.user_status !== 'inactive');
+  const staleCutoff = useMemo(() => {
+    if (!staleFilter) return null;
+    const threshold = new Date();
+    threshold.setDate(threshold.getDate() - 30);
+    return threshold;
+  }, [staleFilter]);
 
-  // Sort users based on sort field and direction
-  const sortedUsers = [...visibleUsers].sort((a, b) => {
-    // First, priority sort by role (Admin at top)
-    if (sortField === 'role') {
-      // Sort by role with admins at the top
-      const roleA = a.role?.toLowerCase() || '';
-      const roleB = b.role?.toLowerCase() || '';
-      
-      // Admin roles should be at the top regardless of sort direction
-      if (roleA.includes('admin') && !roleB.includes('admin')) return -1;
-      if (!roleA.includes('admin') && roleB.includes('admin')) return 1;
-      
-      // Then apply normal sort for other roles
-      const comparison = roleA.localeCompare(roleB);
+  const filteredUsers = useMemo(() => {
+    const term = debouncedSearch.toLowerCase();
+    return allUsers.filter(user => {
+      if (!showInactive && user.user_status === 'inactive') {
+        return false;
+      }
+      if (roleFilter !== 'all' && user.role?.toLowerCase() !== roleFilter) {
+        return false;
+      }
+      if (brandFilter === 'none') {
+        if ((user.brand_permissions ?? []).some(perm => perm.brand_id)) {
+          return false;
+        }
+      } else if (brandFilter !== 'all') {
+        if (!(user.brand_permissions ?? []).some(perm => perm.brand_id === brandFilter)) {
+          return false;
+        }
+      }
+      if (staleCutoff) {
+        if (user.last_sign_in_at) {
+          const lastLogin = new Date(user.last_sign_in_at);
+          if (lastLogin > staleCutoff) {
+            return false;
+          }
+        } else {
+          // Never logged in counts as stale
+        }
+      }
+      if (term) {
+        const nameMatch = user.full_name?.toLowerCase().includes(term);
+        const emailMatch = user.email?.toLowerCase().includes(term);
+        if (!nameMatch && !emailMatch) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [allUsers, showInactive, roleFilter, brandFilter, staleCutoff, debouncedSearch]);
+
+  const sortedUsers = useMemo(() => {
+    const data = [...filteredUsers];
+    data.sort((a, b) => {
+      if (sortField === 'role') {
+        const roleA = a.role?.toLowerCase() || '';
+        const roleB = b.role?.toLowerCase() || '';
+        if (roleA.includes('admin') && !roleB.includes('admin')) return -1;
+        if (!roleA.includes('admin') && roleB.includes('admin')) return 1;
+        const comparison = roleA.localeCompare(roleB);
+        return sortDirection === 'asc' ? comparison : -comparison;
+      }
+      const valueA = (a[sortField] ?? '').toString().toLowerCase();
+      const valueB = (b[sortField] ?? '').toString().toLowerCase();
+      const comparison = valueA.localeCompare(valueB);
       return sortDirection === 'asc' ? comparison : -comparison;
-    }
-    
-    // For other fields
-    const valueA = a[sortField]?.toString().toLowerCase() || '';
-    const valueB = b[sortField]?.toString().toLowerCase() || '';
-    
-    const comparison = valueA.localeCompare(valueB);
-    return sortDirection === 'asc' ? comparison : -comparison;
-  });
+    });
+    return data;
+  }, [filteredUsers, sortField, sortDirection]);
 
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(totalCount / PAGE_SIZE)), [totalCount]);
+  const brandOptions = useMemo(
+    () => [
+      { value: 'all', label: 'All brands' },
+      { value: 'none', label: 'No brand assigned' },
+      ...brands.map((brand) => ({
+        value: brand.id,
+        label: brand.name || 'Untitled Brand',
+      })),
+    ],
+    [brands]
+  );
+
+  const totalCount = sortedUsers.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const paginatedUsers = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return sortedUsers.slice(start, start + PAGE_SIZE);
+  }, [sortedUsers, page]);
+  const isBusy = isLoading || (isLoadingBrands && allUsers.length === 0);
+  
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
   
   // Handle sort change
   const handleSort = (field: 'full_name' | 'role' | 'email' | 'company' | 'last_sign_in_at') => {
@@ -258,9 +373,13 @@ export default function UsersPage() {
       // Toggle direction if same field
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
-      // Set new field and default to descending (so admins are at top for role)
+      // Set new field and default direction
       setSortField(field);
-      setSortDirection('desc');
+      if (field === 'role') {
+        setSortDirection('desc');
+      } else {
+        setSortDirection('asc');
+      }
     }
   };
   
@@ -275,7 +394,7 @@ export default function UsersPage() {
       const data = await response.json();
       if (data.success) {
         toast.success(`User ${userToDelete.full_name} deactivated successfully.`);
-        await fetchUsers(debouncedSearch);
+        await fetchAllUsers();
       } else {
         toast.error(data.error || 'Failed to deactivate user.');
       }
@@ -297,7 +416,7 @@ export default function UsersPage() {
       const data = await response.json();
       if (data.success) {
         toast.success('User reactivated successfully.');
-        await fetchUsers(debouncedSearch);
+        await fetchAllUsers();
       } else {
         toast.error(data.error || 'Failed to reactivate user.');
       }
@@ -324,6 +443,7 @@ export default function UsersPage() {
       const data = await response.json();
       if (response.ok && data.success) {
         toast.success(`Invitation resent to ${email}.`);
+        await fetchAllUsers();
       } else {
         toast.error(data.error || 'Failed to resend invitation.');
       }
@@ -460,6 +580,47 @@ export default function UsersPage() {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
+      
+      <div className="flex flex-wrap items-center gap-3">
+        <Select
+          value={roleFilter}
+          onValueChange={(value) => setRoleFilter(value as 'all' | 'admin' | 'editor' | 'viewer')}
+        >
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Filter by role" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All roles</SelectItem>
+            <SelectItem value="admin">Admins</SelectItem>
+            <SelectItem value="editor">Editors</SelectItem>
+            <SelectItem value="viewer">Viewers</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={brandFilter}
+          onValueChange={(value) => setBrandFilter(value)}
+          disabled={isLoadingBrands}
+        >
+          <SelectTrigger className="w-[220px]">
+            <SelectValue placeholder="Filter by brand" />
+          </SelectTrigger>
+          <SelectContent>
+            {brandOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Button
+          variant={staleFilter ? 'default' : 'outline'}
+          onClick={() => setStaleFilter((prev) => !prev)}
+        >
+          {staleFilter ? 'Showing stale logins' : '30+ days since login'}
+        </Button>
+      </div>
 
       {loadError && (
         <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
@@ -468,7 +629,7 @@ export default function UsersPage() {
         </div>
       )}
       
-      {isLoading ? (
+      {isBusy ? (
         <div className="py-10 flex justify-center items-center min-h-[300px]">
           <div className="flex flex-col items-center">
             <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -485,6 +646,25 @@ export default function UsersPage() {
             {debouncedSearch ? 'No results match your search criteria. Try a different search term.' : 'No users have been created yet. Invite your first user to get started.'}
           </p>
           {!searchTerm && (
+            <Button size="lg" asChild>
+              <Link href="/dashboard/users/invite">
+                <Plus className="mr-2 h-4 w-4" /> Invite First User
+              </Link>
+            </Button>
+          )}
+        </div>
+      ) : sortedUsers.length === 0 ? (
+        <div className="text-center py-12 px-4">
+          <div className="mx-auto w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+            <Users2 size={40} className="text-primary" strokeWidth={1.5} />
+          </div>
+          <h3 className="text-xl font-semibold mb-2">No Users Found</h3>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+            {debouncedSearch || roleFilter !== 'all' || brandFilter !== 'all' || staleFilter
+              ? 'No users match your current search or filter selection.'
+              : 'No users have been created yet. Invite your first user to get started.'}
+          </p>
+          {!searchTerm && roleFilter === 'all' && brandFilter === 'all' && !staleFilter && (
             <Button size="lg" asChild>
               <Link href="/dashboard/users/invite">
                 <Plus className="mr-2 h-4 w-4" /> Invite First User
@@ -535,8 +715,16 @@ export default function UsersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedUsers.map(user => (
-                <TableRow key={user.id} className={`${user.role?.toLowerCase().includes('admin') ? 'bg-primary/5' : ''} ${user.user_status === 'inactive' ? 'opacity-60' : ''}`}>
+              {paginatedUsers.map(user => {
+                const hasAdminRole =
+                  user.role?.toLowerCase().includes('admin') ||
+                  user.highest_brand_role?.toLowerCase().includes('admin');
+                const isInactive = user.user_status === 'inactive';
+                return (
+                  <TableRow
+                    key={user.id}
+                    className={`${hasAdminRole ? 'bg-primary/5' : ''} ${isInactive ? 'opacity-60' : ''}`}
+                  >
                   <TableCell>
                     <Avatar className="h-8 w-8">
                       {getAvatarUrl(user.id, user.avatar_url) ? (
@@ -551,13 +739,19 @@ export default function UsersPage() {
                   <TableCell className="font-medium">{user.full_name}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
-                    <Badge variant={
-                      user.role?.toLowerCase().includes('admin') ? 'default' : 
-                      user.role?.toLowerCase().includes('editor') ? 'secondary' : 
-                      'outline'
-                    }>
-                      {user.role}
-                    </Badge>
+                    <div className="flex flex-wrap gap-1">
+                      <Badge variant={
+                        user.role?.toLowerCase().includes('admin') ? 'default' : 
+                        user.role?.toLowerCase().includes('editor') ? 'secondary' : 
+                        'outline'
+                      }>
+                        {user.role}
+                      </Badge>
+                      {user.highest_brand_role &&
+                        user.highest_brand_role !== user.role && (
+                          <Badge variant="secondary">{user.highest_brand_role}</Badge>
+                        )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant={getUserStatus(user).variant}>
@@ -613,20 +807,21 @@ export default function UsersPage() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
           {totalPages > 1 && (
             <div className="flex flex-col gap-2 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm text-muted-foreground">
-                Page {page} of {totalPages} • Showing {users.length} of {totalCount} users
+                Page {page} of {totalPages} • Showing {paginatedUsers.length} of {totalCount} users
               </div>
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setPage(prev => Math.max(1, prev - 1))}
-                  disabled={page === 1 || isLoading}
+                  disabled={page === 1 || isBusy}
                 >
                   Previous
                 </Button>
@@ -634,7 +829,7 @@ export default function UsersPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={page >= totalPages || isLoading}
+                  disabled={page >= totalPages || isBusy}
                 >
                   Next
                 </Button>

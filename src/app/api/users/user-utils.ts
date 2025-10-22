@@ -108,7 +108,7 @@ export function buildUserResponse(
     typeof authUser.user_metadata?.role === 'string'
       ? String(authUser.user_metadata.role).toLowerCase()
       : null;
-  const displayRole = highestBrandRole ?? globalRole ?? 'viewer';
+  const displayRole = globalRole ?? highestBrandRole ?? 'viewer';
   const userStatus =
     (authUser.user_metadata?.status as string | undefined) ||
     (invitationStatus?.user_status as string | undefined) ||
