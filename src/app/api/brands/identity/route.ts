@@ -12,6 +12,8 @@ import { recommendVettingAgencies } from '@/lib/vetting-agencies/recommendations
 import { withAdminAuthAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import { getServerEnv } from '@/lib/env';
+import { truncateGraphemeSafe } from '@/lib/text/enforce-limit';
+import { fetchWebPageContent } from '@/lib/utils/web-scraper';
 
 export const runtime = 'nodejs';
 
@@ -27,7 +29,8 @@ const rawAllowlist = (PROXY_ALLOWED_HOSTS || '')
 const allowlistedHosts = new Set(rawAllowlist);
 
 const MAX_URLS = 3;
-const MAX_SCRAPED_CHARACTERS = 8000;
+const MAX_CHARACTERS_PER_URL = 3500;
+const MAX_COMBINED_CHARACTERS = 9000;
 const requestSchema = z.object({
   name: z.string().trim().min(1).max(200),
   urls: z
@@ -146,9 +149,118 @@ function getLanguageName(languageCode: string): string {
 }
 
 // Function to extract website content from a URL
-const MAX_DOWNLOAD_BYTES = MAX_SCRAPED_CHARACTERS * 120; // cap raw payload before sanitisation
+const MAX_DOWNLOAD_BYTES = MAX_CHARACTERS_PER_URL * 160; // cap raw payload before sanitisation
 
-async function scrapeWebsiteContent(url: string): Promise<string> {
+const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
+  allowedTags: [],
+  allowedAttributes: {},
+  textFilter(text: string) {
+    return text.replace(/\s+/g, ' ').trim();
+  },
+};
+
+interface CleanContentResult {
+  text: string;
+  truncated: boolean;
+  originalLength: number;
+  finalLength: number;
+}
+
+const truncateNotice = (url: string, original: number, final: number) =>
+  `Content from ${url} was truncated to ${final} characters (original length ${original}) to stay within AI limits.`;
+
+function cleanScrapedContent(rawContent: string): CleanContentResult {
+  if (!rawContent || !rawContent.trim()) {
+    throw new Error('The page did not return readable content.');
+  }
+
+  const textContent = sanitizeHtml(rawContent, SANITIZE_OPTIONS);
+
+  if (!textContent.trim()) {
+    throw new Error('The page did not contain any readable text after sanitization.');
+  }
+
+  const { text, truncated, originalLength, finalLength } = truncateGraphemeSafe(textContent, MAX_CHARACTERS_PER_URL);
+  if (!text.trim()) {
+    throw new Error('The page did not contain any readable text after sanitization.');
+  }
+
+  return { text, truncated, originalLength, finalLength };
+}
+
+function getErrorMessage(error: unknown): string {
+  if (!error) return 'Unknown error';
+  if (axios.isAxiosError(error)) {
+    const status = error.response?.status;
+    const reason = error.response?.statusText;
+    if (status) {
+      return `HTTP ${status}${reason ? ` ${reason}` : ''}`;
+    }
+    if (error.code) {
+      return error.code;
+    }
+    if (typeof error.message === 'string') {
+      return error.message;
+    }
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  return 'Unknown error';
+}
+
+async function scrapeWithAxios(url: string): Promise<CleanContentResult> {
+  const response = await axios.get(url, {
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-GB,en;q=0.5',
+      'Accept-Encoding': 'identity',
+    },
+    timeout: 10000,
+    responseType: 'stream',
+    decompress: true,
+    maxRedirects: 5,
+    validateStatus: (status) => status >= 200 && status < 400,
+  });
+
+  const stream = response.data as Readable;
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+
+  try {
+    for await (const chunk of stream) {
+      const buffer = Buffer.isBuffer(chunk)
+        ? chunk
+        : Buffer.from(typeof chunk === 'string' ? chunk : new Uint8Array(chunk as ArrayBuffer));
+      totalBytes += buffer.length;
+      if (totalBytes > MAX_DOWNLOAD_BYTES) {
+        if (typeof stream.destroy === 'function') {
+          stream.destroy();
+        } else if (
+          typeof (stream as unknown as { cancel?: () => Promise<void> | void }).cancel === 'function'
+        ) {
+          await (stream as unknown as { cancel: () => Promise<void> | void }).cancel();
+        }
+        throw new Error(`Page content exceeded the ${Math.round(MAX_DOWNLOAD_BYTES / 1024)}KB limit.`);
+      }
+      chunks.push(buffer);
+    }
+  } catch (streamError) {
+    throw streamError;
+  }
+
+  const rawContent = Buffer.concat(chunks).toString('utf-8');
+  return cleanScrapedContent(rawContent);
+}
+
+async function scrapeWebsiteContent(url: string): Promise<{ content: string; warnings: string[] }> {
+  const warnings: string[] = [];
+
   try {
     const parsed = new URL(url);
 
@@ -171,65 +283,55 @@ async function scrapeWebsiteContent(url: string): Promise<string> {
       throw new Error('Requests to internal or reserved IP addresses are not allowed');
     }
 
-    const response = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 compatible MixerAIContentScraper/1.0',
-        'Accept': 'text/plain, text/html;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-GB,en;q=0.5',
-        'Accept-Encoding': 'identity',
-      },
-      timeout: 8000,
-      responseType: 'stream',
-      decompress: true,
-    });
-
-    const stream = response.data as Readable;
-    const chunks: Buffer[] = [];
-    let totalBytes = 0;
-
-    try {
-      for await (const chunk of stream) {
-        const buffer = Buffer.isBuffer(chunk)
-          ? chunk
-          : Buffer.from(typeof chunk === 'string' ? chunk : new Uint8Array(chunk as ArrayBuffer));
-        totalBytes += buffer.length;
-        if (totalBytes > MAX_DOWNLOAD_BYTES) {
-          if (typeof stream.destroy === 'function') {
-            stream.destroy();
-          } else if (typeof (stream as unknown as { cancel?: () => Promise<void> | void }).cancel === 'function') {
-            await (stream as unknown as { cancel: () => Promise<void> | void }).cancel();
-          }
-          throw new Error(`Page content exceeded the ${Math.round(MAX_DOWNLOAD_BYTES / 1024)}KB limit.`);
-        }
-        chunks.push(buffer);
-      }
-    } catch (streamError) {
-      throw streamError;
+    const axiosResult = await scrapeWithAxios(url);
+    if (axiosResult.truncated) {
+      warnings.push(truncateNotice(url, axiosResult.originalLength, axiosResult.finalLength));
     }
-
-    const rawContent = Buffer.concat(chunks).toString('utf-8');
-    if (!rawContent.trim()) {
-      throw new Error('The page did not return readable content.');
-    }
-
-    const textContent = sanitizeHtml(rawContent, {
-      allowedTags: [],
-      allowedAttributes: {},
-      textFilter(text: string) {
-        return text.replace(/\s+/g, ' ').trim();
-      },
-    });
-
-    if (!textContent.trim()) {
-      throw new Error('The page did not contain any readable text after sanitization.');
-    }
-
-    return textContent.slice(0, MAX_SCRAPED_CHARACTERS);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Unknown scraping error';
-    throw new Error(`Failed to scrape ${url}: ${message}`);
+    return { content: axiosResult.text, warnings };
+  } catch (primaryError) {
+    warnings.push(`Primary fetch failed for ${url}: ${getErrorMessage(primaryError)}`);
   }
+
+  try {
+    const fallbackRaw = await fetchWebPageContent(url, 10000);
+    const cleaned = cleanScrapedContent(fallbackRaw);
+    if (cleaned.truncated) {
+      warnings.push(truncateNotice(url, cleaned.originalLength, cleaned.finalLength));
+    }
+    return { content: cleaned.text, warnings };
+  } catch (fallbackError) {
+    warnings.push(`Fallback fetch failed for ${url}: ${getErrorMessage(fallbackError)}`);
+  }
+
+  throw new Error(warnings.join(' | '));
+}
+
+function enforceCombinedCharacterLimit(
+  scrapes: { url: string; content: string }[],
+  warnings: string[]
+): { url: string; content: string }[] {
+  if (!scrapes.length) {
+    return scrapes;
+  }
+
+  const totalChars = scrapes.reduce((sum, item) => sum + item.content.length, 0);
+  if (totalChars <= MAX_COMBINED_CHARACTERS) {
+    return scrapes;
+  }
+
+  const ratio = MAX_COMBINED_CHARACTERS / totalChars;
+
+  return scrapes.map(({ url, content }) => {
+    const targetLength = Math.max(600, Math.floor(content.length * ratio));
+    if (targetLength >= content.length) {
+      return { url, content };
+    }
+    const { text, truncated, originalLength, finalLength } = truncateGraphemeSafe(content, targetLength);
+    if (truncated) {
+      warnings.push(truncateNotice(url, originalLength, finalLength));
+    }
+    return { url, content: text };
+  });
 }
 
 export const POST = withAdminAuthAndCSRF(async (req: NextRequest) => {
@@ -275,13 +377,18 @@ export const POST = withAdminAuthAndCSRF(async (req: NextRequest) => {
 
     const successfulScrapes: { url: string; content: string }[] = [];
     const scrapeWarnings: string[] = [];
+    const processingWarnings: string[] = [];
 
     for (const url of normalizedUrls) {
       try {
-        const content = await scrapeWebsiteContent(url);
+        const scrapeResult = await scrapeWebsiteContent(url);
+        const content = scrapeResult.content;
         if (!content.trim()) {
           scrapeWarnings.push(`No readable content could be extracted from ${url}.`);
           continue;
+        }
+        if (scrapeResult.warnings.length) {
+          scrapeWarnings.push(...scrapeResult.warnings);
         }
         successfulScrapes.push({ url, content });
       } catch (error) {
@@ -292,9 +399,18 @@ export const POST = withAdminAuthAndCSRF(async (req: NextRequest) => {
 
     if (!successfulScrapes.length) {
       const combined = [...normalizationWarnings, ...scrapeWarnings];
-      const detail = combined.length ? combined.join(' | ') : 'No readable content could be extracted from the provided URLs.';
-      throw new Error(`Unable to extract content from the provided URLs. ${detail}`);
+      const detail = combined.length ? combined : ['No readable content could be extracted from the provided URLs.'];
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'We could not extract readable content from the supplied URLs.',
+          details: detail,
+        },
+        { status: 422 }
+      );
     }
+
+    const preparedScrapes = enforceCombinedCharacterLimit(successfulScrapes, processingWarnings);
     
     // Prepare prompt for OpenAI
     const countryInfo = COUNTRIES.find(c => c.value === country);
@@ -320,7 +436,7 @@ Do not include any content in English unless the specified language is ${specifi
     
     const userMessage = `Create a comprehensive brand identity profile for "${name}" based on the following website content:
     
-${successfulScrapes.map(({ url, content }, index) => {
+${preparedScrapes.map(({ url, content }, index) => {
   const safeContent = content && content.trim().length > 0 ? content : '[No readable content extracted from this URL.]';
   return `URL ${index + 1}: ${url}\n${safeContent}\n`;
 }).join('\n')}
@@ -368,6 +484,10 @@ Remember that ALL text fields (except potentially within agency names) must be w
         throw new Error('AI service returned malformed JSON. Please try again.');
       }
       
+      const uniqueScrapeWarnings = Array.from(new Set(scrapeWarnings));
+      const uniqueNormalizationWarnings = Array.from(new Set(normalizationWarnings));
+      const uniqueProcessingWarnings = Array.from(new Set(processingWarnings));
+      
       // Validate and structure the result - remove defaults for missing fields
       const result = {
         brandIdentity: jsonData.brandIdentity,
@@ -375,8 +495,9 @@ Remember that ALL text fields (except potentially within agency names) must be w
         guardrails: jsonData.guardrails,
         suggestedAgencies: Array.isArray(jsonData.suggestedAgencies) ? jsonData.suggestedAgencies : [],
         brandColor: (jsonData.brandColor && /^#[0-9A-Fa-f]{6}$/.test(jsonData.brandColor)) ? jsonData.brandColor : null,
-        scrapeWarnings,
-        normalizationWarnings,
+        scrapeWarnings: uniqueScrapeWarnings,
+        normalizationWarnings: uniqueNormalizationWarnings,
+        processingWarnings: uniqueProcessingWarnings,
         // usedFallback: false, // This flag is no longer relevant
       };
 

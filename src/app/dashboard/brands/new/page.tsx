@@ -442,12 +442,17 @@ export default function NewBrandPage() {
        toast.error('Please enter at least one website URL (main or additional) to generate identity.');
        return;
     }
-    const urls = [formData.website_url, ...formData.additional_website_urls.map(u => u.value)].filter(url => url && url.trim() !== '');
-    for (const url of urls) {
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        toast.error('All URLs must start with http:// or https://');
-        return;
-      }
+    const rawUrls = [formData.website_url, ...formData.additional_website_urls.map(u => u.value)]
+      .map(url => (url || '').trim())
+      .filter((url): url is string => Boolean(url));
+    const urls = Array.from(
+      new Set(
+        rawUrls.map(url => (/^https?:\/\//i.test(url) ? url : `https://${url}`))
+      )
+    );
+    if (!urls.length) {
+      toast.error('Please enter at least one website URL (main or additional) to generate identity.');
+      return;
     }
 
     setIsGenerating(true);
@@ -463,48 +468,108 @@ export default function NewBrandPage() {
           language: (formData.language && formData.language.trim()) || 'en-GB'
         })
       });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: `HTTP error ${response.status}` }));
-        let detailMsg = '';
-        if (Array.isArray(errorData.details) && errorData.details.length) {
-          detailMsg = ` (${errorData.details.join(' | ')})`;
-        } else if (typeof errorData.details === 'string' && errorData.details.trim()) {
-          detailMsg = ` (${errorData.details})`;
-        }
-        throw new Error((errorData.error || 'Failed to generate brand identity') + detailMsg);
+      let payload: unknown = null;
+      let parseError: unknown = null;
+      try {
+        payload = await response.json();
+      } catch (jsonError) {
+        parseError = jsonError;
       }
-      const data = await response.json();
-      if (data.success && data.data) {
-        const { matched: generatedAgencies, unmatched } = resolveSuggestedAgencyIds(data.data.suggestedAgencies);
-        setFormData(prev => ({
-          ...prev,
-          brand_identity: data.data.brandIdentity || prev.brand_identity,
-          tone_of_voice: data.data.toneOfVoice || prev.tone_of_voice,
-          content_vetting_agencies: Array.from(new Set([...prev.content_vetting_agencies, ...generatedAgencies])),
-          brand_color: data.data.brandColor || prev.brand_color
-        }));
-        if (Array.isArray(data.data.scrapeWarnings) && data.data.scrapeWarnings.length) {
-          toast.warning('Some URLs could not be processed completely.', {
-            description: data.data.scrapeWarnings.join('\n').slice(0, 400),
-          });
+
+      const parsed = payload as {
+        success?: boolean;
+        data?: {
+          brandIdentity?: string | null;
+          toneOfVoice?: string | null;
+          brandColor?: string | null;
+          suggestedAgencies?: unknown;
+          scrapeWarnings?: string[];
+          normalizationWarnings?: string[];
+          processingWarnings?: string[];
+        };
+        error?: string;
+        details?: unknown;
+      } | null;
+
+      const isSuccessfulResponse = response.ok && parsed?.success && parsed.data;
+
+      if (!isSuccessfulResponse) {
+        const detailSet = new Set<string>();
+        const collectDetails = (value: unknown) => {
+          if (!value) return;
+          if (Array.isArray(value)) {
+            value.forEach(collectDetails);
+            return;
+          }
+          if (typeof value === 'object') {
+            Object.values(value as Record<string, unknown>).forEach(collectDetails);
+            return;
+          }
+          const text = String(value).trim();
+          if (text) {
+            detailSet.add(text);
+          }
+        };
+
+        collectDetails(parsed?.details);
+        if (parseError) {
+          detailSet.add('The server response could not be parsed.');
         }
-        if (Array.isArray(data.data.normalizationWarnings) && data.data.normalizationWarnings.length) {
-          toast.warning('Some URLs were reformatted automatically.', {
-            description: data.data.normalizationWarnings.join('\n').slice(0, 400),
-          });
-        }
-        if (unmatched.length > 0) {
-          toast.info('Some suggested vetting agencies were not recognised and were skipped.', {
-            description: unmatched.join(', ')
-          });
-        }
-        toast.success('Brand identity generated successfully!');
-        setActiveTab('identity');
-      } else {
-        throw new Error(data.error || 'Failed to parse generation response');
+
+        const detailMessages = Array.from(detailSet);
+        const description = detailMessages.length
+          ? detailMessages.join('\n').slice(0, 500)
+          : undefined;
+        const message =
+          parsed?.error ||
+          (parseError ? 'Unexpected response from the server' : 'Failed to generate brand identity');
+        const notify = response.status >= 500 ? toast.error : toast.warning;
+        notify(message, description ? { description } : undefined);
+        return;
       }
+
+      const data = parsed.data;
+      if (!data) {
+        throw new Error(parsed?.error || 'Failed to parse generation response');
+      }
+
+      const { matched: generatedAgencies, unmatched } = resolveSuggestedAgencyIds(data.suggestedAgencies);
+      setFormData(prev => ({
+        ...prev,
+        brand_identity: data.brandIdentity || prev.brand_identity,
+        tone_of_voice: data.toneOfVoice || prev.tone_of_voice,
+        content_vetting_agencies: Array.from(new Set([...prev.content_vetting_agencies, ...generatedAgencies])),
+        brand_color: data.brandColor || prev.brand_color
+      }));
+      const toDescription = (messages: string[]) => messages.join('\n').slice(0, 400);
+      if (Array.isArray(data.scrapeWarnings) && data.scrapeWarnings.length) {
+        toast.warning('Some URLs could not be processed completely.', {
+          description: toDescription(data.scrapeWarnings),
+        });
+      }
+      if (Array.isArray(data.normalizationWarnings) && data.normalizationWarnings.length) {
+        toast.warning('Some URLs were reformatted automatically.', {
+          description: toDescription(data.normalizationWarnings),
+        });
+      }
+      if (Array.isArray(data.processingWarnings) && data.processingWarnings.length) {
+        toast.info('Website content was adjusted to fit AI limits.', {
+          description: toDescription(data.processingWarnings),
+        });
+      }
+      if (unmatched.length > 0) {
+        toast.info('Some suggested vetting agencies were not recognised and were skipped.', {
+          description: unmatched.join(', ')
+        });
+      }
+      toast.success('Brand identity generated successfully!');
+      setActiveTab('identity');
     } catch (error) {
-      toast.error((error as Error).message || 'An error occurred during identity generation.');
+      const message =
+        error instanceof Error
+          ? (error.message || 'An error occurred during identity generation.')
+          : 'An error occurred during identity generation.';
+      toast.error(message);
     } finally {
       setIsGenerating(false);
     }
