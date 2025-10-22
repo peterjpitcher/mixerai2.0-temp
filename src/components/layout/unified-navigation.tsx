@@ -320,31 +320,24 @@ export function UnifiedNavigation() {
       } else if (isEditor) {
         // Editors see templates based on workflows for their brands
         const userBrandIds = (currentUser?.brand_permissions || []).map(p => p.brand_id).filter(Boolean);
-        if (userBrandIds.length > 0 && userWorkflows.length > 0) {
-          const items = userTemplates
-            .filter(template => 
-              userWorkflows.some(workflow => 
-                workflow.template_id === template.id && 
-                userBrandIds.includes(workflow.brand_id)
-              )
-            )
-            .map(template => ({
-              href: `/dashboard/content/new?template=${template.id}`,
-              label: template.name,
-              icon: <FileText className="h-4 w-4" />,
-              segment: template.id
-            }));
-          return items;
+
+        const matchingTemplates = userTemplates.filter(template =>
+          userWorkflows.some(workflow =>
+            workflow.template_id === template.id &&
+            (userBrandIds.length === 0 ? false : userBrandIds.includes(workflow.brand_id))
+          )
+        );
+
+        if (matchingTemplates.length === 0) {
+          return [];
         }
-        // If no workflows, still show all templates for editors
-        const items = userTemplates.map(template => ({
+
+        return matchingTemplates.map(template => ({
           href: `/dashboard/content/new?template=${template.id}`,
           label: template.name,
           icon: <FileText className="h-4 w-4" />,
           segment: template.id
         }));
-        // Editor - Show all templates (no workflow filtering)
-        return items;
       } else {
         // Not admin or editor - no templates shown
         return [];
