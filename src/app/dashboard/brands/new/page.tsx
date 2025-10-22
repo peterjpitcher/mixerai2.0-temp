@@ -20,21 +20,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { v4 as uuidv4 } from 'uuid';
 import { apiFetch } from '@/lib/api-client';
 
-// Define UserSessionData interface (can be moved to a shared types file later)
-interface UserSessionData {
-  id: string;
-  email?: string;
-  user_metadata?: {
-    role?: string;
-    full_name?: string;
-  };
-  brand_permissions?: Array<{
-    brand_id: string;
-    role: string;
-  }>;
-}
-
-
 /**
  * NewBrandPage allows users to create a new brand profile.
  */
@@ -118,7 +103,6 @@ export default function NewBrandPage() {
   const [isGeneratingAgencies, setIsGeneratingAgencies] = useState(false);
   const [isLoading, setIsLoading] = useState(false); 
 
-  const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [isForbidden, setIsForbidden] = useState(false);
   const [userLoadError, setUserLoadError] = useState<string | null>(null);
@@ -232,7 +216,6 @@ export default function NewBrandPage() {
       const response = await apiFetch('/api/me', { retry: 2, retryDelayMs: 400 });
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
-          setCurrentUser(null);
           setIsForbidden(true);
           return;
         }
@@ -245,7 +228,6 @@ export default function NewBrandPage() {
       }
       const data = await response.json();
       if (data.success && data.user) {
-        setCurrentUser(data.user);
         const userRole = data.user.user_metadata?.role;
         setIsForbidden(userRole !== 'admin');
       } else {
@@ -256,7 +238,6 @@ export default function NewBrandPage() {
       }
     } catch (error) {
       console.error('Error fetching current user:', error);
-      setCurrentUser(null);
       setIsForbidden(false);
       setUserLoadError((error as Error).message || 'Could not verify your permissions.');
     } finally {
@@ -713,14 +694,7 @@ export default function NewBrandPage() {
       }
       toast.success('Brand created successfully!');
       
-      // Permission-aware redirect logic
-      // Only redirect to brand detail page if user is a global admin
-      // Non-admin users should go to the brands list instead
-      if (currentUser?.user_metadata?.role === 'admin') {
-        router.push(`/dashboard/brands/${data.data.id}`);
-      } else {
-        router.push('/dashboard/brands');
-      }
+      router.push('/dashboard/brands');
     } catch (error) {
       toast.error((error as Error).message || 'Failed to create brand.');
     } finally {
