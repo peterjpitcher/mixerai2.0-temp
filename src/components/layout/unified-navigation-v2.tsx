@@ -158,8 +158,12 @@ export function UnifiedNavigationV2({ className }: UnifiedNavigationProps) {
           .filter((value): value is string => Boolean(value))
       );
 
+      if (templateIdsForUser.size === 0) {
+        return [];
+      }
+
       return templates
-        .filter((template) => templateIdsForUser.size === 0 || templateIdsForUser.has(template.id))
+        .filter((template) => templateIdsForUser.has(template.id))
         .map((template) => ({
           id: `template-${template.id}`,
           href: `/dashboard/content/new?template=${template.id}`,
