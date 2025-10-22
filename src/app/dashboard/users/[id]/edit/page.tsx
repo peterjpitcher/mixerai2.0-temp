@@ -227,11 +227,45 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
         setUser(userData.user);
         
         // Initialize form values
+        const userRecord = userData.user as Record<string, unknown>;
+
+        const jobTitle =
+          typeof userRecord.job_title === 'string' && userRecord.job_title.trim()
+            ? userRecord.job_title
+            : typeof userRecord.jobTitle === 'string' && userRecord.jobTitle.trim()
+              ? userRecord.jobTitle
+              : typeof userRecord.profile_job_title === 'string' && userRecord.profile_job_title.trim()
+                ? userRecord.profile_job_title
+                : '';
+
+        const companyName =
+          typeof userRecord.company === 'string' && userRecord.company.trim()
+            ? userRecord.company
+            : typeof userRecord.profile_company === 'string' && userRecord.profile_company.trim()
+              ? userRecord.profile_company
+              : '';
+
+        const rawGlobalRole =
+          typeof userRecord.global_role === 'string' && userRecord.global_role.trim()
+            ? userRecord.global_role
+            : typeof userRecord.globalRole === 'string' && userRecord.globalRole.trim()
+              ? userRecord.globalRole
+              : typeof userRecord.role === 'string' && userRecord.role.trim()
+                ? userRecord.role
+                : 'viewer';
+
+        const lowerGlobalRole = rawGlobalRole.toLowerCase();
+        const normalizedGlobalRole = (['admin', 'editor', 'viewer'].includes(lowerGlobalRole)
+          ? lowerGlobalRole
+          : 'viewer') as 'admin' | 'editor' | 'viewer';
+
         setForm({
-          full_name: userData.user.full_name || '',
-          job_title: userData.user.job_title || '',
-          company: userData.user.company || '',
-          globalRole: userData.user.globalRole || 'viewer' // Initialize globalRole
+          full_name: (typeof userRecord.full_name === 'string' && userRecord.full_name.trim())
+            ? userRecord.full_name
+            : '',
+          job_title: jobTitle,
+          company: companyName,
+          globalRole: normalizedGlobalRole
         });
       } catch (error) {
         console.error('Error loading data:', error);

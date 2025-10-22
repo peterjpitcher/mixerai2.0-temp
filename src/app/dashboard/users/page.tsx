@@ -716,14 +716,12 @@ export default function UsersPage() {
             </TableHeader>
             <TableBody>
               {paginatedUsers.map(user => {
-                const hasAdminRole =
-                  user.role?.toLowerCase().includes('admin') ||
-                  user.highest_brand_role?.toLowerCase().includes('admin');
+                const hasGlobalAdmin = user.global_role?.toLowerCase().includes('admin');
                 const isInactive = user.user_status === 'inactive';
                 return (
                   <TableRow
                     key={user.id}
-                    className={`${hasAdminRole ? 'bg-primary/5' : ''} ${isInactive ? 'opacity-60' : ''}`}
+                    className={`${hasGlobalAdmin ? 'bg-primary/5' : ''} ${isInactive ? 'opacity-60' : ''}`}
                   >
                   <TableCell>
                     <Avatar className="h-8 w-8">
@@ -739,19 +737,13 @@ export default function UsersPage() {
                   <TableCell className="font-medium">{user.full_name}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      <Badge variant={
-                        user.role?.toLowerCase().includes('admin') ? 'default' : 
-                        user.role?.toLowerCase().includes('editor') ? 'secondary' : 
-                        'outline'
-                      }>
-                        {user.role}
-                      </Badge>
-                      {user.highest_brand_role &&
-                        user.highest_brand_role !== user.role && (
-                          <Badge variant="secondary">{user.highest_brand_role}</Badge>
-                        )}
-                    </div>
+                    <Badge variant={
+                      user.role?.toLowerCase().includes('admin') ? 'default' : 
+                      user.role?.toLowerCase().includes('editor') ? 'secondary' : 
+                      'outline'
+                    }>
+                      {user.global_role ?? user.role}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Badge variant={getUserStatus(user).variant}>
