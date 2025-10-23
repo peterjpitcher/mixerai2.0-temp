@@ -9,10 +9,11 @@ import { Label } from '@/components/ui/label';
 import { createSupabaseClient } from "@/lib/supabase/client";
 import { toast } from 'sonner';
 import { AlertCircle } from 'lucide-react';
-import { apiFetchJson } from '@/lib/api-client';
+import { ApiClientError, apiFetchJson } from '@/lib/api-client';
 import type { AccountLockStatus } from '@/lib/auth/account-lockout';
 import { sessionConfig } from '@/lib/auth/session-config';
 import { useSearchParams } from 'next/navigation';
+import { TurnstileChallenge } from '@/components/security/turnstile-challenge';
 
 /**
  * LoginForm component.
@@ -25,7 +26,11 @@ export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const searchParams = useSearchParams();
+  const shouldEnforceCaptcha = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
 
   useEffect(() => {
     if (!searchParams) {
@@ -108,8 +113,40 @@ export function LoginForm() {
     e.preventDefault();
     setIsLoading(true);
     setError("");
+    setCaptchaError(null);
 
     try {
+      if (shouldEnforceCaptcha) {
+        if (!captchaToken) {
+          setCaptchaError('Please complete the verification challenge.');
+          setIsLoading(false);
+          return;
+        }
+
+        try {
+          await apiFetchJson<{ success: boolean }>(
+            '/api/auth/verify-captcha',
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: captchaToken, action: 'login' }),
+              errorMessage: 'CAPTCHA verification failed',
+            }
+          );
+          setCaptchaError(null);
+        } catch (captchaVerificationError) {
+          const message =
+            captchaVerificationError instanceof ApiClientError
+              ? captchaVerificationError.message || 'CAPTCHA verification failed.'
+              : 'CAPTCHA verification failed. Please try again.';
+          setCaptchaError(message);
+          setIsLoading(false);
+          setCaptchaToken(null);
+          setCaptchaResetKey((value) => value + 1);
+          return;
+        }
+      }
+
       const lockStatus = await fetchLockoutStatus({ email, action: 'status' });
       if (lockStatus.locked) {
         const minutes = Math.ceil((lockStatus.remainingTime || 0) / 60);
@@ -127,45 +164,59 @@ export function LoginForm() {
 
       if (signInError) {
         // Clear password field for security
-        setPassword("");
-        
+        setPassword('');
+
         // Record failed attempt
         const newLockStatus = await fetchLockoutStatus({ email, action: 'record', success: false });
         if (newLockStatus.locked) {
           const minutes = Math.ceil((newLockStatus.remainingTime || 0) / 60);
           setError(`Account has been locked due to too many failed attempts. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`);
         } else {
-          const remainingAttempts = newLockStatus.remainingAttempts ?? Math.max(0, sessionConfig.lockout.maxAttempts - (newLockStatus.attempts || 0));
+          const remainingAttempts =
+            newLockStatus.remainingAttempts ??
+            Math.max(0, sessionConfig.lockout.maxAttempts - (newLockStatus.attempts || 0));
           // Use consistent error message wording
-          const errorMessage = signInError.message === "Invalid login credentials" 
-            ? "Invalid email or password" 
-            : signInError.message;
-          setError(`${errorMessage}${remainingAttempts < 3 ? ` (${remainingAttempts} attempt${remainingAttempts > 1 ? 's' : ''} remaining)` : ''}`);
+          const errorMessage =
+            signInError.message === 'Invalid login credentials' ? 'Invalid email or password' : signInError.message;
+          setError(
+            `${errorMessage}${
+              remainingAttempts < 3 ? ` (${remainingAttempts} attempt${remainingAttempts > 1 ? 's' : ''} remaining)` : ''
+            }`,
+          );
         }
-        
+
         // Only show toast for actual login attempts, not for session validation errors
         if (email && password) {
-          toast.error(signInError.message === "Invalid login credentials" ? "Invalid email or password" : signInError.message);
+          toast.error(signInError.message === 'Invalid login credentials' ? 'Invalid email or password' : signInError.message);
+        }
+
+        if (shouldEnforceCaptcha) {
+          setCaptchaToken(null);
+          setCaptchaResetKey((value) => value + 1);
         }
       } else {
         // Record successful attempt
-        fetchLockoutStatus({ email, action: 'record', success: true }).catch(error => {
-          console.warn('[login] Failed to clear lockout state after successful login', error);
+        fetchLockoutStatus({ email, action: 'record', success: true }).catch((err) => {
+          console.warn('[login] Failed to clear lockout state after successful login', err);
         });
-        
+
         toast.success('You have been logged in successfully.');
-        
+
         // Add a small delay to ensure auth state is properly set
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
         // Use window.location for a hard redirect to ensure cookies are properly set
-        window.location.href = "/dashboard";
+        window.location.href = '/dashboard';
       }
     } catch (err) {
       // Clear password field for security
       setPassword("");
       setError("An unexpected error occurred. Please try again.");
       toast.error(err instanceof Error ? err.message : "An unexpected error occurred. Please try again.");
+      if (shouldEnforceCaptcha) {
+        setCaptchaToken(null);
+        setCaptchaResetKey((value) => value + 1);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -219,7 +270,25 @@ export function LoginForm() {
               <span>{error}</span>
             </div>
           )}
-          <Button type="submit" className="w-full" disabled={isLoading}>
+          {shouldEnforceCaptcha && (
+            <div className="space-y-2">
+              <TurnstileChallenge
+                action="login"
+                resetCounter={captchaResetKey}
+                onTokenChange={setCaptchaToken}
+                disabled={isLoading}
+                className="flex justify-center"
+              />
+              {captchaError && (
+                <p className="text-xs text-destructive text-center">{captchaError}</p>
+              )}
+            </div>
+          )}
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={isLoading || (shouldEnforceCaptcha && !captchaToken)}
+          >
             {isLoading ? "Logging in..." : "Log in"}
           </Button>
         </form>

@@ -16,6 +16,10 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 
+# CAPTCHA / Abuse Protection
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=
+
 # Application Settings
 NODE_ENV=development
 EOL
@@ -103,6 +107,10 @@ cat > .env << EOL
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+
+# CAPTCHA / Abuse Protection
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=
 
 # Database Connection Method
 # Set to 'true' to use direct PostgreSQL connection instead of Supabase

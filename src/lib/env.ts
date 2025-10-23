@@ -20,6 +20,8 @@ type OptionalEnvKeys = {
   NEXT_PUBLIC_GITHUB_OWNER: string | undefined;
   NEXT_PUBLIC_GITHUB_REPO: string | undefined;
   PROXY_ALLOWED_HOSTS: string | undefined;
+  NEXT_PUBLIC_TURNSTILE_SITE_KEY: string | undefined;
+  TURNSTILE_SECRET_KEY: string | undefined;
 };
 
 type ServerEnv = Readonly<RequiredEnvKeys & OptionalEnvKeys>;
@@ -41,6 +43,8 @@ const optionalEnvVars: OptionalEnvKeys = {
   NEXT_PUBLIC_GITHUB_OWNER: process.env.NEXT_PUBLIC_GITHUB_OWNER,
   NEXT_PUBLIC_GITHUB_REPO: process.env.NEXT_PUBLIC_GITHUB_REPO,
   PROXY_ALLOWED_HOSTS: process.env.PROXY_ALLOWED_HOSTS,
+  NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+  TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
 };
 
 function buildEnv(): ServerEnv {
