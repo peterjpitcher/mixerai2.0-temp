@@ -80,43 +80,14 @@ Because the policy triggers on this query, *all* authenticated API routes fail i
 2. Verify `/api/me` and `/api/me/tasks` return 200s, and the dashboard renders.
 
 ### Longer-term (preferred solution)
-1. Replace inline policy logic with a security-definer helper that runs without RLS:
-
-```sql
-CREATE OR REPLACE FUNCTION public.user_has_brand_access(p_brand_id uuid)
-RETURNS boolean
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  has_access boolean;
-BEGIN
-  SELECT EXISTS (
-    SELECT 1
-    FROM public.user_brand_permissions ubp
-    WHERE ubp.user_id = auth.uid()
-      AND ubp.brand_id = p_brand_id
-  ) INTO has_access;
-  RETURN has_access;
-END;
-$$;
-```
-
-2. Update policies to call the helper:
-
-```sql
-DROP POLICY IF EXISTS "Only brand admins can manage permissions" ON public.user_brand_permissions;
-CREATE POLICY "Brand admins can manage permissions"
-ON public.user_brand_permissions
-FOR ALL
-USING (public.user_has_brand_access(user_brand_permissions.brand_id) AND ...)
-WITH CHECK (public.user_has_brand_access(user_brand_permissions.brand_id) AND ...);
-```
-
+1. Replace inline policy logic with a security-definer helper that runs without RLS.
+2. Update policies to call the helper and restrict mutations to brand admins or global admins.
 3. Ensure the helper function either `SET row_security = off` internally or relies on `SECURITY DEFINER` with a safe `search_path`.
-
 4. Re-run Supabase type generation if schema signatures change.
+
+### Latest Fix (2025-11-04)
+- Added migration `20251104190000_harden_user_brand_permissions_rls.sql` that introduces a `user_is_brand_admin_safe` helper which temporarily turns off row security for the internal lookup to avoid recursion.
+- Replaced the `user_brand_permissions` policies with versions that rely on the helper (and `public.is_global_admin()`), restoring brand admin capabilities without risking infinite recursion.
 
 ### Optional Structural Improvement
 - Move admin mutations for brand permissions into a dedicated RPC or server action executed with the service-role key, keeping the table’s public RLS simple (`USING (user_id = auth.uid())`).
