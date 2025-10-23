@@ -164,8 +164,8 @@ TO authenticated
 USING (public.is_global_admin());
 
 DROP POLICY IF EXISTS "Global admins can read system roles" ON public.user_system_roles;
-CREATE POLICY "Global admins can read system roles"
+CREATE POLICY "Users can read own system roles"
 ON public.user_system_roles
 FOR SELECT
 TO authenticated
-USING (public.is_global_admin());
+USING (user_id = auth.uid());
