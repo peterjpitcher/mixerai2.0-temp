@@ -89,7 +89,7 @@ export function useContentGenerator(templateId?: string | null) {
       
       const [templateResult, brandsResult, workflowsResult] = await Promise.allSettled([
         apiFetch(`/api/content-templates/${templateId}`).then(res => res.json()),
-        apiFetch('/api/brands').then(res => res.json()),
+        apiFetch('/api/brands?limit=all').then(res => res.json()),
         apiFetch(`/api/workflows?template_id=${templateId}`).then(res => res.json())
       ]);
       

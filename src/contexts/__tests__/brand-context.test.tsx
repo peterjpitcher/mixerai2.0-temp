@@ -50,7 +50,7 @@ describe('BrandProvider', () => {
     mockedApiFetchJson.mockImplementation(async (url: RequestInfo | URL) => {
       const target = typeof url === 'string' ? url : url.toString();
 
-      if (target === '/api/brands') {
+      if (target === '/api/brands?limit=all') {
         return {
           success: true,
           data: [

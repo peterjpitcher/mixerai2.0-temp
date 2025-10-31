@@ -58,7 +58,7 @@ export function useBrandsDisplay() {
   const query = useQuery({
     queryKey: ['brands-display'],
     queryFn: async () => {
-      const data = await apiFetchJson<ApiResponse<BrandData[]>>('/api/brands', {
+      const data = await apiFetchJson<ApiResponse<BrandData[]>>('/api/brands?limit=all', {
         errorMessage: 'Failed to fetch brands',
       });
 

@@ -63,7 +63,7 @@ export function ArticleGeneratorForm() {
     // Fetch brands
     const fetchBrands = async () => {
       try {
-        const response = await apiFetch('/api/brands');
+        const response = await apiFetch('/api/brands?limit=all');
         const data = await response.json();
         
         if (data.success && Array.isArray(data.brands)) {

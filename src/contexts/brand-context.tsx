@@ -56,7 +56,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   const fetchBrands = async (): Promise<Brand[]> => {
     if (!user) return [];
 
-    const data = await apiFetchJson<ApiResponse<Brand[]>>('/api/brands', {
+    const data = await apiFetchJson<ApiResponse<Brand[]>>('/api/brands?limit=all', {
       errorMessage: 'Failed to fetch brands',
     });
 

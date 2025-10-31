@@ -48,7 +48,7 @@ export function DebugPanel() {
       setApiTest({ status: 'testing' });
       try {
         const startTime = performance.now();
-        const response = await fetch('/api/brands');
+        const response = await fetch('/api/brands?limit=all');
         const endTime = performance.now();
         const responseTime = Math.round(endTime - startTime);
         

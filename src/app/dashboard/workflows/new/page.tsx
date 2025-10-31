@@ -32,7 +32,8 @@ import { useCurrentUser } from '@/hooks/use-common-data';
 interface Brand {
   id: string;
   name: string;
-  color?: string; // Ensure brand object has color if used directly
+  color?: string | null; // Normalized UI color
+  brand_color?: string | null;
   logo_url?: string | null;
 }
 
@@ -154,6 +155,29 @@ export default function NewWorkflowPage() {
   }));
   
   const selectedBrandFull = brands.find(b => b.id === workflow.brand_id);
+  const selectedTemplate = useMemo(() => {
+    if (!workflow.template_id) {
+      return null;
+    }
+    return contentTemplates.find(template => template.id === workflow.template_id) || null;
+  }, [workflow.template_id, contentTemplates]);
+
+  useEffect(() => {
+    setWorkflow(prev => {
+      const brandName = selectedBrandFull?.name?.trim();
+      const templateName = selectedTemplate?.name?.trim();
+      const autoName = brandName && templateName ? `${brandName} ${templateName} Review` : '';
+      if (prev.name === autoName) {
+        return prev;
+      }
+      return { ...prev, name: autoName };
+    });
+  }, [
+    selectedBrandFull?.id,
+    selectedBrandFull?.name,
+    selectedTemplate?.id,
+    selectedTemplate?.name,
+  ]);
 
   const [assigneeInputs, setAssigneeInputs] = useState<string[]>(() => new Array(workflow.steps.length).fill(''));
   const [userSearchResults, setUserSearchResults] = useState<Record<number, UserOption[]>>({});
@@ -195,7 +219,7 @@ export default function NewWorkflowPage() {
       setIsLoading(true);
       try {
         const [brandsResponse, templatesResponse] = await Promise.all([
-          apiFetch('/api/brands', { cache: 'no-store', signal: controller.signal }),
+          apiFetch('/api/brands?limit=all', { cache: 'no-store', signal: controller.signal }),
           apiFetch('/api/content-templates', { cache: 'no-store', signal: controller.signal }),
         ]);
 
@@ -203,7 +227,12 @@ export default function NewWorkflowPage() {
         if (!brandsData.success) {
           throw new Error(brandsData.error || 'Failed to process brands data');
         }
-        setAllFetchedBrands(Array.isArray(brandsData.data) ? brandsData.data : []);
+        const rawBrands: Brand[] = Array.isArray(brandsData.data) ? brandsData.data : [];
+        const normalizedBrands = rawBrands.map((brand) => ({
+          ...brand,
+          color: brand.color ?? brand.brand_color ?? null,
+        }));
+        setAllFetchedBrands(normalizedBrands);
 
         const templatesData = await templatesResponse.json();
         if (!templatesData.success) {
@@ -805,7 +834,13 @@ export default function NewWorkflowPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           {selectedBrandFull && 
-            <BrandIcon name={selectedBrandFull.name} color={selectedBrandFull.color ?? undefined} logoUrl={selectedBrandFull.logo_url} size="md" className="mr-1" />
+            <BrandIcon
+              name={selectedBrandFull.name}
+              color={selectedBrandFull.color ?? selectedBrandFull.brand_color ?? undefined}
+              logoUrl={selectedBrandFull.logo_url}
+              size="md"
+              className="mr-1"
+            />
           }
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Create New Workflow</h1>
@@ -826,14 +861,17 @@ export default function NewWorkflowPage() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="space-y-2 lg:col-span-2">
-                <Label htmlFor="name">Workflow Name <span className="text-destructive">*</span></Label>
+                <Label htmlFor="name">Workflow Name (auto-generated)</Label>
                 <Input
                   id="name"
                   name="name"
                   value={workflow.name}
-                  onChange={handleUpdateWorkflowDetails}
-                  placeholder="e.g., Blog Post Approval"
+                  readOnly
+                  placeholder="Select a brand and content template to generate the name"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Updates automatically based on the selected brand and content template.
+                </p>
               </div>
               
               <div className="space-y-2">
@@ -863,12 +901,15 @@ export default function NewWorkflowPage() {
                     )}
                     {brands.map((brand) => (
                       <SelectItem key={brand.id} value={brand.id}>
-                        <div className="flex items-center">
-                          <div 
-                            className="w-3 h-3 rounded-full mr-2" 
-                            style={{ backgroundColor: brand.color || '#CCCCCC' }}
+                        <div className="flex items-center gap-2">
+                          <BrandIcon
+                            name={brand.name}
+                            color={brand.color ?? brand.brand_color ?? undefined}
+                            logoUrl={brand.logo_url}
+                            size="sm"
+                            className="h-6 w-6"
                           />
-                          {brand.name}
+                          <span>{brand.name}</span>
                         </div>
                       </SelectItem>
                     ))}

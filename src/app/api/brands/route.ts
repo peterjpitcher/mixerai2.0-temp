@@ -8,39 +8,16 @@ import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { getUserAuthByEmail, inviteNewUserWithAppMetadata } from '@/lib/auth/user-management';
  // Added import
 import { User } from '@supabase/supabase-js';
-import { z } from 'zod';
-import { validateRequest, commonSchemas } from '@/lib/api/validation';
+import { validateRequest } from '@/lib/api/validation';
 import { CompensatingTransaction } from '@/lib/db/transactions';
+import { createBrandSchema, type CreateBrandSchema, formatGuardrailsInput } from './create-brand-schema';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
 
 // Removed PostgreSQL pool configuration - using Supabase instead
 
-// Validation schema for creating a brand
-const createBrandSchema = z.object({
-  name: commonSchemas.nonEmptyString,
-  website_url: commonSchemas.url.optional().nullable(),
-  additional_website_urls: z.array(z.string()).optional().nullable(), // Add missing field
-  country: z.string().optional().nullable(),
-  language: z.string().optional().nullable(),
-  brand_identity: z.string().optional().nullable(),
-  tone_of_voice: z.string().optional().nullable(),
-  guardrails: z.union([
-    z.string(),
-    z.array(z.string())
-  ]).optional().nullable(),
-  brand_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color').optional().nullable(),
-  logo_url: commonSchemas.url.optional().nullable(),
-  master_claim_brand_id: commonSchemas.uuid.optional().nullable(),
-  master_claim_brand_ids: z.array(commonSchemas.uuid).optional().nullable(), // NEW: Array for multiple master claim brands
-  selected_agency_ids: z.array(commonSchemas.uuid).optional().nullable(),
-  approved_content_types: z.array(z.string()).optional().nullable(),
-  admin_users: z.array(z.object({
-    email: commonSchemas.email,
-    role: z.literal('admin')
-  })).optional()
-});
+type CreateBrandPayload = CreateBrandSchema;
 
 // Type for priority as it comes from Supabase (enum string values)
 type SupabaseVettingAgencyPriority = "High" | "Medium" | "Low" | null;
@@ -182,14 +159,20 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     
     // Parse pagination parameters from query string
     const searchParams = req.nextUrl.searchParams;
-    const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = parseInt(searchParams.get('limit') || '20', 10);
+    const pageParam = searchParams.get('page') || '1';
+    const limitParam = searchParams.get('limit');
     const search = searchParams.get('search') || '';
     
-    // Validate pagination parameters
-    const validatedPage = Math.max(1, page);
-    const validatedLimit = Math.min(Math.max(1, limit), 100); // Max 100 items per page
-    const offset = (validatedPage - 1) * validatedLimit;
+    const requestedPage = Number.parseInt(pageParam, 10);
+    const validatedPage = Number.isNaN(requestedPage) ? 1 : Math.max(1, requestedPage);
+    
+    const normalizedLimitParam = limitParam?.toLowerCase();
+    const fetchAllBrands = normalizedLimitParam === 'all' || limitParam === '-1';
+    const parsedLimit = limitParam && !fetchAllBrands ? Number.parseInt(limitParam, 10) : Number.NaN;
+    const resolvedLimit = Number.isNaN(parsedLimit) ? 20 : parsedLimit;
+    
+    const validatedLimit = fetchAllBrands ? null : Math.min(Math.max(1, resolvedLimit), 100); // Max 100 items per page when limited
+    const offset = validatedLimit !== null ? (validatedPage - 1) * validatedLimit : 0;
     
     // console.log('Attempting to fetch brands from database');
     const supabase = createSupabaseAdminClient();
@@ -242,7 +225,10 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     }
     
     // Apply ordering and pagination
-    brandsQuery = brandsQuery.order('name').range(offset, offset + validatedLimit - 1);
+    brandsQuery = brandsQuery.order('name', { ascending: true });
+    if (validatedLimit !== null) {
+      brandsQuery = brandsQuery.range(offset, offset + validatedLimit - 1);
+    }
     
     const { data: brandsData, error, count } = await brandsQuery;
     
@@ -303,17 +289,18 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     // console.log(`Successfully fetched ${formattedBrands.length} brands`);
     
     // Calculate pagination metadata
-    const totalPages = count ? Math.ceil(count / validatedLimit) : 0;
-    const hasNextPage = validatedPage < totalPages;
-    const hasPreviousPage = validatedPage > 1;
+    const totalItems = typeof count === 'number' ? count : formattedBrands.length;
+    const totalPages = validatedLimit ? Math.ceil(totalItems / validatedLimit) : 1;
+    const hasNextPage = validatedLimit ? validatedPage < totalPages : false;
+    const hasPreviousPage = validatedLimit ? validatedPage > 1 : false;
     
     return NextResponse.json({ 
       success: true, 
       data: formattedBrands,
       pagination: {
-        page: validatedPage,
-        limit: validatedLimit,
-        total: count || 0,
+        page: validatedLimit ? validatedPage : 1,
+        limit: validatedLimit ?? formattedBrands.length,
+        total: totalItems,
         totalPages,
         hasNextPage,
         hasPreviousPage
@@ -343,31 +330,13 @@ export const POST = withAuthAndCSRF(async (req: NextRequest, user) => {
       return validation.response;
     }
     
-    const body = validation.data;
-    console.log('[API POST /brands] Received body:', body);
-    console.log('[API POST /brands] Logo URL:', body.logo_url);
+    const body = validation.data as CreateBrandPayload;
     
-    let formattedGuardrails = body.guardrails || null;
-    if (formattedGuardrails) {
-      if (Array.isArray(formattedGuardrails)) {
-        formattedGuardrails = formattedGuardrails.map((item:string) => `- ${item}`).join('\\n');
-      } 
-      else if (typeof formattedGuardrails === 'string' && 
-              formattedGuardrails.trim().startsWith('[') && 
-              formattedGuardrails.trim().endsWith(']')) {
-        try {
-          const guardrailsArray = JSON.parse(formattedGuardrails);
-          if (Array.isArray(guardrailsArray)) {
-            formattedGuardrails = guardrailsArray.map((item:string) => `- ${item}`).join('\\n');
-          }
-        } catch { /* ignore */ }
-      }
-    }
+    const formattedGuardrails = formatGuardrailsInput(body.guardrails);
 
-    const uniqueAdditionalUrls =
-      body.additional_website_urls && Array.isArray(body.additional_website_urls)
-        ? Array.from(new Set(body.additional_website_urls.filter((url: string) => typeof url === 'string' && url.trim() !== '')))
-        : null;
+    const uniqueAdditionalUrls = Array.isArray(body.additional_website_urls)
+      ? Array.from(new Set(body.additional_website_urls))
+      : null;
 
     const normalizedDomain = normalizeWebsiteDomain(body.website_url);
 

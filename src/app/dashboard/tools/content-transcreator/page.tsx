@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Loader2, ClipboardCopy, Globe, AlertTriangle, Briefcase, History, ExternalLink, ShieldAlert } from 'lucide-react';
+import { Loader2, ClipboardCopy, Globe, AlertTriangle, Briefcase, History, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,6 +21,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { apiFetch } from '@/lib/api-client';
 import { useToolAccess } from '../use-tool-access';
 import { useToolHistory, type ToolRunHistoryRecord } from '../use-tool-history';
+import { ToolAccessDenied, ToolAccessSessionError } from '../components/access-states';
 
 
 // Language options - can be kept for source language or if no brand is selected (though API requires brand)
@@ -39,28 +41,6 @@ const languageOptions = [
 // Country options - will be determined by selected brand's settings
 
 const HISTORY_PAGE_SIZE = 20;
-
-const SessionErrorState = ({ message, onRetry }: { message: string; onRetry: () => void }) => (
-  <div className="flex flex-col items-center justify-center min-h-[300px] py-10 text-center">
-    <AlertTriangle className="mb-4 h-16 w-16 text-destructive" />
-    <h3 className="text-xl font-bold mb-2">Unable to verify your access</h3>
-    <p className="text-muted-foreground mb-4 max-w-md">{message}</p>
-    <Button onClick={onRetry}>Try Again</Button>
-  </div>
-);
-
-const AccessDeniedState = ({ message }: { message?: string }) => (
-  <div className="flex flex-col items-center justify-center min-h-[300px] py-10 text-center">
-    <ShieldAlert className="mb-4 h-16 w-16 text-destructive" />
-    <h3 className="text-xl font-bold mb-2">Access Denied</h3>
-    <p className="text-muted-foreground mb-4 max-w-md">
-      {message || 'You do not have permission to use this tool.'}
-    </p>
-    <Button variant="outline" onClick={() => window.location.href = '/dashboard/tools'}>
-      Return to Tools
-    </Button>
-  </div>
-);
 
 interface Brand {
   id: string;
@@ -90,6 +70,7 @@ interface BatchGroup {
  * The trans-creation will target the selected brand's configured language and country.
  */
 export default function ContentTransCreatorPage() {
+  const router = useRouter();
   const [content, setContent] = useState('');
   const [sourceLanguage, setSourceLanguage] = useState('en');
   const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null);
@@ -105,6 +86,7 @@ export default function ContentTransCreatorPage() {
   const [batchContent, setBatchContent] = useState('');
   const [batchResults, setBatchResults] = useState<Array<{ content: string; transCreatedContent?: string; error?: string }>>([]);
   const [brandsError, setBrandsError] = useState<string | null>(null);
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<'all' | 'success' | 'failure'>('all');
 
   const {
     isLoading: isLoadingSession,
@@ -208,6 +190,7 @@ export default function ContentTransCreatorPage() {
     enabled: hasAccess,
     pageSize: HISTORY_PAGE_SIZE,
     transform: historyTransform,
+    filters: historyStatusFilter === 'all' ? undefined : { status: historyStatusFilter },
   });
 
   useEffect(() => {
@@ -227,7 +210,7 @@ export default function ContentTransCreatorPage() {
       setIsLoadingBrands(true);
       setBrandsError(null);
       try {
-        const response = await apiFetch('/api/brands');
+        const response = await apiFetch('/api/brands?limit=all');
         const data = await response.json();
 
         if (!response.ok || !data.success || !Array.isArray(data.data)) {
@@ -425,11 +408,16 @@ export default function ContentTransCreatorPage() {
   }
 
   if (sessionError && sessionStatus !== 403) {
-    return <SessionErrorState message={sessionError} onRetry={() => refetchSession()} />;
+    return <ToolAccessSessionError message={sessionError} onRetry={() => refetchSession()} />;
   }
 
   if (!hasAccess) {
-    return <AccessDeniedState message={sessionStatus === 403 ? sessionError ?? undefined : undefined} />;
+    return (
+      <ToolAccessDenied
+        message={sessionStatus === 403 ? sessionError ?? undefined : undefined}
+        onNavigate={() => router.push('/dashboard/tools')}
+      />
+    );
   }
 
   return (
@@ -688,14 +676,36 @@ export default function ContentTransCreatorPage() {
         <div className="lg:col-span-1 space-y-6">
           {/* Run History Section - now in the second column for lg screens */} 
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <History className="mr-2 h-5 w-5" />
-                Run History
-              </CardTitle>
-              <CardDescription>
-                Your recent content trans-creation runs.
-              </CardDescription>
+            <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="flex items-center">
+                  <History className="mr-2 h-5 w-5" />
+                  Run History
+                </CardTitle>
+                <CardDescription>
+                  Your recent content trans-creation runs.
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-3">
+                <Label htmlFor="transcreator-history-status" className="text-sm text-muted-foreground">
+                  Status Filter
+                </Label>
+                <Select
+                  value={historyStatusFilter}
+                  onValueChange={(value) =>
+                    setHistoryStatusFilter(value as 'all' | 'success' | 'failure')
+                  }
+                >
+                  <SelectTrigger id="transcreator-history-status" className="w-[140px]">
+                    <SelectValue placeholder="All runs" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All runs</SelectItem>
+                    <SelectItem value="success">Success only</SelectItem>
+                    <SelectItem value="failure">Failures only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent>
               {isLoadingHistory && (

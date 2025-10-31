@@ -113,7 +113,7 @@ export default function UserDetailPage() {
         // Fetch user, brands, and activity in parallel
         const [userRes, brandsRes, actRes] = await Promise.all([
           fetch(`/api/users/${params.id}`),
-          fetch('/api/brands'),
+          fetch('/api/brands?limit=all'),
           apiFetch(`/api/users/${params.id}/activity`)
         ]);
 

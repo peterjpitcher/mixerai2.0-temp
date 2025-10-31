@@ -35,10 +35,11 @@ interface WorkflowEditPageProps {
 }
 
 interface BrandSummary {
-    id: string;
-    name: string;
-    color?: string;
-    logo_url?: string | null;
+  id: string;
+  name: string;
+  color?: string | null;
+  brand_color?: string | null;
+  logo_url?: string | null;
 }
 
 interface ContentTemplateSummary {
@@ -76,6 +77,7 @@ interface WorkflowFull {
   created_at?: string;
   updated_at?: string;
   brand?: BrandSummary; // For displaying brand info
+  content_count?: number;
 }
 
 interface WorkflowSummary { 
@@ -174,6 +176,40 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
   const [isDuplicated, setIsDuplicated] = useState(false);
 
   const currentBrandForDisplay = brands.find(b => b.id === workflow?.brand_id);
+  const effectiveBrand = useMemo(() => {
+    if (currentBrandForDisplay) {
+      return currentBrandForDisplay;
+    }
+    if (workflow?.brand) {
+      return workflow.brand;
+    }
+    return null;
+  }, [currentBrandForDisplay, workflow?.brand]);
+
+  const selectedTemplate = useMemo(() => {
+    if (!workflow?.template_id) {
+      return null;
+    }
+    return contentTemplates.find(template => template.id === workflow.template_id) || null;
+  }, [workflow?.template_id, contentTemplates]);
+
+  useEffect(() => {
+    setWorkflow(prev => {
+      if (!prev) return prev;
+      const brandName = effectiveBrand?.name?.trim();
+      const templateName = selectedTemplate?.name?.trim();
+      const autoName = brandName && templateName ? `${brandName} ${templateName} Review` : '';
+      if (prev.name === autoName) {
+        return prev;
+      }
+      return { ...prev, name: autoName };
+    });
+  }, [
+    effectiveBrand?.id,
+    effectiveBrand?.name,
+    selectedTemplate?.id,
+    selectedTemplate?.name,
+  ]);
 
   useEffect(() => {
     if (isLoadingUser) {
@@ -189,6 +225,16 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
       setIsLoading(false);
       return;
     }
+
+    if (!currentUser) {
+      setError('You must be signed in to view this workflow.');
+      setIsLoading(false);
+      return;
+    }
+
+    const isGlobalAdminUser = currentUser.user_metadata?.role === 'admin';
+    const userBrandAdminPerms =
+      currentUser.brand_permissions?.filter(permission => permission.role === 'admin').map(permission => permission.brand_id) || [];
 
     const controller = new AbortController();
     const isAbortError = (error: unknown) =>
@@ -255,22 +301,72 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         setSelectedTemplateId(processedWorkflow?.template_id || 'NO_TEMPLATE_SELECTED');
         setAssigneeInputs(new Array(processedWorkflow?.steps?.length || 0).fill(''));
 
-        const [brandsResponse, templatesResponse] = await Promise.all([
-          apiFetch('/api/brands', { cache: 'no-store', signal: controller.signal }),
-          apiFetch('/api/content-templates', { cache: 'no-store', signal: controller.signal }),
-        ]);
+        const fallbackTemplateName =
+          typeof workflowData.workflow?.template_name === 'string' && workflowData.workflow.template_name.trim().length > 0
+            ? workflowData.workflow.template_name
+            : 'Current Template';
+        const fallbackTemplateOption: ContentTemplateSummary[] = processedWorkflow?.template_id
+          ? [
+              {
+                id: processedWorkflow.template_id,
+                name: fallbackTemplateName,
+              },
+            ]
+          : [];
+        if (fallbackTemplateOption.length > 0) {
+          setContentTemplates(fallbackTemplateOption);
+        } else {
+          setContentTemplates([]);
+        }
+
+        const canManageWorkflowBrand =
+          isGlobalAdminUser ||
+          (processedWorkflow?.brand_id ? userBrandAdminPerms.includes(processedWorkflow.brand_id) : false);
+
+        const brandsResponse = await apiFetch('/api/brands?limit=all', {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        let templatesResponse: Response | null = null;
+        if (canManageWorkflowBrand) {
+          templatesResponse = await apiFetch('/api/content-templates', {
+            cache: 'no-store',
+            signal: controller.signal,
+          });
+        }
 
         const brandsData = await brandsResponse.json();
         if (!brandsResponse.ok || !brandsData?.success) {
           throw new Error(brandsData?.error || 'Failed to load brands.');
         }
-        setAllFetchedBrands(Array.isArray(brandsData.data) ? brandsData.data : []);
+        const rawBrands: BrandSummary[] = Array.isArray(brandsData.data) ? brandsData.data : [];
+        const normalizedBrands = rawBrands.map((brand) => ({
+          ...brand,
+          color: brand.color ?? brand.brand_color ?? null,
+        }));
+        setAllFetchedBrands(normalizedBrands);
 
-        const templatesData = await templatesResponse.json();
-        if (!templatesResponse.ok || !templatesData?.success) {
-          throw new Error(templatesData?.error || 'Failed to load content templates.');
+        if (templatesResponse) {
+          let templatesData: any = null;
+          try {
+            templatesData = await templatesResponse.json();
+          } catch {
+            templatesData = null;
+          }
+
+          if (templatesResponse.status === 403) {
+            // User lacks permission to list templates; keep fallback option and continue without error toast.
+            if (fallbackTemplateOption.length === 0) {
+              setContentTemplates([]);
+            }
+          } else if (!templatesResponse.ok || !templatesData?.success) {
+            throw new Error(templatesData?.error || 'Failed to load content templates.');
+          } else {
+            setContentTemplates(Array.isArray(templatesData.templates) ? templatesData.templates : []);
+          }
+        } else if (fallbackTemplateOption.length === 0) {
+          setContentTemplates([]);
         }
-        setContentTemplates(Array.isArray(templatesData.templates) ? templatesData.templates : []);
       } catch (err) {
         if (isAbortError(err)) {
           return;
@@ -286,7 +382,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
     void fetchData();
 
     return () => controller.abort();
-  }, [id, searchParams, isLoadingUser, currentUserError]);
+  }, [id, searchParams, isLoadingUser, currentUserError, currentUser]);
 
   useEffect(() => {
     if (isLoadingUser || isLoading || currentUserError) {
@@ -372,14 +468,35 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
   const isGlobalAdmin = currentUser?.user_metadata?.role === 'admin';
   const userBrandAdminPermissions = currentUser?.brand_permissions?.filter(p => p.role === 'admin').map(p => p.brand_id) || [];
   const canEditThisWorkflow = workflow && (isGlobalAdmin || (workflow.brand_id && userBrandAdminPermissions.includes(workflow.brand_id)));
+  const canEditWorkflowRef = useRef(Boolean(canEditThisWorkflow));
+
+  useEffect(() => {
+    canEditWorkflowRef.current = Boolean(canEditThisWorkflow);
+  }, [canEditThisWorkflow]);
 
   const performUserSearch = useCallback(
     async (searchTerm: string, stepIndex: number) => {
       const normalized = searchTerm.trim();
 
+      if (!canEditWorkflowRef.current) {
+        const existingController = userSearchControllers.current[stepIndex];
+        if (existingController) {
+          existingController.abort();
+          delete userSearchControllers.current[stepIndex];
+        }
+        setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
+        setUserSearchLoading(prev => ({ ...prev, [stepIndex]: false }));
+        return;
+      }
+
       if (normalized.length < 2) {
         setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
         setUserSearchLoading(prev => ({ ...prev, [stepIndex]: false }));
+        const existingController = userSearchControllers.current[stepIndex];
+        if (existingController) {
+          existingController.abort();
+          delete userSearchControllers.current[stepIndex];
+        }
         return;
       }
 
@@ -401,6 +518,9 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
           }
         );
         const data = await response.json();
+        if (!canEditWorkflowRef.current) {
+          return;
+        }
         if (data.success && Array.isArray(data.users)) {
           setUserSearchResults(prev => ({ ...prev, [stepIndex]: data.users }));
         } else {
@@ -422,6 +542,9 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         setUserSearchResults(prev => ({ ...prev, [stepIndex]: [] }));
         toast.error((error as Error).message || 'Failed to search users.');
       } finally {
+        if (userSearchControllers.current[stepIndex] === controller) {
+          delete userSearchControllers.current[stepIndex];
+        }
         setUserSearchLoading(prev => ({ ...prev, [stepIndex]: false }));
       }
     },
@@ -505,11 +628,6 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
       );
       return { ...prevWorkflow, steps: newSteps };
     });
-  };
-
-  const handleUpdateWorkflowDetails = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setWorkflow((prev: WorkflowFull | null) => prev ? ({ ...prev, [name]: value }) : null);
   };
 
   const handleUpdateWorkflowStatus = (value: string) => {
@@ -980,6 +1098,16 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
     );
   }
 
+  const contentUsageCount = workflow.content_count ?? 0;
+  const contentUsageHelperText =
+    contentUsageCount > 0
+      ? `Used by ${contentUsageCount} content item${contentUsageCount === 1 ? '' : 's'}.`
+      : 'Not used by any content.';
+  const deleteDialogDescription =
+    contentUsageCount > 0
+      ? `This workflow is used by ${contentUsageCount} content item${contentUsageCount === 1 ? '' : 's'}. Reassign those items before deleting. This action cannot be undone.`
+      : 'No content currently uses this workflow. This action cannot be undone.';
+
   return (
     <div className="space-y-6 pb-20">
       <Breadcrumbs items={[
@@ -1003,7 +1131,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         <div className="my-4">
           <ActiveBrandIndicator
             brandName={currentBrandForDisplay.name}
-            brandColor={currentBrandForDisplay.color}
+            brandColor={currentBrandForDisplay.color ?? currentBrandForDisplay.brand_color ?? undefined}
             brandLogoUrl={currentBrandForDisplay.logo_url}
           />
         </div>
@@ -1012,7 +1140,13 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
           {currentBrandForDisplay && 
-            <BrandIcon name={currentBrandForDisplay.name} color={currentBrandForDisplay.color ?? undefined} logoUrl={currentBrandForDisplay.logo_url} size="md" className="mr-1" />
+            <BrandIcon
+              name={currentBrandForDisplay.name}
+              color={currentBrandForDisplay.color ?? currentBrandForDisplay.brand_color ?? undefined}
+              logoUrl={currentBrandForDisplay.logo_url}
+              size="md"
+              className="mr-1"
+            />
           }
           <div>
             <h1 className="text-3xl font-bold tracking-tight">{isDuplicated ? 'Create New Workflow' : `Edit: ${workflow.name || 'Workflow'}`}</h1>
@@ -1023,7 +1157,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
           </div>
         </div>
         {!isDuplicated && (
-          <div className="flex space-x-2">
+          <div className="flex flex-col items-end space-y-1">
             <Button 
               variant="destructive"
               onClick={() => setShowDeleteConfirm(true)}
@@ -1036,6 +1170,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
                 <><Trash2 className="mr-2 h-4 w-4" /> Delete Workflow</>
               )}
             </Button>
+            <p className="text-xs text-muted-foreground">{contentUsageHelperText}</p>
           </div>
         )}
       </div>
@@ -1049,14 +1184,18 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="space-y-2 lg:col-span-2">
-                <Label htmlFor="name">Workflow Name</Label>
+                <Label htmlFor="name">Workflow Name (auto-generated)</Label>
                 <Input
                   id="name"
                   name="name"
                   value={workflow.name || ''}
-                  onChange={handleUpdateWorkflowDetails}
+                  readOnly
+                  placeholder="Select a brand and content template to generate the name"
                   disabled={!canEditThisWorkflow}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Updates automatically based on the selected brand and content template.
+                </p>
               </div>
               
               <div className="space-y-2">
@@ -1082,12 +1221,15 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
                   <SelectContent>
                     {brands.map((brand: BrandSummary) => (
                       <SelectItem key={brand.id} value={brand.id}>
-                        <div className="flex items-center">
-                          <div 
-                            className="w-3 h-3 rounded-full mr-2" 
-                            style={{ backgroundColor: brand.color || '#CCCCCC' }}
+                        <div className="flex items-center gap-2">
+                          <BrandIcon
+                            name={brand.name}
+                            color={brand.color ?? brand.brand_color ?? undefined}
+                            logoUrl={brand.logo_url}
+                            size="sm"
+                            className="h-6 w-6"
                           />
-                          {brand.name}
+                          <span>{brand.name}</span>
                         </div>
                       </SelectItem>
                     ))}
@@ -1348,7 +1490,7 @@ export default function WorkflowEditPage({ params, searchParams }: WorkflowEditP
         open={showDeleteConfirm}
         onOpenChange={setShowDeleteConfirm}
         title="Delete Workflow?"
-        description="Are you sure you want to delete this workflow? This action cannot be undone. Any content items using this workflow may need to be reassigned."
+        description={deleteDialogDescription}
         confirmText="Delete"
         onConfirm={handleDeleteWorkflow}
       />

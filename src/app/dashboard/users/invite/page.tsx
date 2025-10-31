@@ -110,7 +110,7 @@ export default function InviteUserPage() {
     const fetchBrands = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch('/api/brands');
+        const response = await fetch('/api/brands?limit=all');
         const data = await response.json();
         
         if (data.success) {
