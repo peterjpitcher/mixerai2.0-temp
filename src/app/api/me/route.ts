@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'; // Use serve
 import { handleApiError } from '@/lib/api-utils';
 import { withRouteAuth } from '@/lib/auth/route-handlers';
 import { User } from '@supabase/supabase-js';
+import { isRecursivePolicyError } from '@/lib/api/rls-helpers';
 
 export const dynamic = "force-dynamic"; // Ensure fresh data on every request
 
@@ -64,18 +65,27 @@ export const GET = withRouteAuth(async (request: NextRequest, authUser: User) =>
       `)
       .eq('user_id', authUser.id);
 
-    if (permissionsError) {
-      console.error('[API /me] Error fetching brand permissions:', permissionsError);
-      // Decide if this is critical. For navigation, it might be.
-      throw permissionsError; 
-    }
+    let typedBrandPermissions: UserProfileResponse['brand_permissions'] = [];
 
-    // Ensure brand_permissions are correctly typed and filter out any with null brand_id if necessary
-    const typedBrandPermissions = (rawBrandPermissions || []).map((p) => ({
+    if (permissionsError) {
+      if (isRecursivePolicyError(permissionsError)) {
+        console.warn('[API /me] Recursive policy detected when fetching brand permissions. Returning empty set fallback.', {
+          userId: authUser.id,
+          error: permissionsError,
+        });
+        typedBrandPermissions = [];
+      } else {
+        console.error('[API /me] Error fetching brand permissions:', permissionsError);
+        throw permissionsError; 
+      }
+    } else {
+      // Ensure brand_permissions are correctly typed and filter out any with null brand_id if necessary
+      typedBrandPermissions = (rawBrandPermissions || []).map((p) => ({
         ...p,
         brand_id: p.brand_id as string, // Asserting brand_id is a string, as it's a FK
         brand: p.brand as unknown as { id: string; name: string; master_claim_brand_id?: string | null; } | null // Explicitly type the joined brand
-    })).filter((p) => p.brand_id != null) as UserProfileResponse['brand_permissions'];
+      })).filter((p) => p.brand_id != null) as UserProfileResponse['brand_permissions'];
+    }
 
     // Combine all data into the final user object
     const finalUserResponse: UserProfileResponse = {
@@ -89,7 +99,13 @@ export const GET = withRouteAuth(async (request: NextRequest, authUser: User) =>
       avatar_url: userProfileDataFromDb?.avatar_url || authUser.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUser.id}`,
     };
 
-    return NextResponse.json({ success: true, user: finalUserResponse });
+    return NextResponse.json({
+      success: true,
+      user: finalUserResponse,
+      meta: {
+        brandPermissionsFallback: permissionsError ? isRecursivePolicyError(permissionsError) : false,
+      },
+    });
 
   } catch (error) {
     return handleApiError(error, 'Error fetching user session information');

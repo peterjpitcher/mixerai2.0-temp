@@ -7,13 +7,23 @@ import Image from 'next/image';
 import { notFound, usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { MarkdownDisplay } from '@/components/content/markdown-display';
 import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
 import { VettingAgencyFeedbackCard } from '@/components/content/vetting-agency-feedback-card';
 import { toast } from 'sonner';
 import { PageHeader } from "@/components/dashboard/page-header";
 import { BrandIcon,  } from '@/components/brand-icon';
-import { ArrowLeft, Edit3, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Edit3, CheckCircle, Trash2 } from 'lucide-react';
 import { RestartWorkflowButton } from '@/components/content/restart-workflow-button';
 import { RejectionFeedbackCard } from '@/components/content/rejection-feedback-card';
 import { format as formatDateFns } from 'date-fns';
@@ -135,11 +145,134 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [activeBrandData, setActiveBrandData] = useState<BrandData | null>(null);
   const [template, setTemplate] = useState<Template | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { data: currentUser } = useCurrentUser();
   const currentUserId = currentUser?.id ?? null;
+  const userCanDelete = useMemo(() => {
+    if (!currentUser) return false;
+    const globalRole = currentUser.user_metadata?.role?.toLowerCase();
+    if (globalRole === 'admin') {
+      return true;
+    }
+    const brandId = content?.brand_id ?? null;
+    if (brandId && Array.isArray(currentUser.brand_permissions)) {
+      return currentUser.brand_permissions.some(
+        (permission) =>
+          permission.brand_id === brandId && permission.role.toLowerCase() === 'admin'
+      );
+    }
+    return false;
+  }, [content?.brand_id, currentUser]);
 
+  const resolveBrandAndTemplate = useCallback(
+    async (contentData: ContentData, signal?: AbortSignal) => {
+      const aborted = () => signal?.aborted;
+
+      const loadBrand = async () => {
+        if (contentData.brands) {
+          if (!aborted()) {
+            setActiveBrandData(contentData.brands as BrandData);
+          }
+          return;
+        }
+
+        if (!contentData.brand_id) {
+          if (!aborted()) {
+            setActiveBrandData(null);
+          }
+          return;
+        }
+
+        try {
+          const brandRes = await apiFetch(`/api/brands/${contentData.brand_id}`, { signal });
+          if (aborted()) return;
+
+          if (brandRes.ok) {
+            const brandJson = await brandRes.json();
+            setActiveBrandData(brandJson.success ? brandJson.brand ?? null : null);
+          } else {
+            setActiveBrandData(null);
+          }
+        } catch (brandError) {
+          if (!aborted()) {
+            console.warn('Error fetching brand data:', brandError);
+            setActiveBrandData(null);
+          }
+        }
+      };
+
+      const loadTemplate = async (): Promise<boolean> => {
+        if (contentData.content_templates) {
+          if (!aborted()) {
+            setTemplate(contentData.content_templates as Template);
+          }
+          return true;
+        }
+
+        if (!contentData.template_id) {
+          if (!aborted()) {
+            setTemplate(null);
+          }
+          return false;
+        }
+
+        try {
+          const templateRes = await apiFetch(`/api/content-templates/${contentData.template_id}`, { signal });
+          if (aborted()) {
+            return false;
+          }
+
+          if (templateRes.ok) {
+            const templateJson = await templateRes.json();
+            if (templateJson.success && templateJson.template) {
+              const apiTemplateData = templateJson.template;
+              const normalizedTemplate: Template = {
+                id: apiTemplateData.id,
+                name: apiTemplateData.name,
+                description: apiTemplateData.description,
+                fields: {
+                  inputFields: apiTemplateData.inputFields || [],
+                  outputFields: apiTemplateData.outputFields || [],
+                },
+              };
+              setTemplate(normalizedTemplate);
+              return true;
+            }
+          } else {
+            const errorPayload = await templateRes.json().catch(() => ({}));
+            toast.error(errorPayload.error || 'Could not load content template structure.');
+          }
+        } catch (templateError) {
+          if (!aborted()) {
+            console.error('Error fetching template:', templateError);
+            toast.error('Error loading content template structure.');
+          }
+        }
+
+        if (!aborted()) {
+          setTemplate(null);
+        }
+        return false;
+      };
+
+      const [, templateResolved] = await Promise.all([loadBrand(), loadTemplate()]);
+
+      if (
+        !templateResolved &&
+        !contentData.template_id &&
+        !contentData.content_templates &&
+        !aborted()
+      ) {
+        toast.message(
+          'Content does not have an associated template. Field names may not display correctly in history.'
+        );
+      }
+    },
+    [setActiveBrandData, setTemplate]
+  );
   useEffect(() => {
     const mainEl = document.querySelector<HTMLElement>('[data-dashboard-main]');
     if (!mainEl) return;
@@ -177,75 +310,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
 
         setContent(contentResult.data);
         setVersions(contentResult.data.versions || []);
-
-        if (contentResult.data.brand_id) {
-          try {
-            const brandRes = await apiFetch(`/api/brands/${contentResult.data.brand_id}`, {
-              signal: abortController.signal,
-            });
-            if (brandRes.ok) {
-              const brandJson = await brandRes.json();
-              if (!abortController.signal.aborted) {
-                setActiveBrandData(brandJson.success ? brandJson.brand ?? null : null);
-              }
-            } else if (!abortController.signal.aborted) {
-              setActiveBrandData(null);
-            }
-          } catch (brandError) {
-            if (!abortController.signal.aborted) {
-              console.warn('Error fetching brand data:', brandError);
-              setActiveBrandData(null);
-            }
-          }
-        } else if (contentResult.data.brands) {
-          setActiveBrandData(contentResult.data.brands as BrandData);
-        } else {
-          setActiveBrandData(null);
-        }
-
-        let templateResolved = false;
-
-        if (contentResult.data.template_id) {
-          try {
-            const templateRes = await apiFetch(`/api/content-templates/${contentResult.data.template_id}`, {
-              signal: abortController.signal,
-            });
-            if (templateRes.ok) {
-              const templateJson = await templateRes.json();
-              if (templateJson.success && templateJson.template && !abortController.signal.aborted) {
-                const apiTemplateData = templateJson.template;
-                const normalizedTemplate: Template = {
-                  id: apiTemplateData.id,
-                  name: apiTemplateData.name,
-                  description: apiTemplateData.description,
-                  fields: {
-                    inputFields: apiTemplateData.inputFields || [],
-                    outputFields: apiTemplateData.outputFields || [],
-                  },
-                };
-                setTemplate(normalizedTemplate);
-                templateResolved = true;
-              }
-            } else if (!abortController.signal.aborted) {
-              const errorPayload = await templateRes.json().catch(() => ({}));
-              toast.error(errorPayload.error || 'Could not load content template structure.');
-              setTemplate(null);
-            }
-          } catch (templateError) {
-            if (!abortController.signal.aborted) {
-              console.error('Error fetching template:', templateError);
-              toast.error('Error loading content template structure.');
-              setTemplate(null);
-            }
-          }
-        } else if (contentResult.data.content_templates) {
-          setTemplate(contentResult.data.content_templates);
-          templateResolved = true;
-        }
-
-        if (!templateResolved && !contentResult.data.template_id && !contentResult.data.content_templates) {
-          toast.message('Content does not have an associated template. Field names may not display correctly in history.');
-        }
+        await resolveBrandAndTemplate(contentResult.data, abortController.signal);
       } catch (error: unknown) {
         if (abortController.signal.aborted) return;
         console.error('Error fetching page data:', error);
@@ -262,7 +327,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     }
 
     return () => abortController.abort();
-  }, [id]);
+  }, [id, resolveBrandAndTemplate]);
 
   const outputFieldIdToNameMap = useMemo(() => {
     if (!template || !template.fields || !template.fields.outputFields) {
@@ -313,6 +378,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
           setContent(contentResult.data);
           const refreshedVersions = contentResult.data.versions || [];
           setVersions(refreshedVersions);
+          await resolveBrandAndTemplate(contentResult.data);
         } else {
           throw new Error(contentResult.error || 'Failed to load content data.');
         }
@@ -326,7 +392,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     };
     fetchData();
     router.refresh();
-  }, [id, router]);
+  }, [id, resolveBrandAndTemplate, router]);
 
   if (isLoading || !currentUserId) {
     return (
@@ -387,13 +453,63 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
     { label: content.title || 'Details' }
   ];
 
+  const handleDeleteRequest = () => {
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!content) return;
+    setIsDeleting(true);
+    try {
+      const response = await apiFetch(`/api/content/${content.id}`, { method: 'DELETE' });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok && payload.success) {
+        toast.success(`Content "${content.title}" deleted.`);
+        setShowDeleteDialog(false);
+        router.replace('/dashboard/content');
+        router.refresh();
+      } else {
+        throw new Error(payload.error || 'Failed to delete content.');
+      }
+    } catch (error) {
+      console.error('Error deleting content:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to delete content.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    if (!isDeleting) {
+      setShowDeleteDialog(false);
+    }
+  };
+
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && isDeleting) {
+      return;
+    }
+    setShowDeleteDialog(nextOpen);
+  };
+
+  const deleteButton = userCanDelete ? (
+    <Button
+      variant="destructive"
+      onClick={handleDeleteRequest}
+      disabled={isDeleting}
+    >
+      <Trash2 className="mr-2 h-4 w-4" /> {isDeleting ? 'Deleting…' : 'Delete'}
+    </Button>
+  ) : null;
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6">
-      <div className="shrink-0 space-y-6">
-        <Breadcrumbs items={breadcrumbItems} />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex items-center gap-3">
-            {brandIcon ? (
+    <>
+      <div className="flex min-h-0 flex-1 flex-col gap-6">
+        <div className="shrink-0 space-y-6">
+          <Breadcrumbs items={breadcrumbItems} />
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-center gap-3">
+              {brandIcon ? (
               <Image src={brandIcon} alt={`${brandName} logo`} width={40} height={40} className="h-10 w-10 rounded-full object-cover" />
             ) : (
               <BrandIcon name={brandName} color={brandColor} size="md" />
@@ -409,7 +525,7 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
           </div>
           <div className="flex-shrink-0">
             {content.status === 'rejected' ? (
-              <div className="flex gap-2">
+              <div className="flex flex-wrap justify-end gap-2">
                 <Button asChild variant="default">
                   <Link href={`${pathname}/edit`}>
                     <Edit3 className="mr-2 h-4 w-4" /> Edit Content
@@ -421,17 +537,24 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
                   onRestart={refreshContentData}
                   variant="outline"
                 />
+                {deleteButton}
               </div>
             ) : content.status !== 'approved' && content.status !== 'published' ? (
-              <Button asChild variant="default">
-                <Link href={`${pathname}/edit`}>
-                  <Edit3 className="mr-2 h-4 w-4" /> Edit Content
-                </Link>
-              </Button>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button asChild variant="default">
+                  <Link href={`${pathname}/edit`}>
+                    <Edit3 className="mr-2 h-4 w-4" /> Edit Content
+                  </Link>
+                </Button>
+                {deleteButton}
+              </div>
             ) : (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <span>Content is {content.status}</span>
+              <div className="flex flex-col items-end gap-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span>Content is {content.status}</span>
+                </div>
+                {deleteButton}
               </div>
             )}
           </div>
@@ -549,5 +672,28 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
         </aside>
       </div>
     </div>
+      <AlertDialog open={showDeleteDialog} onOpenChange={handleDialogOpenChange}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this content?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The content and its workflow history will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleDeleteCancel} disabled={isDeleting}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting…' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

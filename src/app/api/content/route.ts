@@ -52,17 +52,14 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       }
 
       if (!permissionsData || permissionsData.length === 0) {
-        console.log('[API Content GET] Non-admin user has no brand permissions in user_brand_permissions table. Returning empty array.');
         return NextResponse.json({ success: true, data: [] });
       }
       
       permittedBrandIds = permissionsData.map(p => p.brand_id).filter(id => id != null);
       
       if (permittedBrandIds.length === 0) {
-        console.log('[API Content GET] Non-admin user has no valid brand IDs after fetching permissions. Returning empty array.');
         return NextResponse.json({ success: true, data: [] });
       }
-      console.log(`[API Content GET] User ${user.id} (role: ${globalRole}) has permitted brand IDs: ${permittedBrandIds.join(', ')}`);
     }
 
     let queryBuilder = supabase
@@ -85,18 +82,15 @@ export const GET = withAuth(async (request: NextRequest, user) => {
 
     if (requestedBrandId) {
       if (globalRole !== 'admin' && permittedBrandIds && !permittedBrandIds.includes(requestedBrandId)) {
-        console.log(`[API Content GET] Non-admin user access denied for requested brandId: ${requestedBrandId}`);
-        return NextResponse.json({ success: true, data: [] }); // Or return 403 error
+        return NextResponse.json(
+          { success: false, error: 'You do not have permission to view content for the selected brand.' },
+          { status: 403 }
+        );
       }
-      console.log(`[API Content GET] Filtering by requested brandId: ${requestedBrandId}`);
       queryBuilder = queryBuilder.eq('brand_id', requestedBrandId);
     } else if (globalRole !== 'admin' && permittedBrandIds) {
       // If no specific brand requested, and user is not admin, filter by their permitted brands
-      console.log(`[API Content GET] Non-admin user. Filtering content by permitted brand IDs: ${permittedBrandIds.join(', ')}`);
       queryBuilder = queryBuilder.in('brand_id', permittedBrandIds);
-    } else if (globalRole === 'admin') {
-      console.log('[API Content GET] Admin user. Fetching all content (or specific brand if requestedBrandId set).');
-      // Admins can see all, or specific if requestedBrandId is set (handled by the first if block)
     }
 
     // Status filtering logic

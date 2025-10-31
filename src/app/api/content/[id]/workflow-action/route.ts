@@ -15,6 +15,29 @@ interface WorkflowActionRequest {
   publishedUrl?: string;
 }
 
+type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
+
+async function enqueueWorkflowNotificationSafely(
+  supabaseClient: SupabaseAdminClient,
+  payload: {
+    p_content_id: string;
+    p_workflow_id: string;
+    p_step_id: string;
+    p_recipient_id: string;
+    p_action: string;
+    p_content_title: string;
+    p_brand_name: string;
+    p_step_name: string;
+    p_comment?: string;
+  },
+  context: string
+) {
+  const { error } = await supabaseClient.rpc('enqueue_workflow_notification', payload);
+  if (error) {
+    console.error(`Failed to enqueue workflow notification (${context}):`, error);
+  }
+}
+
 
 export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, context?: unknown): Promise<Response> => {
   const { params } = context as { params: { id: string } };
@@ -224,22 +247,27 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
         .eq('id', contentId)
         .single();
       
-      if (contentData && currentContent.assigned_to && currentContent.assigned_to.length > 0) {
-        // Notify the content creator about rejection
-        // TODO: Uncomment after migration is applied
-        /* for (const userId of currentContent.assigned_to) {
-          await supabase.rpc('enqueue_workflow_notification', {
-            p_content_id: contentId,
-            p_workflow_id: currentContent.workflow_id,
-            p_step_id: currentContent.current_step,
-            p_recipient_id: userId,
-            p_action: 'rejected',
-            p_content_title: contentData.title || 'Content',
-            p_brand_name: (contentData.brands as any)?.name || 'Brand',
-            p_step_name: currentDbStep.name,
-            p_comment: feedback
-          });
-        } */
+      if (contentData && Array.isArray(currentContent.assigned_to) && currentContent.assigned_to.length > 0) {
+        const brandName = (contentData.brands as { name?: string } | null)?.name ?? 'Brand';
+        await Promise.all(
+          currentContent.assigned_to.map((userId: string) =>
+            enqueueWorkflowNotificationSafely(
+              supabase,
+              {
+                p_content_id: contentId,
+                p_workflow_id: currentContent.workflow_id ?? '',
+                p_step_id: currentDbStep.id ?? '',
+                p_recipient_id: userId,
+                p_action: 'rejected',
+                p_content_title: contentData.title || 'Content',
+                p_brand_name: brandName,
+                p_step_name: currentDbStep.name ?? 'Workflow Step',
+                p_comment: feedback ?? undefined,
+              },
+              'rejection'
+            )
+          )
+        );
       }
       
       // Create a version record for the rejection
@@ -265,7 +293,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
       // For approval: move to next step or mark as approved
       const { data: nextDbStep, error: nextStepError } = await supabase
         .from('workflow_steps')
-        .select('id, assigned_user_ids, step_order')
+        .select('id, name, assigned_user_ids, step_order')
         .eq('workflow_id', currentContent.workflow_id)
         .gt('step_order', currentDbStep.step_order)
         .order('step_order', { ascending: true })
@@ -324,27 +352,28 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
           .eq('id', contentId)
           .single();
         
-        if (contentData && nextDbStep.assigned_user_ids && nextDbStep.assigned_user_ids.length > 0) {
-          await supabase
-            .from('workflow_steps')
-            .select('name')
-            .eq('id', nextDbStep.id)
-            .single();
-            
-          // TODO: Uncomment after migration is applied
-          /* for (const userId of nextDbStep.assigned_user_ids) {
-            await supabase.rpc('enqueue_workflow_notification', {
-              p_content_id: contentId,
-              p_workflow_id: currentContent.workflow_id,
-              p_step_id: nextDbStep.id,
-              p_recipient_id: userId,
-              p_action: 'review_required',
-              p_content_title: contentData.title || 'Content',
-              p_brand_name: (contentData.brands as any)?.name || 'Brand',
-              p_step_name: nextStepData?.name || 'Review',
-              p_comment: feedback
-            });
-          } */
+        if (contentData && Array.isArray(nextDbStep.assigned_user_ids) && nextDbStep.assigned_user_ids.length > 0) {
+          const brandName = (contentData.brands as { name?: string } | null)?.name ?? 'Brand';
+          const stepName = nextDbStep.name ?? 'Review';
+          await Promise.all(
+            nextDbStep.assigned_user_ids.map((userId: string) =>
+              enqueueWorkflowNotificationSafely(
+                supabase,
+                {
+                  p_content_id: contentId,
+                  p_workflow_id: currentContent.workflow_id ?? '',
+                  p_step_id: nextDbStep.id ?? '',
+                  p_recipient_id: userId,
+                  p_action: 'review_required',
+                  p_content_title: contentData.title || 'Content',
+                  p_brand_name: brandName,
+                  p_step_name: stepName,
+                  p_comment: feedback ?? undefined,
+                },
+                'next-step-assignment'
+              )
+            )
+          );
         }
         
       } else {
@@ -389,18 +418,22 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
           .single();
         
         if (contentData && contentData.created_by) {
-          // TODO: Uncomment after migration is applied
-          /* await supabase.rpc('enqueue_workflow_notification', {
-            p_content_id: contentId,
-            p_workflow_id: currentContent.workflow_id,
-            p_step_id: currentDbStep.id,
-            p_recipient_id: contentData.created_by,
-            p_action: 'approved',
-            p_content_title: contentData.title || 'Content',
-            p_brand_name: (contentData.brands as any)?.name || 'Brand',
-            p_step_name: 'Final Approval',
-            p_comment: feedback
-          }); */
+          const brandName = (contentData.brands as { name?: string } | null)?.name ?? 'Brand';
+          await enqueueWorkflowNotificationSafely(
+            supabase,
+            {
+              p_content_id: contentId,
+              p_workflow_id: currentContent.workflow_id ?? '',
+              p_step_id: currentDbStep.id ?? '',
+              p_recipient_id: contentData.created_by,
+              p_action: 'approved',
+              p_content_title: contentData.title || 'Content',
+              p_brand_name: brandName,
+              p_step_name: 'Final Approval',
+              p_comment: feedback ?? undefined,
+            },
+            'final-approval'
+          );
         }
       }
       

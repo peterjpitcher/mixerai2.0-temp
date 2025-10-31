@@ -570,7 +570,7 @@ export function FieldDesigner({
         (updatedField as InputField).aiSuggester = value as boolean;
       } else if (fieldType === 'output') {
         if (feature === 'aiAutoComplete') {
-          (updatedField as OutputField).aiAutoComplete = true;
+          (updatedField as OutputField).aiAutoComplete = value as boolean;
         } else if (feature === 'useBrandIdentity' || feature === 'useToneOfVoice' || feature === 'useGuardrails') {
           if (feature in updatedField) {
             (updatedField as OutputField)[feature as 'useBrandIdentity' | 'useToneOfVoice' | 'useGuardrails'] = value as boolean;

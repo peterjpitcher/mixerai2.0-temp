@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { withAuthAndCSRF } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
-import { buildPreferences, mapProfileToSettings, NotificationSettingsSchema } from './helpers';
+import {
+  buildPreferences,
+  mapProfileToSettings,
+  NotificationSettingsSchema,
+  evaluateIfMatchHeader,
+} from './helpers';
 
 type ProfileSettingsRow = {
   email_notifications_enabled: boolean | null;
@@ -66,26 +71,14 @@ export const POST = withAuthAndCSRF(async function (request: NextRequest, user: 
     const body = parseResult.data;
 
     const ifMatch = request.headers.get('if-match');
-    if (!ifMatch) {
-      return NextResponse.json(
-        { success: false, error: 'Missing If-Match header for concurrency control.' },
-        { status: 428 }
-      );
-    }
-
     const profile = await fetchProfile(supabase, user.id);
     const currentVersion = profile ? Number(profile.notification_settings_version ?? 0) : 0;
-    const ifMatchVersion = (() => {
-      if (ifMatch === '*') return currentVersion;
-      if (ifMatch === 'null') return 0;
-      const parsed = Number(ifMatch);
-      return Number.isFinite(parsed) ? parsed : NaN;
-    })();
+    const versionCheck = evaluateIfMatchHeader(ifMatch, currentVersion);
 
-    if (!Number.isFinite(ifMatchVersion) || (ifMatch !== '*' && ifMatchVersion !== currentVersion)) {
+    if (!versionCheck.ok) {
       return NextResponse.json(
-        { success: false, error: 'Notification settings have been modified by another session.' },
-        { status: 412 }
+        { success: false, error: versionCheck.error },
+        { status: versionCheck.status }
       );
     }
 
@@ -167,26 +160,14 @@ export const PATCH = withAuthAndCSRF(async function (request: NextRequest, user:
     const body = parseResult.data;
 
     const ifMatch = request.headers.get('if-match');
-    if (!ifMatch) {
-      return NextResponse.json(
-        { success: false, error: 'Missing If-Match header for concurrency control.' },
-        { status: 428 }
-      );
-    }
-
     const profile = await fetchProfile(supabase, user.id);
     const currentVersion = profile ? Number(profile.notification_settings_version ?? 0) : 0;
-    const ifMatchVersion = (() => {
-      if (ifMatch === '*') return currentVersion;
-      if (ifMatch === 'null') return 0;
-      const parsed = Number(ifMatch);
-      return Number.isFinite(parsed) ? parsed : NaN;
-    })();
+    const versionCheck = evaluateIfMatchHeader(ifMatch, currentVersion);
 
-    if (!Number.isFinite(ifMatchVersion) || (ifMatch !== '*' && ifMatchVersion !== currentVersion)) {
+    if (!versionCheck.ok) {
       return NextResponse.json(
-        { success: false, error: 'Notification settings have been modified by another session.' },
-        { status: 412 }
+        { success: false, error: versionCheck.error },
+        { status: versionCheck.status }
       );
     }
 

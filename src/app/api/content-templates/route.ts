@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { validateRequest, commonSchemas } from '@/lib/api/validation';
 import { InputFieldSchema, OutputFieldSchema, TemplateFieldsSchema } from '@/lib/schemas/template';
 import type { Json } from '@/types/supabase';
+import { isSystemTemplateId } from '@/lib/templates/system-templates';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -182,6 +183,10 @@ export const GET = withAuth(async (request: NextRequest, user: AuthenticatedUser
     const userRole = user.user_metadata?.role;
     const isAdmin = userRole === 'admin';
 
+    const url = new URL(request.url);
+    const id = url.searchParams.get('id');
+    const includeFields = url.searchParams.get('includeFields') === 'true';
+
     // Role check: Allow Admins (Platform/Scoped) and Editors to list/view content templates
     if (!(isAdmin || userRole === 'editor')) {
       return NextResponse.json(
@@ -190,8 +195,6 @@ export const GET = withAuth(async (request: NextRequest, user: AuthenticatedUser
       );
     }
 
-    const url = new URL(request.url);
-    const id = url.searchParams.get('id');
     const supabase = createSupabaseAdminClient();
     
     // If ID is provided, fetch a single template
@@ -255,7 +258,10 @@ export const GET = withAuth(async (request: NextRequest, user: AuthenticatedUser
     const { data: templatesData, error } = await query;
     
     if (error) {
-      console.error('Error fetching templates:', error);
+      console.error('[content-templates][GET] Failed to fetch templates', {
+        message: error.message,
+        code: error.code,
+      });
       throw error;
     }
 
@@ -285,11 +291,21 @@ export const GET = withAuth(async (request: NextRequest, user: AuthenticatedUser
         : { inputFields: [], outputFields: [] };
 
       const usageCount = Array.isArray(rawCount) && rawCount.length > 0 ? rawCount[0]?.count ?? 0 : 0;
-      return {
+      const baseTemplate = {
         ...rest,
-        fields: normalizedFields,
         usageCount,
+        inputFieldsCount: normalizedFields.inputFields.length,
+        outputFieldsCount: normalizedFields.outputFields.length,
       };
+
+      if (includeFields) {
+        return {
+          ...baseTemplate,
+          fields: normalizedFields,
+        };
+      }
+
+      return baseTemplate;
     });
 
     return NextResponse.json({ 
@@ -419,10 +435,29 @@ export const DELETE = withAuthAndCSRF(async (request: NextRequest, user: Authent
         { status: 400 }
       );
     }
+
+    if (isSystemTemplateId(id)) {
+      return NextResponse.json(
+        { success: false, error: 'System templates cannot be deleted.' },
+        { status: 403 }
+      );
+    }
     
     // Optional: Check if template exists before attempting to delete
     // This is good practice but adds an extra DB call.
     // For now, we'll rely on the delete operation itself.
+
+    const { count: usageCount } = await supabase
+      .from('content')
+      .select('id', { count: 'exact', head: true })
+      .eq('template_id', id);
+
+    if ((usageCount ?? 0) > 0) {
+      return NextResponse.json(
+        { success: false, error: 'Cannot delete template that is currently in use.' },
+        { status: 400 }
+      );
+    }
 
     const { error: deleteError } = await supabase
       .from('content_templates')

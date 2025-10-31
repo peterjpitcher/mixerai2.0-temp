@@ -5,6 +5,9 @@ import { withAuth } from '@/lib/auth/api-auth';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 import { isBrandAdmin } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
+import { validateRequest } from '@/lib/api/validation';
+import { updateBrandSchema, type UpdateBrandSchema } from '../update-brand-schema';
+import { formatGuardrailsInput } from '../create-brand-schema';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -128,34 +131,57 @@ const putHandlerCore = async (
       }
     }
 
-    const body = await request.json();
-    // Process brand update request
-    
-    if (!body.name || body.name.trim() === '') {
+    const validation = await validateRequest(request, updateBrandSchema);
+    if (!validation.success) {
+      return validation.response;
+    }
+
+    const body = validation.data as UpdateBrandSchema;
+    const trimmedName = body.name?.trim() ?? '';
+    if (!trimmedName) {
       return NextResponse.json(
         { success: false, error: 'Brand name is required' },
         { status: 400 }
       );
     }
+
+    const formattedGuardrails = formatGuardrailsInput(body.guardrails);
+    const normalizedCountry = body.country?.trim() || null;
+    const normalizedLanguage = body.language?.trim() || null;
+
+    const uniqueAdditionalUrls = Array.isArray(body.additional_website_urls)
+      ? Array.from(new Set(body.additional_website_urls))
+      : null;
+    const normalizedAdditionalUrls =
+      uniqueAdditionalUrls && uniqueAdditionalUrls.length > 0 ? uniqueAdditionalUrls : null;
+
+    const selectedAgencyIds = Array.from(
+      new Set(Array.isArray(body.selected_agency_ids) ? body.selected_agency_ids : []),
+    );
+    const newCustomAgencyNames = Array.isArray(body.new_custom_agency_names)
+      ? body.new_custom_agency_names
+      : [];
+    const masterClaimBrandIds = Array.isArray(body.master_claim_brand_ids)
+      ? Array.from(new Set(body.master_claim_brand_ids))
+      : [];
     
     // Update brand directly without RPC
     const brandUpdateData: Record<string, unknown> = {
-      name: body.name,
+      name: trimmedName,
       website_url: body.website_url || null,
-      additional_website_urls: Array.isArray(body.additional_website_urls) 
-        ? body.additional_website_urls.filter((url: unknown) => typeof url === 'string') 
-        : [],
-      country: body.country || null,
-      language: body.language || null,
+      additional_website_urls: normalizedAdditionalUrls,
+      country: normalizedCountry,
+      language: normalizedLanguage,
       brand_identity: body.brand_identity || null,
       tone_of_voice: body.tone_of_voice || null,
-      guardrails: body.guardrails || null,
+      guardrails: formattedGuardrails,
       brand_color: body.brand_color || '#1982C4',
-      master_claim_brand_id: body.master_claim_brand_id === "@none@" || body.master_claim_brand_id === "" ? null : body.master_claim_brand_id,
+      master_claim_brand_id: body.master_claim_brand_id || null,
       logo_url: body.logo_url || null,
       updated_at: new Date().toISOString()
     };
-
+    
+    // Update brand directly without RPC
     const { data: updatedBrandData, error: updateError } = await supabase
       .from('brands')
       .update(brandUpdateData)
@@ -188,10 +214,10 @@ const putHandlerCore = async (
       }
 
       // Insert new agency associations if provided
-      if (Array.isArray(body.selected_agency_ids) && body.selected_agency_ids.length > 0) {
-        const agencyAssociations = body.selected_agency_ids.map((agency_id: string) => ({
+      if (selectedAgencyIds.length > 0) {
+        const agencyAssociations = selectedAgencyIds.map((agencyId) => ({
           brand_id: brandIdToUpdate,
-          agency_id: agency_id
+          agency_id: agencyId
         }));
 
         const { error: insertAgenciesError } = await supabase
@@ -204,29 +230,43 @@ const putHandlerCore = async (
       }
 
       // Handle custom agencies if provided  
-      if (Array.isArray(body.new_custom_agency_names) && body.new_custom_agency_names.length > 0) {
-        for (const agencyName of body.new_custom_agency_names) {
+      if (newCustomAgencyNames.length > 0) {
+        for (const agencyName of newCustomAgencyNames) {
           if (typeof agencyName === 'string' && agencyName.trim()) {
+            if (!normalizedCountry) {
+              console.warn('[API Brands PUT] Skipping custom agency setup due to missing country context.', {
+                brandId: brandIdToUpdate,
+                agencyName,
+              });
+              continue;
+            }
+
             // Check if agency already exists
-            const { data: existingAgency } = await supabase
+            let existingAgencyQuery = supabase
               .from('content_vetting_agencies')
               .select('id')
-              .eq('name', agencyName.trim())
-              .eq('country_code', body.country || null)
-              .single();
+              .eq('name', agencyName.trim());
+
+            if (normalizedCountry) {
+              existingAgencyQuery = existingAgencyQuery.eq('country_code', normalizedCountry);
+            }
+
+            const { data: existingAgency } = await existingAgencyQuery.single();
 
             let agencyId: string;
             if (existingAgency) {
               agencyId = existingAgency.id;
             } else {
               // Create new agency
+              const newAgencyPayload = {
+                name: agencyName.trim(),
+                country_code: normalizedCountry,
+                created_by: authenticatedUser.id,
+              };
+
               const { data: newAgency, error: createAgencyError } = await supabase
                 .from('content_vetting_agencies')
-                .insert({
-                  name: agencyName.trim(),
-                  country_code: body.country || null,
-                  created_by: authenticatedUser.id
-                })
+                .insert(newAgencyPayload)
                 .select('id')
                 .single();
 
@@ -254,7 +294,7 @@ const putHandlerCore = async (
     }
 
     // Handle master_claim_brand_ids array if provided using the new junction table
-    if (body.master_claim_brand_ids !== undefined && Array.isArray(body.master_claim_brand_ids)) {
+    if (Array.isArray(body.master_claim_brand_ids)) {
       // First, delete all existing links for this brand
       const { error: deleteError } = await supabase
         .from('brand_master_claim_brands')
@@ -266,8 +306,8 @@ const putHandlerCore = async (
       }
       
       // Then, insert new links
-      if (body.master_claim_brand_ids.length > 0) {
-        const newLinks = body.master_claim_brand_ids.map((masterClaimBrandId: string) => ({
+      if (masterClaimBrandIds.length > 0) {
+        const newLinks = masterClaimBrandIds.map((masterClaimBrandId) => ({
           brand_id: brandIdToUpdate,
           master_claim_brand_id: masterClaimBrandId,
           created_by: authenticatedUser.id

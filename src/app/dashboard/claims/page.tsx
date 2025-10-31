@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PRODUCT_CLAIMS_DEPRECATION_MESSAGE } from '@/lib/constants/claims';
+import { logError } from '@/lib/logger';
 
 // Types from API definitions
 type ClaimTypeEnum = 'allowed' | 'disallowed';
@@ -289,9 +290,24 @@ export default function ClaimsPage() {
 
         if (!claimsRes.ok || !claimsData.success) throw new Error(claimsData.error || 'Failed to fetch claims');
         // Non-critical, allow page to load if these fail but log error
-        if (!brandsRes.ok || !brandsData.success) console.error(brandsData.error || 'Failed to fetch brands');
-        if (!productsRes.ok || !productsData.success) console.error(productsData.error || 'Failed to fetch products');
-        if (!ingredientsRes.ok || !ingredientsData.success) console.error(ingredientsData.error || 'Failed to fetch ingredients');
+        if (!brandsRes.ok || !brandsData.success) {
+          logError('[ClaimsPage] Failed to fetch brands metadata', {
+            status: brandsRes.status,
+            ok: brandsRes.ok,
+          });
+        }
+        if (!productsRes.ok || !productsData.success) {
+          logError('[ClaimsPage] Failed to fetch products metadata', {
+            status: productsRes.status,
+            ok: productsRes.ok,
+          });
+        }
+        if (!ingredientsRes.ok || !ingredientsData.success) {
+          logError('[ClaimsPage] Failed to fetch ingredients metadata', {
+            status: ingredientsRes.status,
+            ok: ingredientsRes.ok,
+          });
+        }
 
         const fetchedBrands: MasterClaimBrand[] = brandsData.success ? brandsData.data : [];
         const fetchedProducts: Product[] = productsData.success ? productsData.data : [];
@@ -348,7 +364,9 @@ export default function ClaimsPage() {
 
       } catch (err) {
         const errorMessage = (err as Error).message || 'An unexpected error occurred';
-        console.error('Error fetching data for claims page:', errorMessage);
+        logError('[ClaimsPage] Failed to load claims list', {
+          message: errorMessage,
+        });
         setError(errorMessage);
         toast.error("Failed to load Claims data.", { description: errorMessage });
       } finally {
@@ -374,7 +392,7 @@ export default function ClaimsPage() {
       }
     } catch (err) {
       const errorMessage = (err as Error).message || 'An unexpected error occurred';
-      console.error('Error deleting Claim:', errorMessage);
+      logError('[ClaimsPage] Failed to delete claim', { claimId: itemToDelete.id, message: errorMessage });
       toast.error("Failed to delete Claim.", { description: errorMessage });
     } finally {
       setIsDeleting(false);

@@ -7,6 +7,7 @@ import type { InputField, OutputField } from '@/types/template'; // Import field
 import { User } from '@supabase/supabase-js';
 import { createApiErrorResponse } from '@/lib/api-error-handler';
 import { OutputFieldSchema, InputFieldSchema } from '@/lib/schemas/template';
+import { isSystemTemplateId } from '@/lib/templates/system-templates';
 
 // Force dynamic rendering for this route
 export const dynamic = "force-dynamic";
@@ -379,6 +380,13 @@ export const DELETE = withAuthAndCSRF(async (
         { status: 400 }
       );
     }
+
+    if (isSystemTemplateId(templateIdToDelete)) {
+      return NextResponse.json(
+        { success: false, error: 'System templates cannot be deleted.' },
+        { status: 403 }
+      );
+    }
     
     const supabase = createSupabaseAdminClient();
 
@@ -406,6 +414,18 @@ export const DELETE = withAuthAndCSRF(async (
       return createApiErrorResponse(
         'You do not have permission to delete this template.',
         403
+      );
+    }
+
+    const { count: usageCount } = await supabase
+      .from('content')
+      .select('id', { count: 'exact', head: true })
+      .eq('template_id', templateIdToDelete);
+
+    if ((usageCount ?? 0) > 0) {
+      return NextResponse.json(
+        { success: false, error: 'Cannot delete template that is currently in use.' },
+        { status: 400 }
       );
     }
 

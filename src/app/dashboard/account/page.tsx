@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, FormEvent, ChangeEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, FormEvent, ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -78,6 +78,44 @@ export default function AccountPage() {
     const nextVersion = etag ?? (payload?.version ?? null);
     setNotificationVersion(nextVersion);
   }, []);
+  const [profileSaveStatus, setProfileSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const profileStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [notificationSaveStatus, setNotificationSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const notificationDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notificationStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notificationSettingsRef = useRef(notificationSettings);
+  const lastSyncedNotificationSettingsRef = useRef(notificationSettings);
+  const notificationVersionRef = useRef<string | null>(notificationVersion);
+  const notificationSavePromiseRef = useRef<Promise<void> | null>(null);
+  const pendingNotificationAutoSaveRef = useRef(false);
+
+  useEffect(() => {
+    notificationSettingsRef.current = notificationSettings;
+  }, [notificationSettings]);
+
+  useEffect(() => {
+    notificationVersionRef.current = notificationVersion;
+  }, [notificationVersion]);
+
+  const scheduleProfileStatusReset = useCallback(() => {
+    if (profileStatusResetRef.current) {
+      clearTimeout(profileStatusResetRef.current);
+    }
+    profileStatusResetRef.current = setTimeout(() => {
+      setProfileSaveStatus('idle');
+      profileStatusResetRef.current = null;
+    }, 2500);
+  }, []);
+
+  const scheduleNotificationStatusReset = useCallback(() => {
+    if (notificationStatusResetRef.current) {
+      clearTimeout(notificationStatusResetRef.current);
+    }
+    notificationStatusResetRef.current = setTimeout(() => {
+      setNotificationSaveStatus('idle');
+      notificationStatusResetRef.current = null;
+    }, 2000);
+  }, []);
 
   const refreshNotificationSettings = useCallback(async () => {
     try {
@@ -89,6 +127,8 @@ export default function AccountPage() {
       const payload = await response.json().catch(() => ({}));
       if (payload?.success) {
         setNotificationSettings(payload.data);
+        lastSyncedNotificationSettingsRef.current = payload.data;
+        setNotificationSaveStatus('idle');
         syncNotificationVersion(response, payload);
       }
     } catch (error) {
@@ -110,6 +150,7 @@ export default function AccountPage() {
         if (controller.signal.aborted) return;
 
         if (response.status === 401) {
+          toast.error('Your session expired. Please log in again.', { description: 'Authentication required' });
           router.push('/auth/login');
           return;
         }
@@ -156,45 +197,134 @@ export default function AccountPage() {
     return () => controller.abort();
   }, [refreshNotificationSettings, router]);
 
+  useEffect(() => {
+    return () => {
+      if (profileStatusResetRef.current) {
+        clearTimeout(profileStatusResetRef.current);
+      }
+      if (notificationDebounceRef.current) {
+        clearTimeout(notificationDebounceRef.current);
+      }
+      if (notificationStatusResetRef.current) {
+        clearTimeout(notificationStatusResetRef.current);
+      }
+    };
+  }, []);
+
   const handleProfileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setProfileData(prev => ({ ...prev, [id]: value }));
   };
 
-  const handleNotificationChange = async (id: keyof typeof notificationSettings, checked: boolean) => {
-    setNotificationSettings(prev => ({ ...prev, [id]: checked }));
-    
-    const headers: HeadersInit = { 'Content-Type': 'application/json' };
-    if (notificationVersion) {
-      headers['If-Match'] = notificationVersion;
-    }
-    
-    try {
-      const response = await apiFetch('/api/user/notification-settings', {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({ [id]: checked })
-      });
-
-      const payload = await response.json().catch(() => ({ success: response.ok }));
-
-      if (!response.ok || !payload?.success) {
-        if (response.status === 412 || response.status === 428) {
-          setNotificationVersion(null);
-          await refreshNotificationSettings();
+  const persistNotificationSettings = useCallback(
+    async (mode: 'auto' | 'manual' = 'auto'): Promise<void> => {
+      if (notificationSavePromiseRef.current) {
+        if (mode === 'auto') {
+          pendingNotificationAutoSaveRef.current = true;
+          return;
         }
-        throw new Error(payload?.error || 'Failed to update notification setting');
+
+        await notificationSavePromiseRef.current;
       }
 
-      if (payload?.data) {
-        setNotificationSettings(payload.data);
+      const savePromise = (async () => {
+        if (mode === 'manual') {
+          setIsSubmitting(true);
+        }
+        setNotificationSaveStatus('saving');
+
+        const snapshot = notificationSettingsRef.current;
+        const fallback = lastSyncedNotificationSettingsRef.current;
+
+        const headers: HeadersInit = { 'Content-Type': 'application/json' };
+        const versionForRequest = notificationVersionRef.current;
+        if (versionForRequest) {
+          headers['If-Match'] = versionForRequest;
+        }
+
+        try {
+          const response = await apiFetch('/api/user/notification-settings', {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify(snapshot),
+          });
+
+          const payload = await response.json().catch(() => ({ success: response.ok }));
+
+          if (!response.ok || !payload?.success) {
+            if (response.status === 412 || response.status === 428) {
+              setNotificationVersion(null);
+              await refreshNotificationSettings();
+              setNotificationSaveStatus('error');
+              scheduleNotificationStatusReset();
+              toast.error('Notification preferences changed in another session. We reloaded the latest settings.', {
+                description: 'Version conflict',
+              });
+            } else {
+              setNotificationSettings(fallback);
+              lastSyncedNotificationSettingsRef.current = fallback;
+              setNotificationSaveStatus('error');
+              scheduleNotificationStatusReset();
+              throw new Error(payload?.error || 'Failed to update notification setting');
+            }
+            return;
+          }
+
+          const nextSettings = payload?.data ?? snapshot;
+          setNotificationSettings(nextSettings);
+          lastSyncedNotificationSettingsRef.current = nextSettings;
+          syncNotificationVersion(response, payload);
+          setNotificationSaveStatus('saved');
+          scheduleNotificationStatusReset();
+
+          if (mode === 'manual') {
+            toast('Your notification preferences have been updated.', { description: 'Preferences Saved' });
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Failed to update notification settings.';
+          setNotificationSaveStatus('error');
+          scheduleNotificationStatusReset();
+
+          if (mode === 'manual') {
+            toast.error('Failed to save your notification preferences.', { description: message });
+          } else {
+            toast.error('Failed to update notification preference', { description: message });
+          }
+          setNotificationSettings(fallback);
+          lastSyncedNotificationSettingsRef.current = fallback;
+        } finally {
+          if (mode === 'manual') {
+            setIsSubmitting(false);
+          }
+        }
+      })();
+
+      notificationSavePromiseRef.current = savePromise;
+      try {
+        await savePromise;
+      } finally {
+        notificationSavePromiseRef.current = null;
+        if (pendingNotificationAutoSaveRef.current) {
+          pendingNotificationAutoSaveRef.current = false;
+          void persistNotificationSettings('auto');
+        }
       }
-      syncNotificationVersion(response, payload);
-    } catch (error) {
-      setNotificationSettings(prev => ({ ...prev, [id]: !checked }));
-      const message = error instanceof Error ? error.message : 'Failed to update notification preference';
-      toast.error('Failed to update notification preference', { description: message });
+    },
+    [refreshNotificationSettings, scheduleNotificationStatusReset, syncNotificationVersion]
+  );
+
+  const handleNotificationChange = (id: keyof typeof notificationSettings, checked: boolean) => {
+    setNotificationSettings(prev => ({ ...prev, [id]: checked }));
+    setNotificationSaveStatus('saving');
+
+    if (notificationDebounceRef.current) {
+      clearTimeout(notificationDebounceRef.current);
     }
+
+    notificationDebounceRef.current = setTimeout(() => {
+      notificationDebounceRef.current = null;
+      void persistNotificationSettings('auto');
+    }, 400);
   };
 
   const handleProfileSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -206,6 +336,11 @@ export default function AccountPage() {
     }
 
     setIsSubmitting(true);
+    setProfileSaveStatus('saving');
+    if (profileStatusResetRef.current) {
+      clearTimeout(profileStatusResetRef.current);
+      profileStatusResetRef.current = null;
+    }
     try {
       if (!userId) {
         throw new Error('User information is still loading. Please try again in a moment.');
@@ -239,9 +374,13 @@ export default function AccountPage() {
 
       setProfileError(null);
       toast('Your profile information has been successfully updated.', { description: 'Profile Updated' });
+      setProfileSaveStatus('success');
+      scheduleProfileStatusReset();
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
       toast.error(errorMessage || 'Failed to update your profile. Please try again.', { description: 'Profile Update Error' });
+      setProfileSaveStatus('error');
+      scheduleProfileStatusReset();
     } finally {
       setIsSubmitting(false);
     }
@@ -323,41 +462,11 @@ export default function AccountPage() {
 
   const handleNotificationSettingsSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    try {
-      const headers: HeadersInit = { 'Content-Type': 'application/json' };
-      if (notificationVersion) {
-        headers['If-Match'] = notificationVersion;
-      }
-
-      const response = await apiFetch('/api/user/notification-settings', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(notificationSettings)
-      });
-
-      const payload = await response.json().catch(() => ({ success: response.ok }));
-
-      if (!response.ok || !payload?.success) {
-        if (response.status === 412 || response.status === 428) {
-          setNotificationVersion(null);
-          await refreshNotificationSettings();
-        }
-        throw new Error(payload?.error || 'Failed to save notification settings');
-      }
-
-      if (payload?.data) {
-        setNotificationSettings(payload.data);
-      }
-      syncNotificationVersion(response, payload);
-      toast('Your notification preferences have been updated.', { description: 'Preferences Saved' });
-    } catch (error: unknown) {
-      // console.error removed
-      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-      toast.error(errorMessage || 'Failed to save your notification preferences.', { description: 'Save Error' });
-    } finally {
-      setIsSubmitting(false);
+    if (notificationDebounceRef.current) {
+      clearTimeout(notificationDebounceRef.current);
+      notificationDebounceRef.current = null;
     }
+    await persistNotificationSettings('manual');
   };
 
   if (isLoading) {
@@ -465,9 +574,20 @@ export default function AccountPage() {
                 </div>
               </CardContent>
               <CardFooter className="pt-6 flex justify-start">
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && <Spinner className="mr-2 h-4 w-4 animate-spin" />}Update Profile
-                </Button>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Spinner className="mr-2 h-4 w-4 animate-spin" />}Update Profile
+                  </Button>
+                  {profileSaveStatus === 'saving' && (
+                    <span className="text-sm text-muted-foreground">Saving changes…</span>
+                  )}
+                  {profileSaveStatus === 'success' && (
+                    <span className="text-sm text-emerald-600">All changes saved</span>
+                  )}
+                  {profileSaveStatus === 'error' && (
+                    <span className="text-sm text-destructive">Unable to save changes</span>
+                  )}
+                </div>
               </CardFooter>
             </form>
           </Card>
@@ -606,9 +726,20 @@ export default function AccountPage() {
                 </div>
               </CardContent>
               <CardFooter className="pt-6 flex justify-start">
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && <Spinner className="mr-2 h-4 w-4 animate-spin" />}Save Preferences
-                </Button>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Spinner className="mr-2 h-4 w-4 animate-spin" />}Save Preferences
+                  </Button>
+                  {notificationSaveStatus === 'saving' && (
+                    <span className="text-sm text-muted-foreground">Saving preferences…</span>
+                  )}
+                  {notificationSaveStatus === 'saved' && (
+                    <span className="text-sm text-emerald-600">Preferences saved</span>
+                  )}
+                  {notificationSaveStatus === 'error' && (
+                    <span className="text-sm text-destructive">Could not save preferences</span>
+                  )}
+                </div>
               </CardFooter>
             </form>
           </Card>

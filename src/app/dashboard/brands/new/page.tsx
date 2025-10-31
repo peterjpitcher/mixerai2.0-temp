@@ -19,6 +19,13 @@ import { COUNTRIES, LANGUAGES, getLanguagesForCountry, getLanguageLabel } from '
 import { Checkbox } from '@/components/ui/checkbox';
 import { v4 as uuidv4 } from 'uuid';
 import { apiFetch } from '@/lib/api-client';
+import {
+  normalizeUrlCandidate,
+  sanitizeAdditionalWebsiteEntries,
+  resolveBrandColor,
+  isAbortError,
+  isValidUuid,
+} from './utils';
 
 /**
  * NewBrandPage allows users to create a new brand profile.
@@ -209,101 +216,139 @@ export default function NewBrandPage() {
     [agencyLookupById, agencyLookupByName]
   );
 
-  const fetchCurrentUser = useCallback(async () => {
-    setIsLoadingUser(true);
-    setUserLoadError(null);
-    try {
-      const response = await apiFetch('/api/me', { retry: 2, retryDelayMs: 400 });
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          setIsForbidden(true);
+  const fetchCurrentUser = useCallback(
+    async (signal?: AbortSignal) => {
+      setIsLoadingUser(true);
+      setUserLoadError(null);
+      try {
+        const response = await apiFetch('/api/me', { retry: 2, retryDelayMs: 400, signal });
+        if (signal?.aborted) return;
+
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            setIsForbidden(true);
+            return;
+          }
+          const errorBody = await response.json().catch(() => ({}));
+          const message =
+            typeof errorBody === 'object' && errorBody && 'error' in errorBody && typeof errorBody.error === 'string'
+              ? errorBody.error
+              : 'Failed to fetch user session';
+          throw new Error(message);
+        }
+
+        const data = await response.json();
+        if (signal?.aborted) return;
+
+        if (data.success && data.user) {
+          const userRole = data.user.user_metadata?.role;
+          setIsForbidden(userRole !== 'admin');
+        } else {
+          const fallbackMessage =
+            (typeof data?.error === 'string' && data.error) ||
+            'Your session could not be verified. Please try again.';
+          throw new Error(fallbackMessage);
+        }
+      } catch (error) {
+        if (isAbortError(error) || signal?.aborted) {
           return;
         }
-        const errorBody = await response.json().catch(() => ({}));
-        const message =
-          typeof errorBody === 'object' && errorBody && 'error' in errorBody && typeof errorBody.error === 'string'
-            ? errorBody.error
-            : 'Failed to fetch user session';
-        throw new Error(message);
+        console.error('Error fetching current user:', error);
+        setIsForbidden(false);
+        setUserLoadError((error as Error).message || 'Could not verify your permissions.');
+      } finally {
+        if (!signal?.aborted) {
+          setIsLoadingUser(false);
+        }
       }
-      const data = await response.json();
-      if (data.success && data.user) {
-        const userRole = data.user.user_metadata?.role;
-        setIsForbidden(userRole !== 'admin');
-      } else {
-        const fallbackMessage =
-          (typeof data?.error === 'string' && data.error) ||
-          'Your session could not be verified. Please try again.';
-        throw new Error(fallbackMessage);
-      }
-    } catch (error) {
-      console.error('Error fetching current user:', error);
-      setIsForbidden(false);
-      setUserLoadError((error as Error).message || 'Could not verify your permissions.');
-    } finally {
-      setIsLoadingUser(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
-    fetchCurrentUser();
+    const controller = new AbortController();
+    fetchCurrentUser(controller.signal);
+    return () => controller.abort();
   }, [fetchCurrentUser]);
 
-  // Fetch Master Claim Brands
-  useEffect(() => {
-    const fetchMasterClaimBrands = async () => {
+  const fetchMasterClaimBrands = useCallback(
+    async (signal?: AbortSignal) => {
       if (isForbidden || isLoadingUser || userLoadError) return;
       setIsLoadingMasterClaimBrands(true);
       try {
-        const response = await apiFetch('/api/master-claim-brands');
+        const response = await apiFetch('/api/master-claim-brands', { signal });
+        if (signal?.aborted) return;
         if (!response.ok) throw new Error('Failed to fetch Master Claim Brands');
+
         const data = await response.json();
+        if (signal?.aborted) return;
+
         if (data.success && Array.isArray(data.data)) {
           setMasterClaimBrands(data.data);
-        } else {
+        } else if (!signal?.aborted) {
           toast.error(data.error || 'Could not load Master Claim Brands.');
           setMasterClaimBrands([]);
         }
       } catch (err) {
+        if (isAbortError(err) || signal?.aborted) {
+          return;
+        }
         toast.error('Failed to fetch Master Claim Brands list.');
         console.error('Error fetching Master Claim Brands:', err);
         setMasterClaimBrands([]);
       } finally {
-        setIsLoadingMasterClaimBrands(false);
+        if (!signal?.aborted) {
+          setIsLoadingMasterClaimBrands(false);
+        }
       }
-    };
-    fetchMasterClaimBrands();
-  }, [isForbidden, isLoadingUser, userLoadError]);
+    },
+    [isForbidden, isLoadingUser, userLoadError]
+  );
 
-  const fetchAllVettingAgencies = useCallback(async () => {
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchMasterClaimBrands(controller.signal);
+    return () => controller.abort();
+  }, [fetchMasterClaimBrands]);
+
+  const fetchAllVettingAgencies = useCallback(async (signal?: AbortSignal) => {
     if (isForbidden || isLoadingUser || userLoadError) return;
     const apiUrl = '/api/content-vetting-agencies';
     setIsLoading(true);
     try {
-      const response = await apiFetch(apiUrl);
+      const response = await apiFetch(apiUrl, { signal });
+      if (signal?.aborted) return;
       if (!response.ok) throw new Error('Failed to fetch vetting agencies');
       const data = await response.json();
+      if (signal?.aborted) return;
       if (data.success && Array.isArray(data.data)) {
         const transformedAgencies: VettingAgency[] = data.data.map((agency: VettingAgencyFromAPI) => ({
           ...agency,
           priority: mapNumericPriorityToLabel(agency.priority),
         }));
         setAllVettingAgencies(transformedAgencies);
-      } else {
+      } else if (!signal?.aborted) {
         toast.error(data.error || 'Could not load vetting agencies.');
         setAllVettingAgencies([]);
       }
     } catch (err) {
+      if (isAbortError(err) || signal?.aborted) {
+        return;
+      }
       toast.error('Failed to fetch vetting agencies list.');
       console.error('Error fetching all vetting agencies:', err);
       setAllVettingAgencies([]);
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+      }
     }
   }, [isForbidden, isLoadingUser, userLoadError]);
 
   useEffect(() => {
-    fetchAllVettingAgencies();
+    const controller = new AbortController();
+    fetchAllVettingAgencies(controller.signal);
+    return () => controller.abort();
   }, [fetchAllVettingAgencies]);
 
   // Conditional rendering for loading and forbidden states
@@ -326,7 +371,7 @@ export default function NewBrandPage() {
           {userLoadError}
         </p>
         <div className="flex flex-wrap gap-3 justify-center">
-          <Button onClick={fetchCurrentUser} disabled={isLoadingUser}>
+          <Button onClick={() => fetchCurrentUser()} disabled={isLoadingUser}>
             {isLoadingUser ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -515,13 +560,16 @@ export default function NewBrandPage() {
       }
 
       const { matched: generatedAgencies, unmatched } = resolveSuggestedAgencyIds(data.suggestedAgencies);
-      setFormData(prev => ({
-        ...prev,
-        brand_identity: data.brandIdentity || prev.brand_identity,
-        tone_of_voice: data.toneOfVoice || prev.tone_of_voice,
-        content_vetting_agencies: Array.from(new Set([...prev.content_vetting_agencies, ...generatedAgencies])),
-        brand_color: data.brandColor || prev.brand_color
-      }));
+      setFormData(prev => {
+        const nextBrandColor = resolveBrandColor(data.brandColor ?? null, prev.brand_color);
+        return {
+          ...prev,
+          brand_identity: data.brandIdentity || prev.brand_identity,
+          tone_of_voice: data.toneOfVoice || prev.tone_of_voice,
+          content_vetting_agencies: Array.from(new Set([...prev.content_vetting_agencies, ...generatedAgencies])),
+          brand_color: nextBrandColor,
+        };
+      });
       const toDescription = (messages: string[]) => messages.join('\n').slice(0, 400);
       if (Array.isArray(data.scrapeWarnings) && data.scrapeWarnings.length) {
         toast.warning('Some URLs could not be processed completely.', {
@@ -627,9 +675,9 @@ export default function NewBrandPage() {
 
       if (normalizedCatalog.length > 0) {
         setAllVettingAgencies((prev) => mergeAgencies(prev, normalizedCatalog));
+      } else {
+        await fetchAllVettingAgencies();
       }
-
-      await fetchAllVettingAgencies();
       toast.success('Vetting agencies generated successfully.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to generate vetting agencies.';
@@ -647,42 +695,86 @@ export default function NewBrandPage() {
     }
     setIsSaving(true);
     try {
-      const validAgencyIds = formData.content_vetting_agencies.filter(id => agencyLookupById.has(id));
-      const invalidAgencyIds = formData.content_vetting_agencies.filter(id => !agencyLookupById.has(id));
+      const dedupedAgencyIds = Array.from(new Set(formData.content_vetting_agencies));
+      const knownAgencyIds = dedupedAgencyIds.filter((id) => agencyLookupById.has(id));
+      const unknownAgencyIds = dedupedAgencyIds.filter((id) => !agencyLookupById.has(id));
 
-      if (invalidAgencyIds.length > 0) {
-        toast.info('Some agencies could not be matched to existing records and were excluded.', {
-          description: invalidAgencyIds.join(', ')
+      const uuidValidAgencyIds = knownAgencyIds.filter((id) => isValidUuid(id));
+      const invalidUuidAgencyIds = knownAgencyIds.filter((id) => !isValidUuid(id));
+
+      if (unknownAgencyIds.length > 0 || invalidUuidAgencyIds.length > 0) {
+        const combinedInvalid = [...unknownAgencyIds, ...invalidUuidAgencyIds];
+        toast.info('Some agencies could not be matched to verified records and were excluded.', {
+          description: combinedInvalid.join(', ')
         });
         setFormData(prev => ({
           ...prev,
-          content_vetting_agencies: validAgencyIds
+          content_vetting_agencies: uuidValidAgencyIds
         }));
       }
 
+      const trimmedWebsite = formData.website_url?.trim() ?? '';
+      const normalizedWebsiteUrl = trimmedWebsite ? normalizeUrlCandidate(trimmedWebsite) : null;
+
+      if (trimmedWebsite && !normalizedWebsiteUrl) {
+        toast.error('Main website URL must be a valid http(s) address.');
+        setActiveTab('basic');
+        setIsSaving(false);
+        return;
+      }
+
+      const { normalized: normalizedAdditionalUrls, invalid: invalidAdditionalUrls } =
+        sanitizeAdditionalWebsiteEntries(formData.additional_website_urls);
+
+      if (invalidAdditionalUrls.length > 0) {
+        toast.error('Some additional website URLs are invalid.', {
+          description: invalidAdditionalUrls.join(', ')
+        });
+        setActiveTab('basic');
+        setIsSaving(false);
+        return;
+      }
+
+      const rawMasterClaimBrandIds = Array.isArray(formData.master_claim_brand_ids)
+        ? formData.master_claim_brand_ids
+        : [];
+      const validMasterClaimBrandIds = rawMasterClaimBrandIds.filter((id) => isValidUuid(id));
+      const invalidMasterClaimBrandIds = rawMasterClaimBrandIds.filter((id) => !isValidUuid(id));
+
+      if (invalidMasterClaimBrandIds.length > 0) {
+        toast.info('Some product claim brand selections were invalid and were removed.', {
+          description: invalidMasterClaimBrandIds.join(', '),
+        });
+        setFormData((prev) => ({
+          ...prev,
+          master_claim_brand_ids: validMasterClaimBrandIds,
+        }));
+      }
+
+      const {
+        additional_website_urls: _unusedAdditionalUrls,
+        master_claim_brand_ids: _unusedMasterClaimBrandIds,
+        ...restFormData
+      } = formData;
+
       const payload: Record<string, unknown> = { 
-        ...formData,
-        selected_agency_ids: validAgencyIds,
-        master_claim_brand_ids: formData.master_claim_brand_ids, // Include the array of master claim brand IDs
+        ...restFormData,
+        website_url: normalizedWebsiteUrl,
+        additional_website_urls: normalizedAdditionalUrls,
+        selected_agency_ids: uuidValidAgencyIds,
+        master_claim_brand_ids: validMasterClaimBrandIds, // Include the array of master claim brand IDs
       };
-      
+      payload.content_vetting_agencies = uuidValidAgencyIds;
+
       Object.keys(payload).forEach(key => {
         if (payload[key] === '' || (Array.isArray(payload[key]) && (payload[key] as unknown[]).length === 0) ) {
           payload[key] = null;
         }
       });
-      if (payload.additional_website_urls && Array.isArray(payload.additional_website_urls)){
-        const urls = payload.additional_website_urls as Array<{id:string, value:string}>;
-        payload.additional_website_urls = urls.map((item) => item.value).filter(Boolean);
-        if((payload.additional_website_urls as string[]).length === 0) payload.additional_website_urls = null;
-      }
       if (payload.master_claim_brand_id === 'NO_SELECTION') {
         payload.master_claim_brand_id = null;
       }
 
-      console.log('Creating brand with payload:', payload);
-      console.log('Logo URL in payload:', payload.logo_url);
-      
       const response = await apiFetch('/api/brands', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { withAuth } from '@/lib/auth/api-auth';
+import { withAdminAuthAndCSRF } from '@/lib/auth/api-auth';
 import { handleApiError } from '@/lib/api-utils';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { recommendVettingAgencies } from '@/lib/vetting-agencies/recommendations';
@@ -15,7 +15,7 @@ type RecommendRequestBody = {
   existingAgencyIds?: string[];
 };
 
-export const POST = withAuth(async (request) => {
+export const POST = withAdminAuthAndCSRF(async (request, _user) => {
   try {
     const body = (await request.json().catch(() => ({}))) as RecommendRequestBody;
     const brandName = body.brandName?.trim();

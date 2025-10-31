@@ -166,16 +166,16 @@ export function VettingAgencyFeedbackCard({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between gap-3">
-          <span>Regulatory Feedback (AI)</span>
-          <Badge variant="outline">Beta</Badge>
-        </CardTitle>
-        <CardDescription>
-          AI-generated compliance insights for {brandName}{stageName ? ` at the "${stageName}" stage` : ''} across selected vetting agencies.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+  <CardHeader>
+    <CardTitle className="flex items-center justify-between gap-3">
+      <span>Regulatory Feedback (AI)</span>
+      <Badge variant="outline">Beta</Badge>
+    </CardTitle>
+    <CardDescription>
+      Synthetic compliance insights for {brandName}{stageName ? ` at the "${stageName}" stage` : ''}, generated from agency criteria by AI — this is not official feedback from those agencies.
+    </CardDescription>
+  </CardHeader>
+  <CardContent className="space-y-4">
         {isDisabled && (
           <AlertMessage message="No vetting agencies are assigned to this brand. Add agencies in the brand settings to receive AI feedback." />
         )}

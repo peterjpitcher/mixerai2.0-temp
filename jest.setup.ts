@@ -1,5 +1,8 @@
 import '@testing-library/jest-dom';
 
+process.env.NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+process.env.NEXT_PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+
 // Provide fetch/request polyfills for tests that rely on Next.js Request objects
 const nodeFetch = require('node-fetch');
 if (typeof globalThis.fetch !== 'function') {

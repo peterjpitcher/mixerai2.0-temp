@@ -51,6 +51,14 @@ interface ContentVersionWithReviewer {
   } | null;
 }
 
+interface SelectedVettingAgency {
+  id: string;
+  name: string;
+  description: string | null;
+  country_code: string | null;
+  priority: number | null;
+}
+
 export const GET = withAuth(async (request: NextRequest, user: User, context?: unknown) => {
   const { params } = context as { params: { id: string } };
   const { id } = params;
@@ -241,21 +249,78 @@ export const GET = withAuth(async (request: NextRequest, user: User, context?: u
       }
     }
 
+    let selectedVettingAgencies: SelectedVettingAgency[] = [];
+    if (content.brand_id) {
+      const { data: brandAgencies, error: brandAgenciesError } = await supabase
+        .from('brand_selected_agencies')
+        .select(
+          `
+            content_vetting_agencies (
+              id,
+              name,
+              description,
+              country_code,
+              priority
+            )
+          `
+        )
+        .eq('brand_id', content.brand_id);
+
+      if (brandAgenciesError) {
+        console.error('[API Content GET] Error fetching brand vetting agencies:', brandAgenciesError);
+      } else {
+        selectedVettingAgencies = (brandAgencies ?? [])
+          .map((entry) => entry?.content_vetting_agencies)
+          .filter((agency): agency is NonNullable<typeof agency> => Boolean(agency))
+          .map((agency) => ({
+            id: agency.id,
+            name: agency.name ?? 'Unnamed Agency',
+            description: agency.description ?? null,
+            country_code: agency.country_code ?? null,
+            priority: typeof agency.priority === 'number' ? agency.priority : 999,
+          }))
+          .sort((a, b) => {
+            const rankA = typeof a.priority === 'number' ? a.priority : Number.MAX_SAFE_INTEGER;
+            const rankB = typeof b.priority === 'number' ? b.priority : Number.MAX_SAFE_INTEGER;
+            return rankA - rankB;
+          });
+      }
+    }
+
     const creatorProfileRaw = content.profiles;
     const creatorName =
       creatorProfileRaw && typeof creatorProfileRaw === 'object' && 'full_name' in creatorProfileRaw
         ? (creatorProfileRaw as { full_name?: string | null }).full_name ?? null
         : null;
 
+    const brandDetails = content.brand_id || content.brands
+      ? {
+          id: content.brand_id ?? null,
+          ...(content.brands ?? {}),
+          selected_vetting_agencies: selectedVettingAgencies,
+        }
+      : null;
+
+    const brandName =
+      brandDetails && typeof brandDetails === 'object' && 'name' in brandDetails
+        ? (brandDetails as { name?: string | null }).name ?? null
+        : content.brands?.name ?? null;
+
+    const brandColor =
+      brandDetails && typeof brandDetails === 'object' && 'brand_color' in brandDetails
+        ? (brandDetails as { brand_color?: string | null }).brand_color ?? null
+        : content.brands?.brand_color ?? null;
+
     const formattedContent = {
       ...content,
-      brand_name: content.brands?.name || null,
-      brand_color: content.brands?.brand_color || null,
+      brand_name: brandName,
+      brand_color: brandColor,
       created_by_name: creatorName,
       template_name: content.content_templates?.name || null,
       template_icon: content.content_templates?.icon || null,
       workflow: workflowDataWithSteps, // Embed the workflow with its steps and assignees
-      versions: versions // Add versions to the response
+      versions: versions, // Add versions to the response
+      brands: brandDetails,
     };
     
     console.log(`[API /content/${id}] Returning formattedContent with versions:`, JSON.stringify(formattedContent.versions, null, 2)); // Log versions being returned

@@ -1,13 +1,15 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { formatDate } from '@/lib/utils/date';
-import { FilePlus, Send, CheckCircle, Edit3, UserPlus, Milestone, Activity } from 'lucide-react';
+import { FilePlus, Send, CheckCircle, Edit3, UserPlus, Milestone, Activity, Ban, Rocket } from 'lucide-react';
 
 export type ActivityType =
   | 'content_created'
   | 'content_submitted'
   | 'content_approved'
   | 'content_updated'
+  | 'content_rejected'
+  | 'content_published'
   | 'user_invited'
   | 'brand_created';
 
@@ -44,6 +46,14 @@ const activityConfig: { [key in ActivityType]: { icon: React.ReactNode; bgColor:
     icon: <Edit3 className="h-5 w-5" />,
     bgColor: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/50 dark:text-yellow-400',
   },
+  content_rejected: {
+    icon: <Ban className="h-5 w-5" />,
+    bgColor: 'bg-red-100 text-red-600 dark:bg-red-900/50 dark:text-red-400',
+  },
+  content_published: {
+    icon: <Rocket className="h-5 w-5" />,
+    bgColor: 'bg-sky-100 text-sky-600 dark:bg-sky-900/50 dark:text-sky-400',
+  },
   user_invited: {
     icon: <UserPlus className="h-5 w-5" />,
     bgColor: 'bg-pink-100 text-pink-600 dark:bg-pink-900/50 dark:text-pink-400',
@@ -56,8 +66,17 @@ const activityConfig: { [key in ActivityType]: { icon: React.ReactNode; bgColor:
 
 const getActivityMessage = (item: ActivityItem): React.ReactNode => {
   const userName = <span className="font-semibold">{item.user?.full_name || 'A user'}</span>;
+  const routeMap: Record<'content' | 'brand' | 'user', (id: string) => string> = {
+    content: id => `/dashboard/content/${id}`,
+    brand: id => `/dashboard/brands/${id}`,
+    user: id => `/dashboard/users/${id}`,
+  };
+
   const targetLink = item.target ? (
-    <Link href={`/dashboard/${item.target.type}/${item.target.id}`} className="font-semibold hover:underline">
+    <Link
+      href={routeMap[item.target.type]?.(item.target.id) ?? `/dashboard/content/${item.target.id}`}
+      className="font-semibold hover:underline"
+    >
       {item.target.name}
     </Link>
   ) : 'an item';
@@ -69,12 +88,18 @@ const getActivityMessage = (item: ActivityItem): React.ReactNode => {
       return <>{userName} submitted {targetLink} for review.</>;
     case 'content_approved':
       return <>{userName} approved {targetLink}.</>;
+    case 'content_rejected':
+      return <>{userName} rejected {targetLink}.</>;
     case 'content_updated':
-        return <>{userName} updated {targetLink}.</>;
+      return <>{userName} updated {targetLink}.</>;
+    case 'content_published':
+      return <>{userName} published {targetLink}.</>;
     case 'user_invited':
-        return <>{userName} invited a new user.</>;
+      return item.target
+        ? <>{userName} invited {targetLink}.</>
+        : <>{userName} invited a new user.</>;
     case 'brand_created':
-        return <>{userName} created the brand {targetLink}.</>;
+      return <>{userName} created the brand {targetLink}.</>;
     default:
       return 'An unknown action occurred.';
   }

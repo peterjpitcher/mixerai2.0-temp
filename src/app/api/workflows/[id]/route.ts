@@ -172,6 +172,15 @@ export const GET = withAuth(async (
         };
       });
     }
+
+    const { count: contentCount, error: contentCountError } = await supabase
+      .from('content')
+      .select('id', { count: 'exact', head: true })
+      .eq('workflow_id', workflowId);
+
+    if (contentCountError) {
+      console.warn(`Failed to compute content usage count for workflow ${workflowId}:`, contentCountError.message);
+    }
     
     const formattedWorkflow = {
       id: workflowData.id,
@@ -188,7 +197,8 @@ export const GET = withAuth(async (
       template_name: workflowData.content_templates?.name || null,
       created_at: workflowData.created_at,
       updated_at: workflowData.updated_at,
-      created_by: (workflowData as Record<string, unknown>).created_by || null 
+      created_by: (workflowData as Record<string, unknown>).created_by || null,
+      content_count: typeof contentCount === 'number' ? contentCount : 0
     };
 
     return NextResponse.json({ 
@@ -371,11 +381,36 @@ export const PUT = withAuthAndCSRF(async (
       );
     }
     
-    const stepsFromClient = body.steps || [];
+    const stepsFromClient = Array.isArray(body.steps) ? body.steps : [];
+
+    if (stepsFromClient.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'At least one workflow step is required.' },
+        { status: 400 }
+      );
+    }
     
     // Validate that each step has at least one assignee
     for (let i = 0; i < stepsFromClient.length; i++) {
       const step = stepsFromClient[i];
+      if (!step || typeof step !== 'object') {
+        return NextResponse.json(
+          { success: false, error: `Invalid step data at position ${i + 1}` },
+          { status: 400 }
+        );
+      }
+      if (!step.name || typeof step.name !== 'string' || !step.name.trim()) {
+        return NextResponse.json(
+          { success: false, error: `Step ${i + 1} must have a name.` },
+          { status: 400 }
+        );
+      }
+      if (!step.role || typeof step.role !== 'string' || !step.role.trim()) {
+        return NextResponse.json(
+          { success: false, error: `Step "${step.name}" must have an assigned role.` },
+          { status: 400 }
+        );
+      }
       if (!step.assignees || !Array.isArray(step.assignees) || step.assignees.length === 0) {
         return NextResponse.json(
           { success: false, error: `Step "${step.name || `Step ${i + 1}`}" must have at least one assignee` },
@@ -483,7 +518,12 @@ export const PUT = withAuthAndCSRF(async (
       paramsToPass.p_description = descriptionToUse;
     }
 
-    console.log('Calling RPC update_workflow_and_handle_invites with params:', JSON.stringify(paramsToPass, null, 2));
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug(
+        'Calling RPC update_workflow_and_handle_invites with params:',
+        JSON.stringify(paramsToPass, null, 2)
+      );
+    }
 
     const { data: rpcData, error: rpcError } = await supabase.rpc(
       'update_workflow_and_handle_invites',
@@ -491,8 +531,16 @@ export const PUT = withAuthAndCSRF(async (
     );
 
     // Enhanced logging for RPC response
-    console.log(`[API Workflows PUT /${workflowId}] RPC Response - rpcData:`, JSON.stringify(rpcData, null, 2));
-    console.log(`[API Workflows PUT /${workflowId}] RPC Response - rpcError:`, JSON.stringify(rpcError, null, 2));
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug(
+        `[API Workflows PUT /${workflowId}] RPC Response - rpcData:`,
+        JSON.stringify(rpcData, null, 2)
+      );
+      console.debug(
+        `[API Workflows PUT /${workflowId}] RPC Response - rpcError:`,
+        JSON.stringify(rpcError, null, 2)
+      );
+    }
 
     if (rpcError) {
       console.error(`[API Workflows PUT /${workflowId}] Error calling RPC update_workflow_and_handle_invites:`, rpcError);

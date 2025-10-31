@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { FieldDesigner } from './field-designer';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Icons } from '@/components/icons';
 import { toast } from 'sonner';
-import { Menu } from 'lucide-react';
+import { AlertCircle, Menu } from 'lucide-react';
 import { 
   GenericField as Field,
   InputField, 
@@ -20,6 +20,9 @@ import {
   ContentTemplate 
 } from '@/types/template';
 import { apiClient } from '@/lib/api-client-csrf';
+import { useBrands } from '@/contexts/brand-context';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type TemplateData = ContentTemplate;
 
@@ -27,6 +30,42 @@ interface TemplateFormProps {
   initialData?: TemplateData;
   isReadOnly?: boolean;
 }
+
+const SPECIAL_PLACEHOLDERS = new Set(['rules', 'product name']);
+
+const normalizePlaceholderToken = (token: string) =>
+  token
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\u00A0\u2000-\u200B]+/g, ' ')
+    .replace(/[\p{P}\p{S}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const isSupportedPlaceholder = (placeholder: string, allowed: Set<string>) => {
+  if (!placeholder) {
+    return true;
+  }
+
+  const normalized = normalizePlaceholderToken(placeholder);
+  if (!normalized) {
+    return true;
+  }
+
+  if (allowed.has(normalized)) {
+    return true;
+  }
+
+  if (SPECIAL_PLACEHOLDERS.has(normalized)) {
+    return true;
+  }
+
+  if (normalized === 'brand' || normalized.startsWith('brand ')) {
+    return true;
+  }
+
+  return false;
+};
 
 export function TemplateForm({ initialData, isReadOnly = false }: TemplateFormProps) {
   const router = useRouter();
@@ -48,6 +87,91 @@ export function TemplateForm({ initialData, isReadOnly = false }: TemplateFormPr
   );
   const [isAddingField, setIsAddingField] = useState(false);
   const [editingField, setEditingField] = useState<Field | null>(null);
+  const { brands, activeBrand, isLoading: isLoadingBrands } = useBrands();
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const allowedPlaceholders = useMemo(() => {
+    const allowed = new Set<string>();
+    const register = (value?: string | null) => {
+      if (!value) return;
+      const normalized = normalizePlaceholderToken(value);
+      if (normalized) {
+        allowed.add(normalized);
+      }
+    };
+
+    (templateData.inputFields || []).forEach(field => {
+      register(field.id);
+      register(field.name);
+    });
+
+    (templateData.outputFields || []).forEach(field => {
+      register(field.id);
+      register(field.name);
+    });
+
+    return allowed;
+  }, [templateData.inputFields, templateData.outputFields]);
+
+  useEffect(() => {
+    if (isReadOnly) {
+      return;
+    }
+
+    if (initialData?.id && initialData.id !== 'new') {
+      return;
+    }
+
+    if (templateData.brand_id) {
+      return;
+    }
+
+    const candidateBrandId = activeBrand?.id || (brands.length === 1 ? brands[0].id : null);
+    if (candidateBrandId) {
+      setTemplateData(prev => ({
+        ...prev,
+        brand_id: candidateBrandId
+      }));
+    }
+  }, [activeBrand?.id, brands, initialData?.id, isReadOnly, templateData.brand_id]);
+
+  const findInvalidPlaceholderReferences = () => {
+    const invalid: Array<{ fieldId: string; fieldName: string; placeholder: string; type: 'input' | 'output' }> = [];
+    const placeholderPattern = /\{\{([^}]+)\}\}/g;
+
+    const checkFields = (fields: Field[] | undefined, type: 'input' | 'output') => {
+      (fields || []).forEach(field => {
+        if (!field.aiPrompt) {
+          return;
+        }
+
+        if (
+          (type === 'input' && 'aiSuggester' in field && !(field as InputField).aiSuggester) ||
+          (type === 'output' && 'aiAutoComplete' in field && !(field as OutputField).aiAutoComplete)
+        ) {
+          return;
+        }
+
+        placeholderPattern.lastIndex = 0;
+        let match;
+        while ((match = placeholderPattern.exec(field.aiPrompt)) !== null) {
+          const placeholder = match[1]?.trim() ?? '';
+          if (!isSupportedPlaceholder(placeholder, allowedPlaceholders)) {
+            invalid.push({
+              fieldId: field.id,
+              fieldName: field.name,
+              placeholder,
+              type,
+            });
+          }
+        }
+      });
+    };
+
+    checkFields(templateData.inputFields, 'input');
+    checkFields(templateData.outputFields, 'output');
+
+    return invalid;
+  };
   
 
   const handleBasicInfoChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -136,6 +260,7 @@ export function TemplateForm({ initialData, isReadOnly = false }: TemplateFormPr
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSessionError(null);
     
     // Prevent submission in read-only mode
     if (isReadOnly) {
@@ -156,6 +281,14 @@ export function TemplateForm({ initialData, isReadOnly = false }: TemplateFormPr
       toast.error('At least one output field is required');
       return;
     }
+
+    const invalidPlaceholders = findInvalidPlaceholderReferences();
+    if (invalidPlaceholders.length > 0) {
+      const firstInvalid = invalidPlaceholders[0];
+      setActiveTab(firstInvalid.type);
+      toast.error(`Unknown placeholder "{{${firstInvalid.placeholder}}}" in ${firstInvalid.type} field "${firstInvalid.fieldName}".`);
+      return;
+    }
     
     try {
       setIsSubmitting(true);
@@ -164,7 +297,7 @@ export function TemplateForm({ initialData, isReadOnly = false }: TemplateFormPr
         name: templateData.name,
         description: templateData.description,
         icon: templateData.icon,
-        brand_id: templateData.brand_id === undefined ? null : templateData.brand_id, 
+        brand_id: templateData.brand_id ?? null,
         inputFields: templateData.inputFields || [],
         outputFields: templateData.outputFields || []
       }; 
@@ -173,37 +306,17 @@ export function TemplateForm({ initialData, isReadOnly = false }: TemplateFormPr
         ? `/api/content-templates/${initialData.id}` 
         : '/api/content-templates';
       
-      const method = initialData?.id && initialData.id !== 'new' ? 'PUT' : 'POST';
-      
-      console.log('[DEBUG] Template Save Request:', {
-        url,
-        method,
-        payload,
-        timestamp: new Date().toISOString()
-      });
-      
       const response = initialData?.id && initialData.id !== 'new' 
         ? await apiClient.put(url, payload)
         : await apiClient.post(url, payload);
       
-      console.log('[DEBUG] Template Save Response:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        url: response.url,
-        ok: response.ok
-      });
-      
       // Check if response is JSON
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('[DEBUG] Non-JSON Response Body:', text);
-        throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 100)}...`);
+        throw new Error(`Server returned non-JSON response (${response.status}).`);
       }
       
       const data = await response.json();
-      console.log('[DEBUG] Parsed Response Data:', data);
       
       if (!data.success) {
         throw new Error(data.error || 'Failed to save template');
@@ -215,11 +328,20 @@ export function TemplateForm({ initialData, isReadOnly = false }: TemplateFormPr
       router.refresh();
     } catch (error: unknown) {
       console.error('Error saving template:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to save template');
+      const message = error instanceof Error ? error.message : 'Failed to save template';
+      if (/forbidden|permission/i.test(message)) {
+        setSessionError(message);
+      } else {
+        toast.error(message);
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const selectedBrand = templateData.brand_id
+    ? brands.find(brand => brand.id === templateData.brand_id) || null
+    : null;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -253,6 +375,47 @@ export function TemplateForm({ initialData, isReadOnly = false }: TemplateFormPr
               onChange={handleBasicInfoChange} 
               placeholder="A brief description of what this template is for."
             />
+          </div>
+          <div>
+            <Label htmlFor="brand-select">Brand Assignment</Label>
+            {isReadOnly ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                {selectedBrand ? selectedBrand.name : (templateData.brand_id || 'No brand (available to all teams)')}
+              </p>
+            ) : (
+              <Select
+                value={templateData.brand_id ?? 'none'}
+                onValueChange={(value) => {
+                  setTemplateData(prev => ({
+                    ...prev,
+                    brand_id: value === 'none' ? null : value
+                  }));
+                }}
+                disabled={isSubmitting || isLoadingBrands}
+              >
+                <SelectTrigger id="brand-select">
+                  <SelectValue placeholder={isLoadingBrands ? 'Loading brands…' : 'Select a brand'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No brand (available to all teams)</SelectItem>
+                  {templateData.brand_id && !selectedBrand && (
+                    <SelectItem value={templateData.brand_id} disabled>
+                      {templateData.brand_id} (no longer accessible)
+                    </SelectItem>
+                  )}
+                  {brands.map(brand => (
+                    <SelectItem key={brand.id} value={brand.id}>
+                      {brand.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {!isReadOnly && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Assign a brand when this template should only be used within that brand&apos;s workspace.
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -303,6 +466,14 @@ export function TemplateForm({ initialData, isReadOnly = false }: TemplateFormPr
           availableInputFields={(templateData.inputFields || []).map(f => ({ id: f.id, name: f.name }))}
           fieldType={activeTab as 'input' | 'output'}
         />
+      )}
+
+      {sessionError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Permission issue</AlertTitle>
+          <AlertDescription>{sessionError}</AlertDescription>
+        </Alert>
       )}
 
       <CardFooter className="flex justify-end space-x-2 pt-6">

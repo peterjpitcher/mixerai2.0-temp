@@ -24,6 +24,11 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { apiClient } from '@/lib/api-client';
 import { BreadcrumbNav } from '@/components/ui/breadcrumb-nav';
+import {
+  normalizeUrlCandidate,
+  sanitizeAdditionalWebsiteEntries,
+  isAbortError,
+} from '../../new/utils';
 
 // export const metadata: Metadata = {
 //   title: 'Edit Brand | MixerAI 2.0',
@@ -167,6 +172,8 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     logo_url: null as string | null,
   });
 
+  const [invalidAdditionalUrlIds, setInvalidAdditionalUrlIds] = useState<string[]>([]);
+
   const [allVettingAgencies, setAllVettingAgencies] = useState<VettingAgency[]>([]);
   const [isLoadingAgencies, setIsLoadingAgencies] = useState(true);
   const priorityOrder: Array<'High' | 'Medium' | 'Low'> = ['High', 'Medium', 'Low'];
@@ -253,167 +260,282 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     { label: `Edit: ${formData.name || 'Loading...'}` },
   ];
 
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
+  const fetchCurrentUser = useCallback(
+    async (signal?: AbortSignal) => {
       setIsLoadingUser(true);
       try {
-        const response = await fetch('/api/me');
-        if (!response.ok) throw new Error('Failed to fetch user session');
+        const response = await apiFetch('/api/me', { signal });
+        if (signal?.aborted) return;
+
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            setIsForbidden(true);
+            toast.error('Access denied', {
+              description: 'You do not have permission to edit this brand.',
+            });
+            return;
+          }
+
+          const errorBody = await response.json().catch(() => ({}));
+          const message =
+            typeof errorBody?.error === 'string' && errorBody.error
+              ? errorBody.error
+              : 'Failed to fetch user session';
+          throw new Error(message);
+        }
+
         const data = await response.json();
+        if (signal?.aborted) return;
+
         if (data.success && data.user) {
           const userRole = data.user.user_metadata?.role;
-          let hasBrandAdminPermission = false;
-          if (data.user.brand_permissions) {
-            const brandPerm = data.user.brand_permissions.find(p => p.brand_id === id);
-            if (brandPerm && brandPerm.role === 'admin') {
-              hasBrandAdminPermission = true;
-            }
-          }
-          if (userRole !== REQUIRED_ROLE && !hasBrandAdminPermission) {
-            setIsForbidden(true);
-            toast.error("Access Denied", { description: "You do not have permission to edit this brand." });
+          const brandPermissions = Array.isArray(data.user.brand_permissions)
+            ? data.user.brand_permissions
+            : [];
+
+          const hasBrandAdminPermission = brandPermissions.some(
+            (perm: { brand_id?: string; role?: string }) =>
+              perm?.brand_id === id && perm?.role === 'admin',
+          );
+
+          const isGlobalAdmin = userRole === REQUIRED_ROLE;
+          const allowed = isGlobalAdmin || hasBrandAdminPermission;
+
+          setIsForbidden(!allowed);
+
+          if (!allowed) {
+            toast.error('Access denied', {
+              description: 'You do not have permission to edit this brand.',
+            });
           }
         } else {
           setIsForbidden(true);
           toast.error('Your session could not be verified.');
         }
-      } catch (err) {
-        console.error('Error fetching current user:', err);
+      } catch (error) {
+        if (isAbortError(error) || signal?.aborted) {
+          return;
+        }
+        console.error('Error fetching current user:', error);
         setIsForbidden(true);
         toast.error('Could not verify your permissions.');
       } finally {
-        setIsLoadingUser(false);
+        if (!signal?.aborted) {
+          setIsLoadingUser(false);
+        }
       }
-    };
-    fetchCurrentUser();
-  }, [id]);
+    },
+    [id],
+  );
 
-  const fetchAllVettingAgencies = useCallback(async () => {
-    if (isForbidden || isLoadingUser) return;
-    setIsLoadingAgencies(true);
-    try {
-      const response = await fetch('/api/content-vetting-agencies');
-      if (!response.ok) throw new Error('Failed to fetch vetting agencies');
-      const data = await response.json();
-      if (data.success && Array.isArray(data.data)) {
-        const transformedAgencies: VettingAgency[] = data.data.map((agency: VettingAgencyFromAPI) => ({
-          ...agency,
-          country_code: agency.country_code ? agency.country_code.toUpperCase() : null,
-          priority: mapNumericPriorityToLabel(agency.priority),
-        }));
-        setAllVettingAgencies(transformedAgencies);
-      } else {
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchCurrentUser(controller.signal);
+    return () => controller.abort();
+  }, [fetchCurrentUser]);
+
+  const fetchAllVettingAgencies = useCallback(
+    async (signal?: AbortSignal) => {
+      if (isForbidden || isLoadingUser) return;
+      setIsLoadingAgencies(true);
+      try {
+        const response = await apiFetch('/api/content-vetting-agencies', { signal });
+        if (signal?.aborted) return;
+        if (!response.ok) throw new Error('Failed to fetch vetting agencies');
+
+        const data = await response.json();
+        if (signal?.aborted) return;
+
+        if (data.success && Array.isArray(data.data)) {
+          const transformedAgencies: VettingAgency[] = data.data.map(
+            (agency: VettingAgencyFromAPI) => ({
+              ...agency,
+              country_code: agency.country_code ? agency.country_code.toUpperCase() : null,
+              priority: mapNumericPriorityToLabel(agency.priority),
+            }),
+          );
+          setAllVettingAgencies(transformedAgencies);
+        } else if (!signal?.aborted) {
+          toast.error(data.error || 'Failed to load vetting agencies.');
+          setAllVettingAgencies([]);
+        }
+      } catch (error) {
+        if (isAbortError(error) || signal?.aborted) {
+          return;
+        }
+        console.error('Error fetching vetting agencies:', error);
+        toast.error('Failed to load vetting agencies', {
+          description: (error as Error).message,
+        });
         setAllVettingAgencies([]);
+      } finally {
+        if (!signal?.aborted) {
+          setIsLoadingAgencies(false);
+        }
       }
-    } catch (err) {
-      console.error('Error fetching vetting agencies:', err);
-      toast.error('Failed to load vetting agencies', { description: (err as Error).message });
-      setAllVettingAgencies([]);
-    } finally {
-      setIsLoadingAgencies(false);
-    }
-  }, [isForbidden, isLoadingUser]);
+    },
+    [isForbidden, isLoadingUser],
+  );
 
   useEffect(() => {
     if (isForbidden || isLoadingUser) return;
+    const controller = new AbortController();
+    fetchAllVettingAgencies(controller.signal);
+    return () => controller.abort();
+  }, [fetchAllVettingAgencies, isForbidden, isLoadingUser]);
 
-    const fetchBrandData = async () => {
+  const fetchBrandData = useCallback(
+    async (signal?: AbortSignal) => {
+      if (isForbidden || isLoadingUser) return;
       setIsLoadingBrand(true);
+      setError(null);
       try {
-        const response = await fetch(`/api/brands/${id}`);
+        const response = await apiFetch(`/api/brands/${id}`, { signal });
+        if (signal?.aborted) return;
+
         if (!response.ok) {
           if (response.status === 404) {
             setError('Brand not found.');
-            setIsForbidden(true); 
-          } else {
-            throw new Error(`Failed to fetch brand: ${response.statusText}`);
+            setIsForbidden(true);
+            return;
           }
-          return;
+          if (response.status === 403) {
+            setIsForbidden(true);
+            setError('You do not have permission to edit this brand.');
+            toast.error('Access denied', {
+              description: 'You do not have permission to edit this brand.',
+            });
+            return;
+          }
+          throw new Error(`Failed to fetch brand: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
+        if (signal?.aborted) return;
+
         if (!data.success || !data.brand) {
           throw new Error(data.error || 'Failed to fetch brand data structure');
         }
-        
-        console.log('Edit page - Received brand data:', data.brand);
-        console.log('Edit page - Logo URL:', data.brand.logo_url);
-        setBrand(data.brand);
-        
-        const normalizedCountry = normalizeCountryValue(data.brand.country);
 
+        setBrand(data.brand);
+
+        const normalizedCountry = normalizeCountryValue(data.brand.country);
+        const additionalUrlsRaw = Array.isArray(data.brand.additional_website_urls)
+          ? data.brand.additional_website_urls
+          : [];
+
+        const mappedAdditionalUrls = additionalUrlsRaw
+          .map((urlItem: string | { id?: string; value: string }) => {
+            if (typeof urlItem === 'string') {
+              return { id: uuidv4(), value: urlItem };
+            }
+            const value =
+              typeof urlItem?.value === 'string' ? urlItem.value : '';
+            return { id: urlItem?.id || uuidv4(), value };
+          })
+          .filter((entry) => typeof entry.value === 'string');
+
+        setInvalidAdditionalUrlIds([]);
         setFormData({
           name: data.brand.name || '',
           website_url: data.brand.website_url || '',
-          additional_website_urls: Array.isArray(data.brand.additional_website_urls)
-                                      ? data.brand.additional_website_urls.map((urlItem: string | { id?: string, value: string }) =>
-                                          typeof urlItem === 'string'
-                                              ? { id: uuidv4(), value: urlItem }
-                                              : { id: urlItem.id || uuidv4(), value: urlItem.value }
-                                        )
-                                      : [],
+          additional_website_urls: mappedAdditionalUrls,
           country: normalizedCountry,
           language: data.brand.language || '',
           brand_color: data.brand.brand_color || '#1982C4',
           brand_identity: data.brand.brand_identity || '',
           tone_of_voice: data.brand.tone_of_voice || '',
           guardrails: data.brand.guardrails || '',
-          content_vetting_agencies: Array.isArray(data.brand.selected_vetting_agencies) 
-                                      ? data.brand.selected_vetting_agencies.map((agency: { id: string }) => agency.id)
-                                      : [],
+          content_vetting_agencies: Array.isArray(data.brand.selected_vetting_agencies)
+            ? data.brand.selected_vetting_agencies.map((agency: { id: string }) => agency.id)
+            : [],
           master_claim_brand_id: data.brand.master_claim_brand_id || null,
-          master_claim_brand_ids: [], // Will be populated separately
+          master_claim_brand_ids: [], // Populated separately
           logo_url: data.brand.logo_url || null,
         });
-
-      } catch (err) {
-        console.error('Error fetching brand data:', err);
-        setError((err as Error).message);
-        toast.error("Failed to load brand data", { description: (err as Error).message });
+      } catch (error) {
+        if (isAbortError(error) || signal?.aborted) {
+          return;
+        }
+        console.error('Error fetching brand data:', error);
+        const message = (error as Error).message || 'Failed to load brand data';
+        setError(message);
+        toast.error('Failed to load brand data', { description: message });
       } finally {
-        setIsLoadingBrand(false);
+        if (!signal?.aborted) {
+          setIsLoadingBrand(false);
+        }
       }
-    };
+    },
+    [id, isForbidden, isLoadingUser],
+  );
 
-    const fetchMasterClaimBrands = async () => {
+  useEffect(() => {
+    if (isForbidden || isLoadingUser) return;
+    const controller = new AbortController();
+    fetchBrandData(controller.signal);
+    return () => controller.abort();
+  }, [fetchBrandData, isForbidden, isLoadingUser]);
+
+  const fetchMasterClaimBrands = useCallback(
+    async (signal?: AbortSignal) => {
+      if (isForbidden || isLoadingUser) return;
       setIsLoadingMasterClaimBrands(true);
       try {
-        // Fetch all master claim brands
-        const response = await fetch('/api/master-claim-brands');
+        const response = await apiFetch('/api/master-claim-brands', { signal });
+        if (signal?.aborted) return;
         if (!response.ok) throw new Error('Failed to fetch Master Claim Brands');
+
         const data = await response.json();
+        if (signal?.aborted) return;
+
         if (data.success && Array.isArray(data.data)) {
           setMasterClaimBrands(data.data);
         } else {
           throw new Error(data.error || 'Failed to parse Master Claim Brands');
         }
-        
-        // Fetch which master claim brands are linked to this brand
-        const linkedResponse = await fetch(`/api/brands/${id}/master-claim-brands`);
+
+        const linkedResponse = await apiFetch(`/api/brands/${id}/master-claim-brands`, {
+          signal,
+        });
+        if (signal?.aborted) return;
+
         if (linkedResponse.ok) {
           const linkedData = await linkedResponse.json();
+          if (signal?.aborted) return;
+
           if (linkedData.success && Array.isArray(linkedData.data)) {
-            // Update the form with the linked master claim brand IDs
-            setFormData(prev => ({
+            setFormData((prev) => ({
               ...prev,
-              master_claim_brand_ids: linkedData.data.map((link: { master_claim_brand_id: string }) => link.master_claim_brand_id)
+              master_claim_brand_ids: linkedData.data.map(
+                (link: { master_claim_brand_id: string }) => link.master_claim_brand_id,
+              ),
             }));
           }
         }
-      } catch (err) {
-        console.error('Error fetching Master Claim Brands:', err);
-        toast.error("Failed to load Master Claim Brands", { description: (err as Error).message });
+      } catch (error) {
+        if (isAbortError(error) || signal?.aborted) {
+          return;
+        }
+        console.error('Error fetching Master Claim Brands:', error);
+        toast.error('Failed to load Master Claim Brands', {
+          description: (error as Error).message,
+        });
       } finally {
-        setIsLoadingMasterClaimBrands(false);
+        if (!signal?.aborted) {
+          setIsLoadingMasterClaimBrands(false);
+        }
       }
-    };
+    },
+    [id, isForbidden, isLoadingUser],
+  );
 
-    if (!isForbidden) {
-    fetchBrandData();
-    fetchAllVettingAgencies();
-    fetchMasterClaimBrands();
-    }
-  }, [id, isForbidden, isLoadingUser, fetchAllVettingAgencies]);
+  useEffect(() => {
+    if (isForbidden || isLoadingUser) return;
+    const controller = new AbortController();
+    fetchMasterClaimBrands(controller.signal);
+    return () => controller.abort();
+  }, [fetchMasterClaimBrands, isForbidden, isLoadingUser]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -441,6 +563,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
       ...prev,
       additional_website_urls: prev.additional_website_urls.filter(url => url.id !== idToRemove)
     }));
+    setInvalidAdditionalUrlIds(prev => prev.filter(id => id !== idToRemove));
   };
 
   const handleAdditionalUrlChange = (id: string, newValue: string) => {
@@ -450,6 +573,7 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         url.id === id ? { ...url, value: newValue } : url
       )
     }));
+    setInvalidAdditionalUrlIds(prev => prev.filter(existingId => existingId !== id));
   };
 
   const handleAgencyCheckboxChange = (agencyId: string, checked: boolean) => {
@@ -566,6 +690,15 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
 
       const payload = await response.json().catch(() => ({}));
 
+      if (response.status === 403) {
+        const message =
+          typeof payload?.error === 'string' && payload.error
+            ? payload.error
+            : 'You do not have permission to generate vetting agencies.';
+        toast.error(message);
+        return;
+      }
+
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.error || 'Failed to generate vetting agencies');
       }
@@ -617,7 +750,6 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
         setAllVettingAgencies((prev) => mergeAgencies(prev, normalizedCatalog));
       }
 
-      await fetchAllVettingAgencies();
       toast.success('Vetting agencies generated successfully.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to generate vetting agencies.';
@@ -636,8 +768,47 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     setIsSaving(true);
     setLastSaveError(null);
     try {
-      const validAgencyIds = formData.content_vetting_agencies.filter(id => agencyLookupById.has(id));
-      const invalidAgencyIds = formData.content_vetting_agencies.filter(id => !agencyLookupById.has(id));
+      const trimmedWebsite = formData.website_url?.trim() ?? '';
+      const normalizedWebsiteUrl = trimmedWebsite
+        ? normalizeUrlCandidate(trimmedWebsite)
+        : null;
+
+      if (trimmedWebsite && !normalizedWebsiteUrl) {
+        const message = 'Main website URL must be a valid http(s) address.';
+        toast.error(message);
+        setActiveTab('basic');
+        throw new Error(message);
+      }
+
+      const {
+        normalized: normalizedAdditionalUrls,
+        invalid: invalidAdditionalUrls,
+      } = sanitizeAdditionalWebsiteEntries(formData.additional_website_urls);
+
+      if (invalidAdditionalUrls.length > 0) {
+        const invalidSet = new Set(
+          invalidAdditionalUrls.map((url) => url.trim()).filter(Boolean),
+        );
+        const invalidIds = formData.additional_website_urls
+          .filter((entry) => invalidSet.has(entry.value.trim()))
+          .map((entry) => entry.id);
+
+        setInvalidAdditionalUrlIds(invalidIds);
+        setActiveTab('identity');
+        toast.error('Some additional website URLs are invalid.', {
+          description: invalidAdditionalUrls.join(', '),
+        });
+        throw new Error('Some additional website URLs are invalid.');
+      }
+
+      setInvalidAdditionalUrlIds([]);
+
+      const validAgencyIds = Array.from(
+        new Set(formData.content_vetting_agencies.filter((id) => agencyLookupById.has(id))),
+      );
+      const invalidAgencyIds = formData.content_vetting_agencies.filter(
+        (id) => !agencyLookupById.has(id),
+      );
 
       if (invalidAgencyIds.length > 0) {
         toast.info('Some agencies could not be matched to existing records and were excluded.', {
@@ -651,27 +822,22 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
 
       const payload: Record<string, unknown> = {
         ...formData,
+        website_url: normalizedWebsiteUrl,
+        additional_website_urls: normalizedAdditionalUrls,
         selected_agency_ids: validAgencyIds,
         master_claim_brand_ids: formData.master_claim_brand_ids, // Include the array of master claim brand IDs
       };
+      payload.content_vetting_agencies = validAgencyIds;
       
       Object.keys(payload).forEach(key => {
         if (payload[key] === '' || (Array.isArray(payload[key]) && (payload[key] as unknown[]).length === 0) ) {
           payload[key] = null;
         }
       });
-      if (payload.additional_website_urls && Array.isArray(payload.additional_website_urls)){
-        const urls = payload.additional_website_urls as Array<{id:string, value:string}>;
-        payload.additional_website_urls = urls.map((item) => item.value).filter(Boolean);
-        if((payload.additional_website_urls as string[]).length === 0) payload.additional_website_urls = null;
-      }
       if (payload.master_claim_brand_id === 'NO_SELECTION') {
         payload.master_claim_brand_id = null;
       }
 
-      console.log('Updating brand with payload:', payload);
-      console.log('Logo URL in payload:', payload.logo_url);
-      
       // Temporary workaround for CloudFlare 403 issue with PUT requests
       const response = await apiClient.post(`/api/brands/${id}?_method=PUT`, payload);
       
@@ -699,7 +865,13 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
     } catch (error) {
       const errorMessage = (error instanceof Error ? error.message : String(error)) || 'Failed to update brand.';
       setLastSaveError(errorMessage);
-      toast.error(errorMessage);
+      const handledMessages = new Set([
+        'Some additional website URLs are invalid.',
+        'Main website URL must be a valid http(s) address.',
+      ]);
+      if (!handledMessages.has(errorMessage)) {
+        toast.error(errorMessage);
+      }
       throw error; // Re-throw for auto-save hook
     } finally {
       setIsSaving(false);
@@ -1108,20 +1280,41 @@ export default function BrandEditPage({ params }: BrandEditPageProps) {
                         Additional<br />Website URLs
                       </Label>
                       <div className="col-span-12 sm:col-span-9 space-y-2">
-                        {formData.additional_website_urls.map((urlObj) => (
-                          <div key={urlObj.id} className="flex items-center gap-2">
-                            <Input
-                              value={urlObj.value}
-                              onChange={(e) => handleAdditionalUrlChange(urlObj.id, e.target.value)}
-                              placeholder="https://additional-example.com"
-                              className="flex-grow"
-                              type="url"
-                            />
-                            <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveAdditionalUrl(urlObj.id)} className="h-8 w-8" aria-label="Remove URL">
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
+                        {formData.additional_website_urls.map((urlObj) => {
+                          const isInvalid = invalidAdditionalUrlIds.includes(urlObj.id);
+                          return (
+                            <div key={urlObj.id} className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  value={urlObj.value}
+                                  onChange={(e) => handleAdditionalUrlChange(urlObj.id, e.target.value)}
+                                  placeholder="https://additional-example.com"
+                                  className={cn(
+                                    'flex-grow',
+                                    isInvalid && 'border-destructive focus-visible:ring-destructive'
+                                  )}
+                                  type="url"
+                                  aria-invalid={isInvalid}
+                                />
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleRemoveAdditionalUrl(urlObj.id)}
+                                  className="h-8 w-8"
+                                  aria-label="Remove URL"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                              {isInvalid && (
+                                <p className="text-xs text-destructive">
+                                  Enter a valid URL that starts with http:// or https://.
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
                         <Button type="button" variant="outline" onClick={handleAddAdditionalUrlField} size="sm" className="mt-2 w-full">
                           <PlusCircle className="mr-2 h-4 w-4" /> Add another URL
                         </Button>

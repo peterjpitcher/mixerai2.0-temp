@@ -1,4 +1,10 @@
-import { buildPreferences, mapProfileToSettings } from '../notification-settings/helpers';
+import {
+  buildPreferences,
+  mapProfileToSettings,
+  evaluateIfMatchHeader,
+  MISSING_IF_MATCH_ERROR,
+  VERSION_CONFLICT_ERROR,
+} from '../notification-settings/helpers';
 
 describe('notification settings helpers', () => {
   it('maps profile rows into UI-friendly defaults', () => {
@@ -40,5 +46,32 @@ describe('notification settings helpers', () => {
     });
     expect(prefs.workflow_assigned).toBe(false);
     expect(prefs.workflow_completed).toBe(false);
+  });
+
+  describe('evaluateIfMatchHeader', () => {
+    it('rejects missing headers', () => {
+      const result = evaluateIfMatchHeader(null, 0);
+      expect(result).toEqual({ ok: false, status: 428, error: MISSING_IF_MATCH_ERROR });
+    });
+
+    it('allows wildcard headers', () => {
+      const result = evaluateIfMatchHeader('*', 3);
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('allows null header when there is no existing version', () => {
+      const result = evaluateIfMatchHeader('null', 0);
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('rejects mismatched numeric versions', () => {
+      const result = evaluateIfMatchHeader('7', 4);
+      expect(result).toEqual({ ok: false, status: 412, error: VERSION_CONFLICT_ERROR });
+    });
+
+    it('rejects invalid version tokens', () => {
+      const result = evaluateIfMatchHeader('abc', 1);
+      expect(result).toEqual({ ok: false, status: 412, error: VERSION_CONFLICT_ERROR });
+    });
   });
 });

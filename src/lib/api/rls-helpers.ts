@@ -20,6 +20,25 @@ export function isRLSError(error: unknown): error is PostgrestError {
 }
 
 /**
+ * Detect PostgreSQL's "infinite recursion" policy error so API routes can fall back gracefully
+ * while migrations are catching up.
+ */
+export function isRecursivePolicyError(error: unknown): error is PostgrestError {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const candidate = error as { code?: unknown; message?: unknown };
+  const code = typeof candidate.code === 'string' ? candidate.code.toUpperCase() : undefined;
+  if (code === '42P17') {
+    return true;
+  }
+
+  const message = typeof candidate.message === 'string' ? candidate.message.toLowerCase() : '';
+  return message.includes('infinite recursion');
+}
+
+/**
  * Extract table name from RLS error message
  */
 export function extractTableFromRLSError(error: PostgrestError | { message?: string }): string | null {

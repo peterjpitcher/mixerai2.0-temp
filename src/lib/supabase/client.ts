@@ -27,20 +27,34 @@ function getSupabaseBrowserClient() {
       // Set session lifetime to 24 hours (in seconds)
       // Note: This needs to be configured in Supabase dashboard as well
       storage: {
-        getItem: (key: string) => {
-          if (typeof window !== 'undefined') {
-            return window.localStorage.getItem(key);
+        getItem: async (key: string) => {
+          if (typeof window === 'undefined') {
+            return null;
           }
-          return null;
+          return window.localStorage.getItem(key);
         },
-        setItem: (key: string, value: string) => {
-          if (typeof window !== 'undefined') {
+        setItem: async (key: string, value: string) => {
+          if (typeof window === 'undefined') {
+            return;
+          }
+          try {
             window.localStorage.setItem(key, value);
+          } catch (error) {
+            if (process.env.NODE_ENV !== 'production') {
+              console.warn('[SupabaseClient] Failed to persist session to localStorage:', error);
+            }
           }
         },
-        removeItem: (key: string) => {
-          if (typeof window !== 'undefined') {
+        removeItem: async (key: string) => {
+          if (typeof window === 'undefined') {
+            return;
+          }
+          try {
             window.localStorage.removeItem(key);
+          } catch (error) {
+            if (process.env.NODE_ENV !== 'production') {
+              console.warn('[SupabaseClient] Failed to remove session from localStorage:', error);
+            }
           }
         },
       },

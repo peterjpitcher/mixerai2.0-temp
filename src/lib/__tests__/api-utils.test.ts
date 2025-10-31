@@ -136,6 +136,14 @@ describe('handleApiError', () => {
 });
 
 describe('data fetch helpers', () => {
+  beforeEach(() => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    (console.error as jest.Mock).mockRestore();
+  });
+
   it('returns countries when API responds with countries array', async () => {
     mockApiFetchJson.mockResolvedValue({ success: true, countries: [{ code: 'US' }] as any });
 

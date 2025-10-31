@@ -2,20 +2,39 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, withAuthAndCSRF } from '@/lib/auth/api-auth';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
-import { z } from 'zod';
 import type { User } from '@supabase/supabase-js';
+import { hasProfileUpdates, updateProfileSchema } from './validation';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const profileSelect = 'full_name, company, job_title, avatar_url';
+const profileSelect = 'id, full_name, company, job_title, avatar_url';
 
-async function ensureProfile(user: User) {
+type ProfileRow = {
+  id: string;
+  full_name: string | null;
+  company: string | null;
+  job_title: string | null;
+  avatar_url: string | null;
+};
+
+function toPublicProfile(user: User, profile: ProfileRow | null) {
+  return {
+    id: user.id,
+    email: user.email ?? '',
+    fullName: profile?.full_name ?? '',
+    company: profile?.company ?? '',
+    jobTitle: profile?.job_title ?? '',
+    avatarUrl: profile?.avatar_url ?? '',
+  };
+}
+
+async function ensureProfile(user: User): Promise<ProfileRow> {
   const supabaseAdmin = createSupabaseAdminClient();
 
-  const { data: profile, error } = await supabaseAdmin
+  const { data: profileData, error } = await supabaseAdmin
     .from('profiles')
-    .select(`${profileSelect}, email_notifications_enabled, email_preferences`)
+    .select(profileSelect)
     .eq('id', user.id)
     .maybeSingle();
 
@@ -23,11 +42,19 @@ async function ensureProfile(user: User) {
     throw error;
   }
 
+  const profile = profileData as ProfileRow | null;
+
   if (profile) {
-    return profile;
+    return {
+      id: profile.id,
+      full_name: profile.full_name ?? null,
+      company: profile.company ?? null,
+      job_title: profile.job_title ?? null,
+      avatar_url: profile.avatar_url ?? null,
+    };
   }
 
-  const newProfile = {
+  const newProfile: ProfileRow = {
     id: user.id,
     full_name: user.user_metadata?.full_name || user.email || '',
     company: user.user_metadata?.company || '',
@@ -35,51 +62,31 @@ async function ensureProfile(user: User) {
     avatar_url: null,
   };
 
-  const { data: createdProfile, error: createError } = await supabaseAdmin
+  const { data: createdProfileData, error: createError } = await supabaseAdmin
     .from('profiles')
     .insert(newProfile)
-    .select(`${profileSelect}, email_notifications_enabled, email_preferences`)
+    .select(profileSelect)
     .single();
 
   if (createError) {
     throw createError;
   }
 
-  return createdProfile;
+  return createdProfileData as ProfileRow;
 }
 
 export const GET = withAuth(async (_req: NextRequest, user: User) => {
   try {
     const profile = await ensureProfile(user);
+    const sanitized = toPublicProfile(user, profile);
 
     return NextResponse.json({
       success: true,
-      profile: {
-        id: user.id,
-        email: user.email ?? '',
-        fullName: profile.full_name ?? '',
-        company: profile.company ?? '',
-        jobTitle: profile.job_title ?? '',
-        avatarUrl: profile.avatar_url ?? '',
-      },
+      profile: sanitized,
     });
   } catch (error) {
     return handleApiError(error, 'Failed to load profile');
   }
-});
-
-const updateProfileSchema = z.object({
-  fullName: z.string().trim().min(1, 'Full name is required').optional(),
-  company: z.string().trim().optional(),
-  jobTitle: z.string().trim().optional(),
-  avatarUrl: z
-    .string()
-    .trim()
-    .url()
-    .optional()
-    .or(z.literal('').transform(() => null))
-    .or(z.null())
-    .optional(),
 });
 
 export const PUT = withAuthAndCSRF(async (request: NextRequest, user: User) => {
@@ -87,12 +94,7 @@ export const PUT = withAuthAndCSRF(async (request: NextRequest, user: User) => {
     const body = await request.json();
     const parsed = updateProfileSchema.parse(body);
 
-    if (
-      parsed.fullName === undefined &&
-      parsed.company === undefined &&
-      parsed.jobTitle === undefined &&
-      parsed.avatarUrl === undefined
-    ) {
+    if (!hasProfileUpdates(parsed)) {
       return NextResponse.json(
         { success: false, error: 'No profile fields were provided.' },
         { status: 422 }
@@ -105,7 +107,7 @@ export const PUT = withAuthAndCSRF(async (request: NextRequest, user: User) => {
 
     const supabaseAdmin = createSupabaseAdminClient();
 
-    const { data: updatedProfile, error } = await supabaseAdmin
+    const { data: updatedProfileData, error } = await supabaseAdmin
       .from('profiles')
       .upsert(
         {
@@ -146,16 +148,12 @@ export const PUT = withAuthAndCSRF(async (request: NextRequest, user: User) => {
       }
     }
 
+    const updatedProfile = (updatedProfileData ?? existingProfile) as ProfileRow;
+    const responseProfile = toPublicProfile(user, updatedProfile);
+
     return NextResponse.json({
       success: true,
-      profile: {
-        id: user.id,
-        email: user.email ?? '',
-        fullName: updatedProfile?.full_name ?? existingProfile.full_name ?? '',
-        company: updatedProfile?.company ?? '',
-        jobTitle: updatedProfile?.job_title ?? '',
-        avatarUrl: updatedProfile?.avatar_url ?? '',
-      },
+      profile: responseProfile,
     });
   } catch (error) {
     return handleApiError(error, 'Failed to update profile');

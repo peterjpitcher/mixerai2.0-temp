@@ -1,10 +1,11 @@
-'use client';
-
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Home, HelpCircle, Search, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 /**
  * Custom 404 Not Found page.
@@ -104,14 +105,11 @@ export default function NotFound() {
 
         {/* Back Button */}
         <div className="text-center">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => window.history.back()}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Go Back
+          <Button asChild variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+            <Link href="/">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Go Back
+            </Link>
           </Button>
         </div>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,35 +8,72 @@ import { TasksSkeleton } from './dashboard-skeleton';
 import { Task } from '@/types/task';
 import { formatDistanceToNow } from 'date-fns';
 import { BrandDisplay } from '@/components/ui/brand-display';
+import { apiFetchJson, ApiClientError } from '@/lib/api-client';
+import { Button } from '@/components/ui/button';
+import { createLogger } from '@/lib/observability/logger';
 
-async function fetchTasks(): Promise<Task[]> {
-  try {
-    const response = await fetch('/api/me/tasks');
-    if (!response.ok) {
-      console.error('Failed to fetch tasks');
-      return [];
-    }
-    const data = await response.json();
-    return data.success ? data.data : [];
-  } catch (error) {
-    console.error('Error fetching tasks:', error);
-    return [];
-  }
-}
+const isAbortError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+  const name = (error as { name?: unknown }).name;
+  return name === 'AbortError';
+};
+
+const logger = createLogger('dashboard:my-tasks');
 
 export function MyTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const loadTasks = useCallback(async (signal: AbortSignal) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await apiFetchJson<{ success: boolean; data?: Task[]; error?: string }>(
+        '/api/me/tasks',
+        {
+          signal,
+          errorMessage: 'Unable to load tasks right now.',
+        }
+      );
+
+      if (!response.success) {
+        throw new Error(response.error || 'Unable to load tasks.');
+      }
+
+      if (!signal.aborted) {
+        setTasks(response.data ?? []);
+      }
+    } catch (err) {
+      if (isAbortError(err) || signal.aborted) {
+        return;
+      }
+
+      logger.error('Failed to fetch dashboard tasks', { error: err });
+      const message = err instanceof ApiClientError ? err.message : 'Unable to load tasks right now.';
+      setTasks([]);
+      setError(message);
+    } finally {
+      if (!signal.aborted) {
+        setIsLoading(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    const loadTasks = async () => {
-      setIsLoading(true);
-      const fetchedTasks = await fetchTasks();
-      setTasks(fetchedTasks);
-      setIsLoading(false);
+    const controller = new AbortController();
+    loadTasks(controller.signal);
+
+    return () => {
+      controller.abort();
     };
-    loadTasks();
-  }, []);
+  }, [loadTasks, reloadKey]);
+
+  const handleRetry = () => {
+    setReloadKey((value) => value + 1);
+  };
 
   if (isLoading) {
     return <TasksSkeleton />;
@@ -51,7 +88,14 @@ export function MyTasks() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {tasks && tasks.length > 0 ? (
+        {error ? (
+          <div className="text-center space-y-3 py-8">
+            <p className="text-sm text-destructive">{error}</p>
+            <Button onClick={handleRetry} size="sm" variant="outline">
+              Retry
+            </Button>
+          </div>
+        ) : tasks && tasks.length > 0 ? (
           <ul className="space-y-4">
             {tasks.map((task) => (
               <li key={task.id} className="flex items-start justify-between gap-4">
@@ -97,4 +141,4 @@ export function MyTasks() {
       </CardContent>
     </Card>
   );
-} 
+}

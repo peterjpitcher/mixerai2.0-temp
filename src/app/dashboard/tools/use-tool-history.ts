@@ -32,6 +32,7 @@ export interface UseToolHistoryOptions<T> {
   enabled?: boolean;
   pageSize?: number;
   transform?: (records: ToolRunHistoryRecord[]) => T[];
+  filters?: ToolHistoryFilters;
 }
 
 export interface UseToolHistoryResult<T> {
@@ -46,6 +47,11 @@ export interface UseToolHistoryResult<T> {
 
 const DEFAULT_PAGE_SIZE = 20;
 
+export interface ToolHistoryFilters {
+  status?: 'success' | 'failure';
+  brandId?: string;
+}
+
 export function useToolHistory<T = ToolRunHistoryRecord>(
   toolName: string,
   options: UseToolHistoryOptions<T> = {}
@@ -54,6 +60,7 @@ export function useToolHistory<T = ToolRunHistoryRecord>(
     enabled = true,
     pageSize = DEFAULT_PAGE_SIZE,
     transform,
+    filters,
   } = options;
 
   const [items, setItems] = useState<T[]>([]);
@@ -67,6 +74,11 @@ export function useToolHistory<T = ToolRunHistoryRecord>(
       transform ??
       ((records: ToolRunHistoryRecord[]) => records as unknown as T[]),
     [transform]
+  );
+
+  const serializedFilters = useMemo(
+    () => JSON.stringify(filters ?? {}),
+    [filters]
   );
 
   const fetchPage = useCallback(
@@ -89,6 +101,14 @@ export function useToolHistory<T = ToolRunHistoryRecord>(
           limit: pageSize.toString(),
         });
 
+        if (filters?.status) {
+          params.set('status', filters.status);
+        }
+
+        if (filters?.brandId) {
+          params.set('brand_id', filters.brandId);
+        }
+
         const data = await apiFetchJson<ToolRunHistoryResponse>(
           `/api/me/tool-run-history?${params.toString()}`
         );
@@ -109,6 +129,7 @@ export function useToolHistory<T = ToolRunHistoryRecord>(
           if (!append) {
             setItems([]);
             setHasMore(false);
+            setPage(1);
           }
           setError(data.error || 'History data not found.');
         }
@@ -116,13 +137,14 @@ export function useToolHistory<T = ToolRunHistoryRecord>(
         if (!append) {
           setItems([]);
           setHasMore(false);
+          setPage(1);
         }
         setError(err instanceof Error ? err.message : 'Failed to load history.');
       } finally {
         setIsLoading(false);
       }
     },
-    [enabled, mapper, pageSize, toolName]
+    [enabled, filters, mapper, pageSize, toolName]
   );
 
   const refresh = useCallback(() => {
@@ -143,7 +165,7 @@ export function useToolHistory<T = ToolRunHistoryRecord>(
     }
 
     void fetchPage(1, false);
-  }, [enabled, fetchPage]);
+  }, [enabled, fetchPage, serializedFilters]);
 
   return {
     items,

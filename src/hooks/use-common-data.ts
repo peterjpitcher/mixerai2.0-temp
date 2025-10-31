@@ -69,7 +69,6 @@ export function useCurrentUser() {
         throw new Error('Invalid user data');
       } catch (error) {
         console.error('Error fetching current user:', error);
-        toast.error('Could not verify your permissions.');
         throw error;
       }
     },

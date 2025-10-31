@@ -8,6 +8,36 @@ export const NotificationSettingsSchema = z.object({
   marketingEmails: z.boolean().optional(),
 });
 
+export const MISSING_IF_MATCH_ERROR = 'Missing If-Match header for concurrency control.';
+export const VERSION_CONFLICT_ERROR = 'Notification settings have been modified by another session.';
+
+export type VersionCheckResult =
+  | { ok: true }
+  | { ok: false; status: 412 | 428; error: string };
+
+export function evaluateIfMatchHeader(ifMatch: string | null, currentVersion: number): VersionCheckResult {
+  if (!ifMatch) {
+    return { ok: false, status: 428, error: MISSING_IF_MATCH_ERROR };
+  }
+
+  if (ifMatch === '*') {
+    return { ok: true };
+  }
+
+  if (ifMatch === 'null') {
+    return currentVersion === 0
+      ? { ok: true }
+      : { ok: false, status: 412, error: VERSION_CONFLICT_ERROR };
+  }
+
+  const parsed = Number(ifMatch);
+  if (!Number.isFinite(parsed) || parsed !== currentVersion) {
+    return { ok: false, status: 412, error: VERSION_CONFLICT_ERROR };
+  }
+
+  return { ok: true };
+}
+
 export function mapProfileToSettings(profile: {
   email_notifications_enabled: boolean | null;
   email_preferences: unknown;

@@ -51,6 +51,8 @@ import { apiFetch, apiFetchJson } from '@/lib/api-client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getAvatarUrl, getNameInitials } from '@/lib/utils/avatar';
 import { useCurrentUser } from '@/hooks/use-common-data';
+import { useDebounce } from '@/hooks/use-debounce';
+import { fetchUsersPaginated } from './fetch-users';
 
 // export const metadata: Metadata = {
 //   title: 'Manage Users | MixerAI 2.0',
@@ -93,6 +95,8 @@ interface User {
  * and deleting existing ones. User roles and brand permissions are also displayed.
  */
 const PAGE_SIZE = 25;
+const BRAND_CACHE_KEY = 'dashboard.users.brands.v1';
+const BRAND_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 export default function UsersPage() {
   const { data: currentUser, isLoading: isLoadingUser, error: currentUserError } = useCurrentUser();
@@ -102,7 +106,6 @@ export default function UsersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
   const [sortField, setSortField] = useState<'full_name' | 'role' | 'email' | 'company' | 'last_sign_in_at'>('full_name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -115,6 +118,7 @@ export default function UsersPage() {
   const [staleFilter, setStaleFilter] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [isLoadingBrands, setIsLoadingBrands] = useState(false);
+  const debouncedSearch = useDebounce(searchTerm.trim(), 300);
 
   const sessionErrorMessage = useMemo(() => {
     if (!currentUserError) return null;
@@ -126,15 +130,6 @@ export default function UsersPage() {
       return 'Failed to load user session.';
     }
   }, [currentUserError]);
-
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setDebouncedSearch(searchTerm.trim());
-      setPage(1);
-    }, 300);
-
-    return () => clearTimeout(timeout);
-  }, [searchTerm]);
 
   useEffect(() => {
     setPage(1);
@@ -152,54 +147,35 @@ export default function UsersPage() {
       setIsLoading(true);
       setLoadError(null);
 
-      try {
-        const aggregated: User[] = [];
-        const perPage = 100;
-        let nextPage = 1;
-        let total = Number.POSITIVE_INFINITY;
-
-        while (!signal?.aborted && aggregated.length < total) {
-          const params = new URLSearchParams({
-            page: String(nextPage),
-            pageSize: String(perPage),
-            includeInactive: 'true',
-          });
-
-          const response = await apiFetchJson<{
+      const result = await fetchUsersPaginated<User>({
+        signal,
+        includeInactive: true,
+        fetchPage: async (url, init) =>
+          apiFetchJson<{
             success: boolean;
             data?: User[];
             error?: string;
             pagination?: { total?: number };
-          }>(`/api/users?${params.toString()}`, { signal });
+          }>(url, init),
+      });
 
-          if (!response.success) {
-            throw new Error(response.error || 'Failed to load users.');
-          }
-
-          const chunk = response.data ?? [];
-          aggregated.push(...chunk);
-          total = response.pagination?.total ?? aggregated.length;
-          if (chunk.length < perPage) {
-            break;
-          }
-
-          nextPage += 1;
-        }
-
-        if (signal?.aborted) return;
-        setAllUsers(aggregated);
-      } catch (error) {
-        if (signal?.aborted) return;
-        console.error('[UsersPage] Failed to load users:', error);
-        const message = error instanceof Error ? error.message : 'Failed to load users.';
-        setLoadError(message);
-        toast.error('Failed to load users. Please try again.');
-        setAllUsers([]);
-      } finally {
-        if (!signal?.aborted) {
-          setIsLoading(false);
-        }
+      if (signal?.aborted) {
+        setIsLoading(false);
+        return;
       }
+
+      setAllUsers(result.users);
+
+      if (result.error) {
+        setLoadError(result.error);
+        toast.error(
+          result.users.length > 0
+            ? 'Unable to load all users. Showing partial results.'
+            : result.error
+        );
+      }
+
+      setIsLoading(false);
     },
     [isAllowedToAccess]
   );
@@ -221,6 +197,32 @@ export default function UsersPage() {
     if (isLoadingUser || !isAllowedToAccess) return;
 
     const controller = new AbortController();
+    let shouldFetch = true;
+
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = window.sessionStorage.getItem(BRAND_CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached) as { brands?: Brand[]; cachedAt?: number };
+          if (
+            Array.isArray(parsed?.brands) &&
+            typeof parsed?.cachedAt === 'number' &&
+            Date.now() - parsed.cachedAt < BRAND_CACHE_TTL_MS
+          ) {
+            setBrands(parsed.brands);
+            setIsLoadingBrands(false);
+            shouldFetch = false;
+          }
+        }
+      } catch (error) {
+        console.warn('[UsersPage] Failed to read cached brands from sessionStorage:', error);
+      }
+    }
+
+    if (!shouldFetch) {
+      return () => controller.abort();
+    }
+
     const loadBrands = async () => {
       setIsLoadingBrands(true);
       try {
@@ -262,6 +264,12 @@ export default function UsersPage() {
           })
         );
         setBrands(sorted);
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.setItem(
+            BRAND_CACHE_KEY,
+            JSON.stringify({ brands: sorted, cachedAt: Date.now() })
+          );
+        }
       } catch (error) {
         if (controller.signal.aborted) return;
         console.error('[UsersPage] Failed to load brands:', error);
@@ -440,13 +448,28 @@ export default function UsersPage() {
         },
         body: JSON.stringify({ email }), // API expects email
       });
-      const data = await response.json();
-      if (response.ok && data.success) {
-        toast.success(`Invitation resent to ${email}.`);
-        await fetchAllUsers();
-      } else {
-        toast.error(data.error || 'Failed to resend invitation.');
+      let payload: { success?: boolean; message?: string; error?: string } | null = null;
+      try {
+        payload = await response.json();
+      } catch (parseError) {
+        console.warn('Failed to parse resend invite response:', parseError);
       }
+
+      if (!response.ok) {
+        const message =
+          (payload && typeof payload.error === 'string' && payload.error) ||
+          `Failed to resend invitation (status ${response.status}).`;
+        toast.error(message);
+        return;
+      }
+
+      if (!payload?.success) {
+        toast.error(payload?.error || 'Failed to resend invitation.');
+        return;
+      }
+
+      toast.success(payload.message || `Invitation resent to ${email}.`);
+      await fetchAllUsers();
     } catch (error) {
       console.error('Error resending invite:', error);
       toast.error('An error occurred while resending the invitation.');

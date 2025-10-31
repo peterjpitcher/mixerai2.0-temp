@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { v4 as uuidv4 } from 'uuid';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
@@ -42,6 +43,8 @@ interface Template {
   name: string;
   description: string;
   fields?: TemplateFields;
+  inputFieldsCount?: number;
+  outputFieldsCount?: number;
   icon?: string | null;
   brand_id?: string | null;
   usageCount?: number;
@@ -116,14 +119,32 @@ export default function TemplatesPage() {
         };
 
         if (data.success && Array.isArray(data.templates)) {
-          const normalizedTemplates = data.templates.map((template) => ({
-            ...template,
-            fields: {
-              inputFields: template.fields?.inputFields ?? [],
-              outputFields: template.fields?.outputFields ?? [],
-            },
-            usageCount: template.usageCount ?? 0,
-          }));
+          const normalizedTemplates = data.templates.map((template) => {
+            const normalizedFields = template.fields
+              ? {
+                  inputFields: template.fields.inputFields ?? [],
+                  outputFields: template.fields.outputFields ?? [],
+                }
+              : undefined;
+
+            const inputFieldsCount =
+              template.inputFieldsCount ??
+              normalizedFields?.inputFields.length ??
+              0;
+
+            const outputFieldsCount =
+              template.outputFieldsCount ??
+              normalizedFields?.outputFields.length ??
+              0;
+
+            return {
+              ...template,
+              fields: normalizedFields,
+              usageCount: template.usageCount ?? 0,
+              inputFieldsCount,
+              outputFieldsCount,
+            };
+          });
           setTemplates(normalizedTemplates);
         } else {
           setTemplates([]);
@@ -147,7 +168,7 @@ export default function TemplatesPage() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
       return crypto.randomUUID();
     }
-    return `field_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    return uuidv4();
   };
 
   const deepClone = <T,>(value: T): T => {
@@ -224,13 +245,40 @@ export default function TemplatesPage() {
     return { inputFields: clonedInputFields, outputFields: clonedOutputFields };
   };
 
-  const handleDuplicateTemplate = async (templateToDuplicate: Template) => {
+  const handleDuplicateTemplate = async (templateSummary: Template) => {
     if (!currentUser || currentUser.user_metadata?.role !== 'admin') {
       toast.error('You do not have permission to duplicate templates.');
       return;
     }
-    setIsDuplicating(templateToDuplicate.id);
+    setIsDuplicating(templateSummary.id);
     try {
+      const templateDetailResponse = await apiFetch(
+        `/api/content-templates?id=${templateSummary.id}&includeFields=true`,
+        {
+          retry: 1,
+          retryDelayMs: 300,
+          throwOnHttpError: true,
+        }
+      );
+      const templateDetail = await templateDetailResponse.json() as {
+        success: boolean;
+        template?: Template;
+        error?: string;
+      };
+
+      const detailTemplate = templateDetail.template;
+
+      if (!templateDetail.success || !detailTemplate?.fields) {
+        throw new Error(templateDetail.error || 'Template data unavailable for duplication.');
+      }
+
+      const templateToDuplicate = {
+        ...detailTemplate,
+        fields: {
+          inputFields: detailTemplate.fields.inputFields ?? [],
+          outputFields: detailTemplate.fields.outputFields ?? [],
+        },
+      };
       // Check if template has valid field structure
       if (!templateToDuplicate.fields?.inputFields || !templateToDuplicate.fields?.outputFields) {
         toast.error('Template structure is invalid for duplication');
@@ -278,6 +326,10 @@ export default function TemplatesPage() {
       return;
     }
     if (!templateToDelete) return;
+    if ((templateToDelete.usageCount ?? 0) > 0) {
+      toast.error('Cannot delete template that is currently in use.');
+      return;
+    }
     setIsDeleting(true);
     try {
       // Note: System templates (article-template, product-template) are handled on their edit page.
@@ -324,7 +376,7 @@ export default function TemplatesPage() {
       id: "inputFields",
       header: "Input Fields",
       cell: ({ row }) => {
-        const count = row.fields?.inputFields?.length ?? 0;
+        const count = row.inputFieldsCount ?? row.fields?.inputFields?.length ?? 0;
         return (
           <Badge variant="secondary">
             {count} field{count !== 1 ? 's' : ''}
@@ -333,8 +385,8 @@ export default function TemplatesPage() {
       },
       enableSorting: true,
       sortingFn: (a, b) => {
-        const aCount = a.fields?.inputFields?.length ?? 0;
-        const bCount = b.fields?.inputFields?.length ?? 0;
+        const aCount = a.inputFieldsCount ?? a.fields?.inputFields?.length ?? 0;
+        const bCount = b.inputFieldsCount ?? b.fields?.inputFields?.length ?? 0;
         return aCount - bCount;
       },
     },
@@ -342,7 +394,7 @@ export default function TemplatesPage() {
       id: "outputFields",
       header: "Output Fields",
       cell: ({ row }) => {
-        const count = row.fields?.outputFields?.length ?? 0;
+        const count = row.outputFieldsCount ?? row.fields?.outputFields?.length ?? 0;
         return (
           <Badge variant="secondary">
             {count} field{count !== 1 ? 's' : ''}
@@ -351,8 +403,8 @@ export default function TemplatesPage() {
       },
       enableSorting: true,
       sortingFn: (a, b) => {
-        const aCount = a.fields?.outputFields?.length ?? 0;
-        const bCount = b.fields?.outputFields?.length ?? 0;
+        const aCount = a.outputFieldsCount ?? a.fields?.outputFields?.length ?? 0;
+        const bCount = b.outputFieldsCount ?? b.fields?.outputFields?.length ?? 0;
         return aCount - bCount;
       },
     },
@@ -432,16 +484,26 @@ export default function TemplatesPage() {
                   >
                     <Copy className="mr-2 h-4 w-4" /> Duplicate
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setTemplateToDelete(row);
-                      setShowDeleteDialog(true);
-                    }}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" /> Delete
-                  </DropdownMenuItem>
+                  {(row.usageCount ?? 0) > 0 ? (
+                    <DropdownMenuItem
+                      disabled
+                      className="text-muted-foreground"
+                      title="Templates in use cannot be deleted."
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete (In Use)
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTemplateToDelete(row);
+                        setShowDeleteDialog(true);
+                      }}
+                      className="text-destructive"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                    </DropdownMenuItem>
+                  )}
                 </>
               )}
             </DropdownMenuContent>

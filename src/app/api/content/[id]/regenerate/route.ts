@@ -6,17 +6,60 @@ import { User } from '@supabase/supabase-js';
 import { generateTextCompletion } from '@/lib/azure/openai';
 import { normalizeFieldContent } from '@/lib/content/html-normalizer';
 import { Database, Json } from '@/types/supabase';
+import { z } from 'zod';
+import { TemplateFieldsSchema } from '@/lib/schemas/template';
 
 type ContentVersionInsert = Database['public']['Tables']['content_versions']['Insert'];
-import { TemplateFields, TemplateOutputField } from '@/types/content-templates';
 import { withAuthAndCSRF } from '@/lib/api/with-csrf';
 
 export const dynamic = "force-dynamic";
 
-interface RegenerationRequest {
-  sections?: ('title' | 'body' | 'meta_description')[];
-  feedback?: string;
-  fieldId?: string; // For regenerating specific template output fields
+const SectionEnum = z.enum(['title', 'body', 'meta_description'] as const);
+type Section = z.infer<typeof SectionEnum>;
+
+const RegenerationRequestSchema = z
+  .object({
+    sections: z.array(SectionEnum).optional(),
+    feedback: z.string().trim().max(2000).optional(),
+    fieldId: z.string().trim().min(1).optional(),
+  })
+  .refine((data) => !(data.sections && data.fieldId), {
+    message: 'Provide either sections or fieldId, not both.',
+    path: ['fieldId'],
+  });
+
+const NormalizedContentSchema = z.object({
+  html: z.string(),
+  plain: z.string(),
+  wordCount: z.number().int().nonnegative(),
+  charCount: z.number().int().nonnegative(),
+});
+
+const GeneratedOutputsSchema = z.record(NormalizedContentSchema);
+
+type ParsedTemplateFields = z.infer<typeof TemplateFieldsSchema>;
+type ParsedTemplateOutputField = ParsedTemplateFields['outputFields'][number];
+
+function coerceSectionText(section: Section, value: unknown): string {
+  if (typeof value !== 'string') {
+    throw new Error(`AI response for ${section} was not textual content.`);
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new Error(`AI response for ${section} was empty.`);
+  }
+  return trimmed;
+}
+
+function hasMeaningfulContent(content: z.infer<typeof NormalizedContentSchema>): boolean {
+  if (!content) return false;
+  if (content.plain && content.plain.trim().length > 0) {
+    return true;
+  }
+  if (content.html && content.html.replace(/<[^>]*>/g, '').trim().length > 0) {
+    return true;
+  }
+  return false;
 }
 
 export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, context?: unknown): Promise<Response> => {
@@ -25,7 +68,28 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
   
   try {
     const supabase = createSupabaseAdminClient();
-    const body: RegenerationRequest = await request.json();
+    let requestBody: unknown;
+
+    try {
+      requestBody = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON payload' }, { status: 400 });
+    }
+
+    const parsedRequest = RegenerationRequestSchema.safeParse(requestBody);
+    if (!parsedRequest.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid request body',
+          details: parsedRequest.error.flatten(),
+        },
+        { status: 400 }
+      );
+    }
+
+    const { sections: requestedSections, feedback, fieldId } = parsedRequest.data;
+    const sections = requestedSections ?? (fieldId ? undefined : (['body'] as Section[]));
     
     // Fetch content with all necessary relations
     const { data: content, error: contentError } = await supabase
@@ -80,7 +144,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
         content_data: content.content_data
       } as Json,
       action_status: 'regeneration_requested',
-      feedback: body.feedback || 'Manual regeneration requested',
+      feedback: feedback ?? 'Manual regeneration requested',
       reviewer_id: user.id
     };
     
@@ -112,9 +176,25 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
     } as Record<string, unknown>; // TODO: Type properly when Database types are generated
     
     // Handle specific field regeneration
-    const templateFields = template.fields as unknown as TemplateFields;
-    if (body.fieldId && templateFields?.outputFields) {
-      const field = templateFields.outputFields.find((f) => f.id === body.fieldId);
+    const templateFieldsResult = TemplateFieldsSchema.safeParse(template.fields);
+    if (!templateFieldsResult.success) {
+      console.error('Invalid template fields for regeneration:', templateFieldsResult.error);
+      return NextResponse.json(
+        { success: false, error: 'Template configuration is invalid; cannot regenerate content.' },
+        { status: 422 }
+      );
+    }
+    const templateFields = templateFieldsResult.data;
+    const outputFields = templateFields.outputFields ?? [];
+
+    if (fieldId) {
+      if (outputFields.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Template does not define any output fields.' },
+          { status: 400 }
+        );
+      }
+      const field = outputFields.find((f) => f.id === fieldId);
       if (!field) {
         return NextResponse.json({ 
           success: false, 
@@ -127,7 +207,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
         field,
         contentWithRelations,
         contentWithRelations.brands as Record<string, unknown>,
-        body.feedback
+        feedback
       );
       
       const regeneratedContent = await generateTextCompletion(
@@ -141,6 +221,25 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
         throw new Error('Failed to generate content');
       }
       const normalizedContent = normalizeFieldContent(regeneratedContent, field.type);
+      let validatedContent: z.infer<typeof NormalizedContentSchema>;
+      try {
+        validatedContent = NormalizedContentSchema.parse(normalizedContent);
+      } catch (validationError) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Generated output did not match the expected schema.',
+            details: validationError instanceof z.ZodError ? validationError.flatten() : undefined,
+          },
+          { status: 422 }
+        );
+      }
+      if (field.required && !hasMeaningfulContent(validatedContent)) {
+        return NextResponse.json(
+          { success: false, error: `Generated content for "${field.name}" is empty.` },
+          { status: 422 }
+        );
+      }
 
       // Update specific field in content_data
       const currentContentData = (content.content_data || {}) as Record<string, unknown>;
@@ -151,12 +250,25 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
 
       const updatedGeneratedOutputs: Record<string, unknown> = {
         ...currentGeneratedOutputsRaw,
-        [body.fieldId]: normalizedContent,
+        [fieldId]: validatedContent,
       };
+      let validatedOutputs: Record<string, z.infer<typeof NormalizedContentSchema>>;
+      try {
+        validatedOutputs = GeneratedOutputsSchema.parse(updatedGeneratedOutputs);
+      } catch (validationError) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Generated outputs map failed validation.',
+            details: validationError instanceof z.ZodError ? validationError.flatten() : undefined,
+          },
+          { status: 422 }
+        );
+      }
 
       const updatedContentData = {
         ...currentContentData,
-        generatedOutputs: updatedGeneratedOutputs,
+        generatedOutputs: validatedOutputs,
       };
       
       // If this is the primary body field, also update main body
@@ -164,7 +276,7 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
         content_data: updatedContentData
       };
       if (isBodyField(field, templateFields.outputFields)) {
-        updatePayload.body = normalizedContent.html;
+        updatePayload.body = validatedContent.html;
       }
       
       const { error: updateError } = await supabase
@@ -179,23 +291,23 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
       return NextResponse.json({ 
         success: true, 
         data: { 
-          fieldId: body.fieldId, 
-          content: normalizedContent 
+          fieldId, 
+          content: validatedContent 
         } 
       });
     }
     
     // Handle full content regeneration
-    const sections = body.sections || ['body'];
+    const sectionsToRegenerate = sections ?? (['body'] as Section[]);
     const updates: Partial<Record<string, unknown>> = {}; // TODO: Type as Partial<Database['public']['Tables']['content']['Update']> when types are regenerated
     
-    for (const section of sections) {
+    for (const section of sectionsToRegenerate) {
       const prompt = buildSectionRegenerationPrompt(
         section,
         contentWithRelations,
         brand,
         template,
-        body.feedback
+        feedback
       );
       
       const regeneratedContent = await generateTextCompletion(
@@ -209,7 +321,18 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User, con
         throw new Error(`Failed to generate content for ${section}`);
       }
       
-      updates[section] = regeneratedContent;
+      let sanitizedSectionText: string;
+      try {
+        sanitizedSectionText = coerceSectionText(section, regeneratedContent);
+      } catch (validationError) {
+        const errorMessage =
+          validationError instanceof Error
+            ? validationError.message
+            : `Generated ${section} response was invalid.`;
+        return NextResponse.json({ success: false, error: errorMessage }, { status: 422 });
+      }
+
+      updates[section] = sanitizedSectionText;
     }
     
     // Update content with regenerated sections
@@ -252,7 +375,7 @@ async function getNextVersionNumber(
 }
 
 function buildFieldRegenerationPrompt(
-  field: TemplateOutputField,
+  field: ParsedTemplateOutputField,
   content: Record<string, unknown>, // TODO: Type as Database['public']['Tables']['content']['Row'] & {...} when types are regenerated
   brand: Record<string, unknown>, // TODO: Type as Database['public']['Tables']['brands']['Row'] when types are regenerated
   feedback?: string
@@ -283,7 +406,7 @@ function buildFieldRegenerationPrompt(
 }
 
 function buildSectionRegenerationPrompt(
-  section: string,
+  section: Section,
   content: Record<string, unknown>, // TODO: Type as Database['public']['Tables']['content']['Row'] & {...} when types are regenerated
   brand: Record<string, unknown>, // TODO: Type as Database['public']['Tables']['brands']['Row'] when types are regenerated
   template: Record<string, unknown>, // TODO: Type as Database['public']['Tables']['content_templates']['Row'] when types are regenerated
@@ -320,9 +443,9 @@ function buildSectionRegenerationPrompt(
   return prompt;
 }
 
-function isBodyField(field: TemplateOutputField, outputFields: TemplateOutputField[]): boolean {
+function isBodyField(field: ParsedTemplateOutputField, outputFields: ParsedTemplateOutputField[]): boolean {
   // Check if this is the primary body field
-  const richTextField = outputFields.find(f => f.type === 'rich-text');
+  const richTextField = outputFields.find(f => f.type === 'richText');
   if (richTextField && field.id === richTextField.id) return true;
   
   // If no rich text field, check if it's the first field

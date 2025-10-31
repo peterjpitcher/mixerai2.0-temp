@@ -92,6 +92,12 @@ describe('Password Validation', () => {
         expect(result.valid).toBe(true);
       });
     });
+
+    it('should reject passwords that include common weak patterns', () => {
+      const result = validatePassword('Password123!');
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Password is too common. Please choose a more unique password');
+    });
   });
 
   describe('checkReauthenticationRequired', () => {

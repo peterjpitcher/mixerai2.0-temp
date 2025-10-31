@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,7 @@ import { apiFetch } from '@/lib/api-client';
 import { ensureNormalizedContent, normalizeOutputsMap } from '@/lib/content/html-normalizer';
 import type { NormalizedContent } from '@/types/template';
 import type { VettingFeedbackStageResult } from '@/types/vetting-feedback';
+import { formatDistanceToNow } from 'date-fns';
 
 
 interface ContentEditPageProps {
@@ -140,7 +141,12 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
+  const [autoSaveError, setAutoSaveError] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [lastSaveSource, setLastSaveSource] = useState<'manual' | 'auto' | null>(null);
   const fetchingRef = React.useRef(false);
+  const markAsSavedRef = React.useRef<(data?: ContentState) => void>();
   
   // User and Permissions State
   const [currentUser, setCurrentUser] = useState<UserSessionData | null>(null);
@@ -311,6 +317,10 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             due_date: contentResult.data.due_date || null
           };
           setContent(newContentState);
+          markAsSavedRef.current?.(newContentState);
+          setLastSavedAt(null);
+          setLastSaveSource(null);
+          setHasUnsavedChanges(false);
 
           // Set brand data from the content response if available
           if (contentResult.data.brands) {
@@ -422,72 +432,107 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       };
     });
     setHasUnsavedChanges(true);
+    setLastSavedAt(null);
+    setLastSaveSource(null);
   };
   
-  const handleSave = async (): Promise<boolean> => {
-    setIsSaving(true);
-    let success = false;
-    try {
-      const outputsForSave = normalizeOutputsMap(
-        (content.content_data?.generatedOutputs as Record<string, unknown> | undefined) ?? undefined,
-        outputFieldDefinitions
-      );
+  const saveContent = useCallback(
+    async (mode: 'manual' | 'auto'): Promise<boolean> => {
+      if (mode === 'manual') {
+        setIsSaving(true);
+      }
 
-      let primaryBodyFromOutputs = content.body;
-      if (template && template.fields && template.fields.outputFields && template.fields.outputFields.length > 0) {
-        const richTextOutputField = template.fields.outputFields.find(f => isRichFieldType(f.type));
-        const firstOutputField = template.fields.outputFields[0];
-        const fieldToUseForBody = richTextOutputField || firstOutputField;
+      try {
+        const outputsForSave = normalizeOutputsMap(
+          (content.content_data?.generatedOutputs as Record<string, unknown> | undefined) ?? undefined,
+          outputFieldDefinitions
+        );
 
-        if (fieldToUseForBody) {
-          const normalized = outputsForSave[fieldToUseForBody.id];
-          if (normalized) {
-            primaryBodyFromOutputs = isRichFieldType(fieldToUseForBody.type) ? normalized.html : normalized.plain;
+        let primaryBodyFromOutputs = content.body;
+        if (template?.fields?.outputFields && template.fields.outputFields.length > 0) {
+          const richTextOutputField = template.fields.outputFields.find((f) => isRichFieldType(f.type));
+          const firstOutputField = template.fields.outputFields[0];
+          const fieldToUseForBody = richTextOutputField || firstOutputField;
+
+          if (fieldToUseForBody) {
+            const normalized = outputsForSave[fieldToUseForBody.id];
+            if (normalized) {
+              primaryBodyFromOutputs = isRichFieldType(fieldToUseForBody.type) ? normalized.html : normalized.plain;
+            }
           }
         }
-      }
 
-      const payloadToSave = {
-        title: content.title,
-        body: primaryBodyFromOutputs, 
-        status: content.status,
-        due_date: content.due_date,
-        content_data: {
-          ...(content.content_data || {}),
-          generatedOutputs: outputsForSave,
+        const payloadToSave = {
+          title: content.title,
+          body: primaryBodyFromOutputs,
+          status: content.status,
+          due_date: content.due_date,
+          content_data: {
+            ...(content.content_data || {}),
+            generatedOutputs: outputsForSave,
+          },
+        };
+
+        const response = await apiFetch(`/api/content/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payloadToSave),
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || `Failed to update content. Status: ${response.status}`);
         }
-      };
-      
-      const response = await apiFetch(`/api/content/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payloadToSave),
-      });
-      const result = await response.json();
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || `Failed to update content. Status: ${response.status}`);
+
+        let persistedState: ContentState = {
+          ...content,
+          ...payloadToSave,
+        };
+
+        if (result.data) {
+          persistedState = {
+            ...content,
+            ...result.data,
+          };
+        }
+
+        setContent(persistedState);
+        setHasUnsavedChanges(false);
+        setLastSavedAt(new Date());
+        setLastSaveSource(mode);
+        markAsSavedRef.current?.(persistedState);
+
+        if (mode === 'manual') {
+          toast.success('Content updated successfully!');
+          if (autoSaveError) {
+            setAutoSaveError(null);
+          }
+        }
+
+        return true;
+      } catch (error) {
+        if (mode === 'manual') {
+          console.error('Error updating content:', error);
+          toast.error(error instanceof Error ? error.message : 'Failed to update content. Please try again.');
+          return false;
+        }
+        console.error('Auto-save error:', error);
+        throw error instanceof Error ? error : new Error('Auto-save failed');
+      } finally {
+        if (mode === 'manual') {
+          setIsSaving(false);
+        }
       }
-      toast.success('Content updated successfully!');
-      if (result.data) {
-        setContent(prev => ({ ...prev, ...result.data }));
-      }
-      setHasUnsavedChanges(false);
-      success = true;
-    } catch (error: unknown) {
-      console.error('Error updating content:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to update content. Please try again.');
-      success = false;
-    } finally {
-      setIsSaving(false);
-    }
-    return success;
-  };
+    },
+    [autoSaveError, content, id, isRichFieldType, outputFieldDefinitions, template]
+  );
+
+  const handleSave = useCallback(() => saveContent('manual'), [saveContent]);
 
   // Assign to ref so ContentApprovalWorkflow can call it if needed
   useEffect(() => {
     contentSaveRef.current = handleSave;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [content, template]); // Dependencies that handleSave actually uses
+  }, [handleSave]);
   
   const handleWorkflowActionCompletion = () => {
     // This function is called AFTER the workflow action in ContentApprovalWorkflow is successful.
@@ -496,24 +541,36 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     router.push('/dashboard/my-tasks');
     // Optionally, refresh data globally or for the My Tasks page if needed upon arrival.
   };
+
+  const handleResumeAutoSave = () => {
+    setAutoSaveError(null);
+    setAutoSaveEnabled(true);
+  };
   
-  // Configure auto-save (DISABLED per user request - manual save only)
-  const { isSaving: isAutoSaving } = useAutoSave({
+  const { isSaving: isAutoSaving, markAsSaved } = useAutoSave({
     data: content,
     onSave: async () => {
-      const success = await handleSave();
-      if (!success) {
-        throw new Error('Failed to save content');
-      }
+      await saveContent('auto');
     },
-    debounceMs: 3000, // Auto-save after 3 seconds of inactivity
-    enabled: false, // DISABLED - manual save only
+    debounceMs: 3000,
+    enabled: autoSaveEnabled,
     onError: (error) => {
-      console.error('Auto-save error:', error);
-      toast.error('Auto-save failed. Your changes are not being saved automatically.');
+      const message = error instanceof Error ? error.message : 'Auto-save failed.';
+      setAutoSaveError(message);
+      setAutoSaveEnabled(false);
+      toast.error(`${message} Auto-save has been paused; please save manually.`);
     },
-    onSuccess: () => {}
+    onSuccess: () => {
+      setAutoSaveError(null);
+    }
   });
+  markAsSavedRef.current = markAsSaved;
+
+  useEffect(() => {
+    if (hasUnsavedChanges && !autoSaveError && !autoSaveEnabled) {
+      setAutoSaveEnabled(true);
+    }
+  }, [autoSaveEnabled, autoSaveError, hasUnsavedChanges]);
 
   if (isLoadingUser || isLoading || isCheckingPermissions) {
     return (
@@ -632,10 +689,23 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             </div>
           </div>
 
-          <div className="flex flex-col items-start gap-3 sm:items-end">
-            {hasUnsavedChanges && (
+          <div className="flex flex-col items-start gap-2 sm:items-end">
+            {hasUnsavedChanges ? (
               <span className="text-sm text-muted-foreground">You have unsaved changes</span>
-            )}
+            ) : lastSavedAt ? (
+              <span className="text-sm text-muted-foreground">
+                {(lastSaveSource === 'auto' ? 'Auto-saved' : 'Saved')}{' '}
+                {formatDistanceToNow(lastSavedAt, { addSuffix: true })}
+              </span>
+            ) : null}
+            {autoSaveError ? (
+              <div className="flex flex-wrap items-center gap-2 text-sm text-destructive">
+                <span>Auto-save paused: {autoSaveError}</span>
+                <Button variant="ghost" size="sm" onClick={handleResumeAutoSave}>
+                  Resume auto-save
+                </Button>
+              </div>
+            ) : null}
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => router.push(`/dashboard/content/${id}`)}>
                 View Content (Read-only)
@@ -669,6 +739,8 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
                   onDateChange={(date) => {
                     setContent(prev => ({ ...prev, due_date: date?.toISOString() || null }));
                     setHasUnsavedChanges(true);
+                    setLastSavedAt(null);
+                    setLastSaveSource(null);
                   }}
                   placeholder="Select a due date"
                   disabled={false}

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Loader2, Globe, ArrowLeft, AlertTriangle, ExternalLink, Languages, History, Download, ShieldAlert } from 'lucide-react';
+import { Loader2, Globe, ArrowLeft, AlertTriangle, ExternalLink, Languages, History, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -32,6 +32,7 @@ import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { apiFetch } from '@/lib/api-client';
 import { useToolAccess } from '../use-tool-access';
 import { useToolHistory, type ToolRunHistoryRecord } from '../use-tool-history';
+import { ToolAccessDenied, ToolAccessSessionError } from '../components/access-states';
 
 
 interface MetadataResultItem {
@@ -119,28 +120,6 @@ const getLanguageFromDomain = (url: string): string => {
 
 const HISTORY_PAGE_SIZE = 20;
 
-const SessionErrorState = ({ message, onRetry }: { message: string; onRetry: () => void }) => (
-  <div className="flex flex-col items-center justify-center min-h-[300px] py-10 text-center">
-    <AlertTriangle className="mb-4 h-16 w-16 text-destructive" />
-    <h3 className="text-xl font-bold mb-2">Unable to verify your access</h3>
-    <p className="text-muted-foreground mb-4 max-w-md">{message}</p>
-    <Button onClick={onRetry}>Try Again</Button>
-  </div>
-);
-
-const AccessDeniedState = ({ message }: { message?: string }) => (
-  <div className="flex flex-col items-center justify-center min-h-[300px] py-10 text-center">
-    <ShieldAlert className="mb-4 h-16 w-16 text-destructive" />
-    <h3 className="text-xl font-bold mb-2">Access Denied</h3>
-    <p className="text-muted-foreground mb-4 max-w-md">
-      {message || 'You do not have permission to use this tool.'}
-    </p>
-    <Button variant="outline" onClick={() => window.location.href = '/dashboard/tools'}>
-      Return to Tools
-    </Button>
-  </div>
-);
-
 /**
  * MetadataGeneratorPage provides a tool for users to generate SEO metadata
  * (meta title, meta description, keywords) for a given URL, tailored to a selected brand and language.
@@ -154,6 +133,7 @@ export default function MetadataGeneratorPage() {
   const [, setProcessedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<'all' | 'success' | 'failure'>('all');
   const router = useRouter();
 
   const {
@@ -176,6 +156,7 @@ export default function MetadataGeneratorPage() {
     enabled: hasAccess,
     pageSize: HISTORY_PAGE_SIZE,
     transform: enhanceHistory,
+    filters: historyStatusFilter === 'all' ? undefined : { status: historyStatusFilter },
   });
 
   useEffect(() => {
@@ -359,11 +340,16 @@ export default function MetadataGeneratorPage() {
   }
 
   if (sessionError && sessionStatus !== 403) {
-    return <SessionErrorState message={sessionError} onRetry={() => refetchSession()} />;
+    return <ToolAccessSessionError message={sessionError} onRetry={() => refetchSession()} />;
   }
 
   if (!hasAccess) {
-    return <AccessDeniedState message={sessionStatus === 403 ? sessionError ?? undefined : undefined} />;
+    return (
+      <ToolAccessDenied
+        message={sessionStatus === 403 ? sessionError ?? undefined : undefined}
+        onNavigate={() => router.push('/dashboard/tools')}
+      />
+    );
   }
   // --- Main Page Content ---
   return (
@@ -585,14 +571,36 @@ export default function MetadataGeneratorPage() {
 
         {/* Run History Section */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <History className="mr-2 h-5 w-5" />
-              Run History
-            </CardTitle>
-            <CardDescription>
-              Your recent metadata generation runs.
-            </CardDescription>
+          <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="flex items-center">
+                <History className="mr-2 h-5 w-5" />
+                Run History
+              </CardTitle>
+              <CardDescription>
+                Your recent metadata generation runs.
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-3">
+              <Label htmlFor="metadata-history-status" className="text-sm text-muted-foreground">
+                Status Filter
+              </Label>
+              <Select
+                value={historyStatusFilter}
+                onValueChange={(value) =>
+                  setHistoryStatusFilter(value as 'all' | 'success' | 'failure')
+                }
+              >
+                <SelectTrigger id="metadata-history-status" className="w-[140px]">
+                  <SelectValue placeholder="All runs" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All runs</SelectItem>
+                  <SelectItem value="success">Success only</SelectItem>
+                  <SelectItem value="failure">Failures only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             {isLoadingHistory && (

@@ -240,9 +240,11 @@ describe('Performance Utilities', () => {
       expect(result.current.value).toBeUndefined();
       expect(result.current.error).toBeUndefined();
 
-      await waitFor(() => {
-        expect(result.current.loading).toBe(false);
-        expect(result.current.value).toBe('result');
+      await act(async () => {
+        await waitFor(() => {
+          expect(result.current.loading).toBe(false);
+          expect(result.current.value).toBe('result');
+        });
       });
     });
 
@@ -251,9 +253,11 @@ describe('Performance Utilities', () => {
       const asyncFunc = jest.fn().mockRejectedValue(error);
       const { result } = renderHook(() => useAsyncState(asyncFunc));
 
-      await waitFor(() => {
-        expect(result.current.loading).toBe(false);
-        expect(result.current.error).toBe(error);
+      await act(async () => {
+        await waitFor(() => {
+          expect(result.current.loading).toBe(false);
+          expect(result.current.error).toBe(error);
+        });
       });
     });
 

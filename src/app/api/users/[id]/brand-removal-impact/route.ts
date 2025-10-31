@@ -1,8 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { handleApiError } from '@/lib/api-utils';
 import { withAuth } from '@/lib/auth/api-auth';
 import { User } from '@supabase/supabase-js';
+
+type WorkflowAssignmentRow = {
+  workflow: {
+    id: string;
+    name: string | null;
+    status: string | null;
+    brand_id: string | null;
+  } | null;
+};
+
+type UserTaskRow = {
+  status: string | null;
+  content: {
+    id: string;
+    title: string | null;
+    status: string | null;
+    brand_id: string | null;
+  } | null;
+};
+
+const INACTIVE_TASK_STATUSES = new Set(['completed', 'cancelled', 'rejected', 'skipped', 'archived', 'done', 'declined']);
 
 // GET /api/users/[id]/brand-removal-impact?brand_id=[brandId]
 // Check the impact of removing a user from a brand
@@ -28,36 +49,128 @@ export const GET = withAuth(async (request: NextRequest, user: User, context?: u
       );
     }
 
-    const supabase = createSupabaseServerClient();
+    const supabase = createSupabaseAdminClient();
 
-    // TODO: Replace with actual RPC call once the database function is deployed
-    // const { data, error } = await supabase.rpc('check_user_workflow_assignments', {
-    //   p_user_id: params.id,
-    //   p_brand_id: brandId
-    // });
-
-    // For now, return placeholder data
-    const data = {
-      workflow_count: 0,
-      content_count: 0,
-      total_assignments: 0,
-      affected_workflows: [],
-      affected_content: []
-    };
-
-    // Get user and brand details for better context
-    const [userResult, brandResult] = await Promise.all([
+    const [
+      workflowAssignmentsResult,
+      userTaskResult,
+      userResult,
+      brandResult
+    ] = await Promise.all([
+      supabase
+        .from('workflow_user_assignments')
+        .select(
+          `
+            workflow:workflows!inner(
+              id,
+              name,
+              status,
+              brand_id
+            )
+          `
+        )
+        .eq('user_id', params.id)
+        .eq('workflows.brand_id', brandId),
+      supabase
+        .from('user_tasks')
+        .select(
+          `
+            status,
+            content:content!inner(
+              id,
+              title,
+              status,
+              brand_id
+            )
+          `
+        )
+        .eq('user_id', params.id)
+        .eq('content.brand_id', brandId),
       supabase
         .from('profiles')
         .select('full_name, email')
         .eq('id', params.id)
-        .single(),
+        .maybeSingle(),
       supabase
         .from('brands')
         .select('name')
         .eq('id', brandId)
-        .single()
+        .maybeSingle()
     ]);
+
+    if (workflowAssignmentsResult.error) {
+      throw workflowAssignmentsResult.error;
+    }
+    if (userTaskResult.error) {
+      throw userTaskResult.error;
+    }
+    if (userResult.error) {
+      throw userResult.error;
+    }
+    if (brandResult.error) {
+      throw brandResult.error;
+    }
+
+    const workflowAssignments = (workflowAssignmentsResult.data ?? []) as WorkflowAssignmentRow[];
+    const taskAssignments = (userTaskResult.data ?? []) as UserTaskRow[];
+
+    const affectedWorkflows = Array.from(
+      workflowAssignments.reduce<Map<string, { id: string; name?: string | null; status?: string | null }>>(
+        (acc, entry) => {
+          const workflow = entry.workflow;
+          if (!workflow) {
+            return acc;
+          }
+          if (workflow.brand_id !== brandId) {
+            return acc;
+          }
+          const normalizedStatus = (workflow.status ?? '').toLowerCase();
+          if (normalizedStatus === 'archived') {
+            return acc;
+          }
+          if (!acc.has(workflow.id)) {
+            acc.set(workflow.id, {
+              id: workflow.id,
+              name: workflow.name,
+              status: workflow.status,
+            });
+          }
+          return acc;
+        },
+        new Map()
+      ).values()
+    );
+
+    const affectedContent = Array.from(
+      taskAssignments.reduce<Map<string, { id: string; title?: string | null; status?: string | null }>>(
+        (acc, task) => {
+          const content = task.content;
+          if (!content) {
+            return acc;
+          }
+          if (content.brand_id !== brandId) {
+            return acc;
+          }
+          const normalizedStatus = typeof task.status === 'string' ? task.status.toLowerCase() : null;
+          if (normalizedStatus && INACTIVE_TASK_STATUSES.has(normalizedStatus)) {
+            return acc;
+          }
+          if (!acc.has(content.id)) {
+            acc.set(content.id, {
+              id: content.id,
+              title: content.title,
+              status: content.status,
+            });
+          }
+          return acc;
+        },
+        new Map()
+      ).values()
+    );
+
+    const workflowCount = affectedWorkflows.length;
+    const contentCount = affectedContent.length;
+    const totalAssignments = workflowCount + contentCount;
 
     return NextResponse.json({
       success: true,
@@ -71,15 +184,16 @@ export const GET = withAuth(async (request: NextRequest, user: User, context?: u
         name: brandResult.data?.name
       },
       impact: {
-        workflow_count: data.workflow_count || 0,
-        content_count: data.content_count || 0,
-        total_assignments: data.total_assignments || 0,
-        affected_workflows: data.affected_workflows || [],
-        affected_content: data.affected_content || []
+        workflow_count: workflowCount,
+        content_count: contentCount,
+        total_assignments: totalAssignments,
+        affected_workflows: affectedWorkflows,
+        affected_content: affectedContent
       },
-      recommendation: data.total_assignments > 0 
-        ? 'User has active assignments. Reassignment will be required.'
-        : 'User has no active assignments. Safe to remove.'
+      recommendation:
+        totalAssignments > 0
+          ? 'User has active assignments. Reassignment will be required.'
+          : 'User has no active assignments. Safe to remove.'
     });
   } catch (error) {
     return handleApiError(error, 'Error checking brand removal impact');

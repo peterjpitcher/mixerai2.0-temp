@@ -7,42 +7,10 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { Json } from '@/types/supabase';
 import { z } from 'zod';
 import { BrandPermissionVerificationError, userHasBrandAccess } from '@/lib/auth/brand-access';
+import { enforceContentRateLimits } from '@/lib/rate-limit/content';
  // TODO: Uncomment when types are regenerated
 
-type RateLimitEntry = {
-  count: number;
-  timestamp: number;
-  resetTimer: NodeJS.Timeout | null;
-};
-
-// In-memory rate limiting
-const rateLimit = new Map<string, RateLimitEntry>();
-const RATE_LIMIT_PERIOD = 60 * 1000; // 1 minute
-const MAX_REQUESTS_PER_MINUTE = 60; // Allow 60 requests per minute per IP (relaxed)
 const MAX_URLS_PER_REQUEST = 5;
-
-function getOrCreateRateLimitEntry(ip: string, now: number): RateLimitEntry {
-  let entry = rateLimit.get(ip);
-
-  if (!entry) {
-    entry = { count: 0, timestamp: now, resetTimer: null };
-    rateLimit.set(ip, entry);
-  } else if (now - entry.timestamp > RATE_LIMIT_PERIOD) {
-    if (entry.resetTimer) {
-      clearTimeout(entry.resetTimer);
-    }
-    entry.count = 0;
-    entry.timestamp = now;
-  }
-
-  if (!entry.resetTimer) {
-    entry.resetTimer = setTimeout(() => {
-      rateLimit.delete(ip);
-    }, RATE_LIMIT_PERIOD);
-  }
-
-  return entry;
-}
 
 const MetadataGenerationSchema = z.object({
   urls: z
@@ -85,40 +53,22 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
     );
   }
 
-  // Rate limiting logic
-  const ip = request.headers.get('x-forwarded-for') || request.ip || 'unknown';
-  const now = Date.now();
+  let requestBody: unknown;
 
-  const rateEntry = getOrCreateRateLimitEntry(ip, now);
-  rateEntry.timestamp = now;
-
-  if (rateEntry.count >= MAX_REQUESTS_PER_MINUTE) {
-    console.warn(`[RateLimit] Blocked ${ip} for metadata-generator. Count: ${rateEntry.count}`);
+  try {
+    requestBody = await request.json();
+  } catch (parseError) {
+    console.error('[MetadataGen] Failed to parse request body:', parseError);
     historyEntryStatus = 'failure';
-    historyErrorMessage = 'Rate limit exceeded.';
-    try {
-      await supabaseAdmin.from('tool_run_history').insert({
-          user_id: user.id,
-          tool_name: 'metadata_generator',
-          inputs: { error: 'Rate limit exceeded for initial request' } as Json,
-          outputs: { error: 'Rate limit exceeded' } as Json,
-          status: historyEntryStatus,
-          error_message: historyErrorMessage,
-          brand_id: null
-      });
-    } catch (logError) {
-      console.error('[HistoryLoggingError] Failed to log rate limit error for metadata-generator:', logError);
-    }
+    historyErrorMessage = 'Invalid JSON payload.';
     return NextResponse.json(
-      { success: false, error: 'Rate limit exceeded. Please try again in a minute.' },
-      { status: 429 }
+      { success: false, error: historyErrorMessage },
+      { status: 400 }
     );
   }
 
-  rateEntry.count += 1;
-
   try {
-    const parsedBody = MetadataGenerationSchema.safeParse(await request.json());
+    const parsedBody = MetadataGenerationSchema.safeParse(requestBody);
     if (!parsedBody.success) {
       historyEntryStatus = 'failure';
       historyErrorMessage = 'Invalid request payload';
@@ -130,6 +80,17 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
 
     const data = parsedBody.data;
     apiInputs = data;
+
+    const rateLimitCheck = await enforceContentRateLimits(request, user.id, data.brand_id ?? null);
+    if (!('ok' in rateLimitCheck)) {
+      historyEntryStatus = 'failure';
+      historyErrorMessage = rateLimitCheck.body.error;
+      apiOutputs = { results: [] as MetadataResultItem[] };
+      return NextResponse.json(rateLimitCheck.body, {
+        status: rateLimitCheck.status,
+        headers: rateLimitCheck.headers,
+      });
+    }
 
     let brandLanguage: string | undefined;
     let brandCountry: string | undefined;

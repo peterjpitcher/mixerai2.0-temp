@@ -5,10 +5,11 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { z } from 'zod';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
+import { passwordPolicy, validatePassword } from '@/lib/auth/session-config';
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),
-  newPassword: z.string().min(8, 'New password must be at least 8 characters long'),
+  newPassword: z.string().min(passwordPolicy.minLength, `New password must be at least ${passwordPolicy.minLength} characters long`),
 });
 
 export const POST = withAuthAndCSRF(async (request: NextRequest, user: User) => {
@@ -22,6 +23,14 @@ export const POST = withAuthAndCSRF(async (request: NextRequest, user: User) => 
 
     const body = await request.json();
     const { currentPassword, newPassword } = changePasswordSchema.parse(body);
+
+    const validation = validatePassword(newPassword);
+    if (!validation.valid) {
+      return NextResponse.json(
+        { success: false, error: 'New password does not meet complexity requirements.', details: validation.errors },
+        { status: 422 }
+      );
+    }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

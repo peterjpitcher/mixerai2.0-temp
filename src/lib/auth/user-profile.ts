@@ -1,12 +1,33 @@
-import { SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient, User } from '@supabase/supabase-js';
+
+interface GetProfileOptions {
+  user?: User | null;
+}
+
+interface ProfileWithAssignedBrands {
+  role: string;
+  assigned_brands: string[];
+}
 
 // This function retrieves the current user's profile, including their role
 // and a list of brand IDs they are assigned to.
-export async function getProfileWithAssignedBrands(supabase: SupabaseClient) {
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
+export async function getProfileWithAssignedBrands(
+  supabase: SupabaseClient,
+  options?: GetProfileOptions
+): Promise<ProfileWithAssignedBrands | null> {
+  const providedUser = options?.user ?? null;
+  let user = providedUser;
 
-  if (userError || !user) {
-    console.error('Error fetching user:', userError?.message);
+  if (!user) {
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user) {
+      console.error('Error fetching user:', error?.message);
+      return null;
+    }
+    user = data.user;
+  }
+
+  if (!user) {
     return null;
   }
 
@@ -23,13 +44,17 @@ export async function getProfileWithAssignedBrands(supabase: SupabaseClient) {
   if (permissionsError) {
     console.error('Error fetching brand permissions:', permissionsError.message);
     // Return the role but with empty brands, as permissions might not be set.
-    return { role: role, assigned_brands: [] };
+    return { role, assigned_brands: [] };
   }
-  
-  const assigned_brands = permissions ? permissions.map(p => p.brand_id) : [];
+
+  const assigned_brands = permissions
+    ? permissions
+        .map(permission => permission.brand_id)
+        .filter((brandId): brandId is string => Boolean(brandId))
+    : [];
 
   return {
-    role: role,
+    role,
     assigned_brands,
   };
-} 
+}

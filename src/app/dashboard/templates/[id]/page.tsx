@@ -21,6 +21,7 @@ import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import type { ContentTemplate } from '@/types/template';
 import { apiFetch } from '@/lib/api-client';
 import { useTemplateSession } from '../use-template-session';
+import { isSystemTemplateId } from '@/lib/templates/system-templates';
 
 const SessionErrorState = ({ message, onRetry }: { message: string; onRetry: () => void }) => (
   <div className="flex flex-col items-center justify-center min-h-[300px] py-10 text-center">
@@ -190,6 +191,8 @@ export default function TemplateEditPage() {
   const userRole = currentUser?.user_metadata?.role;
   const canEditTemplate = userRole === 'admin'; // Only admins can edit/delete templates
   const canViewTemplate = userRole === 'admin' || userRole === 'editor' || userRole === 'viewer';
+  const defaultTemplateDefinition = defaultTemplates[id as keyof typeof defaultTemplates];
+  const isSystemTemplate = isSystemTemplateId(id);
 
   useEffect(() => {
     if (!id) {
@@ -215,8 +218,8 @@ export default function TemplateEditPage() {
     const fetchTemplate = async () => {
       setLoading(true);
 
-      if (defaultTemplates[id as keyof typeof defaultTemplates]) {
-        setTemplate(defaultTemplates[id as keyof typeof defaultTemplates] as Record<string, unknown>);
+      if (defaultTemplateDefinition) {
+        setTemplate(defaultTemplateDefinition as Record<string, unknown>);
         setLoading(false);
         return;
       }
@@ -273,9 +276,8 @@ export default function TemplateEditPage() {
     canViewTemplate,
     sessionError,
     sessionStatus,
+    defaultTemplateDefinition,
   ]);
-
-  const isSystemTemplate = defaultTemplates[id as keyof typeof defaultTemplates];
 
   if (isLoadingUser || (loading && !sessionError)) {
     return (
@@ -339,7 +341,7 @@ export default function TemplateEditPage() {
         setShowDeleteDialog(false);
         return;
     }
-    if (!template || template.id === 'article-template' || template.id === 'product-template') {
+    if (!template || isSystemTemplateId(String(template.id))) {
       toast.error('System templates cannot be deleted.');
       return;
     }

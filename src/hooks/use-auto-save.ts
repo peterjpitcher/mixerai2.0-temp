@@ -10,12 +10,13 @@ interface UseAutoSaveOptions<T> {
   onSuccess?: () => void;
 }
 
-interface UseAutoSaveReturn {
+interface UseAutoSaveReturn<T> {
   isSaving: boolean;
   lastSaved: Date | null;
   error: Error | null;
   save: () => Promise<void>;
   hasUnsavedChanges: boolean;
+  markAsSaved: (data?: T) => void;
 }
 
 export function useAutoSave<T>({
@@ -25,7 +26,7 @@ export function useAutoSave<T>({
   enabled = true,
   onError,
   onSuccess
-}: UseAutoSaveOptions<T>): UseAutoSaveReturn {
+}: UseAutoSaveOptions<T>): UseAutoSaveReturn<T> {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [error, setError] = useState<Error | null>(null);
@@ -36,7 +37,18 @@ export function useAutoSave<T>({
   
   // Debounced data for auto-save
   const debouncedData = useDebounce(data, debounceMs);
-  
+
+  const markAsSaved = useCallback(
+    (nextData?: T) => {
+      const snapshot = nextData ?? data;
+      lastSavedDataRef.current = snapshot;
+      setHasUnsavedChanges(false);
+      setError(null);
+      setLastSaved(new Date());
+    },
+    [data]
+  );
+
   // Manual save function
   const save = useCallback(async () => {
     if (!enabled || saveInProgressRef.current) return;
@@ -47,9 +59,7 @@ export function useAutoSave<T>({
     
     try {
       await onSave(data);
-      setLastSaved(new Date());
-      setHasUnsavedChanges(false);
-      lastSavedDataRef.current = data;
+      markAsSaved(data);
       onSuccess?.();
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Save failed');
@@ -59,7 +69,7 @@ export function useAutoSave<T>({
       setIsSaving(false);
       saveInProgressRef.current = false;
     }
-  }, [data, enabled, onSave, onSuccess, onError]);
+  }, [data, enabled, markAsSaved, onError, onSave, onSuccess]);
   
   // Auto-save effect
   useEffect(() => {
@@ -98,6 +108,7 @@ export function useAutoSave<T>({
     lastSaved,
     error,
     save,
-    hasUnsavedChanges
+    hasUnsavedChanges,
+    markAsSaved
   };
 }

@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 
 interface DueDateIndicatorProps {
   dueDate: string | Date | null;
-  status?: 'draft' | 'in_review' | 'approved' | 'published' | 'completed';
+  status?: 'draft' | 'in_review' | 'approved' | 'published' | 'completed' | 'rejected';
   size?: 'sm' | 'md' | 'lg';
   showIcon?: boolean;
   className?: string;
@@ -18,6 +18,26 @@ export function DueDateIndicator({
   showIcon = true,
   className
 }: DueDateIndicatorProps) {
+  const sizeClasses = {
+    sm: 'text-xs px-2 py-0.5',
+    md: 'text-sm',
+    lg: 'text-base px-3 py-1'
+  };
+
+  const isRejected = status === 'rejected';
+
+  if (!dueDate && isRejected) {
+    return (
+      <Badge
+        variant="destructive"
+        className={cn(sizeClasses[size], className)}
+      >
+        {showIcon && <AlertTriangle className={cn('mr-1', size === 'sm' ? 'h-3 w-3' : 'h-4 w-4')} />}
+        Rejected
+      </Badge>
+    );
+  }
+
   if (!dueDate) return null;
 
   const date = new Date(dueDate);
@@ -28,7 +48,11 @@ export function DueDateIndicator({
   let Icon = Calendar;
   let label = format(date, 'MMM d, yyyy');
 
-  if (isCompleted) {
+  if (isRejected) {
+    variant = 'destructive';
+    Icon = AlertTriangle;
+    label = 'Rejected';
+  } else if (isCompleted) {
     variant = 'default'; // Use default (primary color) for success
     Icon = CheckCircle;
     label = `Completed ${format(date, 'MMM d')}`;
@@ -49,12 +73,6 @@ export function DueDateIndicator({
     Icon = Clock;
     label = `Due ${formatDistanceToNow(date, { addSuffix: true })}`;
   }
-
-  const sizeClasses = {
-    sm: 'text-xs px-2 py-0.5',
-    md: 'text-sm',
-    lg: 'text-base px-3 py-1'
-  };
 
   return (
     <Badge 

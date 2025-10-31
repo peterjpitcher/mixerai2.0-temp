@@ -9,6 +9,7 @@ import { hasAccessToBrand, canAccessProduct, canAccessIngredient } from '@/lib/a
 import { ok, fail } from '@/lib/http/response';
 import { ALL_COUNTRIES_CODE, GLOBAL_CLAIM_COUNTRY_CODE } from '@/lib/constants/claims';
 import { logClaimAudit } from '@/lib/audit';
+import { logError } from '@/lib/logger';
 
 export const dynamic = "force-dynamic";
 
@@ -341,82 +342,85 @@ export const DELETE = withCorrelation(withAuthAndCSRF(async (req: NextRequest, u
 
     try {
         const supabase = createSupabaseAdminClient();
-        
+
+        const { data: claimData, error: claimFetchError } = await supabase
+            .from('claims')
+            .select('level, master_brand_id, product_id, created_by, workflow_id, workflow_status')
+            .eq('id', id)
+            .single();
+
+        if (claimFetchError) {
+            if ((claimFetchError as { code?: string }).code === 'PGRST116') {
+                return fail(404, 'Claim not found.');
+            }
+            logError(`[API Claims DELETE /${id}] Failed to fetch claim for deletion`, claimFetchError);
+            return handleApiError(claimFetchError, 'Failed to verify claim before deletion.');
+        }
+
+        if (!claimData) {
+            return fail(404, 'Claim not found.');
+        }
+
         // --- Permission Check Start ---
         let hasPermission = user?.user_metadata?.role === 'admin';
 
         if (!hasPermission) {
-            // Fetch the claim to determine its context for permission checking
-
-            const { data: claimData, error: claimFetchError } = await supabase
-                .from('claims')
-                .select('level, master_brand_id, product_id, created_by')
-                .eq('id', id)
-                .single();
-
-            if (claimFetchError) { 
-                console.error(`[API Claims DELETE /${id}] Error fetching claim for permissions:`, claimFetchError);
-                return handleApiError(claimFetchError, 'Failed to verify claim for permissions before deletion.');
+            if (claimData.created_by === user.id) {
+                hasPermission = true;
             }
-            if (!claimData) { // Claim not found, let the actual delete call handle the 404 or specific error.
-                // Proceed to delete attempt which will fail if claim not found or if other error occurs
-            } else {
-                if (claimData.created_by === user.id) {
-                    hasPermission = true;
-                }
 
-                if (!hasPermission && claimData) { 
-                    let coreBrandId: string | null = null;
-                    if (claimData.level === 'brand' && claimData.master_brand_id) { 
+            if (!hasPermission) {
+                let coreBrandId: string | null = null;
 
-                        const { data: mcbData, error: mcbError } = await supabase 
-                            .from('master_claim_brands') 
+                if (claimData.level === 'brand' && claimData.master_brand_id) {
+                    const { data: mcbData, error: mcbError } = await supabase
+                        .from('master_claim_brands')
+                        .select('mixerai_brand_id')
+                        .eq('id', claimData.master_brand_id)
+                        .single();
+
+                    if (mcbError || !mcbData) {
+                        logError(`[API Claims DELETE /${id}] Failed to load master claim brand for permissions`, mcbError);
+                    } else {
+                        coreBrandId = mcbData.mixerai_brand_id;
+                    }
+                } else if (claimData.level === 'product' && claimData.product_id) {
+                    const { data: productData, error: productError } = await supabase
+                        .from('products')
+                        .select('master_brand_id')
+                        .eq('id', claimData.product_id)
+                        .single();
+
+                    if (productError || !productData?.master_brand_id) {
+                        logError(`[API Claims DELETE /${id}] Failed to load product details for permissions`, productError);
+                    } else {
+                        const { data: mcbData, error: mcbError } = await supabase
+                            .from('master_claim_brands')
                             .select('mixerai_brand_id')
-                            .eq('id', claimData.master_brand_id) 
+                            .eq('id', productData.master_brand_id)
                             .single();
+
                         if (mcbError || !mcbData) {
-                            console.error(`[API Claims DELETE /${id}] Error fetching MCB for brand-level claim permissions:`, mcbError);
+                            logError(`[API Claims DELETE /${id}] Failed to resolve master brand from product`, mcbError);
                         } else {
                             coreBrandId = mcbData.mixerai_brand_id;
                         }
-                    } else if (claimData.level === 'product' && claimData.product_id) {
+                    }
+                }
 
-                        const { data: productData, error: productError } = await supabase
-                            .from('products')
-                            .select('master_brand_id') 
-                            .eq('id', claimData.product_id)
-                            .single();
-                        if (productError || !productData || !productData.master_brand_id) {
-                            console.error(`[API Claims DELETE /${id}] Error fetching product/MCB for product-level claim permissions:`, productError);
-                        } else {
+                if (coreBrandId) {
+                    const { data: permissionsData, error: permissionsError } = await supabase
+                        .from('user_brand_permissions')
+                        .select('role')
+                        .eq('user_id', user.id)
+                        .eq('brand_id', coreBrandId)
+                        .eq('role', 'admin')
+                        .limit(1);
 
-                            const { data: mcbData, error: mcbError } = await supabase 
-                                .from('master_claim_brands') 
-                                .select('mixerai_brand_id')
-                                .eq('id', productData.master_brand_id) 
-                                .single();
-                            if (mcbError || !mcbData) {
-                                console.error(`[API Claims DELETE /${id}] Error fetching MCB for product-level claim (via product) permissions:`, mcbError);
-                            } else {
-                                coreBrandId = mcbData.mixerai_brand_id;
-                            }
-                        }
-                    } 
-
-                    if (coreBrandId) {
-
-                        const { data: permissionsData, error: permissionsError } = await supabase
-                            .from('user_brand_permissions')
-                            .select('role')
-                            .eq('user_id', user.id)
-                            .eq('brand_id', coreBrandId)
-                            .eq('role', 'admin') 
-                            .limit(1);
-                        if (permissionsError) {
-                            console.error(`[API Claims DELETE /${id}] Error fetching user_brand_permissions:`, permissionsError);
-                        } else if (permissionsData && permissionsData.length > 0) {
-                            hasPermission = true;
-                        }
+                    if (permissionsError) {
+                        logError(`[API Claims DELETE /${id}] Failed to verify brand admin permissions`, permissionsError);
+                    } else if (permissionsData && permissionsData.length > 0) {
+                        hasPermission = true;
                     }
                 }
             }
@@ -425,34 +429,51 @@ export const DELETE = withCorrelation(withAuthAndCSRF(async (req: NextRequest, u
         if (!hasPermission) return fail(403, 'You do not have permission to delete this claim.');
         // --- Permission Check End ---
 
+        const { count: pendingApprovalCount, error: pendingHistoryError } = await supabase
+            .from('claim_workflow_history')
+            .select('id', { head: true, count: 'exact' })
+            .eq('claim_id', id)
+            .eq('action_status', 'pending_review');
 
-        // First, delete any workflow history entries for this claim
-        const { error: historyError } = await supabase.from('claim_workflow_history')
+        if (pendingHistoryError) {
+            logError(`[API Claims DELETE /${id}] Failed to verify workflow dependencies`, pendingHistoryError);
+            return handleApiError(pendingHistoryError, 'Failed to verify workflow dependencies before deleting the claim.');
+        }
+
+        const activeWorkflowStatuses = new Set(['pending_review']);
+        if (activeWorkflowStatuses.has(claimData.workflow_status ?? '') || (pendingApprovalCount ?? 0) > 0) {
+            return fail(409, 'This claim has workflow approvals in progress. Resolve the workflow before deleting the claim.');
+        }
+
+        const { error: historyError } = await supabase
+            .from('claim_workflow_history')
             .delete()
             .eq('claim_id', id);
 
         if (historyError) {
-            console.error(`[API Claims DELETE /${id}] Error deleting claim workflow history:`, historyError);
-            // Continue with claim deletion even if history deletion fails
+            logError(`[API Claims DELETE /${id}] Failed to remove workflow history prior to deletion`, historyError);
+            // Continue with deletion even if history cleanup fails
         }
 
         // Fetch associated product ids before delete for cache invalidation
         let pids: string[] = [];
         try {
-          const { data: cps } = await supabase
-            .from('claim_products')
-            .select('product_id')
-            .eq('claim_id', id);
-          pids = (cps || []).map((r: any) => r.product_id).filter(Boolean);
-        } catch {}
+            const { data: cps } = await supabase
+                .from('claim_products')
+                .select('product_id')
+                .eq('claim_id', id);
+            pids = (cps || []).map((r: any) => r.product_id).filter(Boolean);
+        } catch {
+            // Ignore cache invalidation issues
+        }
 
-        // Now delete the claim itself
-        const { error, count } = await supabase.from('claims')
+        const { error, count } = await supabase
+            .from('claims')
             .delete({ count: 'exact' })
             .eq('id', id);
 
         if (error) {
-            console.error(`[API Claims DELETE /${id}] Error deleting claim:`, error);
+            logError(`[API Claims DELETE /${id}] Failed to delete claim`, error);
             return handleApiError(error, 'Failed to delete claim.');
         }
 
@@ -460,15 +481,17 @@ export const DELETE = withCorrelation(withAuthAndCSRF(async (req: NextRequest, u
 
         await logClaimAudit('CLAIM_DELETED', user.id, id);
         try {
-          if (pids.length) {
-            const { invalidateClaimsCacheForProduct } = await import('@/lib/claims-service');
-            await Promise.all(pids.map(pid => invalidateClaimsCacheForProduct(pid)));
-          }
-        } catch {}
-        return ok({ message: 'Claim and any pending approvals deleted successfully.' });
+            if (pids.length) {
+                const { invalidateClaimsCacheForProduct } = await import('@/lib/claims-service');
+                await Promise.all(pids.map((pid) => invalidateClaimsCacheForProduct(pid)));
+            }
+        } catch {
+            // Cache invalidation is a best-effort step
+        }
 
+        return ok({ message: 'Claim and any pending approvals deleted successfully.' });
     } catch (error: unknown) {
-        console.error(`[API Claims DELETE /${id}] Catched error:`, error);
+        logError(`[API Claims DELETE /${id}] Unexpected error`, error);
         return handleApiError(error, 'An unexpected error occurred while deleting the claim.');
     }
 })); 
