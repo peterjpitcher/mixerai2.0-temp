@@ -389,7 +389,7 @@ export function useContentGenerator(templateId?: string | null) {
       const outputFields = template.outputFields || [];
       const isRichOutput = (fieldType: OutputField['type']) => {
         const normalizedType = fieldType?.toLowerCase();
-        return normalizedType === 'richtext' || normalizedType === 'rich-text' || normalizedType === 'html';
+        return normalizedType === 'richtext' || normalizedType === 'rich-text' || normalizedType === 'html' || normalizedType === 'faq';
       };
 
       let primaryField: OutputField | undefined;

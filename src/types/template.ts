@@ -19,10 +19,22 @@ export type FieldType =
   | 'plainText'
   | 'html'
   | 'image'
+  | 'faq'
   | 'product-selector'
   | 'recipeUrl';
 
-export type { NormalizedContent } from '@/lib/content/html-normalizer';
+import type {
+  NormalizedContent as NormalizedContentType,
+  FaqContent as FaqContentType,
+  FaqEntry as FaqEntryType,
+  FaqSection as FaqSectionType,
+} from '@/lib/content/html-normalizer';
+
+export type NormalizedContent = NormalizedContentType;
+export type FaqContent = FaqContentType;
+export type FaqEntry = FaqEntryType;
+export type FaqSection = FaqSectionType;
+export type FaqContentPayload = FaqContentType;
 
 export interface ShortTextOptions { minLength?: number; maxLength?: number; placeholder?: string; }
 export interface LongTextOptions { minWords?: number; maxWords?: number; placeholder?: string; rows?: number; maxRows?: number; maxLength?: number; }
@@ -60,6 +72,11 @@ export interface RecipeUrlOptions {
 export interface PlainTextOutputOptions { maxLength?: number; }
 export interface HtmlOutputOptions { maxLength?: number; sanitize?: boolean; }
 export interface ImageOutputOptions { format?: string; width?: number; height?: number; altText?: string; }
+export interface FaqOutputOptions {
+  allowSections?: boolean;
+  defaultCollapseMode?: 'single' | 'multiple';
+  startCollapsed?: boolean;
+}
 
 interface BaseField {
   id: string;
@@ -96,10 +113,11 @@ export type OutputFieldOptionType =
   | ({ type: 'plainText'; options?: PlainTextOutputOptions })
   | ({ type: 'richText'; options?: RichTextOptions })
   | ({ type: 'html'; options?: HtmlOutputOptions })
-  | ({ type: 'image'; options?: ImageOutputOptions });
+  | ({ type: 'image'; options?: ImageOutputOptions })
+  | ({ type: 'faq'; options?: FaqOutputOptions });
 
 export interface OutputField extends BaseField {
-  type: Extract<FieldType, 'plainText' | 'richText' | 'html' | 'image'>;
+  type: Extract<FieldType, 'plainText' | 'richText' | 'html' | 'image' | 'faq'>;
   options?: OutputFieldOptionType['options'];
   aiAutoComplete?: boolean;
   useBrandIdentity?: boolean;

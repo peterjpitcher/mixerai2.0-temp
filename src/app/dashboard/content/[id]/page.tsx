@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { MarkdownDisplay } from '@/components/content/markdown-display';
+import { FaqAccordionDisplay } from '@/components/content/faq-field';
 import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
 import { VettingAgencyFeedbackCard } from '@/components/content/vetting-agency-feedback-card';
 import { toast } from 'sonner';
@@ -37,6 +38,7 @@ interface TemplateOutputField {
   id: string;
   name: string;
   type: string; // e.g., 'plainText', 'richText', 'html'
+  options?: Record<string, unknown> | null;
 }
 
 interface TemplateFields {
@@ -590,7 +592,9 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
                 {template && template.fields && template.fields.outputFields && template.fields.outputFields.length > 0 ? (
                   template.fields.outputFields.map(field => {
                     const normalized = generatedOutputs[field.id];
-                    const isPlainTextField = field.type?.toLowerCase() === 'plaintext';
+                    const normalizedType = field.type?.toLowerCase();
+                    const isPlainTextField = normalizedType === 'plaintext';
+                    const isFaqField = normalizedType === 'faq';
                     const plainTextContent = normalized?.plain?.trim() ?? '';
                     const htmlContent = normalized?.html?.trim();
                     const emptyPlainText = (
@@ -600,7 +604,20 @@ export default function ContentDetailPage({ params }: ContentDetailPageProps) {
                     return (
                       <div key={field.id} className="mb-6" data-field-container-id={field.id}>
                         <h3 className="mb-2 text-lg font-semibold">{field.name}</h3>
-                        {isPlainTextField ? (
+                        {isFaqField ? (
+                          <FaqAccordionDisplay
+                            content={normalized}
+                            collapseMode={
+                              ((field as { options?: { defaultCollapseMode?: string } }).options?.defaultCollapseMode ===
+                                'single'
+                                ? 'single'
+                                : 'multiple') as 'single' | 'multiple'
+                            }
+                            startCollapsed={
+                              ((field as { options?: { startCollapsed?: boolean } }).options?.startCollapsed ?? true)
+                            }
+                          />
+                        ) : isPlainTextField ? (
                           <div
                             data-field-id={field.id}
                             className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-foreground shadow-xs whitespace-pre-wrap"

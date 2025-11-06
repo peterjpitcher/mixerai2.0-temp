@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RichTextEditor } from '@/components/content/rich-text-editor';
+import { FaqEditor } from '@/components/content/faq-field';
 import { toast } from 'sonner';
 import { createBrowserClient } from '@supabase/ssr';
 import { ContentApprovalWorkflow, WorkflowStep } from '@/components/content/content-approval-workflow';
@@ -95,6 +96,7 @@ interface TemplateOutputField {
   id: string;
   name: string;
   type: string; // e.g., 'plainText', 'richText', 'html'
+  options?: Record<string, unknown> | null;
 }
 
 interface TemplateFields {
@@ -196,7 +198,11 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
 
   const isRichFieldType = React.useCallback((fieldType: string) => {
     const normalized = fieldType?.toLowerCase();
-    return normalized === 'richtext' || normalized === 'rich-text' || normalized === 'html';
+    return normalized === 'richtext' || normalized === 'rich-text' || normalized === 'html' || normalized === 'faq';
+  }, []);
+
+  const isFaqFieldType = React.useCallback((fieldType: string) => {
+    return fieldType?.toLowerCase() === 'faq';
   }, []);
 
   const normalizedGeneratedOutputs = React.useMemo(() => {
@@ -767,7 +773,15 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
                         <Label htmlFor={`output_field_${field.id}`} className="text-base">
                           {field.name || `Output Field (ID: ${field.id})`}
                         </Label>
-                        {field.type === 'plainText' ? (
+                        {isFaqFieldType(field.type) ? (
+                          <FaqEditor
+                            value={normalizedValue}
+                            onChange={(updated) => handleGeneratedOutputChange(field.id, updated)}
+                            allowSections={Boolean(
+                              (field.options as { allowSections?: boolean })?.allowSections
+                            )}
+                          />
+                        ) : field.type === 'plainText' ? (
                           <Textarea
                             id={`output_field_${field.id}`}
                             value={plainValue}

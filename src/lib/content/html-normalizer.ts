@@ -5,6 +5,12 @@ const headingSmallClass = 'mix-generated-heading-small';
 const paragraphClass = 'mix-generated-paragraph';
 const listClass = 'mix-generated-list';
 const listItemClass = 'mix-generated-list-item';
+const faqContainerClass = 'mix-generated-faq';
+const faqSectionClass = 'mix-generated-faq-section';
+const faqSectionTitleClass = 'mix-generated-faq-section-title';
+const faqItemClass = 'mix-generated-faq-item';
+const faqQuestionClass = 'mix-generated-faq-question';
+const faqAnswerClass = 'mix-generated-faq-answer';
 
 const htmlTagRegex = /<\s*([a-z][a-z0-9]*)\b[^>]*>/i;
 const inlineBoldRegex = /\*\*(.+?)\*\*|__(.+?)__/g;
@@ -17,6 +23,25 @@ export interface NormalizedContent {
   plain: string;
   wordCount: number;
   charCount: number;
+  faq?: FaqContent | null;
+}
+
+export interface FaqEntry {
+  id: string;
+  question: string;
+  answerHtml: string;
+  answerPlain: string;
+}
+
+export interface FaqSection {
+  id: string;
+  title: string;
+  entries: FaqEntry[];
+}
+
+export interface FaqContent {
+  entries: FaqEntry[];
+  sections?: FaqSection[];
 }
 
 function escapeHtml(text: string): string {
@@ -216,6 +241,284 @@ function countWords(text: string): number {
   return text.split(/\s+/).filter(Boolean).length;
 }
 
+function buildFaqEntry(
+  question: string,
+  answerSource: string,
+  fallbackId: string,
+  maybeProvidedId?: unknown
+): FaqEntry {
+  const normalizedAnswer = normalizeRichText(answerSource);
+  const entryId =
+    typeof maybeProvidedId === 'string' && maybeProvidedId.trim().length > 0
+      ? maybeProvidedId.trim()
+      : fallbackId;
+  const safeQuestion = question.trim();
+  return {
+    id: entryId,
+    question: safeQuestion.length > 0 ? safeQuestion : 'Frequently Asked Question',
+    answerHtml: normalizedAnswer.html,
+    answerPlain: normalizedAnswer.plain,
+  };
+}
+
+function coerceFaqEntries(raw: unknown, pathPrefix = 'faq', offset = 0): FaqEntry[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item, index) => {
+        if (!item || typeof item !== 'object') {
+          const value = String(item ?? '').trim();
+          if (!value) return null;
+          return buildFaqEntry(`Question ${offset + index + 1}`, value, `${pathPrefix}-entry-${index + 1}`);
+        }
+        const obj = item as Record<string, unknown>;
+        const question =
+          typeof obj.question === 'string' && obj.question.trim().length > 0
+            ? obj.question
+            : typeof obj.title === 'string' && obj.title.trim().length > 0
+            ? obj.title
+            : `Question ${offset + index + 1}`;
+        const answerCandidate =
+          (typeof obj.answerHtml === 'string' && obj.answerHtml) ||
+          (typeof obj.answer === 'string' && obj.answer) ||
+          (typeof obj.answer_text === 'string' && obj.answer_text) ||
+          (typeof obj.content === 'string' && obj.content) ||
+          (typeof obj.body === 'string' && obj.body) ||
+          (typeof obj.description === 'string' && obj.description) ||
+          '';
+        return buildFaqEntry(question, answerCandidate, `${pathPrefix}-entry-${index + 1}`, obj.id);
+      })
+      .filter((entry): entry is FaqEntry => Boolean(entry));
+  }
+
+  if (typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    if (Array.isArray(obj.entries)) {
+      return coerceFaqEntries(obj.entries, pathPrefix, offset);
+    }
+    if (Array.isArray(obj.items)) {
+      return coerceFaqEntries(obj.items, pathPrefix, offset);
+    }
+    if (Array.isArray(obj.faq)) {
+      return coerceFaqEntries(obj.faq, pathPrefix, offset);
+    }
+    if (Array.isArray(obj.questions)) {
+      return coerceFaqEntries(obj.questions, pathPrefix, offset);
+    }
+  }
+
+  if (typeof raw === 'string' && raw.trim()) {
+    // Treat plain text as a single Q/A entry with a generated question label
+    return [
+      buildFaqEntry(
+        'FAQ Item',
+        raw,
+        `${pathPrefix}-entry-${offset + 1}`
+      ),
+    ];
+  }
+
+  return [];
+}
+
+function coerceFaqSections(raw: unknown): FaqSection[] {
+  if (!raw) return [];
+  if (!Array.isArray(raw)) {
+    if (typeof raw === 'object' && raw) {
+      const obj = raw as Record<string, unknown>;
+      if (Array.isArray(obj.sections)) {
+        return coerceFaqSections(obj.sections);
+      }
+      if (Array.isArray(obj.groups)) {
+        return coerceFaqSections(obj.groups);
+      }
+    }
+    return [];
+  }
+
+  return raw
+    .map((item, index) => {
+      if (!item || typeof item !== 'object') {
+        return null;
+      }
+      const obj = item as Record<string, unknown>;
+      const entries = coerceFaqEntries(
+        obj.entries ?? obj.items ?? obj.questions ?? obj.faq ?? [],
+        `faq-section-${index + 1}`,
+        0
+      );
+      if (!entries.length) {
+        return null;
+      }
+      const titleCandidate =
+        typeof obj.title === 'string' && obj.title.trim().length > 0
+          ? obj.title.trim()
+          : typeof obj.name === 'string' && obj.name.trim().length > 0
+          ? obj.name.trim()
+          : `Section ${index + 1}`;
+      const idCandidate =
+        typeof obj.id === 'string' && obj.id.trim().length > 0
+          ? obj.id.trim()
+          : `faq-section-${index + 1}`;
+      return {
+        id: idCandidate,
+        title: titleCandidate,
+        entries,
+      } as FaqSection;
+    })
+    .filter((section): section is FaqSection => Boolean(section));
+}
+
+function coerceFaqContent(raw: unknown): FaqContent {
+  if (!raw) {
+    return { entries: [] };
+  }
+
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      return { entries: [] };
+    }
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return coerceFaqContent(parsed);
+      } catch {
+        // fall through to treating as plain text
+      }
+    }
+    return { entries: coerceFaqEntries(trimmed) };
+  }
+
+  if (Array.isArray(raw)) {
+    return { entries: coerceFaqEntries(raw) };
+  }
+
+  if (typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+
+    const directContent =
+      obj.faq ?? obj.content ?? obj.data ?? obj.value ?? obj.payload ?? obj;
+
+    if (Array.isArray(directContent)) {
+      return { entries: coerceFaqEntries(directContent) };
+    }
+
+    const entries = coerceFaqEntries(obj.entries ?? obj.items ?? obj.questions ?? obj.faq);
+    const sections = coerceFaqSections(obj.sections ?? obj.groups);
+
+    if (!entries.length && Array.isArray(obj.sections)) {
+      // If only sections exist, flatten them into entries while keeping sections structure.
+      const parsedSections = coerceFaqSections(obj.sections);
+      const flattened = parsedSections.flatMap((section) => section.entries);
+      return {
+        entries: flattened,
+        sections: parsedSections,
+      };
+    }
+
+    return {
+      entries,
+      sections: sections.length ? sections : undefined,
+    };
+  }
+
+  return { entries: [] };
+}
+
+function renderFaqHtml(content: FaqContent): string {
+  const allSections = content.sections ?? [];
+  const hasSections = allSections.length > 0;
+  const entriesOutsideSections =
+    content.entries.filter((entry) => {
+      if (!hasSections) return true;
+      // When sections are present, exclude duplicates already listed inside them
+      const entryId = entry.id;
+      return !allSections.some((section) =>
+        section.entries.some((sectionEntry) => sectionEntry.id === entryId)
+      );
+    }) ?? [];
+
+  const parts: string[] = [`<div class="${faqContainerClass}">`];
+
+  if (hasSections) {
+    allSections.forEach((section) => {
+      parts.push(
+        `<div class="${faqSectionClass}" data-faq-section-id="${escapeHtml(section.id)}">`,
+        `<p class="${faqSectionTitleClass}">${escapeHtml(section.title)}</p>`
+      );
+      section.entries.forEach((entry) => {
+        parts.push(
+          `<div class="${faqItemClass}" data-faq-entry-id="${escapeHtml(entry.id)}">`,
+          `<p class="${faqQuestionClass}">${escapeHtml(entry.question)}</p>`,
+          `<div class="${faqAnswerClass}">${entry.answerHtml}</div>`,
+          `</div>`
+        );
+      });
+      parts.push(`</div>`);
+    });
+  }
+
+  entriesOutsideSections.forEach((entry) => {
+    parts.push(
+      `<div class="${faqItemClass}" data-faq-entry-id="${escapeHtml(entry.id)}">`,
+      `<p class="${faqQuestionClass}">${escapeHtml(entry.question)}</p>`,
+      `<div class="${faqAnswerClass}">${entry.answerHtml}</div>`,
+      `</div>`
+    );
+  });
+
+  parts.push(`</div>`);
+  return parts.join('');
+}
+
+function renderFaqPlain(content: FaqContent): string {
+  const strings: string[] = [];
+  const appendEntries = (entries: FaqEntry[], sectionTitle?: string) => {
+    entries.forEach((entry) => {
+      if (sectionTitle) {
+        strings.push(`${sectionTitle}`.trim());
+      }
+      strings.push(entry.question.trim());
+      strings.push(entry.answerPlain.trim());
+      strings.push(''); // blank line between entries
+    });
+  };
+
+  if (content.sections?.length) {
+    content.sections.forEach((section) => {
+      appendEntries(section.entries, section.title);
+    });
+  }
+
+  const sectionEntryIds = new Set(
+    content.sections?.flatMap((section) => section.entries.map((entry) => entry.id)) ?? []
+  );
+  const standaloneEntries = content.entries.filter((entry) => !sectionEntryIds.has(entry.id));
+  appendEntries(standaloneEntries);
+
+  return strings.join('\n').trim();
+}
+
+function normalizeFaq(raw: unknown): NormalizedContent {
+  const parsed = coerceFaqContent(raw);
+  const html = renderFaqHtml(parsed);
+  const sanitizedHtml = sanitizeHTML(html, {
+    allow_links: true,
+    allow_tables: true,
+    allow_images: false,
+  }).replace(/\n+/g, '');
+  const plain = renderFaqPlain(parsed);
+
+  return {
+    html: sanitizedHtml || `<div class="${faqContainerClass}"></div>`,
+    plain,
+    wordCount: countWords(plain),
+    charCount: plain.length,
+    faq: parsed,
+  };
+}
+
 export function normalizeRichText(raw: string): NormalizedContent {
   const trimmed = raw?.trim() ?? '';
 
@@ -266,11 +569,15 @@ export function normalizeFieldContent(raw: string, fieldType: string): Normalize
       html: `<p class="${paragraphClass}"></p>`,
       plain: '',
       wordCount: 0,
-      charCount: 0
+      charCount: 0,
+      faq: fieldType?.toLowerCase() === 'faq' ? { entries: [] } : undefined,
     };
   }
 
   const normalizedType = fieldType?.toLowerCase();
+  if (normalizedType === 'faq') {
+    return normalizeFaq(raw);
+  }
   if (normalizedType === 'richtext' || normalizedType === 'rich-text' || normalizedType === 'html') {
     return normalizeRichText(raw);
   }
@@ -307,6 +614,14 @@ export function ensureNormalizedContent(value: unknown, fieldType: string): Norm
     if (typeof maybeContent.html === 'string' && typeof maybeContent.plain === 'string') {
       const hasCounts = typeof maybeContent.wordCount === 'number' && typeof maybeContent.charCount === 'number';
       if (hasCounts) {
+        // Ensure faq payload is at least an object when the field type expects it
+        if (fieldType?.toLowerCase() === 'faq') {
+          const faqPayload = maybeContent.faq ?? coerceFaqContent(maybeContent.html);
+          return {
+            ...maybeContent,
+            faq: faqPayload,
+          } as NormalizedContent;
+        }
         return maybeContent as NormalizedContent;
       }
       const fallbackSource = maybeContent.html || maybeContent.plain;
@@ -318,10 +633,16 @@ export function ensureNormalizedContent(value: unknown, fieldType: string): Norm
     if (typeof maybeContent.plain === 'string') {
       return normalizeFieldContent(maybeContent.plain, fieldType);
     }
+    if (fieldType?.toLowerCase() === 'faq' && maybeContent.faq) {
+      return normalizeFaq(maybeContent.faq);
+    }
   }
 
   const raw = typeof value === 'string' ? value : value == null ? '' : String(value);
   const normalizedType = fieldType?.toLowerCase();
+  if (normalizedType === 'faq') {
+    return normalizeFaq(value);
+  }
   const candidate = normalizedType === 'richtext' || normalizedType === 'rich-text' || normalizedType === 'html'
     ? extractFirstHtmlValue(raw)
     : raw;

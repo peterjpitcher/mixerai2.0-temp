@@ -28,11 +28,30 @@ const RegenerationRequestSchema = z
     path: ['fieldId'],
   });
 
+const FaqEntrySchema = z.object({
+  id: z.string(),
+  question: z.string(),
+  answerHtml: z.string(),
+  answerPlain: z.string(),
+});
+
+const FaqSectionSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  entries: z.array(FaqEntrySchema),
+});
+
+const FaqContentSchema = z.object({
+  entries: z.array(FaqEntrySchema),
+  sections: z.array(FaqSectionSchema).optional(),
+});
+
 const NormalizedContentSchema = z.object({
   html: z.string(),
   plain: z.string(),
   wordCount: z.number().int().nonnegative(),
   charCount: z.number().int().nonnegative(),
+  faq: FaqContentSchema.nullable().optional(),
 });
 
 const GeneratedOutputsSchema = z.record(NormalizedContentSchema);

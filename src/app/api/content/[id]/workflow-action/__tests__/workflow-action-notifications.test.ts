@@ -1,5 +1,4 @@
 import { NextRequest } from 'next/server';
-import type { User } from '@supabase/supabase-js';
 import { POST } from '../route';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 
@@ -141,9 +140,7 @@ describe('workflow-action notifications', () => {
       headers: new Headers({ 'content-type': 'application/json' }),
     });
 
-    const user = { id: 'user-1', user_metadata: { role: 'editor' } } as unknown as User;
-
-    const response = await POST(request, user, { params: { id: 'content-1' } });
+    const response = await POST(request, { params: { id: 'content-1' } });
 
     expect(response.status).toBe(200);
     expect(contentUpdateMock).toHaveBeenCalledTimes(1);

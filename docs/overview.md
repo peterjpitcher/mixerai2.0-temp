@@ -6,7 +6,7 @@ MixerAI helps content, brand, and workflow teams generate compliant marketing as
 
 - **Brand admins** define identities, guardrails, and agencies (`src/app/dashboard/brands` + `/api/brands`).  
 - **Editors and reviewers** create, vet, and approve content through multi-step workflows (`src/app/dashboard/content`, `/api/content`, `/api/workflows`).  
-- **Template designers** maintain structured content templates and release notes (`src/app/dashboard/templates`, `/api/content-templates`).  
+- **Template designers** maintain structured content templates (inputs + plain text, rich text, HTML, FAQ accordion, and image outputs) and release notes (`src/app/dashboard/templates`, `/api/content-templates`).  
 - **Automation specialists** run AI-powered tools (alt text, metadata, transcreation) while logging usage to Supabase (`src/app/dashboard/tools`, `/api/tools/*`).
 
 ## Major Services

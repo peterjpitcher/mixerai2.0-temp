@@ -21,6 +21,7 @@ const OUTPUT_FIELD_TYPES = [
   'richText',
   'html',
   'image',
+  'faq',
 ] as const;
 
 // Schema for Output Field with explicit boolean defaults

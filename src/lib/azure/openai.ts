@@ -1,7 +1,7 @@
 import { OpenAI } from "openai";
 import { randomUUID } from 'crypto';
 import type { StyledClaims } from "@/types/claims";
-import { normalizeFieldContent, extractFirstHtmlValue, type NormalizedContent } from "@/lib/content/html-normalizer";
+import { normalizeFieldContent, extractFirstHtmlValue, ensureNormalizedContent, type NormalizedContent } from "@/lib/content/html-normalizer";
 import { activityTracker } from "./activity-tracker";
 import type { VettingFeedbackItem, VettingFeedbackPriority } from '@/types/vetting-feedback';
 import { COUNTRIES, getLanguageLabel } from '@/lib/constants';
@@ -688,18 +688,34 @@ The product context is provided in the user prompt.
   userPrompt += `Generate the following ${template.outputFields.length} output fields:\n`;
   
   // Include output field requirements with their prompts
-  template.outputFields.forEach((field, index) => {
-    userPrompt += `\n${index + 1}. Field: \"${field.name}\" (ID: ${field.id})\n`;
-    userPrompt += `   This field MUST be generated and wrapped with the markers below:\n`;
-    
-    let fieldSpecificInstruction = "";
-    if (field.type === 'richText') {
-      fieldSpecificInstruction += 'Output as well-formed HTML, not Markdown. ';
-    }
+    template.outputFields.forEach((field, index) => {
+      userPrompt += `\n${index + 1}. Field: \"${field.name}\" (ID: ${field.id})\n`;
+      userPrompt += `   This field MUST be generated and wrapped with the markers below:\n`;
+      
+      const normalizedType = (field.type || '').toLowerCase();
+      let fieldSpecificInstruction = "";
+      if (normalizedType === 'richtext') {
+        fieldSpecificInstruction += 'Output as well-formed HTML, not Markdown. ';
+      } else if (normalizedType === 'html') {
+        fieldSpecificInstruction += 'Return a valid HTML fragment (no <html>, <head>, or <body> wrappers). ';
+      } else if (normalizedType === 'faq') {
+        const faqOptions = (field.options ?? undefined) as {
+          allowSections?: boolean;
+        } | undefined;
+        const allowSections = faqOptions?.allowSections === true;
+        fieldSpecificInstruction += 'Return structured FAQ JSON. The value must be a JSON object with an "entries" array. Each entry must include at least "question" and "answerHtml" (HTML fragment) and SHOULD include "answerPlain" (plain text). ';
+        fieldSpecificInstruction += 'Answer HTML must avoid wrapping in full HTML documents and should rely on headings, paragraphs, and lists only. ';
+        if (allowSections) {
+          fieldSpecificInstruction += 'If there are logical groupings, include a "sections" array where each section has "title" and an "entries" array referencing the grouped FAQs. ';
+        } else {
+          fieldSpecificInstruction += 'Do NOT include sections; only the top-level "entries" array should be present. ';
+        }
+        fieldSpecificInstruction += 'Ensure answers stay concise, accurate, and align with brand guidance. ';
+      }
 
-    let fieldAIPrompt = "";
-    if (field.aiPrompt) {
-      const processedPrompt = field.aiPrompt.replace(/\{\{([^}]+)\}\}/g, (match, rawPlaceholder) => {
+      let fieldAIPrompt = "";
+      if (field.aiPrompt) {
+        const processedPrompt = field.aiPrompt.replace(/\{\{([^}]+)\}\}/g, (match, rawPlaceholder) => {
         const placeholder = rawPlaceholder.trim();
 
         if (placeholder === 'Rules') {
@@ -731,7 +747,7 @@ The product context is provided in the user prompt.
         fieldAIPrompt = `${fieldAIPrompt ? `${fieldAIPrompt} ` : ''}based on the provided brand context and input values`;
       }
     }
-    
+
     const combinedInstruction = `${fieldSpecificInstruction}${fieldAIPrompt}`.trim();
     if (combinedInstruction) {
         userPrompt += `   Instructions: ${combinedInstruction}\n`;
@@ -762,7 +778,11 @@ The product context is provided in the user prompt.
       wordDirectives.push(`no more than ${field.maxWords} words`);
     }
     if (wordDirectives.length) {
-      userPrompt += `   Word Count: ${wordDirectives.join(' and ')}.\n`;
+      const directiveText =
+        normalizedType === 'faq'
+          ? `Each answer must be ${wordDirectives.join(' and ')}`
+          : wordDirectives.join(' and ');
+      userPrompt += `   Word Count: ${directiveText}.\n`;
     }
 
     const charDirectives: string[] = [];
@@ -774,11 +794,20 @@ The product context is provided in the user prompt.
       charDirectives.push(`no more than ${field.maxChars} characters`);
     }
     if (charDirectives.length) {
-      userPrompt += `   Character Count: ${charDirectives.join(' and ')}.\n`;
+      const charDirectiveText =
+        normalizedType === 'faq'
+          ? `Each answer must contain ${charDirectives.join(' and ')}`
+          : charDirectives.join(' and ');
+      userPrompt += `   Character Count: ${charDirectiveText}.\n`;
     }
 
-    const isRich = field.type === 'richText' || field.type === 'html';
-    userPrompt += `   Output Type: ${isRich ? 'HTML_FRAGMENT' : 'PLAIN_TEXT'}\n`;
+    const outputTypeLabel =
+      normalizedType === 'richtext' || normalizedType === 'html'
+        ? 'HTML_FRAGMENT'
+        : normalizedType === 'faq'
+        ? 'FAQ_JSON'
+        : 'PLAIN_TEXT';
+    userPrompt += `   Output Type: ${outputTypeLabel}\n`;
     if (!isSingleFieldHtml) {
       userPrompt += `   JSON Key: ${field.id}\n`;
     }
@@ -961,6 +990,10 @@ The product context is provided in the user prompt.
     };
 
     const normalizeValueForField = (field: TemplateOutputField, rawValue: unknown): NormalizedContent => {
+      const normalizedType = (field.type || '').toLowerCase();
+      if (normalizedType === 'faq') {
+        return ensureNormalizedContent(rawValue, field.type);
+      }
       if (rawValue && typeof rawValue === 'object' && 'html' in (rawValue as Record<string, unknown>) && 'plain' in (rawValue as Record<string, unknown>)) {
         const existing = rawValue as Partial<NormalizedContent>;
         if (typeof existing.wordCount === 'number' && typeof existing.charCount === 'number') {
@@ -1102,7 +1135,15 @@ The product context is provided in the user prompt.
     };
 
     const out: Record<string, NormalizedContent> = {};
-    const wordCountViolations: Array<{ field: TemplateOutputField; words: number; range: { min?: number; max?: number } }> = [];
+    const countWords = (text: string): number =>
+      text.trim().length === 0 ? 0 : text.trim().split(/\s+/).filter(Boolean).length;
+
+    const wordCountViolations: Array<{
+      field: TemplateOutputField;
+      range: { min?: number; max?: number };
+      words?: number;
+      faqViolations?: Array<{ entryId: string; wordCount: number }>;
+    }> = [];
     const charCountViolations: Array<{ field: TemplateOutputField; chars: number; constraints: { min?: number; max?: number } }> = [];
     let json: Record<string, unknown> | null = null;
 
@@ -1222,11 +1263,28 @@ The product context is provided in the user prompt.
         out[f.id] = normalized;
         const range = getWordConstraints(f);
         if (range) {
-          const words = normalized.wordCount;
-          const belowMin = typeof range.min === 'number' ? words < range.min : false;
-          const aboveMax = typeof range.max === 'number' ? words > range.max : false;
-          if (belowMin || aboveMax) {
-            wordCountViolations.push({ field: f, words, range });
+          if ((f.type || '').toLowerCase() === 'faq' && normalized.faq) {
+            const faqViolations =
+              normalized.faq.entries
+                .map((entry) => ({
+                  entryId: entry.id,
+                  wordCount: countWords(entry.answerPlain || entry.answerHtml),
+                }))
+                .filter(({ wordCount }) => {
+                  const belowMin = typeof range.min === 'number' ? wordCount < range.min : false;
+                  const aboveMax = typeof range.max === 'number' ? wordCount > range.max : false;
+                  return belowMin || aboveMax;
+                });
+            if (faqViolations.length > 0) {
+              wordCountViolations.push({ field: f, range, faqViolations });
+            }
+          } else {
+            const words = normalized.wordCount;
+            const belowMin = typeof range.min === 'number' ? words < range.min : false;
+            const aboveMax = typeof range.max === 'number' ? words > range.max : false;
+            if (belowMin || aboveMax) {
+              wordCountViolations.push({ field: f, words, range });
+            }
           }
         }
         const charConstraints = getCharConstraints(f);
@@ -1249,10 +1307,11 @@ The product context is provided in the user prompt.
       words?: number;
       chars?: number;
       constraints?: { min?: number; max?: number };
+      faqViolations?: Array<{ entryId: string; wordCount: number }>;
     }> = [];
     missingFields.forEach((f) => retryCandidates.push({ field: f, reason: 'empty' }));
-    wordCountViolations.forEach(({ field, words, range }) => {
-      retryCandidates.push({ field, reason: 'word_range', range, words });
+    wordCountViolations.forEach(({ field, words, range, faqViolations }) => {
+      retryCandidates.push({ field, reason: 'word_range', range, words, faqViolations });
     });
     charCountViolations.forEach(({ field, chars, constraints }) => {
       retryCandidates.push({ field, reason: 'char_range', chars, constraints });
@@ -1261,20 +1320,32 @@ The product context is provided in the user prompt.
     if (retryCandidates.length > 0) {
       for (const candidate of retryCandidates) { 
         const f = candidate.field;
+        const normalizedFieldType = (f.type || '').toLowerCase();
         const fieldWordRange = getWordConstraints(f);
         const fieldCharConstraints = getCharConstraints(f);
         try {
           const singleFieldSystemPrompt = (() => {
-            const expectingHtml = isSingleFieldHtml && (f.type === 'richText' || f.type === 'html');
+            const expectingHtml = isSingleFieldHtml && (normalizedFieldType === 'richtext' || normalizedFieldType === 'html');
             let sp = `You are an expert content creator for the brand "${brand.name}".`;
-            if (expectingHtml) {
+            if (normalizedFieldType === 'faq') {
+              const faqOptions = (f.options ?? undefined) as { allowSections?: boolean } | undefined;
+              const allowSections = faqOptions?.allowSections === true;
+              sp += ` Return ONLY a JSON object where the single key is exactly "${f.id}" and the value is a structured FAQ object. The FAQ object MUST contain an "entries" array with question/answer pairs (each having "question" and "answerHtml").`;
+              if (allowSections) {
+                sp += ` If there are logical groupings, also include a "sections" array with { "title": string, "entries": [...] }.`;
+              } else {
+                sp += ` Do NOT include a "sections" array unless the content naturally requires it.`;
+              }
+              sp += ` The "answerHtml" values must be well-formed HTML fragments without wrapping the entire document. Optionally include "answerPlain" for each entry.`;
+            } else if (expectingHtml) {
               sp += ` Return ONLY a well-formed HTML fragment for this field. Do NOT include JSON, code fences, or commentary.`;
             } else {
               sp += ` Return ONLY a JSON object where the single key is exactly "${f.id}" and the value is the generated content string for that field.`;
             }
-            const isRich = f.type === 'richText' || f.type === 'html';
-            if (isRich) {
+            if (normalizedFieldType === 'richtext' || normalizedFieldType === 'html') {
               sp += ` For this field, output well-formed HTML fragments ONLY (no <!DOCTYPE>, <html>, <head>, or <body> wrappers).`;
+            } else if (normalizedFieldType === 'faq') {
+              sp += ` For this field, generate concise FAQs that directly answer the question. Use paragraphs and lists inside "answerHtml" where appropriate.`;
             } else {
               sp += ` For this field, output plain text (no HTML tags).`;
             }
@@ -1318,8 +1389,16 @@ The product context is provided in the user prompt.
           if (f.aiPrompt) {
             singleFieldUserPrompt += `\nInstructions: ${f.aiPrompt}`;
           }
+          if (normalizedFieldType === 'faq') {
+            singleFieldUserPrompt += `\nReturn the value as JSON in the format {"${f.id}": {"entries": [{"question": "...", "answerHtml": "<p>...</p>", "answerPlain": "..."}]}}.`;
+            const faqOptions = (f.options ?? undefined) as { allowSections?: boolean } | undefined;
+            if (faqOptions?.allowSections) {
+              singleFieldUserPrompt += ` If helpful, include a "sections" array with grouped entries using the shape { "title": "...", "entries": [ ... ] }.`;
+            } else {
+              singleFieldUserPrompt += ` Do not include a "sections" array unless it is absolutely necessary.`;
+            }
+          }
           if (candidate.reason === 'word_range' && candidate.range) {
-            const previousCount = typeof candidate.words === 'number' ? candidate.words : 'UNKNOWN';
             const wordLimits: string[] = [];
             if (typeof candidate.range.min === 'number') {
               wordLimits.push(`at least ${candidate.range.min} words`);
@@ -1327,8 +1406,14 @@ The product context is provided in the user prompt.
             if (typeof candidate.range.max === 'number') {
               wordLimits.push(`no more than ${candidate.range.max} words`);
             }
-            if (wordLimits.length > 0) {
-              singleFieldUserPrompt += `\nThe previous draft contained ${previousCount} words. Regenerate so the response stays ${wordLimits.join(' and ')}.`;
+            const limitPhrase = wordLimits.length ? wordLimits.join(' and ') : null;
+            if (candidate.faqViolations && candidate.faqViolations.length > 0) {
+              const exampleCount = candidate.faqViolations[0]?.wordCount ?? 'UNKNOWN';
+              singleFieldUserPrompt += `\n${candidate.faqViolations.length} FAQ answer(s) violated the word limits${limitPhrase ? ` (${limitPhrase})` : ''}.`;
+              singleFieldUserPrompt += ` Ensure each answer individually respects these limits (example violating answer length: ${exampleCount} words).`;
+            } else if (limitPhrase) {
+              const previousCount = typeof candidate.words === 'number' ? candidate.words : 'UNKNOWN';
+              singleFieldUserPrompt += `\nThe previous draft contained ${previousCount} words. Regenerate so the response stays ${limitPhrase}.`;
             }
           }
           if (candidate.reason === 'char_range' && candidate.constraints) {
@@ -1357,7 +1442,7 @@ The product context is provided in the user prompt.
             }
           }
 
-          const expectingHtml = isSingleFieldHtml && (f.type === 'richText' || f.type === 'html');
+          const expectingHtml = isSingleFieldHtml && (normalizedFieldType === 'richtext' || normalizedFieldType === 'html');
 
           const fallbackMaxTokens = (() => {
             const candidateCharMax = (candidate.reason === 'char_range' && candidate.constraints?.max)
@@ -1403,14 +1488,32 @@ The product context is provided in the user prompt.
               out[f.id] = normalized;
               const postRange = getWordConstraints(f);
               if (postRange) {
-                const words = normalized.wordCount;
-                const belowMin = typeof postRange.min === 'number' ? words < postRange.min : false;
-                const aboveMax = typeof postRange.max === 'number' ? words > postRange.max : false;
-                if (belowMin || aboveMax) {
-                  const limits: string[] = [];
-                  if (typeof postRange.min === 'number') limits.push(`min ${postRange.min}`);
-                  if (typeof postRange.max === 'number') limits.push(`max ${postRange.max}`);
-                  console.warn(`Field ${f.id} still violates word count after retry (${words} words, expected ${limits.join(', ')}).`);
+                if ((f.type || '').toLowerCase() === 'faq' && normalized.faq) {
+                  const remainingViolations = normalized.faq.entries
+                    .map((entry) => ({
+                      entryId: entry.id,
+                      wordCount: countWords(entry.answerPlain || entry.answerHtml),
+                    }))
+                    .filter(({ wordCount }) => {
+                      const belowMin = typeof postRange.min === 'number' ? wordCount < postRange.min : false;
+                      const aboveMax = typeof postRange.max === 'number' ? wordCount > postRange.max : false;
+                      return belowMin || aboveMax;
+                    });
+                  if (remainingViolations.length > 0) {
+                    console.warn(
+                      `Field ${f.id} still has ${remainingViolations.length} FAQ answer(s) outside the word range after retry.`
+                    );
+                  }
+                } else {
+                  const words = normalized.wordCount;
+                  const belowMin = typeof postRange.min === 'number' ? words < postRange.min : false;
+                  const aboveMax = typeof postRange.max === 'number' ? words > postRange.max : false;
+                  if (belowMin || aboveMax) {
+                    const limits: string[] = [];
+                    if (typeof postRange.min === 'number') limits.push(`min ${postRange.min}`);
+                    if (typeof postRange.max === 'number') limits.push(`max ${postRange.max}`);
+                    console.warn(`Field ${f.id} still violates word count after retry (${words} words, expected ${limits.join(', ')}).`);
+                  }
                 }
               }
               const postChar = getCharConstraints(f);
@@ -2247,7 +2350,7 @@ export async function generateVettingAgencyFeedback(
   const outputsSection = options.outputs
     .map((output, index) => {
       const preview = output.plainText.length > 1500 ? `${output.plainText.slice(0, 1500)}…` : output.plainText;
-      return `${index + 1}. ${output.fieldName} [${output.fieldId}]\n${preview}`;
+      return `${index + 1}. ${output.fieldName}\nField ID: ${output.fieldId}\n${preview}`;
     })
     .join('\n\n');
 
@@ -2289,8 +2392,9 @@ Return only JSON in the following structure:
 }
 
 Only include agencies that have actionable feedback. The relatedFields array must contain the identifiers of the content fields that triggered the feedback.`;
+  const idUsageGuidance = `Do not repeat or display the raw field identifiers (Field ID values or bracketed UUIDs) inside the summary or recommendedAction text. Use those identifiers only within the relatedFields array.`;
 
-  const userPromptParts = [instructions];
+  const userPromptParts = [instructions, idUsageGuidance];
   if (contextualNotes.length > 0) {
     userPromptParts.push(`Additional brand guidance:\n${contextualNotes.join('\n\n')}`);
   }

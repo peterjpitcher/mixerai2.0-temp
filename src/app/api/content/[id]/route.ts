@@ -75,7 +75,7 @@ export const GET = withAuth(async (request: NextRequest, user: User, context?: u
       .from('content')
       .select(`
         *,
-        brands:brand_id(name, brand_color),
+        brands:brand_id(name, brand_color, logo_url),
         profiles!created_by(full_name),
         content_templates:template_id(id, name, icon, fields)
       `)

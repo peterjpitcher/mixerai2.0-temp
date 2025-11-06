@@ -3,7 +3,16 @@
 export interface TemplateField {
   id: string;
   name: string;
-  type: 'text' | 'textarea' | 'rich-text' | 'select' | 'multi-select' | 'number' | 'url' | 'date';
+  type:
+    | 'text'
+    | 'textarea'
+    | 'rich-text'
+    | 'select'
+    | 'multi-select'
+    | 'number'
+    | 'url'
+    | 'date'
+    | 'faq';
   label: string;
   required?: boolean;
   placeholder?: string;
@@ -39,5 +48,5 @@ export interface TemplateFields {
 }
 
 export interface ContentData {
-  [fieldId: string]: string | number | string[] | null;
+  [fieldId: string]: unknown;
 }

@@ -2,10 +2,12 @@
 
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { RichTextEditor } from './rich-text-editor';
 import { RefreshCw, AlertCircle } from 'lucide-react';
 import type { OutputField, RichTextOptions, NormalizedContent } from '@/types/template';
 import { ensureNormalizedContent } from '@/lib/content/html-normalizer';
+import { FaqEditor } from './faq-field';
 
 interface GeneratedContentPreviewProps {
   generatedOutputs: Record<string, NormalizedContent>;
@@ -46,6 +48,7 @@ export function GeneratedContentPreview({
         const hasContent = value && (value.html.trim().length > 0 || value.plain.trim().length > 0);
         const normalizedType = field.type.toLowerCase();
         const isRich = normalizedType === 'richtext' || normalizedType === 'rich-text' || normalizedType === 'html';
+        const isFaq = normalizedType === 'faq';
         
         return (
           <div key={field.id} className="space-y-2">
@@ -69,9 +72,15 @@ export function GeneratedContentPreview({
               </Button>
             </div>
             
-            {isRich ? (
+            {isFaq ? (
+              <FaqEditor
+                value={value}
+                onChange={(content) => onOutputChange(field.id, content)}
+                allowSections={Boolean((field.options as { allowSections?: boolean })?.allowSections)}
+              />
+            ) : isRich ? (
               <RichTextEditor
-                key={`${field.id}-${value?.html?.length ?? value?.plain?.length ?? 0}`} // Force remount on content changes
+                key={field.id}
                 value={value?.html ?? ''}
                 onChange={(content) => onOutputChange(field.id, ensureNormalizedContent(content, field.type))}
                 placeholder="Generated content will appear here"
@@ -79,15 +88,22 @@ export function GeneratedContentPreview({
                 minHeight={180}
               />
             ) : (
-              <div className={`p-4 border rounded-md ${hasContent ? 'bg-muted/50' : 'bg-amber-50/50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800'}`}>
-                <p className="text-sm whitespace-pre-wrap">
-                  {value?.plain || (
-                    <span className="text-muted-foreground italic">
-                      No content generated - click Regenerate to generate this field
-                    </span>
-                  )}
-                </p>
-              </div>
+              <Textarea
+                value={value?.plain ?? ''}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  const normalized = ensureNormalizedContent(next, field.type);
+                  onOutputChange(field.id, {
+                    ...normalized,
+                    plain: next,
+                    wordCount: next.trim().length === 0 ? 0 : next.trim().split(/\s+/).length,
+                    charCount: next.length,
+                  });
+                }}
+                placeholder="Generated content will appear here"
+                rows={6}
+                className="text-sm"
+              />
             )}
           </div>
         );

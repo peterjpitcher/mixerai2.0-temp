@@ -163,6 +163,19 @@ export function VettingAgencyFeedbackCard({
   }, [autoRun, stageId, existingFeedback, agencies.length, isGenerating, handleGenerate, csrfReady]);
 
   const isDisabled = agencies.length === 0;
+  const formatWithFieldLabels = useCallback(
+    (text?: string | null) => {
+      if (!text) return '';
+      return text.replace(/\[([^\]]+)\]/g, (match, fieldId) => {
+        const label = outputFieldLabels[fieldId];
+        if (!label) {
+          return '';
+        }
+        return ` (${label})`;
+      });
+    },
+    [outputFieldLabels]
+  );
 
   return (
     <Card>
@@ -204,9 +217,9 @@ export function VettingAgencyFeedbackCard({
                     </div>
                   </div>
                   <Separator className="my-2" />
-                  <p className="text-sm text-muted-foreground">{item.summary}</p>
+                  <p className="text-sm text-muted-foreground">{formatWithFieldLabels(item.summary)}</p>
                   <div className="mt-2 text-sm">
-                    <span className="font-medium">Recommended action:</span> {item.recommendedAction}
+                    <span className="font-medium">Recommended action:</span> {formatWithFieldLabels(item.recommendedAction)}
                   </div>
                   {item.relatedFields && item.relatedFields.length > 0 && (
                     <div className="mt-2 text-xs text-muted-foreground">

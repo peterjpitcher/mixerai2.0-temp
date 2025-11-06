@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { apiFetch } from '@/lib/api-client';
 import DOMPurify from 'isomorphic-dompurify';
 import { normalizeOutputsMap } from '@/lib/content/html-normalizer';
+import { FaqAccordionDisplay } from '@/components/content/faq-field';
 import type { NormalizedContent } from '@/types/template';
 
 export interface WorkflowStep {
@@ -381,17 +382,25 @@ export function ContentApprovalWorkflow({
                             <div className="space-y-3">
                               <h5 className="text-xs font-semibold text-muted-foreground">Content at this step:</h5>
                               {ordered.map(({ id, label, type, content }) => {
-                                const isPlainTextField = type?.toLowerCase() === 'plaintext';
-                                const plainTextContent = content.plain?.trim() ?? '';
-                                const htmlContent = content.html?.trim();
-                                const emptyPlainText = (
-                                  <span className="text-muted-foreground italic">No content provided.</span>
-                                );
+                                  const normalizedType = type?.toLowerCase();
+                                  const isPlainTextField = normalizedType === 'plaintext';
+                                  const isFaqField = normalizedType === 'faq';
+                                  const plainTextContent = content.plain?.trim() ?? '';
+                                  const htmlContent = content.html?.trim();
+                                  const emptyPlainText = (
+                                    <span className="text-muted-foreground italic">No content provided.</span>
+                                  );
 
                                 return (
                                   <div key={id} className="space-y-1" data-field-container-id={id}>
                                     <p className="text-xs font-medium text-foreground">{label}:</p>
-                                    {isPlainTextField ? (
+                                    {isFaqField ? (
+                                      <FaqAccordionDisplay
+                                        content={content}
+                                        collapseMode="multiple"
+                                        startCollapsed
+                                      />
+                                    ) : isPlainTextField ? (
                                       <div
                                         data-field-id={id}
                                         className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-foreground whitespace-pre-wrap shadow-xs"

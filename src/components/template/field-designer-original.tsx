@@ -33,6 +33,7 @@ import {
   ImageOutputOptions,
   ProductSelectorOptions,
   RecipeUrlOptions,
+  FaqOutputOptions,
 } from '@/types/template';
 import { ProductSelectorOptionsComponent } from './product-selector-options';
 
@@ -43,7 +44,7 @@ function isInputField(field: Field): field is InputField {
 }
 
 function isOutputField(field: Field): field is OutputField {
-  const outputTypes = ['plainText', 'richText', 'html', 'image'];
+  const outputTypes = ['plainText', 'richText', 'html', 'image', 'faq'];
   return outputTypes.includes(field.type);
 }
 
@@ -388,6 +389,90 @@ const ImageOutputOptionsComponent = ({ options, onChange }: { options: ImageOutp
   </div>
 );
 
+const defaultFaqOptions: FaqOutputOptions = {
+  allowSections: false,
+  defaultCollapseMode: 'multiple',
+  startCollapsed: true,
+};
+
+const mergeFaqOptions = (options?: unknown): FaqOutputOptions => {
+  if (!options || typeof options !== 'object') {
+    return { ...defaultFaqOptions };
+  }
+  const candidate = options as Partial<FaqOutputOptions>;
+  return {
+    allowSections: candidate.allowSections ?? defaultFaqOptions.allowSections,
+    defaultCollapseMode:
+      candidate.defaultCollapseMode === 'single' || candidate.defaultCollapseMode === 'multiple'
+        ? candidate.defaultCollapseMode
+        : defaultFaqOptions.defaultCollapseMode,
+    startCollapsed: candidate.startCollapsed ?? defaultFaqOptions.startCollapsed,
+  };
+};
+
+const FaqOutputOptionsComponent = ({
+  options,
+  onChange,
+}: {
+  options: FaqOutputOptions;
+  onChange: (options: FaqOutputOptions) => void;
+}) => {
+  const normalized = mergeFaqOptions(options);
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center space-x-2">
+        <Checkbox
+          id="faq-allow-sections"
+          checked={normalized.allowSections}
+          onCheckedChange={(checked) =>
+            onChange({
+              ...normalized,
+              allowSections: !!checked,
+            })
+          }
+        />
+        <Label htmlFor="faq-allow-sections">Allow grouped sections</Label>
+      </div>
+      <div>
+        <Label htmlFor="faq-collapse-mode">Default accordion behaviour</Label>
+        <Select
+          value={normalized.defaultCollapseMode ?? 'multiple'}
+          onValueChange={(value) =>
+            onChange({
+              ...normalized,
+              defaultCollapseMode: value === 'single' ? 'single' : 'multiple',
+            })
+          }
+        >
+          <SelectTrigger id="faq-collapse-mode">
+            <SelectValue placeholder="Choose accordion behaviour" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="single">Single (only one answer open at a time)</SelectItem>
+            <SelectItem value="multiple">Multiple (allow many answers open)</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Controls how accordions behave when rendered in the dashboard UI.
+        </p>
+      </div>
+      <div className="flex items-center space-x-2">
+        <Checkbox
+          id="faq-start-collapsed"
+          checked={normalized.startCollapsed}
+          onCheckedChange={(checked) =>
+            onChange({
+              ...normalized,
+              startCollapsed: !!checked,
+            })
+          }
+        />
+        <Label htmlFor="faq-start-collapsed">Start with answers collapsed</Label>
+      </div>
+    </div>
+  );
+};
+
 interface FieldDesignerProps {
   isOpen: boolean;
   fieldType: 'input' | 'output';
@@ -450,12 +535,15 @@ const initializeFieldData = (fieldType: 'input' | 'output', initialData: Field |
       maxWords?: number;
     };
 
+    const normalizedOptions =
+      initialData.type === 'faq' ? mergeFaqOptions(initialData.options) : initialData.options || {};
+
     const outputData: OutputField = ensureBooleanDefaults({
       id: initialData.id,
       name: initialData.name,
       type: initialData.type,
       required: initialData.required,
-      options: initialData.options || {},
+      options: normalizedOptions,
       aiPrompt: initialData.aiPrompt || '',
       aiAutoComplete: initialData.aiAutoComplete ?? true,
       useBrandIdentity: initialData.useBrandIdentity ?? false,
@@ -529,7 +617,7 @@ export function FieldDesigner({
         required: basePrev.required,
         aiPrompt: basePrev.aiPrompt,
         type: newType,
-        options: {}, 
+        options: newType === 'faq' ? mergeFaqOptions(undefined) : {},
       };
       if (fieldType === 'input') {
         return {
@@ -543,6 +631,7 @@ export function FieldDesigner({
           useBrandIdentity: (prev as OutputField).useBrandIdentity || false,
           useToneOfVoice: (prev as OutputField).useToneOfVoice || false,
           useGuardrails: (prev as OutputField).useGuardrails || false,
+          options: newType === 'faq' ? mergeFaqOptions(prev.options) : base.options,
         } as OutputField;
       }
     });
@@ -712,6 +801,18 @@ export function FieldDesigner({
   //   }
   // }, [fieldData.aiPrompt]); // This specific dependency might need adjustment if prompt changes externally
   
+  const handleFaqOptionsChange = (options: FaqOutputOptions) => {
+    setFieldData(prev => {
+      if (isOutputField(prev) && prev.type === 'faq') {
+        return {
+          ...prev,
+          options: mergeFaqOptions(options),
+        } as OutputField;
+      }
+      return prev;
+    });
+  };
+  
   const handleOptionsChange = (newOptions: Partial<Field['options']>) => {
     setFieldData(prev => {
       if (isInputField(prev)) {
@@ -826,6 +927,7 @@ export function FieldDesigner({
     { value: 'richText', label: 'Rich Text (WYSIWYG)' },
     { value: 'html', label: 'HTML' },
     { value: 'image', label: 'Image' },
+    { value: 'faq', label: 'FAQ (Accordion)' },
   ];
 
   const currentFieldTypes = fieldType === 'input' ? fieldTypes : outputFieldTypes;
@@ -860,6 +962,13 @@ export function FieldDesigner({
         return <HtmlOutputOptionsComponent options={fieldData.options as HtmlOutputOptions} onChange={handleOptionsChange} />;
       case 'image':
         return <ImageOutputOptionsComponent options={fieldData.options as ImageOutputOptions} onChange={handleOptionsChange} />;
+      case 'faq':
+        return (
+          <FaqOutputOptionsComponent
+            options={mergeFaqOptions(fieldData.options)}
+            onChange={handleFaqOptionsChange}
+          />
+        );
       default:
         return <p className="text-sm text-gray-500">No specific options for this field type.</p>;
     }
