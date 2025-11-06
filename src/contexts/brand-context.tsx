@@ -37,6 +37,34 @@ export const brandQueryKey = (id: string) => ['brands', id];
 // Local storage key for persisting active brand
 const ACTIVE_BRAND_KEY = 'mixerai-active-brand';
 
+const safeStorage = {
+  get(key: string): string | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      return window.localStorage.getItem(key);
+    } catch (error) {
+      console.warn('[BrandProvider] localStorage get failed:', error);
+      return null;
+    }
+  },
+  set(key: string, value: string) {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(key, value);
+    } catch (error) {
+      console.warn('[BrandProvider] localStorage set failed:', error);
+    }
+  },
+  remove(key: string) {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.removeItem(key);
+    } catch (error) {
+      console.warn('[BrandProvider] localStorage remove failed:', error);
+    }
+  },
+};
+
 export function BrandProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -44,11 +72,9 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 
   // Load active brand from localStorage on mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedBrandId = localStorage.getItem(ACTIVE_BRAND_KEY);
-      if (savedBrandId) {
-        setActiveBrandIdState(savedBrandId);
-      }
+    const savedBrandId = safeStorage.get(ACTIVE_BRAND_KEY);
+    if (savedBrandId) {
+      setActiveBrandIdState(savedBrandId);
     }
   }, []);
 
@@ -113,25 +139,19 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   const setActiveBrand = useCallback((brand: Brand | null) => {
     if (brand) {
       setActiveBrandIdState(brand.id);
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(ACTIVE_BRAND_KEY, brand.id);
-      }
+      safeStorage.set(ACTIVE_BRAND_KEY, brand.id);
       // Cache the brand data
       queryClient.setQueryData(brandQueryKey(brand.id), brand);
     } else {
       setActiveBrandIdState(null);
-      if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(ACTIVE_BRAND_KEY);
-      }
+      safeStorage.remove(ACTIVE_BRAND_KEY);
     }
   }, [queryClient]);
 
   // Set active brand by ID
   const setActiveBrandId = useCallback((brandId: string) => {
     setActiveBrandIdState(brandId);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(ACTIVE_BRAND_KEY, brandId);
-    }
+    safeStorage.set(ACTIVE_BRAND_KEY, brandId);
   }, []);
 
   // Refresh brands data
@@ -153,9 +173,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user) {
       setActiveBrandIdState(null);
-      if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(ACTIVE_BRAND_KEY);
-      }
+      safeStorage.remove(ACTIVE_BRAND_KEY);
     }
   }, [user]);
 

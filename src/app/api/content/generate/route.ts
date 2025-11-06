@@ -262,20 +262,26 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
     }
 
     try {
-      const generatedOutputs = await generateContentFromTemplate(
+      const generationResult = await generateContentFromTemplate(
         brandInfoForGeneration,
         templateForGeneration,
-        sanitizedInput
+        sanitizedInput,
+        {
+          skipFallbacks: true,
+          timeoutMs: 45_000,
+        }
       );
 
       if (process.env.NODE_ENV === 'development') {
-        console.log('[api/content/generate] generatedOutputs', generatedOutputs);
+        console.log('[api/content/generate] generationResult', generationResult);
       }
 
       const responsePayload = {
         success: true,
         userId: user.id,
-        generatedOutputs,
+        generatedOutputs: generationResult.outputs,
+        retryCandidates: generationResult.retryCandidates,
+        diagnostics: generationResult.diagnostics,
       };
 
       await logContentGenerationAudit({
@@ -287,6 +293,9 @@ export const POST = withAuthMonitoringAndCSRF(async (request: NextRequest, user)
           templateName: templateRecord.name,
           inputFieldCount: sanitizedInputFields.length,
           outputFieldCount: parsedFields.outputFields.length,
+          retryCandidateCount: generationResult.retryCandidates.length,
+          azureRequestCount: generationResult.diagnostics.azureRequestCount,
+          primaryRequestDurationMs: generationResult.diagnostics.primaryRequestDurationMs,
         },
       });
 

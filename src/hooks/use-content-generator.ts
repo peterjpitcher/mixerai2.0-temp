@@ -8,6 +8,36 @@ import { normalizeOutputsMap } from '@/lib/content/html-normalizer';
 import type { InputField, OutputField, ContentTemplate as Template, FieldType, NormalizedContent } from '@/types/template';
 import type { ProductContext } from '@/types/claims';
 
+type RetryReason = 'empty' | 'word_range' | 'char_range';
+
+interface GenerationRetryCandidate {
+  fieldId: string;
+  fieldName?: string;
+  fieldType?: string;
+  reason: RetryReason;
+  range?: { min?: number; max?: number };
+  words?: number;
+  chars?: number;
+  constraints?: { min?: number; max?: number };
+  faqViolations?: Array<{ entryId: string; wordCount: number }>;
+}
+
+interface ContentGenerationDiagnostics {
+  primaryRequestDurationMs: number;
+  totalDurationMs: number;
+  azureRequestCount: number;
+  usedFallbacks: boolean;
+}
+
+interface ContentGenerationResponse {
+  success?: boolean;
+  error?: string;
+  generatedOutputs?: Record<string, unknown>;
+  retryCandidates?: GenerationRetryCandidate[];
+  diagnostics?: ContentGenerationDiagnostics;
+  code?: string;
+}
+
 interface Brand {
   id: string;
   name: string;
@@ -274,6 +304,14 @@ export function useContentGenerator(templateId?: string | null) {
         ? { product_context: productContext }
         : undefined;
 
+      const templateFieldValueMap = (template.inputFields || []).reduce<Record<string, string>>((acc, field) => {
+        const value = templateFieldValues[field.id];
+        if (value !== undefined && value !== null) {
+          acc[field.id] = typeof value === 'string' ? value : String(value);
+        }
+        return acc;
+      }, {});
+
       const requestBody = {
         brand_id: selectedBrand,
         template: {
@@ -285,12 +323,7 @@ export function useContentGenerator(templateId?: string | null) {
         ...(inputPayload ? { input: inputPayload } : {}),
       };
 
-      const data = await apiFetchJson<{
-        success?: boolean;
-        error?: string;
-        generatedOutputs?: Record<string, unknown>;
-        code?: string;
-      }>(
+      const data = await apiFetchJson<ContentGenerationResponse>(
         '/api/content/generate',
         {
           method: 'POST',
@@ -306,7 +339,72 @@ export function useContentGenerator(templateId?: string | null) {
 
         if (Object.keys(normalized).length > 0) {
           setGeneratedOutputs(normalized);
-          toast.success('Content generated successfully!');
+          let currentOutputs: Record<string, NormalizedContent> = { ...normalized };
+          const retryCandidates = Array.isArray(data.retryCandidates) ? data.retryCandidates : [];
+          const existingOutputsPayload: Record<string, NormalizedContent> = { ...currentOutputs };
+          const fallbackErrors: string[] = [];
+
+          if (retryCandidates.length > 0) {
+            toast.info(`Generated initial content. Refining ${retryCandidates.length} field${retryCandidates.length > 1 ? 's' : ''}...`);
+          }
+
+          for (const candidate of retryCandidates) {
+            setRetryingFieldId(candidate.fieldId);
+            try {
+              const response = await apiFetchJson<{
+                success?: boolean;
+                generated_content?: NormalizedContent;
+                output_field_id?: string;
+                field_name?: string;
+                error?: string;
+              }>(
+                '/api/content/generate-field',
+                {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    brand_id: selectedBrand,
+                    template_id: template.id,
+                    output_field_to_generate_id: candidate.fieldId,
+                    template_field_values: templateFieldValueMap,
+                    existing_outputs: existingOutputsPayload,
+                  }),
+                }
+              );
+
+              if (response?.success && response.generated_content && response.output_field_id) {
+                currentOutputs = {
+                  ...currentOutputs,
+                  [response.output_field_id]: response.generated_content,
+                };
+                existingOutputsPayload[response.output_field_id] = response.generated_content;
+                setGeneratedOutputs(currentOutputs);
+
+                if (response.field_name || candidate.fieldName) {
+                  const label = response.field_name ?? candidate.fieldName ?? candidate.fieldId;
+                  toast.success(`Refined ${label}`);
+                }
+              } else {
+                const label = candidate.fieldName ?? candidate.fieldId;
+                const message = response?.error || `Field ${label} did not return content`;
+                fallbackErrors.push(message);
+                toast.error(message);
+              }
+            } catch (retryError) {
+              console.error('Field-level generation error:', retryError);
+              const label = candidate.fieldName ?? candidate.fieldId;
+              const message = retryError instanceof Error ? retryError.message : 'Unknown error';
+              fallbackErrors.push(`${label}: ${message}`);
+              toast.error(`Failed to refine ${label}: ${message}`);
+            } finally {
+              setRetryingFieldId(null);
+            }
+          }
+
+          if (fallbackErrors.length === 0) {
+            toast.success('Content generated successfully!');
+          } else {
+            toast.warning(`Content generated with ${fallbackErrors.length} field${fallbackErrors.length > 1 ? 's' : ''} needing review.`);
+          }
         } else {
           throw new Error('No content fields were generated');
         }
@@ -334,6 +432,7 @@ export function useContentGenerator(templateId?: string | null) {
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
+      setRetryingFieldId(null);
     }
   }, [selectedBrand, template, templateFieldValues, productContext]);
   

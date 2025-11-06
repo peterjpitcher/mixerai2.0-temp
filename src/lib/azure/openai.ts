@@ -34,8 +34,47 @@ type TemplateOutputField = {
 };
 
 const MAX_COMPLETION_TOKENS = 4000;
+const DEFAULT_AZURE_TIMEOUT_MS = 45_000;
 
 export const VETTING_AGENCY_PROMPT_VERSION = '2025-10-01';
+
+export type RetryCandidateReason = 'empty' | 'word_range' | 'char_range';
+
+export interface GenerateContentRetryCandidate {
+  fieldId: string;
+  fieldName?: string;
+  fieldType?: string;
+  reason: RetryCandidateReason;
+  range?: { min?: number; max?: number };
+  words?: number;
+  chars?: number;
+  constraints?: { min?: number; max?: number };
+  faqViolations?: Array<{ entryId: string; wordCount: number }>;
+}
+
+export interface GenerateContentDiagnostics {
+  primaryRequestDurationMs: number;
+  totalDurationMs: number;
+  azureRequestCount: number;
+  usedFallbacks: boolean;
+}
+
+export interface GenerateContentOptions {
+  /**
+   * Skip expensive retry/fallback logic and return retry candidates for the caller to handle.
+   */
+  skipFallbacks?: boolean;
+  /**
+   * Optional timeout (ms) for the primary Azure request. Defaults to 45 seconds.
+   */
+  timeoutMs?: number;
+}
+
+export interface GenerateContentResult {
+  outputs: Record<string, NormalizedContent>;
+  retryCandidates: GenerateContentRetryCandidate[];
+  diagnostics: GenerateContentDiagnostics;
+}
 
 export interface VettingAgencyModelInput {
   brandName: string;
@@ -501,8 +540,11 @@ export function getVettingAgenciesForCountry(countryCode: string): Array<{name: 
  * const result = await generateContentFromTemplate(
  *   { name: "BrandX", tone_of_voice: "Professional" },
  *   { prompt: "Create a product description", fields: {...} },
- *   { product_name: "Widget Pro" }
+ *   { product_name: "Widget Pro" },
+ *   { skipFallbacks: true }
  * );
+ * // result.outputs contains normalized fields
+ * // result.retryCandidates lists fields that require follow-up generation
  */
 export async function generateContentFromTemplate(
   brand: {
@@ -523,8 +565,13 @@ export async function generateContentFromTemplate(
     additionalInstructions?: string;
     templateFields?: Record<string, string>;
     product_context?: { productName?: string; styledClaims: StyledClaims | null };
-  }
-): Promise<Record<string, NormalizedContent>> {
+  },
+  options: GenerateContentOptions = {}
+): Promise<GenerateContentResult> {
+  const overallStart = Date.now();
+  let primaryRequestDurationMs = 0;
+  let azureRequestCount = 0;
+  let fallbackExecutions = 0;
   // console.log(`Generating template-based content for brand: ${brand.name} using template: ${template.name}`);
   // console.log(`Brand localization - Language: ${brand.language || 'not specified'}, Country: ${brand.country || 'not specified'}`);
   
@@ -881,16 +928,37 @@ The product context is provided in the user prompt.
     
     // Start tracking the request
     const requestId = activityTracker.startRequest('generateContentFromTemplate');
+    const abortController = new AbortController();
+    const timeoutMs = Math.max(1_000, options.timeoutMs ?? DEFAULT_AZURE_TIMEOUT_MS);
+    const timeoutHandle = setTimeout(() => abortController.abort(), timeoutMs);
+    let requestCompleted = false;
+    const primaryRequestStart = Date.now();
     
-    // Make a direct fetch call
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': process.env.AZURE_OPENAI_API_KEY || ''
-      },
-      body: JSON.stringify(completionRequest)
-    });
+    let response: Response;
+    try {
+      azureRequestCount += 1;
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': process.env.AZURE_OPENAI_API_KEY || ''
+        },
+        body: JSON.stringify(completionRequest),
+        signal: abortController.signal
+      });
+      primaryRequestDurationMs = Date.now() - primaryRequestStart;
+    } catch (error) {
+      clearTimeout(timeoutHandle);
+      if (!requestCompleted) {
+        activityTracker.completeRequest(requestId, 'error');
+      }
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Azure content generation request timed out');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutHandle);
+    }
     
     // Extract rate limit headers
     const rateLimitHeaders = extractRateLimitHeaders(response);
@@ -899,11 +967,13 @@ The product context is provided in the user prompt.
       const errorText = await response.text();
       const status = response.status === 429 ? 'rate_limited' : 'error';
       activityTracker.completeRequest(requestId, status, rateLimitHeaders);
+      requestCompleted = true;
       throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
     
     // Mark request as successful
     activityTracker.completeRequest(requestId, 'success', rateLimitHeaders);
+    requestCompleted = true;
     
     const responseData = await response.json();
     // console.log("API call successful");
@@ -1171,7 +1241,7 @@ The product context is provided in the user prompt.
     const requiredIds = (template.outputFields || []).map(f => f.id);
     const hasAllKeys = (obj: Record<string, unknown> | null) => !!obj && requiredIds.every(id => Object.prototype.hasOwnProperty.call(obj, id));
 
-    if (json && !hasAllKeys(json)) {
+    if (json && !hasAllKeys(json) && !options.skipFallbacks) {
       const retryRequest = {
         model: deploymentName,
         messages: [
@@ -1191,6 +1261,8 @@ The product context is provided in the user prompt.
         headers: { 'Content-Type': 'application/json', 'api-key': process.env.AZURE_OPENAI_API_KEY || '' },
         body: JSON.stringify(retryRequest)
       });
+      azureRequestCount += 1;
+      fallbackExecutions += 1;
       if (retryResp.ok) {
         const rj = await retryResp.json();
         let retryContent = rj.choices?.[0]?.message?.content || '';
@@ -1317,7 +1389,7 @@ The product context is provided in the user prompt.
       retryCandidates.push({ field, reason: 'char_range', chars, constraints });
     });
 
-    if (retryCandidates.length > 0) {
+    if (!options.skipFallbacks && retryCandidates.length > 0) {
       for (const candidate of retryCandidates) { 
         const f = candidate.field;
         const normalizedFieldType = (f.type || '').toLowerCase();
@@ -1472,6 +1544,8 @@ The product context is provided in the user prompt.
             ...(expectingHtml ? {} : { response_format: { type: 'json_object' as const } }),
           };
           const endpointSf = `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-12-01-preview`;
+          azureRequestCount += 1;
+          fallbackExecutions += 1;
           const sfResp = await fetch(endpointSf, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'api-key': process.env.AZURE_OPENAI_API_KEY || '' },
@@ -1528,11 +1602,13 @@ The product context is provided in the user prompt.
       }
     }
 
-    if (isSingleFieldHtml && singleField) {
+    if (!options.skipFallbacks && isSingleFieldHtml && singleField) {
       const current = out[singleField.id];
       const hasContent = current && ((current.html && current.html.replace(/<[^>]+>/g, '').trim().length > 0) || (current.plain && current.plain.trim().length > 0));
 
       if (!hasContent) {
+        fallbackExecutions += 1;
+        azureRequestCount += 1;
         const fallbackNormalized = await runSingleFieldHtmlFallback();
         if (fallbackNormalized && (fallbackNormalized.html.replace(/<[^>]+>/g, '').trim().length > 0 || fallbackNormalized.plain.trim().length > 0)) {
           out[singleField.id] = fallbackNormalized;
@@ -1540,7 +1616,71 @@ The product context is provided in the user prompt.
       }
     }
 
-    return out;
+    const diagnostics: GenerateContentDiagnostics = {
+      primaryRequestDurationMs,
+      totalDurationMs: Date.now() - overallStart,
+      azureRequestCount,
+      usedFallbacks: !options.skipFallbacks && fallbackExecutions > 0,
+    };
+
+    const normalizedRetryCandidates: GenerateContentRetryCandidate[] = retryCandidates
+      .filter(({ field, reason, range, constraints }) => {
+        if (options.skipFallbacks) {
+          return true;
+        }
+        const normalized = out[field.id];
+        if (!normalized) {
+          return true;
+        }
+        const hasContent =
+          (normalized.html && normalized.html.trim().length > 0) ||
+          (normalized.plain && normalized.plain.trim().length > 0);
+        if (!hasContent) {
+          return true;
+        }
+        if (reason === 'word_range' && range) {
+          if ((field.type || '').toLowerCase() === 'faq' && normalized.faq) {
+            const remainingViolations =
+              normalized.faq.entries
+                .map((entry) => ({
+                  entryId: entry.id,
+                  wordCount: countWords(entry.answerPlain || entry.answerHtml),
+                }))
+                .filter(({ wordCount }) => {
+                  const belowMin = typeof range.min === 'number' ? wordCount < range.min : false;
+                  const aboveMax = typeof range.max === 'number' ? wordCount > range.max : false;
+                  return belowMin || aboveMax;
+                });
+            return remainingViolations.length > 0;
+          }
+          const belowMin = typeof range.min === 'number' ? normalized.wordCount < range.min : false;
+          const aboveMax = typeof range.max === 'number' ? normalized.wordCount > range.max : false;
+          return belowMin || aboveMax;
+        }
+        if (reason === 'char_range' && constraints) {
+          const belowMin = typeof constraints.min === 'number' ? normalized.charCount < constraints.min : false;
+          const aboveMax = typeof constraints.max === 'number' ? normalized.charCount > constraints.max : false;
+          return belowMin || aboveMax;
+        }
+        return false;
+      })
+      .map(({ field, reason, range, words, chars, constraints, faqViolations }) => ({
+        fieldId: field.id,
+        fieldName: field.name,
+        fieldType: field.type,
+        reason,
+        range,
+        words,
+        chars,
+        constraints,
+        faqViolations,
+      }));
+
+    return {
+      outputs: out,
+      retryCandidates: normalizedRetryCandidates,
+      diagnostics,
+    };
   } catch (error) {
     console.error("Error generating content with template:", error);
     throw new Error(`Failed to generate template-based content: ${error instanceof Error ? error.message : 'Unknown error'}`);
