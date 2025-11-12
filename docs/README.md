@@ -13,4 +13,10 @@ This folder now focuses on the documents teams rely on every day. Each note is s
 | Testing | Current coverage, commands, and known gaps | [testing.md](./testing.md) |
 | Feature guide | Where to find code for brands, templates, content, workflows, and tools | [features.md](./features.md) |
 
+## Archival Policy
+
+- Customer briefs, completed section reviews, and other long-form narratives now live under [`docs/archive`](./archive/README.md).
+- When a document stops being part of the day-to-day workflows, move it into the archive instead of keeping it alongside the core references.
+- If an archived topic becomes active again, pull it back into this folder and update this index so teammates know where to look.
+
 **Need something that is missing?** Keep the docs lean—open a PR that either updates one of the focused pages above or adds a new one with a clear owner.

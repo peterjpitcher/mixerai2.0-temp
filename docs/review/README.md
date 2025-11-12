@@ -23,7 +23,8 @@ We track each dashboard surface through four stages. Every deep-dive document sh
 
 4. **`finished/`** – Work verified and closed.  
    - Ensure the document captures final outcomes, test commands, and any follow-up tickets.  
-   - Add a completion date before moving.
+   - Add a completion date before moving.  
+   - Once stakeholders sign off, relocate the file to `../archive/section-reviews/finished/` so this folder only holds the current release’s work.
 
 ## Movement Rules
 - Always move the entire file between folders—do not copy so we maintain a single source of truth.
@@ -35,4 +36,3 @@ We track each dashboard surface through four stages. Every deep-dive document sh
 - Duplicate `discovery/section-review-template.md` for new sections.  
 - Keep headings consistent so downstream tooling can parse findings.  
 - Tailor content per section but retain the structure (Scope, Data Flow, Findings with priorities, Testing, Open Questions).
-
